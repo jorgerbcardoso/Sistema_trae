@@ -130,6 +130,11 @@ export default function CadastroOrdensCompra() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // 🔍 DEBUG: Log quando componente renderiza
+  console.log('🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO');
+  console.log('🔵 [COMPONENTE] location.state:', location.state);
+  
   const [ordens, setOrdens] = useState<OrdemCompra[]>([]);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -234,7 +239,8 @@ export default function CadastroOrdensCompra() {
 
   // ✅ FLUXO RÁPIDO: Detectar ordem recém-criada via navegação
   useEffect(() => {
-    console.log('🔍 [DEBUG] useEffect disparado - location.state:', location.state);
+    console.log('🔍 [DEBUG] useEffect disparado - location:', location);
+    console.log('🔍 [DEBUG] location.state:', location.state);
     
     const state = location.state as any;
     if (state?.abrirFluxoRapido && state?.ordemRecemCriada) {
@@ -262,19 +268,23 @@ export default function CadastroOrdensCompra() {
       setOrdemProcessada(state.ordemRecemCriada);
       setItensComValor(state.itensComValor || []);
       
-      // ✅ CORREÇÃO: Aguardar um tick antes de abrir dialog (para garantir que o state foi atualizado)
-      setTimeout(() => {
-        console.log('🟢 [FLUXO RÁPIDO] Abrindo dialog de fornecedor...');
-        setDialogPerguntaFornecedor(true);
-      }, 150);
+      // ✅ CORREÇÃO: Abrir dialog IMEDIATAMENTE
+      console.log('🟢 [FLUXO RÁPIDO] Abrindo dialog de fornecedor...');
+      setDialogPerguntaFornecedor(true);
       
-      // Limpar o state DEPOIS de um delay maior
+      // Limpar o state DEPOIS de um delay
       setTimeout(() => {
         console.log('🟢 [FLUXO RÁPIDO] Limpando location.state');
         navigate(location.pathname, { replace: true, state: {} });
-      }, 300);
+      }, 500);
+    } else {
+      console.log('❌ [DEBUG] Condições não atendidas:', {
+        abrirFluxoRapido: state?.abrirFluxoRapido,
+        temOrdemRecemCriada: !!state?.ordemRecemCriada,
+        state: state
+      });
     }
-  }, [location.state]);
+  }, [location]);
 
   const carregarOrdens = async () => {
     setLoading(true);
