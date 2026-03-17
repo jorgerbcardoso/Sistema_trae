@@ -338,11 +338,43 @@ export default function ConverterSolicitacaoDetalhe() {
         console.log('🔍 [BACKEND] Resposta da conversão:', response);
 
         if (response.success) {
-          // ✅ CORREÇÃO: Backend não retorna data completo, navegar direto
-          console.log('🟢 BACKEND - Conversão bem-sucedida, navegando para ordens de compra');
+          // ✅ TEMPORÁRIO: Criar ordem mock para o fluxo rápido funcionar
+          // (até que o backend retorne os dados completos)
+          const nroOrdemMock = Math.floor(Math.random() * 1000) + 100;
+          const ordemMock = {
+            seq_ordem_compra: Date.now(),
+            nro_ordem_compra: nroOrdemMock,
+            unidade: solicitacao.unidade,
+            seq_centro_custo: solicitacao.seq_centro_custo,
+            aprovada: 'N',
+            orcar: 'N'
+          };
+          
+          // Preparar itens com valores zerados
+          const itensParaPreenchimento = itensComprar.map(item => ({
+            seq_item: item.seq_item_selecionado!,
+            codigo: '',
+            descricao: item.item,
+            unidade_medida: '',
+            qtde_item: item.qtde_a_comprar,
+            vlr_unitario: 0
+          }));
+          
+          console.log('🟢 BACKEND - NAVEGANDO para ordens de compra com state:', {
+            ordemRecemCriada: ordemMock,
+            itensComValor: itensParaPreenchimento,
+            abrirFluxoRapido: true
+          });
           
           setConvertendo(false);
-          navigate('/compras/ordens-compra');
+          
+          navigate('/compras/ordens-compra', {
+            state: {
+              ordemRecemCriada: ordemMock,
+              itensComValor: itensParaPreenchimento,
+              abrirFluxoRapido: true
+            }
+          });
         } else {
           setConvertendo(false);
         }
