@@ -1,0 +1,523 @@
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/solicitacoes_compra_converter.php
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "toast": {
+    "message": "Solicitação convertida em Ordem de Compra  com sucesso!",
+    "type": "success"
+  }
+}
+index-DAB3IN41.js:8617 🔔 [apiUtils] Toast detectado: {message: 'Solicitação convertida em Ordem de Compra  com sucesso!', type: 'success'}
+index-DAB3IN41.js:8617 ✅ [apiUtils] Toast de sucesso exibido
+index-DAB3IN41.js:10114 🔍 [BACKEND] Resposta da conversão: {success: true, toast: {…}}
+index-DAB3IN41.js:10114 ⚠️ BACKEND - seq_ordem_compra NÃO retornado, navegando sem fluxo rápido
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null
+index-DAB3IN41.js:9641 📊 [DEBUG] Iniciando filtros...
+index-DAB3IN41.js:9641 📊 [DEBUG] Total de ordens: 0
+index-DAB3IN41.js:9641 📊 [DEBUG] Filtros ativos: {filtroUnidade: '', filtroDataInicio: '', filtroDataFim: '', filtroCentroCusto: '', filtroSetor: null, …}
+index-DAB3IN41.js:9641 📊 [DEBUG] Total final após todos os filtros: 0
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: /sistema/api/admin/setores.php
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:9641 🔍 [FilterSelectSetor] useEffect executado: {suggestUserSetor: false, userNroSetor: 1, setoresLength: 0, hasSuggested: false, value: null, …}
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/centros_custo.php?ativo=S
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:8669 📄 [usePageTitle] Título atualizado: Sistema Presto - Gestão de Transportes
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/ordens_compra.php
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/centros_custo.php?ativo=S
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/estoque/itens.php?ativo=S
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/usuarios_aprovadores.php
+index-DAB3IN41.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-DAB3IN41.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 37ed7bff336cb1d9e6a899a56ed4152bd15c8708237ba5ec91b8016acca97a59', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-DAB3IN41.js:9641 🔍 [DEBUG] useEffect disparado - location: {pathname: '/compras/ordens-compra', search: '', hash: '', state: null, key: '10ax2ja0', …}
+index-DAB3IN41.js:9641 🔍 [DEBUG] location.state: null
+index-DAB3IN41.js:9641 ❌ [DEBUG] Condições não atendidas: {abrirFluxoRapido: undefined, temOrdemRecemCriada: false, state: null}
+index-DAB3IN41.js:8661 🔄 [SessionTimeout] Atividade detectada, resetando timers
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null
+index-DAB3IN41.js:9641 📊 [DEBUG] Iniciando filtros...
+index-DAB3IN41.js:9641 📊 [DEBUG] Total de ordens: 0
+index-DAB3IN41.js:9641 📊 [DEBUG] Filtros ativos: {filtroUnidade: '', filtroDataInicio: '2026-02-15', filtroDataFim: '2026-03-17', filtroCentroCusto: '', filtroSetor: null, …}
+index-DAB3IN41.js:9641 📊 [DEBUG] Após filtro data início: 0
+index-DAB3IN41.js:9641 📊 [DEBUG] Após filtro data fim: 0
+index-DAB3IN41.js:9641 📊 [DEBUG] Total final após todos os filtros: 0
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_ordem_compra": "59",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000029 - A",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:26:17.881368",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "1",
+      "setor_descricao": "GERAL",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "58",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000030 - ASD",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:25:33.061326",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "3",
+      "setor_descricao": "AAA",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "57",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000027 - 1",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:18:33.429312",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "3",
+      "setor_descricao": "AAA",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "56",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000028 - 1",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:17:42.324992",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "3",
+      "setor_descricao": "AAA",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "55",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000026 - 1",
+      "placa": "AAA1111",
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:11:59.37041",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "1",
+      "setor_descricao": "GERAL",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "54",
+      "unidade": "MTZ",
+      "nro_ordem_compra": null,
+      "seq_centro_custo": "1",
+      "aprovada": "N",
+      "orcar": "N",
+      "observacao": "CONVERTIDA DA SOLICITAÇÃO MTZ000024 - 1",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:05:24.820941",
+      "login_inclusao": "presto",
+      "data_aprovacao": null,
+      "hora_aprovacao": null,
+      "login_aprovacao": null,
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "3",
+      "setor_descricao": "AAA",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "53",
+      "unidade": "MTZ",
+      "nro_ordem_compra": "34",
+      "seq_centro_custo": "1",
+      "aprovada": "S",
+      "orcar": "N",
+      "observacao": "A",
+      "placa": null,
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "15:03:31.248285",
+      "login_inclusao": "presto",
+      "data_aprovacao": "2026-03-17",
+      "hora_aprovacao": "15:03:35.569661",
+      "login_aprovacao": "presto",
+      "motivo_reprovacao": null,
+      "nro_centro_custo": "123",
+      "centro_custo_descricao": "C DE CUSTO TESTE",
+      "centro_custo_unidade": "MTZ",
+      "nro_setor": "1",
+      "setor_descricao": "GERAL",
+      "qtd_itens": "1"
+    },
+    {
+      "seq_ordem_compra": "52",
+      "unidade": "MTZ",
+      "nro_ordem_compra": n
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null
+index-DAB3IN41.js:9641 📊 [DEBUG] Iniciando filtros...
+index-DAB3IN41.js:9641 📊 [DEBUG] Total de ordens: 59
+index-DAB3IN41.js:9641 📊 [DEBUG] Filtros ativos: {filtroUnidade: '', filtroDataInicio: '2026-02-15', filtroDataFim: '2026-03-17', filtroCentroCusto: '', filtroSetor: null, …}
+index-DAB3IN41.js:9641 📊 [DEBUG] Após filtro data início: 55
+index-DAB3IN41.js:9641 📊 [DEBUG] Após filtro data fim: 55
+index-DAB3IN41.js:9641 📊 [DEBUG] Total final após todos os filtros: 55
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=utf-8
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_centro_custo": "1",
+      "unidade": "MTZ",
+      "nro_centro_custo": "123",
+      "descricao": "C DE CUSTO TESTE",
+      "ativo": "S",
+      "data_inclusao": "2026-02-02",
+      "hora_inclusao": "05:33:01.379746",
+      "login_inclusao": "presto",
+      "data_alteracao": "2026-02-07",
+      "hora_alteracao": "18:17:15.496299",
+      "login_alteracao": "PRESTO"
+    },
+    {
+      "seq_centro_custo": "2",
+      "unidade": "MTZ",
+      "nro_centro_custo": "3",
+      "descricao": "INOVAÇÃO",
+      "ativo": "S",
+      "data_inclusao": "2026-02-20",
+      "hora_inclusao": "09:32:06.680154",
+      "login_inclusao": "PRESTO",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null
+    }
+  ]
+}
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "setores": [
+    {
+      "nro_setor": 1,
+      "descricao": "GERAL",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 2,
+      "descricao": "TESTE",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 3,
+      "descricao": "AAA",
+      "efetua_compras": true
+    }
+  ]
+}
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "id": "43",
+      "username": "presto",
+      "full_name": "USUÁRIO PADRÃO",
+      "email": "JORGE@WEBPRESTO.COM.BR"
+    }
+  ]
+}
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null
+index-DAB3IN41.js:9641 🔍 [FilterSelectSetor] useEffect executado: {suggestUserSetor: false, userNroSetor: 1, setoresLength: 3, hasSuggested: false, value: null, …}
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_item": 1,
+      "codigo": "1",
+      "codigo_fabricante": "FAB-MP-001",
+      "descricao": "AÇO CARBONO 1020 CHAPA 3MM",
+      "seq_tipo_item": 1,
+      "seq_unidade_medida": 3,
+      "vlr_item": 1,
+      "estoque_minimo": 100,
+      "estoque_maximo": 500,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.048053",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": "2026-02-07",
+      "hora_alteracao": "19:31:26.492376",
+      "login_alteracao": "PRESTO",
+      "tipo_descricao": "MATÉRIA PRIMA",
+      "unidade_medida_sigla": "M"
+    },
+    {
+      "seq_item": 10,
+      "codigo": "10",
+      "codigo_fabricante": "MAKITA-002",
+      "descricao": "ESMERILHADEIRA ANGULAR 7POL",
+      "seq_tipo_item": 6,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 3,
+      "estoque_maximo": 15,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.050612",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "FERRAMENTA",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 11,
+      "codigo": "11",
+      "codigo_fabricante": "DEWALT-003",
+      "descricao": "PARAFUSADEIRA SEM FIO 12V",
+      "seq_tipo_item": 6,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 5,
+      "estoque_maximo": 20,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.050612",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "FERRAMENTA",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 12,
+      "codigo": "12",
+      "codigo_fabricante": "REP-001",
+      "descricao": "ROLAMENTO SKF 6205",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 20,
+      "estoque_maximo": 100,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 13,
+      "codigo": "13",
+      "codigo_fabricante": "REP-002",
+      "descricao": "CORREIA SINCRONIZADA HTD 8M",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 10,
+      "estoque_maximo": 50,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 14,
+      "codigo": "14",
+      "codigo_fabricante": "REP-003",
+      "descricao": "FILTRO DE AR COMPRESSOR",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 65,
+      "estoque_minimo": 15,
+      "estoque_maximo": 80,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 15,
+      "codigo": "15",
+      "codigo_fabricante": "OF-001",
+      "descricao": "PAPEL A4 RESMA 500 FOLHAS",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 1,
+      "vlr_item": 25,
+      "estoque_minimo": 50,
+      "estoque_maximo": 200,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.052024",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "MATERIAL DE ESCRITÓRIO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 16,
+      "codigo": "16",
+      "codigo_fabricante": "OF-002",
+      "descricao": "CANETA ESFEROGRÁFICA AZUL",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 5,
+      "vlr_item": 15,
+      "estoque_minimo": 20,
+      "estoque_maximo": 100,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.052024",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "MATERIAL DE ESCRITÓRIO",
+      "unidade_medida_sigla": "CX"
+    },
+    {
+      "seq_item": 17,
+      "codigo": "17",
+      "codigo_fabricante": "OF-003",
+      "descricao": "TONER HP CF283A",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 1,
+      "vlr_item": 180,
+      "estoque_minimo": 5,
+      "estoque_maximo": 30,
+      "ativo": "S",
+      "data_inclusao": "
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null
+index-DAB3IN41.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-DAB3IN41.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-DAB3IN41.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_centro_custo": "1",
+      "unidade": "MTZ",
+      "nro_centro_custo": "123",
+      "descricao": "C DE CUSTO TESTE",
+      "ativo": "S",
+      "data_inclusao": "2026-02-02",
+      "hora_inclusao": "05:33:01.379746",
+      "login_inclusao": "presto",
+      "data_alteracao": "2026-02-07",
+      "hora_alteracao": "18:17:15.496299",
+      "login_alteracao": "PRESTO"
+    },
+    {
+      "seq_centro_custo": "2",
+      "unidade": "MTZ",
+      "nro_centro_custo": "3",
+      "descricao": "INOVAÇÃO",
+      "ativo": "S",
+      "data_inclusao": "2026-02-20",
+      "hora_inclusao": "09:32:06.680154",
+      "login_inclusao": "PRESTO",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null
+    }
+  ]
+}
+index-DAB3IN41.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] CadastroOrdensCompra RENDERIZADO
+index-DAB3IN41.js:9641 🔵 [COMPONENTE] location.state: null

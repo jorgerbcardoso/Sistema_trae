@@ -265,11 +265,37 @@ function converterSolicitacao($conn, $prefix, $user, $domain, $seq_solicitacao_c
         
         // Criar ordem de compra APENAS se houver itens para comprar
         if (count($itens_comprar) > 0) {
-            // ✅ INCLUIR PLACA NA ORDEM DE COMPRA
+            // ✅ GERAR NÚMERO DA ORDEM DE COMPRA AUTOMATICAMENTE
+            // Formato: Sequencial numérico único para todas as unidades (IGUAL à inclusão manual)
+            $queryNumero = "
+                SELECT COALESCE(MAX(
+                    CASE 
+                        WHEN nro_ordem_compra ~ '^[0-9]+$' THEN CAST(nro_ordem_compra AS INTEGER)
+                        ELSE 0
+                    END
+                ), 0) + 1 AS proximo_numero
+                FROM {$prefix}ordem_compra
+                WHERE nro_ordem_compra IS NOT NULL
+            ";
+            $resultNumero = pg_query($conn, $queryNumero);
+            
+            if (!$resultNumero) {
+                throw new Exception('Erro ao gerar número da ordem: ' . pg_last_error($conn));
+            }
+            
+            $rowNumero = pg_fetch_assoc($resultNumero);
+            $nro_ordem_compra = intval($rowNumero['proximo_numero']);
+            
+            // ✅ GARANTIR que o número não seja 0 ou NULL
+            if ($nro_ordem_compra <= 0) {
+                $nro_ordem_compra = 1;
+            }
+            
+            // ✅ INCLUIR PLACA E NRO_ORDEM_COMPRA NA ORDEM DE COMPRA
             $query_oc = "INSERT INTO {$prefix}ordem_compra 
-                (unidade, data_inclusao, hora_inclusao, login_inclusao, seq_centro_custo, nro_setor, placa, observacao, aprovada, orcar)
-                VALUES ($1, CURRENT_DATE, CURRENT_TIME, $2, $3, $4, $5, $6, 'N', 'N')
-                RETURNING seq_ordem_compra, nro_ordem_compra";
+                (unidade, nro_ordem_compra, data_inclusao, hora_inclusao, login_inclusao, seq_centro_custo, nro_setor, placa, observacao, aprovada, orcar)
+                VALUES ($1, $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7, 'N', 'N')
+                RETURNING seq_ordem_compra";
             
             // Formatar número da solicitação sem "#" no formato AAA000000
             $nro_solicitacao_formatado = $solicitacao['unidade'] . str_pad($seq_solicitacao_compra, 6, '0', STR_PAD_LEFT);
@@ -278,9 +304,10 @@ function converterSolicitacao($conn, $prefix, $user, $domain, $seq_solicitacao_c
                 $observacao_oc .= ' - ' . $solicitacao['observacao'];
             }
             
-            // ✅ ADICIONAR PLACA NOS PARÂMETROS
+            // ✅ ADICIONAR NRO_ORDEM_COMPRA E PLACA NOS PARÂMETROS
             $result_oc = pg_query_params($conn, $query_oc, [
                 $solicitacao['unidade'],
+                (string)$nro_ordem_compra, // ✅ Número gerado
                 strtolower($user['username']),
                 $solicitacao['seq_centro_custo'],
                 $solicitacao['nro_setor'],
@@ -294,7 +321,6 @@ function converterSolicitacao($conn, $prefix, $user, $domain, $seq_solicitacao_c
             
             $ordem = pg_fetch_assoc($result_oc);
             $seq_ordem_compra = $ordem['seq_ordem_compra'];
-            $nro_ordem_compra = $ordem['nro_ordem_compra'];
             
             // Inserir itens na ordem de compra
             foreach ($itens_comprar as $item) {
@@ -398,7 +424,13 @@ function converterSolicitacao($conn, $prefix, $user, $domain, $seq_solicitacao_c
         
         // Mensagem de sucesso
         if ($seq_ordem_compra) {
-            msg('Solicitação convertida em Ordem de Compra ' . $nro_ordem_compra . ' com sucesso!', 'success');
+            // ✅ RETORNAR seq_ordem_compra e nro_ordem_compra para o frontend (fluxo rápido)
+            msg('Solicitação convertida em Ordem de Compra ' . $nro_ordem_compra . ' com sucesso!', 'success', 200, [
+                'data' => [
+                    'seq_ordem_compra' => $seq_ordem_compra,
+                    'nro_ordem_compra' => $nro_ordem_compra
+                ]
+            ]);
         } else {
             msg('Solicitação marcada como atendida (nenhum item para comprar)', 'success');
         }
