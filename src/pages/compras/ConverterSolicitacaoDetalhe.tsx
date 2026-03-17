@@ -335,41 +335,14 @@ export default function ConverterSolicitacaoDetalhe() {
           body: JSON.stringify(payload),
         });
 
-        if (response.success && response.data) {
-          // Preparar itens com valores zerados (buscar do backend)
-          const itensData = await apiFetch(
-            `${ENVIRONMENT.apiBaseUrl}/compras/ordens_compra.php?seq_ordem_compra=${response.data.seq_ordem_compra}&action=itens`,
-            { method: 'GET' }
-          );
+        console.log('🔍 [BACKEND] Resposta da conversão:', response);
+
+        if (response.success) {
+          // ✅ CORREÇÃO: Backend não retorna data completo, navegar direto
+          console.log('🟢 BACKEND - Conversão bem-sucedida, navegando para ordens de compra');
           
-          const itensParaPreenchimento = itensData.success 
-            ? (itensData.data || []).map((item: any) => ({
-                seq_item: item.seq_item,
-                codigo: item.codigo,
-                descricao: item.descricao,
-                unidade_medida: item.unidade_medida,
-                qtde_item: item.qtde_item,
-                vlr_unitario: 0
-              }))
-            : [];
-          
-          // ✅ Navegar para ordens de compra e abrir dialog automaticamente
-          console.log('🟢 BACKEND - NAVEGANDO para ordens de compra com state:', {
-            ordemRecemCriada: response.data,
-            itensComValor: itensParaPreenchimento,
-            abrirFluxoRapido: true
-          });
-          
-          // ✅ CORREÇÃO: Resetar loading ANTES de navegar
           setConvertendo(false);
-          
-          navigate('/compras/ordens-compra', {
-            state: {
-              ordemRecemCriada: response.data,
-              itensComValor: itensParaPreenchimento,
-              abrirFluxoRapido: true
-            }
-          });
+          navigate('/compras/ordens-compra');
         } else {
           setConvertendo(false);
         }
