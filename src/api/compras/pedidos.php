@@ -194,7 +194,7 @@ try {
                             i.descricao,
                             um.sigla AS unidade_medida
                         FROM $tblPedidoItem pi
-                        INNER JOIN {$prefix}item i ON i.seq_item = pi.seq_item
+                        INNER JOIN $tblItem i ON i.seq_item = pi.seq_item
                         LEFT JOIN {$prefix}unidade_medida um ON um.seq_unidade_medida = i.seq_unidade_medida
                         WHERE pi.seq_pedido = $1
                         ORDER BY pi.seq_pedido_item
@@ -202,14 +202,22 @@ try {
                     
                     $resultItens = sql($queryItens, [$seq], $g_sql);
                     $itens = [];
+                    $vlr_total_recalculado = 0; // ✅ RECALCULAR TOTAL
                     
                     while ($row = pg_fetch_assoc($resultItens)) {
                         // ✅ Garantir que valores numéricos sejam float
                         $row['qtde_item'] = floatval($row['qtde_item']);
                         $row['vlr_unitario'] = floatval($row['vlr_unitario']);
                         $row['vlr_total'] = floatval($row['vlr_total']);
+                        
+                        // ✅ SOMAR AO TOTAL RECALCULADO
+                        $vlr_total_recalculado += $row['vlr_total'];
+                        
                         $itens[] = $row;
                     }
+                    
+                    // ✅ ATUALIZAR VLR_TOTAL DO PEDIDO COM VALOR RECALCULADO DOS ITENS
+                    $pedido['vlr_total'] = $vlr_total_recalculado;
                     
                     // Buscar fornecedor completo
                     $fornecedor = null;
