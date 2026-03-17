@@ -999,9 +999,9 @@ export default function PedidoForm() {
 
   const ordensFiltradas = ordensDisponiveis.filter(ordem => {
     // Filtro de busca textual
-    const matchBusca = ordem.nro_ordem_compra.toLowerCase().includes(buscaOrdem.toLowerCase()) ||
-      ordem.centro_custo_descricao?.toLowerCase().includes(buscaOrdem.toLowerCase()) ||
-      ordem.observacao?.toLowerCase().includes(buscaOrdem.toLowerCase());
+    const matchBusca = (ordem.nro_ordem_compra || '').toLowerCase().includes((buscaOrdem || '').toLowerCase()) ||
+      (ordem.centro_custo_descricao || '').toLowerCase().includes((buscaOrdem || '').toLowerCase()) ||
+      (ordem.observacao || '').toLowerCase().includes((buscaOrdem || '').toLowerCase());
     
     // ✅ Filtro de setor
     const matchSetor = !setorFiltroOrdens || setorFiltroOrdens === '' || 
@@ -1186,7 +1186,7 @@ export default function PedidoForm() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <UserCheck className="size-3 sm:size-4 flex-shrink-0" />
-                        <span className="truncate">{pedido.login_inclusao.toLowerCase()}</span>
+                        <span className="truncate">{(pedido.login_inclusao || '').toLowerCase()}</span>
                       </div>
                       <Badge variant={isPedidoOrcado ? 'default' : 'secondary'} className="gap-1 w-fit">
                         {isPedidoOrcado ? <MapPin className="size-3" /> : <FileText className="size-3" />}
@@ -1430,7 +1430,7 @@ export default function PedidoForm() {
                   </div>
                   <div className="info-col">
                     <div className="info-label">Usuário</div>
-                    <div className="info-value">{pedido.login_inclusao.toLowerCase()}</div>
+                    <div className="info-value">{(pedido.login_inclusao || '').toLowerCase()}</div>
                   </div>
                 </div>
               </div>
