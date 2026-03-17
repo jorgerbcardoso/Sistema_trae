@@ -156,6 +156,20 @@ try {
                 
                 // ✅ Se action=detalhes, buscar pedido + itens + fornecedor
                 if (isset($_GET['action']) && $_GET['action'] === 'detalhes') {
+                    $seq = intval($_GET['seq_pedido'] ?? 0);
+                    
+                    if (!$seq) {
+                        msg('Pedido não informado', 'error');
+                    }
+                    
+                    // ✅ CRÍTICO: RECALCULAR vlr_total de TODOS OS ITENS antes de buscar
+                    $queryRecalcular = "
+                        UPDATE $tblPedidoItem
+                        SET vlr_total = qtde_item * vlr_unitario
+                        WHERE seq_pedido = $1
+                    ";
+                    sql($queryRecalcular, [$seq], $g_sql);
+                    
                     // Buscar pedido
                     $query = "
                         SELECT 

@@ -1,0 +1,211 @@
+Navegou para https://webpresto.com.br/sistema/compras/pedidos/visualizar/1
+cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation cdn.tailwindcss.com:64:1711
+O layout foi forçado antes que a página fosse totalmente carregada. Se houver folhas de estilo ainda não carregadas, isso pode causar piscamento de conteúdo sem estilo. node.js:418:1
+✅ [SessionTimeout] Iniciando monitoramento de sessão index-DAB3IN41.js:8661:51682
+🌐 [apiFetch] Chamando: /sistema/api/admin/setores.php index-DAB3IN41.js:8617:178738
+🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false index-DAB3IN41.js:8617:178779
+📤 [apiFetch] Headers enviados: 
+Object { "Content-Type": "application/json", Authorization: "Bearer 9ebb07556d6f3e2c7f0b7999cd4a5aa86d4aa4fccbb3f3b7b3e107eb9c92ccd4", "X-Domain": "ACV", "X-Unidade": "MTZ" }
+index-DAB3IN41.js:8617:179029
+🔍 [FilterSelectSetorWithAll] useEffect executado: 
+Object { suggestUserSetor: true, userNroSetor: 1, setoresLength: 0, hasSuggested: false, value: "", apenasEfetuaCompras: false }
+index-DAB3IN41.js:9641:82273
+📄 [usePageTitle] Título atualizado: Aceville - Sistema de Gestão index-DAB3IN41.js:8669:4190
+🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/pedidos.php?action=detalhes&seq_pedido=1 index-DAB3IN41.js:8617:178738
+🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false index-DAB3IN41.js:8617:178779
+📤 [apiFetch] Headers enviados: 
+Object { "Content-Type": "application/json", Authorization: "Bearer 9ebb07556d6f3e2c7f0b7999cd4a5aa86d4aa4fccbb3f3b7b3e107eb9c92ccd4", "X-Domain": "ACV", "X-Unidade": "MTZ" }
+index-DAB3IN41.js:8617:179029
+🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/compras/usuarios_aprovadores.php index-DAB3IN41.js:8617:178738
+🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false index-DAB3IN41.js:8617:178779
+📤 [apiFetch] Headers enviados: 
+Object { "Content-Type": "application/json", Authorization: "Bearer 9ebb07556d6f3e2c7f0b7999cd4a5aa86d4aa4fccbb3f3b7b3e107eb9c92ccd4", "X-Domain": "ACV", "X-Unidade": "MTZ" }
+index-DAB3IN41.js:8617:179029
+📥 [apiFetch] Resposta recebida: 200 <empty string> index-DAB3IN41.js:8617:179118
+🔍 [apiUtils] Content-Type: application/json; charset=UTF-8 index-DAB3IN41.js:8617:176463
+📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": {
+    "pedido": {
+      "seq_pedido": 1,
+      "unidade": "MTZ",
+      "nro_pedido": "1",
+      "seq_orcamento": null,
+      "seq_fornecedor": 5073,
+      "status": "A",
+      "vlr_total": 0,
+      "observacao": "",
+      "data_inclusao": "2026-03-17",
+      "hora_inclusao": "14:03:27.579973",
+      "login_inclusao": "daniela",
+      "data_fin": null,
+      "hora_fin": null,
+      "login_fin": null,
+      "ser_nf": null,
+      "nro_nf": null,
+      "chave_nfe": null,
+      "nro_lancto": "0",
+      "fornecedor_nome": "10836216 MARCELO FRANCO",
+      "fornecedor_cnpj": "10836216000145",
+      "nro_orcamento": null
+    },
+    "itens": [
+      {
+        "seq_pedido_item": "1",
+        "seq_pedido": "1",
+        "seq_item": "16",
+        "qtde_item": 3,
+        "vlr_unitario": 50,
+        "vlr_total": 0,
+        "observacao": null,
+        "codigo": "000002",
+        "descricao": "BATERIA SELADA 180 AMP",
+        "unidade_medida": "PC"
+      }
+    ],
+    "fornecedor": {
+      "seq_fornecedor": "5073",
+      "cnpj": "10836216000145",
+      "nome": "10836216 MARCELO FRANCO",
+      "endereco": "RUA JAGUARIAIVA",
+      "bairro": "PALOMA",
+      "seq_cidade": "8782",
+      "email": "",
+      "telefone": "4199242417",
+      "ativo": "S",
+      "data_inclusao": "2026-01-27",
+      "hora_inclusao": "20:07:27.028561",
+      "login_inclusao": "sistema",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "cidade_nome": "COLOMBO / PR"
+    }
+  }
+} index-DAB3IN41.js:8617:176757
+⚠️ [apiUtils] Nenhum toast encontrado na resposta index-DAB3IN41.js:8617:177462
+📥 [apiFetch] Resposta recebida: 200 <empty string> index-DAB3IN41.js:8617:179118
+🔍 [apiUtils] Content-Type: application/json; charset=utf-8 index-DAB3IN41.js:8617:176463
+📥 [apiFetch] Resposta recebida: 200 <empty string> index-DAB3IN41.js:8617:179118
+🔍 [apiUtils] Content-Type: application/json; charset=UTF-8 index-DAB3IN41.js:8617:176463
+📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "setores": [
+    {
+      "nro_setor": 1,
+      "descricao": "GERAL",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 2,
+      "descricao": "MARKETING",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 3,
+      "descricao": "TI",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 4,
+      "descricao": "FROTA",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 6,
+      "descricao": "FINANCEIRO",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 7,
+      "descricao": "DIRETORIA",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 11,
+      "descricao": "COMPRAS",
+      "efetua_compras": true
+    },
+    {
+      "nro_setor": 12,
+      "descricao": "OPERAÇÃO",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 13,
+      "descricao": "EXPEDIÇÃO",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 14,
+      "descricao": "GERENCIA",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 15,
+      "descricao": "RH",
+      "efetua_compras": false
+    },
+    {
+      "nro_setor": 16,
+      "descricao": "COMERCIAL",
+      "efetua_compras": false
+    }
+  ]
+} index-DAB3IN41.js:8617:176757
+⚠️ [apiUtils] Nenhum toast encontrado na resposta index-DAB3IN41.js:8617:177462
+📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "id": "57",
+      "username": "clamir",
+      "full_name": "CLAMIR ORO",
+      "email": "CLAMIR@ACEVILLE.COM.BR"
+    },
+    {
+      "id": "136",
+      "username": "neia1",
+      "full_name": "CLAUDINEIA OLBRISCH",
+      "email": "neia@aceville.com.br"
+    },
+    {
+      "id": "65",
+      "username": "daniela1",
+      "full_name": "DANIELA RABAIOLLI",
+      "email": "daniela@aceville.com.br"
+    },
+    {
+      "id": "49",
+      "username": "daniela",
+      "full_name": "DANIELA RABAIOLLI",
+      "email": "DANIELA@ACEVILLE.COM.BR"
+    },
+    {
+      "id": "146",
+      "username": "kauany3",
+      "full_name": "KAUANY BEATRIZ PAVARIN PRESTES",
+      "email": "cobranca.ctb@aceville.com.br"
+    },
+    {
+      "id": "256",
+      "username": "michael1",
+      "full_name": "MICHAEL GONCALVES STEINBACH",
+      "email": "compras1@aceville.com.br"
+    },
+    {
+      "id": "8",
+      "username": "presto",
+      "full_name": "USUÁRIO PADRÃO",
+      "email": "jorge@webpresto.com.br"
+    },
+    {
+      "id": "273",
+      "username": "willy1",
+      "full_name": "WILLY ARANHA",
+      "email": "marketing@aceville.com.br"
+    }
+  ]
+} index-DAB3IN41.js:8617:176757
+⚠️ [apiUtils] Nenhum toast encontrado na resposta index-DAB3IN41.js:8617:177462
+✅ [SessionTimeout] Sessão válida no backend
