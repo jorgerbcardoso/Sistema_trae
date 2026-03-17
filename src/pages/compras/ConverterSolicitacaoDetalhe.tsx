@@ -338,15 +338,21 @@ export default function ConverterSolicitacaoDetalhe() {
         console.log('🔍 [BACKEND] Resposta da conversão:', response);
 
         if (response.success) {
-          // ✅ CORREÇÃO: Backend ainda não retorna seq_ordem_compra real
-          // Por isso, não podemos fazer fluxo rápido no backend ainda
-          // Navegar direto para lista de ordens
-          console.log('🟢 BACKEND - Conversão bem-sucedida');
-          console.log('⚠️ BACKEND - Fluxo rápido DESABILITADO (aguardando backend retornar seq_ordem_compra)');
-          
-          setConvertendo(false);
-          toast.success('Solicitação convertida em ordem de compra com sucesso!');
-          navigate('/compras/ordens-compra');
+          if (itensComprar.length > 0) {
+            // ✅ CORREÇÃO: Backend ainda não retorna seq_ordem_compra real
+            // Por isso, não podemos fazer fluxo rápido no backend ainda
+            // Navegar direto para lista de ordens
+            console.log('🟢 BACKEND - Conversão bem-sucedida');
+            console.log('⚠️ BACKEND - Fluxo rápido DESABILITADO (aguardando backend retornar seq_ordem_compra)');
+            
+            setConvertendo(false);
+            toast.success('Solicitação convertida em ordem de compra com sucesso!');
+            navigate('/compras/ordens-compra');
+          } else {
+            toast.success('Solicitação marcada como atendida (nenhum item para comprar)');
+            setConvertendo(false);
+            navigate('/compras/ordens-compra');
+          }
         } else {
           setConvertendo(false);
         }
