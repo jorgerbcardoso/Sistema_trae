@@ -462,7 +462,9 @@ try {
                         $seqItem = intval($item['seq_item'] ?? 0);
                         $qtdeItem = floatval($item['qtde_item'] ?? 0);
                         $vlrUnitario = floatval($item['vlr_unitario'] ?? 0);
-                        $vlrTotalItem = floatval($item['vlr_total'] ?? 0);
+                        
+                        // ✅ CRÍTICO: CALCULAR vlr_total no BACKEND (qtde * vlr_unitario)
+                        $vlrTotalItem = $qtdeItem * $vlrUnitario;
                         
                         // ✅ DEBUG: Logar cada item individualmente
                         error_log("🔍 [ITEM $itemIndex] seq_item=$seqItem | qtde=$qtdeItem | vlr_unit=$vlrUnitario | vlr_total=$vlrTotalItem");

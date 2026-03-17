@@ -224,6 +224,11 @@ function aprovarOrcamento($g_sql, $prefix, $data, $username) {
         
         // Inserir itens do pedido
         foreach ($cotacoes as $cot) {
+            // ✅ CRÍTICO: CALCULAR vlr_total no BACKEND (qtde * vlr_unitario)
+            $qtde_item = floatval($cot['qtde_item']);
+            $vlr_fornecedor = floatval($cot['vlr_fornecedor']);
+            $vlr_total_item_calculado = $qtde_item * $vlr_fornecedor;
+            
             $query_item = "INSERT INTO {$tabela_pedido_item}
                            (seq_pedido, seq_item, qtde_item, vlr_unitario, vlr_total)
                            VALUES ($1, $2, $3, $4, $5)";
@@ -231,9 +236,9 @@ function aprovarOrcamento($g_sql, $prefix, $data, $username) {
             $params_item = array(
                 $seq_pedido,
                 $cot['seq_item'],
-                $cot['qtde_item'],
-                $cot['vlr_fornecedor'],
-                $cot['vlr_total']
+                $qtde_item,
+                $vlr_fornecedor,
+                $vlr_total_item_calculado  // ✅ USAR VALOR CALCULADO
             );
             
             sql($g_sql, $query_item, false, $params_item);
