@@ -339,15 +339,52 @@ export default function ConverterSolicitacaoDetalhe() {
 
         if (response.success) {
           if (itensComprar.length > 0) {
-            // ✅ CORREÇÃO: Backend ainda não retorna seq_ordem_compra real
-            // Por isso, não podemos fazer fluxo rápido no backend ainda
-            // Navegar direto para lista de ordens
-            console.log('🟢 BACKEND - Conversão bem-sucedida');
-            console.log('⚠️ BACKEND - Fluxo rápido DESABILITADO (aguardando backend retornar seq_ordem_compra)');
-            
-            setConvertendo(false);
-            toast.success('Solicitação convertida em ordem de compra com sucesso!');
-            navigate('/compras/ordens-compra');
+            // ✅ BACKEND - Verificar se retornou seq_ordem_compra
+            if (response.data && response.data.seq_ordem_compra) {
+              console.log('🟢 BACKEND - seq_ordem_compra retornado:', response.data.seq_ordem_compra);
+              
+              // ✅ FLUXO RÁPIDO HABILITADO - Backend retornou ordem criada
+              const ordemCriada = {
+                seq_ordem_compra: parseInt(response.data.seq_ordem_compra),
+                nro_ordem_compra: response.data.nro_ordem_compra || null,
+                unidade: solicitacao.unidade,
+                seq_centro_custo: solicitacao.seq_centro_custo,
+                aprovada: 'N',
+                orcar: 'N'
+              };
+              
+              // Preparar itens com valores zerados
+              const itensParaPreenchimento = itensComprar.map(item => ({
+                seq_item: item.seq_item_selecionado!,
+                codigo: '', // Será buscado na API
+                descricao: item.item,
+                unidade_medida: '',
+                qtde_item: item.qtde_a_comprar,
+                vlr_unitario: 0
+              }));
+              
+              console.log('🟢 BACKEND - NAVEGANDO para ordens de compra com state:', {
+                ordemRecemCriada: ordemCriada,
+                itensComValor: itensParaPreenchimento,
+                abrirFluxoRapido: true
+              });
+              
+              setConvertendo(false);
+              
+              navigate('/compras/ordens-compra', {
+                state: {
+                  ordemRecemCriada: ordemCriada,
+                  itensComValor: itensParaPreenchimento,
+                  abrirFluxoRapido: true
+                }
+              });
+            } else {
+              // Backend não retornou seq_ordem_compra - fluxo normal
+              console.log('⚠️ BACKEND - seq_ordem_compra NÃO retornado, navegando sem fluxo rápido');
+              setConvertendo(false);
+              toast.success('Solicitação convertida em ordem de compra com sucesso!');
+              navigate('/compras/ordens-compra');
+            }
           } else {
             toast.success('Solicitação marcada como atendida (nenhum item para comprar)');
             setConvertendo(false);
