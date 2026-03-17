@@ -318,8 +318,8 @@ export default function PedidoForm() {
         // MOCK
         await new Promise(resolve => setTimeout(resolve, 300));
         const filtrados = MOCK_FORNECEDORES.filter(f => 
-          f.nome.toLowerCase().includes(search.toLowerCase()) ||
-          f.cnpj.includes(search)
+          (f.nome || '').toLowerCase().includes((search || '').toLowerCase()) ||
+          (f.cnpj || '').includes(search || '')
         );
         setFornecedoresDisponiveis(filtrados);
       } else {
