@@ -1,0 +1,159 @@
+vendor-core-ade2edecaf4781c7.min.js.br:54 Too many elapsed hits of react since last report
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:54
+t @ figma_app-726b2563eb8cdce8.min.js.br:41
+eI @ figma_app-726b2563eb8cdce8.min.js.br:41
+gJ @ 4239-c4c06d09094e9c07.min.js.br:188
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+requestAnimationFrame
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:63
+gX @ 4239-c4c06d09094e9c07.min.js.br:188
+s @ 4239-c4c06d09094e9c07.min.js.br:386
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:1279
+dispatch @ 4239-c4c06d09094e9c07.min.js.br:1279
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:986
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ figma_app-726b2563eb8cdce8.min.js.br:41
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:167
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:99
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:1919
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:99
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:1919
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:188
+$ @ figma_app-726b2563eb8cdce8.min.js.br:229
+(anônimo) @ figma_app-726b2563eb8cdce8.min.js.br:229
+s @ 4239-c4c06d09094e9c07.min.js.br:1625
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+setTimeout
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:63
+l @ 4239-c4c06d09094e9c07.min.js.br:1625
+(anônimo) @ figma_app-726b2563eb8cdce8.min.js.br:229
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+2vendor-core-ade2edecaf4781c7.min.js.br:54 [devtools] Initialized LS
+devtools_worker-28bcb023fe1485d0.min.js.br:1190 [esbuild-wasm] Initializing from URL: /webpack-artifacts/assets/2b68f2d3d5e8b3d6.wasm
+devtools_worker-28bcb023fe1485d0.min.js.br:1190 [esbuild-wasm] Initialized
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Found 3 CSS files in VFS
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Total CSS size to be processed by lightningcss: 0.11MB
+devtools_worker-28bcb023fe1485d0.min.js.br:3209 Error: Invalid declaration: `48864 assets/index-CUH7rUCy.css @import "tailwindcss"`
+    at uX (devtools_worker-28bcb023fe1485d0.min.js.br:1975:1794)
+    at _v (devtools_worker-28bcb023fe1485d0.min.js.br:2008:116162)
+    at _D (devtools_worker-28bcb023fe1485d0.min.js.br:3176:25)
+    at _C (devtools_worker-28bcb023fe1485d0.min.js.br:3176:198)
+    at _j (devtools_worker-28bcb023fe1485d0.min.js.br:3176:8930)
+    at async _G (devtools_worker-28bcb023fe1485d0.min.js.br:3176:7498)
+    at async m5 (devtools_worker-28bcb023fe1485d0.min.js.br:3176:4194270)
+    at async onmessage (devtools_worker-28bcb023fe1485d0.min.js.br:3209:2192)
+m5 @ devtools_worker-28bcb023fe1485d0.min.js.br:3209
+vendor-core-ade2edecaf4781c7.min.js.br:54 Failed to download files: Error: Invalid declaration: `48864 assets/index-CUH7rUCy.css @import "tailwindcss"`
+    at uX (devtools_worker-28bcb023fe1485d0.min.js.br:1975:1794)
+    at _v (devtools_worker-28bcb023fe1485d0.min.js.br:2008:116162)
+    at _D (devtools_worker-28bcb023fe1485d0.min.js.br:3176:25)
+    at _C (devtools_worker-28bcb023fe1485d0.min.js.br:3176:198)
+    at _j (devtools_worker-28bcb023fe1485d0.min.js.br:3176:8930)
+    at async _G (devtools_worker-28bcb023fe1485d0.min.js.br:3176:7498)
+    at async m5 (devtools_worker-28bcb023fe1485d0.min.js.br:3176:4194270)
+    at async onmessage (devtools_worker-28bcb023fe1485d0.min.js.br:3209:2192)
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:54
+o.JZ.<computed> @ vendor-191557b646cc979f.min.js.br:3
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+await in (anônimo)
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+O.eventName @ 4239-c4c06d09094e9c07.min.js.br:1377
+onPointerUp @ 4239-c4c06d09094e9c07.min.js.br:1377
+(anônimo) @ vendor-d88bce00ff902098.min.js.br:8
+e.<computed> @ vendor-d88bce00ff902098.min.js.br:8
+ez @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eq @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fi @ vendor-core-ade2edecaf4781c7.min.js.br:11
+ff @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oP @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eR @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fl @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nz @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nI @ vendor-core-ade2edecaf4781c7.min.js.br:11
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+vendor-core-ade2edecaf4781c7.min.js.br:63  PUT https://www.figma.com/api/integrations/github-app/plans/team/1565133021950789753/github-installations/admin/repository 400 (Bad Request)
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:63
+h @ vendor-191557b646cc979f.min.js.br:3
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:1319
+T @ 4239-c4c06d09094e9c07.min.js.br:1319
+C @ 4239-c4c06d09094e9c07.min.js.br:1319
+i @ 4239-c4c06d09094e9c07.min.js.br:1319
+put @ 4239-c4c06d09094e9c07.min.js.br:1319
+(anônimo) @ 3733-6bc0c88924ad6833.min.js.br:3
+validate @ figma_app-726b2563eb8cdce8.min.js.br:229
+adminUpdateGithubRepository @ 3733-6bc0c88924ad6833.min.js.br:3
+L.i @ 3198-295cf359ba26bdec.min.js.br:62
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+await in (anônimo)
+O.eventName @ 4239-c4c06d09094e9c07.min.js.br:1377
+onPointerUp @ 4239-c4c06d09094e9c07.min.js.br:1377
+(anônimo) @ vendor-d88bce00ff902098.min.js.br:8
+e.<computed> @ vendor-d88bce00ff902098.min.js.br:8
+ez @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eq @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fi @ vendor-core-ade2edecaf4781c7.min.js.br:11
+ff @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oP @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eR @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fl @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nz @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nI @ vendor-core-ade2edecaf4781c7.min.js.br:11
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117  GET https://app-2lpaagwz2vc26cljnft7g4iinhkuj57o3sqmtp4ywdyuqxq67ifa.makeproxy-c.figma.site/@react-refresh net::ERR_ABORTED 503 (Service Unavailable)
+times @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+E @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+w @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+sb @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+su @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+snapshotDOMToPNG @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:984
+await in snapshotDOMToPNG
+o @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:65
+t.onmessage @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:65
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Found 3 CSS files in VFS
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Total CSS size to be processed by lightningcss: 0.11MB
+devtools_worker-28bcb023fe1485d0.min.js.br:1190 [lightningcss-wasm] Initialized
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [lightningCSS] Processing 0.31MB of CSS (environment: browser)
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [lightningCSS] Encoded size: 0.31MB
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [lightningCSS] Transform completed successfully
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117  GET https://app-2lpaagwz2vc26cljnft7g4iinhkuj57o3sqmtp4ywdyuqxq67ifa.makeproxy-c.figma.site/@react-refresh net::ERR_ABORTED 503 (Service Unavailable)
+times @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+E @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+w @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:572
+sb @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+su @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+snapshotDOMToPNG @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:984
+await in snapshotDOMToPNG
+o @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:65
+t.onmessage @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:65
+vendor-core-ade2edecaf4781c7.min.js.br:54 [devtools] Initialized LS

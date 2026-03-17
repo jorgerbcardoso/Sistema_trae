@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de APIs - Sistema Presto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .config-section {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .config-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .api-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .api-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .api-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+        
+        .api-card h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        
+        .method.get { background: #dbeafe; color: #1e40af; }
+        .method.post { background: #d1fae5; color: #065f46; }
+        .method.put { background: #fef3c7; color: #92400e; }
+        .method.delete { background: #fee2e2; color: #991b1b; }
+        
+        .endpoint {
+            background: #f9fafb;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #1f2937;
+            margin-bottom: 15px;
+            word-break: break-all;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result.success {
+            background: #d1fae5;
+            border: 2px solid #a7f3d0;
+            color: #065f46;
+        }
+        
+        .result.error {
+            background: #fee2e2;
+            border: 2px solid #fecaca;
+            color: #991b1b;
+        }
+        
+        .result.loading {
+            background: #dbeafe;
+            border: 2px solid #bfdbfe;
+            color: #1e40af;
+        }
+        
+        .result-header {
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .result-data {
+            background: rgba(0,0,0,0.05);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0,0,0,0.1);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .test-all-btn {
+            margin-bottom: 30px;
+        }
+        
+        .footer {
+            background: #f9fafb;
+            padding: 20px 30px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            font-size: 13px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 Teste de APIs</h1>
+            <p>Sistema Presto - Verificação de Endpoints REST</p>
+        </div>
+        
+        <div class="content">
+            <!-- Configuração -->
+            <div class="config-section">
+                <h2>⚙️ Configuração</h2>
+                <div class="form-group">
+                    <label for="baseUrl">URL Base da API:</label>
+                    <input 
+                        type="text" 
+                        id="baseUrl" 
+                        value="https://webpresto.com.br/api"
+                        placeholder="https://webpresto.com.br/api"
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="authToken">Token de Autenticação (opcional):</label>
+                    <input 
+                        type="text" 
+                        id="authToken" 
+                        placeholder="Bearer token..."
+                    >
+                </div>
+            </div>
+            
+            <!-- Botão Testar Tudo -->
+            <div class="test-all-btn">
+                <button class="btn btn-primary" onclick="testAll()">
+                    🚀 Testar Todos os Endpoints
+                </button>
+            </div>
+            
+            <!-- APIs -->
+            <div class="api-grid">
+                <!-- GET /domains -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method get">GET</span>
+                        Listar Domínios
+                    </h3>
+                    <div class="endpoint">/domains</div>
+                    <button class="btn btn-primary" onclick="testEndpoint('domains', 'GET')">
+                        Testar
+                    </button>
+                    <div id="result-domains"></div>
+                </div>
+                
+                <!-- GET /domains/:id -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method get">GET</span>
+                        Buscar Domínio
+                    </h3>
+                    <div class="endpoint">/domains/XXX</div>
+                    <button class="btn btn-primary" onclick="testEndpoint('domains/XXX', 'GET')">
+                        Testar
+                    </button>
+                    <div id="result-domains-XXX"></div>
+                </div>
+                
+                <!-- GET /users -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method get">GET</span>
+                        Listar Usuários
+                    </h3>
+                    <div class="endpoint">/users?domain=XXX</div>
+                    <button class="btn btn-primary" onclick="testEndpoint('users?domain=XXX', 'GET')">
+                        Testar
+                    </button>
+                    <div id="result-users"></div>
+                </div>
+                
+                <!-- POST /auth/login -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method post">POST</span>
+                        Login
+                    </h3>
+                    <div class="endpoint">/auth/login</div>
+                    <button class="btn btn-primary" onclick="testLogin()">
+                        Testar
+                    </button>
+                    <div id="result-login"></div>
+                </div>
+                
+                <!-- GET /menu -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method get">GET</span>
+                        Listar Menu
+                    </h3>
+                    <div class="endpoint">/menu?domain=XXX</div>
+                    <button class="btn btn-primary" onclick="testEndpoint('menu?domain=XXX', 'GET')">
+                        Testar
+                    </button>
+                    <div id="result-menu"></div>
+                </div>
+                
+                <!-- GET /permissions -->
+                <div class="api-card">
+                    <h3>
+                        <span class="method get">GET</span>
+                        Listar Permissões
+                    </h3>
+                    <div class="endpoint">/permissions?domain=XXX</div>
+                    <button class="btn btn-primary" onclick="testEndpoint('permissions?domain=XXX', 'GET')">
+                        Testar
+                    </button>
+                    <div id="result-permissions"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <strong>💡 Dica:</strong> Verifique o console do navegador (F12) para mais detalhes das requisições.
+        </div>
+    </div>
+    
+    <script>
+        async function testEndpoint(endpoint, method = 'GET', body = null) {
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const authToken = document.getElementById('authToken').value.trim();
+            const url = `${baseUrl}/${endpoint}`;
+            
+            // Identificar resultado pelo endpoint
+            const resultId = 'result-' + endpoint.replace(/\//g, '-').replace(/\?/g, '-').replace(/=/g, '-');
+            const resultDiv = document.getElementById(resultId);
+            
+            if (!resultDiv) {
+                console.error('Result div not found:', resultId);
+                return;
+            }
+            
+            // Loading
+            resultDiv.innerHTML = `
+                <div class="result loading">
+                    <div class="result-header">
+                        <span class="spinner"></span>
+                        Testando...
+                    </div>
+                </div>
+            `;
+            
+            try {
+                console.log(`Testing ${method} ${url}`);
+                
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (authToken) {
+                    options.headers['Authorization'] = authToken;
+                }
+                
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+                
+                const startTime = performance.now();
+                const response = await fetch(url, options);
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+                
+                console.log('Response:', response.status, data);
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <div class="result-header">
+                                ✅ Sucesso (${response.status}) - ${duration}ms
+                            </div>
+                            <div class="result-data">${JSON.stringify(data, null, 2)}</div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <div class="result-header">
+                                ❌ Erro ${response.status} - ${duration}ms
+                            </div>
+                            <div class="result-data">${JSON.stringify(data, null, 2)}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <div class="result-header">
+                            ❌ Erro de Conexão
+                        </div>
+                        <div class="result-data">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        async function testLogin() {
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const url = `${baseUrl}/auth/login`;
+            const resultDiv = document.getElementById('result-login');
+            
+            // Loading
+            resultDiv.innerHTML = `
+                <div class="result loading">
+                    <div class="result-header">
+                        <span class="spinner"></span>
+                        Testando login...
+                    </div>
+                </div>
+            `;
+            
+            const credentials = {
+                domain: 'XXX',
+                username: 'presto',
+                password: 'presto123'
+            };
+            
+            try {
+                console.log(`Testing POST ${url}`, credentials);
+                
+                const startTime = performance.now();
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(credentials)
+                });
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                
+                const data = await response.json();
+                
+                console.log('Response:', response.status, data);
+                
+                if (response.ok) {
+                    // Salvar token se retornou
+                    if (data.token) {
+                        document.getElementById('authToken').value = `Bearer ${data.token}`;
+                    }
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <div class="result-header">
+                                ✅ Login realizado com sucesso (${response.status}) - ${duration}ms
+                            </div>
+                            <div class="result-data">${JSON.stringify(data, null, 2)}</div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <div class="result-header">
+                                ❌ Erro ${response.status} - ${duration}ms
+                            </div>
+                            <div class="result-data">${JSON.stringify(data, null, 2)}</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <div class="result-header">
+                            ❌ Erro de Conexão
+                        </div>
+                        <div class="result-data">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        async function testAll() {
+            console.log('Testing all endpoints...');
+            
+            // Testar em sequência
+            await testEndpoint('domains', 'GET');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testEndpoint('domains/XXX', 'GET');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testEndpoint('users?domain=XXX', 'GET');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testLogin();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testEndpoint('menu?domain=XXX', 'GET');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testEndpoint('permissions?domain=XXX', 'GET');
+            
+            console.log('All tests completed!');
+        }
+    </script>
+</body>
+</html>

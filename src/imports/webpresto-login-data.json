@@ -1,0 +1,195 @@
+Navegou para https://webpresto.com.br/sistema/?token=e327f1ae968c030327369552e54c10efa2b91b3a84f49389092516ee20fdb9f1&pedido=99&domain=DMN
+index-Cpw2W7Xf.js:7854 🔍 [AutoLogin] Iniciando verificação
+index-Cpw2W7Xf.js:7854 🔍 Token: e327f1ae968c030327369552e54c10efa2b91b3a84f49389092516ee20fdb9f1
+index-Cpw2W7Xf.js:7854 🔍 Orcamento: null
+index-Cpw2W7Xf.js:7854 🔍 Pedido: 99
+index-Cpw2W7Xf.js:7854 🔍 Domain: DMN
+index-Cpw2W7Xf.js:7854 🔍 User: null
+index-Cpw2W7Xf.js:7854 📧 [AutoLogin] Link de aprovação de PEDIDO detectado
+index-Cpw2W7Xf.js:7854 🔐 [AutoLogin] Usuário não está logado, redirecionando para login...
+index-Cpw2W7Xf.js:7846 ✅ [SessionTimeout] Iniciando monitoramento de sessão
+index-Cpw2W7Xf.js:7854 🔍 [AutoLogin] Iniciando verificação
+index-Cpw2W7Xf.js:7854 🔍 Token: e327f1ae968c030327369552e54c10efa2b91b3a84f49389092516ee20fdb9f1
+index-Cpw2W7Xf.js:7854 🔍 Orcamento: null
+index-Cpw2W7Xf.js:7854 🔍 Pedido: 99
+index-Cpw2W7Xf.js:7854 🔍 Domain: DMN
+index-Cpw2W7Xf.js:7854 🔍 User: {id: 43, username: 'presto', email: 'JORGE@WEBPRESTO.COM.BR', full_name: 'USUÁRIO PADRÃO', client_id: 28, …}
+index-Cpw2W7Xf.js:7854 📧 [AutoLogin] Link de aprovação de PEDIDO detectado
+index-Cpw2W7Xf.js:7854 ✅ [AutoLogin] Usuário já está logado, validando permissão...
+index-Cpw2W7Xf.js:7854 📡 [AutoLogin] Validando token de aprovação de pedido...
+index-Cpw2W7Xf.js:7854 ✅ [AutoLogin] Token válido! Redirecionando para pedido...
+index-Cpw2W7Xf.js:7854 🔍 [AutoLogin] Iniciando verificação
+index-Cpw2W7Xf.js:7854 🔍 Token: null
+index-Cpw2W7Xf.js:7854 🔍 Orcamento: null
+index-Cpw2W7Xf.js:7854 🔍 Pedido: null
+index-Cpw2W7Xf.js:7854 🔍 Domain: null
+index-Cpw2W7Xf.js:7854 🔍 User: {id: 43, username: 'presto', email: 'JORGE@WEBPRESTO.COM.BR', full_name: 'USUÁRIO PADRÃO', client_id: 28, …}
+index-Cpw2W7Xf.js:7854 ✅ [AutoLogin] Usuário logado sem token, indo para menu
+index-Cpw2W7Xf.js:7854 📄 [usePageTitle] Título atualizado: Sistema Presto - Gestão de Transportes
+index-Cpw2W7Xf.js:7802 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/menu/get_user_menu.php
+index-Cpw2W7Xf.js:7802 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-Cpw2W7Xf.js:7802 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 1031f2095ea1135f10020b286695b849e798831f9c7da117e33a3b87a8a2889d', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-Cpw2W7Xf.js:7846 ✅ [SessionTimeout] Sessão válida no backend
+index-Cpw2W7Xf.js:7802 📥 [apiFetch] Resposta recebida: 200 
+index-Cpw2W7Xf.js:7802 🔍 [apiUtils] Content-Type: application/json; charset=utf-8
+index-Cpw2W7Xf.js:7802 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "use_mock": false,
+  "sections": [
+    {
+      "id": 1,
+      "code": "dashboards",
+      "name": "DASHBOARDS",
+      "description": "PAINÉIS ANALÍTICOS E INDICADORES",
+      "icon": "BarChart3",
+      "order": 1,
+      "items": [
+        {
+          "id": 1,
+          "code": "dashboard_dre",
+          "name": "DASHBOARD FINANCEIRO",
+          "description": "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO",
+          "icon": "TrendingUp",
+          "route": "/financeiro/dashboard",
+          "component": "dashboards/FinanceiroDashboard",
+          "status": "active"
+        },
+        {
+          "id": 2,
+          "code": "dashboard_linhas",
+          "name": "RESULTADO DAS LINHAS",
+          "description": "RESULTADO OPERACIONAL POR LINHA DE TRANSPORTE",
+          "icon": "Route",
+          "route": "/dashboards/linhas",
+          "component": "dashboards/LinhasDashboard",
+          "status": "active"
+        },
+        {
+          "id": 3,
+          "code": "dashboard_performance_entregas",
+          "name": "PERFORMANCE DE ENTREGAS",
+          "description": "ANÁLISE DE ENTREGAS E PRAZOS",
+          "icon": "Truck",
+          "route": "/dashboards/performance-entregas",
+          "component": "dashboards/PerformanceEntregas",
+          "status": "active"
+        },
+        {
+          "id": 4,
+          "code": "dashboard_performance_coletas",
+          "name": "PERFORMANCE DE COLETAS",
+          "description": "ANÁLISE DE COLETAS E PRAZOS",
+          "icon": "Package",
+          "route": "/dashboards/performance-coletas",
+          "component": "dashboards/PerformanceColetas",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "code": "cadastros",
+      "name": "CADASTROS",
+      "description": "CADASTROS GERAIS DO SISTEMA",
+      "icon": "FolderPlus",
+      "order": 2,
+      "items": [
+        {
+          "id": 7,
+          "code": "grupos_eventos",
+          "name": "GRUPOS DE EVENTOS",
+          "description": "GERENCIAR GRUPOS E ASSOCIAÇÕES DE EVENTOS",
+          "icon": "FolderOpen",
+          "route": "/cadastros/grupos-eventos",
+          "component": "cadastros/GruposEventos",
+          "status": "active"
+        },
+        {
+          "id": 6,
+          "code": "cadastro_eventos",
+          "name": "CADASTRO DE EVENTOS",
+          "description": "GERENCIAR TIPOS DE DESPESAS E EVENTOS",
+          "icon": "FolderPlus",
+          "route": "/cadastros/eventos",
+          "component": "cadastros/CadastroEventos",
+          "status": "active"
+        },
+        {
+          "id": 8,
+          "code": "cadastro_linhas",
+          "name": "CADASTRO DE LINHAS",
+          "description": "GERENCIAR LINHAS DE TRANSPORTE",
+          "icon": "Route",
+          "route": "/cadastros/linhas",
+          "component": "cadastros/CadastroLinhas",
+          "status": "active"
+        },
+        {
+          "id": 19,
+          "code": "vendedores",
+          "name": "CADASTRO DE VENDEDORES",
+          "description": "IMPORTAÇÃO DOS VENDEDORES E DEFINIÇÃO DE SETORES",
+          "icon": "UserCheck",
+          "route": "/cadastros/vendedores",
+          "component": "cadastros/Vendedores",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "code": "relatorios",
+      "name": "RELATÓRIOS",
+      "description": "RELATÓRIOS E CONFERÊNCIAS",
+      "icon": "FileText",
+      "order": 4,
+      "items": [
+        {
+          "id": 10,
+          "code": "conferencia_saidas",
+          "name": "CONFERÊNCIA DE SAÍDAS",
+          "description": "RELATÓRIO DE MANIFESTOS E SAÍDAS DE VEÍCULOS",
+          "icon": "Truck",
+          "route": "/relatorios/conferencia-saidas",
+          "component": "relatorios/ConferenciaSaidas",
+          "status": "active"
+        },
+        {
+          "id": 17,
+          "code": "controle_transbordo",
+          "name": "CONTROLE DE TRANSBORDO",
+          "description": "RELAÇÃO E CONTROLE DE VOLUMES TRANSBORDADOS",
+          "icon": "Package",
+          "route": "/relatorios/controle-transbordo",
+          "component": "relatorios/ControleTransbordo",
+          "status": "active"
+        },
+        {
+          "id": 18,
+          "code": "tot_vend",
+          "name": "TOTAIS DE VENDEDORES POR UNIDADE",
+          "description": "PLANILHA DE VENDAS POR VENDEDOR E UNIDADE DOS ÚLTIMOS 3 MESES",
+          "icon": "FileText",
+          "route": "/relatorios/totais_vendedores",
+          "component": "relatorios/TotaisVendedores",
+          "status": "active"
+        },
+        {
+          "id": 36,
+          "code": "tabelas_vencer",
+          "name": "TABELAS A VENCER",
+          "description": "RELATÓRIO DE TABELAS COM VENCIMENTO ATÉ O FIM DO MÊS",
+          "icon": "FileSpreadsheet",
+          "route": "/relatorios/tabelas-vencer",
+          "component": "relatorios/TabelasVencer",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "code": "ESTOQUE",
+      "name": "ESTOQUE",
+      "description": "GE
+index-Cpw2W7Xf.js:7802 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-Cpw2W7Xf.js:7846 🔄 [SessionTimeout] Atividade detectada, resetando timers

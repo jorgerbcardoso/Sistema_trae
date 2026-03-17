@@ -1,0 +1,135 @@
+index-B3UlrCy0.js:8146 🔔 onChange chamado com value: 8
+index-B3UlrCy0.js:7802 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/estoque/estoques.php
+index-B3UlrCy0.js:7802 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-B3UlrCy0.js:7802 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer bcf2287198e99096903faa8b2d0f510f8f8e26047525a5c49cbdba16bbed1193', X-Domain: 'ACV', X-Unidade: 'MTZ'}
+index-B3UlrCy0.js:7802 📥 [apiFetch] Resposta recebida: 200 
+index-B3UlrCy0.js:7802 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-B3UlrCy0.js:7802 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_estoque": "1",
+      "unidade": "MTZ",
+      "nro_estoque": "0001",
+      "descricao": "PILHA  ALCALINA  AA",
+      "ativo": "N",
+      "data_inclusao": "2026-03-02",
+      "hora_inclusao": "14:56:00.68675",
+      "login_inclusao": "clamir",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "13:33:47.176388",
+      "login_alteracao": "michael",
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "2",
+      "unidade": "MTZ",
+      "nro_estoque": "0002",
+      "descricao": "PILHA  ALCALINA  AAA",
+      "ativo": "N",
+      "data_inclusao": "2026-03-02",
+      "hora_inclusao": "14:56:33.300119",
+      "login_inclusao": "clamir",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "13:33:49.648588",
+      "login_alteracao": "michael",
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "7",
+      "unidade": "MTZ",
+      "nro_estoque": "001",
+      "descricao": "ALMOXARIFADO - MATRIZ",
+      "ativo": "S",
+      "data_inclusao": "2026-03-04",
+      "hora_inclusao": "13:36:22.219964",
+      "login_inclusao": "michael",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "8",
+      "unidade": "MTZ",
+      "nro_estoque": "MKT0001",
+      "descricao": "MKT ESTOQUE",
+      "ativo": "S",
+      "data_inclusao": "2026-03-04",
+      "hora_inclusao": "14:13:32.05973",
+      "login_inclusao": "admin",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "qtd_posicoes": "4",
+      "qtd_itens": "4"
+    },
+    {
+      "seq_estoque": "5",
+      "unidade": "MTZ",
+      "nro_estoque": "MKT001",
+      "descricao": "MOCHILAS - BRINDES MKT",
+      "ativo": "N",
+      "data_inclusao": "2026-03-03",
+      "hora_inclusao": "16:03:06.477884",
+      "login_inclusao": "willy1",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "14:17:47.410986",
+      "login_alteracao": "willy1",
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "6",
+      "unidade": "MTZ",
+      "nro_estoque": "MKT002",
+      "descricao": "GARRAFA TERMICA - BRINDES MKT",
+      "ativo": "N",
+      "data_inclusao": "2026-03-03",
+      "hora_inclusao": "16:03:48.803082",
+      "login_inclusao": "willy1",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "14:17:54.759764",
+      "login_alteracao": "willy1",
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "4",
+      "unidade": "MTZ",
+      "nro_estoque": "MKT003 CANETAS",
+      "descricao": "CANETAS - BRINDES MKT",
+      "ativo": "N",
+      "data_inclusao": "2026-03-03",
+      "hora_inclusao": "16:02:16.192927",
+      "login_inclusao": "willy1",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "14:18:04.617561",
+      "login_alteracao": "willy1",
+      "qtd_posicoes": "0",
+      "qtd_itens": "0"
+    },
+    {
+      "seq_estoque": "3",
+      "unidade": "MTZ",
+      "nro_estoque": "MKT004",
+      "descricao": "JAQUETAS - BRINDES MKT",
+      "ativo": "N",
+      "data_inclusao": "2026-03-03",
+      "hora_inclusao": "15:43:09.022768",
+      "login_inclusao": "willy1",
+      "data_alteracao": "2026-03-04",
+      "hora_alteracao": "14:18:09.418705",
+      "login_alteracao": "willy1",
+      "qtd_posicoes": "1",
+      "qtd_itens": "1"
+    }
+  ]
+}
+index-B3UlrCy0.js:7802 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-B3UlrCy0.js:8146 📦 Estoque BACKEND encontrado: undefined
+index-B3UlrCy0.js:8146 🔍 DEBUG NovaEntradaEstoque: {tipoEntrada: 'MANUAL', estoqueSelecionado: null, exibirSecaoItens: false, etapaEntradaPedido: 'NFE', pedidoSelecionado: null, …}
+2index-B3UlrCy0.js:7846 🔄 [SessionTimeout] Atividade detectada, resetando timers

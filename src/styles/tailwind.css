@@ -1,0 +1,4 @@
+/* Diretivas Tailwind v3 - usado apenas no build do servidor */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

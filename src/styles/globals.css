@@ -1,0 +1,380 @@
+/* Importar fonte Open Sans do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap');
+
+/* ================================================================
+ * VARIÁVEIS CSS - HSL FORMAT (compatível com Tailwind v3)
+ * ================================================================ */
+
+:root {
+  --font-size: 16px;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.625rem;
+  --chart-1: 12 76% 61%;
+  --chart-2: 173 58% 39%;
+  --chart-3: 197 37% 24%;
+  --chart-4: 43 74% 66%;
+  --chart-5: 27 87% 67%;
+  --input-background: 0 0% 95%;
+  --switch-background: 0 0% 80%;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+}
+
+/* ✅ MODO ESCURO - Variáveis CSS */
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --chart-1: 220 70% 50%;
+  --chart-2: 160 60% 45%;
+  --chart-3: 30 80% 55%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 340 75% 55%;
+}
+
+/* ================================================================
+ * ESTILOS BASE - CSS PURO (sem diretivas Tailwind)
+ * ================================================================ */
+
+* {
+  border-color: hsl(var(--border));
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Open Sans', sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Remover sublinhado de links globalmente */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+/* Cursor pointer em links e botões */
+a, button {
+  cursor: pointer;
+}
+
+/* ================================================================
+ * ✅ ÍCONES DE CALENDÁRIO/RELÓGIO CLAROS NO TEMA ESCURO
+ * ================================================================ */
+
+/* Chrome, Safari, Edge, Opera - Inverter cor do ícone no tema escuro */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+/* Hover state */
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="time"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="month"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="week"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(1) brightness(1.2);
+}
+
+/* ================================================================
+ * ✅ ESCONDER ÍCONE NATIVO DE SENHA DO NAVEGADOR
+ * ================================================================ */
+
+/* Microsoft Edge/IE - Esconder botão de revelar senha */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+/* Webkit (Chrome, Safari, Edge) - Esconder ícone de autofill de senha */
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Webkit - Esconder decoração de senha */
+input[type="password"]::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* ================================================================
+ * ✅ ÍCONE DO "OLHO" DOS INPUTS DE SENHA BRANCO NO TEMA ESCURO (FALLBACK)
+ * ================================================================ */
+
+/* Chrome, Safari, Edge, Opera */
+.dark input[type="password"]::-ms-reveal,
+.dark input[type="password"]::-ms-clear {
+  filter: invert(100%) brightness(120%) !important;
+  cursor: pointer !important;
+}
+
+/* Webkit (Chrome, Safari, Edge) - eye icon */
+.dark input[type="password"]::-webkit-credentials-auto-fill-button,
+.dark input[type="password"]::-webkit-textfield-decoration-container {
+  filter: invert(100%) brightness(120%) !important;
+}
+
+/* Edge/IE - reveal button */
+.dark input[type="password"]::-ms-reveal {
+  filter: invert(100%) brightness(120%) !important;
+}
+
+/* Fallback para navegadores que suportam color-scheme */
+.dark input[type="password"] {
+  color-scheme: dark !important;
+}
+
+/* ================================================================
+ * ✅ ESTILIZAÇÃO CUSTOMIZADA DE SCROLLBARS - DISCRETOS
+ * ================================================================ */
+
+/* ==================== TEMA CLARO ==================== */
+
+/* Largura do scrollbar - mais fino e discreto */
+*::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* Track (trilho) - quase transparente */
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+  border-radius: 8px !important;
+}
+
+/* Thumb (barra) - discreto e sutil */
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3) !important;
+  border-radius: 8px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background 0.2s ease !important;
+}
+
+/* Hover - mais visível */
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6) !important;
+}
+
+/* Active - totalmente visível */
+*::-webkit-scrollbar-thumb:active {
+  background: rgba(100, 116, 139, 0.8) !important;
+}
+
+/* Corner (canto) */
+*::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+/* ==================== TEMA ESCURO ==================== */
+
+/* Largura do scrollbar - mais fino e discreto */
+.dark *::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* Track (trilho) - quase transparente */
+.dark *::-webkit-scrollbar-track {
+  background: transparent !important;
+  border-radius: 8px !important;
+}
+
+/* Thumb (barra) - discreto e sutil no tema escuro */
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3) !important;
+  border-radius: 8px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background 0.2s ease !important;
+}
+
+/* Hover - mais visível */
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6) !important;
+}
+
+/* Active - totalmente visível */
+.dark *::-webkit-scrollbar-thumb:active {
+  background: rgba(148, 163, 184, 0.8) !important;
+}
+
+/* Corner (canto) */
+.dark *::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+/* ==================== FIREFOX ==================== */
+
+/* Tema Claro - Scrollbar fino e discreto */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
+}
+
+/* Tema Escuro - Scrollbar fino e discreto */
+.dark * {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent !important;
+}
+
+/* ================================================================
+ * TIPOGRAFIA BASE
+ * ================================================================ */
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  margin: 0;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  margin: 0;
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+  margin: 0;
+}
+
+p {
+  font-size: 1rem;
+  font-weight: var(--font-weight-normal);
+  line-height: 1.5;
+  margin: 0;
+}
+
+label {
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+}
+
+button {
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.5;
+}
+
+input {
+  font-size: 1rem;
+  font-weight: var(--font-weight-normal);
+  line-height: 1.5;
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* ================================================================
+ * PRINT STYLES
+ * ================================================================ */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide navigation tabs in print */
+  [role="tablist"] {
+    display: none !important;
+  }
+
+  /* Ensure all content is visible */
+  [role="tabpanel"] {
+    display: block !important;
+  }
+
+  /* Page breaks */
+  .space-y-6 > * {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Force light theme for print */
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+  }
+
+  .dark\:bg-slate-900,
+  .dark\:bg-slate-950,
+  .dark\:bg-slate-800 {
+    background-color: #ffffff !important;
+  }
+
+  .dark\:text-slate-100,
+  .dark\:text-slate-200 {
+    color: #000000 !important;
+  }
+}

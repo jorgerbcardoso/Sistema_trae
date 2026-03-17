@@ -1,0 +1,688 @@
+<!--html-->
+<html>
+    <head>
+        <title>560 - Aprova &ccedil;&atilde;o de despesas :: SSW Sistema de Transportes</title>
+        <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+        <LINK REL="stylesheet" href="/ssw.css?version=6" type="text/css" charset="iso-8859-1">
+        <script language="JavaScript" src="/scripts/ssw_010622.js?version=3" charset="iso-8859-1"></script>
+        <script type="text/javascript">
+            <!--
+            var obj;
+            var objfocus;
+            var objmais;
+            var help_file;
+            var webTitle;
+            function fl() {}
+            //-->
+        </script>
+    </head>
+    <body onload="srMainButton='C';itoffset=1;soLista='S';srComCheck=true;loadTableData();fl();totalizador();">
+        <form name="frm" id="frm" method="POST" action="/bin/ssw1196" autocomplete="off">
+            <script language="JavaScript" src="/scripts/ssw1196_210920.js" charset="iso-8859-1"></script>
+            <script language="JavaScript" src="/scripts/lookup_311025.js?v=31.10.25" charset="iso-8859-1"></script>
+            <div class=texto style="left:384px;top:64px;width:216px;">Mudar &nbsp;data &nbsp;de &nbsp;pagamento &nbsp;para &nbsp;(opc):</div>
+            <input name="f1" num=1 dt=1 id="1" value="" maxlength=6 style="left:608px;top:64px;width:48px;">
+            <div class=texto style="text-align:left;left:8px;top:64px;">Marque &nbsp;com &nbsp;X &nbsp;os &nbsp;pagamentos &nbsp;que &nbsp;se &nbsp;deseja &nbsp;aprovar:</div>
+            <div class=texto style="left:720px;top:64px;width:192px;">Total &nbsp;dos &nbsp;pagamentos &nbsp;marcados:</div>
+            <input READONLY name="total" cep=2 ces=10 currencyedit="true" type="text" class=nodata id="total" value="0,00" style="left:920px; top:64px; width:80px;">
+            <div class=srmain style="text-align:left;left:0px;top:80px;">
+                <script language="JavaScript" src="/scripts/srcore_180923.js?version=180624"></script>
+                <div class=srtr2 id=srtmp style="left:44px;top:5px;visibility:hidden"></div>
+                <script language="JavaScript">
+                    <!--
+                    function getDataFieldNames() {
+                        array[0] = ["f0", 60, "Lan&ccedil;amento", "A"];
+                        array[1] = ["f1", 35, "Unidade", "A"];
+                        array[2] = ["f2", 40, "Inclus&atilde;o", "DT"];
+                        array[3] = ["f3", 35, "Usu&aacute;rio", "A"];
+                        array[4] = ["f4", 45, "Fornecedor", "A"];
+                        array[5] = ["f5", 45, "Descri&ccedil;&atilde;o da despesa", "A"];
+                        array[6] = ["f6", 40, "Vencimento", "D"];
+                        array[7] = ["f7", 40, "Pagamento", "D"];
+                        array[8] = ["f8", 40, "Compet&ecirc;ncia", "A"];
+                        array[9] = ["f9", 40, "Evento", "A"];
+                        array[10] = ["f10", 30, "Descri&ccedil;&atilde;o evento", "A"];
+                        array[11] = ["f11", 30, "Boleto", "A"];
+                        array[12] = ["f12", 70, "Or&ccedil;amento", "N"];
+                        array[13] = ["f13", 70, "Comprometido", "N"];
+                        array[14] = ["f14", 80, "Saldo", "R"];
+                        array[15] = ["f15", 40, "Parcela", "R"];
+                        array[16] = ["f16", 30, "Juros", "R"];
+                        array[17] = ["f17", 30, "Desconto", "R"];
+                        array[18] = ["f18", 68, "Vlr Final da Parcela", "N"];
+                        array[19] = ["f19", 50, "Repasse", "A"];
+                        array[20] = ["f20", 50, "Coment&aacute;rio ", "A"];
+                        array[21] = ["f22", 10, "SEQ", "A"];
+
+                    }
+                    -->
+                </script>
+                <div class=srdiv id=tit></div>
+                <xml id="xmlsr">
+                    <rs>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=361082 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;130068-21 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=361082 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;130068-21 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>19/06/23 08:12</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANCO BRADESCO S/A</f4>
+                            <f5>JUROS EMP. BRADESCO CONTRATO 237.2693.2000 EM 48X </f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5041</f9>
+                            <f10>AMORTIZACAO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>26.776,30</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>26.776,30</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=361082');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=361082');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>361082</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=385819 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;141113-30 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=385819 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;141113-30 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>05/10/23 08:20</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANCO COOPERATIVO SICREDI S A</f4>
+                            <f5>JUROS MENSAL EMPRESTIMO SICRED CONTRATO C22330405 54X</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5041</f9>
+                            <f10>AMORTIZACAO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>13.945,74</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>13.945,74</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=385819');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=385819');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>385819</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=360985 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;130067-21 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=360985 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;130067-21 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>19/06/23 08:10</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANCO BRADESCO S/A</f4>
+                            <f5>PARCELA FIXA EMP. BRADESCO CONTRATO 237.2696.2000 EM 48X</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5130</f9>
+                            <f10>EMPRESTIMOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>41.666,66</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>41.666,66</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=360985');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=360985');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>360985</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=385714 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;141110-30 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=385714 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;141110-30 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>05/10/23 08:13</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANCO COOPERATIVO SICREDI S A</f4>
+                            <f5>PARECLA FIXA EMPRESTIMO SICRED CONTRATO C22330405 54X</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5130</f9>
+                            <f10>EMPRESTIMOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>20.129,63</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>20.129,63</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=385714');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=385714');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>385714</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=631499 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;234029-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=631499 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;234029-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>06/03/26 15:31</f2>
+                            <f3>andrea1 </f3>
+                            <f4>VM FERREIRA SERVICOS ME</f4>
+                            <f5>BOLETO- SERVICO DE AET</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5330</f9>
+                            <f10>OUTROS IMPOSTOS E TAXAS DIVERSAS</f10>
+                            <f11>08591138000001180001010021605180700000557201</f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.180,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.180,00</f18>
+                            <f19>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=234029 &amp;codigo=5330 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=234029 &amp;codigo=5330 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=631499');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=631499');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>631499</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=613840 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226788-03 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=613840 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226788-03 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>29/12/25 14:16</f2>
+                            <f3>mitra   </f3>
+                            <f4>PORTO SEGURO CIA DE SEGUROS</f4>
+                            <f5>SEGURO POTRO SEGURO</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5402</f9>
+                            <f10>SEGURO DE VEICULOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>11.110,56</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>11.110,56</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=613840');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=613840');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>613840</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=613859 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226789-03 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=613859 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226789-03 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>29/12/25 14:48</f2>
+                            <f3>mitra   </f3>
+                            <f4>PORTO SEGURO CIA DE SEGUROS</f4>
+                            <f5>ENDOSSO SEGURO  PORTO</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5402</f9>
+                            <f10>SEGURO DE VEICULOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>769,37</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>769,37</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=613859');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=613859');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>613859</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433789 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;94820-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433789 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;94820-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>09/06/22 08:31</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>CONSORCIO BANRISUL PROP 303560 GP 031015 CT 0747-00 AUTOM PRAZO 100 MESES</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.561,96</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.561,96</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433789');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433789');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>433789</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433942 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95141-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433942 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95141-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>14/06/22 08:33</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>CONSORCIO BANRISUL PROP 303567 GP 031015 CT 0754-00 AUTOM PRAZO 100 MESES</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.561,96</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.561,96</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433942');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433942');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>433942</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=434095 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95142-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=434095 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95142-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>14/06/22 08:34</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>CONSORCIO BANRISUL PROP 303565 GP 031015 CT 0753-00 AUTOM PRAZO 100 MESES</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.561,96</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.561,96</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=434095');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=434095');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>434095</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=434248 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95146-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=434248 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;95146-47 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>14/06/22 08:35</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>CONSORCIO BANRISUL PROP 303564 GP 031015 CT 0751-00 AUTOM PRAZO 100 MESES</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.561,96</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.561,96</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=434248');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=434248');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>434248</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433618 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;128897-35 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=433618 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;128897-35 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>05/06/23 08:27</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>PARCELA CONSORCIO BANRISUL GP 031013 52X</f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.370,37</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.370,37</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433618');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=433618');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>433618</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=482094 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;171776-19 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=482094 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;171776-19 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>21/08/24 10:53</f2>
+                            <f3>amanda1 </f3>
+                            <f4>BANCO SICOOB</f4>
+                            <f5>CONSORCIO SICOOB CONTRATO 65931742 GP 1449  CT 0406</f5>
+                            <f6>07/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>8.457,10</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>8.457,10</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=482094');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=482094');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>482094</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=626779 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231870-02 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=626779 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231870-02 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>18/02/26 08:45</f2>
+                            <f3>thaislm1</f3>
+                            <f4>BANRISUL SA CONSORCIO</f4>
+                            <f5>CONSORCIO BANRISUL DEB AUT CREDITO R$150 MIL PROPOSTA 425317</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5412</f9>
+                            <f10>PARCELA DE CONSORCIO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.293,75</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.293,75</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=626779');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=626779');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>626779</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=614296 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226922-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=614296 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;226922-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>02/01/26 09:55</f2>
+                            <f3>mitra   </f3>
+                            <f4>SCHERER S A COMERCIO DE AUTOPECAS</f4>
+                            <f5>BOLETO OS 6392</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5733</f9>
+                            <f10>PECAS E ACESSORIOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.071,85</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.071,85</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=614296');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=614296');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>614296</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=615447 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227468-02 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=615447 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227468-02 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>08/01/26 14:17</f2>
+                            <f3>andrea1 </f3>
+                            <f4>CARBONI DISTRIB DE VEICULOS LTDA - JLE</f4>
+                            <f5>BOLETO OS 6458</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>01/26</f8>
+                            <f9>5733</f9>
+                            <f10>PECAS E ACESSORIOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>650,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>650,00</f18>
+                            <f19>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=227468 &amp;codigo=5733 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=227468 &amp;codigo=5733 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=615447');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=615447');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>615447</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=625851 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231432-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=625851 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231432-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>11/02/26 14:44</f2>
+                            <f3>andrea1 </f3>
+                            <f4>ATA COMERCIO DE COMPONENTES HIDRAULICOS EIRELI ME</f4>
+                            <f5>BOLETO OS 6548- PECAS</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>02/26</f8>
+                            <f9>5733</f9>
+                            <f10>PECAS E ACESSORIOS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>162,80</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>162,80</f18>
+                            <f19>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=231432 &amp;codigo=5733 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0094?act=REP &amp;nro_lancto=231432 &amp;codigo=5733 &amp;chamador=ssw0099 &amp;readonly=S');return(false);&gt;&lt;u &gt;Repasse &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=625851');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=625851');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>625851</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=626467 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231739-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=626467 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;231739-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>13/02/26 10:00</f2>
+                            <f3>michael1</f3>
+                            <f4>COMERCIO DE MATERIAIS DE CONSTRUCAO BENEVENUTTI LTDA</f4>
+                            <f5>BOLETO, MATERIAIS PARA A AMPLIACAO DA ACAT </f5>
+                            <f6>08/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>02/26</f8>
+                            <f9>5737</f9>
+                            <f10>CONSTRUCAO E AMPLIACAO DE IMOVEIS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.292,23</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.292,23</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=626467');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=626467');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>626467</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=607601 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;224027-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=607601 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;224027-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>02/12/25 14:02</f2>
+                            <f3>mitra   </f3>
+                            <f4>DETRAN SC</f4>
+                            <f5>MULTA J001931382-</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>12/25</f8>
+                            <f9>5748</f9>
+                            <f10>MULTAS DE TRANSITO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>104,13</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>104,13</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=607601');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=607601');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>607601</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=616177 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227678-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=616177 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227678-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>09/01/26 13:45</f2>
+                            <f3>clamir1 </f3>
+                            <f4>LIDER ETIQUETAS EIRELI</f4>
+                            <f5>COMPRA DE 800 ROLOS DE ETIQUETAS</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>04/26</f8>
+                            <f9>5751</f9>
+                            <f10>RIBONS E ETIQUETAS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>3.550,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>3.550,00</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=616177');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=616177');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>616177</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=615872 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227679-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=615872 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;227679-04 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>09/01/26 14:16</f2>
+                            <f3>clamir1 </f3>
+                            <f4>LIDER ETIQUETAS EIRELI</f4>
+                            <f5>COMPORA DE 400 RIBBONS</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>01/26</f8>
+                            <f9>5751</f9>
+                            <f10>RIBONS E ETIQUETAS</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>757,50</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>757,50</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=615872');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=615872');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>615872</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=628936 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;232722-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=628936 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;232722-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>24/02/26 16:52</f2>
+                            <f3>michael1</f3>
+                            <f4>SELOPLAST INDUSTRIA E COMERCIO DE PLASTICOS E METAIS LTDA</f4>
+                            <f5>BOLETO, COMPRA DE 2 CAIXAS C/ 20000 MILHAS </f5>
+                            <f6>07/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>02/26</f8>
+                            <f9>5754</f9>
+                            <f10>LACRES</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>1.600,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>1.600,00</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=628936');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=628936');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>628936</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=630424 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;233469-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=630424 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;233469-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>03/03/26 15:32</f2>
+                            <f3>clarap  </f3>
+                            <f4>CONTROL TECH</f4>
+                            <f5>EXTENCAO E SUPORTE SSW PG VIA PIX CNPJ</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5762</f9>
+                            <f10>INOVACAO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>3.000,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>3.000,00</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=630424');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=630424');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>630424</f22>
+                        </r>
+                        <r ckd="1">
+                            <f0>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=630430 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;233472-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw0099?act=630430 &amp;sequencisa=477');return(false);&gt;&lt;u &gt;233472-01 &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f0>
+                            <f1>MTZ</f1>
+                            <f2>03/03/26 15:45</f2>
+                            <f3>clarap  </f3>
+                            <f4>MARCOS GABRIEL PEREIRA ROSA</f4>
+                            <f5>PORTAL DO CLIENTE PG VIA PIX</f5>
+                            <f6>09/03/26</f6>
+                            <f7>09/03/26</f7>
+                            <f8>03/26</f8>
+                            <f9>5762</f9>
+                            <f10>INOVACAO</f10>
+                            <f11></f11>
+                            <f12>0,00</f12>
+                            <f13>0,00</f13>
+                            <f14>0,00</f14>
+                            <f15>4.200,00</f15>
+                            <f16>0,00</f16>
+                            <f17>0,00</f17>
+                            <f18>4.200,00</f18>
+                            <f19></f19>
+                            <f20>&lt;!--&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=630430');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;--&gt;&lt;u &gt;&lt;a href=# class=sra onclick=setohn();ajaxEnvia('',1,'ssw1196?act=COM &amp;seq_desp_parcela=630430');return(false);&gt;&lt;u &gt;Incluir &lt;/u &gt;&lt;/a &gt;&lt;/u &gt;</f20>
+                            <f22>630430</f22>
+                        </r>
+                    </rs>
+                </xml>
+            </div>
+            <input type=hidden name=act>
+            <input type=hidden name=web_body id=web_body value="onload%3D%22srMainButton%3D%27C%27%3Bitoffset%3D1%3BsoLista%3D%27S%27%3BsrComCheck%3Dtrue%3BloadTableData%28%29%3Bfl%28%29%3Btotalizador%28%29%3B%22">
+            <script id=mainscript type="text/javascript">
+                <!--
+                objfocus = "1";
+                objmais = "1";
+                help_file = "ssw1196.htm";
+                -->
+            </script>
+            <div style="left:0px;top:112px;">&nbsp;</div>
+        </form>
+        <div class=cabecalho>
+            &nbsp;
+            <div id=infodiv class=texto3 style="left:8px;bottom:8px;overflow:visible;">
+                <span style="color: rgb(245,245,255)">
+                    Dom &iacute;nio: <b>ACV
+                </span>
+                &nbsp;MTZ &nbsp;damasce1 &nbsp;50
+</b></div><div id=telaprog class=texto3 style="right:8px;bottom:24px;color:silver;overflow:visible">ssw1196.02 &nbsp;09/03/26 &nbsp;21:26</div>
+<div id=cablnk style="right:8px;bottom:8px;">
+    <a class=cablnk href=# onclick="window.print(); return false;">Imprimir</a>
+    &nbsp;&nbsp;&nbsp;<a class=cablnk href=# onclick="envia3('', 1, 'ssw1243');return false;">E-mails/fones</a>
+    &nbsp;&nbsp;&nbsp;<a class=cablnk href=# onclick="envia3('', 1, 'ssw0187'); return false;">Correio</a>
+    &nbsp;&nbsp;&nbsp;
+    <a class=cablnk href=# onclick="showhelp(1, '/ajuda/' + help_file);return false;">
+        <big>
+            <b>? </b>
+        </big>
+    </a>
+</div>
+<div class=tituloprog id=tituloprog>
+    <a class="tituloprog" href="/bin/menu01">SSW</a>
+    &nbsp;/&nbsp;<a class="tituloprog" href="#" help="A0013" onclick="TitleMenu01Click(this, 13);return false;">Contas a Pagar</a>
+    / <a class="tituloprog" href="#" help="B00130002" onclick="TitleMenu02Click(this, 13,2);return false">Programa &ccedil;&atilde;o de despesas</a>
+    / <span class="titulo">560 - Aprova &ccedil;&atilde;o de despesas</span>
+</div>
+</div><div id=errorpanel style="text-align:left;overflow:visible;left:0px;top:0px;height:10px;width:10px;background:white;filter:alpha(opacity=50);-moz-opacity:0.5;opacity: 0.5;visibility:hidden;z-index:1147483607;"></div>
+<div id=errormsg style="text-align:left;overflow:visible;left:185px;top:100px;height:120px;width:400px;
+visibility:hidden;z-index:1147483648;">&nbsp;</div>
+<div id=procimg style="position:absolute;left:400px;top:208px;width:200px;height:100px;
+visibility:hidden;overflow:visible;background:white;z-index:1147483649;">
+    <img src="/images/ajax-loader2.gif" style="position:absolute;left:92px;top:32px;">
+    <br>
+    <label class=texto style="color:red;font-size:8pt;top:56px;left:72px;">Aguarde ...</label>
+    <div id="id_progressoSSW" class="progressoSSW"></div>
+</div>
+</body></html><iframe name=dframe id=dframe style="position:absolute;left:10px;top:50px;height:50px;width:50px;visibility:hidden;"></iframe>

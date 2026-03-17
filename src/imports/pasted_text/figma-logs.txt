@@ -1,0 +1,118 @@
+vendor-core-ade2edecaf4781c7.min.js.br:54 [FullscreenApp] calling setEditorTheme and setting preference dark
+vendor-core-ade2edecaf4781c7.min.js.br:54 [MultiplayerSession] connecting to wss://www.figma.com/api/multiplayer/yEPjh6tvXUMt3NRqhhCWVO?role=editor&tracking_session_id=C0YcdaB5u6dsIu27&version=151&recentReload=0&file-load-streaming-compression&user-id=1565133019337327559&client_release=107bbd51e86fce9a104f472597b3e63a6aa8ffa6
+vendor-core-ade2edecaf4781c7.min.js.br:54 [FullscreenApp] calling setEditorTheme and setting preference dark
+/make/yEPjh6tvXUMt3NRqhhCWVO/Sistema-Presto---Backup-15-03-2026?t=QipfZMrFeaBhgdXb-0:1 No available adapters.Understand this warning
+8245-61d61b2c2a415443.min.js.br:7 The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127
+initialize @ 8245-61d61b2c2a415443.min.js.br:7
+await in initialize
+f @ 8245-61d61b2c2a415443.min.js.br:7
+fullscreenIsReady @ 4239-c4c06d09094e9c07.min.js.br:188
+_FigmaApp_fullscreenIsReady @ compiled_wasm.js.br:2
+$wasm-function[32493] @ compiled_wasm.wasm.br:0x1b68668
+$wasm-function[29818] @ compiled_wasm.wasm.br:0x19baf81
+callMain @ compiled_wasm.js.br:2
+e @ compiled_wasm.js.br:2
+run @ compiled_wasm.js.br:2
+removeRunDependency @ compiled_wasm.js.br:2
+e @ compiled_wasm.js.br:2
+(anonymous) @ compiled_wasm.js.br:2
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:41
+time @ 4239-c4c06d09094e9c07.min.js.br:386
+callMain @ figma_app-726b2563eb8cdce8.min.js.br:41
+d @ 4239-c4c06d09094e9c07.min.js.br:1377
+et @ figma_app-726b2563eb8cdce8.min.js.br:41
+await in et
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+await in (anonymous)
+n @ 4239-c4c06d09094e9c07.min.js.br:1625
+gr @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+await in (anonymous)
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:1919
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:1919
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:1919
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:167
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+dispatch @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:41
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:167
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:46
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+d @ 4239-c4c06d09094e9c07.min.js.br:1282
+K @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+time @ 4239-c4c06d09094e9c07.min.js.br:386
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:188
+await in (anonymous)
+tO @ 4239-c4c06d09094e9c07.min.js.br:167
+SW @ 4239-c4c06d09094e9c07.min.js.br:188
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:6
+i @ 4239-c4c06d09094e9c07.min.js.br:1249
+722024 @ figma_app-726b2563eb8cdce8.min.js.br:6
+i @ runtime~figma_app-36b5153fa3785576.min.js.br:3
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:475
+(anonymous) @ runtime~figma_app-36b5153fa3785576.min.js.br:3
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:475
+r @ runtime~figma_app-36b5153fa3785576.min.js.br:3
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:3Understand this warning
+/make/yEPjh6tvXUMt3NRqhhCWVO/Sistema-Presto---Backup-15-03-2026?t=QipfZMrFeaBhgdXb-0:1 No available adapters.Understand this warning
+/make/yEPjh6tvXUMt3NRqhhCWVO/Sistema-Presto---Backup-15-03-2026?t=QipfZMrFeaBhgdXb-0:1 No available adapters.Understand this warning
+vendor-core-ade2edecaf4781c7.min.js.br:54 [MultiplayerSession] Joining file version 106 (initial load)
+vendor-core-ade2edecaf4781c7.min.js.br:54 Migration succeeded: context: fullscreen_migrate_SceneGraphManager, version: 106, duration: 0ms.
+vendor-core-ade2edecaf4781c7.min.js.br:54 [Fullscreen] loadtime=15.25s maxmem=499129328
+vendor-core-ade2edecaf4781c7.min.js.br:54 [devtools] Initialized LS
+vendor-core-ade2edecaf4781c7.min.js.br:63  POST https://www.figma.com/api/make/fetch_ds_code_gen_status 400 (Bad Request)
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:63
+h @ vendor-191557b646cc979f.min.js.br:3
+(anonymous) @ 4239-c4c06d09094e9c07.min.js.br:1319
+T @ 4239-c4c06d09094e9c07.min.js.br:1319
+C @ 4239-c4c06d09094e9c07.min.js.br:1319
+r @ 4239-c4c06d09094e9c07.min.js.br:1319
+o @ figma_app-726b2563eb8cdce8.min.js.br:222
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:227
+(anonymous) @ figma_app-726b2563eb8cdce8.min.js.br:227
+aB @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oD @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oB @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oL @ vendor-core-ade2edecaf4781c7.min.js.br:11
+f5 @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oD @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anonymous) @ vendor-core-ade2edecaf4781c7.min.js.br:54
+S @ vendor-core-ade2edecaf4781c7.min.js.br:54
+O @ vendor-core-ade2edecaf4781c7.min.js.br:54Understand this error
+vendor-core-ade2edecaf4781c7.min.js.br:54 [devtools] Initialized LS
+vendor-core-ade2edecaf4781c7.min.js.br:63  GET https://www.figma.com/api/make/yEPjh6tvXUMt3NRqhhCWVO/cached_preview_urls?source_code_hash=118bdaa93ad8265d86ccc2e9fee70258850f0cf7 404 (Not Found)

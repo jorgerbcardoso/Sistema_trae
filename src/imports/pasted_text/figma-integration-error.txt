@@ -1,0 +1,135 @@
+devtools_worker-28bcb023fe1485d0.min.js.br:1190 [esbuild-wasm] Initializing from URL: /webpack-artifacts/assets/2b68f2d3d5e8b3d6.wasm
+devtools_worker-28bcb023fe1485d0.min.js.br:1190 [esbuild-wasm] Initialized
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Found 3 CSS files in VFS
+devtools_worker-28bcb023fe1485d0.min.js.br:3176 [bundleCode] Total CSS size to be processed by lightningcss: 0.10MB
+devtools_worker-28bcb023fe1485d0.min.js.br:3209 Error: Invalid declaration: `48864 assets/index-CUH7rUCy.css @tailwind base`
+    at uX (devtools_worker-28bcb023fe1485d0.min.js.br:1975:1794)
+    at _v (devtools_worker-28bcb023fe1485d0.min.js.br:2008:116162)
+    at _D (devtools_worker-28bcb023fe1485d0.min.js.br:3176:25)
+    at _C (devtools_worker-28bcb023fe1485d0.min.js.br:3176:198)
+    at _j (devtools_worker-28bcb023fe1485d0.min.js.br:3176:8930)
+    at async _G (devtools_worker-28bcb023fe1485d0.min.js.br:3176:7498)
+    at async m5 (devtools_worker-28bcb023fe1485d0.min.js.br:3176:4194270)
+    at async onmessage (devtools_worker-28bcb023fe1485d0.min.js.br:3209:2192)
+m5 @ devtools_worker-28bcb023fe1485d0.min.js.br:3209
+vendor-core-ade2edecaf4781c7.min.js.br:54 Failed to download files: Error: Invalid declaration: `48864 assets/index-CUH7rUCy.css @tailwind base`
+    at uX (devtools_worker-28bcb023fe1485d0.min.js.br:1975:1794)
+    at _v (devtools_worker-28bcb023fe1485d0.min.js.br:2008:116162)
+    at _D (devtools_worker-28bcb023fe1485d0.min.js.br:3176:25)
+    at _C (devtools_worker-28bcb023fe1485d0.min.js.br:3176:198)
+    at _j (devtools_worker-28bcb023fe1485d0.min.js.br:3176:8930)
+    at async _G (devtools_worker-28bcb023fe1485d0.min.js.br:3176:7498)
+    at async m5 (devtools_worker-28bcb023fe1485d0.min.js.br:3176:4194270)
+    at async onmessage (devtools_worker-28bcb023fe1485d0.min.js.br:3209:2192)
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:54
+push.386909.s.cP.o.JZ.<computed> @ vendor-191557b646cc979f.min.js.br:3
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+await in (anônimo)
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+O.eventName @ 4239-c4c06d09094e9c07.min.js.br:1377
+onPointerUp @ 4239-c4c06d09094e9c07.min.js.br:1377
+(anônimo) @ vendor-d88bce00ff902098.min.js.br:8
+push.158749.t.map.concat.reduce.Object.entries.forEach.e.<computed> @ vendor-d88bce00ff902098.min.js.br:8
+ez @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eq @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fi @ vendor-core-ade2edecaf4781c7.min.js.br:11
+ff @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oP @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eR @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fl @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nz @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nI @ vendor-core-ade2edecaf4781c7.min.js.br:11
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+vendor-core-ade2edecaf4781c7.min.js.br:63  PUT https://www.figma.com/api/integrations/github-app/plans/team/1565133021950789753/github-installations/admin/repository 400 (Bad Request)
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:63
+h @ vendor-191557b646cc979f.min.js.br:3
+(anônimo) @ 4239-c4c06d09094e9c07.min.js.br:1319
+T @ 4239-c4c06d09094e9c07.min.js.br:1319
+C @ 4239-c4c06d09094e9c07.min.js.br:1319
+i @ 4239-c4c06d09094e9c07.min.js.br:1319
+put @ 4239-c4c06d09094e9c07.min.js.br:1319
+(anônimo) @ 3733-6bc0c88924ad6833.min.js.br:3
+validate @ figma_app-726b2563eb8cdce8.min.js.br:229
+adminUpdateGithubRepository @ 3733-6bc0c88924ad6833.min.js.br:3
+L.i @ 3198-295cf359ba26bdec.min.js.br:62
+(anônimo) @ 3198-295cf359ba26bdec.min.js.br:62
+await in (anônimo)
+O.eventName @ 4239-c4c06d09094e9c07.min.js.br:1377
+onPointerUp @ 4239-c4c06d09094e9c07.min.js.br:1377
+(anônimo) @ vendor-d88bce00ff902098.min.js.br:8
+push.158749.t.map.concat.reduce.Object.entries.forEach.e.<computed> @ vendor-d88bce00ff902098.min.js.br:8
+ez @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eq @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fi @ vendor-core-ade2edecaf4781c7.min.js.br:11
+ff @ vendor-core-ade2edecaf4781c7.min.js.br:11
+(anônimo) @ vendor-core-ade2edecaf4781c7.min.js.br:11
+oP @ vendor-core-ade2edecaf4781c7.min.js.br:11
+eR @ vendor-core-ade2edecaf4781c7.min.js.br:11
+fl @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nz @ vendor-core-ade2edecaf4781c7.min.js.br:11
+nI @ vendor-core-ade2edecaf4781c7.min.js.br:11
+u @ vendor-core-ade2edecaf4781c7.min.js.br:54
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 [AutoLogin] Iniciando verificação
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Token: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Orcamento: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Pedido: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Domain: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 User: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ➡️ [AutoLogin] Sem usuário e sem token, indo para login
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ✅ [SessionTimeout] Iniciando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 [AutoLogin] Iniciando verificação
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Token: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Orcamento: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Pedido: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 Domain: null
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🔍 User: {id: 1, user_id: 1, username: 'DEMO', email: 'demo@webpresto.com.br', full_name: 'Usuário Demo', …}
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ✅ [AutoLogin] Usuário logado sem token, indo para menu
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🧹 [SessionTimeout] Limpando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ✅ [SessionTimeout] Iniciando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🧹 [SessionTimeout] Limpando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ✅ [SessionTimeout] Iniciando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🧹 [SessionTimeout] Limpando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 ✅ [SessionTimeout] Iniciando monitoramento de sessão
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 📄 [usePageTitle] Título atualizado: Sistema Presto - Gestão de Transportes
+53e9f5ed-5a17-4db4-871f-b7de9326f188-v2-figmaiframepreview.figma.site/menu:1 Access to fetch at 'https://sistema.webpresto.com.br/images/logo-branca-simples.png' from origin 'https://53e9f5ed-5a17-4db4-871f-b7de9326f188-v2-figmaiframepreview.figma.site' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+53e9f5ed-5a17-4db4-871f-b7de9326f188-v2-figmaiframepreview.figma.site/menu:1 Access to fetch at 'https://sistema.webpresto.com.br/images/logo-branca-simples.png' from origin 'https://53e9f5ed-5a17-4db4-871f-b7de9326f188-v2-figmaiframepreview.figma.site' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90  GET https://sistema.webpresto.com.br/images/logo-branca-simples.png net::ERR_FAILED
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90
+V @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+R @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+A @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in A
+I @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in I
+b @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:135
+await in b
+F @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:117
+TN @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+T8 @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+T7 @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+T6 @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+T4 @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+S1 @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+SQ @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:37
+(anônimo) @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:65
+V @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:61
+B @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:61
+eo @ code_components_preview_iframe-f4fd20809e153e7b.min.js.br:61
+sistema.webpresto.com.br/images/logo-branca-simples.png:1  Failed to load resource: net::ERR_FAILED
+code_components_preview_iframe-f4fd20809e153e7b.min.js.br:90 🧹 [SessionTimeout] Limpando monitoramento de sessão
