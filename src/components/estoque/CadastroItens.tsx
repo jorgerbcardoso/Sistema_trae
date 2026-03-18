@@ -105,7 +105,7 @@ export function CadastroItens() {
 
   // Estados para dialog de adicionar a estoque (após criação)
   const [dialogEstoqueOpen, setDialogEstoqueOpen] = useState(false);
-  const [itemCriado, setItemCriado] = useState<{seq_item: number; codigo: string} | null>(null);
+  const [itemCriado, setItemCriado] = useState<{seq_item: number; codigo: string; descricao: string} | null>(null);
   const [seqEstoque, setSeqEstoque] = useState('');
   const [qtdeItem, setQtdeItem] = useState('');
   const [salvandoPosicao, setSalvandoPosicao] = useState(false);
@@ -236,7 +236,8 @@ export function CadastroItens() {
           if (data.seq_item) {
             setItemCriado({
               seq_item: data.seq_item, 
-              codigo: data.codigo || formData.codigo
+              codigo: data.codigo || formData.codigo,
+              descricao: data.descricao || formData.descricao
             });
             setDialogEstoqueOpen(true);
             console.log('✅ Dialog de estoque deve abrir agora!');
@@ -774,37 +775,42 @@ export function CadastroItens() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* ✅ PRIMEIRA LINHA: Código e Descrição do Item */}
+            <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="text-sm font-medium text-slate-600 dark:text-slate-400">Item criado:</div>
+              <div className="flex items-baseline gap-3">
+                <span className="text-lg font-mono font-bold text-blue-600 dark:text-blue-400">
+                  {itemCriado?.codigo}
+                </span>
+                <span className="text-base text-slate-900 dark:text-slate-100">
+                  {itemCriado?.descricao}
+                </span>
+              </div>
+            </div>
+
+            {/* ✅ SEGUNDA LINHA: Estoque e Quantidade */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="codigo" className="text-slate-900 dark:text-slate-100">Código do Item</Label>
-                <Input
-                  id="codigo"
-                  value={itemCriado?.codigo || ''}
-                  readOnly
-                  className="dark:bg-slate-800 dark:border-slate-700"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="estoque" className="text-slate-900 dark:text-slate-100">Estoque</Label>
+                <Label htmlFor="estoque" className="text-slate-900 dark:text-slate-100">Estoque *</Label>
                 <FilterSelectEstoque
                   value={seqEstoque}
                   onChange={(value) => setSeqEstoque(value)}
                   placeholder="Selecione o estoque"
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="qtde_item" className="text-slate-900 dark:text-slate-100">Quantidade</Label>
-              <Input
-                id="qtde_item"
-                type="number"
-                step="0.01"
-                value={qtdeItem}
-                onChange={(e) => setQtdeItem(e.target.value)}
-                className="dark:bg-slate-800 dark:border-slate-700"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="qtde_item" className="text-slate-900 dark:text-slate-100">Quantidade *</Label>
+                <Input
+                  id="qtde_item"
+                  type="number"
+                  step="0.01"
+                  value={qtdeItem}
+                  onChange={(e) => setQtdeItem(e.target.value)}
+                  placeholder="0.00"
+                  className="dark:bg-slate-800 dark:border-slate-700"
+                />
+              </div>
             </div>
           </div>
 
@@ -830,6 +836,9 @@ export function CadastroItens() {
                     body: JSON.stringify({
                       seq_item: itemCriado?.seq_item,
                       seq_estoque: parseInt(seqEstoque),
+                      rua: 'PSO', // ✅ POSIÇÃO PADRÃO
+                      altura: 1,  // ✅ POSIÇÃO PADRÃO
+                      coluna: 1,  // ✅ POSIÇÃO PADRÃO
                       qtde_item: parseFloat(qtdeItem)
                     })
                   });
