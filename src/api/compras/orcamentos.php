@@ -257,21 +257,22 @@ try {
                         $seq_item = intval($cot['seq_item']);
                         $qtde_item = floatval($cot['qtde_item']);
                         $vlr_estoque = floatval($cot['vlr_estoque'] ?? 0);
-                        $vlr_fornecedor = floatval($cot['vlr_fornecedor']);
+                        $vlr_fornecedor = floatval($cot['vlr_fornecedor'] ?? 0);
                         $prazo_entrega = intval($cot['prazo_entrega'] ?? 0);
                         $obs = trim($cot['observacao'] ?? '');
+                        $link = trim($cot['link'] ?? ''); // ✅ NOVO: campo link
                         
                         $vlr_total = $qtde_item * $vlr_fornecedor;
                         
                         $queryCot = "INSERT INTO $tblOrcamentoCotacao 
                                     (seq_orcamento, seq_fornecedor, seq_ordem_compra, seq_item, qtde_item, 
-                                     vlr_estoque, vlr_fornecedor, vlr_total, prazo_entrega, observacao) 
-                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+                                     vlr_estoque, vlr_fornecedor, vlr_total, prazo_entrega, observacao, link) 
+                                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
                         
                         // ✅ PADRÃO CORRETO: sql($query, $params, $g_sql)
                         sql($queryCot, [
                             $seq_orcamento, $seq_fornecedor, $seq_ordem_compra, $seq_item, $qtde_item,
-                            $vlr_estoque, $vlr_fornecedor, $vlr_total, $prazo_entrega, $obs
+                            $vlr_estoque, $vlr_fornecedor, $vlr_total, $prazo_entrega, $obs, $link
                         ], $g_sql);
                     }
                     

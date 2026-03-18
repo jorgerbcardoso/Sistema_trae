@@ -634,6 +634,7 @@ function obterItensCotacao($g_sql, $dominio, $seq_orcamento, $seq_fornecedor) {
                 cc.nro_centro_custo,
                 cc.descricao as centro_custo_descricao,
                 cot.vlr_fornecedor,
+                cot.link,
                 cot.seq_orcamento_cotacao
               FROM {$tabela_orcamento_oc} oo
               INNER JOIN {$tabela_ordem} oc ON oc.seq_ordem_compra = oo.seq_ordem_compra
