@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Plus, Edit, Trash2, Loader2, MapPin, Map, List, RotateCcw } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, MapPin, Map, List, RotateCcw, Package, DollarSign, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -39,6 +39,11 @@ interface Posicao {
   item_descricao: string | null;
 }
 
+interface Item {
+  seq_item: number;
+  vlr_item: number;
+}
+
 interface FormData {
   seq_posicao?: number;
   seq_estoque: string;
@@ -53,6 +58,7 @@ export function CadastroPosicoes() {
   usePageTitle('Posições de Estoque');
 
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
+  const [itens, setItens] = useState<Item[]>([]); // ✅ NOVO: armazenar itens com valores
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editando, setEditando] = useState(false);
@@ -80,6 +86,11 @@ export function CadastroPosicoes() {
     'ativa' | 'unidade' | 'rua' | 'altura' | 'coluna' | 'item_codigo' | 'saldo'
   >('rua', 'asc');
 
+  // ✅ Carregar itens com valores ao montar o componente
+  useEffect(() => {
+    carregarItens();
+  }, []);
+
   useEffect(() => {
     // ✅ CORRIGIDO: Só carregar posições se houver estoque selecionado
     if (filtroEstoque) {
@@ -89,6 +100,29 @@ export function CadastroPosicoes() {
       setPosicoes([]);
     }
   }, [filtroEstoque, filtroRua, filtroColuna, filtroAltura, filtroItem, filtroTipoItem]);
+
+  const carregarItens = async () => {
+    try {
+      if (ENVIRONMENT.isFigmaMake) {
+        // Mock: usar dados do MOCK_ITENS
+        setItens(MOCK_ITENS.map(i => ({ seq_item: i.seq_item, vlr_item: i.vlr_item || 0 })));
+      } else {
+        // Backend real
+        const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/estoque/itens.php?ativo=S`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            'X-Unidade': sessionStorage.getItem('unidade') || ''
+          }
+        });
+        const data = await response.json();
+        if (data.success) {
+          setItens(data.data.map((i: any) => ({ seq_item: i.seq_item, vlr_item: i.vlr_item || 0 })));
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar itens:', error);
+    }
+  };
 
   const carregarPosicoes = async () => {
     setLoading(true);
@@ -327,6 +361,47 @@ export function CadastroPosicoes() {
   const mapa = organizarMapa();
   const ruas = Object.keys(mapa).sort();
 
+  // ✅ CALCULAR TOTAIS (apenas posições ativas)
+  const totais = useMemo(() => {
+    const posicoesAtivas = posicoes.filter(p => p.ativa === 'S');
+    
+    // Total de endereços únicos (rua + altura + coluna)
+    const enderecosUnicos = new Set(
+      posicoesAtivas.map(p => `${p.rua}-${p.altura}-${p.coluna}`)
+    );
+    
+    // Total de itens únicos
+    const itensUnicos = new Set(
+      posicoesAtivas.filter(p => p.seq_item).map(p => p.seq_item)
+    );
+    
+    // Saldo total
+    const saldoTotal = posicoesAtivas.reduce((sum, p) => sum + p.saldo, 0);
+    
+    // Valor total (saldo * valor unitário)
+    const valorTotal = posicoesAtivas.reduce((sum, p) => {
+      const item = itens.find(i => i.seq_item === p.seq_item);
+      const vlrUnitario = item?.vlr_item || 0;
+      return sum + (p.saldo * vlrUnitario);
+    }, 0);
+    
+    return {
+      posicoes: enderecosUnicos.size,
+      itens: itensUnicos.size,
+      saldo: saldoTotal,
+      valor: valorTotal
+    };
+  }, [posicoes, itens]);
+
+  // ✅ Formatar números no padrão brasileiro
+  const formatarNumero = (num: number) => {
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatarValor = (num: number) => {
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, style: 'currency', currency: 'BRL' });
+  };
+
   return (
     <AdminLayout
       title="POSIÇÕES DE ESTOQUE"
@@ -405,6 +480,71 @@ export function CadastroPosicoes() {
             </div>
           </CardContent>
         </Card>
+
+        {/* ✅ CARDS DE TOTAIS */}
+        {filtroEstoque && posicoes.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Card: Posições (Endereços) */}
+            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Posições</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.posicoes}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Warehouse className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card: Itens */}
+            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Itens</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.itens}</p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                    <Package className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card: Saldo Total */}
+            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Saldo Total</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatarNumero(totais.saldo)}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <MapPin className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card: Valor Total */}
+            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Valor Total</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatarValor(totais.valor)}</p>
+                  </div>
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Controles */}
         <div className="flex items-center justify-between">
