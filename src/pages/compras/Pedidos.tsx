@@ -68,7 +68,6 @@ export default function Pedidos() {
   const [ordensCompraDisp, setOrdensCompraDisp] = useState(0);
 
   // Filtros
-  const [filtroFornecedor, setFiltroFornecedor] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState(() => {
     // ✅ Padrão: 30 dias atrás
     const dataInicio = new Date();
@@ -208,11 +207,6 @@ export default function Pedidos() {
       if (!match) return false;
     }
 
-    // Filtro de fornecedor
-    if (filtroFornecedor && !pedido.fornecedor_nome?.toLowerCase().includes(filtroFornecedor.toLowerCase())) {
-      return false;
-    }
-
     // Filtro de status
     if (filtroStatus && pedido.status !== filtroStatus) {
       return false;
@@ -239,7 +233,6 @@ export default function Pedidos() {
   const totalFinalizados = pedidosFiltrados.filter(p => p.status === 'E').length; // ✅ ENTREGUE (E)
 
   const limparFiltros = () => {
-    setFiltroFornecedor('');
     setFiltroDataInicio('');
     setFiltroDataFim('');
     setFiltroStatus('');
@@ -359,20 +352,16 @@ export default function Pedidos() {
               </div>
 
               {/* Linha 2 - Filtros específicos */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div>
-                  <Input
-                    value={filtroFornecedor}
-                    onChange={(e) => setFiltroFornecedor(e.target.value)}
-                    placeholder="Filtrar por fornecedor..."
-                  />
-                </div>
-
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Filtro de Status */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Status
+                  </label>
                   <select
                     value={filtroStatus}
                     onChange={(e) => setFiltroStatus(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                    className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">Todos os status</option>
                     <option value="A">AGUARDANDO APROVAÇÃO</option>
@@ -381,27 +370,33 @@ export default function Pedidos() {
                   </select>
                 </div>
 
-                <div>
+                {/* Filtro de Data Início */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Data Inclusão - Início
+                  </label>
                   <Input
                     type="date"
                     value={filtroDataInicio}
                     onChange={(e) => setFiltroDataInicio(e.target.value)}
-                    placeholder="Data início"
                   />
                 </div>
 
-                <div>
+                {/* Filtro de Data Fim */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Data Inclusão - Fim
+                  </label>
                   <Input
                     type="date"
                     value={filtroDataFim}
                     onChange={(e) => setFiltroDataFim(e.target.value)}
-                    placeholder="Data fim"
                   />
                 </div>
               </div>
 
               {/* Botão limpar filtros */}
-              {(filtroFornecedor || filtroStatus || filtroDataInicio || filtroDataFim || filtroBusca) && (
+              {(filtroStatus || filtroDataInicio || filtroDataFim || filtroBusca) && (
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" onClick={limparFiltros} className="gap-2">
                     <Filter className="size-4" />
