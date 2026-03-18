@@ -42,12 +42,12 @@ interface Item {
 interface Posicao {
   seq_posicao: number;
   seq_estoque: number;
-  estoque_codigo: string;
+  estoque_codigo: number;
   estoque_unidade: string;
   rua: string;
   altura: number;
   coluna: number;
-  qtde_item: number;
+  saldo: number;
 }
 
 interface TipoItem {
@@ -229,12 +229,20 @@ export function CadastroItens() {
         carregarItens();
         
         // Se for criação, abrir dialog de adicionar ao estoque
-        if (!editando && data.data) {
-          setItemCriado({
-            seq_item: data.data.seq_item || 0, 
-            codigo: data.data.codigo || formData.codigo
-          });
-          setDialogEstoqueOpen(true);
+        if (!editando) {
+          console.log('🔍 DEBUG - Item criado:', data);
+          console.log('🔍 DEBUG - data.data:', data.data);
+          
+          if (data.data && data.data.seq_item) {
+            setItemCriado({
+              seq_item: data.data.seq_item, 
+              codigo: data.data.codigo || formData.codigo
+            });
+            setDialogEstoqueOpen(true);
+            console.log('✅ Dialog de estoque deve abrir agora!');
+          } else {
+            console.warn('⚠️ data.data ou seq_item não encontrado');
+          }
         }
       }
       // ✅ Se success=false, o toast já foi exibido pelo apiUtils (msg() do backend)
@@ -690,7 +698,7 @@ export function CadastroItens() {
                         <TableBody>
                           {posicoes.map((posicao) => {
                             const valorUnitario = parseFloat(formData.vlr_item) || 0;
-                            const qtdeItem = posicao.qtde_item || 0;
+                            const qtdeItem = posicao.saldo || 0;
                             const valorTotal = valorUnitario * qtdeItem;
                             const estoqueFormatado = `${posicao.estoque_unidade || ''}${String(posicao.estoque_codigo || '0').padStart(6, '0')}`;
                             const endereco = `${posicao.rua || 'PSO'}/${posicao.altura || 1}/${posicao.coluna || 1}`;
@@ -712,10 +720,10 @@ export function CadastroItens() {
                           <TableRow className="bg-slate-50 dark:bg-slate-800/50 font-semibold">
                             <TableCell colSpan={2} className="text-right">TOTAL:</TableCell>
                             <TableCell className="text-right font-mono">
-                              {posicoes.reduce((acc, p) => acc + (p.qtde_item || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {posicoes.reduce((acc, p) => acc + (p.saldo || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              R$ {posicoes.reduce((acc, p) => acc + ((parseFloat(formData.vlr_item) || 0) * (p.qtde_item || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              R$ {posicoes.reduce((acc, p) => acc + ((parseFloat(formData.vlr_item) || 0) * (p.saldo || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                           </TableRow>
                         </TableBody>
