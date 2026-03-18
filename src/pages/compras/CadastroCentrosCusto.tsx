@@ -117,10 +117,48 @@ export default function CadastroCentrosCusto() {
     }
   };
 
-  const handleNew = () => {
+  // ✅ NOVO: Buscar próximo número disponível para a unidade
+  const buscarProximoNumero = async (unidade: string): Promise<string> => {
+    if (!unidade || unidade === 'TODAS') return '';
+
+    try {
+      if (ENVIRONMENT.isFigmaMake) {
+        // MOCK: Buscar maior número da unidade nos dados locais
+        const centrosDaUnidade = centrosCusto.filter(cc => cc.unidade === unidade);
+        if (centrosDaUnidade.length === 0) {
+          return '000001'; // Primeiro centro de custo da unidade
+        }
+
+        const maiorNumero = Math.max(
+          ...centrosDaUnidade.map(cc => parseInt(cc.nro_centro_custo) || 0)
+        );
+        const proximoNumero = maiorNumero + 1;
+        return proximoNumero.toString().padStart(6, '0');
+      } else {
+        // BACKEND: Buscar próximo número da API
+        const data = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/compras/centros_custo.php?acao=proximo_numero&unidade=${unidade}`,
+          { method: 'GET' }
+        );
+
+        if (data.success && data.proximo_numero) {
+          return data.proximo_numero;
+        }
+        return '000001';
+      }
+    } catch (error) {
+      console.error('Erro ao buscar próximo número:', error);
+      return '';
+    }
+  };
+
+  const handleNew = async () => {
+    const unidadeInicial = user?.unidade || '';
+    const numeroSugerido = await buscarProximoNumero(unidadeInicial);
+    
     setFormData({
-      unidade: user?.unidade || '',
-      nro_centro_custo: '',
+      unidade: unidadeInicial,
+      nro_centro_custo: numeroSugerido,
       descricao: '',
       ativo: 'S'
     });
@@ -128,6 +166,17 @@ export default function CadastroCentrosCusto() {
     setIsEditing(false);
     setIsDialogOpen(true);
   };
+
+  // ✅ NOVO: Reagir à mudança de unidade e sugerir novo número
+  useEffect(() => {
+    if (isDialogOpen && !isEditing && formData.unidade) {
+      buscarProximoNumero(formData.unidade).then(numero => {
+        if (numero) {
+          setFormData(prev => ({ ...prev, nro_centro_custo: numero }));
+        }
+      });
+    }
+  }, [formData.unidade, isDialogOpen, isEditing]);
 
   const handleEdit = (centro: CentroCusto) => {
     setFormData({
@@ -153,6 +202,12 @@ export default function CadastroCentrosCusto() {
       return;
     }
 
+    // ✅ NOVO: Validar se é numérico
+    if (!/^\d+$/.test(formData.nro_centro_custo)) {
+      toast.error('Número do centro de custo deve conter apenas dígitos');
+      return;
+    }
+
     if (!formData.descricao.trim()) {
       toast.error('Descrição é obrigatória');
       return;
@@ -160,6 +215,9 @@ export default function CadastroCentrosCusto() {
 
     try {
       setIsSaving(true);
+
+      // ✅ NOVO: Formatar número com 6 dígitos
+      const nroCentroCustoFormatado = formData.nro_centro_custo.padStart(6, '0');
 
       if (ENVIRONMENT.isFigmaMake) {
         // ✅ MOCK: Simular salvamento
@@ -172,7 +230,7 @@ export default function CadastroCentrosCusto() {
               ? {
                   ...cc,
                   unidade: toUpperCase(formData.unidade),
-                  nro_centro_custo: toUpperCase(formData.nro_centro_custo),
+                  nro_centro_custo: nroCentroCustoFormatado, // ✅ FORMATADO
                   descricao: toUpperCase(formData.descricao),
                   ativo: formData.ativo
                 }
@@ -183,7 +241,7 @@ export default function CadastroCentrosCusto() {
           const novoCentro: CentroCusto = {
             seq_centro_custo: Math.max(...centrosCusto.map(cc => cc.seq_centro_custo), 0) + 1,
             unidade: toUpperCase(formData.unidade),
-            nro_centro_custo: toUpperCase(formData.nro_centro_custo),
+            nro_centro_custo: nroCentroCustoFormatado, // ✅ FORMATADO
             descricao: toUpperCase(formData.descricao),
             ativo: formData.ativo,
             data_inclusao: new Date().toISOString().split('T')[0],
@@ -198,7 +256,7 @@ export default function CadastroCentrosCusto() {
         // ✅ BACKEND
         const payload = {
           unidade: toUpperCase(formData.unidade),
-          nro_centro_custo: toUpperCase(formData.nro_centro_custo),
+          nro_centro_custo: nroCentroCustoFormatado, // ✅ FORMATADO
           descricao: toUpperCase(formData.descricao),
           ativo: formData.ativo
         };
@@ -493,11 +551,19 @@ export default function CadastroCentrosCusto() {
               <Label htmlFor="nro_centro_custo">Número *</Label>
               <Input
                 id="nro_centro_custo"
+                type="text"
                 value={formData.nro_centro_custo}
-                onChange={(e) => setFormData({ ...formData, nro_centro_custo: e.target.value })}
-                placeholder="Ex: CC-001"
-                maxLength={20}
+                onChange={(e) => {
+                  // ✅ NOVO: Aceitar apenas dígitos
+                  const valor = e.target.value.replace(/\D/g, '');
+                  setFormData({ ...formData, nro_centro_custo: valor });
+                }}
+                placeholder="000001"
+                maxLength={6}
               />
+              <p className="text-xs text-gray-500">
+                Digite apenas números. Será gravado com 6 dígitos (ex: 000001)
+              </p>
             </div>
 
             <div className="grid gap-2">

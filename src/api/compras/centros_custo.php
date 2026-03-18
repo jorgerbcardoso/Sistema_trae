@@ -34,6 +34,33 @@ try {
     
     switch ($method) {
         case 'GET':
+            // ✅ NOVO: Buscar próximo número disponível para uma unidade
+            if (isset($_GET['acao']) && $_GET['acao'] === 'proximo_numero') {
+                $unidade = $_GET['unidade'] ?? '';
+                
+                if (empty($unidade)) {
+                    msg('UNIDADE É OBRIGATÓRIA', 'error', 400);
+                }
+                
+                // ✅ Buscar maior nro_centro_custo da unidade
+                $query = "SELECT COALESCE(MAX(CAST(nro_centro_custo AS INTEGER)), 0) AS maior_numero 
+                         FROM $tblCentroCusto 
+                         WHERE unidade = $1 
+                         AND nro_centro_custo ~ '^[0-9]+$'"; // Apenas numéricos
+                
+                $result = sql($query, [strtoupper($unidade)], $g_sql);
+                $row = pg_fetch_assoc($result);
+                
+                $proximoNumero = ($row['maior_numero'] ?? 0) + 1;
+                $proximoNumeroFormatado = str_pad($proximoNumero, 6, '0', STR_PAD_LEFT);
+                
+                echo json_encode([
+                    'success' => true,
+                    'proximo_numero' => $proximoNumeroFormatado
+                ]);
+                exit;
+            }
+            
             // LISTAR ou BUSCAR POR ID
             if (isset($_GET['seq_centro_custo'])) {
                 $seq = intval($_GET['seq_centro_custo']);
@@ -114,6 +141,14 @@ try {
             $descricao = strtoupper(trim($input['descricao'] ?? ''));
             $ativo = $input['ativo'] ?? 'S';
             
+            // ✅ NOVO: Garantir que o número tenha 6 dígitos
+            if (!empty($nro_centro_custo)) {
+                // Remover qualquer formatação e manter só números
+                $nro_centro_custo = preg_replace('/\D/', '', $nro_centro_custo);
+                // Formatar com 6 dígitos
+                $nro_centro_custo = str_pad($nro_centro_custo, 6, '0', STR_PAD_LEFT);
+            }
+            
             if (empty($unidade) || empty($nro_centro_custo) || empty($descricao)) {
                 msg('CAMPOS OBRIGATÓRIOS NÃO PREENCHIDOS', 'error', 400);
             }
@@ -148,7 +183,7 @@ try {
                 msg('ID DO CENTRO DE CUSTO INVÁLIDO', 'error', 400);
             }
             
-            // ✅ OBTER DADOS ATUAIS DO CENTRO DE CUSTO
+            // �� OBTER DADOS ATUAIS DO CENTRO DE CUSTO
             // ✅ PADRÃO CORRETO: sql($query, $params, $g_sql)
             $checkCentroCusto = sql("SELECT unidade FROM $tblCentroCusto WHERE seq_centro_custo = $1", [$seq], $g_sql);
             if (pg_num_rows($checkCentroCusto) === 0) {
@@ -160,6 +195,14 @@ try {
             $nro_centro_custo = strtoupper(trim($input['nro_centro_custo'] ?? ''));
             $descricao = strtoupper(trim($input['descricao'] ?? ''));
             $ativo = $input['ativo'] ?? 'S';
+            
+            // ✅ NOVO: Garantir que o número tenha 6 dígitos
+            if (!empty($nro_centro_custo)) {
+                // Remover qualquer formatação e manter só números
+                $nro_centro_custo = preg_replace('/\D/', '', $nro_centro_custo);
+                // Formatar com 6 dígitos
+                $nro_centro_custo = str_pad($nro_centro_custo, 6, '0', STR_PAD_LEFT);
+            }
             
             if (empty($unidade) || empty($nro_centro_custo) || empty($descricao)) {
                 msg('CAMPOS OBRIGATÓRIOS NÃO PREENCHIDOS', 'error', 400);

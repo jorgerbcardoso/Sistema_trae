@@ -75,6 +75,7 @@ function listarOrdens($g_sql, $dominio, $user_unidade, $isMtzOrAll) {
     $data_fim = $_GET['data_fim'] ?? null;
     $unidade_filtro = $_GET['unidade'] ?? null;
     $seq_centro_custo_filtro = $_GET['seq_centro_custo'] ?? null;
+    $nro_setor_filtro = $_GET['nro_setor'] ?? null; // ✅ NOVO: Filtro de setor
     
     $tabela_ordem = $dominio . '_ordem_compra';
     $tabela_centro = $dominio . '_centro_custo';
@@ -150,6 +151,13 @@ function listarOrdens($g_sql, $dominio, $user_unidade, $isMtzOrAll) {
     if ($seq_centro_custo_filtro && $seq_centro_custo_filtro !== 'TODOS') {
         $query .= " AND oc.seq_centro_custo = $" . $param_count;
         $params[] = $seq_centro_custo_filtro;
+        $param_count++;
+    }
+    
+    // Filtro por setor
+    if ($nro_setor_filtro && $nro_setor_filtro !== 'TODOS') {
+        $query .= " AND oc.nro_setor = $" . $param_count;
+        $params[] = $nro_setor_filtro;
         $param_count++;
     }
     
