@@ -1,0 +1,207 @@
+index-Cw3UVC0u.js:8661 🔄 [SessionTimeout] Atividade detectada, resetando timers
+index-Cw3UVC0u.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/estoque/itens.php
+index-Cw3UVC0u.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-Cw3UVC0u.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 201c4883b5a41659c5ed81ad843011086922b8b632b471fadcf21102d06072ca', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-Cw3UVC0u.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-Cw3UVC0u.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-Cw3UVC0u.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "seq_item": 29
+}
+index-Cw3UVC0u.js:8617 ⚠️ [apiUtils] Nenhum toast encontrado na resposta
+index-Cw3UVC0u.js:8617 🌐 [apiFetch] Chamando: https://webpresto.com.br/sistema/api/estoque/itens.php?
+index-Cw3UVC0u.js:8617 🌐 [apiFetch] ENVIRONMENT.isFigmaMake: false
+index-Cw3UVC0u.js:8617 📤 [apiFetch] Headers enviados: {Content-Type: 'application/json', Authorization: 'Bearer 201c4883b5a41659c5ed81ad843011086922b8b632b471fadcf21102d06072ca', X-Domain: 'DMN', X-Unidade: 'MTZ'}
+index-Cw3UVC0u.js:8948 🔍 DEBUG - Item criado: {success: true, seq_item: 29}
+index-Cw3UVC0u.js:8948 🔍 DEBUG - data.data: undefined
+index-Cw3UVC0u.js:8948 ⚠️ data.data ou seq_item não encontrado
+X @ index-Cw3UVC0u.js:8948
+await in X
+be @ index-Cw3UVC0u.js:37
+Ye @ index-Cw3UVC0u.js:37
+dt @ index-Cw3UVC0u.js:37
+RX @ index-Cw3UVC0u.js:37
+qX @ index-Cw3UVC0u.js:37
+(anônimo) @ index-Cw3UVC0u.js:37
+SB @ index-Cw3UVC0u.js:40
+Vt @ index-Cw3UVC0u.js:37
+SF @ index-Cw3UVC0u.js:37
+cF @ index-Cw3UVC0u.js:37
+Wxe @ index-Cw3UVC0u.js:37
+index-Cw3UVC0u.js:8617 📥 [apiFetch] Resposta recebida: 200 
+index-Cw3UVC0u.js:8617 🔍 [apiUtils] Content-Type: application/json; charset=UTF-8
+index-Cw3UVC0u.js:8617 📦 [apiUtils] Dados recebidos: {
+  "success": true,
+  "data": [
+    {
+      "seq_item": 1,
+      "codigo": "1",
+      "codigo_fabricante": "FAB-MP-001",
+      "descricao": "AÇO CARBONO 1020 CHAPA 3MM",
+      "seq_tipo_item": 1,
+      "seq_unidade_medida": 3,
+      "vlr_item": 1,
+      "estoque_minimo": 100,
+      "estoque_maximo": 500,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.048053",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": "2026-02-07",
+      "hora_alteracao": "19:31:26.492376",
+      "login_alteracao": "PRESTO",
+      "tipo_descricao": "MATÉRIA PRIMA",
+      "unidade_medida_sigla": "M"
+    },
+    {
+      "seq_item": 10,
+      "codigo": "10",
+      "codigo_fabricante": "MAKITA-002",
+      "descricao": "ESMERILHADEIRA ANGULAR 7POL",
+      "seq_tipo_item": 6,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 3,
+      "estoque_maximo": 15,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.050612",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "FERRAMENTA",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 11,
+      "codigo": "11",
+      "codigo_fabricante": "DEWALT-003",
+      "descricao": "PARAFUSADEIRA SEM FIO 12V",
+      "seq_tipo_item": 6,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 5,
+      "estoque_maximo": 20,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.050612",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "FERRAMENTA",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 12,
+      "codigo": "12",
+      "codigo_fabricante": "REP-001",
+      "descricao": "ROLAMENTO SKF 6205",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 20,
+      "estoque_maximo": 100,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 13,
+      "codigo": "13",
+      "codigo_fabricante": "REP-002",
+      "descricao": "CORREIA SINCRONIZADA HTD 8M",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 1,
+      "estoque_minimo": 10,
+      "estoque_maximo": 50,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 14,
+      "codigo": "14",
+      "codigo_fabricante": "REP-003",
+      "descricao": "FILTRO DE AR COMPRESSOR",
+      "seq_tipo_item": 7,
+      "seq_unidade_medida": 1,
+      "vlr_item": 65,
+      "estoque_minimo": 15,
+      "estoque_maximo": 80,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.051376",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "PEÇA DE REPOSIÇÃO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 15,
+      "codigo": "15",
+      "codigo_fabricante": "OF-001",
+      "descricao": "PAPEL A4 RESMA 500 FOLHAS",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 1,
+      "vlr_item": 25,
+      "estoque_minimo": 50,
+      "estoque_maximo": 200,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.052024",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "MATERIAL DE ESCRITÓRIO",
+      "unidade_medida_sigla": "UN"
+    },
+    {
+      "seq_item": 16,
+      "codigo": "16",
+      "codigo_fabricante": "OF-002",
+      "descricao": "CANETA ESFEROGRÁFICA AZUL",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 5,
+      "vlr_item": 15,
+      "estoque_minimo": 20,
+      "estoque_maximo": 100,
+      "ativo": "S",
+      "data_inclusao": "2026-01-28",
+      "hora_inclusao": "22:36:01.052024",
+      "login_inclusao": "ADMIN",
+      "data_alteracao": null,
+      "hora_alteracao": null,
+      "login_alteracao": null,
+      "tipo_descricao": "MATERIAL DE ESCRITÓRIO",
+      "unidade_medida_sigla": "CX"
+    },
+    {
+      "seq_item": 17,
+      "codigo": "17",
+      "codigo_fabricante": "OF-003",
+      "descricao": "TONER HP CF283A",
+      "seq_tipo_item": 4,
+      "seq_unidade_medida": 1,
+      "vlr_item": 180,
+      "estoque_minimo": 5,
+      "estoque_maximo": 30,
+      "ativo": "S",
+      "data_inclusao": "

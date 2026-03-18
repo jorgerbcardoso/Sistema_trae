@@ -42,8 +42,8 @@ interface Item {
 interface Posicao {
   seq_posicao: number;
   seq_estoque: number;
-  estoque_codigo: number;
-  estoque_unidade: string;
+  nro_estoque: number;
+  unidade: string;
   rua: string;
   altura: number;
   coluna: number;
@@ -231,17 +231,17 @@ export function CadastroItens() {
         // Se for criação, abrir dialog de adicionar ao estoque
         if (!editando) {
           console.log('🔍 DEBUG - Item criado:', data);
-          console.log('🔍 DEBUG - data.data:', data.data);
           
-          if (data.data && data.data.seq_item) {
+          // ✅ CORREÇÃO: Backend retorna seq_item direto, não em data.data
+          if (data.seq_item) {
             setItemCriado({
-              seq_item: data.data.seq_item, 
-              codigo: data.data.codigo || formData.codigo
+              seq_item: data.seq_item, 
+              codigo: data.codigo || formData.codigo
             });
             setDialogEstoqueOpen(true);
             console.log('✅ Dialog de estoque deve abrir agora!');
           } else {
-            console.warn('⚠️ data.data ou seq_item não encontrado');
+            console.warn('⚠️ seq_item não encontrado na resposta');
           }
         }
       }
@@ -700,7 +700,7 @@ export function CadastroItens() {
                             const valorUnitario = parseFloat(formData.vlr_item) || 0;
                             const qtdeItem = posicao.saldo || 0;
                             const valorTotal = valorUnitario * qtdeItem;
-                            const estoqueFormatado = `${posicao.estoque_unidade || ''}${String(posicao.estoque_codigo || '0').padStart(6, '0')}`;
+                            const estoqueFormatado = `${posicao.unidade || ''}${String(posicao.nro_estoque || '0').padStart(6, '0')}`;
                             const endereco = `${posicao.rua || 'PSO'}/${posicao.altura || 1}/${posicao.coluna || 1}`;
                             
                             return (
