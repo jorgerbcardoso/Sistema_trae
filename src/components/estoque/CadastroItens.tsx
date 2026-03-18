@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Plus, Edit, Trash2, Loader2, Package, Search, Filter, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Package, Search, Filter, X, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -14,6 +14,7 @@ import { Checkbox } from '../ui/checkbox';
 import { apiFetch } from '../../utils/apiUtils';
 import { SortableTableHeader, useSortableTable } from '../table/SortableTableHeader';
 import { FilterSelectTipoItem } from './FilterSelectTipoItem';
+import { FilterSelectEstoque } from '../shared/FilterSelectEstoque';
 import {
   Table,
   TableBody,
@@ -101,6 +102,13 @@ export function CadastroItens() {
   // Estado para posições (apenas quando editando)
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
   const [loadingPosicoes, setLoadingPosicoes] = useState(false);
+
+  // Estados para dialog de adicionar a estoque (após criação)
+  const [dialogEstoqueOpen, setDialogEstoqueOpen] = useState(false);
+  const [itemCriado, setItemCriado] = useState<{seq_item: number; codigo: string} | null>(null);
+  const [seqEstoque, setSeqEstoque] = useState('');
+  const [qtdeItem, setQtdeItem] = useState('');
+  const [salvandoPosicao, setSalvandoPosicao] = useState(false);
 
   useEffect(() => {
     carregarTipos();
@@ -219,9 +227,17 @@ export function CadastroItens() {
         toast.success(editando ? 'Item atualizado com sucesso!' : 'Item cadastrado com sucesso!');
         setDialogOpen(false);
         carregarItens();
+        
+        // Se for criação, abrir dialog de adicionar ao estoque
+        if (!editando && data.data) {
+          setItemCriado({
+            seq_item: data.data.seq_item || 0, 
+            codigo: data.data.codigo || formData.codigo
+          });
+          setDialogEstoqueOpen(true);
+        }
       }
       // ✅ Se success=false, o toast já foi exibido pelo apiUtils (msg() do backend)
-      // Não precisamos fazer nada aqui
     } catch (error) {
       // ✅ Erro de comunicação (network error, etc) - não relacionado ao backend
       console.error('Erro ao salvar item:', error);
@@ -515,6 +531,9 @@ export function CadastroItens() {
             <DialogTitle className="text-card-foreground">
               {editando ? 'Editar Item' : 'Novo Item'}
             </DialogTitle>
+            <DialogDescription>
+              {editando ? 'Atualize os detalhes do item' : 'Insira os detalhes do novo item'}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -671,16 +690,17 @@ export function CadastroItens() {
                         <TableBody>
                           {posicoes.map((posicao) => {
                             const valorUnitario = parseFloat(formData.vlr_item) || 0;
-                            const valorTotal = valorUnitario * posicao.qtde_item;
-                            const estoqueFormatado = `${posicao.estoque_unidade}${String(posicao.estoque_codigo).padStart(6, '0')}`;
-                            const endereco = `${posicao.rua}/${posicao.altura}/${posicao.coluna}`;
+                            const qtdeItem = posicao.qtde_item || 0;
+                            const valorTotal = valorUnitario * qtdeItem;
+                            const estoqueFormatado = `${posicao.estoque_unidade || ''}${String(posicao.estoque_codigo || '0').padStart(6, '0')}`;
+                            const endereco = `${posicao.rua || 'PSO'}/${posicao.altura || 1}/${posicao.coluna || 1}`;
                             
                             return (
                               <TableRow key={posicao.seq_posicao}>
                                 <TableCell className="font-mono text-sm">{estoqueFormatado}</TableCell>
                                 <TableCell className="font-mono text-sm">{endereco}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">
-                                  {posicao.qtde_item.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {qtdeItem.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -692,10 +712,10 @@ export function CadastroItens() {
                           <TableRow className="bg-slate-50 dark:bg-slate-800/50 font-semibold">
                             <TableCell colSpan={2} className="text-right">TOTAL:</TableCell>
                             <TableCell className="text-right font-mono">
-                              {posicoes.reduce((acc, p) => acc + p.qtde_item, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {posicoes.reduce((acc, p) => acc + (p.qtde_item || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              R$ {posicoes.reduce((acc, p) => acc + ((parseFloat(formData.vlr_item) || 0) * p.qtde_item), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              R$ {posicoes.reduce((acc, p) => acc + ((parseFloat(formData.vlr_item) || 0) * (p.qtde_item || 0)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                           </TableRow>
                         </TableBody>
@@ -727,6 +747,110 @@ export function CadastroItens() {
                 </>
               ) : (
                 'Salvar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Adicionar ao Estoque */}
+      <Dialog open={dialogEstoqueOpen} onOpenChange={setDialogEstoqueOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-card max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-card-foreground">
+              Adicionar ao Estoque
+            </DialogTitle>
+            <DialogDescription>
+              Adicione o item recém criado a um estoque
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="codigo" className="text-slate-900 dark:text-slate-100">Código do Item</Label>
+                <Input
+                  id="codigo"
+                  value={itemCriado?.codigo || ''}
+                  readOnly
+                  className="dark:bg-slate-800 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estoque" className="text-slate-900 dark:text-slate-100">Estoque</Label>
+                <FilterSelectEstoque
+                  value={seqEstoque}
+                  onChange={(value) => setSeqEstoque(value)}
+                  placeholder="Selecione o estoque"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="qtde_item" className="text-slate-900 dark:text-slate-100">Quantidade</Label>
+              <Input
+                id="qtde_item"
+                type="number"
+                step="0.01"
+                value={qtdeItem}
+                onChange={(e) => setQtdeItem(e.target.value)}
+                className="dark:bg-slate-800 dark:border-slate-700"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDialogEstoqueOpen(false)}
+              className="dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!seqEstoque || !qtdeItem) {
+                  toast.error('Preencha todos os campos obrigatórios');
+                  return;
+                }
+
+                setSalvandoPosicao(true);
+                try {
+                  const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/estoque/posicoes.php`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      seq_item: itemCriado?.seq_item,
+                      seq_estoque: parseInt(seqEstoque),
+                      qtde_item: parseFloat(qtdeItem)
+                    })
+                  });
+
+                  // ✅ PADRÃO CORRETO: apiUtils já interceptou e exibiu o toast automaticamente
+                  if (data.success) {
+                    toast.success('Item adicionado ao estoque com sucesso!');
+                    setDialogEstoqueOpen(false);
+                    carregarItens();
+                  }
+                  // ✅ Se success=false, o toast já foi exibido pelo apiUtils (msg() do backend)
+                } catch (error) {
+                  // ✅ Erro de comunicação (network error, etc) - não relacionado ao backend
+                  console.error('Erro ao adicionar ao estoque:', error);
+                  toast.error('Erro de comunicação com o servidor');
+                } finally {
+                  setSalvandoPosicao(false);
+                }
+              }}
+              disabled={salvandoPosicao}
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white"
+            >
+              {salvandoPosicao ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Adicionar'
               )}
             </Button>
           </DialogFooter>
