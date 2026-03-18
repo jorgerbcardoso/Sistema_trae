@@ -239,6 +239,9 @@ export function CadastroItens() {
               codigo: data.codigo || formData.codigo,
               descricao: data.descricao || formData.descricao
             });
+            // ✅ LIMPAR campos ao abrir o dialog
+            setSeqEstoque('');
+            setQtdeItem('');
             setDialogEstoqueOpen(true);
             console.log('✅ Dialog de estoque deve abrir agora!');
           } else {
@@ -796,6 +799,8 @@ export function CadastroItens() {
                   value={seqEstoque}
                   onChange={(value) => setSeqEstoque(value)}
                   placeholder="Selecione o estoque"
+                  label=""
+                  showAll={false}
                 />
               </div>
 
@@ -839,7 +844,7 @@ export function CadastroItens() {
                       rua: 'PSO', // ✅ POSIÇÃO PADRÃO
                       altura: 1,  // ✅ POSIÇÃO PADRÃO
                       coluna: 1,  // ✅ POSIÇÃO PADRÃO
-                      qtde_item: parseFloat(qtdeItem)
+                      saldo: parseFloat(qtdeItem) // ✅ CAMPO CORRETO: saldo
                     })
                   });
 
