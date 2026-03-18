@@ -116,8 +116,8 @@ function handlePost($conn, $prefix, $user, $domain) {
     try {
         // Inserir solicitação
         $query_insert = "INSERT INTO {$prefix}solicitacao_compra 
-            (unidade, data_inclusao, hora_inclusao, login_inclusao, seq_centro_custo, nro_setor, observacao, placa)
-            VALUES ($1, CURRENT_DATE, CURRENT_TIME, $2, $3, $4, $5, $6)
+            (unidade, data_inclusao, hora_inclusao, login_inclusao, seq_centro_custo, nro_setor, observacao, placa, status)
+            VALUES ($1, CURRENT_DATE, CURRENT_TIME, $2, $3, $4, $5, $6, 'P')
             RETURNING seq_solicitacao_compra";
         
         $result = pg_query_params($conn, $query_insert, [

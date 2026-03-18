@@ -1134,10 +1134,12 @@ export default function CadastroOrdensCompra() {
         console.log('🔍 [SOLICITAÇÕES] Resposta da API:', data);
         
         if (data.success && data.data) {
-          // Contar apenas as solicitações PENDENTES (status='P')
-          const pendentes = data.data.filter((sol: any) => sol.status === 'P');
+          // Contar apenas as solicitações PENDENTES (status='P' ou status=null) e sem ordem de compra
+          const pendentes = data.data.filter((sol: any) => 
+            (sol.status === 'P' || sol.status === null) && !sol.seq_ordem_compra
+          );
           console.log('🔍 [SOLICITAÇÕES] Total de solicitações:', data.data.length);
-          console.log('🔍 [SOLICITAÇÕES] Solicitações pendentes (status=P):', pendentes.length);
+          console.log('🔍 [SOLICITAÇÕES] Solicitações pendentes (status=P ou null e sem ordem):', pendentes.length);
           setQtdSolicitacoesPendentes(pendentes.length);
         } else {
           console.warn('⚠️ [SOLICITAÇÕES] Resposta sem sucesso ou sem dados:', data);

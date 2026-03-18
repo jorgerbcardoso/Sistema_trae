@@ -240,7 +240,7 @@ try {
                 exit;
             }
             
-            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (exceto a posição atual)
+            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (exceto a posi��ão atual)
             if ($seq_item !== null && $seq_item > 0) {
                 $check = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND ativa = 'S' AND seq_posicao != $6", 
                             false, [$seq_estoque, $rua, $altura, $coluna, $seq_item, $seq]);
@@ -314,7 +314,7 @@ try {
             // ✅ VERIFICAR SE POSIÇÃO PERTENCE À UNIDADE DO USUÁRIO
             if (!$isMTZ && !empty($unidadeAtual)) {
                 $checkUnit = sql($g_sql, 
-                    "SELECT e.unidade, p.seq_estoque, p.rua, p.altura, p.coluna FROM $tblPosicao p 
+                    "SELECT e.unidade, p.seq_estoque, p.rua, p.altura, p.coluna, p.seq_item FROM $tblPosicao p 
                      INNER JOIN $tblEstoque e ON p.seq_estoque = e.seq_estoque 
                      WHERE p.seq_posicao = $1", 
                     false, [$seq]);
@@ -329,7 +329,7 @@ try {
                 }
             } else {
                 // MTZ - buscar dados da posição
-                $check = sql($g_sql, "SELECT seq_estoque, rua, altura, coluna FROM $tblPosicao WHERE seq_posicao = $1", false, [$seq]);
+                $check = sql($g_sql, "SELECT seq_estoque, rua, altura, coluna, seq_item FROM $tblPosicao WHERE seq_posicao = $1", false, [$seq]);
                 if (pg_num_rows($check) === 0) {
                     msg('Posição não encontrada');
                     exit;
@@ -337,21 +337,22 @@ try {
                 $posicaoData = pg_fetch_assoc($check);
             }
             
-            // Verificar se já existe outra posição ativa com mesma localização
+            // ✅ REGRA ATUALIZADA: Verificar se já existe outra posição ativa com MESMA LOCALIZAÇÃO + MESMO ITEM
             $checkConflict = sql($g_sql, 
                 "SELECT seq_posicao FROM $tblPosicao 
-                 WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 
-                 AND ativa = 'S' AND seq_posicao != $5", 
+                 WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5
+                 AND ativa = 'S' AND seq_posicao != $6", 
                 false, [
                     $posicaoData['seq_estoque'], 
                     $posicaoData['rua'], 
                     $posicaoData['altura'], 
                     $posicaoData['coluna'],
+                    $posicaoData['seq_item'],
                     $seq
                 ]);
             
             if (pg_num_rows($checkConflict) > 0) {
-                msg('Não é possível reativar: já existe uma posição ativa com esta localização');
+                msg('Não é possível reativar: já existe uma posição ativa para este ITEM nesta localização');
                 exit;
             }
             
