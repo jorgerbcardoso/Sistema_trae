@@ -53,6 +53,18 @@ export function FilterSelectEstoque({
     carregarEstoques();
   }, [apenasAtivos, unidade]);
 
+  // ✅ SINCRONIZAR value externo com selectedEstoque interno
+  useEffect(() => {
+    if (value && value !== 'ALL' && allEstoques.length > 0) {
+      const estoque = allEstoques.find(e => e.seq_estoque.toString() === value);
+      if (estoque) {
+        setSelectedEstoque(estoque);
+      }
+    } else if (value === 'ALL' || !value) {
+      setSelectedEstoque(null);
+    }
+  }, [value, allEstoques]);
+
   // Filtrar localmente quando buscar
   useEffect(() => {
     if (searchValue.length > 0) {

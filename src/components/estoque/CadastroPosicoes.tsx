@@ -483,63 +483,75 @@ export function CadastroPosicoes() {
 
         {/* ✅ CARDS DE TOTAIS */}
         {filtroEstoque && posicoes.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card: Posições (Endereços) */}
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Posições</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.posicoes}</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <Warehouse className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                  <Warehouse className="w-4 h-4" />
+                  Posições
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  {totais.posicoes}
+                </div>
+                <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  endereços
                 </div>
               </CardContent>
             </Card>
 
             {/* Card: Itens */}
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Itens</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.itens}</p>
-                  </div>
-                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    <Package className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-purple-600 dark:text-purple-400 flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Itens
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                  {totais.itens}
+                </div>
+                <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  itens diferentes
                 </div>
               </CardContent>
             </Card>
 
             {/* Card: Saldo Total */}
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Saldo Total</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatarNumero(totais.saldo)}</p>
-                  </div>
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <MapPin className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Saldo Total
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                  {formatarNumero(totais.saldo)}
+                </div>
+                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  quantidade
                 </div>
               </CardContent>
             </Card>
 
             {/* Card: Valor Total */}
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Valor Total</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatarValor(totais.valor)}</p>
-                  </div>
-                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                  </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Valor Total
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                  {formatarValor(totais.valor)}
+                </div>
+                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  estoque valorizado
                 </div>
               </CardContent>
             </Card>
