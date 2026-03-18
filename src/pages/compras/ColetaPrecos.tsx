@@ -13,7 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { Loader2, Save, ArrowLeft, DollarSign, Package, CalendarClock, CreditCard } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+import { Loader2, Save, ArrowLeft, DollarSign, Package, CalendarClock, CreditCard, Link, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -38,6 +46,7 @@ interface ItemCotacao {
   vlr_estoque: number;
   vlr_fornecedor?: number;
   observacao?: string;
+  link?: string; // ✅ NOVO: URL do link de compra
   seq_orcamento_cotacao?: number;
 }
 
@@ -58,6 +67,11 @@ export default function ColetaPrecos() {
   // ✅ NOVO: Estados para condição de pagamento e previsão de entrega
   const [condicaoPgto, setCondicaoPgto] = useState('');
   const [dataPrevEnt, setDataPrevEnt] = useState('');
+
+  // ✅ NOVO: Estados do dialog de link
+  const [dialogLinkOpen, setDialogLinkOpen] = useState(false);
+  const [itemLinkIndex, setItemLinkIndex] = useState<number | null>(null);
+  const [linkTemp, setLinkTemp] = useState('');
 
   useEffect(() => {
     carregarDados();
@@ -114,6 +128,7 @@ export default function ColetaPrecos() {
               vlr_estoque: item?.vlr_item || 0,
               vlr_fornecedor: cotacaoExistente?.vlr_fornecedor || 0,
               observacao: cotacaoExistente?.observacao || '',
+              link: cotacaoExistente?.link || '', // ✅ NOVO: Adicionar link de compra
               seq_orcamento_cotacao: cotacaoExistente?.seq_orcamento_cotacao
             });
           });
@@ -154,6 +169,7 @@ export default function ColetaPrecos() {
             vlr_estoque: parseFloat(item.vlr_item || 0), // ✅ CORRIGIDO: Agora vem da API como vlr_item
             vlr_fornecedor: item.vlr_fornecedor ? parseFloat(item.vlr_fornecedor) : 0,
             observacao: '',
+            link: item.link || '', // ✅ NOVO: Adicionar link de compra
             seq_orcamento_cotacao: item.seq_orcamento_cotacao ? parseInt(item.seq_orcamento_cotacao) : undefined
           }));
 
@@ -175,6 +191,39 @@ export default function ColetaPrecos() {
       }
       return cot;
     }));
+  };
+
+  // ✅ NOVO: Abrir dialog de link
+  const abrirDialogLink = (index: number) => {
+    setItemLinkIndex(index);
+    setLinkTemp(cotacoes[index].link || '');
+    setDialogLinkOpen(true);
+  };
+
+  // ✅ NOVO: Salvar link
+  const salvarLink = () => {
+    if (itemLinkIndex !== null) {
+      atualizarCotacao(itemLinkIndex, 'link', linkTemp.trim());
+      setDialogLinkOpen(false);
+      setItemLinkIndex(null);
+      setLinkTemp('');
+      
+      if (linkTemp.trim()) {
+        toast.success('Link salvo com sucesso!');
+      }
+    }
+  };
+
+  // ✅ NOVO: Abrir link em nova aba
+  const abrirLink = (link: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (link && link.trim()) {
+      // Garantir que o link tenha protocolo
+      const url = link.startsWith('http://') || link.startsWith('https://') 
+        ? link 
+        : `https://${link}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleSalvar = async () => {
@@ -229,6 +278,7 @@ export default function ColetaPrecos() {
               vlr_fornecedor: cot.vlr_fornecedor || 0,
               vlr_total: (cot.vlr_fornecedor || 0) * cot.qtde_item,
               observacao: cot.observacao?.trim().toUpperCase() || '',
+              link: cot.link || '', // ✅ NOVO: Adicionar link de compra
               selecionado: 'N'
             };
           } else {
@@ -245,6 +295,7 @@ export default function ColetaPrecos() {
               vlr_total: (cot.vlr_fornecedor || 0) * cot.qtde_item,
               prazo_entrega: 0,
               observacao: cot.observacao?.trim().toUpperCase() || '',
+              link: cot.link || '', // ✅ NOVO: Adicionar link de compra
               selecionado: 'N'
             });
           }
@@ -267,7 +318,8 @@ export default function ColetaPrecos() {
           itens: cotacoesComPreco.map(cot => ({
             seq_item: cot.seq_item,
             seq_ordem_compra_item: cot.seq_ordem_compra_item, // ✅ Usar seq_ordem_compra_item
-            vlr_fornecedor: cot.vlr_fornecedor || 0
+            vlr_fornecedor: cot.vlr_fornecedor || 0,
+            link: cot.link || '' // ✅ NOVO: Adicionar link de compra
           }))
         };
 
@@ -467,6 +519,7 @@ export default function ColetaPrecos() {
                   <TableRow>
                     <TableHead>Código</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead className="text-center w-12">Link</TableHead>
                     <TableHead className="text-center">UN</TableHead>
                     <TableHead className="text-right">Qtd.</TableHead>
                     <TableHead className="text-right">Vlr. Estoque</TableHead>
@@ -479,11 +532,45 @@ export default function ColetaPrecos() {
                   {cotacoes.map((cotacao, index) => {
                     const economia = calcularEconomia(cotacao.vlr_estoque, cotacao.vlr_fornecedor || 0);
                     const total = (cotacao.vlr_fornecedor || 0) * cotacao.qtde_item;
+                    const temLink = cotacao.link && cotacao.link.trim().length > 0;
                     
                     return (
                       <TableRow key={index}>
                         <TableCell className="font-medium">{cotacao.codigo}</TableCell>
                         <TableCell className="max-w-xs">{cotacao.descricao}</TableCell>
+                        <TableCell className="text-center">
+                          {/* ✅ NOVO: Ícone de link com estado visual */}
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => abrirDialogLink(index)}
+                              title={temLink ? 'Editar link' : 'Adicionar link'}
+                            >
+                              <Link 
+                                className={`h-4 w-4 ${
+                                  temLink 
+                                    ? 'text-green-600 dark:text-green-400' 
+                                    : 'text-slate-400 dark:text-slate-600'
+                                }`} 
+                              />
+                            </Button>
+                            {temLink && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => abrirLink(cotacao.link!, e)}
+                                title="Abrir link em nova aba"
+                              >
+                                <ExternalLink className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-center">{cotacao.unidade_medida}</TableCell>
                         <TableCell className="text-right">{parseFloat(cotacao.qtde_item || 0).toFixed(2)}</TableCell>
                         <TableCell className="text-right">
@@ -572,6 +659,81 @@ export default function ColetaPrecos() {
             )}
           </Button>
         </div>
+
+        {/* ✅ NOVO: Dialog de Link */}
+        <Dialog open={dialogLinkOpen} onOpenChange={setDialogLinkOpen}>
+          <DialogContent className="sm:max-w-[500px]" aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Link className="h-5 w-5 text-blue-600" />
+                Link de Compra do Produto
+              </DialogTitle>
+              <DialogDescription>
+                {itemLinkIndex !== null && (
+                  <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Item:</div>
+                    <div className="font-medium">{cotacoes[itemLinkIndex]?.codigo}</div>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
+                      {cotacoes[itemLinkIndex]?.descricao}
+                    </div>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="link">URL do Produto</Label>
+                <Input
+                  id="link"
+                  type="url"
+                  value={linkTemp}
+                  onChange={(e) => setLinkTemp(e.target.value)}
+                  placeholder="https://exemplo.com/produto"
+                  className="w-full"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      salvarLink();
+                    }
+                  }}
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Cole aqui o link do produto no site do fornecedor para facilitar futuras compras.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDialogLinkOpen(false);
+                  setLinkTemp('');
+                }}
+              >
+                Cancelar
+              </Button>
+              {linkTemp && linkTemp.trim() && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    atualizarCotacao(itemLinkIndex!, 'link', '');
+                    setDialogLinkOpen(false);
+                    setLinkTemp('');
+                    toast.success('Link removido!');
+                  }}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Remover Link
+                </Button>
+              )}
+              <Button onClick={salvarLink}>
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

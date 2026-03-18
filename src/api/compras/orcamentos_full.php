@@ -860,6 +860,7 @@ function salvarCotacao($g_sql, $dominio, $data, $username) {
         $seq_item = $item['seq_item'] ?? null;
         $seq_ordem_compra_item = $item['seq_ordem_compra_item'] ?? null;
         $vlr_fornecedor = $item['vlr_fornecedor'] ?? null;
+        $link = trim($item['link'] ?? ''); // ✅ NOVO: campo link
 
         if ($seq_item && $seq_ordem_compra_item && $vlr_fornecedor !== null && $vlr_fornecedor > 0) {
             // Buscar dados do item da ordem de compra
@@ -882,8 +883,8 @@ function salvarCotacao($g_sql, $dominio, $data, $username) {
                 // Inserir cotação
                 $query_ins = "INSERT INTO {$tabela_cotacao}
                               (seq_orcamento, seq_fornecedor, seq_ordem_compra, seq_item, 
-                               qtde_item, vlr_estoque, vlr_fornecedor, vlr_total)
-                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
+                               qtde_item, vlr_estoque, vlr_fornecedor, vlr_total, link)
+                              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
                 sql($g_sql, $query_ins, false, array(
                     $seq_orcamento, 
                     $seq_fornecedor, 
@@ -892,7 +893,8 @@ function salvarCotacao($g_sql, $dominio, $data, $username) {
                     $qtde_item,
                     $vlr_estoque,
                     $vlr_fornecedor, 
-                    $vlr_total
+                    $vlr_total,
+                    $link // ✅ NOVO: adicionar link
                 ));
                 $contador_inseridos++;
             }
