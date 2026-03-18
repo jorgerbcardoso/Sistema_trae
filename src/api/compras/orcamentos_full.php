@@ -432,7 +432,8 @@ function obterMapaCotacao($g_sql, $dominio, $seq_orcamento) {
                 'vlr_fornecedor' => $cotacao ? (float)$cotacao['vlr_fornecedor'] : null,
                 'vlr_total' => $cotacao ? (float)$cotacao['vlr_total'] : null,
                 'selecionado' => $cotacao ? $cotacao['selecionado'] : 'N',
-                'seq_orcamento_cotacao' => $cotacao ? (int)$cotacao['seq_orcamento_cotacao'] : null
+                'seq_orcamento_cotacao' => $cotacao ? (int)$cotacao['seq_orcamento_cotacao'] : null,
+                'link' => $cotacao && isset($cotacao['link']) ? $cotacao['link'] : null // ✅ NOVO: link do produto
             );
         }
 

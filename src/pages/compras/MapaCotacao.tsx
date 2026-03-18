@@ -36,7 +36,8 @@ import {
   User,
   CreditCard,
   CalendarClock,
-  Clock
+  Clock,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
@@ -74,6 +75,7 @@ interface CotacaoFornecedor {
   vlr_total?: number;
   selecionado: string;
   seq_orcamento_cotacao?: number;
+  link?: string; // ✅ NOVO: URL do link de compra
 }
 
 interface Fornecedor {
@@ -280,6 +282,18 @@ export default function MapaCotacao() {
       }
       return item;
     }));
+  };
+
+  // ✅ NOVO: Abrir link em nova aba
+  const abrirLink = (link: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (link && link.trim()) {
+      // Garantir que o link tenha protocolo
+      const url = link.startsWith('http://') || link.startsWith('https://') 
+        ? link 
+        : `https://${link}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const salvarSelecoes = async () => {
@@ -1270,6 +1284,16 @@ export default function MapaCotacao() {
                                     {economia.toFixed(1)}%
                                   </span>
                                 </div>
+                                {/* ✅ NOVO: Ícone de link quando disponível */}
+                                {cotacao?.link && cotacao.link.trim() && (
+                                  <button
+                                    onClick={(e) => abrirLink(cotacao.link!, e)}
+                                    className="inline-flex items-center justify-center p-1 hover:bg-blue-100 dark:hover:bg-blue-900 rounded transition-colors"
+                                    title="Abrir link do produto"
+                                  >
+                                    <ExternalLink className="size-3 text-blue-600 dark:text-blue-400" />
+                                  </button>
+                                )}
                                 {cotacao?.selecionado === 'S' && (
                                   <CheckCircle className="size-4 mx-auto text-green-600" />
                                 )}
