@@ -1125,19 +1125,28 @@ export default function CadastroOrdensCompra() {
         await new Promise(resolve => setTimeout(resolve, 300));
         setQtdSolicitacoesPendentes(3);
       } else {
+        console.log('🔍 [SOLICITAÇÕES] Buscando solicitações pendentes...');
         const data = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`,
           { method: 'GET' }
         );
         
+        console.log('🔍 [SOLICITAÇÕES] Resposta da API:', data);
+        
         if (data.success && data.data) {
           // Contar apenas as solicitações PENDENTES (status='P')
           const pendentes = data.data.filter((sol: any) => sol.status === 'P');
+          console.log('🔍 [SOLICITAÇÕES] Total de solicitações:', data.data.length);
+          console.log('🔍 [SOLICITAÇÕES] Solicitações pendentes (status=P):', pendentes.length);
           setQtdSolicitacoesPendentes(pendentes.length);
+        } else {
+          console.warn('⚠️ [SOLICITAÇÕES] Resposta sem sucesso ou sem dados:', data);
+          setQtdSolicitacoesPendentes(0);
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar solicitações pendentes:', error);
+      console.error('❌ [SOLICITAÇÕES] Erro ao carregar solicitações pendentes:', error);
+      setQtdSolicitacoesPendentes(0);
     } finally {
       setLoadingSolicitacoes(false);
     }
