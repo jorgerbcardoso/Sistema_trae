@@ -43,6 +43,16 @@ Adicionada seção específica para corrigir bordas no tema escuro:
    - Elementos com `data-slot="dialog"` e `data-slot="popover"`
    - Cor: `hsl(var(--border))`
 
+5. **Bordas Direcionais** ⭐ NOVO
+   - Classes `.border-t`, `.border-b`, `.border-l`, `.border-r`
+   - Cor: `hsl(var(--border))`
+   - **Exceções**: borders coloridos intencionais
+
+6. **Separator Component** ⭐ NOVO
+   - Elemento com `data-slot="separator-root"`
+   - Background: `hsl(var(--border))`
+   - Corrige linhas separadoras entre seções
+
 ## 🚀 Deploy no Servidor
 
 ### Passo 1: Verificar Variáveis CSS
@@ -70,13 +80,16 @@ Após fazer o deploy do arquivo `globals.css` atualizado:
 Verificar os seguintes elementos no tema escuro:
 
 - [ ] Dialog de detalhes da ordem de compra → campo observação sem borda branca
+- [ ] **Linha separadora** entre observação e itens → sem linha branca ⭐ NOVO
 - [ ] Tabela de itens em dialogs → bordas corretas
 - [ ] Lista de solicitações de compra → sem borda branca
 - [ ] Tela de orçamentos → lista sem borda branca
 - [ ] Buscador de ordens de compra → input sem borda branca ao focar
+- [ ] **Lista de itens após seleção** de ordem → sem borda branca ⭐ NOVO
 - [ ] Cadastro de usuários → todos os inputs sem borda branca
 - [ ] Checkboxes → bordas corretas
 - [ ] Cards em geral → bordas escuras
+- [ ] Separadores (linhas horizontais) em geral → sem linhas brancas ⭐ NOVO
 
 ## 🔍 Como Verificar se Funcionou
 

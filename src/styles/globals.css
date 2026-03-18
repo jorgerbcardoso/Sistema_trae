@@ -323,6 +323,19 @@ input[type="password"]::-webkit-textfield-decoration-container {
   border-color: hsl(var(--border)) !important;
 }
 
+/* Bordas direcionais (border-t, border-b, border-l, border-r) */
+.dark .border-t:not([class*="border-t-red-"]):not([class*="border-t-green-"]):not([class*="border-t-blue-"]):not([class*="border-t-yellow-"]):not([class*="border-t-purple-"]):not([class*="border-t-orange-"]):not(.border-t-white):not(.border-t-transparent),
+.dark .border-b:not([class*="border-b-red-"]):not([class*="border-b-green-"]):not([class*="border-b-blue-"]):not([class*="border-b-yellow-"]):not([class*="border-b-purple-"]):not([class*="border-b-orange-"]):not(.border-b-white):not(.border-b-transparent),
+.dark .border-l:not([class*="border-l-red-"]):not([class*="border-l-green-"]):not([class*="border-l-blue-"]):not([class*="border-l-yellow-"]):not([class*="border-l-purple-"]):not([class*="border-l-orange-"]):not(.border-l-white):not(.border-l-transparent),
+.dark .border-r:not([class*="border-r-red-"]):not([class*="border-r-green-"]):not([class*="border-r-blue-"]):not([class*="border-r-yellow-"]):not([class*="border-r-purple-"]):not([class*="border-r-orange-"]):not(.border-r-white):not(.border-r-transparent) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Separator component - corrigir background */
+.dark [data-slot="separator-root"]:not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-blue-"]):not([class*="bg-yellow-"]):not([class*="bg-purple-"]):not([class*="bg-orange-"]):not(.bg-white):not(.bg-transparent) {
+  background-color: hsl(var(--border)) !important;
+}
+
 /* ================================================================
  * TIPOGRAFIA BASE
  * ================================================================ */
