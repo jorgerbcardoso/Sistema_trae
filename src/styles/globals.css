@@ -268,6 +268,62 @@ input[type="password"]::-webkit-textfield-decoration-container {
 }
 
 /* ================================================================
+ * ✅ CORREÇÃO DE BORDAS NO TEMA ESCURO - FORÇAR CORES CORRETAS
+ * ================================================================ */
+
+/* Forçar cores corretas para inputs, textareas e selects no tema escuro */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([class*="border-"]),
+.dark textarea:not([class*="border-"]),
+.dark select:not([class*="border-"]) {
+  border-color: hsl(var(--input)) !important;
+}
+
+/* Focus state - usar cor do ring */
+.dark input:focus-visible:not([type="checkbox"]):not([type="radio"]),
+.dark textarea:focus-visible,
+.dark select:focus-visible {
+  border-color: hsl(var(--ring)) !important;
+}
+
+/* Tabelas no tema escuro - corrigir bordas brancas */
+.dark table:not([class*="border-"]),
+.dark thead:not([class*="border-"]),
+.dark tbody:not([class*="border-"]),
+.dark tr:not([class*="border-"]),
+.dark th:not([class*="border-"]),
+.dark td:not([class*="border-"]) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Elementos de tabela com classes border-* genéricas */
+.dark [class*="border"]:is(table, thead, tbody, tr, th, td) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Cards no tema escuro - corrigir bordas brancas */
+.dark [data-slot="card"]:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Dialogs e Popovers no tema escuro */
+.dark [data-slot="dialog"],
+.dark [data-slot="popover"],
+.dark [role="dialog"],
+.dark [role="menu"] {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Divs com bordas genéricas no tema escuro */
+.dark div.border:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]):not([class*="border-gray-"]):not([class*="border-slate-"]):not(.border-white):not(.border-transparent) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Elementos com classe rounded-md border (padrão comum) */
+.dark .rounded-md.border:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]):not([class*="border-gray-"]):not([class*="border-slate-"]):not(.border-white) {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* ================================================================
  * TIPOGRAFIA BASE
  * ================================================================ */
 
