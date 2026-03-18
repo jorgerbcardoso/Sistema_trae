@@ -14,6 +14,14 @@ import { Checkbox } from '../ui/checkbox';
 import { apiFetch } from '../../utils/apiUtils';
 import { SortableTableHeader, useSortableTable } from '../table/SortableTableHeader';
 import { FilterSelectTipoItem } from './FilterSelectTipoItem';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
 
 interface Item {
   seq_item: number;
@@ -28,6 +36,17 @@ interface Item {
   ativo: string;
   tipo_descricao: string;
   unidade_medida_sigla: string;
+}
+
+interface Posicao {
+  seq_posicao: number;
+  seq_estoque: number;
+  estoque_codigo: string;
+  estoque_unidade: string;
+  rua: string;
+  altura: number;
+  coluna: number;
+  qtde_item: number;
 }
 
 interface TipoItem {
@@ -78,6 +97,10 @@ export function CadastroItens() {
     estoque_maximo: '0.00',
     ativo: 'S'
   });
+
+  // Estado para posições (apenas quando editando)
+  const [posicoes, setPosicoes] = useState<Posicao[]>([]);
+  const [loadingPosicoes, setLoadingPosicoes] = useState(false);
 
   useEffect(() => {
     carregarTipos();
@@ -147,6 +170,7 @@ export function CadastroItens() {
         ativo: item.ativo
       });
       setEditando(true);
+      carregarPosicoes(item.seq_item);
     } else {
       setFormData({
         codigo: '',
@@ -160,6 +184,7 @@ export function CadastroItens() {
         ativo: 'S'
       });
       setEditando(false);
+      setPosicoes([]);
     }
     setDialogOpen(true);
   };
@@ -228,6 +253,21 @@ export function CadastroItens() {
       toast.error('Erro de comunicação com o servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarPosicoes = async (seq_item: number) => {
+    setLoadingPosicoes(true);
+    try {
+      const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/estoque/posicoes.php?seq_item=${seq_item}`);
+      if (data.success) {
+        setPosicoes(data.data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar posições:', error);
+      toast.error('Erro ao carregar posições do item');
+    } finally {
+      setLoadingPosicoes(false);
     }
   };
 
@@ -600,6 +640,71 @@ export function CadastroItens() {
                 Ativo
               </Label>
             </div>
+
+            {/* Lista de Posições (apenas quando editando) */}
+            {editando && (
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                  Posições em Estoque
+                </h3>
+                
+                {loadingPosicoes ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  </div>
+                ) : posicoes.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 dark:text-slate-400 text-sm">
+                    Este item não está cadastrado em nenhum estoque
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-md border border-slate-200 dark:border-slate-700">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Estoque</TableHead>
+                            <TableHead>Posição</TableHead>
+                            <TableHead className="text-right">Saldo</TableHead>
+                            <TableHead className="text-right">Valor Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {posicoes.map((posicao) => {
+                            const valorUnitario = parseFloat(formData.vlr_item) || 0;
+                            const valorTotal = valorUnitario * posicao.qtde_item;
+                            const estoqueFormatado = `${posicao.estoque_unidade}${String(posicao.estoque_codigo).padStart(6, '0')}`;
+                            const endereco = `${posicao.rua}/${posicao.altura}/${posicao.coluna}`;
+                            
+                            return (
+                              <TableRow key={posicao.seq_posicao}>
+                                <TableCell className="font-mono text-sm">{estoqueFormatado}</TableCell>
+                                <TableCell className="font-mono text-sm">{endereco}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {posicao.qtde_item.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {/* Linha de totais */}
+                          <TableRow className="bg-slate-50 dark:bg-slate-800/50 font-semibold">
+                            <TableCell colSpan={2} className="text-right">TOTAL:</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {posicoes.reduce((acc, p) => acc + p.qtde_item, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              R$ {posicoes.reduce((acc, p) => acc + ((parseFloat(formData.vlr_item) || 0) * p.qtde_item), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
