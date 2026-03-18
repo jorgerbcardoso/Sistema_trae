@@ -1824,7 +1824,7 @@ export default function CadastroOrdensCompra() {
 
       {/* ✅ FLUXO RÁPIDO: Dialog de pergunta sobre fornecedor */}
       <Dialog open={dialogPerguntaFornecedor} onOpenChange={setDialogPerguntaFornecedor}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="size-5 text-blue-600" />
@@ -1842,9 +1842,13 @@ export default function CadastroOrdensCompra() {
                 <Card className="border-2 border-green-500">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold truncate">{fornecedorSelecionado.nome}</h3>
-                        <p className="text-sm text-gray-500 truncate">CNPJ: {fornecedorSelecionado.cnpj}</p>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <h3 className="font-bold truncate" title={fornecedorSelecionado.nome}>
+                          {fornecedorSelecionado.nome}
+                        </h3>
+                        <p className="text-sm text-gray-500 truncate">
+                          CNPJ: {fornecedorSelecionado.cnpj}
+                        </p>
                       </div>
                       <Button
                         variant="outline"
@@ -2071,7 +2075,7 @@ export default function CadastroOrdensCompra() {
 
       {/* ✅ FLUXO RÁPIDO: Modal de Seleção de Fornecedor */}
       <Dialog open={modalFornecedor} onOpenChange={setModalFornecedor}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Selecionar Fornecedor</DialogTitle>
             <DialogDescription>
@@ -2079,7 +2083,7 @@ export default function CadastroOrdensCompra() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
               <Input
@@ -2093,7 +2097,7 @@ export default function CadastroOrdensCompra() {
               />
             </div>
 
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2 flex-1 overflow-y-auto pr-2">
               {fornecedoresDisponiveis.map((fornecedor) => (
                 <Card
                   key={fornecedor.seq_fornecedor}
@@ -2102,11 +2106,17 @@ export default function CadastroOrdensCompra() {
                 >
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold truncate">{fornecedor.nome}</h3>
-                        <p className="text-sm text-gray-500 truncate">CNPJ: {fornecedor.cnpj}</p>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <h3 className="font-bold truncate" title={fornecedor.nome}>
+                          {fornecedor.nome}
+                        </h3>
+                        <p className="text-sm text-gray-500 truncate">
+                          CNPJ: {fornecedor.cnpj}
+                        </p>
                         {fornecedor.email && (
-                          <p className="text-sm text-gray-500 mt-1 truncate">E-mail: {fornecedor.email}</p>
+                          <p className="text-sm text-gray-500 mt-1 truncate" title={fornecedor.email}>
+                            E-mail: {fornecedor.email}
+                          </p>
                         )}
                       </div>
                       <Button size="sm" className="gap-2 shrink-0">
