@@ -142,6 +142,10 @@ export default function CadastroOrdensCompra() {
   const [mostrarDetalhesModal, setMostrarDetalhesModal] = useState(false);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [ordemEdicao, setOrdemEdicao] = useState<OrdemCompra | null>(null);
+  
+  // ✅ NOVO: Contador de solicitações pendentes
+  const [qtdSolicitacoesPendentes, setQtdSolicitacoesPendentes] = useState(0);
+  const [loadingSolicitacoes, setLoadingSolicitacoes] = useState(false);
 
   // Dados do formulário
   const [centroCustoSelecionado, setCentroCustoSelecionado] = useState('');
@@ -235,6 +239,7 @@ export default function CadastroOrdensCompra() {
     carregarCentrosCusto();
     carregarItens();
     carregarUsuariosAprovadores(); // ✅ NOVO: Carregar aprovadores
+    carregarQuantidadeSolicitacoesPendentes(); // ✅ NOVO: Carregar contador de solicitações pendentes
   }, []);
 
   // ✅ FLUXO RÁPIDO: Detectar ordem recém-criada via navegação
@@ -285,6 +290,16 @@ export default function CadastroOrdensCompra() {
       });
     }
   }, [location]);
+
+  // ✅ RECARREGAR CONTADOR ao voltar para a página
+  useEffect(() => {
+    const handleFocus = () => {
+      carregarQuantidadeSolicitacoesPendentes();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const carregarOrdens = async () => {
     setLoading(true);
@@ -598,6 +613,7 @@ export default function CadastroOrdensCompra() {
           
           setMostrarModal(false);
           await carregarOrdens();
+          await carregarQuantidadeSolicitacoesPendentes(); // ✅ Recarregar contador
         } else {
           // ✅ FLUXO RÁPIDO: Preparar dados ANTES de enviar (para garantir que itens não se percam)
           const itensParaPreenchimento = itensOrdem.map(item => ({
@@ -691,6 +707,7 @@ export default function CadastroOrdensCompra() {
           body: JSON.stringify({ seq_ordem_compra: ordem.seq_ordem_compra })
         });
         await carregarOrdens();
+        await carregarQuantidadeSolicitacoesPendentes(); // ✅ Recarregar contador
       }
     } catch (error) {
       console.error('Erro ao excluir ordem:', error);
@@ -1098,6 +1115,34 @@ export default function CadastroOrdensCompra() {
     }
   };
 
+  // ✅ NOVO: Carregar quantidade de solicitações pendentes
+  const carregarQuantidadeSolicitacoesPendentes = async () => {
+    try {
+      setLoadingSolicitacoes(true);
+      
+      if (ENVIRONMENT.isFigmaMake) {
+        // MOCK - simular 3 solicitações pendentes
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setQtdSolicitacoesPendentes(3);
+      } else {
+        const data = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`,
+          { method: 'GET' }
+        );
+        
+        if (data.success && data.data) {
+          // Contar apenas as solicitações PENDENTES (status='P')
+          const pendentes = data.data.filter((sol: any) => sol.status === 'P');
+          setQtdSolicitacoesPendentes(pendentes.length);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar solicitações pendentes:', error);
+    } finally {
+      setLoadingSolicitacoes(false);
+    }
+  };
+
   // ✅ FLUXO RÁPIDO: Solicitar aprovação do pedido
   const solicitarAprovacaoPedido = async () => {
     if (!pedidoGerado) {
@@ -1278,15 +1323,28 @@ export default function CadastroOrdensCompra() {
                 <CardTitle>Ordens de Compra</CardTitle>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/compras/solicitacoes-compra/converter')} 
-                  className="gap-2"
-                  disabled={loading}
-                >
-                  <ClipboardList className="size-4" />
-                  Solicitações
-                </Button>
+                <div className="relative">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/compras/solicitacoes-compra/converter')} 
+                    className="gap-2"
+                    disabled={loading || loadingSolicitacoes}
+                    title={qtdSolicitacoesPendentes > 0 ? `${qtdSolicitacoesPendentes} solicitação(ões) pendente(s) aguardando conversão` : 'Ver todas as solicitações de compra'}
+                  >
+                    {loadingSolicitacoes ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <ClipboardList className="size-4" />
+                    )}
+                    Solicitações
+                  </Button>
+                  {/* ✅ Badge flutuante com quantidade de pendentes */}
+                  {qtdSolicitacoesPendentes > 0 && !loadingSolicitacoes && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-900 animate-pulse">
+                      {qtdSolicitacoesPendentes}
+                    </span>
+                  )}
+                </div>
                 <Button onClick={abrirModalNovo} className="gap-2" disabled={loading}>
                   <Plus className="size-4" />
                   Nova Ordem de Compra

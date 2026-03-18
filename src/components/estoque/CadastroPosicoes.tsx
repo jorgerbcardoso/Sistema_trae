@@ -310,13 +310,15 @@ export function CadastroPosicoes() {
 
   // Organizar posições para o mapa
   const organizarMapa = () => {
-    const mapa: { [rua: string]: { [altura: string]: { [coluna: string]: Posicao } } } = {};
+    // ✅ CORREÇÃO: Usar array para permitir múltiplas posições no mesmo endereço
+    const mapa: { [rua: string]: { [altura: string]: { [coluna: string]: Posicao[] } } } = {};
 
     // ✅ Filtrar apenas posições ATIVAS no mapa
     posicoes.filter(pos => pos.ativa === 'S').forEach(pos => {
       if (!mapa[pos.rua]) mapa[pos.rua] = {};
       if (!mapa[pos.rua][pos.altura]) mapa[pos.rua][pos.altura] = {};
-      mapa[pos.rua][pos.altura][pos.coluna] = pos;
+      if (!mapa[pos.rua][pos.altura][pos.coluna]) mapa[pos.rua][pos.altura][pos.coluna] = [];
+      mapa[pos.rua][pos.altura][pos.coluna].push(pos);
     });
 
     return mapa;
@@ -496,34 +498,48 @@ export function CadastroPosicoes() {
                                 {altura}
                               </td>
                               {colunas.map(coluna => {
-                                const posicao = mapa[rua][altura]?.[coluna];
+                                const posicoes = mapa[rua][altura]?.[coluna];
                                 
                                 return (
                                   <td
                                     key={coluna}
-                                    className="border dark:border-slate-700 p-1 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    onClick={() => posicao && abrirDialogEdicao(posicao)}
+                                    className="border dark:border-slate-700 p-1 text-center"
                                   >
-                                    {posicao ? (
-                                      <div className={`p-2 rounded ${
-                                        posicao.saldo > 0
-                                          ? 'bg-green-100 dark:bg-green-900/30 border border-green-500'
-                                          : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600'
-                                      }`}>
-                                        {posicao.item_codigo ? (
-                                          <>
-                                            <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100">
-                                              {posicao.item_codigo}
-                                            </div>
-                                            <div className="text-[10px] text-slate-600 dark:text-slate-400 truncate" title={posicao.item_descricao || ''}>
-                                              {posicao.item_descricao}
-                                            </div>
-                                            <div className="text-xs font-bold text-green-700 dark:text-green-400 mt-1">
-                                              {posicao.saldo.toFixed(2)}
-                                            </div>
-                                          </>
-                                        ) : (
-                                          <div className="text-xs text-slate-400 dark:text-slate-500">VAZIO</div>
+                                    {posicoes && posicoes.length > 0 ? (
+                                      <div className="space-y-1">
+                                        {posicoes.map((posicao, idx) => (
+                                          <div
+                                            key={posicao.seq_posicao}
+                                            className={`p-2 rounded cursor-pointer hover:ring-2 hover:ring-blue-400 ${
+                                              posicao.saldo > 0
+                                                ? 'bg-green-100 dark:bg-green-900/30 border border-green-500'
+                                                : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600'
+                                            } ${idx > 0 ? 'mt-1' : ''}`}
+                                            onClick={() => abrirDialogEdicao(posicao)}
+                                            title={`Clique para editar ${posicao.item_codigo}`}
+                                          >
+                                            {posicao.item_codigo ? (
+                                              <>
+                                                <div className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100">
+                                                  {posicao.item_codigo}
+                                                </div>
+                                                <div className="text-[10px] text-slate-600 dark:text-slate-400 truncate" title={posicao.item_descricao || ''}>
+                                                  {posicao.item_descricao}
+                                                </div>
+                                                <div className="text-xs font-bold text-green-700 dark:text-green-400 mt-1">
+                                                  {posicao.saldo.toFixed(2)}
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <div className="text-xs text-slate-400 dark:text-slate-500">VAZIO</div>
+                                            )}
+                                          </div>
+                                        ))}
+                                        {/* Indicador de múltiplas posições */}
+                                        {posicoes.length > 1 && (
+                                          <div className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-1">
+                                            {posicoes.length} itens
+                                          </div>
                                         )}
                                       </div>
                                     ) : (

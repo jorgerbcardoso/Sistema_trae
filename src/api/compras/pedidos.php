@@ -293,6 +293,28 @@ try {
                 
             } else {
                 // LISTAR TODOS OS PEDIDOS
+                
+                // ✅ CRÍTICO: RECALCULAR vlr_total de TODOS OS PEDIDOS antes de listar
+                $queryRecalcularTodos = "
+                    UPDATE $tblPedido p
+                    SET vlr_total = (
+                        SELECT COALESCE(SUM(pi.vlr_total), 0)
+                        FROM $tblPedidoItem pi
+                        WHERE pi.seq_pedido = p.seq_pedido
+                    )
+                ";
+                sql($queryRecalcularTodos, [], $g_sql);
+                
+                // ✅ RECALCULAR vlr_total dos ITENS também
+                $queryRecalcularItens = "
+                    UPDATE $tblPedidoItem
+                    SET vlr_total = qtde_item * vlr_unitario
+                ";
+                sql($queryRecalcularItens, [], $g_sql);
+                
+                // ✅ RECALCULAR NOVAMENTE OS PEDIDOS após corrigir itens
+                sql($queryRecalcularTodos, [], $g_sql);
+                
                 $where = ["1=1"];
                 $params = [];
                 $paramCount = 1;

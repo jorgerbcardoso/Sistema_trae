@@ -256,6 +256,18 @@ function aprovarOrcamento($g_sql, $prefix, $data, $username) {
             }
         }
         
+        // ✅ CRÍTICO: RECALCULAR vlr_total do PEDIDO após inserir todos os itens
+        $query_recalcular_pedido = "
+            UPDATE {$tabela_pedido}
+            SET vlr_total = (
+                SELECT COALESCE(SUM(vlr_total), 0)
+                FROM {$tabela_pedido_item}
+                WHERE seq_pedido = $1
+            )
+            WHERE seq_pedido = $1
+        ";
+        sql($g_sql, $query_recalcular_pedido, false, array($seq_pedido));
+        
         // ✅ Buscar nome do fornecedor
         $query_fornecedor = "SELECT nome, email FROM {$tabela_fornecedor} WHERE seq_fornecedor = $1";
         $result_fornecedor = sql($g_sql, $query_fornecedor, false, array($seq_fornecedor));

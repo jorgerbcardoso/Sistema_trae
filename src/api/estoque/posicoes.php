@@ -182,19 +182,11 @@ try {
                 exit;
             }
             
-            // Verificar duplicidade
-            $checkAtiva = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND ativa = 'S'", 
-                        false, [$seq_estoque, $rua, $altura, $coluna]);
-            if (pg_num_rows($checkAtiva) > 0) {
-                msg('Já existe uma posição ATIVA com esta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
-                exit;
-            }
-            
-            // Verificar se existe posição inativa
-            $checkInativa = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND ativa = 'N'", 
-                        false, [$seq_estoque, $rua, $altura, $coluna]);
-            if (pg_num_rows($checkInativa) > 0) {
-                msg('Existe uma posição INATIVA com esta localização. Por favor, reative-a em vez de criar uma nova');
+            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM
+            $checkDuplicata = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND ativa = 'S'", 
+                        false, [$seq_estoque, $rua, $altura, $coluna, $seq_item]);
+            if (pg_num_rows($checkDuplicata) > 0) {
+                msg('Já existe uma posição ATIVA para este ITEM nesta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
                 exit;
             }
             
@@ -248,12 +240,14 @@ try {
                 exit;
             }
             
-            // Verificar duplicidade (apenas posições ativas)
-            $check = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND ativa = 'S' AND seq_posicao != $5", 
-                        false, [$seq_estoque, $rua, $altura, $coluna, $seq]);
-            if (pg_num_rows($check) > 0) {
-                msg('Já existe outra posição ativa com esta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
-                exit;
+            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (exceto a posição atual)
+            if ($seq_item !== null && $seq_item > 0) {
+                $check = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND ativa = 'S' AND seq_posicao != $6", 
+                            false, [$seq_estoque, $rua, $altura, $coluna, $seq_item, $seq]);
+                if (pg_num_rows($check) > 0) {
+                    msg('Já existe outra posição ativa para este ITEM nesta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
+                    exit;
+                }
             }
             
             $query = "UPDATE $tblPosicao SET 
