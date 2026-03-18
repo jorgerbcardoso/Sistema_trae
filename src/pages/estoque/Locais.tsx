@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { MapPin, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function Locais() {
+  usePageTitle('Cadastro de Locais');
+  
   return (
     <AdminLayout
       title="CADASTRO DE LOCAIS"

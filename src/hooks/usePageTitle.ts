@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getSystemTitle } from '../config/clientLogos';
+import { setFaviconByDomainHardcoded } from '../utils/faviconManager';
 
 /**
- * Hook para atualizar o título da página dinamicamente
+ * Hook para atualizar o título da página E FAVICON dinamicamente
  * baseado no domínio do cliente logado
+ * 
+ * ✅ REGRA CRÍTICA: Sempre usa o domínio do usuário logado para definir o favicon
+ * NUNCA permite que o favicon seja alterado por componentes individuais
  */
 export function usePageTitle(pageTitle?: string) {
   const { user } = useAuth();
@@ -15,6 +19,14 @@ export function usePageTitle(pageTitle?: string) {
     
     // Atualizar título (sempre usa o título fixo do domínio, ignorando pageTitle)
     document.title = systemTitle;
+    
+    // ✅ CRÍTICO: SEMPRE atualizar o favicon para o domínio do usuário logado
+    // Isso garante que, independente de qual tela o usuário está,
+    // o favicon sempre reflete o domínio correto
+    if (user?.domain) {
+      setFaviconByDomainHardcoded(user.domain);
+      console.log(`🎨 [usePageTitle] Favicon forçado para domínio: ${user.domain}`);
+    }
     
     console.log(`📄 [usePageTitle] Título atualizado: ${systemTitle}`);
     

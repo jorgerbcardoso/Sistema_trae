@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { BarChart3, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function PosicaoEstoque() {
+  usePageTitle('Posição de Estoque');
+  
   return (
     <AdminLayout
       title="POSIÇÃO DE ESTOQUE"

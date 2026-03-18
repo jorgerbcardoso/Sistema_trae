@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function EstoqueMinimo() {
+  usePageTitle('Estoque Mínimo');
+  
   return (
     <AdminLayout
       title="ESTOQUE MÍNIMO"

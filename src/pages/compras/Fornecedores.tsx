@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL, ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
@@ -79,6 +80,8 @@ interface Cidade {
 type SortField = 'nome' | 'cnpj' | 'cidade_nome' | 'ativo';
 
 export default function Fornecedores() {
+  usePageTitle('Cadastro de Fornecedores');
+  
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

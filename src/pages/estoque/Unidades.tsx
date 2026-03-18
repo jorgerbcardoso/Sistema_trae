@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Ruler, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function Unidades() {
+  usePageTitle('Cadastro de Unidades');
+  
   return (
     <AdminLayout
       title="CADASTRO DE UNIDADES"

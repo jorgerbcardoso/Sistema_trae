@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Package, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function Produtos() {
+  usePageTitle('Cadastro de Produtos');
+  
   return (
     <AdminLayout
       title="CADASTRO DE PRODUTOS"

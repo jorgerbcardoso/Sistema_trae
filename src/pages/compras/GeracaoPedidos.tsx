@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { ShoppingBag, Package, CheckCircle, Clock, TrendingUp, FileText, Plus, Eye, Trash2, Edit, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -50,6 +51,8 @@ interface Pedido {
 }
 
 export default function GeracaoPedidos() {
+  usePageTitle('Geração de Pedidos');
+  
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [totalizadores, setTotalizadores] = useState<Totalizadores>({

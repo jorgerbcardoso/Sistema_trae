@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { ArrowLeftRight, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function Movimentacoes() {
+  usePageTitle('Movimentações de Estoque');
+  
   return (
     <AdminLayout
       title="MOVIMENTAÇÕES"

@@ -1,8 +1,11 @@
 import React from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Tag, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 export default function Categorias() {
+  usePageTitle('Cadastro de Categorias');
+  
   return (
     <AdminLayout
       title="CADASTRO DE CATEGORIAS"
