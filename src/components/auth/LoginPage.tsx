@@ -440,7 +440,7 @@ export function LoginPage() {
                 placeholder="Domínio"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
                 maxLength={3}
                 required
                 disabled={isLoading}
@@ -455,7 +455,7 @@ export function LoginPage() {
                 placeholder="Login"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
                 required
                 disabled={isLoading}
               />
@@ -468,7 +468,7 @@ export function LoginPage() {
                 placeholder="Senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
                 required
                 disabled={isLoading}
               />
@@ -479,6 +479,7 @@ export function LoginPage() {
               type="submit"
               className="w-full cursor-pointer"
               disabled={isLoading}
+              variant="default"
             >
               {isLoading ? (
                 <>

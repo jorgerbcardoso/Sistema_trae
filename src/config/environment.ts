@@ -31,8 +31,8 @@ const isLocalhost = hostname === 'localhost' ||
 // IMPORTANTE: 
 // - Figma Make → SEMPRE MOCK
 // - Produção → BACKEND (mas dashboards podem usar MOCK por domínio)
-// - Localhost → MOCK por padrão
-export const USE_MOCK_DATA = isFigmaMake || isLocalhost;
+// - Localhost → BACKEND REAL (alterado para sempre usar backend real)
+export const USE_MOCK_DATA = isFigmaMake;
 
 // URL da API - DINÂMICA baseada no hostname
 // Se for produção OU acesso via IP, usar URL relativa ao servidor atual
@@ -44,8 +44,8 @@ if (isProduction || isIPAccess) {
   // Isso garante que funciona tanto em webpresto.com.br quanto em 35.247.234.77
   API_BASE_URL = `${window.location.protocol}//${window.location.host}/sistema/api`;
 } else if (isLocalhost) {
-  // Desenvolvimento: apontar para produção
-  API_BASE_URL = 'https://webpresto.com.br/sistema/api';
+  // Desenvolvimento: usar PROXY LOCAL do Vite para evitar CORS
+  API_BASE_URL = '/sistema/api';
 } else {
   // Fallback
   API_BASE_URL = '/sistema/api';

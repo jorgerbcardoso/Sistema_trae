@@ -748,17 +748,25 @@ export default function PedidoForm() {
               font-weight: bold;
               font-size: 9pt;
             }
-            .status-pendente {
+            .status-aguardando {
               background: #fef3c7;
               color: #92400e;
+              border: 1px solid #fcd34d;
+            }
+            .status-aprovado {
+              background: #d1fae5;
+              color: #065f46;
+              border: 1px solid #6ee7b7;
             }
             .status-entregue {
               background: #dbeafe;
               color: #1e40af;
+              border: 1px solid #93c5fd;
             }
             .status-finalizado {
               background: #d1fae5;
               color: #065f46;
+              border: 1px solid #6ee7b7;
             }
             @media print {
               body { padding: 10mm; }
@@ -985,8 +993,10 @@ export default function PedidoForm() {
 
   const getBadgeStatus = (status: string) => {
     const statusConfig: Record<string, { variant: any; icon: any; label: string; class?: string }> = {
-      'P': { variant: 'secondary', icon: Clock, label: 'PENDENTE', class: 'status-pendente' },
-      'PENDENTE': { variant: 'secondary', icon: Clock, label: 'PENDENTE', class: 'status-pendente' },
+      'A': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO', class: 'status-aguardando' },
+      'AGUARDANDO': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO', class: 'status-aguardando' },
+      'P': { variant: 'default', icon: CheckCircle, label: 'APROVADO', class: 'status-aprovado' },
+      'PENDENTE': { variant: 'default', icon: CheckCircle, label: 'APROVADO', class: 'status-aprovado' },
       'E': { variant: 'default', icon: Truck, label: 'ENTREGUE', class: 'status-entregue' },
       'ENTREGUE': { variant: 'default', icon: Truck, label: 'ENTREGUE', class: 'status-entregue' },
       'F': { variant: 'default', icon: CheckCircle, label: 'FINALIZADO', class: 'status-finalizado' },

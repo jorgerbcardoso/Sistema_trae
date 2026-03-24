@@ -301,12 +301,20 @@ export function resetDomainOverride(domainCode: string): void {
 /**
  * Verificar se um domínio deve usar MOCK ou BACKEND
  * Lógica:
+ * - Localhost → SEMPRE BACKEND (forçado)
  * - Figma Make → SEMPRE MOCK
- * - Localhost → Verifica atributo data_source do domínio
+ * - Outros → Verifica atributo data_source do domínio
  */
 export function shouldUseMockData(domainCode: string): boolean {
-  // Detectar ambiente Figma Make (incluindo todas as possíveis URLs)
+  // Forçar BACKEND real em localhost
   const hostname = window.location.hostname;
+  console.log('🔍 [shouldUseMockData] hostname:', hostname, 'domainCode:', domainCode);
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('🔍 [shouldUseMockData] Forçando BACKEND real em localhost');
+    return false;
+  }
+
+  // Detectar ambiente Figma Make (incluindo todas as possíveis URLs)
   const isFigmaMake = hostname.includes('figma.com') ||
                       hostname.includes('esm.sh') ||
                       hostname.includes('fig.run') ||

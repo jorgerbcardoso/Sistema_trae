@@ -417,15 +417,33 @@ public function sendEmail($to_email, $to_name, $seq, $unidade, $domain, $usernam
 ### **1. Nomenclatura de Tabelas**
 
 ```sql
--- ✅ CORRETO - Com prefixo de domínio
+-- ✅ CORRETO - Com prefixo de domínio (REGRA GERAL)
 {$prefix}solicitacao_compra
 {$prefix}ordem_compra
 {$prefix}centro_custo
 {$prefix}setores
 
--- ❌ ERRADO - Sem prefixo (exceto tabelas globais)
+-- ✅ CORRETO - Sem prefixo (EXCEÇÕES GLOBAIS)
+users
+menu_itens
+menu_sections
+user_permissions
+
+-- ❌ ERRADO - Sem prefixo para tabelas de domínio
 solicitacao_compra
 setores
+```
+
+### **2. Implementação no PHP**
+```php
+// Definir prefixo baseado no domínio logado
+$prefix = strtolower($domain) . '_';
+
+// Query em tabela de domínio
+$query = "SELECT * FROM {$prefix}setores WHERE ativo = 'S'";
+
+// Query em tabela global (exceção)
+$query = "SELECT * FROM users WHERE username = $1";
 ```
 
 ### **2. Queries Otimizadas**

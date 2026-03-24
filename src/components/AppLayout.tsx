@@ -23,7 +23,7 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = React.useState(false);
   const { theme, toggleTheme } = useTheme();
 
-  const logoUrl = getLogoUrl(user?.domain || '');
+  const logoUrl = getLogoUrl(user?.domain || '', theme);
   const showSystemName = shouldShowSystemName(user?.domain || '');
 
   const handleBackToMenu = () => {
@@ -31,9 +31,9 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+      <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             {/* Logo e Nome do Sistema */}
@@ -46,7 +46,7 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
                   className="gap-2"
                 >
                   <ArrowLeft className="size-4" />
-                  Menu
+                  <span className="menu-button-text">Menu</span>
                 </Button>
               )}
               
@@ -58,10 +58,10 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
                 />
                 {showSystemName && (
                   <div className="flex flex-col">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                    <span className="header-title-reduced text-gray-900 dark:text-gray-100">
                       SISTEMA PRESTO
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="header-subtitle-reduced text-gray-500 dark:text-gray-400">
                       {user?.client_name || 'Gestão de Transportes'}
                     </span>
                   </div>
@@ -71,7 +71,8 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
 
             {/* Ações do usuário */}
             <div className="flex items-center gap-2">
-              {/* Toggle de tema */}
+              {/* Toggle de tema - DESATIVADO POR ENQUANTO */}
+            {false && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -84,6 +85,7 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
                   <Moon className="size-4" />
                 )}
               </Button>
+            )}
 
               {/* Informações do usuário */}
               <div className="hidden md:flex flex-col items-end mr-3">

@@ -75,6 +75,15 @@
 - ✅ Aplicar em: Solicitações, Ordens, Cotações, Pedidos
 - ✅ Exemplos: `MTZ000001`, `FLN000123`
 
+### 15. **NOMENCLATURA DE TABELAS (DOMÍNIO)**
+- ✅ **REGRA GERAL**: Todas as tabelas do banco de dados devem ter o prefixo `[dominio]_` (ex: `acv_setores`, `vcs_produtos`)
+- ✅ **EXCEÇÕES (SEM PREFIXO)**:
+  - `users`
+  - `menu_itens`
+  - `menu_sections`
+  - `user_permissions`
+- ✅ No PHP, usar a variável `$prefix` (geralmente `strtolower($domain) . '_'`) para montar as queries.
+
 ---
 
 ## 📁 ESTRUTURA DE ARQUIVOS

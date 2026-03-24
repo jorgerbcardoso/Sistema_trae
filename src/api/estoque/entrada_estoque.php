@@ -879,10 +879,13 @@ try {
                         SET status = 'E',
                             data_fin = CURRENT_DATE,
                             hora_fin = CURRENT_TIME,
-                            login_fin = $1
-                        WHERE seq_pedido = $2
+                            login_fin = $1,
+                            ser_nf = $2,
+                            nro_nf = $3,
+                            chave_nfe = $4
+                        WHERE seq_pedido = $5
                     ";
-                    sql($queryUpdatePedido, [$login, $seqOrigem], $g_sql);
+                    sql($queryUpdatePedido, [$login, $serNf, $nroNf, $chaveNfe, $seqOrigem], $g_sql);
                     
                     // ✅ VERIFICAR SE DEVE LANÇAR NO SSW (APENAS PARA PEDIDOS)
                     $querySswDomain = "SELECT ssw_domain FROM domains WHERE domain = $1";

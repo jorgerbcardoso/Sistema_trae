@@ -172,10 +172,10 @@ export default function Pedidos() {
 
   const getBadgeStatus = (status: string) => {
     const statusConfig: Record<string, { variant: any; icon: any; label: string }> = {
-      'A': { variant: 'outline', icon: Clock, label: 'AGUARDANDO APROVAÇÃO' },
-      'AGUARDANDO': { variant: 'outline', icon: Clock, label: 'AGUARDANDO APROVAÇÃO' },
-      'P': { variant: 'secondary', icon: Clock, label: 'PENDENTE' },
-      'PENDENTE': { variant: 'secondary', icon: Clock, label: 'PENDENTE' },
+      'A': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO' },
+      'AGUARDANDO': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO' },
+      'P': { variant: 'default', icon: CheckCircle, label: 'APROVADO' },
+      'PENDENTE': { variant: 'default', icon: CheckCircle, label: 'APROVADO' },
       'E': { variant: 'default', icon: Truck, label: 'ENTREGUE' },
       'ENTREGUE': { variant: 'default', icon: Truck, label: 'ENTREGUE' },
       'F': { variant: 'default', icon: CheckCircle, label: 'FINALIZADO' },

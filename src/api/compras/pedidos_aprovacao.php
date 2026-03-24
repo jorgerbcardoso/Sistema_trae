@@ -16,37 +16,29 @@
  * }
  */
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/auth.php';
-require_once __DIR__ . '/../services/EmailService.php';
+require_once '/var/www/html/sistema/api/config.php';
 
-header('Content-Type: application/json; charset=utf-8');
+// ✅ CRIAR CONEXÃO
+$g_sql = connect();
 
-// ✅ Verificar autenticação
-$auth = verificarAutenticacao();
-if (!$auth['autenticado']) {
-    http_response_code(401);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Não autenticado',
-        'toast' => [
-            'type' => 'error',
-            'message' => 'Sessão expirada. Faça login novamente.'
-        ]
-    ]);
-    exit;
-}
+// ✅ CORS
+setupCORS();
+handleOptionsRequest();
+
+// ✅ AUTENTICAÇÃO
+requireAuth();
+$currentUser = getCurrentUser();
+
+$username = $currentUser['username'];
+$dominio = strtolower($currentUser['domain']);
+$prefix = $dominio . '_';
 
 // ✅ Verificar se usuário tem permissão de aprovação
-if (!$auth['usuario']['aprova_orcamento']) {
+if ($currentUser['aprova_orcamento'] !== 't' && $currentUser['aprova_orcamento'] !== true) {
     http_response_code(403);
     echo json_encode([
         'success' => false,
-        'message' => 'Usuário não tem permissão para aprovar pedidos',
-        'toast' => [
-            'type' => 'error',
-            'message' => 'Você não tem permissão para aprovar pedidos.'
-        ]
+        'message' => 'Você não tem permissão para aprovar pedidos.'
     ]);
     exit;
 }
@@ -60,8 +52,10 @@ try {
     }
     
     $seq_pedido = (int)$input['seq_pedido'];
-    $domain = $auth['domain'];
-    $usuario_aprovador = $auth['usuario']['username'];
+    $usuario_aprovador = $username;
+    
+    $tabela_pedido = $prefix . 'pedido';
+    $tabela_fornecedor = $prefix . 'fornecedor';
     
     // ✅ 1. Buscar dados do pedido
     $query_pedido = "
@@ -73,31 +67,30 @@ try {
             p.vlr_total,
             p.login_inclusao,
             p.data_inclusao,
-            f.razao_social as fornecedor_nome,
+            f.nome as fornecedor_nome,
             u.email as email_solicitante,
             u.full_name as nome_solicitante
-        FROM ped_compras p
-        LEFT JOIN ped_compras_fornecedor f ON p.seq_fornecedor = f.seq_fornecedor
-        LEFT JOIN usuarios u ON LOWER(u.username) = LOWER(p.login_inclusao)
+        FROM {$tabela_pedido} p
+        LEFT JOIN {$tabela_fornecedor} f ON p.seq_fornecedor = f.seq_fornecedor
+        LEFT JOIN users u ON LOWER(u.username) = LOWER(p.login_inclusao)
         WHERE p.seq_pedido = $1 
-          AND p.dominio = $2
     ";
     
-    $result_pedido = sql($query_pedido, [$seq_pedido, $domain], $g_sql);
+    $result_pedido = sql($g_sql, $query_pedido, false, array($seq_pedido));
     
-    if (count($result_pedido) === 0) {
+    if (pg_num_rows($result_pedido) === 0) {
         throw new Exception('Pedido não encontrado');
     }
     
-    $pedido = $result_pedido[0];
+    $pedido = pg_fetch_assoc($result_pedido);
     
     // ✅ 2. Validar se pedido está aguardando aprovação
     if ($pedido['status'] !== 'A') {
         $status_map = [
             'P' => 'Pendente',
-            'E' => 'Enviado',
+            'E' => 'Entregue',
             'C' => 'Cancelado',
-            'R' => 'Recebido'
+            'F' => 'Finalizado'
         ];
         $status_atual = $status_map[$pedido['status']] ?? 'Desconhecido';
         
@@ -106,21 +99,22 @@ try {
     
     // ✅ 3. Aprovar pedido (atualizar status para 'P' - Pendente)
     $query_aprovar = "
-        UPDATE ped_compras 
+        UPDATE {$tabela_pedido} 
         SET 
             status = 'P',
             login_aprovacao = $1,
             data_aprovacao = CURRENT_DATE,
             hora_aprovacao = TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI')
         WHERE seq_pedido = $2 
-          AND dominio = $3
     ";
     
-    sql($query_aprovar, [$usuario_aprovador, $seq_pedido, $domain], $g_sql);
+    sql($g_sql, $query_aprovar, false, array($usuario_aprovador, $seq_pedido));
     
-    // ✅ 4. Enviar email para o solicitante
+    // ✅ 4. Enviar email para o solicitante (opcional)
+    $email_enviado = false;
     if (!empty($pedido['email_solicitante'])) {
         try {
+            require_once __DIR__ . '/../services/EmailService.php';
             $emailService = new EmailService();
             
             $nro_pedido_formatado = $pedido['unidade'] . str_pad($pedido['nro_pedido'], 7, '0', STR_PAD_LEFT);
@@ -130,11 +124,8 @@ try {
             
             $corpo = "
                 <h2 style='color: #059669;'>✅ Pedido Aprovado</h2>
-                
                 <p>Olá <strong>{$pedido['nome_solicitante']}</strong>,</p>
-                
                 <p>Seu pedido foi aprovado e está pronto para envio ao fornecedor!</p>
-                
                 <div style='background-color: #f0fdf4; border-left: 4px solid #059669; padding: 15px; margin: 20px 0;'>
                     <p style='margin: 5px 0;'><strong>Pedido:</strong> {$nro_pedido_formatado}</p>
                     <p style='margin: 5px 0;'><strong>Fornecedor:</strong> {$pedido['fornecedor_nome']}</p>
@@ -143,9 +134,7 @@ try {
                     <p style='margin: 5px 0;'><strong>Aprovado por:</strong> {$usuario_aprovador}</p>
                     <p style='margin: 5px 0;'><strong>Status:</strong> <span style='color: #059669;'>PENDENTE - Pronto para envio</span></p>
                 </div>
-                
                 <p>O pedido agora pode ser enviado ao fornecedor através do sistema.</p>
-                
                 <p style='margin-top: 30px; font-size: 12px; color: #6b7280;'>
                     Este é um email automático. Por favor, não responda.
                 </p>
@@ -157,33 +146,18 @@ try {
                 $corpo,
                 $pedido['nome_solicitante']
             );
-            
             $email_enviado = true;
         } catch (Exception $e) {
-            // Log erro mas não falha a aprovação
             error_log("Erro ao enviar email de aprovação: " . $e->getMessage());
-            $email_enviado = false;
         }
-    } else {
-        $email_enviado = false;
     }
     
-    // ✅ Resposta de sucesso
     echo json_encode([
         'success' => true,
         'message' => 'Pedido aprovado com sucesso',
-        'toast' => [
-            'type' => 'success',
-            'message' => $email_enviado 
-                ? 'Pedido aprovado! Email de notificação enviado ao solicitante.'
-                : 'Pedido aprovado com sucesso!'
-        ],
         'data' => [
             'seq_pedido' => $seq_pedido,
-            'nro_pedido' => $pedido['nro_pedido'],
-            'status_anterior' => 'A',
             'status_atual' => 'P',
-            'aprovador' => $usuario_aprovador,
             'email_enviado' => $email_enviado
         ]
     ]);
@@ -192,10 +166,10 @@ try {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage(),
-        'toast' => [
-            'type' => 'error',
-            'message' => $e->getMessage()
-        ]
+        'message' => $e->getMessage()
     ]);
+} finally {
+    if (isset($g_sql) && is_resource($g_sql)) {
+        pg_close($g_sql);
+    }
 }

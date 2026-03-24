@@ -1,44 +1,68 @@
-/* Importar fonte Open Sans do Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
-/* ================================================================
- * VARIÁVEIS CSS - HSL FORMAT (compatível com Tailwind v3)
- * ================================================================ */
+@theme {
+  /* Cores de Fundo e Texto */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  /* Cores do Card */
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  /* Cores do Popover */
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  /* Cores Primárias e Secundárias */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  /* Cores Muted e Accent */
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  /* Cores de Erro/Destrutivo */
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  /* Bordas e Inputs */
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Bordas */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
 
 :root {
-  --font-size: 16px;
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
+  --background: 210 40% 98%; /* slate-50 (fundo sutilmente cinza) */
+  --foreground: 222.2 84% 4.9%; /* slate-950 (texto quase preto) */
+  --card: 0 0% 100%; /* branco puro */
   --card-foreground: 222.2 84% 4.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
+  --primary: 221.2 83.2% 53.3%; /* blue-600 (azul profissional) */
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
+  --secondary: 210 40% 96.1%; /* slate-100 */
   --secondary-foreground: 222.2 47.4% 11.2%;
   --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted-foreground: 215.4 16.3% 46.9%; /* slate-500 */
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
+  --border: 214.3 31.8% 91.4%; /* slate-200 */
   --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  --ring: 221.2 83.2% 53.3%;
   --radius: 0.625rem;
-  --chart-1: 12 76% 61%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
-  --input-background: 0 0% 95%;
-  --switch-background: 0 0% 80%;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
 }
 
-/* ✅ MODO ESCURO - Variáveis CSS */
 .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -59,391 +83,62 @@
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
-  --chart-1: 220 70% 50%;
-  --chart-2: 160 60% 45%;
-  --chart-3: 30 80% 55%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 340 75% 55%;
 }
 
-/* ================================================================
- * ESTILOS BASE - CSS PURO (sem diretivas Tailwind)
- * ================================================================ */
-
-* {
-  border-color: hsl(var(--border));
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: 'Open Sans', sans-serif;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-/* Remover sublinhado de links globalmente */
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-a:hover {
-  text-decoration: none;
-}
-
-/* Cursor pointer em links e botões */
-a, button {
-  cursor: pointer;
-}
-
-/* ================================================================
- * ✅ ÍCONES DE CALENDÁRIO/RELÓGIO CLAROS NO TEMA ESCURO
- * ================================================================ */
-
-/* Chrome, Safari, Edge, Opera - Inverter cor do ícone no tema escuro */
-.dark input[type="date"]::-webkit-calendar-picker-indicator,
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-.dark input[type="time"]::-webkit-calendar-picker-indicator,
-.dark input[type="month"]::-webkit-calendar-picker-indicator,
-.dark input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-}
-
-/* Hover state */
-.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
-.dark input[type="time"]::-webkit-calendar-picker-indicator:hover,
-.dark input[type="month"]::-webkit-calendar-picker-indicator:hover,
-.dark input[type="week"]::-webkit-calendar-picker-indicator:hover {
-  filter: invert(1) brightness(1.2);
-}
-
-/* ================================================================
- * ✅ ESCONDER ÍCONE NATIVO DE SENHA DO NAVEGADOR
- * ================================================================ */
-
-/* Microsoft Edge/IE - Esconder botão de revelar senha */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
-  display: none !important;
-}
-
-/* Webkit (Chrome, Safari, Edge) - Esconder ícone de autofill de senha */
-input[type="password"]::-webkit-credentials-auto-fill-button {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-/* Webkit - Esconder decoração de senha */
-input[type="password"]::-webkit-textfield-decoration-container {
-  display: none !important;
-  visibility: hidden !important;
-}
-
-/* ================================================================
- * ✅ ÍCONE DO "OLHO" DOS INPUTS DE SENHA BRANCO NO TEMA ESCURO (FALLBACK)
- * ================================================================ */
-
-/* Chrome, Safari, Edge, Opera */
-.dark input[type="password"]::-ms-reveal,
-.dark input[type="password"]::-ms-clear {
-  filter: invert(100%) brightness(120%) !important;
-  cursor: pointer !important;
-}
-
-/* Webkit (Chrome, Safari, Edge) - eye icon */
-.dark input[type="password"]::-webkit-credentials-auto-fill-button,
-.dark input[type="password"]::-webkit-textfield-decoration-container {
-  filter: invert(100%) brightness(120%) !important;
-}
-
-/* Edge/IE - reveal button */
-.dark input[type="password"]::-ms-reveal {
-  filter: invert(100%) brightness(120%) !important;
-}
-
-/* Fallback para navegadores que suportam color-scheme */
-.dark input[type="password"] {
-  color-scheme: dark !important;
-}
-
-/* ================================================================
- * ✅ ESTILIZAÇÃO CUSTOMIZADA DE SCROLLBARS - DISCRETOS
- * ================================================================ */
-
-/* ==================== TEMA CLARO ==================== */
-
-/* Largura do scrollbar - mais fino e discreto */
-*::-webkit-scrollbar {
-  width: 8px !important;
-  height: 8px !important;
-}
-
-/* Track (trilho) - quase transparente */
-*::-webkit-scrollbar-track {
-  background: transparent !important;
-  border-radius: 8px !important;
-}
-
-/* Thumb (barra) - discreto e sutil */
-*::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3) !important;
-  border-radius: 8px !important;
-  border: 2px solid transparent !important;
-  background-clip: padding-box !important;
-  transition: background 0.2s ease !important;
-}
-
-/* Hover - mais visível */
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6) !important;
-}
-
-/* Active - totalmente visível */
-*::-webkit-scrollbar-thumb:active {
-  background: rgba(100, 116, 139, 0.8) !important;
-}
-
-/* Corner (canto) */
-*::-webkit-scrollbar-corner {
-  background: transparent !important;
-}
-
-/* ==================== TEMA ESCURO ==================== */
-
-/* Largura do scrollbar - mais fino e discreto */
-.dark *::-webkit-scrollbar {
-  width: 8px !important;
-  height: 8px !important;
-}
-
-/* Track (trilho) - quase transparente */
-.dark *::-webkit-scrollbar-track {
-  background: transparent !important;
-  border-radius: 8px !important;
-}
-
-/* Thumb (barra) - discreto e sutil no tema escuro */
-.dark *::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.3) !important;
-  border-radius: 8px !important;
-  border: 2px solid transparent !important;
-  background-clip: padding-box !important;
-  transition: background 0.2s ease !important;
-}
-
-/* Hover - mais visível */
-.dark *::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6) !important;
-}
-
-/* Active - totalmente visível */
-.dark *::-webkit-scrollbar-thumb:active {
-  background: rgba(148, 163, 184, 0.8) !important;
-}
-
-/* Corner (canto) */
-.dark *::-webkit-scrollbar-corner {
-  background: transparent !important;
-}
-
-/* ==================== FIREFOX ==================== */
-
-/* Tema Claro - Scrollbar fino e discreto */
-* {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent !important;
-}
-
-/* Tema Escuro - Scrollbar fino e discreto */
-.dark * {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(100, 116, 139, 0.3) transparent !important;
-}
-
-/* ================================================================
- * ✅ CORREÇÃO DE BORDAS NO TEMA ESCURO - FORÇAR CORES CORRETAS
- * ================================================================ */
-
-/* Forçar cores corretas para inputs, textareas e selects no tema escuro */
-.dark input:not([type="checkbox"]):not([type="radio"]):not([class*="border-"]),
-.dark textarea:not([class*="border-"]),
-.dark select:not([class*="border-"]) {
-  border-color: hsl(var(--input)) !important;
-}
-
-/* Focus state - usar cor do ring */
-.dark input:focus-visible:not([type="checkbox"]):not([type="radio"]),
-.dark textarea:focus-visible,
-.dark select:focus-visible {
-  border-color: hsl(var(--ring)) !important;
-}
-
-/* Tabelas no tema escuro - corrigir bordas brancas */
-.dark table:not([class*="border-"]),
-.dark thead:not([class*="border-"]),
-.dark tbody:not([class*="border-"]),
-.dark tr:not([class*="border-"]),
-.dark th:not([class*="border-"]),
-.dark td:not([class*="border-"]) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Elementos de tabela com classes border-* genéricas */
-.dark [class*="border"]:is(table, thead, tbody, tr, th, td) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Cards no tema escuro - corrigir bordas brancas */
-.dark [data-slot="card"]:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Dialogs e Popovers no tema escuro */
-.dark [data-slot="dialog"],
-.dark [data-slot="popover"],
-.dark [role="dialog"],
-.dark [role="menu"] {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Divs com bordas genéricas no tema escuro */
-.dark div.border:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]):not([class*="border-gray-"]):not([class*="border-slate-"]):not(.border-white):not(.border-transparent) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Elementos com classe rounded-md border (padrão comum) */
-.dark .rounded-md.border:not([class*="border-red-"]):not([class*="border-green-"]):not([class*="border-blue-"]):not([class*="border-yellow-"]):not([class*="border-purple-"]):not([class*="border-orange-"]):not([class*="border-gray-"]):not([class*="border-slate-"]):not(.border-white) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Bordas direcionais (border-t, border-b, border-l, border-r) */
-.dark .border-t:not([class*="border-t-red-"]):not([class*="border-t-green-"]):not([class*="border-t-blue-"]):not([class*="border-t-yellow-"]):not([class*="border-t-purple-"]):not([class*="border-t-orange-"]):not(.border-t-white):not(.border-t-transparent),
-.dark .border-b:not([class*="border-b-red-"]):not([class*="border-b-green-"]):not([class*="border-b-blue-"]):not([class*="border-b-yellow-"]):not([class*="border-b-purple-"]):not([class*="border-b-orange-"]):not(.border-b-white):not(.border-b-transparent),
-.dark .border-l:not([class*="border-l-red-"]):not([class*="border-l-green-"]):not([class*="border-l-blue-"]):not([class*="border-l-yellow-"]):not([class*="border-l-purple-"]):not([class*="border-l-orange-"]):not(.border-l-white):not(.border-l-transparent),
-.dark .border-r:not([class*="border-r-red-"]):not([class*="border-r-green-"]):not([class*="border-r-blue-"]):not([class*="border-r-yellow-"]):not([class*="border-r-purple-"]):not([class*="border-r-orange-"]):not(.border-r-white):not(.border-r-transparent) {
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Separator component - corrigir background */
-.dark [data-slot="separator-root"]:not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-blue-"]):not([class*="bg-yellow-"]):not([class*="bg-purple-"]):not([class*="bg-orange-"]):not(.bg-white):not(.bg-transparent) {
-  background-color: hsl(var(--border)) !important;
-}
-
-/* ================================================================
- * TIPOGRAFIA BASE
- * ================================================================ */
-
-h1 {
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-  margin: 0;
-}
-
-h2 {
-  font-size: 1.25rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-  margin: 0;
-}
-
-h3 {
-  font-size: 1.125rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-  margin: 0;
-}
-
-h4 {
-  font-size: 1rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-  margin: 0;
-}
-
-p {
-  font-size: 1rem;
-  font-weight: var(--font-weight-normal);
-  line-height: 1.5;
-  margin: 0;
-}
-
-label {
-  font-size: 1rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-}
-
-button {
-  font-size: 1rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.5;
-}
-
-input {
-  font-size: 1rem;
-  font-weight: var(--font-weight-normal);
-  line-height: 1.5;
-}
-
-html {
-  font-size: var(--font-size);
-}
-
-/* ================================================================
- * PRINT STYLES
- * ================================================================ */
-
-@media print {
-  @page {
-    size: A4;
-    margin: 1.5cm;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-
   body {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+    @apply bg-background text-foreground;
   }
+}
 
-  /* Hide navigation tabs in print */
-  [role="tablist"] {
-    display: none !important;
-  }
+/* Forçar diminuição de fontes de cabeçalho via CSS Global se o Tailwind falhar */
+.header-title-reduced {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
 
-  /* Ensure all content is visible */
-  [role="tabpanel"] {
-    display: block !important;
-  }
+.header-subtitle-reduced {
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+  margin-top: 1px !important;
+}
 
-  /* Page breaks */
-  .space-y-6 > * {
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
+.menu-button-text {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+}
 
-  /* Force light theme for print */
-  .dark {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-  }
+/* Classes específicas para o Menu Principal (15% maiores que o padrão 14px/12px) */
+.header-title-main {
+  font-size: 16px !important;
+  line-height: 1.2 !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
 
-  .dark\:bg-slate-900,
-  .dark\:bg-slate-950,
-  .dark\:bg-slate-800 {
-    background-color: #ffffff !important;
-  }
+.header-subtitle-main {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  margin-top: 1px !important;
+}
 
-  .dark\:text-slate-100,
-  .dark\:text-slate-200 {
-    color: #000000 !important;
-  }
+/* CORREÇÃO DOS BOTÕES - Forçar fundo sólido !important */
+button[data-slot="button"][variant="default"], 
+.bg-primary {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  opacity: 1 !important;
+}
+
+button[data-slot="button"][variant="outline"],
+.bg-background {
+  background-color: hsl(var(--background)) !important;
 }

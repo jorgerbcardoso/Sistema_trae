@@ -4,16 +4,12 @@ type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: Theme;
-  toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const savedTheme = localStorage.getItem('nativa-theme') as Theme;
-    return savedTheme || 'dark';
-  });
+  const [theme] = useState<Theme>('dark'); // Força o tema escuro
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -29,15 +25,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // ✅ FORÇAR atributo data-theme para compatibilidade extra
     root.setAttribute('data-theme', theme);
     
-    localStorage.setItem('nativa-theme', theme);
+    // localStorage.setItem('nativa-theme', theme); // Não é mais necessário salvar o tema
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+  // const toggleTheme = () => { // Função de toggle removida
+  //   setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+  // };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -738,7 +738,7 @@ export function GruposEventos() {
               className="print:hidden"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden md:inline">Menu</span>
+              <span className="hidden md:inline menu-button-text">Menu</span>
             </Button>
             <ImageWithFallback 
               key={theme}
@@ -747,8 +747,8 @@ export function GruposEventos() {
               className="h-6 md:h-8 w-6 md:w-8 object-contain" 
             />
             <div className="flex-1 min-w-0 hidden md:block">
-              <h1 className="text-slate-900 dark:text-slate-100 text-sm md:text-base">Grupos de Eventos</h1>
-              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 hidden md:block">{user?.client_name}</p>
+              <h1 className="text-slate-900 dark:text-slate-100 header-title-reduced truncate">Grupos de Eventos</h1>
+              <p className="text-slate-500 dark:text-slate-400 header-subtitle-reduced hidden md:block truncate">{user?.client_name}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
@@ -786,8 +786,8 @@ export function GruposEventos() {
                 </Tooltip>
               </TooltipProvider>
             )}
-            {/* ✅ PADRÃO: Botão Tema */}
-            {features.dark_mode && (
+            {/* ✅ PADRÃO: Botão Tema - DESATIVADO POR ENQUANTO */}
+            {false && features.dark_mode && (
               <Button
                 variant="outline"
                 size="icon"

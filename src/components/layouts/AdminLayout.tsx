@@ -56,9 +56,9 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border print:relative print:border-0">
+    <div className="min-h-screen bg-background text-foreground">
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm print:relative print:border-0">
         <div className="container mx-auto px-3 md:px-6 h-12 md:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             <Button
@@ -68,7 +68,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               className="print:hidden"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden md:inline">Menu</span>
+              <span className="hidden md:inline menu-button-text">Menu</span>
             </Button>
             <ImageWithFallback 
               key={theme}
@@ -77,8 +77,10 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               className="h-6 md:h-8 w-6 md:w-8 object-contain" 
             />
             <div className="flex-1 min-w-0 hidden md:block">
-              <h1 className="text-foreground text-sm md:text-base">{title}</h1>
-              <p className="text-xs md:text-sm text-muted-foreground hidden md:block">{description || user?.client_name}</p>
+              <h1 className="text-foreground header-title-reduced truncate">{title}</h1>
+              <p className="text-muted-foreground header-subtitle-reduced hidden md:block truncate">
+                {description || user?.client_name}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
@@ -115,19 +117,21 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               </Tooltip>
             </TooltipProvider>
             
-            {/* Botão Tema */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
-            >
-              {theme === 'light' ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
-            </Button>
+            {/* Botão Tema - DESATIVADO POR ENQUANTO */}
+            {false && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTheme}
+                className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+              </Button>
+            )}
             
             {/* Botão Logout */}
             <TooltipProvider>

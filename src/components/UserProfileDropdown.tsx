@@ -137,18 +137,18 @@ export function UserProfileDropdown({ isOpen, onClose, userName, userEmail }: Us
           />
 
           {/* Dropdown Menu */}
-          <div className="absolute top-full right-0 mt-2 w-64 bg-popover rounded-lg shadow-xl border border-border z-50 overflow-hidden">
+          <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden">
             {/* Header do usuário */}
-            <div className="px-4 py-3 border-b border-border bg-muted/50">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0">
                   <User className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">
+                  <p className="font-medium text-slate-900 dark:text-slate-100 truncate">
                     {userName}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                     {userEmail}
                   </p>
                 </div>
@@ -159,21 +159,21 @@ export function UserProfileDropdown({ isOpen, onClose, userName, userEmail }: Us
             <div className="py-2">
               <button
                 onClick={handleOpenPasswordDialog}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <Lock className="w-4 h-4 text-gray-500" />
+                <Lock className="w-4 h-4 text-slate-500" />
                 <span>Trocar Senha</span>
               </button>
               
               <button
                 onClick={handleOpenEmailDialog}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <Mail className="w-4 h-4 text-gray-500" />
+                <Mail className="w-4 h-4 text-slate-500" />
                 <span>Trocar Email</span>
               </button>
               
-              <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+              <div className="border-t border-slate-200 dark:border-slate-800 my-2"></div>
               
               <button
                 onClick={handleLogout}

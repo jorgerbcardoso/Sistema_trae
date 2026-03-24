@@ -449,7 +449,7 @@ export function MainMenu() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header Moderno com Glassmorphism */}
-      <header className="backdrop-blur-md bg-background/80 border-b border-border sticky top-0 z-50 shadow-sm">
+      <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -466,19 +466,19 @@ export function MainMenu() {
             <div className="flex-1 min-w-0">
               {shouldShowSystemName(user?.domain) ? (
                 <>
-                  <h1 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100 truncate">
+                  <h1 className="text-slate-900 dark:text-slate-100 header-title-main truncate">
                     {user?.client_name || 'VIAÇÃO CRUZEIRO DO SUL'}
                   </h1>
-                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  <p className="text-slate-500 dark:text-slate-400 header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
               ) : (
                 <>
-                  <h1 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100 truncate">
+                  <h1 className="text-slate-900 dark:text-slate-100 header-title-main truncate">
                     {user?.client_name || 'Sistema de Gestão'}
                   </h1>
-                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  <p className="text-slate-500 dark:text-slate-400 header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
@@ -492,27 +492,30 @@ export function MainMenu() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowUnidadeSelector(true)}
-                className="dark:border-slate-600 dark:hover:bg-slate-800 hidden md:flex hover:shadow-md transition-all hover:scale-105"
+                className="dark:border-slate-600 dark:hover:bg-slate-800 hidden md:flex hover:shadow-md transition-all hover:scale-105 header-title-main lowercase first-letter:uppercase"
                 disabled={!user?.troca_unidade}
               >
                 <Building2 className="w-4 h-4 mr-2" />
-                {user.unidade_atual}
+                <span className="header-title-main">{user.unidade_atual}</span>
                 {user.troca_unidade && <RefreshCw className="w-3 h-3 ml-2" />}
               </Button>
             )}
             
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              className="dark:border-slate-600 dark:hover:bg-slate-800 hover:shadow-md transition-all hover:scale-105"
-            >
-              {theme === 'light' ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
-            </Button>
+            {/* Botão Tema - DESATIVADO POR ENQUANTO */}
+            {false && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTheme}
+                className="dark:border-slate-600 dark:hover:bg-slate-800 hover:shadow-md transition-all hover:scale-105"
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+              </Button>
+            )}
             <div className="relative">
               <div
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -524,10 +527,10 @@ export function MainMenu() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <p className="header-title-main text-slate-900 dark:text-slate-100">
                     {user?.full_name || user?.username}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="header-subtitle-main text-slate-500 dark:text-slate-400">
                     {user?.email}
                   </p>
                 </div>
@@ -753,6 +756,7 @@ export function MainMenu() {
             <Button
               onClick={handleChangeUnidade}
               disabled={!selectedUnidade || selectedUnidade === user?.unidade_atual}
+              variant="default"
             >
               Confirmar Troca
             </Button>

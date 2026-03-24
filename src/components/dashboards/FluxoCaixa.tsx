@@ -8,8 +8,8 @@ export function FluxoCaixa() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Fluxo de Caixa</h1>
-          <p className="text-gray-500 mt-1">Controle de entradas e saídas</p>
+          <h1 className="header-title-reduced text-slate-900 dark:text-slate-100 uppercase">Fluxo de Caixa</h1>
+          <p className="header-subtitle-reduced text-slate-500">Controle de entradas e saídas</p>
         </div>
       </div>
 

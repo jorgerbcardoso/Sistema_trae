@@ -250,7 +250,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
       
       // ✅ PASSO 2: Determinar se usa MOCK ou BACKEND
-      const USE_MOCK = !isRealProduction;
+      // 🔧 MODIFICAÇÃO: Em localhost, SEMPRE usar BACKEND real
+      const USE_MOCK = hostname === 'localhost' ? false : !isRealProduction;
       
       // ✅ PASSO 3: Buscar informações do domínio
       let domainInfo: any = null;
@@ -717,30 +718,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('🍪 [AuthContext] Cookies deletados');
       console.log('🧹 [AuthContext] Sessão limpa');
       
-      // ✅ REDIRECIONAR BASEADO NO DOMÍNIO (depois de limpar)
-      if (storedDomain === 'ACV') {
-        console.log('🔄 [AuthContext] Redirecionando Aceville para /sistema/login-aceville');
-        // Resetar favicon para o da Aceville antes de redirecionar
-        setFaviconByDomain('ACV');
-        window.location.href = '/sistema/login-aceville';
-      } else {
-        console.log('🔄 [AuthContext] Redirecionando para /sistema/login');
-        // Resetar favicon para o padrão
-        resetFavicon();
-        window.location.href = '/sistema/login';
-      }
+      // ✅ NÃO FAZER REDIRECIONAMENTO AQUI - Deixar o ProtectedRoute ou componente lidar
       
     } catch (error) {
       console.error('❌ [AuthContext] Erro ao fazer logout:', error);
-      // Em caso de erro, ainda assim redirecionar
-      const storedDomain = localStorage.getItem('presto_domain');
-      if (storedDomain === 'ACV') {
-        setFaviconByDomain('ACV');
-        window.location.href = '/sistema/login-aceville';
-      } else {
-        resetFavicon();
-        window.location.href = '/sistema/login';
-      }
+      // Em caso de erro, ainda assim limpar estado
+      setUser(null);
+      setToken(null);
+      setClientConfig(null);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('presto_auth_token');
+      localStorage.removeItem('presto_domain');
+      localStorage.removeItem('presto_user_id');
+      localStorage.removeItem('mock_user');
+      sessionStorage.removeItem('auth_verified');
+      deleteCookie('token');
+      deleteCookie('dominio');
+      deleteCookie('usuario');
     }
   };
 

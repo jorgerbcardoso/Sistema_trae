@@ -54,11 +54,17 @@ export function getDefaultHeaders(): HeadersInit {
     }
   }
   
+  // Em localhost, não enviar headers customizados para evitar CORS
+  const hostname = window.location.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
   return {
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
-    'X-Domain': domain,
-    'X-Unidade': unidade
+    ...(isLocalhost ? {} : {
+      'X-Domain': domain,
+      'X-Unidade': unidade
+    })
   };
 }
 

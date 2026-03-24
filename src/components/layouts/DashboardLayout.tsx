@@ -95,9 +95,9 @@ export function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border print:relative print:border-0">
+    <div className="min-h-screen bg-background text-foreground">
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm print:relative print:border-0">
         <div className="container mx-auto px-3 md:px-6 h-12 md:h-16 flex items-center justify-between gap-4">
           
           {/* Left Side: Logo e Título */}
@@ -109,7 +109,7 @@ export function DashboardLayout({
               className="print:hidden shrink-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden md:inline">Menu</span>
+              <span className="hidden md:inline menu-button-text">Menu</span>
             </Button>
             <ImageWithFallback 
               key={theme}
@@ -118,8 +118,8 @@ export function DashboardLayout({
               className="h-6 md:h-8 w-6 md:w-8 object-contain shrink-0" 
             />
             <div className="flex-1 min-w-0 hidden md:block">
-              <h1 className="text-slate-900 dark:text-slate-100 text-sm md:text-base truncate">{title}</h1>
-              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 hidden md:block truncate">
+              <h1 className="text-slate-900 dark:text-slate-100 header-title-reduced truncate">{title}</h1>
+              <p className="text-slate-500 dark:text-slate-400 header-subtitle-reduced hidden md:block truncate">
                 {description || user?.client_name}
               </p>
             </div>
@@ -167,19 +167,21 @@ export function DashboardLayout({
               </Tooltip>
             </TooltipProvider>
             
-            {/* Botão Tema */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={toggleTheme}
-              className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
-            >
-              {theme === 'light' ? (
-                <Moon className="w-4 h-4" />
-              ) : (
-                <Sun className="w-4 h-4" />
-              )}
-            </Button>
+            {/* Botão Tema - DESATIVADO POR ENQUANTO */}
+            {false && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTheme}
+                className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+              </Button>
+            )}
             
             {/* Botão Logout */}
             <TooltipProvider>

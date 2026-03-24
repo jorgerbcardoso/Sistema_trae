@@ -29,6 +29,7 @@ export function useSessionTimeout() {
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutIdRef = useRef<NodeJS.Timeout | null>(null);
   const backendCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isLoggingOutRef = useRef<boolean>(false); // 🆕 Proteção contra logout múltiplo
   
   // ✅ SEGURANÇA: Verificar se AuthContext está disponível
   let auth;
@@ -49,7 +50,7 @@ export function useSessionTimeout() {
    */
   const checkBackendSession = useCallback(async () => {
     // Não verificar em modo mock/Figma
-    if (ENVIRONMENT.isFigmaMake) {
+    if (ENVIRONMENT.isFigmaMake || ENVIRONMENT.useMockData) {
       return true;
     }
 
@@ -58,7 +59,10 @@ export function useSessionTimeout() {
       
       if (!token) {
         console.log('⚠️ [SessionTimeout] Sem token, fazendo logout...');
-        await logout();
+        if (!isLoggingOutRef.current) {
+          isLoggingOutRef.current = true;
+          await logout();
+        }
         return false;
       }
 
@@ -71,7 +75,10 @@ export function useSessionTimeout() {
       if (!response.ok || response.status === 401) {
         console.log('❌ [SessionTimeout] Sessão expirada no backend (status ' + response.status + '), fazendo logout...');
         toast.error('Sua sessão expirou. Faça login novamente.');
-        await logout();
+        if (!isLoggingOutRef.current) {
+          isLoggingOutRef.current = true;
+          await logout();
+        }
         return false;
       }
 
@@ -80,7 +87,10 @@ export function useSessionTimeout() {
       if (!data.authenticated) {
         console.log('❌ [SessionTimeout] Sessão não autenticada no backend, fazendo logout...');
         toast.error('Sua sessão expirou. Faça login novamente.');
-        await logout();
+        if (!isLoggingOutRef.current) {
+          isLoggingOutRef.current = true;
+          await logout();
+        }
         return false;
       }
 
@@ -113,7 +123,10 @@ export function useSessionTimeout() {
   const handleInactivityLogout = useCallback(async () => {
     console.log('⏰ [SessionTimeout] Timeout de inatividade atingido, fazendo logout...');
     toast.error('Você foi desconectado por inatividade.');
-    await logout();
+    if (!isLoggingOutRef.current) {
+      isLoggingOutRef.current = true;
+      await logout();
+    }
   }, [logout]);
 
   /**
