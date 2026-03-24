@@ -53,139 +53,55 @@ git reset --hard origin/main || error_exit "Falha ao resetar para origin/main"
 success "Pull concluído com sucesso"
 echo ""
 
-# 4.5. CORRIGIR imports do sonner (workaround temporário)
-echo "[4.5] Corrigindo imports do sonner..."
-find . -type f \( -name "*.tsx" -o -name "*.ts" \) -exec sed -i "s/from 'sonner@2.0.3'/from 'sonner'/g" {} \; 2>/dev/null || true
-success "Imports do sonner corrigidos"
+# 4.5. REMOVIDO: Correção manual de imports
+# O repositório já deve conter os imports corretos.
+echo "[4.5] Imports mantidos conforme repositório"
 echo ""
 
-# 5. MOVER TUDO de src/ para a raiz
-echo "[5] Movendo arquivos de src/ para raiz..."
-if [ -d "src" ]; then
-    echo "Encontrado diretório src/, movendo conteúdo..."
-
-    # FORÇAR remoção de arquivos antigos na raiz ANTES de mover
-    echo "Removendo arquivos antigos da raiz..."
-    rm -rf components contexts hooks layouts mocks pages services styles utils config routes.tsx main.tsx App.tsx 2>/dev/null || true
-
-    # Mover TUDO de src/ para raiz (FORÇANDO sobrescrita)
-    shopt -s dotglob  # Incluir arquivos ocultos
-    cp -rf src/* .
-    shopt -u dotglob
-
-    # Remover diretório src/
-    rm -rf src
-
-    success "Arquivos movidos para raiz (FORÇADO)"
-else
-    warning "Diretório src/ não encontrado, arquivos já devem estar na raiz"
-fi
+# 4.7. REMOVIDO: Alteração manual de globals.css
+# O globals.css do repositório já deve estar configurado corretamente.
+echo "[4.7] globals.css mantido conforme repositório"
 echo ""
 
-# 5.5. CORRIGIR index.html para apontar para /main.tsx em vez de /src/main.tsx
-echo "[5.5] Corrigindo index.html..."
-if [ -f "index.html" ]; then
-    sed -i 's|/src/main.tsx|/main.tsx|g' index.html
-    success "index.html corrigido"
-else
-    warning "index.html não encontrado (será gerado pelo build)"
-fi
+# 5. REMOVIDO: Movimentação de arquivos de src/ para raiz
+# O projeto agora mantém a estrutura padrão /src/ conforme o repositório.
+echo "[5] Estrutura mantida (padrão /src/)"
 echo ""
 
-# 5.6. REMOVER TAILWIND CDN do index.html (no servidor usamos Tailwind compilado)
-echo "[5.6] Removendo Tailwind CDN do index.html..."
-if [ -f "index.html" ]; then
-    # Remover linha do CDN do Tailwind
-    sed -i '/<script src="https:\/\/cdn.tailwindcss.com"><\/script>/d' index.html
-    # Remover bloco de configuração do Tailwind (entre <script> e </script> que contém tailwind.config)
-    sed -i '/<script>$/,/<\/script>$/{/tailwind\.config/,/<\/script>/d}' index.html
-    # Remover comentário do Tailwind CDN
-    sed -i '/<!-- Tailwind CSS via CDN/d' index.html
-    success "Tailwind CDN removido (será usado Tailwind compilado)"
-else
-    warning "index.html não encontrado"
-fi
+# 5.5. REMOVIDO: Correção de index.html
+# O index.html do repositório já aponta corretamente para /src/main.tsx.
+echo "[5.5] index.html mantido conforme repositório"
 echo ""
 
 # 6. Verificar estrutura final
-echo "[6] Verificando estrutura final..."
+echo "[6] Verificando estrutura..."
 
 if [ ! -f "package.json" ]; then
-    error_exit "package.json não encontrado na raiz!"
+    error_exit "package.json não encontrado!"
 fi
-if [ ! -d "components" ]; then
-    error_exit "Diretório components/ não encontrado!"
-fi
-if [ ! -d "services" ]; then
-    error_exit "Diretório services/ não encontrado!"
+if [ ! -d "src/components" ]; then
+    error_exit "Diretório src/components/ não encontrado!"
 fi
 success "Estrutura verificada"
 echo ""
 
-# 7. Garantir configurações de build corretas (Versão Homologada com ES Module)
-echo "[7] Garantindo configurações de build corretas..."
-
-# Remover TODOS os configs antigos
-rm -f vite.config.js vite.config.ts vite.config.mjs 2>/dev/null || true
-
-# Criar vite.config.ts
-cat > vite.config.ts << 'VITECONFIG'
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-
-export default defineConfig({
-  plugins: [react()],
-  base: '/sistema/',
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-      '@components': path.resolve(__dirname, './components'),
-      '@contexts': path.resolve(__dirname, './contexts'),
-      '@services': path.resolve(__dirname, './services'),
-      '@utils': path.resolve(__dirname, './utils'),
-      '@styles': path.resolve(__dirname, './styles'),
-    },
-  },
-  build: {
-    outDir: 'build',
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-      },
-    },
-  },
-  server: {
-    port: 5173,
-    strictPort: false,
-  },
-});
-VITECONFIG
-
-# Criar postcss.config.js
-cat > postcss.config.js << 'POSTCSS'
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-POSTCSS
-
-success "Configurações de build restauradas (vite.config.ts + postcss.config.js)"
+# 7. REMOVIDO: Sobrescrita de vite.config.ts e postcss.config.js
+# Usaremos os arquivos que já estão no repositório, pois contêm as configurações ideais.
+echo "[7] Configurações do repositório mantidas (vite.config.ts / postcss.config.js)"
 echo ""
 
 # 8. Limpar e instalar dependências
 echo "[8] Instalando dependências do npm..."
-#rm -rf node_modules package-lock.json
-
-# LIMPAR CACHE COMPLETAMENTE
-rm -rf node_modules .next build dist .vite 2>/dev/null || true
-rm -rf node_modules/.cache node_modules/.vite 2>/dev/null || true
-
+# LIMPAR CACHE E MODULOS ANTIGOS
+rm -rf node_modules .vite build dist 2>/dev/null || true
 npm install || error_exit "Falha ao instalar dependências"
 
 success "Dependências instaladas"
+echo ""
+
+# 8.5. REMOVIDO: Forçar Tailwind v4 beta
+# O package.json já contém a versão correta (4.1.12).
+echo "[8.5] Versão do Tailwind mantida conforme package.json"
 echo ""
 
 # 9. Build em PRODUÇÃO
@@ -311,8 +227,8 @@ echo "========================================"
 echo ""
 echo "📋 RESUMO:"
 echo "  • Código atualizado do GitHub"
-echo "  • Estrutura corrigida (src/ movido para raiz)"
-echo "  • Build em modo produção"
+echo "  • Estrutura mantida padrão (pasta /src/)"
+echo "  • Build em modo produção utilizando vite.config.ts do repositório"
 echo "  • Base configurado para /sistema/"
 echo "  • Assets em /sistema/assets/"
 echo "  • Permissões corrigidas"
@@ -327,9 +243,7 @@ echo "  ou abra uma aba anônima para testar"
 echo ""
 echo "📁 ESTRUTURA:"
 echo "  /var/www/html/sistema/"
-echo "    ├── components/    (código-fonte)"
-echo "    ├── services/      (código-fonte)"
-echo "    ├── utils/         (código-fonte)"
+echo "    ├── src/           (código-fonte)"
 echo "    ├── build/         (build gerado)"
 echo "    ├── index.html     (produção)"
 echo "    ├── assets/        (produção)"
