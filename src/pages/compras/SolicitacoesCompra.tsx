@@ -37,6 +37,8 @@ import {
   Calendar,
   User,
   Printer,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import {
   Select,
@@ -837,6 +839,195 @@ export default function SolicitacoesCompra() {
     }, 500);
   };
 
+  // ✅ Função de Exportação para Excel (Baseada em RelatorioMovimentacao)
+  const exportarExcel = async () => {
+    if (solicitacoes.length === 0) {
+      toast.error('Não há dados para exportar');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (ENVIRONMENT.isFigmaMake) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        toast.success('Relatório Excel gerado com sucesso!');
+        return;
+      }
+
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${ENVIRONMENT.apiBaseUrl}/compras/exportar_solicitacoes.php`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            filters: {
+              unidade: filtroUnidade,
+              data_inicio: filtroDataInicio,
+              data_fim: filtroDataFim,
+              nro_setor: filtroSetor,
+              status: filtroStatus
+            },
+            solicitacoes: sortData(solicitacoes)
+          })
+        }
+      );
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao gerar planilha');
+      }
+
+      if (!response.ok) throw new Error('Erro ao exportar planilha');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `solicitacoes_compra_${new Date().getTime()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Relatório Excel gerado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao exportar Excel:', error);
+      toast.error(error.message || 'Erro ao exportar planilha Excel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Função de Impressão da Listagem (PDF Relatório)
+  const imprimirListagem = () => {
+    if (solicitacoes.length === 0) {
+      toast.error('Não há dados para imprimir');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela de impressão');
+      return;
+    }
+
+    const logoEmpresa = clientConfig?.theme?.logo_light || '';
+    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+    const dataInicio = filtroDataInicio ? new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+    const dataFim = filtroDataFim ? new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Solicitações de Compra</title>
+        <style>
+          @page { size: landscape; margin: 10mm; }
+          body { font-family: Arial, sans-serif; font-size: 8pt; color: #000; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 10px; }
+          .header-left { display: flex; align-items: center; gap: 10px; }
+          .logo { max-width: 80px; max-height: 35px; }
+          .header-info h1 { font-size: 12pt; color: #2563eb; margin: 0; text-transform: uppercase; }
+          .header-info p { font-size: 7pt; color: #666; margin: 0; }
+          .header-right { text-align: right; }
+          .header-right img { max-width: 100px; max-height: 40px; }
+          .filters-bar { background: #f3f4f6; padding: 5px 10px; border-radius: 4px; margin-bottom: 10px; display: flex; justify-content: space-between; font-size: 7pt; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #1e40af; color: white; padding: 6px 4px; text-align: left; font-size: 7pt; text-transform: uppercase; border: 1px solid #1e3a8a; }
+          td { border: 1px solid #e5e7eb; padding: 5px 4px; vertical-align: middle; }
+          tr:nth-child(even) { background: #f9fafb; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-mono { font-family: monospace; }
+          .badge { padding: 2px 6px; border-radius: 10px; font-size: 6pt; font-weight: bold; text-transform: uppercase; }
+          .badge-pendente { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+          .badge-atendida { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+          .footer { margin-top: 10px; padding-top: 5px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 6pt; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-left">
+            <img src="${isAceville ? logoEmpresa : '/sistema/logo-presto.png'}" class="logo" />
+            <div class="header-info">
+              <h1>Relatório de Solicitações de Compra</h1>
+              <p>Sistema PRESTO - Gestão Inteligente</p>
+            </div>
+          </div>
+          <div class="header-right">
+            <p style="font-size: 10pt; font-weight: bold; color: #1e40af;">LISTAGEM GERAL</p>
+            <p style="font-size: 7pt; color: #666;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div>
+            <strong>Período:</strong> ${dataInicio} a ${dataFim} | 
+            <strong>Unidade:</strong> ${filtroUnidade || 'TODAS'} | 
+            <strong>Status:</strong> ${filtroStatus}
+          </div>
+          <div>Total: ${solicitacoes.length} registros</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px;">Número</th>
+              <th style="width: 70px;">Data</th>
+              <th>Centro de Custo</th>
+              <th>Setor</th>
+              <th style="width: 80px;">Placa</th>
+              <th style="width: 50px;" class="text-center">Itens</th>
+              <th style="width: 80px;" class="text-center">O.C.</th>
+              <th style="width: 80px;" class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortData(solicitacoes).map(sol => `
+              <tr>
+                <td class="font-mono">${formatarNumeroSolicitacao(sol.unidade, sol.seq_solicitacao_compra)}</td>
+                <td>${new Date(sol.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                <td>${formatCodigoCentroCusto(sol.centro_custo_unidade || '', sol.centro_custo_nro || '')} - ${sol.centro_custo_descricao}</td>
+                <td>${sol.setor_descricao || '-'}</td>
+                <td class="font-mono">${sol.placa || '-'}</td>
+                <td class="text-center">${sol.qtd_itens}</td>
+                <td class="text-center font-mono">${sol.nro_ordem_compra || '-'}</td>
+                <td class="text-center">
+                  <span class="badge ${sol.status === 'A' ? 'badge-atendida' : 'badge-pendente'}">
+                    ${sol.status === 'A' ? 'Atendida' : 'Pendente'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Documento gerado por ${user?.username?.toUpperCase()} | © 2026 Sistema Presto
+        </div>
+
+        <script>
+          window.onload = () => {
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
   // Limpar filtros
   const limparFiltros = () => {
     // Restaurar período padrão (últimos 3 dias)
@@ -863,17 +1054,44 @@ export default function SolicitacoesCompra() {
         {/* Card de Nova Solicitação */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                   <ClipboardList className="size-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <CardTitle>Minhas Solicitações</CardTitle>
               </div>
-              <Button onClick={abrirModalNovaSolicitacao} className="gap-2">
-                <Plus className="size-4" />
-                Nova Solicitação
-              </Button>
+              
+              <div className="flex flex-wrap items-center gap-2">
+                {solicitacoes.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportarExcel}
+                      disabled={loading}
+                      className="gap-2 border-green-200 hover:bg-green-50 dark:border-green-900 dark:hover:bg-green-900/20 text-green-700 dark:text-green-400"
+                    >
+                      <FileSpreadsheet className="size-4" />
+                      Excel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={imprimirListagem}
+                      disabled={loading}
+                      className="gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+                    >
+                      <FileText className="size-4" />
+                      Relatório PDF
+                    </Button>
+                  </>
+                )}
+                <Button onClick={abrirModalNovaSolicitacao} className="gap-2 ml-2">
+                  <Plus className="size-4" />
+                  Nova Solicitação
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
