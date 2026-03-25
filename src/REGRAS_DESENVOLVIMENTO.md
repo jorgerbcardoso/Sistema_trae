@@ -84,6 +84,14 @@
   - `user_permissions`
 - ✅ No PHP, usar a variável `$prefix` (geralmente `strtolower($domain) . '_'`) para montar as queries.
 
+### 16. **PADRONIZAÇÃO DE SCROLLBARS**
+- ✅ **ESTILO ÚNICO**: O sistema utiliza scrollbars customizadas (finas e arredondadas).
+- ✅ **CONFIGURAÇÃO**: Definida globalmente em `globals.css` via `@layer base`.
+- ✅ **CORES**: 
+  - Light: `bg-slate-300` (hover: `bg-slate-400`)
+  - Dark: `bg-slate-700` (hover: `bg-slate-600`)
+- ✅ **LARGURA**: 8px para vertical e horizontal.
+
 ---
 
 ## 📁 ESTRUTURA DE ARQUIVOS

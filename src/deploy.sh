@@ -50,6 +50,7 @@ echo ""
 echo "[4] Fazendo pull COMPLETO do GitHub..."
 git fetch origin || error_exit "Falha ao fazer fetch do repositório"
 git reset --hard origin/main || error_exit "Falha ao resetar para origin/main"
+git clean -fd || warning "Não foi possível limpar arquivos não rastreados"
 success "Pull concluído com sucesso"
 echo ""
 
@@ -162,7 +163,19 @@ fi
 if [ ! -d "assets" ]; then
     error_exit "assets/ não está na raiz!"
 fi
-success "Arquivos na raiz verificados"
+
+# 14.5. Sincronizar APIs PHP (Link simbólico src/api -> api)
+echo "[14.5] Sincronizando APIs PHP..."
+if [ -d "src/api" ]; then
+    if [ -d "api" ] && [ ! -L "api" ]; then
+        warning "Diretório api/ existe mas não é um link. Fazendo backup e convertendo em link..."
+        mv api "api_backup_$(date '+%Y%m%d_%H%M%S')"
+    fi
+    ln -sfn src/api api || error_exit "Falha ao criar link simbólico para api/"
+    success "APIs sincronizadas (link simbólico src/api -> api)"
+else
+    error_exit "Pasta src/api não encontrada no repositório!"
+fi
 echo ""
 
 # 15. Corrigir permissões

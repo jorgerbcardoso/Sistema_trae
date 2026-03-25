@@ -137,6 +137,7 @@ export default function SolicitacoesCompra() {
     dataInicio.setDate(hoje.getDate() - 3);
     return dataInicio.toISOString().split('T')[0];
   });
+  
   const [filtroDataFim, setFiltroDataFim] = useState(() => {
     const hoje = new Date();
     return hoje.toISOString().split('T')[0];
@@ -694,7 +695,7 @@ export default function SolicitacoesCompra() {
                 <p className="text-sm mt-1">Crie sua primeira solicitação de compra</p>
               </div>
             ) : (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

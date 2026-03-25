@@ -21,6 +21,13 @@ Use este checklist para validar TODAS as telas antes de fazer commit.
 - [ ] Grid adapta colunas: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
 - [ ] Botões empilham em mobile: `flex-col sm:flex-row`
 
+### **Scrollbars**
+- [ ] Scrollbars seguem o padrão fino e arredondado do sistema
+- [ ] Cor em modo Light: `slate-300`
+- [ ] Cor em modo Dark: `slate-700`
+- [ ] Largura/Altura: 8px
+- [ ] Não há scrollbars duplicadas (ex: no body + container)
+
 ### **Dark Mode**
 - [ ] Todas as cores têm variante dark: `bg-white dark:bg-gray-900`
 - [ ] Textos adaptam: `text-gray-900 dark:text-gray-100`
