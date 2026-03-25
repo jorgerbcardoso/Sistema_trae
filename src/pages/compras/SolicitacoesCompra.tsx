@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -36,6 +36,7 @@ import {
   Clock,
   Calendar,
   User,
+  Printer,
 } from 'lucide-react';
 import {
   Select,
@@ -93,10 +94,11 @@ interface UsuarioSetor {
 export default function SolicitacoesCompra() {
   usePageTitle('Solicitações de Compra');
 
-  const { user } = useAuth();
+  const { user, clientConfig } = useAuth();
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoCompra[]>([]);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Formulário de nova solicitação
   const [mostrarModal, setMostrarModal] = useState(false);
@@ -559,6 +561,280 @@ export default function SolicitacoesCompra() {
   // Formatar número da solicitação
   const formatarNumeroSolicitacao = (unidade: string, seq: number): string => {
     return `${unidade?.trim() || ''}${String(seq).padStart(6, '0')}`;
+  };
+
+  // ✅ Função de Impressão (Baseada no padrão de Pedidos)
+  const imprimirSolicitacao = () => {
+    const printContent = printRef.current;
+    if (!printContent || !solicitacaoDetalhes) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela de impressão');
+      return;
+    }
+
+    // Logo do cliente e Presto
+    const logoCliente = clientConfig?.theme?.logo_light || '';
+    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+    
+    // Obter HTML do conteúdo oculto
+    let htmlContent = printContent.innerHTML;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Solicitação ${formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 15mm; 
+              font-size: 11pt;
+              color: #000;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 3px solid #2563eb;
+            }
+            .header-left {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+            }
+            .logo {
+              max-width: 120px;
+              max-height: 50px;
+            }
+            .header-info h1 {
+              font-size: 16pt;
+              color: #2563eb;
+              margin-bottom: 3px;
+              text-transform: uppercase;
+            }
+            .header-info p {
+              font-size: 10pt;
+              color: #666;
+            }
+            .header-right {
+              text-align: right;
+            }
+            .header-right img {
+              max-width: 100px;
+              max-height: 45px;
+            }
+            .documento-numero {
+              font-size: 20pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 5px;
+              font-family: monospace;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 4px 12px;
+              border-radius: 12px;
+              font-size: 9pt;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .status-pendente {
+              background: #fef3c7;
+              color: #92400e;
+              border: 1px solid #fcd34d;
+            }
+            .status-atendida {
+              background: #d1fae5;
+              color: #065f46;
+              border: 1px solid #6ee7b7;
+            }
+            .section {
+              margin-bottom: 20px;
+            }
+            .section-title {
+              font-size: 11pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 8px;
+              padding-bottom: 4px;
+              border-bottom: 2px solid #e5e7eb;
+              text-transform: uppercase;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 10px;
+            }
+            .info-item {
+              margin-bottom: 8px;
+            }
+            .info-label {
+              font-size: 8pt;
+              color: #6b7280;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 2px;
+            }
+            .info-value {
+              font-size: 10pt;
+              color: #000;
+              font-weight: 500;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              font-size: 9pt;
+            }
+            th {
+              background-color: #1e40af;
+              color: white;
+              font-weight: bold;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 9pt;
+              text-transform: uppercase;
+            }
+            td {
+              border: 1px solid #e5e7eb;
+              padding: 8px 10px;
+            }
+            tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .observacoes-box {
+              background: #f9fafb;
+              padding: 12px;
+              border-radius: 6px;
+              border: 1px solid #e5e7eb;
+              font-size: 9pt;
+              line-height: 1.5;
+              color: #374151;
+              min-height: 60px;
+            }
+            .footer {
+              margin-top: 40px;
+              padding-top: 15px;
+              border-top: 1px solid #e5e7eb;
+              text-align: center;
+              color: #9ca3af;
+              font-size: 8pt;
+            }
+            @media print {
+              body { padding: 10mm; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              <img src="${isAceville ? logoCliente : '/sistema/logo-presto.png'}" alt="Sistema Presto" class="logo" />
+              <div class="header-info">
+                <h1>Solicitação de Compra</h1>
+                <p>Sistema de Gestão Presto</p>
+              </div>
+            </div>
+            <div class="header-right">
+              <div class="documento-numero">${formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}</div>
+              <div class="status-badge ${solicitacaoDetalhes.status === 'A' ? 'status-atendida' : 'status-pendente'}">
+                ${solicitacaoDetalhes.status === 'A' ? 'ATENDIDA / CONVERTIDA' : 'PENDENTE DE APROVAÇÃO'}
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Informações Gerais</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Data de Inclusão</div>
+                <div class="info-value">${new Date(solicitacaoDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às ${solicitacaoDetalhes.hora_inclusao?.substring(0, 5)}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Usuário Solicitante</div>
+                <div class="info-value">${solicitacaoDetalhes.login_inclusao?.toUpperCase()}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Centro de Custo</div>
+                <div class="info-value">
+                  ${formatCodigoCentroCusto(solicitacaoDetalhes.centro_custo_unidade || '', solicitacaoDetalhes.centro_custo_nro || '')} - ${solicitacaoDetalhes.centro_custo_descricao}
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Setor Responsável</div>
+                <div class="info-value">${solicitacaoDetalhes.setor_descricao || '-'}</div>
+              </div>
+              ${solicitacaoDetalhes.placa ? `
+              <div class="info-item">
+                <div class="info-label">Veículo / Placa</div>
+                <div class="info-value">${solicitacaoDetalhes.placa}</div>
+              </div>
+              ` : ''}
+              ${solicitacaoDetalhes.nro_ordem_compra ? `
+              <div class="info-item">
+                <div class="info-label">Ordem de Compra Gerada</div>
+                <div class="info-value">${solicitacaoDetalhes.nro_ordem_compra}</div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Itens da Solicitação</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 60px;" class="text-center">#</th>
+                  <th>Descrição do Item</th>
+                  <th style="width: 120px;" class="text-right">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itensDetalhes.map((item, index) => `
+                  <tr>
+                    <td class="text-center">${index + 1}</td>
+                    <td>${item.item}</td>
+                    <td class="text-right">${item.qtde_item}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Observações</div>
+            <div class="observacoes-box">
+              ${solicitacaoDetalhes.observacao || 'NENHUMA OBSERVAÇÃO INFORMADA.'}
+            </div>
+          </div>
+
+          <div class="footer">
+            Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
+            © 2026 Sistema Presto - Gestão Inteligente
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
   };
 
   // Limpar filtros
@@ -1072,25 +1348,39 @@ export default function SolicitacoesCompra() {
           </div>
 
           <DialogFooter className="p-6 border-t bg-gray-50 dark:bg-gray-900/50 shrink-0 sm:justify-between items-center gap-4">
-            <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={imprimirSolicitacao}
+                className="gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+              >
+                <Printer className="size-4" />
+                Imprimir PDF
+              </Button>
+
               {solicitacaoDetalhes && solicitacaoDetalhes.status === 'P' && !solicitacaoDetalhes.seq_ordem_compra && (
                 <Button
                   onClick={() => {
                     setMostrarDetalhesModal(false);
                     abrirModalSolicitarAprovacao(solicitacaoDetalhes);
                   }}
-                  variant="default"
-                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                  variant="outline"
+                  className="gap-2 border-orange-200 hover:bg-orange-50 dark:border-orange-900 dark:hover:bg-orange-900/20 text-orange-700 dark:text-orange-400"
                 >
                   <Mail className="size-4" />
                   Solicitar Aprovação
                 </Button>
               )}
             </div>
-            <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)} className="px-8">
+            <Button variant="default" onClick={() => setMostrarDetalhesModal(false)} className="px-8">
               Fechar
             </Button>
           </DialogFooter>
+
+          {/* Área Invisível para Impressão */}
+          <div style={{ display: 'none' }}>
+            <div ref={printRef}></div>
+          </div>
         </DialogContent>
       </Dialog>
 

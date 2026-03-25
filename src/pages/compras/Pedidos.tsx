@@ -506,13 +506,13 @@ export default function Pedidos() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => navigate(`/compras/pedidos/visualizar/${pedido.seq_pedido}`)}
                             className="gap-2"
                           >
                             <Eye className="size-4" />
-                            Ver Detalhes
+                            Visualizar
                           </Button>
                         </TableCell>
                       </TableRow>
