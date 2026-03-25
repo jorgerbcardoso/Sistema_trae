@@ -33,6 +33,9 @@ import {
   Mail,
   ShoppingCart,
   Filter,
+  Clock,
+  Calendar,
+  User,
 } from 'lucide-react';
 import {
   Select,
@@ -49,6 +52,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { toUpperCase, toUpperCaseInput } from '../../utils/stringUtils';
 import { FilterSelectCentroCusto } from '../../components/shared/FilterSelectCentroCusto';
 import { FilterSelectSetor } from '../../components/admin/FilterSelectSetor';
+import { FilterSelectUnidadeSingle } from '../../components/cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectVeiculo } from '../../components/dashboards/FilterSelectVeiculo';
 import { SortableTableHeader, useSortableTable } from '../../components/table/SortableTableHeader';
 import { formatCodigoCentroCusto } from '../../utils/formatters';
@@ -126,15 +130,14 @@ export default function SolicitacoesCompra() {
   const [excluindo, setExcluindo] = useState(false);
 
   // Filtros
+  const [filtroUnidade, setFiltroUnidade] = useState('');
   const [filtroDataInicio, setFiltroDataInicio] = useState(() => {
-    // Últimos 30 dias como padrão
     const hoje = new Date();
     const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - 30);
+    dataInicio.setDate(hoje.getDate() - 3);
     return dataInicio.toISOString().split('T')[0];
   });
   const [filtroDataFim, setFiltroDataFim] = useState(() => {
-    // Data de hoje como padrão
     const hoje = new Date();
     return hoje.toISOString().split('T')[0];
   });
@@ -146,9 +149,20 @@ export default function SolicitacoesCompra() {
   type SortField = 'seq_solicitacao_compra' | 'data_inclusao' | 'centro_custo_descricao' | 'qtd_itens';
   const { sortField, sortDirection, handleSort, sortData } = useSortableTable<SortField>('data_inclusao', 'desc');
 
+  // ✅ FORÇAR UNIDADE DO USUÁRIO (SE NÃO-MTZ)
+  useEffect(() => {
+    const unidadeAtual = user?.unidade_atual || user?.unidade || 'MTZ';
+    const unidadeAtualUpper = unidadeAtual.toUpperCase();
+    const isMtzOrAll = unidadeAtualUpper === 'MTZ' || unidadeAtualUpper === 'ALL';
+    
+    if (!isMtzOrAll) {
+      setFiltroUnidade(unidadeAtual);
+    }
+  }, [user]);
+
   useEffect(() => {
     carregarSolicitacoes();
-  }, []);
+  }, [filtroUnidade, filtroDataInicio, filtroDataFim, filtroSetor, filtroStatus]);
 
   const carregarSolicitacoes = async () => {
     setLoading(true);
@@ -192,10 +206,32 @@ export default function SolicitacoesCompra() {
             qtd_itens: 5,
           },
         ];
-        setSolicitacoes(mockSolicitacoes);
+
+        // Aplicar filtros no MOCK (para simular comportamento real)
+        const filtradas = mockSolicitacoes.filter(sol => {
+          if (filtroUnidade && filtroUnidade !== 'ALL' && sol.unidade !== filtroUnidade) return false;
+          if (filtroDataInicio && sol.data_inclusao < filtroDataInicio) return false;
+          if (filtroDataFim && sol.data_inclusao > filtroDataFim) return false;
+          if (filtroSetor && sol.nro_setor !== filtroSetor) return false;
+          
+          // PENDENTES = P, CONVERTIDAS = A
+          if (filtroStatus === 'CONVERTIDAS' && sol.status !== 'A') return false;
+          if (filtroStatus === 'PENDENTES' && sol.status !== 'P') return false;
+          
+          return true;
+        });
+
+        setSolicitacoes(filtradas);
       } else {
         // BACKEND
-        const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`, {
+        const queryParams = new URLSearchParams();
+        if (filtroUnidade) queryParams.append('unidade', filtroUnidade);
+        if (filtroDataInicio) queryParams.append('data_inicio', filtroDataInicio);
+        if (filtroDataFim) queryParams.append('data_fim', filtroDataFim);
+        if (filtroSetor) queryParams.append('nro_setor', filtroSetor.toString());
+        if (filtroStatus) queryParams.append('status', filtroStatus);
+
+        const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php?${queryParams.toString()}`, {
           method: 'GET',
         });
 
@@ -517,35 +553,24 @@ export default function SolicitacoesCompra() {
   };
 
   // Função de filtro
-  const solicitacoesFiltradas = solicitacoes.filter(sol => {
-    // Filtro de data início
-    if (filtroDataInicio && sol.data_inclusao < filtroDataInicio) return false;
-    
-    // Filtro de data fim
-    if (filtroDataFim && sol.data_inclusao > filtroDataFim) return false;
-    
-    // Filtro de setor
-    if (filtroSetor && sol.nro_setor !== filtroSetor) return false;
-    
-    // Filtro de status
-    if (filtroStatus === 'CONVERTIDAS' && !sol.seq_ordem_compra) return false;
-    if (filtroStatus === 'PENDENTES' && sol.seq_ordem_compra) return false;
-    
-    return true;
-  });
+  const solicitacoesFiltradas = solicitacoes;
 
   // Formatar número da solicitação
   const formatarNumeroSolicitacao = (unidade: string, seq: number): string => {
-    return `${unidade}${String(seq).padStart(6, '0')}`;
+    return `${unidade?.trim() || ''}${String(seq).padStart(6, '0')}`;
   };
 
   // Limpar filtros
   const limparFiltros = () => {
-    // Restaurar período padrão (últimos 30 dias)
+    // Restaurar período padrão (últimos 3 dias)
     const hoje = new Date();
     const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - 30);
+    dataInicio.setDate(hoje.getDate() - 3);
     
+    const unidadeOriginal = user?.unidade_atual || user?.unidade || 'MTZ';
+    const isMtzOrAll = unidadeOriginal.toUpperCase() === 'MTZ' || unidadeOriginal.toUpperCase() === 'ALL';
+
+    setFiltroUnidade(isMtzOrAll ? '' : unidadeOriginal);
     setFiltroDataInicio(dataInicio.toISOString().split('T')[0]);
     setFiltroDataFim(hoje.toISOString().split('T')[0]);
     setFiltroSetor(null);
@@ -587,7 +612,7 @@ export default function SolicitacoesCompra() {
                   {mostrarFiltros ? 'Ocultar Filtros' : 'Mostrar Filtros'}
                 </Button>
                 
-                {(filtroDataInicio || filtroDataFim || filtroSetor || filtroStatus !== 'TODAS') && (
+                {(filtroDataInicio || filtroDataFim || filtroSetor || filtroStatus !== 'TODAS' || filtroUnidade) && (
                   <Button variant="ghost" onClick={limparFiltros} className="text-sm">
                     Limpar Filtros
                   </Button>
@@ -596,7 +621,18 @@ export default function SolicitacoesCompra() {
 
               {mostrarFiltros && (
                 <Card className="p-4 bg-gray-50 dark:bg-gray-900">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    {/* Unidade */}
+                    <div>
+                      <Label className="text-sm mb-2 block">Unidade</Label>
+                      <FilterSelectUnidadeSingle
+                        value={filtroUnidade}
+                        onChange={setFiltroUnidade}
+                        placeholder="Todas as unidades"
+                        disabled={user?.unidade_atual?.toUpperCase() !== 'MTZ' && user?.unidade?.toUpperCase() !== 'MTZ' && user?.unidade?.toUpperCase() !== 'ALL'}
+                      />
+                    </div>
+
                     {/* Período */}
                     <div>
                       <Label className="text-sm mb-2 block">Data Início</Label>
@@ -704,7 +740,7 @@ export default function SolicitacoesCompra() {
                           {formatarNumeroSolicitacao(solicitacao.unidade, solicitacao.seq_solicitacao_compra)}
                         </TableCell>
                         <TableCell>
-                          {new Date(solicitacao.data_inclusao).toLocaleDateString('pt-BR')}
+                          {new Date(solicitacao.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </TableCell>
                         <TableCell className="font-mono">
                           {formatCodigoCentroCusto(
@@ -914,92 +950,145 @@ export default function SolicitacoesCompra() {
 
       {/* Modal de Detalhes */}
       <Dialog open={mostrarDetalhesModal} onOpenChange={setMostrarDetalhesModal}>
-        <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[750px] h-[85vh] flex flex-col p-0 overflow-hidden bg-card">
+          <DialogHeader className="p-6 pb-2 shrink-0">
             <DialogTitle>Detalhes da Solicitação</DialogTitle>
             <DialogDescription>
               Visualizar informações completas da solicitação de compra
             </DialogDescription>
           </DialogHeader>
 
-          {solicitacaoDetalhes && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-gray-500">Número:</Label>
-                  <p className="font-medium">{String(solicitacaoDetalhes.seq_solicitacao_compra).padStart(6, '0')}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Data:</Label>
-                  <p className="font-medium">
-                    {new Date(solicitacaoDetalhes.data_inclusao).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <Label className="text-sm text-gray-500">Centro de Custo:</Label>
-                  <p className="font-medium">
-                    {formatCodigoCentroCusto(
-                      solicitacaoDetalhes.centro_custo_unidade || '',
-                      solicitacaoDetalhes.centro_custo_nro || ''
-                    )} - {solicitacaoDetalhes.centro_custo_descricao}
-                  </p>
-                </div>
-
-                <div>
-                  <Label className="text-sm text-gray-500">Setor:</Label>
-                  <p className="font-medium">{solicitacaoDetalhes.setor_descricao || '-'}</p>
-                </div>
-
-                {/* ✅ Placa do Veículo - SEMPRE EXIBIR */}
-                <div>
-                  <Label className="text-sm text-gray-500">Placa do Veículo:</Label>
-                  <p className="font-medium font-mono">
-                    {solicitacaoDetalhes.placa || '-'}
-                  </p>
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+            {solicitacaoDetalhes && (
+              <div className="grid gap-6">
+                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Status da Solicitação</Label>
+                    <div className="flex items-center gap-2">
+                      {solicitacaoDetalhes.status === 'A' ? (
+                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 px-3 py-1 text-sm font-bold uppercase">
+                          <CheckCircle className="size-3.5 mr-1.5" />
+                          APROVADA / ATENDIDA
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 px-3 py-1 text-sm font-bold uppercase">
+                          <Clock className="size-3.5 mr-1.5" />
+                          PENDENTE DE APROVAÇÃO
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Número</Label>
+                    <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                      {formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}
+                    </p>
+                  </div>
                 </div>
 
-                {solicitacaoDetalhes.seq_ordem_compra && (
+                <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-sm text-gray-500">Ordem de Compra:</Label>
-                    <p className="font-medium font-mono">{solicitacaoDetalhes.nro_ordem_compra}</p>
+                    <Label className="text-sm text-gray-500 font-medium">Data de Inclusão:</Label>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">
+                      {new Date(solicitacaoDetalhes.data_inclusao).toLocaleDateString('pt-BR')} às {solicitacaoDetalhes.hora_inclusao?.substring(0, 5)}
+                    </p>
                   </div>
-                )}
 
-                {solicitacaoDetalhes.observacao && (
+                  <div>
+                    <Label className="text-sm text-gray-500 font-medium">Usuário Solicitante:</Label>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100 uppercase">
+                      {solicitacaoDetalhes.login_inclusao}
+                    </p>
+                  </div>
+
                   <div className="col-span-2">
-                    <Label className="text-sm text-gray-500">Observações:</Label>
-                    <p className="font-medium">{solicitacaoDetalhes.observacao}</p>
+                    <Label className="text-sm text-gray-500 font-medium">Centro de Custo:</Label>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">
+                      {formatCodigoCentroCusto(
+                        solicitacaoDetalhes.centro_custo_unidade || '',
+                        solicitacaoDetalhes.centro_custo_nro || ''
+                      )} - {solicitacaoDetalhes.centro_custo_descricao}
+                    </p>
                   </div>
-                )}
-              </div>
 
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Itens ({itensDetalhes.length})</h3>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-right">Quantidade</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itensDetalhes.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{item.item}</TableCell>
-                          <TableCell className="text-right">{item.qtde_item}</TableCell>
+                  <div>
+                    <Label className="text-sm text-gray-500 font-medium">Setor Responsável:</Label>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100 uppercase">{solicitacaoDetalhes.setor_descricao || '-'}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm text-gray-500 font-medium">Placa do Veículo:</Label>
+                    <p className="font-semibold font-mono text-gray-900 dark:text-gray-100">
+                      {solicitacaoDetalhes.placa || '-'}
+                    </p>
+                  </div>
+
+                  {solicitacaoDetalhes.seq_ordem_compra && (
+                    <div className="col-span-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800">
+                      <Label className="text-sm text-blue-600 dark:text-blue-400 font-bold">Ordem de Compra Gerada:</Label>
+                      <p className="font-bold font-mono text-blue-700 dark:text-blue-300 text-lg">
+                        {solicitacaoDetalhes.nro_ordem_compra}
+                      </p>
+                    </div>
+                  )}
+
+                  {solicitacaoDetalhes.observacao && (
+                    <div className="col-span-2">
+                      <Label className="text-sm text-gray-500 font-medium">Observações:</Label>
+                      <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-100 dark:border-gray-800 italic text-gray-700 dark:text-gray-300">
+                        {solicitacaoDetalhes.observacao}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4 mb-4">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <ClipboardList className="size-4 text-gray-400" />
+                    Itens da Solicitação ({itensDetalhes.length})
+                  </h3>
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
+                        <TableRow>
+                          <TableHead>Descrição do Item</TableHead>
+                          <TableHead className="text-right w-[120px]">Quantidade</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itensDetalhes.map((item, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{item.item}</TableCell>
+                            <TableCell className="text-right font-mono">{item.qtde_item}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <DialogFooter>
-            <Button onClick={() => setMostrarDetalhesModal(false)}>Fechar</Button>
+          <DialogFooter className="p-6 border-t bg-gray-50 dark:bg-gray-900/50 shrink-0 sm:justify-between items-center gap-4">
+            <div className="flex-1">
+              {solicitacaoDetalhes && solicitacaoDetalhes.status === 'P' && !solicitacaoDetalhes.seq_ordem_compra && (
+                <Button
+                  onClick={() => {
+                    setMostrarDetalhesModal(false);
+                    abrirModalSolicitarAprovacao(solicitacaoDetalhes);
+                  }}
+                  variant="default"
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                >
+                  <Mail className="size-4" />
+                  Solicitar Aprovação
+                </Button>
+              )}
+            </div>
+            <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)} className="px-8">
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

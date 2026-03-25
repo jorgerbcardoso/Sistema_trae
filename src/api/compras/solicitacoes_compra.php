@@ -9,6 +9,9 @@ require_once __DIR__ . '/../config.php';
 
 // CONFIGURAÇÃO INICIAL
 handleOptionsRequest();
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
 
 // AUTENTICAÇÃO
 $auth = authenticateAndGetUser();
@@ -23,13 +26,6 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     msg('Domínio inválido', 'error');
 }
 
-// MOCK
-if (shouldUseMockData($domain)) {
-    $mockData = getMockSolicitacoes();
-    respondJson(['success' => true, 'data' => $mockData]);
-    exit;
-}
-
 // BANCO DE DADOS
 $conn = connect();
 $prefix = strtolower($domain) . '_';
@@ -39,7 +35,7 @@ criarTabelasSolicitacaoCompra($conn, $prefix);
 
 // ROTEAMENTO
 if ($method === 'GET') {
-    handleGet($conn, $prefix, $user);
+    handleGet($conn, $prefix, $user, $domain);
 } elseif ($method === 'POST') {
     handlePost($conn, $prefix, $user, $domain);
 } elseif ($method === 'PUT') {
@@ -58,7 +54,7 @@ if ($method === 'GET') {
 /**
  * GET: Listar solicitações ou buscar itens
  */
-function handleGet($conn, $prefix, $user) {
+function handleGet($conn, $prefix, $user, $domain) {
     $action = $_GET['action'] ?? 'list';
     
     if ($action === 'itens') {
@@ -70,6 +66,7 @@ function handleGet($conn, $prefix, $user) {
         
         buscarItensSolicitacao($conn, $prefix, $seq_solicitacao_compra);
     } else {
+        // REMOVIDO MOCK AUTOMÁTICO PARA ESTA TELA PARA EVITAR BYPASS DE FILTROS
         listarSolicitacoes($conn, $prefix, $user);
     }
 }
@@ -261,26 +258,70 @@ function handleDelete($conn, $prefix, $user, $domain) {
  * Listar solicitações do usuário
  */
 function listarSolicitacoes($conn, $prefix, $user) {
-    $username = strtolower($user['username']);
+    // Parâmetros de filtro
+    $unidade = $_GET['unidade'] ?? '';
+    $data_inicio = $_GET['data_inicio'] ?? '';
+    $data_fim = $_GET['data_fim'] ?? '';
+    $nro_setor = $_GET['nro_setor'] ?? '';
+    $status = $_GET['status'] ?? 'TODAS';
     
-    // ✅ LISTAR TODAS AS SOLICITAÇÕES DO DOMÍNIO (sem filtro de unidade)
-    // Um usuário de qualquer unidade pode ver todas as solicitações do domínio
+    $where = ["1=1"];
+    $params = [];
+    $param_count = 1;
+    
+    // Filtro de unidade
+    if ($unidade !== '' && $unidade !== 'ALL') {
+        $where[] = "TRIM(s.unidade) = $" . $param_count++;
+        $params[] = strtoupper(trim($unidade));
+    }
+    
+    // Filtro de data (Garantindo que sejam tratadas como DATE no PostgreSQL)
+    if ($data_inicio !== '') {
+        $where[] = "s.data_inclusao >= $" . $param_count++ . "::DATE";
+        $params[] = $data_inicio;
+    }
+    if ($data_fim !== '') {
+        $where[] = "s.data_inclusao <= $" . $param_count++ . "::DATE";
+        $params[] = $data_fim;
+    }
+    
+    // Filtro de setor
+    if ($nro_setor !== '' && $nro_setor !== 'null' && $nro_setor !== 'undefined') {
+        $where[] = "s.nro_setor = $" . $param_count++;
+        $params[] = (int)$nro_setor;
+    }
+    
+    // Filtro de status
+    // PENDENTES = P, CONVERTIDAS = A
+    if ($status === 'CONVERTIDAS') {
+        $where[] = "TRIM(s.status) = 'A'";
+    } elseif ($status === 'PENDENTES') {
+        $where[] = "TRIM(s.status) = 'P'";
+    }
+    
+    $where_clause = implode(" AND ", $where);
+    
     $query = "SELECT 
                 s.*,
                 cc.nro_centro_custo AS centro_custo_nro,
                 cc.descricao AS centro_custo_descricao,
                 cc.unidade AS centro_custo_unidade,
                 st.descricao AS setor_descricao,
-                oc.nro_ordem_compra,
+                (CASE 
+                    WHEN oc.unidade IS NOT NULL THEN 
+                        TRIM(oc.unidade) || LPAD(oc.nro_ordem_compra::text, 6, '0')
+                    ELSE NULL 
+                 END) AS nro_ordem_compra,
                 (SELECT COUNT(*) FROM {$prefix}solicitacao_compra_item sci 
                  WHERE sci.seq_solicitacao_compra = s.seq_solicitacao_compra) AS qtd_itens
               FROM {$prefix}solicitacao_compra s
               LEFT JOIN {$prefix}centro_custo cc ON s.seq_centro_custo = cc.seq_centro_custo
               LEFT JOIN {$prefix}setores st ON s.nro_setor = st.nro_setor
               LEFT JOIN {$prefix}ordem_compra oc ON s.seq_ordem_compra = oc.seq_ordem_compra
+              WHERE {$where_clause}
               ORDER BY s.data_inclusao DESC, s.hora_inclusao DESC";
     
-    $result = pg_query($conn, $query);
+    $result = pg_query_params($conn, $query, $params);
     
     if (!$result) {
         msg('Erro ao buscar solicitações: ' . pg_last_error($conn), 'error');

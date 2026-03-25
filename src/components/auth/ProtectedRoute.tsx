@@ -49,8 +49,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     const hostname = window.location.hostname;
     const isIPAccess = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
     const isAcevilleIP = hostname === '35.247.234.77';
+    const isAcevilleHost = hostname === 'sistemagestao.aceville.com.br';
     
-    if (isIPAccess || isAcevilleIP) {
+    // ✅ NOVO: Verificar se o domínio ACV estava ativo (persiste após logout)
+    const lastDomain = localStorage.getItem('presto_last_domain');
+    
+    if (isIPAccess || isAcevilleIP || isAcevilleHost || lastDomain === 'ACV') {
       return <Navigate to="/login-aceville" replace />;
     } else {
       return <Navigate to="/login" replace />;

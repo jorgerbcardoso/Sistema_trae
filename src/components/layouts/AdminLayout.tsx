@@ -31,8 +31,9 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
   const handleLogout = async () => {
     try {
       // 🔥 CRÍTICO: Salvar domínio ANTES de chamar logout() porque logout() limpa o user
-      const userDomain = user?.domain;
-      console.log('🔍 [AdminLayout] Domínio do usuário antes do logout:', userDomain);
+      // Primeiro tentamos o objeto user, se não existir, buscamos no localStorage
+      const userDomain = user?.domain || localStorage.getItem('presto_domain');
+      console.log('🔍 [AdminLayout] Domínio do usuário para redirecionamento:', userDomain);
       
       sessionStorage.clear();
       await logout();
@@ -42,16 +43,11 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
       const loginPath = isAceville ? '/login-aceville' : '/login';
       
       console.log(`✅ [AdminLayout] Logout completo, redirecionando para ${loginPath}`);
+      
       navigate(loginPath, { replace: true });
     } catch (error) {
       console.error('❌ [AdminLayout] Erro durante logout:', error);
-      // Mesmo com erro, forçar navegação para login
-      // Tentar recuperar do localStorage antes de redirecionar
-      const storedDomain = localStorage.getItem('presto_domain');
-      const isAceville = storedDomain === 'ACV';
-      const loginPath = isAceville ? '/login-aceville' : '/login';
-      console.log(`⚠️ [AdminLayout] Redirecionando após erro para ${loginPath}`);
-      navigate(loginPath, { replace: true });
+      navigate('/login', { replace: true });
     }
   };
 

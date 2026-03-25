@@ -503,6 +503,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('mock_user', JSON.stringify(mockUser));
           localStorage.setItem('presto_user', JSON.stringify(mockUser)); // ✅ CRÍTICO: getDefaultHeaders usa presto_user!
           localStorage.setItem('presto_domain', domain.toUpperCase());
+          localStorage.setItem('presto_last_domain', domain.toUpperCase()); // ✅ Stick domain for logout redirect
           localStorage.setItem('presto_user_id', mockUser.id.toString());
           
           console.log('💾 [AuthContext] Usuário mock salvo no localStorage:', mockUser);
@@ -626,6 +627,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('presto_auth_token', data.token); // Para apiService
         localStorage.setItem('presto_domain', data.user.domain); // Para apiService
+        localStorage.setItem('presto_last_domain', data.user.domain); // ✅ Stick domain for logout redirect
         localStorage.setItem('presto_user_id', data.user.id.toString()); // Para apiService
         
         // 🆕 SALVAR USUÁRIO COMPLETO COM use_mock_data NO LOCALSTORAGE
@@ -674,6 +676,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('presto_user', JSON.stringify(userData));
     localStorage.setItem('presto_client_config', JSON.stringify(config));
     localStorage.setItem('presto_domain', userData.domain);
+    localStorage.setItem('presto_last_domain', userData.domain); // ✅ Stick domain for logout redirect
     
     console.log('✅ [AuthContext] Login com token concluído');
   };
@@ -707,6 +710,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('presto_auth_token');
       localStorage.removeItem('presto_domain');
+      // ⚠️ NÃO REMOVER: presto_last_domain (usado para redirecionamento após logout)
       localStorage.removeItem('presto_user_id');
       localStorage.removeItem('mock_user');
       sessionStorage.removeItem('auth_verified');
@@ -729,6 +733,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('presto_auth_token');
       localStorage.removeItem('presto_domain');
+      // ⚠️ NÃO REMOVER: presto_last_domain (usado para redirecionamento após logout)
       localStorage.removeItem('presto_user_id');
       localStorage.removeItem('mock_user');
       sessionStorage.removeItem('auth_verified');

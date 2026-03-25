@@ -92,6 +92,17 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Garantir cursor pointer em elementos interativos */
+  button, 
+  [role="button"],
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .cursor-pointer {
+    cursor: pointer !important;
+  }
 }
 
 /* Forçar diminuição de fontes de cabeçalho via CSS Global se o Tailwind falhar */
