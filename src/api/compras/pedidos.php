@@ -406,25 +406,9 @@ try {
                 msg('É necessário adicionar pelo menos um item', 'error');
             }
             
-            // ✅ VERIFICAR SE DOMÍNIO EXIGE APROVAÇÃO PARA PEDIDOS MANUAIS
-            $statusInicial = 'P'; // Padrão: APROVADO
-            $mensagemAdicional = '';
-            
-            // Se for pedido MANUAL (seq_orcamento NULL), verificar configuração do domínio
-            if ($seqOrcamento === null) {
-                $queryDomain = "SELECT aprova_pedidos_manuais FROM domains WHERE domain = $1";
-                $resultDomain = sql($queryDomain, [strtoupper($domain)], $g_sql);
-                
-                if ($resultDomain && pg_num_rows($resultDomain) > 0) {
-                    $domainData = pg_fetch_assoc($resultDomain);
-                    $aprovaPedidosManuais = pgBoolToPHP($domainData['aprova_pedidos_manuais']);
-                    
-                    if ($aprovaPedidosManuais) {
-                        $statusInicial = 'A'; // AGUARDANDO APROVAÇÃO
-                        $mensagemAdicional = ' O pedido ficará com status AGUARDANDO APROVAÇÃO até ser aprovado.';
-                    }
-                }
-            }
+            // ✅ STATUS INICIAL: Sempre AGUARDANDO APROVAÇÃO (A) para pedidos manuais
+            $statusInicial = 'A'; 
+            $mensagemAdicional = ' O pedido ficará com status AGUARDANDO APROVAÇÃO até ser aprovado.';
             
             // Iniciar transação
             sql("BEGIN", [], $g_sql);

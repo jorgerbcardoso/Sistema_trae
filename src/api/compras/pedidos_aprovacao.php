@@ -132,7 +132,7 @@ try {
                     <p style='margin: 5px 0;'><strong>Valor Total:</strong> {$valor_formatado}</p>
                     <p style='margin: 5px 0;'><strong>Data de Solicitação:</strong> " . date('d/m/Y', strtotime($pedido['data_inclusao'])) . "</p>
                     <p style='margin: 5px 0;'><strong>Aprovado por:</strong> {$usuario_aprovador}</p>
-                    <p style='margin: 5px 0;'><strong>Status:</strong> <span style='color: #059669;'>PENDENTE - Pronto para envio</span></p>
+                    <p style='margin: 5px 0;'><strong>Status:</strong> <span style='color: #059669;'>APROVADO - Pronto para envio</span></p>
                 </div>
                 <p>O pedido agora pode ser enviado ao fornecedor através do sistema.</p>
                 <p style='margin-top: 30px; font-size: 12px; color: #6b7280;'>
