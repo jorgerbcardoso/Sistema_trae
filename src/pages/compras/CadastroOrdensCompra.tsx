@@ -1126,8 +1126,18 @@ export default function CadastroOrdensCompra() {
         setQtdSolicitacoesPendentes(3);
       } else {
         console.log('🔍 [SOLICITAÇÕES] Buscando solicitações pendentes...');
+        
+        // Filtrar pelo setor do usuário logado na contagem
+        // Usamos source=oc para garantir que o backend não filtre pelo login_inclusao
+        const queryParams = new URLSearchParams();
+        queryParams.append('source', 'oc');
+        
+        if (user?.nro_setor) {
+          queryParams.append('nro_setor', String(user.nro_setor));
+        }
+        
         const data = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`,
+          `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php?${queryParams.toString()}`,
           { method: 'GET' }
         );
         
@@ -1135,11 +1145,13 @@ export default function CadastroOrdensCompra() {
         
         if (data.success && data.data) {
           // Contar apenas as solicitações PENDENTES (status='P' ou status=null) e sem ordem de compra
+          // O backend já está filtrando por setor (nro_setor) se passamos o parâmetro.
           const pendentes = data.data.filter((sol: any) => 
-            (sol.status === 'P' || sol.status === null) && !sol.seq_ordem_compra
+            (sol.status === 'P' || sol.status === null) && 
+            !sol.seq_ordem_compra
           );
-          console.log('🔍 [SOLICITAÇÕES] Total de solicitações:', data.data.length);
-          console.log('🔍 [SOLICITAÇÕES] Solicitações pendentes (status=P ou null e sem ordem):', pendentes.length);
+          console.log('🔍 [SOLICITAÇÕES] Total de solicitações carregadas (setor):', data.data.length);
+          console.log('🔍 [SOLICITAÇÕES] Solicitações pendentes do setor:', pendentes.length);
           setQtdSolicitacoesPendentes(pendentes.length);
         } else {
           console.warn('⚠️ [SOLICITAÇÕES] Resposta sem sucesso ou sem dados:', data);

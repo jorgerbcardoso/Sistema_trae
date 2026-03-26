@@ -293,31 +293,24 @@ export default function ConverterSolicitacoesCompra() {
   // Inicialização única
   useEffect(() => {
     if (!inicializadoRef.current && user) {
-      const hoje = getToday();
-      const dias30Atras = get30DaysAgo();
-      const unidadeAtual = user?.unidade_atual || user?.unidade || 'MTZ';
-      const unidadeAtualUpper = unidadeAtual.toUpperCase();
-      const isMtzOrAll = unidadeAtualUpper === 'MTZ' || unidadeAtualUpper === 'ALL';
-
-      // ✅ CORREÇÃO: NÃO aplicar filtros automáticos
-      // Mostrar TODAS as solicitações do domínio sem filtros iniciais
+      // ✅ REGRA: Iniciar com o setor do usuário logado se ele possuir um
+      const setorUsuario = user?.nro_setor ? Number(user.nro_setor) : null;
+      
       setFiltroDataInicioTemp('');
       setFiltroDataFimTemp('');
       setFiltroDataInicio('');
       setFiltroDataFim('');
 
-      // Unidade: sempre vazio (mostrar todas)
       setFiltroUnidadeTemp('');
       setFiltroUnidade('');
 
-      // Setor: sempre vazio (mostrar todas)
-      setFiltroSetorTemp(null);
-      setFiltroSetor(null);
+      setFiltroSetorTemp(setorUsuario);
+      setFiltroSetor(setorUsuario);
 
       inicializadoRef.current = true;
 
-      // ✅ Carregar TODAS as solicitações sem filtros
-      carregarSolicitacoes('', '', '', '', null);
+      // ✅ Carregar solicitações respeitando o setor do usuário
+      carregarSolicitacoes('', '', '', '', setorUsuario);
     }
   }, [user]);
 
@@ -396,6 +389,9 @@ export default function ConverterSolicitacoesCompra() {
         // BACKEND
         const queryParams = new URLSearchParams();
         
+        // Adicionar source=oc para evitar o filtro de login_inclusao no backend
+        queryParams.append('source', 'oc');
+        
         if (unidade) queryParams.append('unidade', unidade);
         if (dataInicio) queryParams.append('data_inicio', dataInicio);
         if (dataFim) queryParams.append('data_fim', dataFim);
@@ -403,7 +399,7 @@ export default function ConverterSolicitacoesCompra() {
         if (setor !== null) queryParams.append('nro_setor', String(setor));
         
         const data = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra_converter.php?${queryParams.toString()}`,
+          `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php?${queryParams.toString()}`,
           { method: 'GET' }
         );
 
