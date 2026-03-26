@@ -41,6 +41,7 @@ try {
     
     $solicitacoes = $input['solicitacoes'] ?? [];
     $filters = $input['filters'] ?? [];
+    $usuarioFiltro = $input['usuario_logado'] ?? '';
     
     if (empty($solicitacoes)) {
         throw new Exception('Nenhuma solicitação para exportar');
@@ -124,7 +125,10 @@ try {
         
         $dataInicio = isset($filters['data_inicio']) ? date('d/m/Y', strtotime($filters['data_inicio'])) : '-';
         $dataFim = isset($filters['data_fim']) ? date('d/m/Y', strtotime($filters['data_fim'])) : '-';
-        $periodoTexto = "Período: {$dataInicio} a {$dataFim} | Unidade: " . ($filters['unidade'] ?: 'TODAS') . " | Status: " . ($filters['status'] ?: 'TODAS');
+        
+        // Texto do usuário (se for filtrado)
+        $textoUsuario = $usuarioFiltro ? " | Solicitações do usuário: " . strtoupper($usuarioFiltro) : "";
+        $periodoTexto = "Período: {$dataInicio} a {$dataFim} | Unidade: " . ($filters['unidade'] ?: 'TODAS') . " | Status: " . ($filters['status'] ?: 'TODAS') . $textoUsuario;
         
         $sheet->setCellValue('C3', $periodoTexto);
         $sheet->mergeCells('C3:I3');

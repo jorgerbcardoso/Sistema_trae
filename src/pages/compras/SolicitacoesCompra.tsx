@@ -872,7 +872,8 @@ export default function SolicitacoesCompra() {
               nro_setor: filtroSetor,
               status: filtroStatus
             },
-            solicitacoes: sortData(solicitacoes)
+            solicitacoes: sortData(solicitacoes),
+            usuario_logado: user?.username
           })
         }
       );
@@ -971,7 +972,8 @@ export default function SolicitacoesCompra() {
           <div>
             <strong>Período:</strong> ${dataInicio} a ${dataFim} | 
             <strong>Unidade:</strong> ${filtroUnidade || 'TODAS'} | 
-            <strong>Status:</strong> ${filtroStatus}
+            <strong>Status:</strong> ${filtroStatus} |
+            <strong>Solicitações do usuário:</strong> ${user?.username?.toUpperCase()}
           </div>
           <div>Total: ${solicitacoes.length} registros</div>
         </div>

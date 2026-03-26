@@ -299,6 +299,13 @@ function listarSolicitacoes($conn, $prefix, $user) {
         $where[] = "TRIM(s.status) = 'P'";
     }
     
+    // ✅ NOVO: Filtro por usuário (Apenas na listagem padrão, não na tela de O.C.)
+    $is_oc_view = ($_GET['source'] ?? '') === 'oc';
+    if (!$is_oc_view) {
+        $where[] = "s.login_inclusao = $" . $param_count++;
+        $params[] = strtolower($user['username']);
+    }
+    
     $where_clause = implode(" AND ", $where);
     
     $query = "SELECT 
