@@ -114,7 +114,7 @@ export default function ConverterSolicitacoesCompra() {
               nro_setor: filtroSetor,
               status: 'TODAS' // Na visão de O.C. mostramos todas
             },
-            solicitacoes: sortData(solicitacoes),
+            solicitacoes: getSolicitacoesOrdenadas(solicitacoes),
             usuario_logado: '' // Vazio para indicar "Todas as solicitações"
           })
         }
@@ -238,7 +238,7 @@ export default function ConverterSolicitacoesCompra() {
             </tr>
           </thead>
           <tbody>
-            ${sortData(solicitacoes).map(sol => `
+            ${getSolicitacoesOrdenadas(solicitacoes).map(sol => `
               <tr>
                 <td class="font-mono">${formatarNumeroSolicitacao(sol.unidade, sol.seq_solicitacao_compra)}</td>
                 <td>${new Date(sol.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
@@ -487,6 +487,20 @@ export default function ConverterSolicitacoesCompra() {
   type SortField = 'seq_solicitacao_compra' | 'data_inclusao' | 'centro_custo_descricao' | 'qtd_itens';
   const { sortField, sortDirection, handleSort, sortData } = useSortableTable<SortField>('data_inclusao', 'desc');
 
+  // ✅ Função para ordenar as solicitações (Pendentes primeiro)
+  const getSolicitacoesOrdenadas = (dados: SolicitacaoCompra[]) => {
+    return [...sortData(dados)].sort((a, b) => {
+      // PENDENTES (status diferente de 'A') vêm primeiro
+      const statusA = a.status?.trim() === 'A' ? 1 : 0;
+      const statusB = b.status?.trim() === 'A' ? 1 : 0;
+      
+      if (statusA !== statusB) return statusA - statusB;
+      
+      // Se o status for o mesmo, mantém a ordenação do hook useSortableTable
+      return 0;
+    });
+  };
+
   return (
     <AdminLayout
       title="CONVERTER SOLICITAÇÕES DE COMPRA"
@@ -582,7 +596,7 @@ export default function ConverterSolicitacoesCompra() {
                 <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                   <ClipboardList className="size-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <CardTitle>Solicitações Pendentes</CardTitle>
+                <CardTitle>Solicitações Cadastradas</CardTitle>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -665,7 +679,7 @@ export default function ConverterSolicitacoesCompra() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortData(solicitacoes).map((solicitacao) => (
+                    {getSolicitacoesOrdenadas(solicitacoes).map((solicitacao) => (
                       <TableRow key={solicitacao.seq_solicitacao_compra}>
                         <TableCell className="font-medium font-mono">
                           {solicitacao.unidade}{String(solicitacao.seq_solicitacao_compra).padStart(6, '0')}
