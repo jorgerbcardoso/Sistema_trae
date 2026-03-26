@@ -15,18 +15,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = window.document.documentElement;
     const body = window.document.body;
     
-    // ✅ FORÇAR aplicação do tema em múltiplos elementos para garantir compatibilidade
-    root.classList.remove('light', 'dark');
-    body.classList.remove('light', 'dark');
+    // ✅ FORÇAR remoção de qualquer vestígio de tema claro
+    root.classList.remove('light');
+    body.classList.remove('light');
     
-    root.classList.add(theme);
-    body.classList.add(theme);
+    // ✅ GARANTIR que o tema escuro esteja aplicado
+    root.classList.add('dark');
+    body.classList.add('dark');
+    
+    // ✅ SOBRESCREVER qualquer preferência no localStorage
+    localStorage.setItem('nativa-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
     
     // ✅ FORÇAR atributo data-theme para compatibilidade extra
-    root.setAttribute('data-theme', theme);
-    
-    // localStorage.setItem('nativa-theme', theme); // Não é mais necessário salvar o tema
-  }, [theme]);
+    root.setAttribute('data-theme', 'dark');
+  }, []);
 
   // const toggleTheme = () => { // Função de toggle removida
   //   setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
