@@ -293,9 +293,19 @@ export default function ConverterSolicitacoesCompra() {
   // Inicialização única
   useEffect(() => {
     if (!inicializadoRef.current && user) {
+      console.log('🔄 [CONVERSÃO] Inicializando tela de conversão:', {
+        username: user.username,
+        nro_setor: user.nro_setor,
+        tipo_setor: typeof user.nro_setor
+      });
+
       // ✅ REGRA: Iniciar com o setor do usuário logado se ele possuir um
-      const setorUsuario = user?.nro_setor ? Number(user.nro_setor) : null;
+      const setorUsuario = (user?.nro_setor !== undefined && user?.nro_setor !== null) 
+        ? Number(user.nro_setor) 
+        : null;
       
+      console.log('🎯 [CONVERSÃO] Setor determinado para filtro inicial:', setorUsuario);
+
       setFiltroDataInicioTemp('');
       setFiltroDataFimTemp('');
       setFiltroDataInicio('');

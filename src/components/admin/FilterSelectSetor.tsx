@@ -69,19 +69,16 @@ export function FilterSelectSetor({
       const setorToSuggest = setorUsuarioDisponivel ? setorUsuario : null;
       
       if (setorToSuggest) {
-        console.log('🎯 [FilterSelectSetor] ✅ SUGERINDO setor:', setorToSuggest, '(setor do usuário que efetua compras)');
+        console.log('🎯 [FilterSelectSetor] ✅ SUGERINDO setor:', setorToSuggest, '(setor do usuário)');
         onChange(setorToSuggest);
         hasSuggested.current = true;
-      } else if (!apenasEfetuaCompras) {
+      } else if (!apenasEfetuaCompras && user?.nro_setor) {
         // Se não está filtrando por efetua_compras, sugere o setor do usuário mesmo que ele não esteja na lista
-        const setorToSuggest = user?.nro_setor || (setoresFiltrados.length > 0 ? setoresFiltrados[0].nro_setor : null);
-        if (setorToSuggest) {
-          console.log('🎯 [FilterSelectSetor] ✅ SUGERINDO setor:', setorToSuggest, user?.nro_setor ? '(do usuário)' : '(primeiro da lista)');
-          onChange(setorToSuggest);
-          hasSuggested.current = true;
-        }
+        console.log('🎯 [FilterSelectSetor] ✅ SUGERINDO setor do usuário (mesmo fora da lista):', user.nro_setor);
+        onChange(user.nro_setor);
+        hasSuggested.current = true;
       } else {
-        console.log('🎯 [FilterSelectSetor] ❌ NÃO SUGERINDO: setor do usuário não efetua compras ou não está na lista');
+        console.log('🎯 [FilterSelectSetor] ❌ NÃO SUGERINDO: setor do usuário indisponível ou critério não atendido');
       }
     }
   }, [suggestUserSetor, user?.nro_setor, setores.length, value, onChange, apenasEfetuaCompras]);

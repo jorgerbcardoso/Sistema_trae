@@ -222,15 +222,35 @@ export default function CadastroOrdensCompra() {
     setFiltroDataFim(hoje);
   }, []);
 
-  // ✅ FORÇAR UNIDADE DO USUÁRIO (SE NÃO-MTZ)
+  // ✅ INICIALIZAR FILTROS COM DADOS DO USUÁRIO
   useEffect(() => {
-    const unidadeAtual = user?.unidade_atual || user?.unidade || 'MTZ';
-    const unidadeAtualUpper = unidadeAtual.toUpperCase();
-    const isMtzOrAll = unidadeAtualUpper === 'MTZ' || unidadeAtualUpper === 'ALL';
-    
-    if (!isMtzOrAll) {
-      setFiltroUnidadeTemp(unidadeAtual);
-      setFiltroUnidade(unidadeAtual);
+    if (user) {
+      console.log('👤 [USUÁRIO LOGADO]', {
+        username: user.username,
+        nro_setor: user.nro_setor,
+        tipo_setor: typeof user.nro_setor,
+        unidade: user.unidade
+      });
+
+      const unidadeAtual = user?.unidade_atual || user?.unidade || 'MTZ';
+      const unidadeAtualUpper = unidadeAtual.toUpperCase();
+      const isMtzOrAll = unidadeAtualUpper === 'MTZ' || unidadeAtualUpper === 'ALL';
+      
+      // Unidade
+      if (!isMtzOrAll) {
+        setFiltroUnidadeTemp(unidadeAtual);
+        setFiltroUnidade(unidadeAtual);
+      }
+
+      // Setor - Forçar a leitura do setor do usuário logado
+      if (user.nro_setor !== undefined && user.nro_setor !== null) {
+        const setorNum = Number(user.nro_setor);
+        if (!isNaN(setorNum) && setorNum > 0) {
+          console.log('🎯 [SETOR] Inicializando filtros com setor do usuário:', setorNum);
+          setFiltroSetorTemp(setorNum);
+          setFiltroSetor(setorNum);
+        }
+      }
     }
   }, [user]);
 
@@ -239,8 +259,15 @@ export default function CadastroOrdensCompra() {
     carregarCentrosCusto();
     carregarItens();
     carregarUsuariosAprovadores(); // ✅ NOVO: Carregar aprovadores
-    carregarQuantidadeSolicitacoesPendentes(); // ✅ NOVO: Carregar contador de solicitações pendentes
   }, []);
+
+  // ✅ RECARREGAR CONTADOR quando o usuário mudar
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 [CONTADOR] Solicitando contagem para usuário:', user.username, 'Setor:', user.nro_setor);
+      carregarQuantidadeSolicitacoesPendentes();
+    }
+  }, [user]);
 
   // ✅ FLUXO RÁPIDO: Detectar ordem recém-criada via navegação
   useEffect(() => {
