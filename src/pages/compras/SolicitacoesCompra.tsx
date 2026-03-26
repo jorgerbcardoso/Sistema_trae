@@ -75,7 +75,7 @@ interface SolicitacaoCompra {
   setor_descricao?: string;
   placa?: string; // ✅ Placa do veículo
   observacao: string;
-  status: 'P' | 'A'; // P = PENDENTE, A = ATENDIDA
+  status: 'P' | 'A' | 'R'; // P = PENDENTE, A = ATENDIDA, R = REPROVADA
   seq_ordem_compra?: number;
   nro_ordem_compra?: string;
   qtd_itens: number;
@@ -950,6 +950,7 @@ export default function SolicitacoesCompra() {
           .badge { padding: 2px 6px; border-radius: 10px; font-size: 6pt; font-weight: bold; text-transform: uppercase; }
           .badge-pendente { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
           .badge-atendida { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+          .badge-reprovada { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
           .footer { margin-top: 10px; padding-top: 5px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 6pt; }
         </style>
       </head>
@@ -1002,8 +1003,8 @@ export default function SolicitacoesCompra() {
                 <td class="text-center">${sol.qtd_itens}</td>
                 <td class="text-center font-mono">${sol.nro_ordem_compra || '-'}</td>
                 <td class="text-center">
-                  <span class="badge ${sol.status === 'A' ? 'badge-atendida' : 'badge-pendente'}">
-                    ${sol.status === 'A' ? 'Atendida' : 'Pendente'}
+                  <span class="badge ${sol.status === 'A' ? 'badge-atendida' : sol.status === 'R' ? 'badge-reprovada' : 'badge-pendente'}">
+                    ${sol.status === 'A' ? 'Atendida' : sol.status === 'R' ? 'Reprovada' : 'Pendente'}
                   </span>
                 </td>
               </tr>
@@ -1261,6 +1262,10 @@ export default function SolicitacoesCompra() {
                             <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                               Atendida
                             </Badge>
+                          ) : solicitacao.status === 'R' ? (
+                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                              Reprovada
+                            </Badge>
                           ) : (
                             <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                               Pendente
@@ -1466,6 +1471,11 @@ export default function SolicitacoesCompra() {
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 px-3 py-1 text-sm font-bold uppercase">
                           <CheckCircle className="size-3.5 mr-1.5" />
                           APROVADA / ATENDIDA
+                        </Badge>
+                      ) : solicitacaoDetalhes.status === 'R' ? (
+                        <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 px-3 py-1 text-sm font-bold uppercase">
+                          <X className="size-3.5 mr-1.5" />
+                          REPROVADA
                         </Badge>
                       ) : (
                         <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 px-3 py-1 text-sm font-bold uppercase">

@@ -173,7 +173,18 @@ try {
     
     foreach ($solicitacoes as $sol) {
         $numeroFormatado = trim($sol['unidade']) . str_pad($sol['seq_solicitacao_compra'], 6, '0', STR_PAD_LEFT);
-        $statusTexto = $sol['status'] === 'A' ? 'Atendida' : 'Pendente';
+        
+        $statusRaw = trim($sol['status'] ?? 'P');
+        $statusTexto = 'Pendente';
+        $corFundo = 'FEFCE8'; // Amarelo (Pendente)
+        
+        if ($statusRaw === 'A') {
+            $statusTexto = 'Atendida';
+            $corFundo = 'F0FDF4'; // Verde (Atendida)
+        } elseif ($statusRaw === 'R') {
+            $statusTexto = 'Reprovada';
+            $corFundo = 'FEF2F2'; // Vermelho (Reprovada)
+        }
         
         $sheet->setCellValue('A' . $linha, $numeroFormatado);
         $sheet->setCellValue('B' . $linha, date('d/m/Y', strtotime($sol['data_inclusao'])));
@@ -189,7 +200,6 @@ try {
         $sheet->setCellValue('I' . $linha, $statusTexto);
         
         // Aplicar cores por status
-        $corFundo = $sol['status'] === 'A' ? 'F0FDF4' : 'FEFCE8';
         $sheet->getStyle('A' . $linha . ':I' . $linha)->applyFromArray([
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $corFundo]],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]]

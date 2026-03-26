@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import {
   Table,
@@ -15,6 +16,14 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+import {
   ClipboardList,
   Search,
   Filter,
@@ -22,6 +31,15 @@ import {
   FolderOpen,
   FileSpreadsheet,
   FileText,
+  Eye,
+  X,
+  CheckCircle,
+  Clock,
+  Printer,
+  Loader2,
+  Calendar,
+  User,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
@@ -80,6 +98,191 @@ export default function ConverterSolicitacoesCompra() {
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoCompra[]>([]);
   const [loading, setLoading] = useState(false);
   const inicializadoRef = useRef(false);
+
+  // Modal de detalhes (Reuso do padrão de SolicitacoesCompra)
+  const [mostrarDetalhesModal, setMostrarDetalhesModal] = useState(false);
+  const [solicitacaoDetalhes, setSolicitacaoDetalhes] = useState<SolicitacaoCompra | null>(null);
+  const [itensDetalhes, setItensDetalhes] = useState<any[]>([]);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // Modal de Reprovação
+  const [mostrarReprovarModal, setMostrarReprovarModal] = useState(false);
+  const [motivoReprovacao, setMotivoReprovar] = useState('');
+  const [solicitacaoParaReprovar, setSolicitacaoParaReprovar] = useState<SolicitacaoCompra | null>(null);
+  const [reprovando, setReprovando] = useState(false);
+
+  // ✅ Função para Visualizar Detalhes
+  const visualizarDetalhes = async (solicitacao: SolicitacaoCompra) => {
+    setSolicitacaoDetalhes(solicitacao);
+    setItensDetalhes([]);
+
+    try {
+      const data = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php?seq_solicitacao_compra=${solicitacao.seq_solicitacao_compra}&action=itens`,
+        { method: 'GET' }
+      );
+
+      if (data.success) {
+        setItensDetalhes(data.data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar itens:', error);
+    }
+
+    setMostrarDetalhesModal(true);
+  };
+
+  // ✅ Função para Reprovar
+  const confirmarReprovacao = async () => {
+    if (!solicitacaoParaReprovar) return;
+    if (!motivoReprovacao.trim()) {
+      toast.error('Informe o motivo da reprovação');
+      return;
+    }
+
+    try {
+      setReprovando(true);
+      const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          action: 'reprovar',
+          seq_solicitacao_compra: solicitacaoParaReprovar.seq_solicitacao_compra,
+          motivo: motivoReprovacao.toUpperCase()
+        }),
+      });
+
+      if (data.success) {
+        toast.success('Solicitação reprovada com sucesso!');
+        setMostrarReprovarModal(false);
+        setMotivoReprovar('');
+        carregarSolicitacoes(); // Recarregar lista
+      }
+    } catch (error) {
+      console.error('Erro ao reprovar:', error);
+    } finally {
+      setReprovando(false);
+    }
+  };
+
+  // ✅ Função de Impressão (Baseada no padrão de Solicitações)
+  const imprimirSolicitacao = () => {
+    if (!solicitacaoDetalhes) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const logoCliente = clientConfig?.theme?.logo_light || '';
+    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Solicitação ${formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 15mm; font-size: 11pt; color: #000; }
+            .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #2563eb; }
+            .logo { max-width: 120px; max-height: 50px; }
+            .header-info h1 { font-size: 16pt; color: #2563eb; margin-bottom: 3px; text-transform: uppercase; }
+            .documento-numero { font-size: 20pt; font-weight: bold; color: #1e40af; font-family: monospace; }
+            .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 9pt; font-weight: bold; text-transform: uppercase; }
+            .status-pendente { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+            .status-atendida { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+            .status-reprovada { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-size: 11pt; font-weight: bold; color: #1e40af; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; }
+            .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .info-label { font-size: 8pt; color: #6b7280; font-weight: bold; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+            th { background-color: #1e40af; color: white; padding: 8px 10px; text-align: left; }
+            td { border: 1px solid #e5e7eb; padding: 8px 10px; }
+            .observacoes-box { background: #f9fafb; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 9pt; min-height: 60px; }
+            .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 8pt; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <img src="${isAceville ? logoCliente : '/sistema/logo-presto.png'}" class="logo" />
+              <div class="header-info">
+                <h1>Solicitação de Compra</h1>
+                <p>Sistema de Gestão Presto</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="documento-numero">${formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}</div>
+              <div class="status-badge ${solicitacaoDetalhes.status === 'A' ? 'status-atendida' : solicitacaoDetalhes.status === 'R' ? 'status-reprovada' : 'status-pendente'}">
+                ${solicitacaoDetalhes.status === 'A' ? 'APROVADA / ATENDIDA' : solicitacaoDetalhes.status === 'R' ? 'REPROVADA' : 'PENDENTE DE APROVAÇÃO'}
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Informações Gerais</div>
+            <div class="info-grid">
+              <div>
+                <div class="info-label">Data de Inclusão</div>
+                <div>${new Date(solicitacaoDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às ${solicitacaoDetalhes.hora_inclusao?.substring(0, 5)}</div>
+              </div>
+              <div>
+                <div class="info-label">Usuário Solicitante</div>
+                <div style="text-transform: uppercase;">${solicitacaoDetalhes.login_inclusao}</div>
+              </div>
+              <div>
+                <div class="info-label">Centro de Custo</div>
+                <div>${formatCodigoCentroCusto(solicitacaoDetalhes.centro_custo_unidade || '', solicitacaoDetalhes.centro_custo_nro || '')} - ${solicitacaoDetalhes.centro_custo_descricao}</div>
+              </div>
+              <div>
+                <div class="info-label">Setor Responsável</div>
+                <div>${solicitacaoDetalhes.setor_descricao || '-'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Itens da Solicitação</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 60px;">#</th>
+                  <th>Descrição do Item</th>
+                  <th style="width: 120px; text-align: right;">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itensDetalhes.map((item, index) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.item}</td>
+                    <td style="text-align: right;">${item.qtde_item}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Observações</div>
+            <div class="observacoes-box">
+              ${solicitacaoDetalhes.observacao || 'NENHUMA OBSERVAÇÃO INFORMADA.'}
+            </div>
+          </div>
+
+          <div class="footer">
+            Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
+            © 2026 Sistema Presto - Gestão Inteligente
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
 
   // ✅ Função de Exportação para Excel (Baseada em SolicitacoesCompra)
   const exportarExcel = async () => {
@@ -196,6 +399,7 @@ export default function ConverterSolicitacoesCompra() {
           .badge { padding: 2px 6px; border-radius: 10px; font-size: 6pt; font-weight: bold; text-transform: uppercase; }
           .badge-pendente { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
           .badge-atendida { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+          .badge-reprovada { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
           .footer { margin-top: 10px; padding-top: 5px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 6pt; }
         </style>
       </head>
@@ -248,8 +452,8 @@ export default function ConverterSolicitacoesCompra() {
                 <td class="text-center">${sol.qtd_itens}</td>
                 <td class="text-center font-mono">${sol.nro_ordem_compra || '-'}</td>
                 <td class="text-center">
-                  <span class="badge ${sol.status?.trim() === 'A' ? 'badge-atendida' : 'badge-pendente'}">
-                    ${sol.status?.trim() === 'A' ? 'Atendida' : 'Pendente'}
+                  <span class="badge ${sol.status?.trim() === 'A' ? 'badge-atendida' : sol.status?.trim() === 'R' ? 'badge-reprovada' : 'badge-pendente'}">
+                    ${sol.status?.trim() === 'A' ? 'Atendida' : sol.status?.trim() === 'R' ? 'Reprovada' : 'Pendente'}
                   </span>
                 </td>
               </tr>
@@ -681,6 +885,7 @@ export default function ConverterSolicitacoesCompra() {
                         onSort={handleSort}
                         className="text-center"
                       />
+                      <TableHead className="text-center">O.C.</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
@@ -708,11 +913,20 @@ export default function ConverterSolicitacoesCompra() {
                             {solicitacao.setor_descricao || '-'}
                           </span>
                         </TableCell>
-                        <TableCell className="text-center">{solicitacao.qtd_itens}</TableCell>
+                        <TableCell className="text-center font-medium">
+                          {solicitacao.qtd_itens}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-xs">
+                          {solicitacao.nro_ordem_compra || '-'}
+                        </TableCell>
                         <TableCell className="text-center">
-                          {(solicitacao.status?.trim() === 'A') ? (
+                          {solicitacao.status?.trim() === 'A' ? (
                             <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                               Atendida
+                            </Badge>
+                          ) : solicitacao.status?.trim() === 'R' ? (
+                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                              Reprovada
                             </Badge>
                           ) : (
                             <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
@@ -720,21 +934,41 @@ export default function ConverterSolicitacoesCompra() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {(solicitacao.status?.trim() !== 'A') ? (
-                              <Button
-                                onClick={() => iniciarConversao(solicitacao)}
-                                className="gap-2"
-                                size="sm"
-                              >
-                                <FolderOpen className="size-4" />
-                                Abrir
-                              </Button>
+                            {solicitacao.status?.trim() === 'P' || !solicitacao.status ? (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/20"
+                                  onClick={() => {
+                                    setSolicitacaoParaReprovar(solicitacao);
+                                    setMostrarReprovarModal(true);
+                                  }}
+                                >
+                                  <X className="size-4" />
+                                  Reprovar
+                                </Button>
+                                <Button
+                                  onClick={() => iniciarConversao(solicitacao)}
+                                  className="gap-2"
+                                  size="sm"
+                                >
+                                  <FolderOpen className="size-4" />
+                                  Abrir
+                                </Button>
+                              </div>
                             ) : (
-                              <span className="text-sm text-gray-500 font-mono">
-                                {solicitacao.nro_ordem_compra ? `OC: ${solicitacao.nro_ordem_compra}` : 'Atendida'}
-                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => visualizarDetalhes(solicitacao)}
+                                className="h-8 w-8 p-0"
+                                title="Visualizar Detalhes"
+                              >
+                                <Eye className="size-4 text-blue-600" />
+                              </Button>
                             )}
                           </div>
                         </TableCell>
@@ -747,6 +981,217 @@ export default function ConverterSolicitacoesCompra() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ✅ Modal de Detalhes (Reuso de SolicitacoesCompra) */}
+      <Dialog open={mostrarDetalhesModal} onOpenChange={setMostrarDetalhesModal}>
+        <DialogContent className="sm:max-w-[750px] h-[85vh] flex flex-col p-0 overflow-hidden bg-card">
+          <DialogHeader className="p-6 pb-2 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <ClipboardList className="size-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <DialogTitle>Detalhes da Solicitação</DialogTitle>
+                  <DialogDescription>
+                    Informações completas da solicitação de compra
+                  </DialogDescription>
+                </div>
+              </div>
+              {solicitacaoDetalhes && (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">
+                    {solicitacaoDetalhes.unidade}{String(solicitacaoDetalhes.seq_solicitacao_compra).padStart(6, '0')}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {solicitacaoDetalhes.status === 'A' ? (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 px-3 py-1 text-sm font-bold uppercase">
+                        <CheckCircle className="size-3.5 mr-1.5" />
+                        APROVADA / ATENDIDA
+                      </Badge>
+                    ) : solicitacaoDetalhes.status === 'R' ? (
+                      <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 px-3 py-1 text-sm font-bold uppercase">
+                        <X className="size-3.5 mr-1.5" />
+                        REPROVADA
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 px-3 py-1 text-sm font-bold uppercase">
+                        <Clock className="size-3.5 mr-1.5" />
+                        PENDENTE DE APROVAÇÃO
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+            {solicitacaoDetalhes && (
+              <div className="space-y-6">
+                {/* Cabeçalho de Informações */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase font-bold">Data de Inclusão</Label>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Calendar className="size-4 text-blue-500" />
+                      {new Date(solicitacaoDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase font-bold">Hora</Label>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Clock className="size-4 text-blue-500" />
+                      {solicitacaoDetalhes.hora_inclusao?.substring(0, 5)}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase font-bold">Solicitante</Label>
+                    <div className="flex items-center gap-2 text-sm font-medium uppercase">
+                      <User className="size-4 text-blue-500" />
+                      {solicitacaoDetalhes.login_inclusao}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase font-bold">Setor</Label>
+                    <div className="text-sm font-medium uppercase">
+                      {solicitacaoDetalhes.setor_descricao || '-'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border">
+                    <Label className="text-xs text-gray-500 uppercase font-bold mb-2 block">Centro de Custo</Label>
+                    <div className="text-sm font-semibold">
+                      {formatCodigoCentroCusto(solicitacaoDetalhes.centro_custo_unidade || '', solicitacaoDetalhes.centro_custo_nro || '')} - {solicitacaoDetalhes.centro_custo_descricao}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de Itens */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-bold flex items-center gap-2">
+                      <ShoppingCart className="size-4 text-blue-600" />
+                      Itens da Solicitação
+                    </Label>
+                    <Badge variant="outline">{itensDetalhes.length} itens</Badge>
+                  </div>
+                  
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-gray-50 dark:bg-gray-900/50">
+                        <TableRow>
+                          <TableHead className="w-[60px] text-center">#</TableHead>
+                          <TableHead>Descrição do Item</TableHead>
+                          <TableHead className="text-right">Quantidade</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itensDetalhes.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="text-center font-mono text-xs text-gray-500">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="font-medium">{item.item}</TableCell>
+                            <TableCell className="text-right font-bold text-blue-600 dark:text-blue-400">
+                              {item.qtde_item}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-bold">Observações</Label>
+                  <div className="p-4 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-lg text-sm italic text-gray-700 dark:text-gray-300 min-h-[80px]">
+                    {solicitacaoDetalhes.observacao || 'Nenhuma observação informada.'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-6 border-t bg-gray-50 dark:bg-gray-900/50 shrink-0 sm:justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={imprimirSolicitacao}
+                className="gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+              >
+                <Printer className="size-4" />
+                Imprimir PDF
+              </Button>
+            </div>
+            <Button variant="default" onClick={() => setMostrarDetalhesModal(false)} className="px-8">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ Modal de Reprovação */}
+      <Dialog open={mostrarReprovarModal} onOpenChange={setMostrarReprovarModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="size-5" />
+              Reprovar Solicitação
+            </DialogTitle>
+            <DialogDescription>
+              Informe o motivo da reprovação para a solicitação {solicitacaoParaReprovar && formatarNumeroSolicitacao(solicitacaoParaReprovar.unidade, solicitacaoParaReprovar.seq_solicitacao_compra)}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="motivo">Motivo da Reprovação *</Label>
+              <Textarea
+                id="motivo"
+                placeholder="Descreva o motivo pelo qual esta solicitação está sendo reprovada..."
+                className="min-h-[120px] uppercase"
+                value={motivoReprovacao}
+                onChange={(e) => setMotivoReprovar(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMostrarReprovarModal(false);
+                setMotivoReprovar('');
+              }}
+              disabled={reprovando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarReprovacao}
+              disabled={reprovando || !motivoReprovacao.trim()}
+              className="gap-2"
+            >
+              {reprovando ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Reprovando...
+                </>
+              ) : (
+                <>
+                  <X className="size-4" />
+                  Confirmar Reprovação
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

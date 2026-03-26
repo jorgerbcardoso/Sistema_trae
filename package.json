@@ -69,6 +69,7 @@
     "dev": "vite",
     "build": "vite build",
     "build_local": "powershell -Command \"Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }; npm run build; npx vite --port 3000 --strictPort\"",
-    "build_push": "npm run build_local && git add . && git commit -m \"update\" && git push origin main"
+    "build_push": "npm run build_local && git add . && git commit -m \"update\" && git push origin main",
+    "just_push": "powershell -Command \"$dt = Get-Date -Format 'dd/MM/yy HH:mm'; git add .; git commit -m 'Alteracoes $dt'; git push origin main\""
   }
 }

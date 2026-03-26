@@ -190,8 +190,53 @@ function handlePut($conn, $prefix, $user, $domain) {
     
     if ($action === 'solicitar_aprovacao') {
         solicitarAprovacao($conn, $prefix, $user, $domain, $input);
+    } elseif ($action === 'reprovar') {
+        reprovarSolicitacao($conn, $prefix, $user, $domain, $input);
     } else {
         msg('Ação não reconhecida', 'error');
+    }
+}
+
+/**
+ * Reprovar solicitação de compra
+ */
+function reprovarSolicitacao($conn, $prefix, $user, $domain, $input) {
+    $seq_solicitacao_compra = $input['seq_solicitacao_compra'] ?? null;
+    $motivo = $input['motivo'] ?? '';
+    
+    if (!$seq_solicitacao_compra) {
+        msg('Solicitação não informada', 'error');
+    }
+    
+    if (empty(trim($motivo))) {
+        msg('Informe o motivo da reprovação', 'error');
+    }
+    
+    // Buscar observação atual
+    $query_obs = "SELECT observacao FROM {$prefix}solicitacao_compra WHERE seq_solicitacao_compra = $1";
+    $result_obs = pg_query_params($conn, $query_obs, [$seq_solicitacao_compra]);
+    
+    if (!$result_obs || pg_num_rows($result_obs) === 0) {
+        msg('Solicitação não encontrada', 'error');
+    }
+    
+    $row = pg_fetch_assoc($result_obs);
+    $obs_atual = $row['observacao'] ?? '';
+    
+    // Nova observação concatenada
+    $nova_obs = trim($obs_atual) . " - REPROVADA. Motivo: " . strtoupper(trim($motivo));
+    
+    // Atualizar status e observação
+    $query_update = "UPDATE {$prefix}solicitacao_compra 
+                     SET status = 'R', observacao = $1 
+                     WHERE seq_solicitacao_compra = $2";
+    
+    $result = pg_query_params($conn, $query_update, [$nova_obs, $seq_solicitacao_compra]);
+    
+    if ($result) {
+        msg('Solicitação reprovada com sucesso!', 'success');
+    } else {
+        msg('Erro ao reprovar solicitação: ' . pg_last_error($conn), 'error');
     }
 }
 

@@ -32,8 +32,15 @@ import {
   Mail,
   X,
   Search,
+  Eye,
+  Clock,
+  Printer,
+  Calendar,
+  User,
+  Building,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Textarea } from '../../components/ui/textarea';
 import { ENVIRONMENT } from '../../config/environment';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { apiFetch } from '../../utils/apiUtils';
@@ -95,6 +102,42 @@ export default function ConverterSolicitacaoDetalhe() {
   // ✅ NOVO: Dialog de criação rápida de item
   const [mostrarNovoItemDialog, setMostrarNovoItemDialog] = useState(false);
   const [itemIndexAtual, setItemIndexAtual] = useState<number | null>(null);
+
+  // ✅ Modal de Reprovação
+  const [mostrarReprovarModal, setMostrarReprovarModal] = useState(false);
+  const [motivoReprovacao, setMotivoReprovar] = useState('');
+  const [reprovando, setReprovando] = useState(false);
+
+  // ✅ Função para Reprovar
+  const confirmarReprovacao = async () => {
+    if (!motivoReprovacao.trim()) {
+      toast.error('Informe o motivo da reprovação');
+      return;
+    }
+
+    try {
+      setReprovando(true);
+      const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra.php`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          action: 'reprovar',
+          seq_solicitacao_compra: solicitacao?.seq_solicitacao_compra,
+          motivo: motivoReprovacao.toUpperCase()
+        }),
+      });
+
+      if (data.success) {
+        toast.success('Solicitação reprovada com sucesso!');
+        setMostrarReprovarModal(false);
+        setMotivoReprovar('');
+        navigate('/compras/solicitacoes-compra/converter');
+      }
+    } catch (error) {
+      console.error('Erro ao reprovar:', error);
+    } finally {
+      setReprovando(false);
+    }
+  };
 
   // ✅ FLUXO RÁPIDO - GERAÇÃO AUTOMÁTICA DE PEDIDO
   const [dialogPerguntaFornecedor, setDialogPerguntaFornecedor] = useState(false);
@@ -677,9 +720,24 @@ export default function ConverterSolicitacaoDetalhe() {
                 </div>
                 <div>
                   <CardTitle>Informações da Solicitação</CardTitle>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Solicitação {solicitacao.unidade}{String(solicitacao.seq_solicitacao_compra).padStart(6, '0')}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-gray-500">
+                      Solicitação {solicitacao.unidade}{String(solicitacao.seq_solicitacao_compra).padStart(6, '0')}
+                    </p>
+                    {solicitacao.status === 'A' ? (
+                      <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        Atendida
+                      </Badge>
+                    ) : solicitacao.status === 'R' ? (
+                      <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        Reprovada
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                        Pendente
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -862,32 +920,48 @@ export default function ConverterSolicitacaoDetalhe() {
           </CardContent>
         </Card>
 
-        {/* Botão de Conversão */}
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/compras/solicitacoes-compra/converter')}
-            disabled={convertendo}
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={converterEmOrdemCompra}
-            disabled={convertendo || itens.some(i => !i.seq_item_selecionado)}
-            className="gap-2"
-          >
-            {convertendo ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Processando...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="size-4" />
-                Confirmar
-              </>
-            )}
-          </Button>
+        {/* Botões de Ação */}
+        <div className="flex items-center justify-between border-t pt-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/20"
+              onClick={() => setMostrarReprovarModal(true)}
+              disabled={convertendo || solicitacao?.status === 'A' || solicitacao?.status === 'R'}
+            >
+              <X className="size-4" />
+              Reprovar
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={converterEmOrdemCompra}
+              disabled={convertendo || solicitacao?.status === 'A' || solicitacao?.status === 'R' || itens.some(i => !i.seq_item_selecionado)}
+              className="px-8 gap-2"
+            >
+              {convertendo ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="size-4" />
+                  Confirmar
+                </>
+              )}
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => navigate('/compras/solicitacoes-compra/converter')}
+              disabled={convertendo}
+              className="px-8"
+            >
+              Voltar
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -903,6 +977,65 @@ export default function ConverterSolicitacaoDetalhe() {
           }
         }}
       />
+
+      {/* ✅ Modal de Reprovação */}
+      <Dialog open={mostrarReprovarModal} onOpenChange={setMostrarReprovarModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="size-5" />
+              Reprovar Solicitação
+            </DialogTitle>
+            <DialogDescription>
+              Informe o motivo da reprovação para a solicitação {solicitacao.unidade}{String(solicitacao.seq_solicitacao_compra).padStart(6, '0')}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="motivo">Motivo da Reprovação *</Label>
+              <Textarea
+                id="motivo"
+                placeholder="Descreva o motivo pelo qual esta solicitação está sendo reprovada..."
+                className="min-h-[120px] uppercase"
+                value={motivoReprovacao}
+                onChange={(e) => setMotivoReprovar(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMostrarReprovarModal(false);
+                setMotivoReprovar('');
+              }}
+              disabled={reprovando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarReprovacao}
+              disabled={reprovando || !motivoReprovacao.trim()}
+              className="gap-2"
+            >
+              {reprovando ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Reprovando...
+                </>
+              ) : (
+                <>
+                  <X className="size-4" />
+                  Confirmar Reprovação
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ FLUXO RÁPIDO: Dialog de pergunta sobre fornecedor */}
       <Dialog open={dialogPerguntaFornecedor} onOpenChange={setDialogPerguntaFornecedor}>
