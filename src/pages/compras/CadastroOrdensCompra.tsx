@@ -249,7 +249,15 @@ export default function CadastroOrdensCompra() {
           console.log('🎯 [SETOR] Inicializando filtros com setor do usuário:', setorNum);
           setFiltroSetorTemp(setorNum);
           setFiltroSetor(setorNum);
+        } else {
+          console.log('🎯 [SETOR] Setor do usuário é inválido ou 0, mantendo vazio');
+          setFiltroSetorTemp(null);
+          setFiltroSetor(null);
         }
+      } else {
+        console.log('🎯 [SETOR] Usuário não possui nro_setor definido no objeto user');
+        setFiltroSetorTemp(null);
+        setFiltroSetor(null);
       }
     }
   }, [user]);

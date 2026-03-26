@@ -41,7 +41,7 @@ try {
         // Buscar sessão ativa
         $stmt = pg_prepare($conn, "verify_token",
             "SELECT s.user_id, s.domain, s.expires_at, s.last_activity,
-                    u.username, u.email, u.full_name, u.is_admin,
+                    u.username, u.email, u.full_name, u.is_admin, u.unidade, u.troca_unidade, u.nro_setor, u.unidades,
                     d.id as domain_id, d.name as domain_name, d.modalidade, d.controla_linhas, d.favicon_url
              FROM sessions s
              INNER JOIN users u ON s.user_id = u.id
@@ -97,6 +97,10 @@ try {
                 'client_id' => (int)$data['domain_id'],
                 'client_name' => $data['domain_name'],
                 'is_admin' => pgBoolToPHP($data['is_admin']),
+                'unidade' => $data['unidade'] ?? 'MTZ',
+                'troca_unidade' => pgBoolToPHP($data['troca_unidade'] ?? false),
+                'nro_setor' => $data['nro_setor'] ? (int)$data['nro_setor'] : null,
+                'unidades' => $data['unidades'] ?? '',
                 'is_presto' => strtolower($data['username']) === 'presto'
             ],
             'client_config' => [
