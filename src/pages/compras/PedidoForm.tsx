@@ -997,7 +997,7 @@ export default function PedidoForm() {
       'A': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO', class: 'status-aguardando' },
       'AGUARDANDO': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO', class: 'status-aguardando' },
       'P': { variant: 'default', icon: CheckCircle, label: 'APROVADO', class: 'status-aprovado' },
-      'PENDENTE': { variant: 'default', icon: CheckCircle, label: 'APROVADO', class: 'status-aprovado' },
+      'APROVADO': { variant: 'default', icon: CheckCircle, label: 'APROVADO', class: 'status-aprovado' },
       'E': { variant: 'default', icon: Truck, label: 'ENTREGUE', class: 'status-entregue' },
       'ENTREGUE': { variant: 'default', icon: Truck, label: 'ENTREGUE', class: 'status-entregue' },
       'F': { variant: 'default', icon: CheckCircle, label: 'FINALIZADO', class: 'status-finalizado' },
@@ -1005,7 +1005,7 @@ export default function PedidoForm() {
       'C': { variant: 'destructive', icon: XCircle, label: 'CANCELADO' },
       'CANCELADO': { variant: 'destructive', icon: XCircle, label: 'CANCELADO' },
     };
-    return statusConfig[status] || statusConfig['P'];
+    return statusConfig[status] || statusConfig['A'];
   };
 
   const ordensFiltradas = ordensDisponiveis.filter(ordem => {

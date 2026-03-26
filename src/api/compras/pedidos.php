@@ -104,7 +104,8 @@ try {
                 $query = "
                     SELECT 
                         COUNT(*) AS total,
-                        COUNT(*) FILTER (WHERE p.status = 'P') AS pendentes,
+                        COUNT(*) FILTER (WHERE p.status = 'A') AS aguardando,
+                        COUNT(*) FILTER (WHERE p.status = 'P') AS aprovados,
                         COUNT(*) FILTER (WHERE p.status = 'E') AS entregues,
                         COALESCE(SUM(p.vlr_total), 0) AS valor_total
                     FROM $tblPedido p
@@ -118,7 +119,8 @@ try {
                     'success' => true,
                     'data' => [
                         'total' => (int)$row['total'],
-                        'pendentes' => (int)$row['pendentes'],
+                        'aguardando' => (int)$row['aguardando'],
+                        'aprovados' => (int)$row['aprovados'],
                         'entregues' => (int)$row['entregues'],
                         'valor_total' => (float)$row['valor_total']
                     ]
@@ -405,7 +407,7 @@ try {
             }
             
             // ✅ VERIFICAR SE DOMÍNIO EXIGE APROVAÇÃO PARA PEDIDOS MANUAIS
-            $statusInicial = 'P'; // Padrão: Pendente
+            $statusInicial = 'P'; // Padrão: APROVADO
             $mensagemAdicional = '';
             
             // Se for pedido MANUAL (seq_orcamento NULL), verificar configuração do domínio
@@ -418,7 +420,7 @@ try {
                     $aprovaPedidosManuais = pgBoolToPHP($domainData['aprova_pedidos_manuais']);
                     
                     if ($aprovaPedidosManuais) {
-                        $statusInicial = 'A'; // Aguardando Aprovação
+                        $statusInicial = 'A'; // AGUARDANDO APROVAÇÃO
                         $mensagemAdicional = ' O pedido ficará com status AGUARDANDO APROVAÇÃO até ser aprovado.';
                     }
                 }

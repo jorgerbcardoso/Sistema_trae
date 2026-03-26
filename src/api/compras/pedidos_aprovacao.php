@@ -6,7 +6,7 @@
  * 
  * Aprova um pedido que estava aguardando aprovação:
  * 1. Valida se pedido existe e está com status 'A' (Aguardando)
- * 2. Atualiza status para 'P' (Pendente - pronto para envio)
+ * 2. Atualiza status para 'P' (APROVADO)
  * 3. Registra quem aprovou e quando
  * 4. Envia email para o usuário que cadastrou o pedido
  * 
@@ -87,17 +87,17 @@ try {
     // ✅ 2. Validar se pedido está aguardando aprovação
     if ($pedido['status'] !== 'A') {
         $status_map = [
-            'P' => 'Pendente',
-            'E' => 'Entregue',
-            'C' => 'Cancelado',
-            'F' => 'Finalizado'
+            'P' => 'APROVADO',
+            'E' => 'ENTREGUE',
+            'C' => 'CANCELADO',
+            'F' => 'FINALIZADO'
         ];
         $status_atual = $status_map[$pedido['status']] ?? 'Desconhecido';
         
         throw new Exception("Pedido não pode ser aprovado. Status atual: $status_atual");
     }
     
-    // ✅ 3. Aprovar pedido (atualizar status para 'P' - Pendente)
+    // ✅ 3. Aprovar pedido (atualizar status para 'P' - APROVADO)
     $query_aprovar = "
         UPDATE {$tabela_pedido} 
         SET 

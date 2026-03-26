@@ -175,7 +175,7 @@ export default function Pedidos() {
       'A': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO' },
       'AGUARDANDO': { variant: 'outline', icon: Hourglass, label: 'AGUARDANDO APROVAÇÃO' },
       'P': { variant: 'default', icon: CheckCircle, label: 'APROVADO' },
-      'PENDENTE': { variant: 'default', icon: CheckCircle, label: 'APROVADO' },
+      'APROVADO': { variant: 'default', icon: CheckCircle, label: 'APROVADO' },
       'E': { variant: 'default', icon: Truck, label: 'ENTREGUE' },
       'ENTREGUE': { variant: 'default', icon: Truck, label: 'ENTREGUE' },
       'F': { variant: 'default', icon: CheckCircle, label: 'FINALIZADO' },
@@ -184,7 +184,7 @@ export default function Pedidos() {
       'CANCELADO': { variant: 'destructive', icon: XCircle, label: 'CANCELADO' },
     };
 
-    const config = statusConfig[status] || statusConfig['P'];
+    const config = statusConfig[status] || statusConfig['A']; // Fallback para Aguardando se não encontrar
     const Icon = config.icon;
 
     return (
@@ -229,8 +229,8 @@ export default function Pedidos() {
   const totalPedidos = pedidosFiltrados.length;
   const totalValor = pedidosFiltrados.reduce((sum, p) => sum + p.vlr_total, 0);
   const totalAguardandoAprovacao = pedidosFiltrados.filter(p => p.status === 'A').length;
-  const totalPendentes = pedidosFiltrados.filter(p => p.status === 'P').length;
-  const totalFinalizados = pedidosFiltrados.filter(p => p.status === 'E').length; // ✅ ENTREGUE (E)
+  const totalAprovados = pedidosFiltrados.filter(p => p.status === 'P').length;
+  const totalEntregues = pedidosFiltrados.filter(p => p.status === 'E').length; // ✅ ENTREGUE (E)
 
   const limparFiltros = () => {
     setFiltroDataInicio('');
@@ -305,26 +305,26 @@ export default function Pedidos() {
             </CardContent>
           </Card>
 
-          {/* 5. Pendentes */}
+          {/* 5. Aprovados */}
           <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950 dark:to-yellow-900 border-yellow-200 dark:border-yellow-800">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <Clock className="size-8 text-yellow-600 dark:text-yellow-400" />
+                <CheckCircle className="size-8 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-1">Pendentes</p>
-              <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{totalPendentes}</p>
+              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-1">Aprovados</p>
+              <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{totalAprovados}</p>
               <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Aguardando entrega</p>
             </CardContent>
           </Card>
 
-          {/* 6. Finalizados */}
+          {/* 6. Entregues */}
           <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900 border-cyan-200 dark:border-cyan-800">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <CheckCircle className="size-8 text-cyan-600 dark:text-cyan-400" />
+                <Truck className="size-8 text-cyan-600 dark:text-cyan-400" />
               </div>
-              <p className="text-sm font-medium text-cyan-700 dark:text-cyan-300 mb-1">Finalizados</p>
-              <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{totalFinalizados}</p>
+              <p className="text-sm font-medium text-cyan-700 dark:text-cyan-300 mb-1">Entregues</p>
+              <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{totalEntregues}</p>
               <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-1">Pedidos concluídos</p>
             </CardContent>
           </Card>
@@ -365,7 +365,7 @@ export default function Pedidos() {
                   >
                     <option value="">Todos os status</option>
                     <option value="A">AGUARDANDO APROVAÇÃO</option>
-                    <option value="P">PENDENTE</option>
+                    <option value="P">APROVADO</option>
                     <option value="E">ENTREGUE</option>
                   </select>
                 </div>

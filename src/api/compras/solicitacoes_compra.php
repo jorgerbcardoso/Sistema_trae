@@ -339,23 +339,22 @@ function listarSolicitacoes($conn, $prefix, $user) {
     // Filtro de status
     // PENDENTES = P, ATENDIDAS = A, REPROVADAS = R
     if ($status === 'ATENDIDAS') {
-        $where[] = "TRIM(s.status) = 'A'";
+        $where[] = "TRIM(s.status) = $" . $param_count++;
+        $params[] = 'A';
     } elseif ($status === 'PENDENTES') {
-        $where[] = "TRIM(s.status) = 'P'";
+        $where[] = "TRIM(s.status) = $" . $param_count++;
+        $params[] = 'P';
     } elseif ($status === 'REPROVADAS') {
-        $where[] = "TRIM(s.status) = 'R'";
+        $where[] = "TRIM(s.status) = $" . $param_count++;
+        $params[] = 'R';
     } elseif ($status !== 'TODAS' && $status !== '') {
         // Se for um código direto (P, A, R) vindo do frontend
         $where[] = "TRIM(s.status) = $" . $param_count++;
         $params[] = strtoupper(trim($status));
     }
     
-    // ✅ NOVO: Filtro por usuário (Apenas na listagem padrão, não na tela de O.C.)
-    $is_oc_view = ($_GET['source'] ?? '') === 'oc';
-    if (!$is_oc_view) {
-        $where[] = "s.login_inclusao = $" . $param_count++;
-        $params[] = strtolower($user['username']);
-    }
+    // Filtro por usuário removido temporariamente para depuração
+    // $is_oc_view = ($_GET['source'] ?? '') === 'oc';
     
     $where_clause = implode(" AND ", $where);
     
@@ -379,15 +378,28 @@ function listarSolicitacoes($conn, $prefix, $user) {
               WHERE {$where_clause}
               ORDER BY s.data_inclusao DESC, s.hora_inclusao DESC";
     
-    $result = pg_query_params($conn, $query, $params);
+    if (empty($params)) {
+        $result = pg_query($conn, $query);
+    } else {
+        $result = pg_query_params($conn, $query, $params);
+    }
     
     if (!$result) {
-        msg('Erro ao buscar solicitações: ' . pg_last_error($conn), 'error');
+        msg([
+            'message' => 'Erro ao buscar solicitações: ' . pg_last_error($conn),
+            'query' => $query,
+            'params' => $params
+        ], 'error');
     }
     
     $solicitacoes = [];
     while ($row = pg_fetch_assoc($result)) {
         $solicitacoes[] = $row;
+    }
+    
+    if (empty($solicitacoes)) {
+        // Log para debug (opcional, mas ajuda a entender por que está vazio)
+        error_log("Nenhuma solicitação encontrada para o domínio $domain. Query: $query. Params: " . json_encode($params));
     }
     
     respondJson(['success' => true, 'data' => $solicitacoes]);
