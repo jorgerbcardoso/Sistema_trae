@@ -9,24 +9,19 @@ set_time_limit(0); // Sem limite de tempo
 ini_set('max_execution_time', '0'); // Sem limite de tempo
 ini_set('memory_limit', '512M'); // Aumentar memória se necessário
 
-require_once '/var/www/html/sistema/api/config.php';
-require_once '/var/www/html/lib/ssw.php';
+require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../lib/ssw_loader.php';
 
 setupCORS();
 handleOptionsRequest();
 validateRequestMethod('POST');
 
 try {
-    // Obter usuário autenticado
+    // ✅ Obter usuário autenticado
     $user = getCurrentUser();
 
     if (!$user) {
-        http_response_code(401);
-        echo json_encode([
-            'success' => false,
-            'message' => 'NÃO AUTENTICADO'
-        ]);
-        exit();
+        returnError('Não autenticado', 401);
     }
 
     $domain = $user['domain'];
@@ -36,45 +31,39 @@ try {
     // ✅ PADRÃO OFICIAL: Prefixo é o domínio em minúsculas
     $prefix = strtolower($domain);
 
+    // ✅ CRIAR CONEXÃO GLOBAL (ESSENCIAL PARA SSW)
+    global $g_sql;
+    $g_sql = connect();
+
     // ✅ SOLICITAR CONFIRMAÇÃO DO USUÁRIO
     // Parâmetros corretos: ask(pergunta, tipo, id_unico)
     $confirma = ask(
-        'ATENÇÃO: Esta operação vai SOBRESCREVER todos os fornecedores. Deseja continuar?
-        (esta operação pode levar alguns minutos)',
+        'ATENÇÃO: Esta operação vai SOBRESCREVER todos os fornecedores. Deseja continuar?\n(esta operação pode levar alguns minutos)',
         'confirm',
         'confirma_import_fornecedores'
     );
 
     // ✅ Se usuário cancelou
     if (!$confirma) {
-        echo json_encode([
+        respondJson([
             'success' => false,
             'message' => 'Operação cancelada pelo usuário'
-        ], JSON_UNESCAPED_UNICODE);
-        exit();
+        ]);
     }
 
-    global $g_sql;
+    // ✅ CARREGAR BIBLIOTECA SSW VIA LOADER
+    require_ssw();
 
     // ✅ IMPORTAR FORNECEDORES DO SSW
     imp_ssw_for();
 
-    // ✅ NÃO usar msg() em sucesso - apenas retornar JSON
-    echo json_encode([
+    // ✅ Retornar sucesso no padrão do sistema
+    respondJson([
         'success' => true,
-        'imported' => 0,
-        'updated' => 0,
-        'errors' => '',
-        'total_processed' => 0,
-        'message' => "Importação concluída!"
-    ], JSON_UNESCAPED_UNICODE);
+        'message' => "Importação concluída com sucesso!"
+    ]);
 
 } catch (Exception $e) {
     error_log("Erro ao importar fornecedores: " . $e->getMessage());
-    http_response_code(500);
-    msg('ERRO', $e->getMessage());
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
+    returnError('Erro ao importar fornecedores: ' . $e->getMessage(), 500);
 }
