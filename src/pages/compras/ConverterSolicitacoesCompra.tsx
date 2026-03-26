@@ -306,10 +306,14 @@ export default function ConverterSolicitacoesCompra() {
       
       console.log('🎯 [CONVERSÃO] Setor determinado para filtro inicial:', setorUsuario);
 
-      setFiltroDataInicioTemp('');
-      setFiltroDataFimTemp('');
-      setFiltroDataInicio('');
-      setFiltroDataFim('');
+      // ✅ REGRA: Período padrão de 30 dias
+      const hoje = getToday();
+      const trintaDiasAtras = get30DaysAgo();
+
+      setFiltroDataInicioTemp(trintaDiasAtras);
+      setFiltroDataFimTemp(hoje);
+      setFiltroDataInicio(trintaDiasAtras);
+      setFiltroDataFim(hoje);
 
       setFiltroUnidadeTemp('');
       setFiltroUnidade('');
@@ -319,8 +323,8 @@ export default function ConverterSolicitacoesCompra() {
 
       inicializadoRef.current = true;
 
-      // ✅ Carregar solicitações respeitando o setor do usuário
-      carregarSolicitacoes('', '', '', '', setorUsuario);
+      // ✅ Carregar solicitações respeitando o setor do usuário e o período de 30 dias
+      carregarSolicitacoes(trintaDiasAtras, hoje, '', '', setorUsuario);
     }
   }, [user]);
 
@@ -442,21 +446,24 @@ export default function ConverterSolicitacoesCompra() {
   };
 
   const limparFiltros = () => {
-    // ✅ CORREÇÃO: Limpar TODOS os filtros, sem aplicar filtros automáticos
+    // ✅ CORREÇÃO: Limpar filtros, mas restaurar período padrão de 30 dias
+    const hoje = getToday();
+    const trintaDiasAtras = get30DaysAgo();
+    
     setFiltroUnidadeTemp('');
-    setFiltroDataInicioTemp('');
-    setFiltroDataFimTemp('');
+    setFiltroDataInicioTemp(trintaDiasAtras);
+    setFiltroDataFimTemp(hoje);
     setFiltroCentroCustoTemp('');
     setFiltroSetorTemp(null);
     
     setFiltroUnidade('');
-    setFiltroDataInicio('');
-    setFiltroDataFim('');
+    setFiltroDataInicio(trintaDiasAtras);
+    setFiltroDataFim(hoje);
     setFiltroCentroCusto('');
     setFiltroSetor(null);
 
-    // ✅ Carregar TODAS as solicitações sem filtros
-    carregarSolicitacoes('', '', '', '', null);
+    // ✅ Carregar solicitações com período padrão e sem outros filtros
+    carregarSolicitacoes(trintaDiasAtras, hoje, '', '', null);
   };
 
   const iniciarConversao = (solicitacao: SolicitacaoCompra) => {
