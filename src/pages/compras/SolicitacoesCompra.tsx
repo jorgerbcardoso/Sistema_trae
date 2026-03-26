@@ -58,7 +58,7 @@ import { FilterSelectSetor } from '../../components/admin/FilterSelectSetor';
 import { FilterSelectUnidadeSingle } from '../../components/cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectVeiculo } from '../../components/dashboards/FilterSelectVeiculo';
 import { SortableTableHeader, useSortableTable } from '../../components/table/SortableTableHeader';
-import { formatCodigoCentroCusto } from '../../utils/formatters';
+import { formatCodigoCentroCusto, formatarNumeroSolicitacao } from '../../utils/formatters';
 import { Checkbox } from '../../components/ui/checkbox';
 
 interface SolicitacaoCompra {
@@ -147,7 +147,7 @@ export default function SolicitacoesCompra() {
     return hoje.toISOString().split('T')[0];
   });
   const [filtroSetor, setFiltroSetor] = useState<number | null>(null);
-  const [filtroStatus, setFiltroStatus] = useState<'TODAS' | 'CONVERTIDAS' | 'PENDENTES'>('TODAS');
+  const [filtroStatus, setFiltroStatus] = useState<'TODAS' | 'ATENDIDAS' | 'PENDENTES' | 'REPROVADAS'>('TODAS');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // Hook de ordenação
@@ -219,9 +219,10 @@ export default function SolicitacoesCompra() {
           if (filtroDataFim && sol.data_inclusao > filtroDataFim) return false;
           if (filtroSetor && sol.nro_setor !== filtroSetor) return false;
           
-          // PENDENTES = P, CONVERTIDAS = A
-          if (filtroStatus === 'CONVERTIDAS' && sol.status !== 'A') return false;
+          // PENDENTES = P, ATENDIDAS = A, REPROVADAS = R
+          if (filtroStatus === 'ATENDIDAS' && sol.status !== 'A') return false;
           if (filtroStatus === 'PENDENTES' && sol.status !== 'P') return false;
+          if (filtroStatus === 'REPROVADAS' && sol.status !== 'R') return false;
           
           return true;
         });
@@ -560,11 +561,6 @@ export default function SolicitacoesCompra() {
   // Função de filtro
   const solicitacoesFiltradas = solicitacoes;
 
-  // Formatar número da solicitação
-  const formatarNumeroSolicitacao = (unidade: string, seq: number): string => {
-    return `${unidade?.trim() || ''}${String(seq).padStart(6, '0')}`;
-  };
-
   // ✅ Função de Impressão (Baseada no padrão de Pedidos)
   const imprimirSolicitacao = () => {
     const printContent = printRef.current;
@@ -752,7 +748,7 @@ export default function SolicitacoesCompra() {
             <div class="header-right">
               <div class="documento-numero">${formatarNumeroSolicitacao(solicitacaoDetalhes.unidade, solicitacaoDetalhes.seq_solicitacao_compra)}</div>
               <div class="status-badge ${solicitacaoDetalhes.status === 'A' ? 'status-atendida' : 'status-pendente'}">
-                ${solicitacaoDetalhes.status === 'A' ? 'ATENDIDA / CONVERTIDA' : 'PENDENTE DE APROVAÇÃO'}
+                ${solicitacaoDetalhes.status === 'A' ? 'ATENDIDA' : 'PENDENTE DE APROVAÇÃO'}
               </div>
             </div>
           </div>
@@ -1172,7 +1168,8 @@ export default function SolicitacoesCompra() {
                         <SelectContent>
                           <SelectItem value="TODAS">TODAS</SelectItem>
                           <SelectItem value="PENDENTES">PENDENTES</SelectItem>
-                          <SelectItem value="CONVERTIDAS">CONVERTIDAS</SelectItem>
+                          <SelectItem value="ATENDIDAS">ATENDIDAS</SelectItem>
+                          <SelectItem value="REPROVADAS">REPROVADAS</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1470,7 +1467,7 @@ export default function SolicitacoesCompra() {
                       {solicitacaoDetalhes.status === 'A' ? (
                         <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800 px-3 py-1 text-sm font-bold uppercase">
                           <CheckCircle className="size-3.5 mr-1.5" />
-                          APROVADA / ATENDIDA
+                          ATENDIDA
                         </Badge>
                       ) : solicitacaoDetalhes.status === 'R' ? (
                         <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800 px-3 py-1 text-sm font-bold uppercase">

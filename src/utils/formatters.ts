@@ -75,3 +75,24 @@ export function formatCodigoCentroCusto(unidade: string, nroCentroCusto: number 
   // Formatar: AAA + 6 dígitos (ex: MTZ000001)
   return `${unidade.toUpperCase()}${num.toString().padStart(6, '0')}`;
 }
+
+/**
+ * Formata número da solicitação de compra no padrão AAA000000
+ * @param unidade Sigla da unidade (ex: "MTZ", "SPO")
+ * @param seq Sequencial da solicitação (ex: 1, 25, 123)
+ * @returns String formatada (ex: "MTZ000001", "SPO000025")
+ */
+export function formatarNumeroSolicitacao(unidade: string, seq: number | string): string {
+  if (!unidade || (seq === null || seq === undefined || seq === '')) {
+    return '';
+  }
+  
+  const num = typeof seq === 'string' ? parseInt(seq) : seq;
+  
+  if (isNaN(num)) {
+    return '';
+  }
+  
+  // Formatar: AAA + 6 dígitos (ex: MTZ000001)
+  return `${unidade.trim().toUpperCase()}${num.toString().padStart(6, '0')}`;
+}

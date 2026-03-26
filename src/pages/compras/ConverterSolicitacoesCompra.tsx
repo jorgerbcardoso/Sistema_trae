@@ -50,7 +50,7 @@ import { FilterSelectCentroCusto } from '../../components/shared/FilterSelectCen
 import { FilterSelectSetor } from '../../components/admin/FilterSelectSetor';
 import { FilterSelectUnidadeSingle } from '../../components/cadastros/FilterSelectUnidadeSingle';
 import { SortableTableHeader, useSortableTable } from '../../components/table/SortableTableHeader';
-import { formatCodigoCentroCusto } from '../../utils/formatters';
+import { formatCodigoCentroCusto, formatarNumeroSolicitacao } from '../../utils/formatters';
 
 // Helper: Obter data de hoje no formato YYYY-MM-DD
 function getToday() {
@@ -367,10 +367,6 @@ export default function ConverterSolicitacoesCompra() {
     const isAceville = user?.domain?.toUpperCase() === 'ACV';
     const dataInicio = filtroDataInicio ? new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
     const dataFim = filtroDataFim ? new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
-
-    const formatarNumeroSolicitacao = (unidade: string, seq: number): string => {
-      return `${unidade?.trim() || ''}${String(seq).padStart(6, '0')}`;
-    };
 
     printWindow.document.write(`
       <!DOCTYPE html>

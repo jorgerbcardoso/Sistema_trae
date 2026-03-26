@@ -337,11 +337,17 @@ function listarSolicitacoes($conn, $prefix, $user) {
     }
     
     // Filtro de status
-    // PENDENTES = P, CONVERTIDAS = A
-    if ($status === 'CONVERTIDAS') {
+    // PENDENTES = P, ATENDIDAS = A, REPROVADAS = R
+    if ($status === 'ATENDIDAS') {
         $where[] = "TRIM(s.status) = 'A'";
     } elseif ($status === 'PENDENTES') {
         $where[] = "TRIM(s.status) = 'P'";
+    } elseif ($status === 'REPROVADAS') {
+        $where[] = "TRIM(s.status) = 'R'";
+    } elseif ($status !== 'TODAS' && $status !== '') {
+        // Se for um código direto (P, A, R) vindo do frontend
+        $where[] = "TRIM(s.status) = $" . $param_count++;
+        $params[] = strtoupper(trim($status));
     }
     
     // ✅ NOVO: Filtro por usuário (Apenas na listagem padrão, não na tela de O.C.)
