@@ -562,7 +562,8 @@ export default function AprovacaoDespesas() {
     setLoading(true);
     try {
       // ✅ 1. LER OBSERVAÇÃO DO SSW EM TEMPO REAL (act=COM)
-      const data = await apiFetch(`/sistema/api/operacoes/aprovacao-despesas.php?act=LER_OBSERVACAO&seq_parcela=${despesa.seq_lancamento}`);
+      // Agora passando também o nro_lancamento para o Passo 0 (PES + f8)
+      const data = await apiFetch(`/sistema/api/operacoes/aprovacao-despesas.php?act=LER_OBSERVACAO&seq_parcela=${despesa.seq_lancamento}&nro_lancamento=${despesa.lancamento}`);
       
       setObsDialog({
         open: true,
@@ -589,6 +590,7 @@ export default function AprovacaoDespesas() {
         method: 'POST',
         body: JSON.stringify({
           seq_parcela: obsDialog.seq,
+          nro_lancamento: obsDialog.nro, // ✅ Enviar número para o Passo 0 (PES + f8)
           observacao: obsDialog.texto
         })
       });

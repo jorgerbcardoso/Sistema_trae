@@ -253,6 +253,7 @@ function aprovarDespesas($userData, $g_sql) {
 function lerObservacao($userData, $g_sql) {
     try {
         $seq = $_GET['seq_parcela'] ?? '';
+        $nro_lancamento = $_GET['nro_lancamento'] ?? ''; // ex: 130068-21
         
         if (empty($seq)) {
             http_response_code(400);
@@ -260,13 +261,20 @@ function lerObservacao($userData, $g_sql) {
             return;
         }
         
-        // ✅ REGRA: act=COM&seq_desp_parcela=$seq
-        $params = "act=COM&seq_desp_parcela=" . urlencode($seq);
-        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        
+        if (!empty($nro_lancamento)) {
+            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
+            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
+        }
+        
+        // ✅ PASSO 1: Chamada act=COM&seq_desp_parcela=$seq
+        $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq);
+        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
         
         // ✅ PARSEAR HTML: Procurar input com id="-3" e extrair seu value
-        // Exemplo: <input ... id="-3" ... value="teste" ...>
-        // Regex robusta para capturar o value do input com id -3
         preg_match('/id=[\"|\']?-3[\"|\']?[^>]*value=[\"|\']?([^\"|\'>]*)[\"|\']?/i', $html, $matches);
         
         $observacao = isset($matches[1]) ? trim($matches[1]) : '';
@@ -296,11 +304,21 @@ function salvarObservacao($userData, $g_sql) {
         }
         
         $seq = $body['seq_parcela'];
+        $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
         $obs = $body['observacao'] ?? '';
         
-        // ✅ REGRA: act=INC&seq_desp_parcela=$seq&comentario1=$obs&comentario2=
-        $params = "act=INC&seq_desp_parcela=" . urlencode($seq) . "&comentario1=" . urlencode($obs) . "&comentario2=";
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        
+        if (!empty($nro_lancamento)) {
+            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
+            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
+        }
+        
+        // ✅ PASSO 1: Gravar a observação com act=INC
+        $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq) . "&comentario1=" . urlencode($obs) . "&comentario2=";
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
         
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
             http_response_code(500);
