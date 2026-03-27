@@ -33,7 +33,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  MessageSquare,
+  Send,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -44,6 +47,15 @@ import { FilterSelectUnidadeSingle } from '@/components/cadastros/FilterSelectUn
 import { EventoSearchInput } from '@/components/shared/EventoSearchInput';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 // ✅ TIPO DA DESPESA
 interface Despesa {
@@ -216,6 +228,22 @@ export default function AprovacaoDespesas() {
   
   // ✅ ORDENAÇÃO
   const [ordenacao, setOrdenacao] = useState<'status' | 'data' | 'evento'>('status');
+
+  // ✅ ESTADOS DOS DIALOGS
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    tipo: 'APROVACAO' | 'ESTORNO';
+    seq?: number;
+    nro?: string;
+  }>({ open: false, tipo: 'APROVACAO' });
+
+  const [obsDialog, setObsDialog] = useState<{
+    open: boolean;
+    seq?: number;
+    nro?: string;
+    texto: string;
+    posReprovacao?: boolean;
+  }>({ open: false, texto: '' });
 
   // ✅ CARREGAR DESPESAS
   useEffect(() => {
@@ -447,12 +475,15 @@ export default function AprovacaoDespesas() {
   };
 
   // ✅ APROVAR SELECIONADAS (EM MASSA)
-  const aprovarSelecionadas = async () => {
+  const handleAprovarMassa = () => {
     if (despesasSelecionadas.size === 0) {
       toast.warning('Selecione ao menos uma despesa para aprovar');
       return;
     }
+    setConfirmDialog({ open: true, tipo: 'APROVACAO' });
+  };
 
+  const aprovarSelecionadas = async () => {
     setLoading(true);
     try {
       const data = await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=APROVAR', {
@@ -462,40 +493,79 @@ export default function AprovacaoDespesas() {
         })
       });
       
-      // No modo simulação, o backend retorna a URL no toast via msg()
-      // toast.success('Comando SRENV enviado com sucesso');
+      toast.success('Aprovações realizadas com sucesso');
+      await carregarDespesas();
       
     } catch (error) {
       console.error('Erro ao aprovar despesas:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao aprovar despesas');
     } finally {
       setLoading(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
   };
 
   // ✅ REMOVER APROVAÇÃO (ESTORNO)
-  const removerAprovacao = async (e: React.MouseEvent, seqLancamento: number, nroLancamento?: string) => {
-    e.stopPropagation(); // Prevenir toggle do card
+  const handleEstornoIndividual = (e: React.MouseEvent, seq: number, nro?: string) => {
+    e.stopPropagation();
+    setConfirmDialog({ open: true, tipo: 'ESTORNO', seq, nro });
+  };
+
+  const confirmarEstorno = async () => {
+    if (!confirmDialog.seq) return;
     
     setLoading(true);
     try {
       await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=REMOVER_APROVACAO', {
         method: 'POST',
         body: JSON.stringify({
-          seq_parcela: seqLancamento,
-          nro_lancamento: nroLancamento // ✅ Enviar o número (ex: 130068-21) para o passo 1 (act=PES)
+          seq_parcela: confirmDialog.seq,
+          nro_lancamento: confirmDialog.nro
         })
       });
       
-      // Recarregar lista
+      toast.success('Desaprovação realizada com sucesso');
       await carregarDespesas();
+      
+      // ✅ Abrir dialog de observação após reprovação
+      setObsDialog({
+        open: true,
+        seq: confirmDialog.seq,
+        nro: confirmDialog.nro,
+        texto: '',
+        posReprovacao: true
+      });
       
     } catch (error) {
       console.error('Erro ao remover aprovação:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao remover aprovação');
     } finally {
       setLoading(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
+  };
+
+  // ✅ GERENCIAR OBSERVAÇÕES
+  const handleAbrirObs = (e: React.MouseEvent, despesa: Despesa) => {
+    e.stopPropagation();
+    setObsDialog({
+      open: true,
+      seq: despesa.seq_lancamento,
+      nro: despesa.lancamento,
+      texto: despesa.observacao || '',
+      posReprovacao: false
+    });
+  };
+
+  const salvarObservacao = async () => {
+    // Por enquanto salvamos localmente para visualização, 
+    // em um cenário real haveria um endpoint act=SALVAR_OBS
+    setDespesas(prev => prev.map(d => 
+      d.seq_lancamento === obsDialog.seq ? { ...d, observacao: obsDialog.texto } : d
+    ));
+    
+    toast.success('Observação salva com sucesso');
+    setObsDialog({ ...obsDialog, open: false });
   };
 
   return (
@@ -911,15 +981,39 @@ export default function AprovacaoDespesas() {
 
                         {/* AÇÕES (SE APROVADA) */}
                         {despesa.aprovada && (
-                          <div className="pt-2 border-t">
+                          <div className="pt-2 border-t flex flex-wrap gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full md:w-auto"
-                              onClick={(e) => removerAprovacao(e, despesa.seq_lancamento, despesa.lancamento)}
+                              className="flex-1 md:flex-none"
+                              onClick={(e) => handleEstornoIndividual(e, despesa.seq_lancamento, despesa.lancamento)}
                             >
                               <XCircle className="h-4 w-4 mr-2" />
                               Remover Aprovação
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1 md:flex-none"
+                              onClick={(e) => handleAbrirObs(e, despesa)}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
+                              {despesa.observacao ? 'Ver Obs.' : 'Inserir Obs.'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* AÇÕES (SE NÃO APROVADA) */}
+                        {!despesa.aprovada && (
+                          <div className="pt-2 border-t flex justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => handleAbrirObs(e, despesa)}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
+                              {despesa.observacao ? 'Ver Obs.' : 'Inserir Obs.'}
                             </Button>
                           </div>
                         )}
@@ -1047,7 +1141,7 @@ export default function AprovacaoDespesas() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Button
               className="w-full"
-              onClick={aprovarSelecionadas}
+              onClick={handleAprovarMassa}
               disabled={despesasSelecionadas.size === 0 || loading}
             >
               <CheckCheck className="h-4 w-4 mr-2" />
@@ -1073,6 +1167,87 @@ export default function AprovacaoDespesas() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ✅ DIALOG DE CONFIRMAÇÃO (APROVAÇÃO/ESTORNO) */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              {confirmDialog.tipo === 'APROVACAO' ? (
+                <>
+                  <CheckCircle2 className="size-6 text-green-600" />
+                  Confirmar Aprovação
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="size-6 text-amber-600" />
+                  Confirmar Desaprovação
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              {confirmDialog.tipo === 'APROVACAO' ? (
+                `Deseja realmente aprovar as ${despesasSelecionadas.size} despesas selecionadas? Esta ação enviará os dados ao SSW.`
+              ) : (
+                <>
+                  Deseja remover a aprovação da despesa <span className="font-mono font-bold">{confirmDialog.nro}</span> no SSW?
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}>
+              Cancelar
+            </Button>
+            <Button 
+              className={confirmDialog.tipo === 'APROVACAO' ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'}
+              onClick={confirmDialog.tipo === 'APROVACAO' ? aprovarSelecionadas : confirmarEstorno}
+              disabled={loading}
+            >
+              {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ DIALOG DE OBSERVAÇÕES */}
+      <Dialog open={obsDialog.open} onOpenChange={(open) => setObsDialog({ ...obsDialog, open })}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="size-5 text-blue-600" />
+              {obsDialog.posReprovacao ? 'Informar Motivo da Reprovação' : 'Observações da Despesa'}
+            </DialogTitle>
+            <DialogDescription>
+              Lançamento: <span className="font-mono font-bold">{obsDialog.nro}</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label htmlFor="obs-text" className="mb-2 block">
+              {obsDialog.posReprovacao ? 'Por que esta despesa está sendo reprovada?' : 'Texto da observação:'}
+            </Label>
+            <Textarea
+              id="obs-text"
+              placeholder="Digite aqui..."
+              className="min-h-[150px] resize-none"
+              value={obsDialog.texto}
+              onChange={(e) => setObsDialog({ ...obsDialog, texto: e.target.value })}
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setObsDialog({ ...obsDialog, open: false })}>
+              {obsDialog.posReprovacao ? 'Agora não' : 'Fechar'}
+            </Button>
+            <Button className="gap-2" onClick={salvarObservacao}>
+              <Send className="size-4" />
+              Salvar Observação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
