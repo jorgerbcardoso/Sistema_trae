@@ -119,6 +119,10 @@ function listarDespesas($userData) {
             $params .= "&f7=" . urlencode($unidade);
         }
         
+        // ✅ SALVAR PARA USO NO ESTORNO (PASSO 1)
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $_SESSION['ssw_last_pes_params'] = $params;
+        
         // Chamar SSW1196
         $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
         
@@ -251,10 +255,13 @@ function removerAprovacao($userData, $g_sql) {
         $seq_parcela = $body['seq_parcela'];
         $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
         
-        // ✅ PASSO 1: Chamada act=PES passando o número do lançamento em f8
-        // Isso "localiza" o registro na sessão do SSW
+        // ✅ PASSO 1: Chamada act=PES completa com todos os filtros + f8
+        // Recuperamos os parâmetros da última busca salvos na sessão
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        
         if (!empty($nro_lancamento)) {
-            $params_pes = "act=PES&f8=" . urlencode($nro_lancamento);
+            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
             ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
         }
         
