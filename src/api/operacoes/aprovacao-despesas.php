@@ -153,40 +153,26 @@ function aprovarDespesas($userData, $g_sql) {
         $seq_parcelas = $body['seq_parcelas'];
         $data_pagamento = $body['data_pagamento'] ?? ''; // Opcional
         
-        $aprovadas = 0;
-        $erros = [];
+        $simulacoes = [];
         
         foreach ($seq_parcelas as $seq) {
-            try {
-                // Montar parâmetros para aprovação
-                $params = "act=MARCAR&seq_desp_parcela=" . urlencode($seq);
-                
-                if (!empty($data_pagamento)) {
-                    $data_ssw = converterDataParaSSW($data_pagamento);
-                    $params .= "&f1=" . $data_ssw;
-                }
-                
-                // Chamar SSW1196 para marcar como aprovada
-                $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
-                
-                // Verificar se houve erro no retorno
-                if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
-                    $erros[] = "Erro ao aprovar despesa $seq";
-                } else {
-                    $aprovadas++;
-                }
-                
-            } catch (Exception $e) {
-                $erros[] = "Erro ao aprovar despesa $seq: " . $e->getMessage();
+            // Montar parâmetros para aprovação
+            $params = "act=MARCAR&seq_desp_parcela=" . urlencode($seq);
+            
+            if (!empty($data_pagamento)) {
+                $data_ssw = converterDataParaSSW($data_pagamento);
+                $params .= "&f1=" . $data_ssw;
             }
+            
+            $simulacoes[] = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         }
         
-        echo json_encode([
-            'success' => true,
-            'aprovadas' => $aprovadas,
-            'total' => count($seq_parcelas),
-            'erros' => $erros
-        ]);
+        // ✅ SIMULAÇÃO SSW: Exibir as URLs que seriam enviadas
+        msg([
+            'modo' => 'SIMULAÇÃO DE APROVAÇÃO',
+            'total_selecionado' => count($seq_parcelas),
+            'requisicoes_ssw' => $simulacoes
+        ], 'info');
         
     } catch (Exception $e) {
         http_response_code(500);
@@ -212,24 +198,16 @@ function removerAprovacao($userData, $g_sql) {
         
         $seq_parcela = $body['seq_parcela'];
         
-        // Chamar SSW1196 para desmarcar
+        // Montar parâmetros para desmarcar
         $params = "act=DESMARCAR&seq_desp_parcela=" . urlencode($seq_parcela);
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         
-        // Verificar se houve erro
-        if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
-            http_response_code(500);
-            echo json_encode([
-                'error' => 'Erro ao remover aprovação',
-                'message' => 'SSW retornou erro'
-            ]);
-            return;
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'message' => 'Aprovação removida com sucesso'
-        ]);
+        // ✅ SIMULAÇÃO SSW: Exibir a URL que seria enviada
+        msg([
+            'modo' => 'SIMULAÇÃO DE ESTORNO',
+            'seq_parcela' => $seq_parcela,
+            'requisicao_ssw' => $url
+        ], 'info');
         
     } catch (Exception $e) {
         http_response_code(500);
