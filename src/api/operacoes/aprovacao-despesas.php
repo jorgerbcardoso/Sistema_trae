@@ -249,19 +249,29 @@ function removerAprovacao($userData, $g_sql) {
         }
         
         $seq_parcela = $body['seq_parcela'];
+        $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
         
-        // Montar parâmetros para desmarcar
-        $params = "act=DESMARCAR&seq_desp_parcela=" . urlencode($seq_parcela);
+        // ✅ PASSO 1: Chamada act=PES passando o número do lançamento em f8
+        // Isso "localiza" o registro na sessão do SSW
+        if (!empty($nro_lancamento)) {
+            $params_pes = "act=PES&f8=" . urlencode($nro_lancamento);
+            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
+        }
         
-        // ✅ ENVIO REAL AO SSW
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        // ✅ PASSO 2: Chamada act=EXC para desmarcar o registro específico
+        $params_exc = "act=EXC&seq_desp_parcela=" . urlencode($seq_parcela);
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_exc);
         
-        // Verificar se houve erro
+        // ✅ PASSO 3: Chamada act=SRENV (simples) para efetivar o estorno
+        $params_final = "act=SRENV";
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
+        
+        // Verificar se houve erro no retorno final
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
             http_response_code(500);
             echo json_encode([
                 'error' => 'Erro ao remover aprovação',
-                'message' => 'SSW retornou erro no estorno'
+                'message' => 'SSW retornou erro no estorno final'
             ]);
             return;
         }

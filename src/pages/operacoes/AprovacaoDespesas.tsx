@@ -473,8 +473,8 @@ export default function AprovacaoDespesas() {
     }
   };
 
-  // ✅ REMOVER APROVAÇÃO
-  const removerAprovacao = async (e: React.MouseEvent, seqLancamento: number) => {
+  // ✅ REMOVER APROVAÇÃO (ESTORNO)
+  const removerAprovacao = async (e: React.MouseEvent, seqLancamento: number, nroLancamento?: string) => {
     e.stopPropagation(); // Prevenir toggle do card
     
     setLoading(true);
@@ -482,7 +482,8 @@ export default function AprovacaoDespesas() {
       await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=REMOVER_APROVACAO', {
         method: 'POST',
         body: JSON.stringify({
-          seq_parcela: seqLancamento
+          seq_parcela: seqLancamento,
+          nro_lancamento: nroLancamento // ✅ Enviar o número (ex: 130068-21) para o passo 1 (act=PES)
         })
       });
       
@@ -915,7 +916,7 @@ export default function AprovacaoDespesas() {
                               variant="outline"
                               size="sm"
                               className="w-full md:w-auto"
-                              onClick={(e) => removerAprovacao(e, despesa.seq_lancamento)}
+                              onClick={(e) => removerAprovacao(e, despesa.seq_lancamento, despesa.lancamento)}
                             >
                               <XCircle className="h-4 w-4 mr-2" />
                               Remover Aprovação
