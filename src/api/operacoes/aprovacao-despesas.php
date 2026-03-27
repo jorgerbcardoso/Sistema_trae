@@ -203,14 +203,8 @@ function aprovarDespesas($userData, $g_sql) {
         
         $seq_parcelas = $body['seq_parcelas'];
         
-        // ✅ 1. LAÇO PARA CHAMAR act=ONE PARA CADA REGISTRO (PRIMEIRO PASSO)
-        // Isso garante que o SSW "marque" individualmente cada registro na sessão antes do envio final
-        foreach ($seq_parcelas as $seq) {
-            $params_one = "act=ONE&seq_desp_parcela=" . urlencode($seq);
-            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_one);
-        }
-        
-        // ✅ 2. ENVIO FINAL (SRENV|id1|id2|id3...)
+        // ✅ ENVIO FINAL (SRENV|id1|id2|id3...)
+        // Agora confiamos na persistência de cookies da ssw.php para manter o estado das marcações individuais feitas no frontend
         $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
         $params_final = "act=" . urlencode($act_ssw);
         
