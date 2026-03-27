@@ -203,19 +203,26 @@ function aprovarDespesas($userData, $g_sql) {
         
         $seq_parcelas = $body['seq_parcelas'];
         
-        // ✅ REGRA: SRENV|id1|id2|id3...
+        // ✅ 1. LAÇO PARA CHAMAR act=ONE PARA CADA REGISTRO (PRIMEIRO PASSO)
+        // Isso garante que o SSW "marque" individualmente cada registro na sessão antes do envio final
+        foreach ($seq_parcelas as $seq) {
+            $params_one = "act=ONE&seq_desp_parcela=" . urlencode($seq);
+            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_one);
+        }
+        
+        // ✅ 2. ENVIO FINAL (SRENV|id1|id2|id3...)
         $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
-        $params = "act=" . urlencode($act_ssw);
+        $params_final = "act=" . urlencode($act_ssw);
         
-        // ✅ ENVIO REAL AO SSW
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        // Chamar SSW1196 para efetivar a aprovação em massa
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
         
-        // Verificar se houve erro no retorno
+        // Verificar se houve erro no retorno final
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
             http_response_code(500);
             echo json_encode([
                 'error' => 'Erro ao comunicar com o SSW',
-                'message' => 'SSW retornou erro na aprovação em massa'
+                'message' => 'SSW retornou erro na aprovação em massa (SRENV)'
             ]);
             return;
         }
