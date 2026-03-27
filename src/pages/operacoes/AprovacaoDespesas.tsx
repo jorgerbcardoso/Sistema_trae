@@ -264,6 +264,16 @@ export default function AprovacaoDespesas() {
       });
       
       setDespesas(despesasOrdenadas);
+      
+      // ✅ INICIALIZAR SELEÇÃO COM DESPESAS QUE JÁ VÊM MARCADAS (aprovada === true)
+      const iniciais = new Set<number>();
+      despesasOrdenadas.forEach((d: Despesa) => {
+        if (d.aprovada) {
+          iniciais.add(d.seq_lancamento);
+        }
+      });
+      setDespesasSelecionadas(iniciais);
+
       calcularIndicadores(despesasOrdenadas);
       calcularEventosTotais(despesasOrdenadas);
       
@@ -404,20 +414,39 @@ export default function AprovacaoDespesas() {
     }
   }, [despesas, ordenacao]);
   
-  // ✅ TOGGLE CARD CLICÁVEL
-  const handleCardClick = (seqLancamento: number, aprovada: boolean) => {
-    if (aprovada) return; // Não permite selecionar aprovadas
+  // ✅ TOGGLE CARD CLICÁVEL (INDIVIDUAL)
+  const handleCardClick = async (seqLancamento: number, aprovada: boolean) => {
+    if (aprovada) return; // Não permite selecionar aprovadas na listagem (seria desaprovação individual)
     
     const novasSelecoes = new Set(despesasSelecionadas);
-    if (novasSelecoes.has(seqLancamento)) {
+    const estaSelecionado = novasSelecoes.has(seqLancamento);
+    
+    // 1. Atualizar UI imediatamente para melhor UX
+    if (estaSelecionado) {
       novasSelecoes.delete(seqLancamento);
     } else {
       novasSelecoes.add(seqLancamento);
     }
     setDespesasSelecionadas(novasSelecoes);
+
+    // 2. Comunicar ao SSW via Backend
+    try {
+      await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=TOGGLE_INDIVIDUAL', {
+        method: 'POST',
+        body: JSON.stringify({
+          seq_parcela: seqLancamento,
+          selecionado: !estaSelecionado
+        })
+      });
+      // toast.success(`Despesa ${estaSelecionado ? 'desmarcada' : 'marcada'} com sucesso`);
+    } catch (error) {
+      console.error('Erro no toggle individual:', error);
+      toast.error('Erro ao comunicar marcação ao SSW');
+      // Reverter UI em caso de erro real (opcional, aqui como é simulação vamos manter)
+    }
   };
 
-  // ✅ APROVAR SELECIONADAS
+  // ✅ APROVAR SELECIONADAS (EM MASSA)
   const aprovarSelecionadas = async () => {
     if (despesasSelecionadas.size === 0) {
       toast.warning('Selecione ao menos uma despesa para aprovar');
@@ -433,13 +462,8 @@ export default function AprovacaoDespesas() {
         })
       });
       
-      if (data.erros && data.erros.length > 0) {
-        data.erros.forEach((erro: string) => toast.error(erro));
-      }
-      
-      // Recarregar lista
-      await carregarDespesas();
-      setDespesasSelecionadas(new Set());
+      // No modo simulação, o backend retorna a URL no toast via msg()
+      // toast.success('Comando SRENV enviado com sucesso');
       
     } catch (error) {
       console.error('Erro ao aprovar despesas:', error);
@@ -740,6 +764,25 @@ export default function AprovacaoDespesas() {
           )}
         </CardContent>
       </Card>
+
+      {/* ✅ AÇÕES EM MASSA */}
+      {despesasSelecionadas.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-6 right-6 z-50"
+        >
+          <Button 
+            size="lg" 
+            className="shadow-2xl px-8 h-14 rounded-full gap-2 bg-green-600 hover:bg-green-700"
+            onClick={aprovarSelecionadas}
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="animate-spin" /> : <CheckCheck className="size-5" />}
+            Aprovar {despesasSelecionadas.size} Selecionada{despesasSelecionadas.size > 1 ? 's' : ''}
+          </Button>
+        </motion.div>
+      )}
 
       {/* ✅ LISTA DE DESPESAS (CARDS CLICÁVEIS - MOBILE FIRST) */}
       <Card className="mb-6">

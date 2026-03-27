@@ -56,6 +56,10 @@ try {
             listarDespesas($userData);
             break;
             
+        case 'TOGGLE_INDIVIDUAL':
+            toggleIndividual($userData, $g_sql);
+            break;
+            
         case 'APROVAR':
             aprovarDespesas($userData, $g_sql);
             break;
@@ -138,7 +142,45 @@ function listarDespesas($userData) {
 }
 
 // ================================================================
-// FUNÇÃO: APROVAR DESPESAS
+// FUNÇÃO: TOGGLE INDIVIDUAL (MARCAR/DESMARCAR)
+// ================================================================
+function toggleIndividual($userData, $g_sql) {
+    try {
+        $body = json_decode(file_get_contents('php://input'), true);
+        
+        if (!isset($body['seq_parcela']) || !isset($body['selecionado'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'seq_parcela e selecionado são obrigatórios']);
+            return;
+        }
+        
+        $seq = $body['seq_parcela'];
+        $selecionado = $body['selecionado']; // boolean
+        
+        // Regra: se marcar (true) -> act=ONE, se desmarcar (false) -> act=EXC
+        $act_ssw = $selecionado ? 'ONE' : 'EXC';
+        $params = "act=" . $act_ssw . "&seq_desp_parcela=" . urlencode($seq);
+        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
+        
+        // ✅ SIMULAÇÃO SSW: Exibir a URL que seria enviada
+        msg([
+            'modo' => 'SIMULAÇÃO INDIVIDUAL',
+            'acao' => $selecionado ? 'MARCAR' : 'DESMARCAR',
+            'seq_parcela' => $seq,
+            'requisicao_ssw' => $url
+        ], 'info');
+        
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => 'Erro no toggle individual',
+            'message' => $e->getMessage()
+        ]);
+    }
+}
+
+// ================================================================
+// FUNÇÃO: APROVAR DESPESAS (EM MASSA)
 // ================================================================
 function aprovarDespesas($userData, $g_sql) {
     try {
@@ -151,27 +193,17 @@ function aprovarDespesas($userData, $g_sql) {
         }
         
         $seq_parcelas = $body['seq_parcelas'];
-        $data_pagamento = $body['data_pagamento'] ?? ''; // Opcional
         
-        $simulacoes = [];
+        // ✅ REGRA: SRENV|id1|id2|id3...
+        $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
+        $params = "act=" . urlencode($act_ssw);
+        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         
-        foreach ($seq_parcelas as $seq) {
-            // Montar parâmetros para aprovação
-            $params = "act=MARCAR&seq_desp_parcela=" . urlencode($seq);
-            
-            if (!empty($data_pagamento)) {
-                $data_ssw = converterDataParaSSW($data_pagamento);
-                $params .= "&f1=" . $data_ssw;
-            }
-            
-            $simulacoes[] = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
-        }
-        
-        // ✅ SIMULAÇÃO SSW: Exibir as URLs que seriam enviadas
+        // ✅ SIMULAÇÃO SSW: Exibir a URL que seria enviada
         msg([
-            'modo' => 'SIMULAÇÃO DE APROVAÇÃO',
-            'total_selecionado' => count($seq_parcelas),
-            'requisicoes_ssw' => $simulacoes
+            'modo' => 'SIMULAÇÃO DE APROVAÇÃO EM MASSA',
+            'total_enviado' => count($seq_parcelas),
+            'requisicao_ssw' => $url
         ], 'info');
         
     } catch (Exception $e) {
