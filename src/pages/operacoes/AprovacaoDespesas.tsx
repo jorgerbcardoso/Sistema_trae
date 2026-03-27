@@ -508,7 +508,24 @@ export default function AprovacaoDespesas() {
   // ✅ REMOVER APROVAÇÃO (ESTORNO)
   const handleEstornoIndividual = (e: React.MouseEvent, seq: number, nro?: string) => {
     e.stopPropagation();
-    setConfirmDialog({ open: true, tipo: 'ESTORNO', seq, nro });
+    // 1. Abrir dialog de observação primeiro (para capturar o motivo)
+    setObsDialog({
+      open: true,
+      seq: seq,
+      nro: nro,
+      texto: '',
+      posReprovacao: true
+    });
+  };
+
+  const handleConfirmarReprovacaoComObs = () => {
+    // 2. Após preencher a obs, abrir a confirmação final
+    setConfirmDialog({ 
+      open: true, 
+      tipo: 'ESTORNO', 
+      seq: obsDialog.seq, 
+      nro: obsDialog.nro 
+    });
   };
 
   const confirmarEstorno = async () => {
@@ -520,21 +537,13 @@ export default function AprovacaoDespesas() {
         method: 'POST',
         body: JSON.stringify({
           seq_parcela: confirmDialog.seq,
-          nro_lancamento: confirmDialog.nro
+          nro_lancamento: confirmDialog.nro,
+          observacao: obsDialog.texto // ✅ Enviar observação/motivo junto com o estorno
         })
       });
       
       toast.success('Desaprovação realizada com sucesso');
       await carregarDespesas();
-      
-      // ✅ Abrir dialog de observação após reprovação
-      setObsDialog({
-        open: true,
-        seq: confirmDialog.seq,
-        nro: confirmDialog.nro,
-        texto: '',
-        posReprovacao: true
-      });
       
     } catch (error) {
       console.error('Erro ao remover aprovação:', error);
@@ -542,6 +551,7 @@ export default function AprovacaoDespesas() {
     } finally {
       setLoading(false);
       setConfirmDialog({ ...confirmDialog, open: false });
+      setObsDialog({ ...obsDialog, open: false, texto: '' });
     }
   };
 
@@ -558,14 +568,32 @@ export default function AprovacaoDespesas() {
   };
 
   const salvarObservacao = async () => {
-    // Por enquanto salvamos localmente para visualização, 
-    // em um cenário real haveria um endpoint act=SALVAR_OBS
-    setDespesas(prev => prev.map(d => 
-      d.seq_lancamento === obsDialog.seq ? { ...d, observacao: obsDialog.texto } : d
-    ));
-    
-    toast.success('Observação salva com sucesso');
-    setObsDialog({ ...obsDialog, open: false });
+    if (!obsDialog.seq) return;
+
+    setLoading(true);
+    try {
+      await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=SALVAR_OBSERVACAO', {
+        method: 'POST',
+        body: JSON.stringify({
+          seq_parcela: obsDialog.seq,
+          observacao: obsDialog.texto
+        })
+      });
+
+      // Atualizar estado local para refletir a mudança visualmente
+      setDespesas(prev => prev.map(d => 
+        d.seq_lancamento === obsDialog.seq ? { ...d, observacao: obsDialog.texto } : d
+      ));
+      
+      toast.success('Observação salva no SSW com sucesso');
+      setObsDialog({ ...obsDialog, open: false });
+
+    } catch (error) {
+      console.error('Erro ao salvar observação:', error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar observação');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1239,11 +1267,11 @@ export default function AprovacaoDespesas() {
 
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="ghost" onClick={() => setObsDialog({ ...obsDialog, open: false })}>
-              {obsDialog.posReprovacao ? 'Agora não' : 'Fechar'}
+              {obsDialog.posReprovacao ? 'Cancelar' : 'Fechar'}
             </Button>
-            <Button className="gap-2" onClick={salvarObservacao}>
+            <Button className="gap-2" onClick={obsDialog.posReprovacao ? handleConfirmarReprovacaoComObs : salvarObservacao}>
               <Send className="size-4" />
-              Salvar Observação
+              {obsDialog.posReprovacao ? 'Próximo' : 'Salvar Observação'}
             </Button>
           </DialogFooter>
         </DialogContent>

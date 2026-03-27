@@ -64,6 +64,10 @@ try {
             aprovarDespesas($userData, $g_sql);
             break;
             
+        case 'SALVAR_OBSERVACAO':
+            salvarObservacao($userData, $g_sql);
+            break;
+            
         case 'REMOVER_APROVACAO':
             removerAprovacao($userData, $g_sql);
             break;
@@ -240,7 +244,44 @@ function aprovarDespesas($userData, $g_sql) {
 }
 
 // ================================================================
-// FUNÇÃO: REMOVER APROVAÇÃO
+// FUNÇÃO: SALVAR OBSERVAÇÃO
+// ================================================================
+function salvarObservacao($userData, $g_sql) {
+    try {
+        $body = json_decode(file_get_contents('php://input'), true);
+        
+        if (!isset($body['seq_parcela'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'seq_parcela é obrigatório']);
+            return;
+        }
+        
+        $seq = $body['seq_parcela'];
+        $obs = $body['observacao'] ?? '';
+        
+        // ✅ REGRA: act=INC&seq_desp_parcela=$seq&comentario1=$obs&comentario2=
+        $params = "act=INC&seq_desp_parcela=" . urlencode($seq) . "&comentario1=" . urlencode($obs) . "&comentario2=";
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        
+        if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Erro ao salvar observação no SSW']);
+            return;
+        }
+        
+        respondJson([
+            'success' => true,
+            'message' => 'Observação salva com sucesso no SSW'
+        ]);
+        
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Erro interno ao salvar observação']);
+    }
+}
+
+// ================================================================
+// FUNÇÃO: REMOVER APROVAÇÃO (ESTORNO)
 // ================================================================
 function removerAprovacao($userData, $g_sql) {
     try {
@@ -254,9 +295,9 @@ function removerAprovacao($userData, $g_sql) {
         
         $seq_parcela = $body['seq_parcela'];
         $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
+        $observacao = $body['observacao'] ?? ''; // ✅ Nova observação opcional
         
-        // ✅ PASSO 1: Chamada act=PES completa com todos os filtros + f8
-        // Recuperamos os parâmetros da última busca salvos na sessão
+        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
         if (session_status() === PHP_SESSION_NONE) session_start();
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
         
@@ -265,9 +306,13 @@ function removerAprovacao($userData, $g_sql) {
             ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
         }
         
-        // ✅ PASSO 2: Chamada act=EXC para desmarcar o registro específico
+        // ✅ PASSO 1: Chamada act=EXC para desmarcar o registro específico
         $params_exc = "act=EXC&seq_desp_parcela=" . urlencode($seq_parcela);
         ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_exc);
+        
+        // ✅ PASSO 2: Chamada act=INC para gravar a observação (motivo) na sessão
+        $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq_parcela) . "&comentario1=" . urlencode($observacao) . "&comentario2=";
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
         
         // ✅ PASSO 3: Chamada act=SRENV (simples) para efetivar o estorno
         $params_final = "act=SRENV";
