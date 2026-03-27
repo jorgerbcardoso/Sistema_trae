@@ -160,17 +160,23 @@ function toggleIndividual($userData, $g_sql) {
         // Regra: se marcar (true) -> act=ONE, se desmarcar (false) -> act=EXC
         $act_ssw = $selecionado ? 'ONE' : 'EXC';
         $params = "act=" . $act_ssw . "&seq_desp_parcela=" . urlencode($seq);
-        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         
-        // ✅ SIMULAÇÃO SSW: Retornar no JSON sem exibir toast
+        // ✅ ENVIO REAL AO SSW
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        
+        // Verificar se houve erro no retorno
+        if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Erro ao comunicar com o SSW',
+                'message' => 'SSW retornou erro no toggle individual'
+            ]);
+            return;
+        }
+        
         respondJson([
             'success' => true,
-            'debug' => [
-                'modo' => 'SIMULAÇÃO INDIVIDUAL',
-                'acao' => $selecionado ? 'MARCAR' : 'DESMARCAR',
-                'seq_parcela' => $seq,
-                'requisicao_ssw' => $url
-            ]
+            'message' => $selecionado ? 'Despesa marcada no SSW' : 'Despesa desmarcada no SSW'
         ]);
         
     } catch (Exception $e) {
@@ -200,16 +206,23 @@ function aprovarDespesas($userData, $g_sql) {
         // ✅ REGRA: SRENV|id1|id2|id3...
         $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
         $params = "act=" . urlencode($act_ssw);
-        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         
-        // ✅ SIMULAÇÃO SSW: Retornar no JSON sem exibir toast
+        // ✅ ENVIO REAL AO SSW
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        
+        // Verificar se houve erro no retorno
+        if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Erro ao comunicar com o SSW',
+                'message' => 'SSW retornou erro na aprovação em massa'
+            ]);
+            return;
+        }
+        
         respondJson([
             'success' => true,
-            'debug' => [
-                'modo' => 'SIMULAÇÃO DE APROVAÇÃO EM MASSA',
-                'total_enviado' => count($seq_parcelas),
-                'requisicao_ssw' => $url
-            ]
+            'message' => 'Aprovação em massa enviada com sucesso ao SSW'
         ]);
         
     } catch (Exception $e) {
@@ -238,16 +251,23 @@ function removerAprovacao($userData, $g_sql) {
         
         // Montar parâmetros para desmarcar
         $params = "act=DESMARCAR&seq_desp_parcela=" . urlencode($seq_parcela);
-        $url = "https://sistema.ssw.inf.br/bin/ssw1196?" . $params;
         
-        // ✅ SIMULAÇÃO SSW: Retornar no JSON sem exibir toast
+        // ✅ ENVIO REAL AO SSW
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        
+        // Verificar se houve erro
+        if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Erro ao remover aprovação',
+                'message' => 'SSW retornou erro no estorno'
+            ]);
+            return;
+        }
+        
         respondJson([
             'success' => true,
-            'debug' => [
-                'modo' => 'SIMULAÇÃO DE ESTORNO',
-                'seq_parcela' => $seq_parcela,
-                'requisicao_ssw' => $url
-            ]
+            'message' => 'Aprovação removida com sucesso no SSW'
         ]);
         
     } catch (Exception $e) {
