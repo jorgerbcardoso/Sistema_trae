@@ -765,25 +765,6 @@ export default function AprovacaoDespesas() {
         </CardContent>
       </Card>
 
-      {/* ✅ AÇÕES EM MASSA */}
-      {despesasSelecionadas.size > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-6 right-6 z-50"
-        >
-          <Button 
-            size="lg" 
-            className="shadow-2xl px-8 h-14 rounded-full gap-2 bg-green-600 hover:bg-green-700"
-            onClick={aprovarSelecionadas}
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="animate-spin" /> : <CheckCheck className="size-5" />}
-            Aprovar {despesasSelecionadas.size} Selecionada{despesasSelecionadas.size > 1 ? 's' : ''}
-          </Button>
-        </motion.div>
-      )}
-
       {/* ✅ LISTA DE DESPESAS (CARDS CLICÁVEIS - MOBILE FIRST) */}
       <Card className="mb-6">
         <CardHeader>
