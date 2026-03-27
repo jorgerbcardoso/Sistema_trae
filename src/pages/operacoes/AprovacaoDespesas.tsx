@@ -556,15 +556,28 @@ export default function AprovacaoDespesas() {
   };
 
   // ✅ GERENCIAR OBSERVAÇÕES
-  const handleAbrirObs = (e: React.MouseEvent, despesa: Despesa) => {
+  const handleAbrirObs = async (e: React.MouseEvent, despesa: Despesa) => {
     e.stopPropagation();
-    setObsDialog({
-      open: true,
-      seq: despesa.seq_lancamento,
-      nro: despesa.lancamento,
-      texto: despesa.observacao || '',
-      posReprovacao: false
-    });
+    
+    setLoading(true);
+    try {
+      // ✅ 1. LER OBSERVAÇÃO DO SSW EM TEMPO REAL (act=COM)
+      const data = await apiFetch(`/sistema/api/operacoes/aprovacao-despesas.php?act=LER_OBSERVACAO&seq_parcela=${despesa.seq_lancamento}`);
+      
+      setObsDialog({
+        open: true,
+        seq: despesa.seq_lancamento,
+        nro: despesa.lancamento,
+        texto: data.observacao || '', // ✅ Usar valor que vem do SSW
+        posReprovacao: false
+      });
+      
+    } catch (error) {
+      console.error('Erro ao ler observação:', error);
+      toast.error('Erro ao buscar observação no SSW');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const salvarObservacao = async () => {
@@ -1025,9 +1038,10 @@ export default function AprovacaoDespesas() {
                               size="sm"
                               className="flex-1 md:flex-none"
                               onClick={(e) => handleAbrirObs(e, despesa)}
+                              disabled={loading}
                             >
                               <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {despesa.observacao ? 'Ver Obs.' : 'Inserir Obs.'}
+                              Visualizar/Incluir observação
                             </Button>
                           </div>
                         )}
@@ -1039,9 +1053,10 @@ export default function AprovacaoDespesas() {
                               variant="ghost"
                               size="sm"
                               onClick={(e) => handleAbrirObs(e, despesa)}
+                              disabled={loading}
                             >
                               <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {despesa.observacao ? 'Ver Obs.' : 'Inserir Obs.'}
+                              Visualizar/Incluir observação
                             </Button>
                           </div>
                         )}

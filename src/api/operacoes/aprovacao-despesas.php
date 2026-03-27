@@ -60,6 +60,10 @@ try {
             toggleIndividual($userData, $g_sql);
             break;
             
+        case 'LER_OBSERVACAO':
+            lerObservacao($userData, $g_sql);
+            break;
+            
         case 'APROVAR':
             aprovarDespesas($userData, $g_sql);
             break;
@@ -240,6 +244,41 @@ function aprovarDespesas($userData, $g_sql) {
             'error' => 'Erro ao aprovar despesas',
             'message' => $e->getMessage()
         ]);
+    }
+}
+
+// ================================================================
+// FUNÇÃO: LER OBSERVAÇÃO (DO SSW)
+// ================================================================
+function lerObservacao($userData, $g_sql) {
+    try {
+        $seq = $_GET['seq_parcela'] ?? '';
+        
+        if (empty($seq)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'seq_parcela é obrigatório']);
+            return;
+        }
+        
+        // ✅ REGRA: act=COM&seq_desp_parcela=$seq
+        $params = "act=COM&seq_desp_parcela=" . urlencode($seq);
+        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        
+        // ✅ PARSEAR HTML: Procurar input com id="-3" e extrair seu value
+        // Exemplo: <input ... id="-3" ... value="teste" ...>
+        // Regex robusta para capturar o value do input com id -3
+        preg_match('/id=[\"|\']?-3[\"|\']?[^>]*value=[\"|\']?([^\"|\'>]*)[\"|\']?/i', $html, $matches);
+        
+        $observacao = isset($matches[1]) ? trim($matches[1]) : '';
+        
+        respondJson([
+            'success' => true,
+            'observacao' => $observacao
+        ]);
+        
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Erro ao ler observação no SSW']);
     }
 }
 
