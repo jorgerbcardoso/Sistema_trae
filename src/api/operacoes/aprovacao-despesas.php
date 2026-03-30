@@ -218,7 +218,7 @@ function aprovarDespesas($userData, $g_sql) {
         // ✅ ENVIO FINAL (SRENV|id1|id2|id3...)
         // Agora confiamos na persistência de cookies da ssw.php para manter o estado das marcações individuais feitas no frontend
         $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
-        $params_final = "act=" . urlencode($act_ssw);
+        $params_final = "act=" . $act_ssw; // Manter pipes literais conforme exemplo do usuário
         
         // Chamar SSW1196 para efetivar a aprovação em massa
         $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
@@ -252,25 +252,20 @@ function aprovarDespesas($userData, $g_sql) {
 // ================================================================
 function lerObservacao($userData, $g_sql) {
     try {
-        $seq = $_GET['seq_parcela'] ?? '';
-        $nro_lancamento = $_GET['nro_lancamento'] ?? ''; // ex: 130068-21
+        $seq = $_GET['seq_parcela'] ?? $_GET['seq_lancamento'] ?? '';
         
         if (empty($seq)) {
             http_response_code(400);
-            echo json_encode(['error' => 'seq_parcela é obrigatório']);
+            echo json_encode(['error' => 'seq_parcela ou seq_lancamento é obrigatório']);
             return;
         }
         
-        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
+        // 1. Reconsulta as despesas com base nos filtros informados na tela
         if (session_status() === PHP_SESSION_NONE) session_start();
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
-        if (!empty($nro_lancamento)) {
-            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
-            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
-        }
-        
-        // ✅ PASSO 1: Chamada act=COM&seq_desp_parcela=$seq
+        // 2. Efetua a busca da observação cadastrada (act=COM)
         $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq);
         $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
         
@@ -286,7 +281,10 @@ function lerObservacao($userData, $g_sql) {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Erro ao ler observação no SSW']);
+        echo json_encode([
+            'error' => 'Erro ao ler observação no SSW',
+            'message' => $e->getMessage()
+        ]);
     }
 }
 
@@ -297,43 +295,58 @@ function salvarObservacao($userData, $g_sql) {
     try {
         $body = json_decode(file_get_contents('php://input'), true);
         
-        if (!isset($body['seq_parcela'])) {
+        // Aceitar seq_parcela ou seq_lancamento (termo do SSW vs termo do sistema)
+        $seq = $body['seq_parcela'] ?? $body['seq_lancamento'] ?? '';
+        
+        if (empty($seq)) {
             http_response_code(400);
-            echo json_encode(['error' => 'seq_parcela é obrigatório']);
+            echo json_encode(['error' => 'seq_parcela ou seq_lancamento é obrigatório']);
             return;
         }
         
-        $seq = $body['seq_parcela'];
-        $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
         $obs = $body['observacao'] ?? '';
+        $seq_parcelas = $body['seq_parcelas'] ?? [$seq]; // Array de todas as despesas que estão marcadas na tela
         
-        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
         if (session_status() === PHP_SESSION_NONE) session_start();
+        
+        // 1. Reconsulta as despesas com base nos filtros informados na tela
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
-        if (!empty($nro_lancamento)) {
-            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
-            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
-        }
+        // 2. Efetua a busca da observação cadastrada (se houve)
+        $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq);
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
         
-        // ✅ PASSO 1: Gravar a observação com act=INC
+        // 3. Grava a nova observação
         $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq) . "&comentario1=" . urlencode($obs) . "&comentario2=";
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
+        
+        // 4. Salva todas as alterações (SRENV|id1|id2...)
+        // O disparo deve ser RIGOROSAMENTE igual ao de aprovação em massa
+        $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
+        $params_final = "act=" . $act_ssw; // Manter pipes literais conforme exemplo
+        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
         
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
             http_response_code(500);
-            echo json_encode(['error' => 'Erro ao salvar observação no SSW']);
+            echo json_encode([
+                'error' => 'Erro ao salvar observação no SSW',
+                'message' => 'SSW retornou erro na gravação final'
+            ]);
             return;
         }
         
         respondJson([
             'success' => true,
-            'message' => 'Observação salva com sucesso no SSW'
+            'message' => 'Observação gravada com sucesso no SSW'
         ]);
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Erro interno ao salvar observação']);
+        echo json_encode([
+            'error' => 'Erro interno ao salvar observação',
+            'message' => $e->getMessage()
+        ]);
     }
 }
 
@@ -344,35 +357,41 @@ function removerAprovacao($userData, $g_sql) {
     try {
         $body = json_decode(file_get_contents('php://input'), true);
         
-        if (!isset($body['seq_parcela'])) {
+        $seq_parcela = $body['seq_parcela'] ?? $body['seq_lancamento'] ?? '';
+        
+        if (empty($seq_parcela)) {
             http_response_code(400);
-            echo json_encode(['error' => 'seq_parcela é obrigatório']);
+            echo json_encode(['error' => 'seq_parcela ou seq_lancamento é obrigatório']);
             return;
         }
+        $observacao = $body['observacao'] ?? ''; // Motivo do estorno
+        $seq_parcelas = $body['seq_parcelas'] ?? []; // Array de despesas marcadas (excluindo a que estamos removendo agora)
         
-        $seq_parcela = $body['seq_parcela'];
-        $nro_lancamento = $body['nro_lancamento'] ?? ''; // ex: 130068-21
-        $observacao = $body['observacao'] ?? ''; // ✅ Nova observação opcional
-        
-        // ✅ PASSO 0: Chamada act=PES completa com todos os filtros + f8 (Localizar)
         if (session_status() === PHP_SESSION_NONE) session_start();
+        
+        // 1. Reconsulta as despesas com base nos filtros informados na tela
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
-        if (!empty($nro_lancamento)) {
-            $params_pes = $last_pes_params . "&f8=" . urlencode($nro_lancamento);
-            ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_pes);
-        }
+        // 2. Efetua a busca da observação cadastrada (act=COM)
+        $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq_parcela);
+        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
         
-        // ✅ PASSO 1: Chamada act=EXC para desmarcar o registro específico
+        // 3. Chamada act=EXC para desmarcar o registro específico
         $params_exc = "act=EXC&seq_desp_parcela=" . urlencode($seq_parcela);
         ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_exc);
         
-        // ✅ PASSO 2: Chamada act=INC para gravar a observação (motivo) na sessão
+        // 4. Grava a nova observação (motivo do estorno)
         $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq_parcela) . "&comentario1=" . urlencode($observacao) . "&comentario2=";
         ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
         
-        // ✅ PASSO 3: Chamada act=SRENV (simples) para efetivar o estorno
-        $params_final = "act=SRENV";
+        // 5. Chamada act=SRENV para efetivar o estorno
+        // Deve conter a lista de despesas que permaneceram marcadas
+        $act_ssw = "SRENV";
+        if (!empty($seq_parcelas)) {
+            $act_ssw .= "|" . implode('|', $seq_parcelas);
+        }
+        $params_final = "act=" . $act_ssw; // Manter pipes literais
         $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
         
         // Verificar se houve erro no retorno final
