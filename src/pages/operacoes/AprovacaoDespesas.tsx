@@ -205,7 +205,7 @@ export default function AprovacaoDespesas() {
     periodo_inicio: dataHoje,
     periodo_fim: dataHoje,
     status: 'TODAS', // ✅ FILTRO PADRÃO: TODAS
-    unidade: user?.unidade_atual || user?.unidade || '' // ✅ UNIDADE DO USUÁRIO LOGADO
+    unidade: isMTZ ? '' : (user?.unidade_atual || user?.unidade || '') // ✅ MTZ = VAZIO, OUTRA = UNIDADE ATUAL
   });
 
   const [despesas, setDespesas] = useState<Despesa[]>([]);
@@ -714,7 +714,7 @@ export default function AprovacaoDespesas() {
                         periodo_inicio: dataHoje,
                         periodo_fim: dataHoje,
                         status: 'TODAS',
-                        unidade: user?.unidade_atual || user?.unidade || 'MTZ'
+                        unidade: isMTZ ? '' : (user?.unidade_atual || user?.unidade || '')
                       });
                     }}
                   >
