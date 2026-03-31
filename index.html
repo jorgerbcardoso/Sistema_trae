@@ -1,10 +1,32 @@
 
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="pt-BR" class="dark" data-theme="dark" style="color-scheme: dark">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="color-scheme" content="dark" />
       <title>Sistema Presto</title>
+      <!-- FORÇAR TEMA ESCURO IMEDIATAMENTE (NUNCA LIGHT) -->
+      <script>
+        (function() {
+          function forceDark() {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.style.colorScheme = 'dark';
+            localStorage.setItem('theme', 'dark');
+            localStorage.setItem('nativa-theme', 'dark');
+          }
+          forceDark();
+          // Observador para garantir que nada mude para light
+          const observer = new MutationObserver(() => {
+            if (document.documentElement.classList.contains('light')) {
+              forceDark();
+            }
+          });
+          observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        })();
+      </script>
     </head>
 
     <body>
