@@ -9,26 +9,42 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme] = useState<Theme>('dark'); // Força o tema escuro
+  const [theme] = useState<Theme>('dark'); // Força o tema escuro como único estado possível
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    const body = window.document.body;
+    const applyTheme = () => {
+      const root = window.document.documentElement;
+      const body = window.document.body;
+      
+      // ✅ FORÇAR remoção de qualquer vestígio de tema claro
+      root.classList.remove('light');
+      body.classList.remove('light');
+      
+      // ✅ GARANTIR que o tema escuro esteja aplicado
+      root.classList.add('dark');
+      body.classList.add('dark');
+      
+      // ✅ SOBRESCREVER qualquer preferência no localStorage
+      localStorage.setItem('nativa-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+      
+      // ✅ FORÇAR atributos extras para compatibilidade total
+      root.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
+    };
+
+    applyTheme();
     
-    // ✅ FORÇAR remoção de qualquer vestígio de tema claro
-    root.classList.remove('light');
-    body.classList.remove('light');
+    // ✅ Observador para garantir que nada mude as classes no runtime
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains('light')) {
+        applyTheme();
+      }
+    });
     
-    // ✅ GARANTIR que o tema escuro esteja aplicado
-    root.classList.add('dark');
-    body.classList.add('dark');
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     
-    // ✅ SOBRESCREVER qualquer preferência no localStorage
-    localStorage.setItem('nativa-theme', 'dark');
-    localStorage.setItem('theme', 'dark');
-    
-    // ✅ FORÇAR atributo data-theme para compatibilidade extra
-    root.setAttribute('data-theme', 'dark');
+    return () => observer.disconnect();
   }, []);
 
   // const toggleTheme = () => { // Função de toggle removida

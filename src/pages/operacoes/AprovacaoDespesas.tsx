@@ -1235,7 +1235,7 @@ export default function AprovacaoDespesas() {
                 `Deseja realmente aprovar as ${despesasSelecionadas.size} despesas selecionadas? Esta ação enviará os dados ao SSW.`
               ) : (
                 <>
-                  Deseja remover a aprovação da despesa <span className="font-mono font-bold">{confirmDialog.nro}</span> no SSW?
+                  Deseja remover a aprovação da despesa <span className="font-mono font-bold">{confirmDialog.nro?.split('-')[0]}</span> no SSW?
                 </>
               )}
             </DialogDescription>
@@ -1259,13 +1259,13 @@ export default function AprovacaoDespesas() {
       {/* ✅ DIALOG DE OBSERVAÇÕES */}
       <Dialog open={obsDialog.open} onOpenChange={(open) => setObsDialog({ ...obsDialog, open })}>
         <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+          <DialogHeader className="text-left">
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-blue-600" />
               {obsDialog.posReprovacao ? 'Informar Motivo da Reprovação' : 'Observações da Despesa'}
             </DialogTitle>
-            <DialogDescription>
-              Lançamento: <span className="font-mono font-bold">{obsDialog.nro}</span>
+            <DialogDescription className="text-left">
+              Lançamento: <span className="font-mono font-bold">{obsDialog.nro?.split('-')[0]}</span>
             </DialogDescription>
           </DialogHeader>
           

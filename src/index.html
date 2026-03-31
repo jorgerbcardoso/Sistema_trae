@@ -6,9 +6,30 @@
     <title>Sistema Presto</title>
     <!-- Forçar tema escuro IMEDIATAMENTE para evitar flash de luz ou tema claro residual -->
     <script>
-      document.documentElement.classList.add('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('nativa-theme', 'dark');
+      (function() {
+        // ✅ Forçar classes dark no HTML e BODY
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.style.colorScheme = 'dark';
+        
+        // ✅ Sobrescrever localStorage agressivamente
+        localStorage.setItem('nativa-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        
+        // ✅ Listener para evitar que outros scripts mudem para light
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+              if (document.documentElement.classList.contains('light')) {
+                document.documentElement.classList.remove('light');
+                document.documentElement.classList.add('dark');
+              }
+            }
+          });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+      })();
     </script>
     <!-- Tailwind CSS via CDN (para compatibilidade com Figma Make) -->
     <script src="https://cdn.tailwindcss.com"></script>
