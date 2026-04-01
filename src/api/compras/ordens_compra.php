@@ -163,6 +163,7 @@ try {
                         oc.seq_centro_custo,
                         oc.aprovada,
                         oc.orcar,
+                        oc.seq_pedido, -- ✅ NOVO: Retornar seq_pedido na listagem
                         oc.observacao,
                         oc.placa,
                         oc.data_inclusao,
