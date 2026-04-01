@@ -741,6 +741,10 @@ function estornarPedidoOrcamento($g_sql, $prefix, $tblPedido, $tblPedidoItem, $t
     sql("BEGIN", [], $g_sql);
     
     try {
+        // 0. ✅ LIMPAR seq_pedido NA TABELA ordem_compra ANTES DE EXCLUIR O PEDIDO
+        $queryLimparOC = "UPDATE $tblOrdemCompra SET seq_pedido = NULL WHERE seq_pedido = $1";
+        sql($queryLimparOC, [$seqPedido], $g_sql);
+
         // 1. Deletar itens do pedido
         $queryDelItens = "DELETE FROM $tblPedidoItem WHERE seq_pedido = $1";
         sql($queryDelItens, [$seqPedido], $g_sql);

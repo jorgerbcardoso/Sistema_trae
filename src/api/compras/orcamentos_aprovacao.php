@@ -243,6 +243,12 @@ function aprovarOrcamento($g_sql, $prefix, $data, $username) {
             
             sql($g_sql, $query_item, false, $params_item);
             
+            // ✅ ATUALIZAR seq_pedido NA TABELA ordem_compra
+            if (isset($cot['seq_ordem_compra']) && $cot['seq_ordem_compra'] > 0) {
+                $query_update_oc = "UPDATE {$prefix}ordem_compra SET seq_pedido = $1 WHERE seq_ordem_compra = $2";
+                sql($g_sql, $query_update_oc, false, array($seq_pedido, $cot['seq_ordem_compra']));
+            }
+            
             // ✅ ATUALIZAR VALOR UNITÁRIO DO ITEM NA TABELA item
             if ($cot['vlr_fornecedor'] > 0) {
                 $query_update_item = "UPDATE {$tabela_item} SET vlr_item = $1 WHERE seq_item = $2";
@@ -454,6 +460,10 @@ function estornarAprovacao($g_sql, $prefix, $data, $username) {
     
     // Excluir itens dos pedidos
     foreach ($pedidos as $pedido) {
+        // ✅ LIMPAR seq_pedido NA TABELA ordem_compra ANTES DE EXCLUIR O PEDIDO
+        $query_limpar_oc = "UPDATE {$prefix}ordem_compra SET seq_pedido = NULL WHERE seq_pedido = $1";
+        sql($g_sql, $query_limpar_oc, false, array($pedido['seq_pedido']));
+        
         $query_delete_items = "DELETE FROM {$tabela_pedido_item} WHERE seq_pedido = $1";
         sql($g_sql, $query_delete_items, false, array($pedido['seq_pedido']));
     }
