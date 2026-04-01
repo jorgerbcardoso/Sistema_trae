@@ -2065,7 +2065,7 @@ export default function CadastroOrdensCompra() {
                             PEDIDO GERADO
                           </div>
                           {ordemDetalhes.nro_pedido_formatado && (
-                            <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 ml-1">
+                            <span className="text-5xl font-mono font-black text-blue-600 dark:text-blue-400 ml-1">
                               Doc: {ordemDetalhes.nro_pedido_formatado}
                             </span>
                           )}

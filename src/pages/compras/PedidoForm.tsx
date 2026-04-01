@@ -484,16 +484,18 @@ export default function PedidoForm() {
         body: JSON.stringify(payload)
       });
 
-      if (data.success) {
+      if (data && data.success && data.seq_pedido) {
         // Armazenar dados do novo pedido para o dialog de sucesso
         setPedidoCriado({
           seq_pedido: data.seq_pedido,
           nro_pedido_formatado: data.nro_pedido_formatado,
-          status: 'A'
+          status: data.status || 'A'
         });
         
-        // Abrir o mesmo dialog de sucesso do pedido manual
-        setDialogNecessitaAprovacao(true);
+        // Pequeno delay para garantir que o estado do pedidoCriado foi processado
+        setTimeout(() => {
+          setDialogNecessitaAprovacao(true);
+        }, 100);
       }
     } catch (error) {
       console.error('Erro ao duplicar pedido:', error);
@@ -1225,8 +1227,7 @@ export default function PedidoForm() {
               {/* BOTÃO: Duplicar Pedido */}
               <Button 
                 onClick={handleDuplicarPedido} 
-                variant="outline" 
-                className="gap-2 w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                className="gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
                 disabled={duplicando}
               >
                 {duplicando ? (
@@ -1645,6 +1646,133 @@ export default function PedidoForm() {
                     Enviar
                   </>
                 )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* ✅ Dialog de Confirmação após criar pedido (Duplicação) */}
+        <Dialog open={dialogConfirmarEnvio} onOpenChange={(open) => {
+          if (!open) {
+            cancelarEnvioAposCriacao();
+          } else {
+            setDialogConfirmarEnvio(open);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="size-6 text-green-600" />
+                Pedido Criado com Sucesso!
+              </DialogTitle>
+              <DialogDescription>
+                {pedidoCriado?.nro_pedido_formatado}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Deseja enviar o pedido via email para o fornecedor?
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelarEnvioAposCriacao}>Não</Button>
+              <Button onClick={confirmarEnvioAposCriacao} className="gap-2">
+                <Mail className="size-4" />
+                Sim, Enviar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Solicitar Aprovação do Pedido (Duplicação) */}
+        <Dialog open={dialogSolicitarAprovacao} onOpenChange={setDialogSolicitarAprovacao}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Solicitar Aprovação do Pedido</DialogTitle>
+              <DialogDescription>
+                Selecione o usuário que aprovará este pedido manual
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="aprovador">APROVADOR *</Label>
+                <select
+                  id="aprovador"
+                  value={aprovadorSelecionado}
+                  onChange={(e) => setAprovadorSelecionado(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm mt-1"
+                >
+                  <option value="">SELECIONE UM APROVADOR</option>
+                  {usuariosAprovadores.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDialogSolicitarAprovacao(false)} disabled={enviandoAprovacao}>Cancelar</Button>
+              <Button onClick={handleSolicitarAprovacao} disabled={enviandoAprovacao || !aprovadorSelecionado}>
+                {enviandoAprovacao ? <><Loader2 className="size-4 mr-2 animate-spin" />Enviando...</> : <><Mail className="size-4 mr-2" />Enviar Solicitação</>}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Pedido Necessita Aprovação (Duplicação) */}
+        <Dialog open={dialogNecessitaAprovacao} onOpenChange={setDialogNecessitaAprovacao}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Info className="size-5 text-blue-600" />
+                Pedido Criado - Necessita Aprovação
+              </DialogTitle>
+              <DialogDescription>
+                O pedido {pedidoCriado?.nro_pedido_formatado} foi criado com sucesso!
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-md border border-blue-200 dark:border-blue-900">
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                  <strong>⚠️ Atenção:</strong> Este pedido ainda precisa de aprovação antes de ser enviado ao fornecedor.
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Deseja solicitar a aprovação agora? Selecione um ou mais aprovadores abaixo.
+                </p>
+              </div>
+              <div>
+                <Label className="mb-3 block">SELECIONE OS APROVADORES *</Label>
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-input rounded-md p-3">
+                  {usuariosAprovadores.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">Nenhum aprovador disponível</p>
+                  ) : (
+                    usuariosAprovadores.map(user => (
+                      <div key={user.id} className="flex items-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md">
+                        <Checkbox
+                          id={`aprovador-criacao-dup-${user.id}`}
+                          checked={aprovadoresSelecionados.includes(user.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) setAprovadoresSelecionados([...aprovadoresSelecionados, user.id]);
+                            else setAprovadoresSelecionados(aprovadoresSelecionados.filter(id => id !== user.id));
+                          }}
+                        />
+                        <label htmlFor={`aprovador-criacao-dup-${user.id}`} className="flex-1 text-sm cursor-pointer">
+                          <div className="font-medium">{user.full_name}</div>
+                          <div className="text-gray-500 text-xs">{user.email}</div>
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setDialogNecessitaAprovacao(false); setPedidoCriado(null); }}>Fechar</Button>
+              <Button onClick={handleSolicitarAprovacao} disabled={enviandoAprovacao || aprovadoresSelecionados.length === 0}>
+                {enviandoAprovacao ? <><Loader2 className="size-4 mr-2 animate-spin" />Enviando...</> : <><UserCheck className="size-4 mr-2" />Solicitar Aprovação</>}
               </Button>
             </div>
           </DialogContent>
