@@ -46,7 +46,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { apiFetch } from '../../utils/apiUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { FilterSelectItem } from '../../components/estoque/FilterSelectItem';
-import { formatCodigoCentroCusto } from '../../utils/formatters';
+import { formatCodigoCentroCusto, formatarNumeroSolicitacao } from '../../utils/formatters';
 import { NovoItemDialog } from '../../components/shared/NovoItemDialog';
 import { useMemo } from 'react';
 import { MOCK_FORNECEDORES } from '../../mocks/estoqueComprasMocks';
@@ -89,7 +89,7 @@ interface SaldoEstoque {
 export default function ConverterSolicitacaoDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, clientConfig } = useAuth();
 
   usePageTitle('Converter Solicitação de Compra');
 
@@ -494,12 +494,138 @@ export default function ConverterSolicitacaoDetalhe() {
     }
   };
 
-  // ✅ FLUXO RÁPIDO: Selecionar fornecedor
+  // ✅ Função de Selecionar Fornecedor
   const selecionarFornecedor = (fornecedor: any) => {
     setFornecedorSelecionado(fornecedor);
     setModalFornecedor(false);
     setBuscaFornecedor('');
     toast.success('Fornecedor selecionado');
+  };
+
+  // ✅ Função de Impressão (Baseada no padrão de Solicitações)
+  const imprimirSolicitacao = () => {
+    if (!solicitacao) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela de impressão');
+      return;
+    }
+
+    // ✅ PADRÃO OFICIAL: Logos com URLs absolutas para evitar quebra no print
+    const logoUrl = user?.domain?.toUpperCase() === 'ACV' 
+      ? 'https://webpresto.com.br/images/logos_clientes/aceville.png'
+      : 'https://webpresto.com.br/images/logo_rel.png';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Solicitação ${formatarNumeroSolicitacao(solicitacao.unidade, solicitacao.seq_solicitacao_compra)}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 15mm; font-size: 11pt; color: #000; }
+            .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #2563eb; }
+            .logo { max-width: 180px; max-height: 60px; object-fit: contain; }
+            .header-info h1 { font-size: 16pt; color: #2563eb; margin-bottom: 3px; text-transform: uppercase; }
+            .header-info p { font-size: 10pt; color: #666; }
+            .documento-numero { font-size: 20pt; font-weight: bold; color: #1e40af; font-family: monospace; }
+            .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 9pt; font-weight: bold; text-transform: uppercase; }
+            .status-pendente { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+            .status-atendida { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+            .status-reprovada { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+            .section { margin-bottom: 20px; }
+            .section-title { font-size: 11pt; font-weight: bold; color: #1e40af; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #e5e7eb; text-transform: uppercase; }
+            .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .info-label { font-size: 8pt; color: #6b7280; font-weight: bold; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+            th { background-color: #1e40af; color: white; padding: 8px 10px; text-align: left; }
+            td { border: 1px solid #e5e7eb; padding: 8px 10px; }
+            .observacoes-box { background: #f9fafb; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 9pt; min-height: 60px; }
+            .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 8pt; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <img src="${logoUrl}" class="logo" />
+              <div class="header-info">
+                <h1>Solicitação de Compra</h1>
+                <p>Sistema de Gestão</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="documento-numero">${formatarNumeroSolicitacao(solicitacao.unidade, solicitacao.seq_solicitacao_compra)}</div>
+              <div class="status-badge ${solicitacao.status === 'A' ? 'status-atendida' : solicitacao.status === 'R' ? 'status-reprovada' : 'status-pendente'}">
+                ${solicitacao.status === 'A' ? 'APROVADA / ATENDIDA' : solicitacao.status === 'R' ? 'REPROVADA' : 'PENDENTE DE APROVAÇÃO'}
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Informações Gerais</div>
+            <div class="info-grid">
+              <div>
+                <div class="info-label">Data de Inclusão</div>
+                <div>${new Date(solicitacao.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às ${solicitacao.hora_inclusao?.substring(0, 5)}</div>
+              </div>
+              <div>
+                <div class="info-label">Usuário Solicitante</div>
+                <div style="text-transform: uppercase;">${solicitacao.login_inclusao}</div>
+              </div>
+              <div>
+                <div class="info-label">Centro de Custo</div>
+                <div>${formatCodigoCentroCusto(solicitacao.centro_custo_unidade || '', solicitacao.centro_custo_nro || '')} - ${solicitacao.centro_custo_descricao}</div>
+              </div>
+              <div>
+                <div class="info-label">Setor Responsável</div>
+                <div>${solicitacao.setor_descricao || '-'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Itens da Solicitação</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 60px;">#</th>
+                  <th>Descrição do Item</th>
+                  <th style="width: 120px; text-align: right;">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itens.map((item, index) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.item}</td>
+                    <td style="text-align: right;">${item.qtde_item}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Observações</div>
+            <div class="observacoes-box">
+              ${solicitacao.observacao || 'NENHUMA OBSERVAÇÃO INFORMADA.'}
+            </div>
+          </div>
+
+          <div class="footer">
+            Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
+            © 2026 Sistema de Gestão Inteligente
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
   };
 
   // ✅ FLUXO RÁPIDO: Abrir modal de fornecedor
@@ -700,15 +826,26 @@ export default function ConverterSolicitacaoDetalhe() {
       description={`Solicitação ${solicitacao.unidade}${String(solicitacao.seq_solicitacao_compra).padStart(6, '0')}`}
     >
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Botão Voltar */}
-        <Button
-          variant="outline"
-          onClick={() => navigate('/compras/solicitacoes-compra/converter')}
-          className="gap-2"
-        >
-          <ArrowLeft className="size-4" />
-          Voltar para Lista
-        </Button>
+        {/* Botões de Ação */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/compras/solicitacoes-compra/converter')}
+            className="gap-2"
+          >
+            <ArrowLeft className="size-4" />
+            Voltar para Lista
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={imprimirSolicitacao}
+            className="gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+          >
+            <Printer className="size-4" />
+            Imprimir Solicitação
+          </Button>
+        </div>
 
         {/* Card de Informações da Solicitação */}
         <Card>
