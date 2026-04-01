@@ -573,8 +573,9 @@ export default function SolicitacoesCompra() {
     }
 
     // Logo do cliente e Presto
-    const logoCliente = clientConfig?.theme?.logo_light || '';
-    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+    const logoUrl = user?.domain?.toUpperCase() === 'ACV' 
+      ? 'https://webpresto.com.br/images/logos_clientes/aceville.png'
+      : 'https://webpresto.com.br/images/logo_rel.png';
     
     // Obter HTML do conteúdo oculto
     let htmlContent = printContent.innerHTML;
@@ -606,8 +607,9 @@ export default function SolicitacoesCompra() {
               gap: 15px;
             }
             .logo {
-              max-width: 120px;
-              max-height: 50px;
+              max-width: 180px;
+              max-height: 60px;
+              object-fit: contain;
             }
             .header-info h1 {
               font-size: 16pt;
@@ -739,10 +741,10 @@ export default function SolicitacoesCompra() {
         <body>
           <div class="header">
             <div class="header-left">
-              <img src="${isAceville ? logoCliente : '/sistema/logo-presto.png'}" alt="Sistema Presto" class="logo" />
+              <img src="${logoUrl}" alt="Sistema Presto" class="logo" />
               <div class="header-info">
                 <h1>Solicitação de Compra</h1>
-                <p>Sistema de Gestão Presto</p>
+                <p>Sistema de Gestão</p>
               </div>
             </div>
             <div class="header-right">

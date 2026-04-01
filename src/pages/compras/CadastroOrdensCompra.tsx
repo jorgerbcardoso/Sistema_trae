@@ -1311,7 +1311,9 @@ export default function CadastroOrdensCompra() {
     }
 
     // Logo do cliente e Presto
-    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+    const logoUrl = user?.domain?.toUpperCase() === 'ACV' 
+      ? 'https://webpresto.com.br/images/logos_clientes/aceville.png'
+      : 'https://webpresto.com.br/images/logo_rel.png';
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -1340,8 +1342,9 @@ export default function CadastroOrdensCompra() {
               gap: 15px;
             }
             .logo {
-              max-width: 120px;
-              max-height: 50px;
+              max-width: 180px;
+              max-height: 60px;
+              object-fit: contain;
             }
             .header-info h1 {
               font-size: 16pt;
@@ -1474,10 +1477,10 @@ export default function CadastroOrdensCompra() {
         <body>
           <div class="header">
             <div class="header-left">
-              <img src="/sistema/logo-presto.png" alt="Sistema Presto" class="logo" />
+              <img src="${logoUrl}" alt="Sistema Presto" class="logo" />
               <div class="header-info">
                 <h1>Ordem de Compra</h1>
-                <p>Sistema de Gestão Presto</p>
+                <p>Sistema de Gestão</p>
               </div>
             </div>
             <div class="header-right">
@@ -2025,127 +2028,136 @@ export default function CadastroOrdensCompra() {
 
       {/* Modal de Detalhes */}
       <Dialog open={mostrarDetalhesModal} onOpenChange={setMostrarDetalhesModal}>
-        <DialogContent className="sm:max-w-[700px]">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Ordem de Compra</DialogTitle>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="size-5 text-blue-600" />
+              Detalhes da Ordem de Compra
+            </DialogTitle>
           </DialogHeader>
 
-          {ordemDetalhes && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-gray-500">Número:</Label>
-                  <p className="font-medium">{ordemDetalhes.nro_ordem_compra}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Data:</Label>
-                  <p className="font-medium">
-                    {new Date(ordemDetalhes.data_inclusao).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                
-                {/* ✅ MELHORIA 1: Login de inclusão nos detalhes */}
-                <div>
-                  <Label className="text-sm text-gray-500">Login Inclusão:</Label>
-                  <p className="font-medium">{ordemDetalhes.login_inclusao}</p>
-                </div>
-                
-                {/* ✅ MELHORIA 4: Unidade */}
-                <div>
-                  <Label className="text-sm text-gray-500">Unidade:</Label>
-                  <p className="font-medium">{ordemDetalhes.unidade}</p>
-                </div>
-                
-                <div className="col-span-2">
-                  <Label className="text-sm text-gray-500">Centro de Custo:</Label>
-                  <p className="font-medium">
-                    {ordemDetalhes.centro_custo_unidade}{String(ordemDetalhes.nro_centro_custo).padStart(6, '0')} - {ordemDetalhes.centro_custo_descricao}
-                  </p>
-                </div>
-                
-                {/* ✅ NOVO: Setor Responsável */}
-                <div className="col-span-2">
-                  <Label className="text-sm text-gray-500">Setor Responsável:</Label>
-                  <p className="font-medium">
-                    {ordemDetalhes.setor_descricao || (ordemDetalhes.nro_setor ? `Setor ${ordemDetalhes.nro_setor}` : 'Não informado')}
-                  </p>
-                </div>
-                
-                {/* ✅ NOVO: Placa do Veículo */}
-                <div className="col-span-2">
-                  <Label className="text-sm text-gray-500">Placa do Veículo:</Label>
-                  <p className="font-medium font-mono">
-                    {ordemDetalhes.placa || '-'}
-                  </p>
-                </div>
-                
-                <div>
-                  <Label className="text-sm text-gray-500">Status:</Label>
-                  <p className="font-medium">
-                    {ordemDetalhes.aprovada === 'S' ? 'Aprovada' : ordemDetalhes.aprovada === 'R' ? 'Reprovada' : 'Pendente'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Orçar:</Label>
-                  <p className="font-medium">{ordemDetalhes.orcar === 'S' ? 'Sim' : 'Não'}</p>
-                </div>
-                
-                {ordemDetalhes.motivo_reprovacao && (
-                  <div className="col-span-2">
-                    <Label className="text-sm text-gray-500">Motivo Reprovação:</Label>
-                    <p className="font-medium text-red-600">{ordemDetalhes.motivo_reprovacao}</p>
+          <div className="flex-1 overflow-y-auto p-6 pt-2">
+            {ordemDetalhes && (
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Número:</Label>
+                    <p className="font-medium">{ordemDetalhes.unidade}{String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}</p>
                   </div>
-                )}
-                
-                {ordemDetalhes.observacao && (
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Data:</Label>
+                    <p className="font-medium">
+                      {new Date(ordemDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às {ordemDetalhes.hora_inclusao?.substring(0, 5)}
+                    </p>
+                  </div>
+                  
+                  {/* ✅ MELHORIA 1: Login de inclusão nos detalhes */}
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Solicitante:</Label>
+                    <p className="font-medium">{ordemDetalhes.login_inclusao?.toUpperCase()}</p>
+                  </div>
+                  
+                  {/* ✅ MELHORIA 4: Unidade */}
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Unidade:</Label>
+                    <p className="font-medium">{ordemDetalhes.unidade}</p>
+                  </div>
+                  
                   <div className="col-span-2">
-                    <Label className="text-sm text-gray-500">Observação:</Label>
-                    <div className="max-h-40 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-3 rounded-md border">
-                      <p className="font-medium whitespace-pre-wrap">{ordemDetalhes.observacao}</p>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Centro de Custo:</Label>
+                    <p className="font-medium">
+                      {ordemDetalhes.centro_custo_unidade}{String(ordemDetalhes.nro_centro_custo).padStart(6, '0')} - {ordemDetalhes.centro_custo_descricao}
+                    </p>
+                  </div>
+                  
+                  {/* ✅ NOVO: Setor Responsável */}
+                  <div className="col-span-2">
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Setor Responsável:</Label>
+                    <p className="font-medium">
+                      {ordemDetalhes.setor_descricao || (ordemDetalhes.nro_setor ? `Setor ${ordemDetalhes.nro_setor}` : 'Não informado')}
+                    </p>
+                  </div>
+                  
+                  {/* ✅ NOVO: Placa do Veículo */}
+                  <div className="col-span-2">
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Placa do Veículo:</Label>
+                    <p className="font-medium font-mono">
+                      {ordemDetalhes.placa || '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Status:</Label>
+                    <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block ${
+                      ordemDetalhes.aprovada === 'S' ? 'bg-green-100 text-green-700' : 
+                      ordemDetalhes.aprovada === 'R' ? 'bg-red-100 text-red-700' : 
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {ordemDetalhes.aprovada === 'S' ? 'APROVADA' : ordemDetalhes.aprovada === 'R' ? 'REPROVADA' : 'PENDENTE'}
                     </div>
                   </div>
-                )}
-              </div>
+                  <div>
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Orçar:</Label>
+                    <p className="font-medium">{ordemDetalhes.orcar === 'S' ? 'Sim' : 'Não'}</p>
+                  </div>
+                  
+                  {ordemDetalhes.motivo_reprovacao && (
+                    <div className="col-span-2">
+                      <Label className="text-sm text-red-500 font-bold uppercase">Motivo Reprovação:</Label>
+                      <p className="font-medium text-red-600">{ordemDetalhes.motivo_reprovacao}</p>
+                    </div>
+                  )}
+                  
+                  {ordemDetalhes.observacao && (
+                    <div className="col-span-2">
+                      <Label className="text-sm text-gray-500 font-bold uppercase">Observação:</Label>
+                      <div className="max-h-40 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-3 rounded-md border">
+                        <p className="font-medium whitespace-pre-wrap">{ordemDetalhes.observacao}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Itens ({itensDetalhes.length})</h3>
-                <div className="max-h-96 overflow-y-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Código</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-center">Unidade</TableHead>
-                        <TableHead className="text-right">Quantidade</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {itensDetalhes.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{item.codigo}</TableCell>
-                          <TableCell>{item.descricao}</TableCell>
-                          <TableCell className="text-center">{item.unidade_medida_sigla || item.unidade_medida}</TableCell>
-                          <TableCell className="text-right">
-                            {parseFloat(item.qtde_item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </TableCell>
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Itens ({itensDetalhes.length})</h3>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Código</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead className="text-center">Unidade</TableHead>
+                          <TableHead className="text-right">Quantidade</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {itensDetalhes.map((item, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{item.codigo}</TableCell>
+                            <TableCell>{item.descricao}</TableCell>
+                            <TableCell className="text-center">{item.unidade_medida_sigla || item.unidade_medida}</TableCell>
+                            <TableCell className="text-right font-bold">
+                              {parseFloat(item.qtde_item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <DialogFooter className="flex justify-between items-center border-t pt-4">
+          <DialogFooter className="flex justify-between items-center border-t p-6">
             <div className="flex gap-2">
               <Button
-                variant="outline"
-                className="gap-2"
+                variant="default"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
                 onClick={imprimirOrdemCompra}
               >
                 <Printer className="size-4" />
-                Imprimir OC
+                Imprimir PDF
               </Button>
             </div>
 
@@ -2153,14 +2165,15 @@ export default function CadastroOrdensCompra() {
               <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
                 Fechar
               </Button>
-              {ordemDetalhes && ordemDetalhes.aprovada === 'N' && (
+              {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (
                 <Button 
+                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
                   onClick={() => {
                     setMostrarDetalhesModal(false);
                     iniciarConversaoEmPedido(ordemDetalhes);
                   }}
                 >
-                  <Package className="mr-2 h-4 w-4" />
+                  <ShoppingCart className="size-4" />
                   Converter em Pedido
                 </Button>
               )}

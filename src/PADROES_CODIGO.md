@@ -129,6 +129,24 @@ const formatarHora = (hora: string): string => {
 const hora = "14:30:45";
 ```
 
+#### **Logotipos em Impressões/Relatórios**
+```typescript
+// ✅ CORRETO - Usar URLs absolutas e lógica de domínio
+const logoUrl = user?.domain?.toUpperCase() === 'ACV' 
+  ? 'https://webpresto.com.br/images/logos_clientes/aceville.png'
+  : 'https://webpresto.com.br/images/logo_rel.png';
+
+// No HTML da impressão
+<img src="${logoUrl}" class="logo" />
+<div class="header-info">
+  <h1>Título do Documento</h1>
+  <p>Sistema de Gestão</p> <!-- ✅ SEMPRE "Sistema de Gestão" -->
+</div>
+
+// ❌ ERRADO - Caminhos relativos (quebram na janela de impressão)
+<img src="/sistema/logo.png" />
+```
+
 ### **4. Inputs em MAIÚSCULAS**
 
 ```typescript

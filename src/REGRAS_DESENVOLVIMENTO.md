@@ -92,6 +92,14 @@
   - Dark: `bg-slate-700` (hover: `bg-slate-600`)
 - ✅ **LARGURA**: 8px para vertical e horizontal.
 
+### 17. **LOGOTIPOS EM IMPRESSÕES**
+- ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão.
+- ✅ **LÓGICA ACV**: 
+  - Se `domain === 'ACV'`: `https://webpresto.com.br/images/logos_clientes/aceville.png`
+  - Demais domínios: `https://webpresto.com.br/images/logo_rel.png`
+- ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"** (sem o nome Presto).
+- ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
+
 ---
 
 ## 📁 ESTRUTURA DE ARQUIVOS
