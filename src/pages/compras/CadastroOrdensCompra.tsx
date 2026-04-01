@@ -108,6 +108,7 @@ interface OrdemCompra {
   motivo_reprovacao?: string;
   qtd_itens: number;
   seq_pedido?: number;
+  nro_pedido_formatado?: string; // ✅ NOVO
 }
 
 interface ItemOrdemCompra {
@@ -2057,7 +2058,19 @@ export default function CadastroOrdensCompra() {
                   <div className="space-y-1">
                     <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Status da Ordem</Label>
                     <div className="flex items-center gap-2">
-                      {ordemDetalhes.aprovada === 'S' ? (
+                      {ordemDetalhes.seq_pedido && Number(ordemDetalhes.seq_pedido) > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                            <ShoppingCart className="size-3.5 mr-1.5" />
+                            PEDIDO GERADO
+                          </div>
+                          {ordemDetalhes.nro_pedido_formatado && (
+                            <span className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 ml-1">
+                              Doc: {ordemDetalhes.nro_pedido_formatado}
+                            </span>
+                          )}
+                        </div>
+                      ) : ordemDetalhes.aprovada === 'S' ? (
                         <div className="flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800">
                           <CheckCircle className="size-3.5 mr-1.5" />
                           APROVADA
@@ -2208,16 +2221,17 @@ export default function CadastroOrdensCompra() {
           <DialogFooter className="flex justify-between items-center border-t p-6 shrink-0 bg-gray-50/50 dark:bg-gray-900/50">
             <div className="flex gap-2">
               <Button
-                variant="default"
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-md"
+                variant="outline"
                 onClick={imprimirOrdemCompra}
+                className="gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-400 shadow-sm"
               >
                 <Printer className="size-4" />
                 Imprimir PDF
               </Button>
               {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (!ordemDetalhes.seq_pedido || Number(ordemDetalhes.seq_pedido) === 0) && (
                 <Button 
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-md"
+                  variant="outline"
+                  className="gap-2 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-sm"
                   onClick={() => {
                     setMostrarDetalhesModal(false);
                     iniciarConversaoEmPedido(ordemDetalhes);
@@ -2229,7 +2243,7 @@ export default function CadastroOrdensCompra() {
               )}
             </div>
 
-            <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
+            <Button variant="default" onClick={() => setMostrarDetalhesModal(false)} className="px-8 shadow-md">
               Fechar
             </Button>
           </DialogFooter>

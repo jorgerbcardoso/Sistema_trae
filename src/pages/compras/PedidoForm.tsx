@@ -50,7 +50,8 @@ import {
   UserCheck,
   Info,
   Trash2,
-  Hourglass
+  Hourglass,
+  Copy
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
@@ -187,6 +188,7 @@ export default function PedidoForm() {
   const [aprovadoresSelecionados, setAprovadoresSelecionados] = useState<number[]>([]); // ✅ NOVO: múltiplos aprovadores
   const [enviandoAprovacao, setEnviandoAprovacao] = useState(false);
   const [aprovandoPedido, setAprovandoPedido] = useState(false);
+  const [duplicando, setDuplicando] = useState(false); // ✅ NOVO: Estado para duplicação
   const [dialogNecessitaAprovacao, setDialogNecessitaAprovacao] = useState(false);
 
   useEffect(() => {
@@ -448,6 +450,56 @@ export default function PedidoForm() {
       console.error('Erro ao aprovar pedido:', error);
     } finally {
       setAprovandoPedido(false);
+    }
+  };
+
+  // ✅ NOVO: Duplicar pedido existente
+  const handleDuplicarPedido = async () => {
+    if (!pedido || !itensPedido.length) return;
+    
+    // ✅ Pedir confirmação ao usuário
+    if (!confirm('Deseja realmente duplicar este pedido?\n\nUm novo pedido IDÊNTICO será gerado, e ele precisará passar por um novo processo de aprovação.')) {
+      return;
+    }
+
+    setDuplicando(true);
+    try {
+      // Preparar payload idêntico ao pedido atual
+      const payload = {
+        unidade: pedido.unidade,
+        seq_fornecedor: pedido.seq_fornecedor,
+        seq_orcamento: null, // Sempre manual
+        observacao: `[DUPLICADO DO PEDIDO ${pedido.unidade}${String(pedido.nro_pedido).padStart(6, '0')}] ${pedido.observacao || ''}`.toUpperCase(),
+        vlr_total: pedido.vlr_total,
+        itens: itensPedido.map(item => ({
+          seq_item: item.seq_item,
+          qtde_item: item.qtde_item,
+          vlr_unitario: item.vlr_unitario,
+          vlr_total: item.vlr_total
+        }))
+      };
+
+      const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/pedidos.php`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (data.success) {
+        // Armazenar dados do novo pedido para o dialog de sucesso
+        setPedidoCriado({
+          seq_pedido: data.seq_pedido,
+          nro_pedido_formatado: data.nro_pedido_formatado,
+          status: 'A'
+        });
+        
+        // Abrir o mesmo dialog de sucesso do pedido manual
+        setDialogNecessitaAprovacao(true);
+      }
+    } catch (error) {
+      console.error('Erro ao duplicar pedido:', error);
+      toast.error('Erro ao duplicar pedido');
+    } finally {
+      setDuplicando(false);
     }
   };
 
@@ -1168,6 +1220,26 @@ export default function PedidoForm() {
               <Button onClick={imprimirPedido} variant="outline" className="gap-2 w-full sm:w-auto">
                 <Printer className="size-4" />
                 Imprimir Pedido
+              </Button>
+
+              {/* BOTÃO: Duplicar Pedido */}
+              <Button 
+                onClick={handleDuplicarPedido} 
+                variant="outline" 
+                className="gap-2 w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                disabled={duplicando}
+              >
+                {duplicando ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Duplicando...
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-4" />
+                    Duplicar Pedido
+                  </>
+                )}
               </Button>
             </div>
           </div>

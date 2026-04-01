@@ -34,6 +34,7 @@ $tblCentroCusto = $prefix . 'centro_custo';
 $tblItem = $prefix . 'item';
 $tblUnidadeMedida = $prefix . 'unidade_medida';
 $tblSetores = $prefix . 'setores';
+$tblPedido = $prefix . 'pedido'; // ✅ NOVO: Tabela de pedidos
 
 // ✅ VERIFICAR SE É MTZ OU ALL (ambos veem tudo)
 $unidadeAtualUpper = strtoupper($unidadeAtual);
@@ -94,10 +95,12 @@ try {
                         cc.unidade AS centro_custo_unidade,
                         oc.nro_setor,
                         s.descricao AS setor_descricao,
+                        p.unidade||TRIM(TO_CHAR(CAST(p.nro_pedido AS INT), '000000')) AS nro_pedido_formatado, -- ✅ NOVO: Número do pedido vinculado
                         (SELECT COUNT(*) FROM $tblOrdemCompraItem WHERE seq_ordem_compra = oc.seq_ordem_compra) AS qtd_itens
                     FROM $tblOrdemCompra oc
                     LEFT JOIN $tblCentroCusto cc ON cc.seq_centro_custo = oc.seq_centro_custo
                     LEFT JOIN $tblSetores s ON s.nro_setor = oc.nro_setor
+                    LEFT JOIN $tblPedido p ON p.seq_pedido = oc.seq_pedido -- ✅ NOVO: Join com pedidos
                     WHERE oc.seq_ordem_compra = $1
                 ";
                 
@@ -164,6 +167,7 @@ try {
                         oc.aprovada,
                         oc.orcar,
                         oc.seq_pedido, -- ✅ NOVO: Retornar seq_pedido na listagem
+                        p.unidade||TRIM(TO_CHAR(CAST(p.nro_pedido AS INT), '000000')) AS nro_pedido_formatado, -- ✅ NOVO: Número do pedido vinculado
                         oc.observacao,
                         oc.placa,
                         oc.data_inclusao,
@@ -182,6 +186,7 @@ try {
                     FROM $tblOrdemCompra oc
                     LEFT JOIN $tblCentroCusto cc ON cc.seq_centro_custo = oc.seq_centro_custo
                     LEFT JOIN $tblSetores s ON s.nro_setor = oc.nro_setor
+                    LEFT JOIN $tblPedido p ON p.seq_pedido = oc.seq_pedido -- ✅ NOVO: Join com pedidos
                     WHERE $whereClause
                     ORDER BY oc.data_inclusao DESC, oc.hora_inclusao DESC
                 ";
