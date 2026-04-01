@@ -2028,115 +2028,161 @@ export default function CadastroOrdensCompra() {
 
       {/* Modal de Detalhes */}
       <Dialog open={mostrarDetalhesModal} onOpenChange={setMostrarDetalhesModal}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardList className="size-5 text-blue-600" />
+        <DialogContent className="sm:max-w-[800px] h-[85vh] flex flex-col p-0 overflow-hidden bg-card">
+          <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <ClipboardList className="size-6 text-blue-600" />
               Detalhes da Ordem de Compra
             </DialogTitle>
+            <DialogDescription>
+              Visualizar informações completas da ordem de compra
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-6 pt-2">
+          <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
             {ordemDetalhes && (
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Número:</Label>
-                    <p className="font-medium">{ordemDetalhes.unidade}{String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Data:</Label>
-                    <p className="font-medium">
-                      {new Date(ordemDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às {ordemDetalhes.hora_inclusao?.substring(0, 5)}
-                    </p>
-                  </div>
-                  
-                  {/* ✅ MELHORIA 1: Login de inclusão nos detalhes */}
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Solicitante:</Label>
-                    <p className="font-medium">{ordemDetalhes.login_inclusao?.toUpperCase()}</p>
-                  </div>
-                  
-                  {/* ✅ MELHORIA 4: Unidade */}
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Unidade:</Label>
-                    <p className="font-medium">{ordemDetalhes.unidade}</p>
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Centro de Custo:</Label>
-                    <p className="font-medium">
-                      {ordemDetalhes.centro_custo_unidade}{String(ordemDetalhes.nro_centro_custo).padStart(6, '0')} - {ordemDetalhes.centro_custo_descricao}
-                    </p>
-                  </div>
-                  
-                  {/* ✅ NOVO: Setor Responsável */}
-                  <div className="col-span-2">
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Setor Responsável:</Label>
-                    <p className="font-medium">
-                      {ordemDetalhes.setor_descricao || (ordemDetalhes.nro_setor ? `Setor ${ordemDetalhes.nro_setor}` : 'Não informado')}
-                    </p>
-                  </div>
-                  
-                  {/* ✅ NOVO: Placa do Veículo */}
-                  <div className="col-span-2">
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Placa do Veículo:</Label>
-                    <p className="font-medium font-mono">
-                      {ordemDetalhes.placa || '-'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Status:</Label>
-                    <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block ${
-                      ordemDetalhes.aprovada === 'S' ? 'bg-green-100 text-green-700' : 
-                      ordemDetalhes.aprovada === 'R' ? 'bg-red-100 text-red-700' : 
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {ordemDetalhes.aprovada === 'S' ? 'APROVADA' : ordemDetalhes.aprovada === 'R' ? 'REPROVADA' : 'PENDENTE'}
+              <div className="grid gap-6">
+                {/* Cabeçalho de Status e Número */}
+                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Status da Ordem</Label>
+                    <div className="flex items-center gap-2">
+                      {ordemDetalhes.aprovada === 'S' ? (
+                        <div className="flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800">
+                          <CheckCircle className="size-3.5 mr-1.5" />
+                          APROVADA
+                        </div>
+                      ) : ordemDetalhes.aprovada === 'R' ? (
+                        <div className="flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800">
+                          <X className="size-3.5 mr-1.5" />
+                          REPROVADA
+                        </div>
+                      ) : (
+                        <div className="flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800">
+                          <Info className="size-3.5 mr-1.5" />
+                          AGUARDANDO APROVAÇÃO
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-sm text-gray-500 font-bold uppercase">Orçar:</Label>
-                    <p className="font-medium">{ordemDetalhes.orcar === 'S' ? 'Sim' : 'Não'}</p>
+                  <div className="text-right space-y-1">
+                    <Label className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Número</Label>
+                    <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                      {ordemDetalhes.unidade}{String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}
+                    </p>
                   </div>
-                  
-                  {ordemDetalhes.motivo_reprovacao && (
-                    <div className="col-span-2">
-                      <Label className="text-sm text-red-500 font-bold uppercase">Motivo Reprovação:</Label>
-                      <p className="font-medium text-red-600">{ordemDetalhes.motivo_reprovacao}</p>
+                </div>
+
+                {/* Grid de Informações */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Data de Inclusão:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">
+                        {new Date(ordemDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às {ordemDetalhes.hora_inclusao?.substring(0, 5)}
+                      </p>
                     </div>
-                  )}
-                  
-                  {ordemDetalhes.observacao && (
-                    <div className="col-span-2">
-                      <Label className="text-sm text-gray-500 font-bold uppercase">Observação:</Label>
-                      <div className="max-h-40 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-3 rounded-md border">
-                        <p className="font-medium whitespace-pre-wrap">{ordemDetalhes.observacao}</p>
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Solicitante:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 uppercase">
+                        {ordemDetalhes.login_inclusao}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Unidade:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">
+                        {ordemDetalhes.unidade}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Centro de Custo:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 font-mono">
+                        {ordemDetalhes.centro_custo_unidade}{String(ordemDetalhes.nro_centro_custo).padStart(6, '0')}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                        {ordemDetalhes.centro_custo_descricao}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Setor Responsável:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">
+                        {ordemDetalhes.setor_descricao || (ordemDetalhes.nro_setor ? `Setor ${ordemDetalhes.nro_setor}` : 'Não informado')}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Veículo / Placa:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 font-mono">
+                        {ordemDetalhes.placa || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Opções Extras */}
+                <div className="grid grid-cols-2 gap-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800">
+                  <div className="space-y-1">
+                    <Label className="text-sm text-gray-500 font-medium">Orçar:</Label>
+                    <p className="font-bold text-gray-900 dark:text-gray-100">
+                      {ordemDetalhes.orcar === 'S' ? 'SIM (Obrigatório)' : 'NÃO'}
+                    </p>
+                  </div>
+                  {ordemDetalhes.aprovada !== 'N' && (
+                    <div className="space-y-1">
+                      <Label className="text-sm text-gray-500 font-medium">Aprovação por:</Label>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 uppercase">
+                        {ordemDetalhes.login_aprovacao} em {ordemDetalhes.data_aprovacao ? new Date(ordemDetalhes.data_aprovacao + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+                      </p>
                     </div>
                   )}
                 </div>
 
-                <div className="border-t pt-4">
-                  <h3 className="font-semibold mb-3">Itens ({itensDetalhes.length})</h3>
-                  <div className="rounded-md border">
+                {/* Motivo Reprovação */}
+                {ordemDetalhes.motivo_reprovacao && (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 rounded-lg">
+                    <Label className="text-sm text-red-600 dark:text-red-400 font-bold uppercase mb-1 block">Motivo da Reprovação</Label>
+                    <p className="text-sm text-red-700 dark:text-red-300 font-medium italic">
+                      "{ordemDetalhes.motivo_reprovacao}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {ordemDetalhes.observacao && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-500 font-bold uppercase">Observações</Label>
+                    <div className="bg-white dark:bg-gray-950 p-4 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm min-h-[80px]">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap italic">
+                        {ordemDetalhes.observacao}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabela de Itens */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 uppercase text-sm">Itens da Ordem ({itensDetalhes.length})</h3>
+                  </div>
+                  <div className="rounded-lg border overflow-hidden shadow-sm">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="bg-gray-50 dark:bg-gray-900">
                         <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Descrição</TableHead>
-                          <TableHead className="text-center">Unidade</TableHead>
-                          <TableHead className="text-right">Quantidade</TableHead>
+                          <TableHead className="w-24">Código</TableHead>
+                          <TableHead>Descrição do Item</TableHead>
+                          <TableHead className="text-center w-24">Unidade</TableHead>
+                          <TableHead className="text-right w-32">Quantidade</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {itensDetalhes.map((item, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{item.codigo}</TableCell>
-                            <TableCell>{item.descricao}</TableCell>
-                            <TableCell className="text-center">{item.unidade_medida_sigla || item.unidade_medida}</TableCell>
-                            <TableCell className="text-right font-bold">
+                          <TableRow key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
+                            <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{item.codigo}</TableCell>
+                            <TableCell className="text-sm font-medium">{item.descricao}</TableCell>
+                            <TableCell className="text-center text-xs text-gray-500">{item.unidade_medida_sigla || item.unidade_medida}</TableCell>
+                            <TableCell className="text-right font-black text-gray-900 dark:text-gray-100">
                               {parseFloat(item.qtde_item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </TableCell>
                           </TableRow>
@@ -2149,11 +2195,11 @@ export default function CadastroOrdensCompra() {
             )}
           </div>
 
-          <DialogFooter className="flex justify-between items-center border-t p-6">
+          <DialogFooter className="flex justify-between items-center border-t p-6 shrink-0 bg-gray-50/50 dark:bg-gray-900/50">
             <div className="flex gap-2">
               <Button
                 variant="default"
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-md"
                 onClick={imprimirOrdemCompra}
               >
                 <Printer className="size-4" />
@@ -2167,7 +2213,7 @@ export default function CadastroOrdensCompra() {
               </Button>
               {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (
                 <Button 
-                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2 shadow-md"
                   onClick={() => {
                     setMostrarDetalhesModal(false);
                     iniciarConversaoEmPedido(ordemDetalhes);
