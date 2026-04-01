@@ -185,6 +185,9 @@ export default function CadastroOrdensCompra() {
   const [gerandoPedido, setGerandoPedido] = useState(false);
   const [solicitandoAprovacao, setSolicitandoAprovacao] = useState(false);
 
+  // ✅ REFERÊNCIA PARA IMPRESSÃO
+  const printRef = useRef<HTMLDivElement>(null);
+
   // ✅ NOVO: Estados para aprovação de pedidos
   const [usuariosAprovadores, setUsuariosAprovadores] = useState<any[]>([]);
   const [aprovadoresSelecionados, setAprovadoresSelecionados] = useState<number[]>([]);
@@ -1296,6 +1299,302 @@ export default function CadastroOrdensCompra() {
     }
   };
 
+  // ✅ Função de Impressão (Baseada no padrão de Solicitações)
+  const imprimirOrdemCompra = () => {
+    if (!ordemDetalhes) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela de impressão');
+      return;
+    }
+
+    // Logo do cliente e Presto
+    const isAceville = user?.domain?.toUpperCase() === 'ACV';
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ordem de Compra ${ordemDetalhes.unidade}${String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 15mm; 
+              font-size: 11pt;
+              color: #000;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 3px solid #2563eb;
+            }
+            .header-left {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+            }
+            .logo {
+              max-width: 120px;
+              max-height: 50px;
+            }
+            .header-info h1 {
+              font-size: 16pt;
+              color: #2563eb;
+              margin-bottom: 3px;
+              text-transform: uppercase;
+            }
+            .header-info p {
+              font-size: 10pt;
+              color: #666;
+            }
+            .header-right {
+              text-align: right;
+            }
+            .documento-numero {
+              font-size: 20pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 5px;
+              font-family: monospace;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 4px 12px;
+              border-radius: 12px;
+              font-size: 9pt;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .status-pendente {
+              background: #fef3c7;
+              color: #92400e;
+              border: 1px solid #fcd34d;
+            }
+            .status-aprovada {
+              background: #d1fae5;
+              color: #065f46;
+              border: 1px solid #6ee7b7;
+            }
+            .status-reprovada {
+              background: #fee2e2;
+              color: #991b1b;
+              border: 1px solid #fca5a5;
+            }
+            .section {
+              margin-bottom: 20px;
+            }
+            .section-title {
+              font-size: 11pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 8px;
+              padding-bottom: 4px;
+              border-bottom: 2px solid #e5e7eb;
+              text-transform: uppercase;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 10px;
+            }
+            .info-item {
+              margin-bottom: 8px;
+            }
+            .info-label {
+              font-size: 8pt;
+              color: #6b7280;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 2px;
+            }
+            .info-value {
+              font-size: 10pt;
+              color: #000;
+              font-weight: 500;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              font-size: 9pt;
+            }
+            th {
+              background-color: #1e40af;
+              color: white;
+              font-weight: bold;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 9pt;
+              text-transform: uppercase;
+            }
+            td {
+              border: 1px solid #e5e7eb;
+              padding: 8px 10px;
+            }
+            tr:nth-child(even) {
+              background-color: #f9fafb;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .observacoes-box {
+              background: #f9fafb;
+              padding: 12px;
+              border-radius: 6px;
+              border: 1px solid #e5e7eb;
+              font-size: 9pt;
+              line-height: 1.5;
+              color: #374151;
+              min-height: 60px;
+            }
+            .footer {
+              margin-top: 40px;
+              padding-top: 15px;
+              border-top: 1px solid #e5e7eb;
+              text-align: center;
+              color: #9ca3af;
+              font-size: 8pt;
+            }
+            @media print {
+              body { padding: 10mm; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              <img src="/sistema/logo-presto.png" alt="Sistema Presto" class="logo" />
+              <div class="header-info">
+                <h1>Ordem de Compra</h1>
+                <p>Sistema de Gestão Presto</p>
+              </div>
+            </div>
+            <div class="header-right">
+              <div class="documento-numero">${ordemDetalhes.unidade}${String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}</div>
+              <div class="status-badge ${ordemDetalhes.aprovada === 'S' ? 'status-aprovada' : ordemDetalhes.aprovada === 'R' ? 'status-reprovada' : 'status-pendente'}">
+                ${ordemDetalhes.aprovada === 'S' ? 'APROVADA' : ordemDetalhes.aprovada === 'R' ? 'REPROVADA' : 'PENDENTE'}
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Informações Gerais</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Data de Inclusão</div>
+                <div class="info-value">${new Date(ordemDetalhes.data_inclusao + 'T00:00:00').toLocaleDateString('pt-BR')} às ${ordemDetalhes.hora_inclusao?.substring(0, 5)}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Usuário Solicitante</div>
+                <div class="info-value">${ordemDetalhes.login_inclusao?.toUpperCase()}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Centro de Custo</div>
+                <div class="info-value">
+                  ${ordemDetalhes.centro_custo_unidade}${String(ordemDetalhes.nro_centro_custo).padStart(6, '0')} - ${ordemDetalhes.centro_custo_descricao}
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Setor Responsável</div>
+                <div class="info-value">${ordemDetalhes.setor_descricao || '-'}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Unidade</div>
+                <div class="info-value">${ordemDetalhes.unidade}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Veículo / Placa</div>
+                <div class="info-value">${ordemDetalhes.placa || '-'}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Deve Orçar?</div>
+                <div class="info-value">${ordemDetalhes.orcar === 'S' ? 'SIM' : 'NÃO'}</div>
+              </div>
+            </div>
+          </div>
+
+          ${ordemDetalhes.aprovada !== 'N' ? `
+          <div class="section">
+            <div class="section-title">Informações de Aprovação</div>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Aprovado/Reprovado por</div>
+                <div class="info-value">${ordemDetalhes.login_aprovacao?.toUpperCase() || '-'}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Data/Hora</div>
+                <div class="info-value">${ordemDetalhes.data_aprovacao ? new Date(ordemDetalhes.data_aprovacao + 'T00:00:00').toLocaleDateString('pt-BR') : ''} ${ordemDetalhes.hora_aprovacao?.substring(0, 5) || ''}</div>
+              </div>
+              ${ordemDetalhes.motivo_reprovacao ? `
+              <div class="info-item" style="grid-column: span 2;">
+                <div class="info-label">Motivo da Reprovação</div>
+                <div class="info-value" style="color: #991b1b;">${ordemDetalhes.motivo_reprovacao}</div>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="section">
+            <div class="section-title">Itens da Ordem de Compra</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 60px;" class="text-center">#</th>
+                  <th style="width: 100px;">Código</th>
+                  <th>Descrição do Item</th>
+                  <th style="width: 80px;" class="text-center">Unid.</th>
+                  <th style="width: 100px;" class="text-right">Quantidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itensDetalhes.map((item, index) => `
+                  <tr>
+                    <td class="text-center">${index + 1}</td>
+                    <td class="font-mono">${item.codigo}</td>
+                    <td>${item.descricao}</td>
+                    <td class="text-center">${item.unidade_medida_sigla || item.unidade_medida}</td>
+                    <td class="text-right">${parseFloat(item.qtde_item).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Observações</div>
+            <div class="observacoes-box">
+              ${ordemDetalhes.observacao || 'NENHUMA OBSERVAÇÃO INFORMADA.'}
+            </div>
+          </div>
+
+          <div class="footer">
+            Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
+            © 2026 Sistema Presto - Gestão Inteligente
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   return (
     <AdminLayout
       title="ORDENS DE COMPRA"
@@ -1837,21 +2136,34 @@ export default function CadastroOrdensCompra() {
             </div>
           )}
 
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
-              Fechar
-            </Button>
-            {ordemDetalhes && ordemDetalhes.aprovada === 'N' && (
-              <Button 
-                onClick={() => {
-                  setMostrarDetalhesModal(false);
-                  iniciarConversaoEmPedido(ordemDetalhes);
-                }}
+          <DialogFooter className="flex justify-between items-center border-t pt-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={imprimirOrdemCompra}
               >
-                <Package className="mr-2 h-4 w-4" />
-                Converter em Pedido
+                <Printer className="size-4" />
+                Imprimir OC
               </Button>
-            )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
+                Fechar
+              </Button>
+              {ordemDetalhes && ordemDetalhes.aprovada === 'N' && (
+                <Button 
+                  onClick={() => {
+                    setMostrarDetalhesModal(false);
+                    iniciarConversaoEmPedido(ordemDetalhes);
+                  }}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Converter em Pedido
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
