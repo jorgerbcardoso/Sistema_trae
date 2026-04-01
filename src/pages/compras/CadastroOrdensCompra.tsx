@@ -107,6 +107,7 @@ interface OrdemCompra {
   login_aprovacao?: string;
   motivo_reprovacao?: string;
   qtd_itens: number;
+  seq_pedido?: number;
 }
 
 interface ItemOrdemCompra {
@@ -1801,14 +1802,22 @@ export default function CadastroOrdensCompra() {
                         <TableCell className="text-center">
                           <span
                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              ordem.aprovada === 'S'
+                              ordem.seq_pedido && Number(ordem.seq_pedido) > 0
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                : ordem.aprovada === 'S'
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                 : ordem.aprovada === 'R'
                                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                 : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                             }`}
                           >
-                            {ordem.aprovada === 'S' ? 'Aprovada' : ordem.aprovada === 'R' ? 'Reprovada' : 'Pendente'}
+                            {ordem.seq_pedido && Number(ordem.seq_pedido) > 0 
+                              ? 'Pedido gerado' 
+                              : ordem.aprovada === 'S' 
+                              ? 'Aprovada' 
+                              : ordem.aprovada === 'R' 
+                              ? 'Reprovada' 
+                              : 'Pendente'}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
@@ -2205,15 +2214,9 @@ export default function CadastroOrdensCompra() {
                 <Printer className="size-4" />
                 Imprimir PDF
               </Button>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
-                Fechar
-              </Button>
-              {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (
+              {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (!ordemDetalhes.seq_pedido || Number(ordemDetalhes.seq_pedido) === 0) && (
                 <Button 
-                  className="bg-purple-600 hover:bg-purple-700 text-white gap-2 shadow-md"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-md"
                   onClick={() => {
                     setMostrarDetalhesModal(false);
                     iniciarConversaoEmPedido(ordemDetalhes);
@@ -2224,6 +2227,10 @@ export default function CadastroOrdensCompra() {
                 </Button>
               )}
             </div>
+
+            <Button variant="outline" onClick={() => setMostrarDetalhesModal(false)}>
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
