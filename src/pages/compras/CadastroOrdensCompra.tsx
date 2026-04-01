@@ -1097,6 +1097,7 @@ export default function CadastroOrdensCompra() {
         // ✅ BACKEND - PASSO 2: Criar pedido
         const payloadPedido = {
           seq_ordem_compra: ordemProcessada.seq_ordem_compra,
+          ordens_compra: [ordemProcessada.seq_ordem_compra], // ✅ VINCULAR OC AO PEDIDO
           seq_fornecedor: fornecedorSelecionado.seq_fornecedor,
           seq_centro_custo: ordemProcessada.seq_centro_custo, // ✅ CORREÇÃO: Centro de custo obrigatório
           status_aprovacao: 'A', // A = Aguardando aprovação
@@ -2322,22 +2323,22 @@ export default function CadastroOrdensCompra() {
 
       {/* ✅ FLUXO RÁPIDO: Dialog de preenchimento de valores */}
       <Dialog open={dialogPreenchimentoValores} onOpenChange={setDialogPreenchimentoValores}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2 shrink-0">
             <DialogTitle>Preencha os Valores dos Itens</DialogTitle>
             <DialogDescription>
               Informe o valor unitário para cada item da ordem de compra.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto py-4">
+          <div className="flex-1 overflow-y-auto min-h-0 p-6 pt-2">
             <div className="rounded-md border border-border overflow-hidden">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-gray-50 dark:bg-gray-900">
                       <TableHead className="w-28">Código</TableHead>
-                      <TableHead className="min-w-[180px]">Descrição</TableHead>
+                      <TableHead className="min-w-[250px]">Descrição</TableHead>
                       <TableHead className="text-center w-16">Unid.</TableHead>
                       <TableHead className="text-right w-24">Qtde</TableHead>
                       <TableHead className="text-right w-36">Valor Unit.</TableHead>
@@ -2346,10 +2347,10 @@ export default function CadastroOrdensCompra() {
                 <TableBody>
                   {itensComValor.map((item) => (
                     <TableRow key={item.seq_item}>
-                      <TableCell className="font-medium whitespace-nowrap">{item.codigo}</TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={item.descricao}>{item.descricao}</TableCell>
-                      <TableCell className="text-center">{item.unidade_medida}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">{item.codigo}</TableCell>
+                      <TableCell className="text-sm font-medium" title={item.descricao}>{item.descricao}</TableCell>
+                      <TableCell className="text-center text-xs text-gray-500">{item.unidade_medida}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap font-medium">
                         {item.qtde_item.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-right">
@@ -2359,7 +2360,7 @@ export default function CadastroOrdensCompra() {
                           value={item.vlr_unitario}
                           onChange={(e) => atualizarValorItem(item.seq_item, e.target.value)}
                           placeholder="0,00"
-                          className="w-32 text-right"
+                          className="w-32 text-right font-bold"
                         />
                       </TableCell>
                     </TableRow>
@@ -2371,15 +2372,15 @@ export default function CadastroOrdensCompra() {
 
             <div className="flex justify-end pt-4 border-t mt-4">
               <div className="text-right">
-                <p className="text-sm text-gray-500">Valor Total</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Valor Total do Pedido</p>
+                <p className="text-3xl font-black text-green-600 dark:text-green-400">
                   R$ {calcularTotalPedido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 p-6 border-t bg-gray-50/50 dark:bg-gray-900/50 shrink-0">
             <Button
               variant="outline"
               onClick={() => setDialogPreenchimentoValores(false)}
@@ -2388,7 +2389,11 @@ export default function CadastroOrdensCompra() {
               <X className="size-4 mr-2" />
               Cancelar
             </Button>
-            <Button onClick={gerarPedidoRapido} disabled={gerandoPedido}>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-md"
+              onClick={gerarPedidoRapido} 
+              disabled={gerandoPedido}
+            >
               {gerandoPedido ? (
                 <>
                   <Loader2 className="size-4 mr-2 animate-spin" />
