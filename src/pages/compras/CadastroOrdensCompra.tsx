@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -46,6 +46,7 @@ import {
   Package,
   Info,
   UserCheck,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
