@@ -167,13 +167,13 @@ export default function TabelasVencer() {
   };
 
   return (
-    <AdminLayout title="TABELAS A VENCER" description="Relatório de tabelas com vencimento no período informado">
+    <AdminLayout title="Tabelas a vencer" description="Relatório de tabelas com vencimento no período informado">
       <div className="space-y-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-              TABELAS A VENCER
+              Tabelas a vencer
             </h1>
             <p className="text-slate-600 dark:text-slate-400">
               Relatório de tabelas com vencimento no período selecionado
@@ -184,19 +184,19 @@ export default function TabelasVencer() {
         {/* Card de Filtros */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold">UNIDADE RESPONSÁVEL</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
+              <div className="space-y-2 lg:col-span-4">
+                <Label className="text-xs font-bold">Unidade responsável</Label>
                 <FilterSelectUnidadeSingle
                   value={filtroUnidade}
                   onChange={setFiltroUnidade}
-                  placeholder="TODAS AS UNIDADES"
+                  placeholder="Todas as Unidades"
                   compact={true}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-bold">VENCIMENTO INÍCIO</Label>
+              <div className="space-y-2 lg:col-span-2">
+                <Label className="text-xs font-bold">Vencimento início</Label>
                 <Input
                   type="date"
                   value={dataInicio}
@@ -205,8 +205,8 @@ export default function TabelasVencer() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-bold">VENCIMENTO FIM</Label>
+              <div className="space-y-2 lg:col-span-2">
+                <Label className="text-xs font-bold">Vencimento fim</Label>
                 <Input
                   type="date"
                   value={dataFim}
@@ -215,21 +215,21 @@ export default function TabelasVencer() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 lg:col-span-4">
                 <Button
                   onClick={handleGerar}
                   disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white w-full uppercase font-bold"
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex-1 font-bold"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      GERANDO...
+                      Gerando...
                     </>
                   ) : (
                     <>
                       <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      GERAR RELATÓRIO
+                      Gerar relatório
                     </>
                   )}
                 </Button>
@@ -238,10 +238,11 @@ export default function TabelasVencer() {
                   <Button
                     onClick={handleExportarExcel}
                     variant="outline"
-                    className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+                    className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 px-4 font-bold gap-2"
                     title="Exportar para Excel"
                   >
                     <Download className="w-4 h-4" />
+                    <span className="hidden xl:inline">Exportar</span>
                   </Button>
                 )}
               </div>
