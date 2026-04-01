@@ -3,6 +3,8 @@ import { AdminLayout } from '../../components/layouts/AdminLayout';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { 
   FileSpreadsheet, 
   AlertCircle, 
@@ -21,15 +23,28 @@ import {
 import { toast } from 'sonner';
 import { getTabelasVencer, exportarTabelasVencerExcel } from '../../services/tabelasVencerService';
 import { type TabelaVencer } from '../../mocks/mockData';
+import { FilterSelectUnidadeSingle } from '../../components/cadastros/FilterSelectUnidadeSingle';
 
 type SortField = keyof TabelaVencer;
 type SortDirection = 'asc' | 'desc';
+
+// ✅ Helpers para datas padrão
+const getHoje = () => new Date().toISOString().split('T')[0];
+const getUltimoDiaMes = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+};
 
 export default function TabelasVencer() {
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState<TabelaVencer[]>([]);
   const [periodo, setPeriodo] = useState<{ inicio: string; fim: string } | null>(null);
   const [showTable, setShowTable] = useState(false);
+  
+  // ✅ FILTROS
+  const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [dataInicio, setDataInicio] = useState(getHoje());
+  const [dataFim, setDataFim] = useState(getUltimoDiaMes());
   
   // ✅ ESTADOS DE ORDENAÇÃO
   const [sortField, setSortField] = useState<SortField>('vig_atual');
@@ -43,7 +58,7 @@ export default function TabelasVencer() {
     // Pedir confirmação
     const confirmed = window.confirm(
       '⚠️ ATENÇÃO: Esta operação pode demorar alguns minutos.\n\n' +
-      'O sistema irá consultar todas as tabelas com vencimento até o final do mês corrente.\n\n' +
+      'O sistema irá consultar as tabelas com vencimento no período informado.\n\n' +
       'Deseja continuar?'
     );
 
@@ -53,7 +68,11 @@ export default function TabelasVencer() {
     setShowTable(false);
 
     try {
-      const response = await getTabelasVencer();
+      const response = await getTabelasVencer({
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        unidade: filtroUnidade
+      });
       
       setDados(response.data);
       setPeriodo(response.periodo);
@@ -81,7 +100,11 @@ export default function TabelasVencer() {
       setLoading(true);
       
       // ✅ Chamar função de exportação via backend PHP
-      await exportarTabelasVencerExcel(dados, periodo);
+      await exportarTabelasVencerExcel(dados, periodo, {
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        unidade: filtroUnidade
+      });
       
       toast.success('Arquivo CSV exportado com sucesso!');
     } catch (error) {
@@ -144,87 +167,87 @@ export default function TabelasVencer() {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout title="TABELAS A VENCER" description="Relatório de tabelas com vencimento no período informado">
       <div className="space-y-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-slate-900 dark:text-slate-100 mb-1">
-              Tabelas a Vencer
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+              TABELAS A VENCER
             </h1>
             <p className="text-slate-600 dark:text-slate-400">
-              Relatório de tabelas com vencimento até o fim do mês
+              Relatório de tabelas com vencimento no período selecionado
             </p>
           </div>
         </div>
 
-        {/* Card de Informações */}
-        <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        {/* Card de Filtros */}
+        <Card>
           <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                  Informações Importantes
-                </h3>
-                <ul className="space-y-1 text-sm text-blue-800 dark:text-blue-200">
-                  <li className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 flex-shrink-0" />
-                    <span>
-                      Serão listadas todas as tabelas com vencimento até <strong>{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('pt-BR')}</strong>
-                    </span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    <span>
-                      Esta operação pode demorar alguns minutos devido ao volume de dados
-                    </span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Download className="w-4 h-4 flex-shrink-0" />
-                    <span>
-                      Após gerar o relatório, você poderá exportar os dados para Excel
-                    </span>
-                  </li>
-                </ul>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold">UNIDADE RESPONSÁVEL</Label>
+                <FilterSelectUnidadeSingle
+                  value={filtroUnidade}
+                  onChange={setFiltroUnidade}
+                  placeholder="TODAS AS UNIDADES"
+                  compact={true}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold">VENCIMENTO INÍCIO</Label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold">VENCIMENTO FIM</Label>
+                <Input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleGerar}
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full uppercase font-bold"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      GERANDO...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      GERAR RELATÓRIO
+                    </>
+                  )}
+                </Button>
+
+                {showTable && dados.length > 0 && (
+                  <Button
+                    onClick={handleExportarExcel}
+                    variant="outline"
+                    className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+                    title="Exportar para Excel"
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Botão Gerar */}
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleGerar}
-            disabled={loading}
-            size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Gerando Relatório...
-              </>
-            ) : (
-              <>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Gerar Relatório
-              </>
-            )}
-          </Button>
-
-          {showTable && dados.length > 0 && (
-            <Button
-              onClick={handleExportarExcel}
-              variant="outline"
-              size="lg"
-              className="border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar CSV
-            </Button>
-          )}
-        </div>
 
         {/* Tabela de Resultados */}
         {showTable && dados.length > 0 && (
@@ -233,7 +256,7 @@ export default function TabelasVencer() {
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-sm text-slate-600 dark:text-slate-400">
                   <strong>{dados.length}</strong> registros encontrados
-                  {periodo && <span> • Vencimento até: <strong>{periodo.fim}</strong></span>}
+                  {periodo && <span> • Período: <strong>{periodo.inicio}</strong> até <strong>{periodo.fim}</strong></span>}
                 </div>
               </div>
 
@@ -386,7 +409,7 @@ export default function TabelasVencer() {
                   Nenhuma tabela a vencer
                 </h3>
                 <p className="text-slate-600 dark:text-slate-400">
-                  Não foram encontradas tabelas com vencimento até o fim do mês.
+                  Não foram encontradas tabelas com vencimento no período selecionado.
                 </p>
               </div>
             </CardContent>

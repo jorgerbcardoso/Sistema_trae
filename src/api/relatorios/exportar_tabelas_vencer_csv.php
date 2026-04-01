@@ -47,10 +47,23 @@ try {
     // ============================================
     // 4. Buscar dados no SSW (Programa 0169)
     // ============================================
-    $dataInicio = date('dmy');
-    $dataFim = date('dmy', strtotime('last day of this month'));
+    $dataInicioParam = $_GET['data_inicio'] ?? null;
+    $dataFimParam = $_GET['data_fim'] ?? null;
+    $unidadeParam = $_GET['unidade'] ?? '';
+
+    // Parâmetros:
+    // - f6: unidade (sigla)
+    // - f7: data início (DDMMYY)
+    // - f8: data fim (DDMMYY)
     
-    $param = "?act=PER&t_tp_geracao=N&f7={$dataInicio}&f8={$dataFim}";
+    // Formatar datas para o padrão SSW (DDMMYY)
+    $dataInicio = $dataInicioParam ? date('dmy', strtotime($dataInicioParam)) : date('dmy');
+    $dataFim = $dataFimParam ? date('dmy', strtotime($dataFimParam)) : date('dmy', strtotime('last day of this month'));
+    
+    // Unidade (se informada)
+    $paramUnidade = $unidadeParam ? "&f6=" . urlencode(strtoupper($unidadeParam)) : "";
+    
+    $param = "?act=PER&t_tp_geracao=N{$paramUnidade}&f7={$dataInicio}&f8={$dataFim}";
     $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
     
     // ============================================

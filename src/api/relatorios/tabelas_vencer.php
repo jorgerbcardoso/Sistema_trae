@@ -47,13 +47,27 @@ try {
     // ============================================
     // 4. Buscar dados no SSW (Programa 0169)
     // ============================================
-    // Parâmetros:
-    // - f7: data início (hoje)
-    // - f8: data fim (último dia do mês)
-    $dataInicio = date('dmy');
-    $dataFim = date('dmy', strtotime('last day of this month'));
+    // Receber parâmetros do corpo da requisição (JSON)
+    $json = file_get_contents('php://input');
+    $input = json_decode($json, true);
     
-    $param = "?act=PER&t_tp_geracao=N&f7={$dataInicio}&f8={$dataFim}";
+    $dataInicioParam = $input['data_inicio'] ?? null;
+    $dataFimParam = $input['data_fim'] ?? null;
+    $unidadeParam = $input['unidade'] ?? '';
+
+    // Parâmetros:
+    // - f6: unidade (sigla)
+    // - f7: data início (DDMMYY)
+    // - f8: data fim (DDMMYY)
+    
+    // Formatar datas para o padrão SSW (DDMMYY)
+    $dataInicio = $dataInicioParam ? date('dmy', strtotime($dataInicioParam)) : date('dmy');
+    $dataFim = $dataFimParam ? date('dmy', strtotime($dataFimParam)) : date('dmy', strtotime('last day of this month'));
+    
+    // Unidade (se informada)
+    $paramUnidade = $unidadeParam ? "&f6=" . urlencode(strtoupper($unidadeParam)) : "";
+    
+    $param = "?act=PER&t_tp_geracao=N{$paramUnidade}&f7={$dataInicio}&f8={$dataFim}";
     $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
     
     // ============================================
@@ -205,8 +219,8 @@ try {
         'data' => $dados,
         'total' => count($dados),
         'periodo' => [
-            'inicio' => date('d/m/Y'),
-            'fim' => date('d/m/Y', strtotime('last day of this month'))
+            'inicio' => $dataInicioParam ? date('d/m/Y', strtotime($dataInicioParam)) : date('d/m/Y'),
+            'fim' => $dataFimParam ? date('d/m/Y', strtotime($dataFimParam)) : date('d/m/Y', strtotime('last day of this month'))
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     

@@ -8,7 +8,7 @@ import { mockGetTabelasVencer, type TabelaVencer } from '../mocks/mockData';
  */
 
 // Buscar tabelas a vencer
-export const getTabelasVencer = async () => {
+export const getTabelasVencer = async (params?: { data_inicio?: string, data_fim?: string, unidade?: string }) => {
   // ✅ SEMPRE USAR MOCK no Figma Make
   if (ENVIRONMENT.isFigmaMake) {
     return await mockGetTabelasVencer();
@@ -25,7 +25,8 @@ export const getTabelasVencer = async () => {
       'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
-      domain
+      domain,
+      ...params
     })
   });
 
@@ -56,14 +57,23 @@ export const getTabelasVencer = async () => {
  */
 export async function exportarTabelasVencerExcel(
   tabelas: TabelaVencer[],
-  periodo: { inicio: string; fim: string } | null
+  periodo: { inicio: string; fim: string } | null,
+  filtros?: { data_inicio?: string; data_fim?: string; unidade?: string }
 ): Promise<void> {
   try {
     const token = localStorage.getItem('auth_token');
     const domain = localStorage.getItem('presto_domain') || '';
     
+    // ✅ Montar query string com filtros
+    const params = new URLSearchParams();
+    if (filtros?.data_inicio) params.append('data_inicio', filtros.data_inicio);
+    if (filtros?.data_fim) params.append('data_fim', filtros.data_fim);
+    if (filtros?.unidade) params.append('unidade', filtros.unidade);
+    
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    
     // ✅ CHAMAR ENDPOINT CSV (sem enviar dados - regenera no servidor)
-    const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/exportar_tabelas_vencer_csv.php`, {
+    const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/exportar_tabelas_vencer_csv.php${queryString}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
