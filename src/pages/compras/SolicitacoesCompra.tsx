@@ -431,7 +431,9 @@ export default function SolicitacoesCompra() {
           { id: 1, username: 'joao', full_name: 'JOÃO DA SILVA', email: 'joao@empresa.com' },
           { id: 2, username: 'maria', full_name: 'MARIA SANTOS', email: 'maria@empresa.com' },
         ];
-        setUsuariosSetor(mockUsuarios);
+        // ✅ Filtrar usuário 'presto' da lista de aprovadores (mesmo no mock)
+        const aprovadoresFiltrados = mockUsuarios.filter(u => u.username.toLowerCase() !== 'presto');
+        setUsuariosSetor(aprovadoresFiltrados);
       } else {
         // BACKEND
         const data = await apiFetch(
@@ -440,7 +442,9 @@ export default function SolicitacoesCompra() {
         );
 
         if (data.success) {
-          setUsuariosSetor(data.data || []);
+          // ✅ Filtrar usuário 'presto' da lista de aprovadores
+          const aprovadoresFiltrados = (data.data || []).filter((u: any) => u.username?.toLowerCase() !== 'presto');
+          setUsuariosSetor(aprovadoresFiltrados);
         }
       }
     } catch (error) {
