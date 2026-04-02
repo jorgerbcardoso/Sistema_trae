@@ -437,7 +437,7 @@ export function ConferenciaSaidas() {
               ` : ''}
               <div style="margin-top: 5px; font-size: 8pt; color: #666;">
                 Período: ${new Date(filters.periodoEmissaoInicio + 'T12:00:00').toLocaleDateString('pt-BR')} até ${new Date(filters.periodoEmissaoFim + 'T12:00:00').toLocaleDateString('pt-BR')}<br/>
-                Unidade: ${filters.unidadeOrigem || 'TODAS'}
+                Origem: ${filters.unidadeOrigem || 'TODAS'} | Destino: ${filters.unidadeDestino || 'TODAS'}
               </div>
             </div>
           </div>

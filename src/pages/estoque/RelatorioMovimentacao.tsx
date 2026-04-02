@@ -439,7 +439,7 @@ export default function RelatorioMovimentacao() {
       <body>
         <div class="header">
           <div class="header-left">
-            <img src="${logoUrl}" alt="Logo Cliente" class="logo" crossorigin="anonymous" />
+            <img src="${logoUrl}" alt="Logo Cliente" class="logo" />
             <div class="header-info">
               <h1>RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE</h1>
               <p>Sistema de Gestão</p>
@@ -450,7 +450,6 @@ export default function RelatorioMovimentacao() {
               <img 
                 src="https://webpresto.com.br/images/logo_rel.png" 
                 alt="Sistema Presto" 
-                crossorigin="anonymous"
               />
             ` : ''}
           </div>
