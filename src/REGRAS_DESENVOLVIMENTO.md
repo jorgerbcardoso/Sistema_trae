@@ -92,16 +92,21 @@
   - Dark: `bg-slate-700` (hover: `bg-slate-600`)
 - ✅ **LARGURA**: 8px para vertical e horizontal.
 
-### 17. **LOGOTIPOS EM IMPRESSÕES**
-- ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão.
-- ✅ **LÓGICA DE POSICIONAMENTO**:
+### 17. **LOGOTIPOS EM IMPRESSÕES (PDF E EXCEL)**
+- ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão ou exportações Excel.
+- ✅ **LÓGICA DE POSICIONAMENTO (PDF/HTML)**:
   - **LADO ESQUERDO (Logo Cliente)**: 
     - Se `domain === 'ACV'`: `https://sistema.webpresto.com.br/images/logos_clientes/aceville.png`
     - Demais domínios: `https://webpresto.com.br/images/logo_rel.png`
-  - **LADO DIREITO (Logo Sistema)**: `https://webpresto.com.br/images/logo_rel.png` (Sempre usar esta URL para a logo do Presto no canto superior direito).
+  - **LADO DIREITO (Logo Sistema)**: 
+    - Se `domain === 'ACV'`: **EXCLUIR** a logo do sistema (Presto).
+    - Demais domínios: `https://webpresto.com.br/images/logo_rel.png` (Logo oficial do Presto).
+- ✅ **LÓGICA EXCEL**:
+  - Usar apenas **UMA** logo (do cliente) no cabeçalho.
+  - Se `domain === 'ACV'`: Usar obrigatoriamente `https://sistema.webpresto.com.br/images/logos_clientes/aceville.png`.
 - ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"**.
 - ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
-- ✅ **ESPERA DE CARREGAMENTO**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.
+- ✅ **ESPERA DE CARREGAMENTO (PDF)**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.
 
 ---
 

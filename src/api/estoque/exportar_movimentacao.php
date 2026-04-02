@@ -24,14 +24,14 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 require_once __DIR__ . '/../config.php';
 
 try {
-    // ✅ Obter usuário autenticado
+    // ✅ Obter usuário autenticado e domínio
     $currentUser = getCurrentUser();
+    $dominioHeader = $_SERVER['HTTP_X_DOMAIN'] ?? null;
+    $dominio = $currentUser['domain'] ?? $dominioHeader;
     
-    if (!$currentUser) {
-        throw new Exception('Não autenticado');
+    if (!$dominio) {
+        throw new Exception('Domínio não identificado');
     }
-    
-    $dominio = $currentUser['domain'];
     
     // ✅ CRIAR CONEXÃO (PADRÃO OBRIGATÓRIO)
     $conn = connect();
@@ -47,7 +47,12 @@ try {
     }
     
     // 🏢 BUSCAR LOGO DO CLIENTE
-    $logoUrl = 'https://webpresto.com.br/images/logo_rel.png';
+    // ✅ PADRÃO OBRIGATÓRIO: Se for ACV, usar a logo da Aceville. Caso contrário, Presto.
+    $isACV = (strtoupper($dominio) === 'ACV');
+    $logoUrl = $isACV 
+        ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png' 
+        : 'https://webpresto.com.br/images/logo_rel.png';
+    
     $nomeCliente = '';
     
     try {
@@ -56,7 +61,9 @@ try {
         
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo = pg_fetch_assoc($resultLogo);
-            if (!empty($rowLogo['logo_light'])) {
+            // Se NÃO for ACV e tiver logo no banco, usa a do banco. 
+            // Se for ACV, mantemos a que fixamos acima.
+            if (!$isACV && !empty($rowLogo['logo_light'])) {
                 $logoUrl = $rowLogo['logo_light'];
             }
             $nomeCliente = $rowLogo['name'] ?? '';

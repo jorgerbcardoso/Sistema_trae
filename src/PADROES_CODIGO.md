@@ -147,15 +147,15 @@ const logoUrl = dominio === 'ACV'
     </div>
   </div>
   <div class="header-right">
-    <img src="https://webpresto.com.br/images/logo_rel.png" />
-  </div>
-</div>
-
-// Script para aguardar imagens antes de imprimir
-<script>
-  let imagesLoaded = 0;
-  const totalImages = 2;
-  function checkAllImagesLoaded() {
+     ${dominio !== 'ACV' ? `<img src="https://webpresto.com.br/images/logo_rel.png" />` : ''}
+   </div>
+ </div>
+ 
+ // Script para aguardar imagens antes de imprimir
+ <script>
+   let imagesLoaded = 0;
+   const totalImages = ${dominio !== 'ACV' ? 2 : 1};
+   function checkAllImagesLoaded() {
     imagesLoaded++;
     if (imagesLoaded >= totalImages) {
       setTimeout(() => window.print(), 500);

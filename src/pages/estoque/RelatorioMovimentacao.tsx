@@ -446,11 +446,13 @@ export default function RelatorioMovimentacao() {
             </div>
           </div>
           <div class="header-right">
-            <img 
-              src="https://webpresto.com.br/images/logo_rel.png" 
-              alt="Sistema Presto" 
-              crossorigin="anonymous"
-            />
+            ${dominio !== 'ACV' ? `
+              <img 
+                src="https://webpresto.com.br/images/logo_rel.png" 
+                alt="Sistema Presto" 
+                crossorigin="anonymous"
+              />
+            ` : ''}
           </div>
         </div>
 
@@ -566,7 +568,7 @@ export default function RelatorioMovimentacao() {
         <script>
           // Aguardar o carregamento de todas as imagens antes de imprimir
           let imagesLoaded = 0;
-          const totalImages = 2; // Logo Cliente + Logo Presto
+          const totalImages = ${dominio !== 'ACV' ? 2 : 1}; // Logo Cliente + Logo Presto (se não for ACV)
           
           function checkAllImagesLoaded() {
             imagesLoaded++;

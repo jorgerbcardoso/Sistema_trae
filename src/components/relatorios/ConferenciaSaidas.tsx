@@ -429,10 +429,12 @@ export function ConferenciaSaidas() {
               </div>
             </div>
             <div class="header-right">
-              <img 
-                src="https://webpresto.com.br/images/logo_rel.png" 
-                alt="Sistema Presto" 
-              />
+              ${dominio !== 'ACV' ? `
+                <img 
+                  src="https://webpresto.com.br/images/logo_rel.png" 
+                  alt="Sistema Presto" 
+                />
+              ` : ''}
               <div style="margin-top: 5px; font-size: 8pt; color: #666;">
                 Período: ${new Date(filters.periodoEmissaoInicio + 'T12:00:00').toLocaleDateString('pt-BR')} até ${new Date(filters.periodoEmissaoFim + 'T12:00:00').toLocaleDateString('pt-BR')}<br/>
                 Unidade: ${filters.unidadeOrigem || 'TODAS'}
@@ -450,7 +452,7 @@ export function ConferenciaSaidas() {
 
           <script>
             let imagesLoaded = 0;
-            const totalImages = 2;
+            const totalImages = ${dominio !== 'ACV' ? 2 : 1};
             
             function checkAllImagesLoaded() {
               imagesLoaded++;
