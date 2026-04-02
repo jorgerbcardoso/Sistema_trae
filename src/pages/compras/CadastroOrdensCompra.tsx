@@ -1149,8 +1149,10 @@ export default function CadastroOrdensCompra() {
         );
         
         if (data.success) {
-          setUsuariosAprovadores(data.data || []);
-        }
+            // ✅ Filtrar usuário 'presto' da lista de aprovadores
+            const aprovadoresFiltrados = (data.data || []).filter((u: any) => u.username?.toLowerCase() !== 'presto');
+            setUsuariosAprovadores(aprovadoresFiltrados);
+          }
       }
     } catch (error) {
       console.error('Erro ao carregar usuários aprovadores:', error);
@@ -2221,7 +2223,7 @@ export default function CadastroOrdensCompra() {
                 <Printer className="size-4" />
                 Imprimir PDF
               </Button>
-              {ordemDetalhes && ordemDetalhes.aprovada === 'S' && (!ordemDetalhes.seq_pedido || Number(ordemDetalhes.seq_pedido) === 0) && (
+              {ordemDetalhes && (ordemDetalhes.aprovada === 'S' || ordemDetalhes.aprovada === 'N') && (!ordemDetalhes.seq_pedido || Number(ordemDetalhes.seq_pedido) === 0) && (
                 <Button 
                   variant="outline"
                   className="gap-2 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-sm"

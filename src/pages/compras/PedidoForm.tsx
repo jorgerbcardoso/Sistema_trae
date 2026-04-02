@@ -359,7 +359,9 @@ export default function PedidoForm() {
         );
         
         if (data.success) {
-          setUsuariosAprovadores(data.data || []);
+          // ✅ Filtrar usuário 'presto' da lista de aprovadores
+          const aprovadoresFiltrados = (data.data || []).filter((u: any) => u.username?.toLowerCase() !== 'presto');
+          setUsuariosAprovadores(aprovadoresFiltrados);
         }
       }
     } catch (error) {

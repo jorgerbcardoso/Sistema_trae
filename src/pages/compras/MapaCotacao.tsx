@@ -438,15 +438,8 @@ export default function MapaCotacao() {
           { id: 3, username: 'presto', full_name: 'PRESTO ADMIN', email: 'presto@sistema.com' }
         ];
         
-        // ✅ CRÍTICO: Filtrar usuário "presto" se o usuário logado não for "presto"
-        console.log('🔍 Usuário logado:', user?.username);
-        const usuariosFiltrados = mockUsuarios.filter(u => {
-          const ehPresto = u.username.toLowerCase() === 'presto';
-          const usuarioLogadoEhPresto = user?.username?.toLowerCase() === 'presto';
-          const deveExibir = !ehPresto || usuarioLogadoEhPresto;
-          console.log(`👤 ${u.username}: ehPresto=${ehPresto}, usuarioLogadoEhPresto=${usuarioLogadoEhPresto}, deveExibir=${deveExibir}`);
-          return deveExibir;
-        });
+        // ✅ CRÍTICO: Filtrar usuário "presto" da lista de aprovadores
+        const usuariosFiltrados = mockUsuarios.filter(u => u.username.toLowerCase() !== 'presto');
         
         console.log('📋 Usuários filtrados:', usuariosFiltrados);
         setUsuariosAprovadores(usuariosFiltrados);
@@ -457,15 +450,8 @@ export default function MapaCotacao() {
         });
 
         if (response.success) {
-          // ✅ CRÍTICO: Filtrar usuário "presto" se o usuário logado não for "presto"
-          console.log('🔍 Usuário logado:', user?.username);
-          const usuariosFiltrados = response.data.filter((u: any) => {
-            const ehPresto = u.username.toLowerCase() === 'presto';
-            const usuarioLogadoEhPresto = user?.username?.toLowerCase() === 'presto';
-            const deveExibir = !ehPresto || usuarioLogadoEhPresto;
-            console.log(`👤 ${u.username}: ehPresto=${ehPresto}, usuarioLogadoEhPresto=${usuarioLogadoEhPresto}, deveExibir=${deveExibir}`);
-            return deveExibir;
-          });
+          // ✅ CRÍTICO: Filtrar usuário "presto" da lista de aprovadores
+          const usuariosFiltrados = (response.data || []).filter((u: any) => u.username?.toLowerCase() !== 'presto');
           
           console.log('📋 Usuários filtrados:', usuariosFiltrados);
           setUsuariosAprovadores(usuariosFiltrados);
