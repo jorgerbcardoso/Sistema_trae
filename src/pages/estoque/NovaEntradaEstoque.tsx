@@ -1441,8 +1441,9 @@ export default function NovaEntradaEstoque() {
                               <TableCell>
                                 <div className="flex justify-end">
                                   <Input
-                                    type="text"
-                                    value={item.qtde_recebida > 0 ? item.qtde_recebida.toString().replace('.', ',') : ''}
+                                    type="number"
+                                    step="any"
+                                    value={item.qtde_recebida || ''}
                                     onChange={(e) => atualizarQuantidadeRecebida(item.seq_item, e.target.value)}
                                     className={`w-24 text-right ${item.divergente ? 'border-yellow-500' : ''}`}
                                     placeholder="0,00"
@@ -1452,8 +1453,9 @@ export default function NovaEntradaEstoque() {
                               <TableCell>
                                 <div className="flex justify-end">
                                   <Input
-                                    type="text"
-                                    value={item.vlr_unitario > 0 ? item.vlr_unitario.toString().replace('.', ',') : ''}
+                                    type="number"
+                                    step="0.01"
+                                    value={item.vlr_unitario || ''}
                                     onChange={(e) => atualizarValorUnitario(item.seq_item, e.target.value)}
                                     className="w-28 text-right"
                                     placeholder="0,00"
