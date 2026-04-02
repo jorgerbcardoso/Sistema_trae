@@ -20,7 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  Printer,
 } from 'lucide-react';
 import { ENVIRONMENT } from '../../config/environment';
 import { FilterSelectVeiculo } from '../dashboards/FilterSelectVeiculo';
@@ -261,6 +261,235 @@ export function ConferenciaSaidas() {
     }
   };
 
+  // ✅ Função de Impressão (Baseada no padrão do sistema)
+  const handlePrint = () => {
+    if (manifestos.length === 0) {
+      toast.error('Não há dados para imprimir.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela de impressão');
+      return;
+    }
+
+    // Logo do cliente e Presto
+    const dominio = user?.domain?.toUpperCase() || 'PRESTO';
+    const logoUrl = dominio === 'ACV' 
+      ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png'
+      : 'https://webpresto.com.br/images/logo_rel.png';
+
+    const renderTableHtml = (list: Manifesto[], title: string, totals: any) => {
+      if (list.length === 0) return '';
+      
+      return `
+        <div class="section">
+          <div class="section-title">${title} (${list.length} registros)</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center;">Manifesto</th>
+                <th style="text-align: center;">Destino</th>
+                <th style="text-align: center;">Placa</th>
+                <th style="text-align: right;">Total Frete</th>
+                <th style="text-align: right;">CTRB</th>
+                <th style="text-align: right;">Pedágio</th>
+                <th style="text-align: right;">Peso (Kg)</th>
+                <th style="text-align: center;">Emissão</th>
+                <th style="text-align: center;">Saída</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${list.map(m => `
+                <tr>
+                  <td style="text-align: center; font-family: monospace;">${m.numero}</td>
+                  <td style="text-align: center;">${m.siglaDestino}</td>
+                  <td style="text-align: center; font-family: monospace;">${m.placa}${m.placaCarreta ? ' + ' + m.placaCarreta : ''}</td>
+                  <td style="text-align: right;">${formatCurrency(m.totalFrete)}</td>
+                  <td style="text-align: right;">${formatCurrency(m.ctrb)}</td>
+                  <td style="text-align: right;">${formatCurrency(m.pedagio)}</td>
+                  <td style="text-align: right;">${formatPeso(m.pesoTotal)}</td>
+                  <td style="text-align: center; font-family: monospace;">${m.dataEmissao || '-'}</td>
+                  <td style="text-align: center; font-family: monospace;">${m.horarioSaida || '-'}</td>
+                </tr>
+              `).join('')}
+              <tr style="background-color: #f3f4f6; font-weight: bold;">
+                <td colspan="3" style="text-align: center;">TOTAL</td>
+                <td style="text-align: right;">${formatCurrency(totals.totalFrete)}</td>
+                <td style="text-align: right;">${formatCurrency(totals.totalCtrb)}</td>
+                <td style="text-align: right;">${formatCurrency(totals.totalPedagio)}</td>
+                <td style="text-align: right;">${formatPeso(totals.totalPeso)}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Conferência de Saídas - ${user?.domain?.toUpperCase()}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 10mm; 
+              font-size: 9pt;
+              color: #000;
+            }
+            .header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 2px solid #2563eb;
+            }
+            .header-left {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+            }
+            .logo {
+              max-width: 150px;
+              max-height: 50px;
+              object-fit: contain;
+            }
+            .header-info h1 {
+              font-size: 14pt;
+              color: #2563eb;
+              margin-bottom: 3px;
+              text-transform: uppercase;
+            }
+            .header-right {
+              text-align: right;
+            }
+            .header-right img {
+              max-width: 120px;
+              max-height: 40px;
+              display: block;
+              margin-left: auto;
+              object-fit: contain;
+            }
+            .section {
+              margin-bottom: 20px;
+            }
+            .section-title {
+              font-size: 10pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-bottom: 8px;
+              padding-bottom: 4px;
+              border-bottom: 1px solid #e5e7eb;
+              text-transform: uppercase;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 5px;
+              font-size: 8pt;
+            }
+            th {
+              background-color: #f3f4f6;
+              color: #1e40af;
+              font-weight: bold;
+              padding: 6px 4px;
+              border: 1px solid #e5e7eb;
+              text-transform: uppercase;
+            }
+            td {
+              border: 1px solid #e5e7eb;
+              padding: 5px 4px;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 10px;
+              border-top: 1px solid #e5e7eb;
+              text-align: center;
+              color: #9ca3af;
+              font-size: 7pt;
+            }
+            @media print {
+              body { padding: 5mm; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              <img src="${logoUrl}" alt="Logo Cliente" class="logo" />
+              <div class="header-info">
+                <h1>Conferência de Saídas</h1>
+                <p>Sistema de Gestão</p>
+              </div>
+            </div>
+            <div class="header-right">
+              <img 
+                src="https://webpresto.com.br/images/logo_rel.png" 
+                alt="Sistema Presto" 
+              />
+              <div style="margin-top: 5px; font-size: 8pt; color: #666;">
+                Período: ${new Date(filters.periodoEmissaoInicio + 'T12:00:00').toLocaleDateString('pt-BR')} até ${new Date(filters.periodoEmissaoFim + 'T12:00:00').toLocaleDateString('pt-BR')}<br/>
+                Unidade: ${filters.unidadeOrigem || 'TODAS'}
+              </div>
+            </div>
+          </div>
+
+          ${renderTableHtml(manifestosFrota, 'VEÍCULOS FROTA', totalsFrota)}
+          ${renderTableHtml(manifestosTerceiros, 'VEÍCULOS TERCEIROS', totalsTerceiros)}
+
+          <div class="footer">
+            Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
+            © 2026 Sistema Presto - Gestão Inteligente
+          </div>
+
+          <script>
+            let imagesLoaded = 0;
+            const totalImages = 2;
+            
+            function checkAllImagesLoaded() {
+              imagesLoaded++;
+              if (imagesLoaded >= totalImages) {
+                setTimeout(() => {
+                  window.print();
+                }, 500);
+              }
+            }
+
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+              if (img.complete) {
+                checkAllImagesLoaded();
+              } else {
+                img.onload = checkAllImagesLoaded;
+                img.onerror = checkAllImagesLoaded;
+              }
+            });
+
+            setTimeout(() => {
+              if (imagesLoaded < totalImages) {
+                window.print();
+              }
+            }, 3000);
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  };
+
   return (
     <AdminLayout 
       title="Conferência de Saídas"
@@ -345,6 +574,24 @@ export function ConferenciaSaidas() {
                   <>
                     <Search className="h-4 w-4 mr-2" />
                     Gerar Relatório
+                  </>
+                )}
+              </Button>
+              
+              <Button
+                onClick={handlePrint}
+                disabled={loading || manifestos.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Imprimindo...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir PDF
                   </>
                 )}
               </Button>

@@ -94,11 +94,14 @@
 
 ### 17. **LOGOTIPOS EM IMPRESSÕES**
 - ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão.
-- ✅ **LÓGICA ACV**: 
-  - Se `domain === 'ACV'`: `https://webpresto.com.br/images/logos_clientes/aceville.png`
-  - Demais domínios: `https://webpresto.com.br/images/logo_rel.png`
-- ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"** (sem o nome Presto).
+- ✅ **LÓGICA DE POSICIONAMENTO**:
+  - **LADO ESQUERDO (Logo Cliente)**: 
+    - Se `domain === 'ACV'`: `https://sistema.webpresto.com.br/images/logos_clientes/aceville.png`
+    - Demais domínios: `https://webpresto.com.br/images/logo_rel.png`
+  - **LADO DIREITO (Logo Sistema)**: `https://webpresto.com.br/images/logo_rel.png` (Sempre usar esta URL para a logo do Presto no canto superior direito).
+- ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"**.
 - ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
+- ✅ **ESPERA DE CARREGAMENTO**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.
 
 ---
 

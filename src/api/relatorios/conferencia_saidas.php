@@ -201,7 +201,7 @@ try {
           'ctrb' => strtofloat ($vlr_ctrb),
           'pedagio' => $vlr_pedagio,
           'pesoTotal' => strtofloat ($peso),
-          'dataEmissao' => $data_inclusao_formatada,
+          'dataEmissao' => date('d/m/y', strtotime($data_inclusao_formatada)),
           'dataSaida' => $data_saida_formatada,
           'dataPrevisaoChegada' => $data_chegada_formatada,
           'horarioTerminoCarga' => ($data_saida_formatada && $hora_saida_formatada)

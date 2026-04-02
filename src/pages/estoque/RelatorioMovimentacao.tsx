@@ -223,7 +223,10 @@ export default function RelatorioMovimentacao() {
     const tipoDescricao = obterDescricaoTipo(filters.tipo || 'TODOS');
 
     // Obter domínio do usuário para logo do cliente
-    const dominio = user?.domain || 'acv';
+    const dominio = user?.domain?.toUpperCase() || 'PRESTO';
+    const logoUrl = dominio === 'ACV' 
+      ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png'
+      : 'https://webpresto.com.br/images/logo_rel.png';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -257,8 +260,9 @@ export default function RelatorioMovimentacao() {
             gap: 10px;
           }
           .logo {
-            max-width: 80px;
-            max-height: 35px;
+            max-width: 150px;
+            max-height: 45px;
+            object-fit: contain;
           }
           .header-info h1 {
             font-size: 12pt;
@@ -270,14 +274,14 @@ export default function RelatorioMovimentacao() {
             color: #666;
           }
           .header-right {
-            min-width: 100px;
             text-align: right;
           }
           .header-right img {
             max-width: 120px;
-            max-height: 50px;
+            max-height: 40px;
             display: block;
             margin-left: auto;
+            object-fit: contain;
           }
           .filters-section {
             background: #f3f4f6;
@@ -435,22 +439,18 @@ export default function RelatorioMovimentacao() {
       <body>
         <div class="header">
           <div class="header-left">
-            <img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" class="logo" crossorigin="anonymous" />
+            <img src="${logoUrl}" alt="Logo Cliente" class="logo" crossorigin="anonymous" />
             <div class="header-info">
               <h1>RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE</h1>
-              <p>Sistema PRESTO - Gestão de Transportadoras</p>
+              <p>Sistema de Gestão</p>
             </div>
           </div>
           <div class="header-right">
-            ${logoEmpresa ? `
             <img 
-              id="logoEmpresa" 
-              src="${logoEmpresa}" 
-              alt="Logo Empresa" 
+              src="https://webpresto.com.br/images/logo_rel.png" 
+              alt="Sistema Presto" 
               crossorigin="anonymous"
-              onerror="this.style.display='none'"
             />
-            ` : ''}
           </div>
         </div>
 
@@ -565,67 +565,31 @@ export default function RelatorioMovimentacao() {
 
         <script>
           // Aguardar o carregamento de todas as imagens antes de imprimir
-          const logoEmpresaExists = ${logoEmpresa ? 'true' : 'false'};
           let imagesLoaded = 0;
-          const totalImages = logoEmpresaExists ? 2 : 1; // Logo Presto + Logo Empresa (se existir)
+          const totalImages = 2; // Logo Cliente + Logo Presto
           
           function checkAllImagesLoaded() {
             imagesLoaded++;
-            console.log('Imagem carregada:', imagesLoaded, 'de', totalImages);
             if (imagesLoaded >= totalImages) {
-              // Pequeno delay adicional para garantir renderização
               setTimeout(() => {
-                console.log('Iniciando impressão...');
                 window.print();
               }, 500);
             }
           }
 
-          // Verificar logo do Presto
-          const logoPresto = document.querySelector('.logo');
-          if (logoPresto) {
-            if (logoPresto.complete) {
-              console.log('Logo Presto já carregada');
+          const images = document.querySelectorAll('img');
+          images.forEach(img => {
+            if (img.complete) {
               checkAllImagesLoaded();
             } else {
-              logoPresto.onload = () => {
-                console.log('Logo Presto carregou via onload');
-                checkAllImagesLoaded();
-              };
-              logoPresto.onerror = () => {
-                console.warn('Erro ao carregar Logo Presto');
-                checkAllImagesLoaded();
-              };
+              img.onload = checkAllImagesLoaded;
+              img.onerror = checkAllImagesLoaded;
             }
-          }
+          });
 
-          // Verificar logo da Empresa (somente se existir)
-          if (logoEmpresaExists) {
-            const logoEmpresa = document.getElementById('logoEmpresa');
-            if (logoEmpresa) {
-              if (logoEmpresa.complete) {
-                console.log('Logo Empresa já carregada');
-                checkAllImagesLoaded();
-              } else {
-                logoEmpresa.onload = () => {
-                  console.log('Logo Empresa carregou via onload');
-                  checkAllImagesLoaded();
-                };
-                logoEmpresa.onerror = () => {
-                  console.warn('Erro ao carregar Logo Empresa');
-                  checkAllImagesLoaded();
-                };
-              }
-            } else {
-              console.warn('Elemento logoEmpresa não encontrado');
-              checkAllImagesLoaded();
-            }
-          }
-
-          // Timeout de segurança: imprimir após 3 segundos de qualquer forma
+          // Timeout de segurança
           setTimeout(() => {
             if (imagesLoaded < totalImages) {
-              console.warn('Timeout: imprimindo sem aguardar todas as imagens. Carregadas:', imagesLoaded, 'de', totalImages);
               window.print();
             }
           }, 3000);
