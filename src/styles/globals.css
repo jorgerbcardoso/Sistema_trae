@@ -14,8 +14,42 @@
   --color-black: #f8fafc;
 
   /* Cores de Fundo e Texto */
-  --color-background: 222.2 84% 4.9%;
-  --color-foreground: 210 40% 98%;
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  /* Cores do Card */
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  /* Cores do Popover */
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  /* Cores Primárias e Secundárias */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  /* Cores Muted e Accent */
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  /* Cores de Erro/Destrutivo */
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  /* Bordas e Inputs */
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Bordas */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
   
   /* Forçar as classes dark: a estarem sempre ativas ou serem redundantes */
   --dark-mode: class;
