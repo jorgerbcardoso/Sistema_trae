@@ -13,11 +13,15 @@
         
         // 1. Forçar classes e atributos IMEDIATAMENTE
         const forceDark = () => {
-          if (!doc.classList.contains('dark')) doc.classList.add('dark');
-          if (doc.classList.contains('light')) doc.classList.remove('light');
-          if (doc.getAttribute('data-theme') !== 'dark') doc.setAttribute('data-theme', 'dark');
-          if (doc.style.colorScheme !== 'dark') {
-            doc.style.setProperty('color-scheme', 'dark', 'important');
+          doc.classList.add('dark');
+          doc.classList.remove('light');
+          doc.setAttribute('data-theme', 'dark');
+          doc.style.setProperty('color-scheme', 'dark', 'important');
+          
+          // Prevenção extra: garantir que o background seja escuro ANTES de qualquer CSS
+          if (document.body) {
+            document.body.style.backgroundColor = '#020617';
+            document.body.style.color = '#f8fafc';
           }
         };
 
@@ -27,7 +31,10 @@
         const observer = new MutationObserver((mutations) => {
           mutations.forEach((mutation) => {
             if (mutation.type === 'attributes' && (mutation.attributeName === 'class' || mutation.attributeName === 'style' || mutation.attributeName === 'data-theme')) {
-              forceDark();
+              // Verificar se tentaram remover dark ou adicionar light
+              if (!doc.classList.contains('dark') || doc.classList.contains('light')) {
+                forceDark();
+              }
             }
           });
         });
@@ -42,6 +49,15 @@
         meta.name = 'color-scheme';
         meta.content = 'dark';
         document.head.appendChild(meta);
+        
+        // 4. Limpar qualquer flag de mock acidental no localStorage se estiver em produção
+        const hostname = window.location.hostname;
+        if (hostname === 'webpresto.com.br' || hostname === 'sistemagestao.aceville.com.br') {
+          if (localStorage.getItem('auth_token') === 'mock_token_figma_make') {
+            localStorage.clear();
+            window.location.reload();
+          }
+        }
       })();
     </script>
     

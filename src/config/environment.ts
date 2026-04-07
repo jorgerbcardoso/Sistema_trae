@@ -28,9 +28,11 @@ const isLocalhost = hostname === 'localhost' ||
                     hostname === '127.0.0.1';
 
 // Determinar modo
-// 🔥 REGRA CRÍTICA: MOCK apenas no Figma Make ou se explicitamente configurado.
+// 🔥 REGRA CRÍTICA: MOCK apenas no Figma Make.
 // Em produção ou localhost, SEMPRE usar BACKEND real.
-export const USE_MOCK_DATA = isFigmaMake;
+// No modo claro do navegador, alguns ambientes podem falhar na detecção de hostname, 
+// por isso forçamos false se não houver certeza absoluta do Figma.
+export const USE_MOCK_DATA = isFigmaMake && hostname.includes('figma');
 
 // URL da API - DINÂMICA baseada no hostname
 // Se for produção OU acesso via IP, usar URL relativa ao servidor atual

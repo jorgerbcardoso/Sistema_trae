@@ -10,8 +10,11 @@ import { router } from './routes.tsx';
 import { useMockUser } from './hooks/useMockUser';
 
 export default function App() {
-  // ✅ Configurar usuário mockado no Figma Make
-  useMockUser();
+  // ✅ Configurar usuário mockado APENAS no Figma Make
+  // No modo claro do navegador em produção, isso NÃO deve rodar.
+  if (window.location.hostname.includes('figma')) {
+    useMockUser();
+  }
   
   return (
     <ErrorBoundary>
