@@ -24,9 +24,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.add('dark');
       body.classList.add('dark');
       
-      // ✅ SOBRESCREVER qualquer preferência no localStorage
+      // ✅ SOBRESCREVER qualquer preferência no localStorage e sessionStorage
       localStorage.setItem('nativa-theme', 'dark');
       localStorage.setItem('theme', 'dark');
+      localStorage.setItem('presto_theme', 'dark');
+      sessionStorage.setItem('theme', 'dark');
       
       // ✅ FORÇAR atributos extras para compatibilidade total
       root.setAttribute('data-theme', 'dark');
@@ -35,16 +37,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     applyTheme();
     
+    // ✅ Intervalo de segurança para garantir que nada mude (BRUTE FORCE)
+    const interval = setInterval(applyTheme, 1000);
+    
     // ✅ Observador para garantir que nada mude as classes no runtime
     const observer = new MutationObserver(() => {
-      if (document.documentElement.classList.contains('light')) {
+      if (document.documentElement.classList.contains('light') || !document.documentElement.classList.contains('dark')) {
         applyTheme();
       }
     });
     
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     
-    return () => observer.disconnect();
+    return () => {
+      clearInterval(interval);
+      observer.disconnect();
+    };
   }, []);
 
   // const toggleTheme = () => { // Função de toggle removida

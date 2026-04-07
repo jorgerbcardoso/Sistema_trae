@@ -100,7 +100,7 @@ try {
         'theme' => [
             'primary_color' => $domainData['primary_color'] ?? '#1e40af',
             'secondary_color' => $domainData['secondary_color'] ?? '#64748b',
-            'theme_mode' => $domainData['theme'] ?? 'light',
+            'theme_mode' => 'dark', // FORÇAR TEMA ESCURO (CLARO DESATIVADO)
             'logo_light' => $domainData['logo_url'] ?? $domainData['favicon_url'],
             'logo_dark' => $domainData['logo_url'] ?? $domainData['favicon_url'],
             'favicon_url' => $domainData['favicon_url']

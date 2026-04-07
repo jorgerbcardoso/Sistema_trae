@@ -5,25 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Sistema Presto</title>
+    
     <!-- FORÇAR TEMA ESCURO IMEDIATAMENTE (NUNCA LIGHT) -->
+    <style>
+      :root, html, body {
+        background-color: #020617 !important; /* slate-950 */
+        color: #f8fafc !important; /* slate-50 */
+        color-scheme: dark !important;
+      }
+      .light { display: none !important; } /* Esconder qualquer coisa que tente ser light */
+    </style>
+    
     <script>
       (function() {
         function forceDark() {
-          document.documentElement.classList.remove('light');
-          document.documentElement.classList.add('dark');
-          document.documentElement.setAttribute('data-theme', 'dark');
-          document.documentElement.style.colorScheme = 'dark';
+          const root = document.documentElement;
+          root.classList.remove('light');
+          root.classList.add('dark');
+          root.setAttribute('data-theme', 'dark');
+          root.style.colorScheme = 'dark';
           localStorage.setItem('theme', 'dark');
           localStorage.setItem('nativa-theme', 'dark');
         }
         forceDark();
-        // Observador para garantir que nada mude para light
-        const observer = new MutationObserver(() => {
-          if (document.documentElement.classList.contains('light')) {
-            forceDark();
-          }
+        
+        // Observador ultra-agressivo
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+              if (document.documentElement.classList.contains('light')) {
+                forceDark();
+              }
+            }
+          });
         });
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        
+        observer.observe(document.documentElement, { 
+          attributes: true, 
+          attributeFilter: ['class'] 
+        });
+
+        // Adicionalmente, forçar no DOMContentLoaded e no load
+        window.addEventListener('DOMContentLoaded', forceDark);
+        window.addEventListener('load', forceDark);
       })();
     </script>
     <!-- Tailwind CSS via CDN (para compatibilidade com Figma Make) -->
