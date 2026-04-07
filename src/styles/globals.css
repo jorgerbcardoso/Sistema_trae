@@ -3,7 +3,7 @@
 @theme {
   --dark-mode: selector;
 
-  /* ✅ Variáveis do Tailwind v4 mapeadas para as variáveis CSS */
+  /* ✅ MAPEAMENTO DIRETO DE CORES DO TEMA */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -24,10 +24,14 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
   --radius-lg: 0.625rem;
+
+  /* ✅ SUBVERSÃO DE CORES PADRÃO */
+  --color-white: hsl(222.2 84% 4.9%);
+  --color-black: hsl(210 40% 98%);
 }
 
-/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL */
-:root, .dark, [data-theme="dark"], [data-theme="light"] {
+/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL (APENAS NO :ROOT E .DARK) */
+:root, .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
@@ -49,24 +53,19 @@
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
 
-  /* Força o navegador a renderizar controles internos (scrollbar, inputs) como dark */
-  color-scheme: dark !important;
+  /* Força o navegador a renderizar controles internos como dark */
+  color-scheme: only dark !important;
 }
 
-/* ✅ NEUTRALIZAR PREFERÊNCIA DO SISTEMA (O PONTO CHAVE) */
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: dark !important;
-  }
+/* ✅ REMOVIDO BLOCO @media (prefers-color-scheme: light) */
+
+/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias que trazem cores claras */
+.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100 {
+  background-color: hsl(222.2 84% 4.9%) !important;
 }
 
-/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias de "Modo Claro" */
-.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100 {
-  background-color: hsl(var(--background)) !important;
-}
-
-.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-neutral-950 {
-  color: hsl(var(--foreground)) !important;
+.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-gray-950, .text-zinc-900 {
+  color: hsl(210 40% 98%) !important;
 }
 
 @layer base {

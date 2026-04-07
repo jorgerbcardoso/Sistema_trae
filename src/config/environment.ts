@@ -17,12 +17,15 @@ const isProduction = hostname === 'webpresto.com.br' ||
 // Detectar se é acesso via IP (Aceville ou outro cliente)
 const isIPAccess = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 
-// DETECÇÃO MELHORADA do Figma Make
-const isFigmaMake = hostname.includes('figma.com') ||
+// DETECÇÃO SEGURA do Figma Make
+// ✅ REGRA: Apenas se houver evidência real de que estamos no Figma
+const isFigmaMake = (hostname.includes('figma.com') ||
                     hostname.includes('esm.sh') ||
                     hostname.includes('fig.run') ||
-                    hostname === '' || // Fallback para ambientes sem hostname definido
-                    window.location.href.includes('figma');
+                    window.location.href.includes('figma')) &&
+                    hostname !== 'webpresto.com.br' &&
+                    hostname !== 'sistemagestao.aceville.com.br' &&
+                    !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 
 const isLocalhost = hostname === 'localhost' || 
                     hostname === '127.0.0.1';

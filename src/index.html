@@ -16,41 +16,46 @@
           doc.classList.add('dark');
           doc.classList.remove('light');
           doc.setAttribute('data-theme', 'dark');
-          doc.style.setProperty('color-scheme', 'dark', 'important');
-          
-          // Prevenção extra: garantir que o background seja escuro ANTES de qualquer CSS
-          if (document.body) {
-            document.body.style.backgroundColor = '#020617';
-            document.body.style.color = '#f8fafc';
-          }
+          doc.style.setProperty('color-scheme', 'only dark', 'important');
         };
 
         forceDark();
 
         // 2. Bloquear qualquer mudança de tema (MutationObserver)
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && (mutation.attributeName === 'class' || mutation.attributeName === 'style' || mutation.attributeName === 'data-theme')) {
-              // Verificar se tentaram remover dark ou adicionar light
-              if (!doc.classList.contains('dark') || doc.classList.contains('light')) {
-                forceDark();
+        const observer = new MutationObserver(() => {
+          if (!doc.classList.contains('dark') || doc.classList.contains('light')) {
+            forceDark();
+          }
+        });
+
+        observer.observe(doc, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
+
+        // 3. NUCLEAR: Remover media queries de "Modo Claro" de todos os estilos
+        const stripLightMode = () => {
+          for (let i = 0; i < document.styleSheets.length; i++) {
+            try {
+              const sheet = document.styleSheets[i];
+              const rules = sheet.cssRules || sheet.rules;
+              if (!rules) continue;
+
+              for (let j = rules.length - 1; j >= 0; j--) {
+                const rule = rules[j];
+                // Se a regra for um @media (prefers-color-scheme: light), removemos ela
+                if (rule.media && rule.media.mediaText.includes('prefers-color-scheme: light')) {
+                  sheet.deleteRule(j);
+                }
               }
+            } catch (e) {
+              // Ignorar erros de cross-origin stylesheets
             }
-          });
-        });
+          }
+        };
 
-        observer.observe(doc, { 
-          attributes: true, 
-          attributeFilter: ['class', 'style', 'data-theme'] 
-        });
-
-        // 3. Forçar dark mode em nível de sistema para o navegador
-        const meta = document.createElement('meta');
-        meta.name = 'color-scheme';
-        meta.content = 'dark';
-        document.head.appendChild(meta);
+        // Executar após o carregamento e periodicamente
+        window.addEventListener('load', stripLightMode);
+        setInterval(stripLightMode, 3000);
         
-        // 4. Limpar qualquer flag de mock acidental no localStorage se estiver em produção
+        // 4. Limpar flags de mock
         const hostname = window.location.hostname;
         if (hostname === 'webpresto.com.br' || hostname === 'sistemagestao.aceville.com.br') {
           if (localStorage.getItem('auth_token') === 'mock_token_figma_make') {
