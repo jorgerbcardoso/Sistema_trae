@@ -1,51 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  /* ... mapeamentos ... */
   --dark-mode: selector;
 
-  /* ✅ TEMA ESCURO ABSOLUTO: TODAS AS VARIÁVEIS SÃO ESCURAS POR PADRÃO NO @THEME */
-  --color-background: hsl(222.2 84% 4.9%);
-  --color-foreground: hsl(210 40% 98%);
-  --color-card: hsl(222.2 84% 4.9%);
-  --color-card-foreground: hsl(210 40% 98%);
-  --color-popover: hsl(222.2 84% 4.9%);
-  --color-popover-foreground: hsl(210 40% 98%);
-  --color-primary: hsl(210 40% 98%);
-  --color-primary-foreground: hsl(222.2 47.4% 11.2%);
-  --color-secondary: hsl(217.2 32.6% 17.5%);
-  --color-secondary-foreground: hsl(210 40% 98%);
-  --color-muted: hsl(217.2 32.6% 17.5%);
-  --color-muted-foreground: hsl(215 20.2% 65.1%);
-  --color-accent: hsl(217.2 32.6% 17.5%);
-  --color-accent-foreground: hsl(210 40% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(217.2 32.6% 17.5%);
-  --color-input: hsl(217.2 32.6% 17.5%);
-  --color-ring: hsl(212.7 26.8% 83.9%);
+  /* ✅ Variáveis do Tailwind v4 mapeadas para as variáveis CSS */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
   --radius-lg: 0.625rem;
 }
 
-/* ✅ NUCLEAR OVERRIDE: NEUTRALIZAR CLASSES CLARAS DIRETAMENTE NO CSS */
-.bg-white, 
-.bg-slate-50, 
-.bg-gray-50, 
-.bg-zinc-50, 
-.bg-neutral-50 {
-  background-color: #020617 !important;
-}
-
-.text-black, 
-.text-slate-900, 
-.text-slate-950, 
-.text-gray-900, 
-.text-gray-950 {
-  color: #f8fafc !important;
-}
-
-/* ✅ DEFINIÇÃO DAS VARIÁVEIS CSS PARA USO VIA VAR() */
-:root, .dark {
+/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL */
+:root, .dark, [data-theme="dark"], [data-theme="light"] {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
@@ -66,119 +48,85 @@
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
-  
-  /* ✅ FORÇAR COLOR-SCHEME DARK */
+
+  /* Força o navegador a renderizar controles internos (scrollbar, inputs) como dark */
   color-scheme: dark !important;
 }
 
-/* ✅ TRAVA DE TEMA ESCURO ABSOLUTA: IGNORAR NAVEGADOR */
-html, body, :root {
-  background-color: #020617 !important;
-  color: #f8fafc !important;
-  color-scheme: dark !important;
+/* ✅ NEUTRALIZAR PREFERÊNCIA DO SISTEMA (O PONTO CHAVE) */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: dark !important;
+  }
 }
 
-/* ✅ REMOVER TOTALMENTE A DETECÇÃO DE PREFERS-COLOR-SCHEME LIGHT */
-/* (Removido o bloco @media prefers-color-scheme: light para evitar ambiguidades) */
+/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias de "Modo Claro" */
+.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100 {
+  background-color: hsl(var(--background)) !important;
+}
+
+.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-neutral-950 {
+  color: hsl(var(--foreground)) !important;
+}
 
 @layer base {
-  body {
-    @apply bg-background text-foreground;
+  * {
+    @apply border-border;
   }
-  
-  /* Garantir cursor pointer em elementos interativos */
-  button, 
-  [role="button"],
-  select,
-  input[type="button"],
-  input[type="submit"],
-  input[type="reset"],
-  .cursor-pointer {
+  body {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Cursor pointer em elementos interativos */
+  button, [role="button"], select, input[type="submit"] {
     cursor: pointer !important;
   }
 }
 
-/* Forçar diminuição de fontes de cabeçalho via CSS Global se o Tailwind falhar */
+/* ✅ ESTILIZAÇÃO ESPECÍFICA (SISTEMA PRESTO) */
 .header-title-reduced {
   font-size: 14px !important;
   line-height: 1.2 !important;
   text-transform: uppercase !important;
   font-weight: 700 !important;
-  letter-spacing: -0.01em !important;
 }
 
-.header-subtitle-reduced {
-  font-size: 12px !important;
-  line-height: 1.2 !important;
-  margin-top: 1px !important;
-}
-
-.menu-button-text {
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  text-transform: none !important;
-}
-
-/* Classes específicas para o Menu Principal (15% maiores que o padrão 14px/12px) */
 .header-title-main {
   font-size: 16px !important;
   line-height: 1.2 !important;
   text-transform: uppercase !important;
   font-weight: 700 !important;
-  letter-spacing: -0.01em !important;
 }
 
-.header-subtitle-main {
-  font-size: 14px !important;
-  line-height: 1.2 !important;
-  margin-top: 1px !important;
-}
-
-/* CORREÇÃO DOS BOTÕES - Forçar fundo sólido !important */
-button[data-slot="button"][variant="default"], 
-.bg-primary {
+/* ✅ BOTÕES E ESTADOS */
+button[data-slot="button"][variant="default"], .bg-primary {
   background-color: hsl(var(--primary)) !important;
   color: hsl(var(--primary-foreground)) !important;
-  opacity: 1 !important;
 }
 
-button[data-slot="button"][variant="outline"],
-.bg-background {
-  background-color: hsl(var(--background)) !important;
+/* ✅ SCROLLBARS PADRONIZADAS */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-/* 🎨 PADRONIZAÇÃO DE SCROLLBARS (SISTEMA PRESTO) */
-@layer base {
-  /* Scrollbar para Chrome, Safari e Edge */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-700 rounded-full transition-colors;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-600;
-  }
-
-  /* Scrollbar para Firefox */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Utilitário para esconder scrollbar mantendo funcionalidade */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 10px;
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent));
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted)) transparent;
 }
