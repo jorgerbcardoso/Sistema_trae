@@ -6,15 +6,19 @@
     <meta name="color-scheme" content="dark" />
     <title>Sistema Presto</title>
     
-    <!-- FORÇAR TEMA ESCURO ABSOLUTO (SEM SUPORTE A LIGHT) -->
+    <!-- FORÇAR TEMA ESCURO (SEM SUPORTE A LIGHT) -->
     <style>
       :root, html, body {
-        background-color: #020617 !important; /* slate-950 */
-        color: #f8fafc !important; /* slate-50 */
         color-scheme: dark !important;
       }
       /* Esconder qualquer elemento que force tema claro */
       .light { display: none !important; }
+      
+      /* Garantir fundo escuro no body como fallback */
+      body {
+        background-color: #020617;
+        color: #f8fafc;
+      }
     </style>
     
     <script>
@@ -64,25 +68,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        // TEMA ÚNICO: ESCURO (SEM SUPORTE A CLASSES OU PREFERÊNCIA DE MÍDIA)
-        darkMode: 'class', // Mantemos class mas a classe 'dark' já está fixa no <html>
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              // Redefinir cores base para que o "light" se torne "dark"
-              white: "#020617",
-              black: "#f8fafc",
-              slate: {
-                50: "#0f172a",
-                100: "#1e293b",
-                900: "#f8fafc",
-                950: "#ffffff",
-              },
-              gray: {
-                50: "#0f172a",
-                100: "#1e293b",
-                900: "#f8fafc",
-              },
               border: "hsl(var(--border))",
               input: "hsl(var(--input))",
               ring: "hsl(var(--ring))",

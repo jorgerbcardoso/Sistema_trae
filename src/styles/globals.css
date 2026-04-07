@@ -1,18 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* ✅ TEMA ÚNICO: ESCURO (FORÇADO EM TODAS AS CLASSES) */
-  --color-white: #020617;
-  --color-slate-50: #0f172a;
-  --color-slate-100: #1e293b;
-  --color-slate-200: #334155;
-  --color-gray-50: #0f172a;
-  --color-gray-100: #1e293b;
-  --color-slate-900: #f8fafc;
-  --color-slate-950: #ffffff;
-  --color-gray-900: #f8fafc;
-  --color-black: #f8fafc;
-
   /* Cores de Fundo e Texto */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -56,17 +44,15 @@
 }
 
 /* ✅ RESET ABSOLUTO: IGNORAR PREFERÊNCIA DO NAVEGADOR */
-:root, html, body, #root {
-  background-color: #020617 !important; /* slate-950 */
-  color: #f8fafc !important; /* slate-50 */
+:root, html, body {
+  background-color: #020617; /* slate-950 */
+  color: #f8fafc; /* slate-50 */
   color-scheme: dark !important;
 }
 
 /* ✅ ANULAR MEDIA QUERY DO NAVEGADOR */
 @media (prefers-color-scheme: light) {
-  :root, html, body, #root {
-    background-color: #020617 !important;
-    color: #f8fafc !important;
+  :root, html, body {
     color-scheme: dark !important;
   }
 }
