@@ -467,6 +467,7 @@ function parsearXMLDespesas($html) {
                 'usuario_lancamento' => trim((string)$r->f3),
                 'fornecedor' => trim((string)$r->f4),
                 'descricao' => trim((string)$r->f5),
+                'historico' => trim((string)$r->f5), // ✅ NOVO: Histórico (f5)
                 'data_vencimento' => $data_vencimento,
                 'data_pagamento' => $data_pagamento,
                 'data' => $data_pagamento, // ✅ ALIAS para compatibilidade com frontend

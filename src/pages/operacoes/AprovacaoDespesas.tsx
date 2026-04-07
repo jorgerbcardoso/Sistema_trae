@@ -72,8 +72,11 @@ interface Despesa {
   nf?: string;
   fornecedor?: string;
   observacao?: string;
+  historico?: string; // ✅ NOVO: f5
   usuario_lancamento: string;
   data_lancamento: string;
+  data_inclusao: string; // ✅ NOVO: f2
+  data_pagamento: string; // ✅ NOVO: f7
   aprovada?: boolean;
 }
 
@@ -958,8 +961,18 @@ export default function AprovacaoDespesas() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             {/* ✅ NRO_LANCAMENTO EM DESTAQUE */}
-                            <div className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2 font-mono tracking-tight">
-                              {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
+                            <div className="flex items-center gap-3 flex-wrap mb-2">
+                              <div className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+                                {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
+                              </div>
+                              {despesa.data_inclusao && (
+                                <div className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 flex flex-col">
+                                  <span className="text-[10px] text-muted-foreground leading-none mb-1">INCLUSÃO</span>
+                                  <span className="text-xs font-mono font-bold leading-none">
+                                    {new Date(despesa.data_inclusao).toLocaleDateString('pt-BR')}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             
                             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -1006,13 +1019,23 @@ export default function AprovacaoDespesas() {
                             </div>
                           )}
                           <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">Data</p>
+                            <p className="text-xs text-muted-foreground mb-0.5">Pagamento</p>
                             <p className="font-medium flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {new Date(despesa.data).toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                         </div>
+
+                        {/* HISTÓRICO (f5) */}
+                        {despesa.historico && (
+                          <div className="p-2 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/50 dark:border-slate-800/50">
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Histórico</p>
+                            <p className="text-sm leading-tight text-slate-700 dark:text-slate-300 italic">
+                              "{despesa.historico}"
+                            </p>
+                          </div>
+                        )}
 
                         {/* OBSERVAÇÃO (se houver) */}
                         {despesa.observacao && (

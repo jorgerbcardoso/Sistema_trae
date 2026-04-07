@@ -16,8 +16,11 @@ export interface DespesaPendente {
   nf?: string;
   fornecedor?: string;
   observacao?: string;
+  historico?: string; // ✅ NOVO: f5
   usuario_lancamento: string;
   data_lancamento: string;
+  data_inclusao?: string; // ✅ NOVO: f2
+  data_pagamento?: string; // ✅ NOVO: f7
   aprovada?: boolean; // ✅ Campo opcional para controle de aprovação
 }
 
@@ -37,8 +40,11 @@ export const MOCK_DESPESAS_PENDENTES: DespesaPendente[] = [
     nf: '12345',
     fornecedor: 'POSTO IPIRANGA',
     observacao: 'Abastecimento completo',
+    historico: 'Abastecimento caminhão placa ABC-1234',
     usuario_lancamento: 'JOAO',
     data_lancamento: '2025-02-25T08:30:00',
+    data_inclusao: '2025-02-25',
+    data_pagamento: '2025-02-25',
     aprovada: true // ✅ JÁ APROVADA
   },
   {
