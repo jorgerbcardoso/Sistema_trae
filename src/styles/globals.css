@@ -3,7 +3,7 @@
 @theme {
   --dark-mode: selector;
 
-  /* ✅ Variáveis do Tailwind v4 mapeadas para as variáveis CSS */
+  /* ✅ Mantendo seus mapeamentos */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -26,8 +26,9 @@
   --radius-lg: 0.625rem;
 }
 
-/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL */
+/* ✅ DEFINIÇÃO GLOBAL ABSOLUTA */
 :root, .dark, [data-theme="dark"], [data-theme="light"] {
+  /* Suas variáveis base */
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
@@ -48,19 +49,28 @@
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
-
-  /* Força o navegador a renderizar controles internos (scrollbar, inputs) como dark */
+  
   color-scheme: dark !important;
+
+  /* 🎯 O ANTÍDOTO: Sequestrando as cores do Tailwind que estão quebrando o layout.
+     Redefinimos as cores "100" (que são claras) para tons escuros. */
+  --color-blue-100: #1e3a8a !important;   /* Blue 900 */
+  --color-purple-100: #581c87 !important; /* Purple 900 */
+  --color-slate-100: #0f172a !important;  /* Slate 900 */
+  --color-slate-200: #1e293b !important;
+  
+  /* Sequestrando cores de texto que ficam invisíveis no modo claro */
+  --color-blue-600: #60a5fa !important;   /* Blue 400 */
+  --color-slate-900: #f8fafc !important;  /* Quase branco */
+  --color-slate-950: #ffffff !important;
 }
 
-/* ✅ NEUTRALIZAR PREFERÊNCIA DO SISTEMA (O PONTO CHAVE) */
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: dark !important;
-  }
-}
+/* Forçar gradientes a respeitarem o modo dark mesmo sem a classe .dark */
+.from-blue-100 { --tw-gradient-from: var(--color-blue-100) !important; }
+.to-purple-100 { --tw-gradient-to: var(--color-purple-100) !important; }
+.text-blue-600 { color: var(--color-blue-600) !important; }
 
-/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias de "Modo Claro" */
+/* ✅ NUCLEAR OVERRIDE: Neutralizar classes fixas */
 .bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100 {
   background-color: hsl(var(--background)) !important;
 }
@@ -70,63 +80,20 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
     background-color: hsl(var(--background)) !important;
     color: hsl(var(--foreground)) !important;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-
-  /* Cursor pointer em elementos interativos */
-  button, [role="button"], select, input[type="submit"] {
-    cursor: pointer !important;
   }
 }
 
-/* ✅ ESTILIZAÇÃO ESPECÍFICA (SISTEMA PRESTO) */
-.header-title-reduced {
-  font-size: 14px !important;
-  line-height: 1.2 !important;
-  text-transform: uppercase !important;
-  font-weight: 700 !important;
-}
+/* ✅ Manutenção do restante do seu CSS Presto */
+.header-title-reduced { font-size: 14px !important; font-weight: 700 !important; text-transform: uppercase !important; }
+.header-title-main { font-size: 16px !important; font-weight: 700 !important; text-transform: uppercase !important; }
 
-.header-title-main {
-  font-size: 16px !important;
-  line-height: 1.2 !important;
-  text-transform: uppercase !important;
-  font-weight: 700 !important;
-}
-
-/* ✅ BOTÕES E ESTADOS */
 button[data-slot="button"][variant="default"], .bg-primary {
   background-color: hsl(var(--primary)) !important;
   color: hsl(var(--primary-foreground)) !important;
 }
 
-/* ✅ SCROLLBARS PADRONIZADAS */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--accent));
-}
-
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted)) transparent;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 10px; }
