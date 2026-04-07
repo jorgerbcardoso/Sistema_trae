@@ -3,7 +3,7 @@
 @theme {
   --dark-mode: selector;
 
-  /* ✅ MAPEAMENTO DIRETO DE CORES DO TEMA */
+  /* ✅ Variáveis do Tailwind v4 mapeadas para as variáveis CSS */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -24,13 +24,9 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
   --radius-lg: 0.625rem;
-
-  /* ✅ SUBVERSÃO DE CORES PADRÃO */
-  --color-white: hsl(222.2 84% 4.9%);
-  --color-black: hsl(210 40% 98%);
 }
 
-/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL (APENAS NO :ROOT E .DARK) */
+/* ✅ DEFINIÇÃO ORIGINAL DO TEMA DARK PRESTO */
 :root, .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -52,9 +48,7 @@
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
-
-  /* Força o navegador a renderizar controles internos como dark */
-  color-scheme: only dark !important;
+  color-scheme: dark;
 }
 
 /* ✅ REMOVIDO BLOCO @media (prefers-color-scheme: light) */
