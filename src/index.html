@@ -1,63 +1,88 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark" data-theme="dark" style="color-scheme: dark">
+<html lang="pt-BR" class="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Sistema Presto</title>
     
-    <!-- FORÇAR TEMA ESCURO IMEDIATAMENTE (NUNCA LIGHT) -->
+    <!-- FORÇAR TEMA ESCURO ABSOLUTO (SEM SUPORTE A LIGHT) -->
     <style>
       :root, html, body {
         background-color: #020617 !important; /* slate-950 */
         color: #f8fafc !important; /* slate-50 */
         color-scheme: dark !important;
       }
-      .light { display: none !important; } /* Esconder qualquer coisa que tente ser light */
+      /* Esconder qualquer elemento que force tema claro */
+      .light { display: none !important; }
     </style>
     
     <script>
       (function() {
-        function forceDark() {
-          const root = document.documentElement;
-          root.classList.remove('light');
-          root.classList.add('dark');
-          root.setAttribute('data-theme', 'dark');
-          root.style.colorScheme = 'dark';
+        // Bloqueio ultra-persistente do tema escuro
+        function forceDarkOnly() {
+          const html = document.documentElement;
+          
+          // 1. Garantir classes
+          if (!html.classList.contains('dark')) html.classList.add('dark');
+          if (html.classList.contains('light')) html.classList.remove('light');
+          
+          // 2. Forçar atributos de estilo e meta
+          html.style.setProperty('color-scheme', 'dark', 'important');
+          html.setAttribute('data-theme', 'dark');
+          
+          // 3. Bloquear localStorage
           localStorage.setItem('theme', 'dark');
-          localStorage.setItem('nativa-theme', 'dark');
+          localStorage.setItem('presto_theme', 'dark');
         }
-        forceDark();
         
-        // Observador ultra-agressivo
+        // Execução imediata e em múltiplos eventos
+        forceDarkOnly();
+        window.addEventListener('DOMContentLoaded', forceDarkOnly);
+        window.addEventListener('load', forceDarkOnly);
+        
+        // Observador de mutação para evitar que scripts externos mudem a classe
         const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-              if (document.documentElement.classList.contains('light')) {
-                forceDark();
-              }
+          mutations.forEach(() => {
+            const html = document.documentElement;
+            if (html.classList.contains('light') || !html.classList.contains('dark')) {
+              forceDarkOnly();
             }
           });
         });
         
         observer.observe(document.documentElement, { 
           attributes: true, 
-          attributeFilter: ['class'] 
+          attributeFilter: ['class', 'style'] 
         });
 
-        // Adicionalmente, forçar no DOMContentLoaded e no load
-        window.addEventListener('DOMContentLoaded', forceDark);
-        window.addEventListener('load', forceDark);
+        // Intervalo de segurança (último recurso)
+        setInterval(forceDarkOnly, 1000);
       })();
     </script>
     <!-- Tailwind CSS via CDN (para compatibilidade com Figma Make) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        darkMode: 'class',
+        // TEMA ÚNICO: ESCURO (SEM SUPORTE A CLASSES OU PREFERÊNCIA DE MÍDIA)
+        darkMode: 'class', // Mantemos class mas a classe 'dark' já está fixa no <html>
         theme: {
           extend: {
             colors: {
+              // Redefinir cores base para que o "light" se torne "dark"
+              white: "#020617",
+              black: "#f8fafc",
+              slate: {
+                50: "#0f172a",
+                100: "#1e293b",
+                900: "#f8fafc",
+                950: "#ffffff",
+              },
+              gray: {
+                50: "#0f172a",
+                100: "#1e293b",
+                900: "#f8fafc",
+              },
               border: "hsl(var(--border))",
               input: "hsl(var(--input))",
               ring: "hsl(var(--ring))",

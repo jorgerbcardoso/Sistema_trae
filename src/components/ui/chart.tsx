@@ -5,8 +5,8 @@ import * as RechartsPrimitive from "recharts";
 
 import { cn } from "./utils";
 
-// Format: { THEME_NAME: CSS_SELECTOR }
-const THEMES = { light: "", dark: ".dark" } as const;
+// Forçar apenas tema dark
+const THEMES = { light: "", dark: "" } as const;
 
 export type ChartConfig = {
   [k in string]: {
@@ -81,22 +81,20 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+        __html: `
+[data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
+    // SEMPRE preferir o tema dark se existir
     const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+      itemConfig.theme?.dark ||
+      itemConfig.theme?.light ||
       itemConfig.color;
     return color ? `  --color-${key}: ${color};` : null;
   })
   .join("\n")}
 }
 `,
-          )
-          .join("\n"),
       }}
     />
   );

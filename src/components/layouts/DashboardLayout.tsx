@@ -5,7 +5,7 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../ThemeProvider';
 import { getLogoUrl } from '../../config/clientLogos';
-import { ArrowLeft, Printer, Moon, Sun, LogOut, Building2, User } from 'lucide-react';
+import { ArrowLeft, Printer, LogOut, Building2, User } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Badge } from '../ui/badge';
 
@@ -56,7 +56,7 @@ export function DashboardLayout({
   headerActions 
 }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const navigate = useNavigate();
 
   const handleBackToMenu = () => {
@@ -167,22 +167,6 @@ export function DashboardLayout({
               </Tooltip>
             </TooltipProvider>
             
-            {/* Botão Tema - DESATIVADO POR ENQUANTO */}
-            {false && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={toggleTheme}
-                className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
-              >
-                {theme === 'light' ? (
-                  <Moon className="w-4 h-4" />
-                ) : (
-                  <Sun className="w-4 h-4" />
-                )}
-              </Button>
-            )}
-            
             {/* Botão Logout */}
             <TooltipProvider>
               <Tooltip>
@@ -191,7 +175,7 @@ export function DashboardLayout({
                     variant="outline"
                     size="icon"
                     onClick={handleLogout}
-                    className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                    className="hidden md:flex border-slate-600 hover:bg-slate-800 print:hidden"
                   >
                     <LogOut className="w-4 h-4" />
                   </Button>

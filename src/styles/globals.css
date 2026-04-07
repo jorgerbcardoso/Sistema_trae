@@ -1,49 +1,46 @@
 @import "tailwindcss";
 
 @theme {
+  /* ✅ TEMA ÚNICO: ESCURO (FORÇADO EM TODAS AS CLASSES) */
+  --color-white: #020617;
+  --color-slate-50: #0f172a;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #334155;
+  --color-gray-50: #0f172a;
+  --color-gray-100: #1e293b;
+  --color-slate-900: #f8fafc;
+  --color-slate-950: #ffffff;
+  --color-gray-900: #f8fafc;
+  --color-black: #f8fafc;
+
   /* Cores de Fundo e Texto */
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-
-  /* Cores do Card */
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-
-  /* Cores do Popover */
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-
-  /* Cores Primárias e Secundárias */
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-
-  /* Cores Muted e Accent */
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-
-  /* Cores de Erro/Destrutivo */
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-
-  /* Bordas e Inputs */
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  /* Bordas */
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-background: 222.2 84% 4.9%;
+  --color-foreground: 210 40% 98%;
+  
+  /* Forçar as classes dark: a estarem sempre ativas ou serem redundantes */
+  --dark-mode: class;
 }
 
-:root, .dark, .light {
-  /* ✅ TEMA ESCURO FORÇADO COMO ÚNICO PADRÃO GLOBAL */
-  --background: 222.2 84% 4.9%; /* slate-950 */
-  --foreground: 210 40% 98%; /* slate-50 */
+/* ✅ RESET ABSOLUTO: IGNORAR PREFERÊNCIA DO NAVEGADOR */
+:root, html, body, #root {
+  background-color: #020617 !important; /* slate-950 */
+  color: #f8fafc !important; /* slate-50 */
+  color-scheme: dark !important;
+}
+
+/* ✅ ANULAR MEDIA QUERY DO NAVEGADOR */
+@media (prefers-color-scheme: light) {
+  :root, html, body, #root {
+    background-color: #020617 !important;
+    color: #f8fafc !important;
+    color-scheme: dark !important;
+  }
+}
+
+/* ✅ FORÇAR VARIÁVEIS DO TEMA ESCURO EM TODOS OS ESTADOS */
+:root {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
   --card-foreground: 210 40% 98%;
   --popover: 222.2 84% 4.9%;
@@ -62,33 +59,6 @@
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
-  color-scheme: dark !important;
-}
-
-/* ✅ IGNORAR QUALQUER PREFERÊNCIA DO NAVEGADOR (FORÇAR SEMPRE ESCURO) */
-@media (prefers-color-scheme: light) {
-  :root, html, body, .light, .dark {
-    --background: 222.2 84% 4.9% !important;
-    --foreground: 210 40% 98% !important;
-    --card: 222.2 84% 4.9% !important;
-    --card-foreground: 210 40% 98% !important;
-    --popover: 222.2 84% 4.9% !important;
-    --popover-foreground: 210 40% 98% !important;
-    --primary: 210 40% 98% !important;
-    --primary-foreground: 222.2 47.4% 11.2% !important;
-    --secondary: 217.2 32.6% 17.5% !important;
-    --secondary-foreground: 210 40% 98% !important;
-    --muted: 217.2 32.6% 17.5% !important;
-    --muted-foreground: 215 20.2% 65.1% !important;
-    --accent: 217.2 32.6% 17.5% !important;
-    --accent-foreground: 210 40% 98% !important;
-    --destructive: 0 62.8% 30.6% !important;
-    --destructive-foreground: 210 40% 98% !important;
-    --border: 217.2 32.6% 17.5% !important;
-    --input: 217.2 32.6% 17.5% !important;
-    --ring: 212.7 26.8% 83.9% !important;
-    color-scheme: dark !important;
-  }
 }
 
 @layer base {

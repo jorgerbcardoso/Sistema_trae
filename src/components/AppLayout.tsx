@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
-import { LogOut, Menu, ArrowLeft, Moon, Sun } from 'lucide-react';
+import { LogOut, Menu, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { getLogoUrl, shouldShowSystemName } from '../config/clientLogos';
@@ -21,7 +21,7 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = React.useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   const logoUrl = getLogoUrl(user?.domain || '', theme);
   const showSystemName = shouldShowSystemName(user?.domain || '');
@@ -71,22 +71,6 @@ export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
 
             {/* Ações do usuário */}
             <div className="flex items-center gap-2">
-              {/* Toggle de tema - DESATIVADO POR ENQUANTO */}
-            {false && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="h-9 w-9 p-0"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="size-4" />
-                ) : (
-                  <Moon className="size-4" />
-                )}
-              </Button>
-            )}
-
               {/* Informações do usuário */}
               <div className="hidden md:flex flex-col items-end mr-3">
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">

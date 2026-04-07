@@ -10,8 +10,6 @@ import {
   BarChart3,
   UserPlus,
   Route,
-  Moon,
-  Sun,
   DollarSign,
   FolderPlus,
   Calendar,
@@ -433,21 +431,21 @@ export function MainMenu() {
     });
   };
 
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Carregando...</p>
+          <p className="text-slate-400">Carregando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header Moderno com Glassmorphism */}
       <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
@@ -458,7 +456,7 @@ export function MainMenu() {
                 key={theme}
                 src={getLogoUrl(user?.domain, theme)}
                 alt="Logo"
-                className="relative h-10 w-10 object-contain p-1 bg-white dark:bg-slate-800 rounded-lg"
+                className="relative h-10 w-10 object-contain p-1 bg-slate-800 rounded-lg"
               />
             </div>
 
@@ -466,19 +464,19 @@ export function MainMenu() {
             <div className="flex-1 min-w-0">
               {shouldShowSystemName(user?.domain) ? (
                 <>
-                  <h1 className="text-slate-900 dark:text-slate-100 header-title-main truncate">
+                  <h1 className="text-slate-100 header-title-main truncate">
                     {user?.client_name || 'VIAÇÃO CRUZEIRO DO SUL'}
                   </h1>
-                  <p className="text-slate-500 dark:text-slate-400 header-subtitle-main hidden md:block truncate">
+                  <p className="text-slate-400 header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
               ) : (
                 <>
-                  <h1 className="text-slate-900 dark:text-slate-100 header-title-main truncate">
+                  <h1 className="text-slate-100 header-title-main truncate">
                     {user?.client_name || 'Sistema de Gestão'}
                   </h1>
-                  <p className="text-slate-500 dark:text-slate-400 header-subtitle-main hidden md:block truncate">
+                  <p className="text-slate-400 header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
@@ -492,7 +490,7 @@ export function MainMenu() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowUnidadeSelector(true)}
-                className="dark:border-slate-600 dark:hover:bg-slate-800 hidden md:flex hover:shadow-md transition-all hover:scale-105 header-title-main lowercase first-letter:uppercase"
+                className="border-slate-600 hover:bg-slate-800 hidden md:flex hover:shadow-md transition-all hover:scale-105 header-title-main lowercase first-letter:uppercase"
                 disabled={!user?.troca_unidade}
               >
                 <Building2 className="w-4 h-4 mr-2" />
@@ -501,21 +499,7 @@ export function MainMenu() {
               </Button>
             )}
             
-            {/* Botão Tema - DESATIVADO POR ENQUANTO */}
-            {false && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={toggleTheme}
-                className="dark:border-slate-600 dark:hover:bg-slate-800 hover:shadow-md transition-all hover:scale-105"
-              >
-                {theme === 'light' ? (
-                  <Moon className="w-4 h-4" />
-                ) : (
-                  <Sun className="w-4 h-4" />
-                )}
-              </Button>
-            )}
+            {/* Botão Tema REMOVIDO */}
             <div className="relative">
               <div
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
