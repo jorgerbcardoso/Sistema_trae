@@ -81,6 +81,78 @@
   --radius: 0.625rem;
 }
 
+/* ✅ SOBRESCREVER CLASSES UTILITÁRIAS "LIGHT" (BRUTE FORCE) */
+@layer utilities {
+  /* Backgrounds que costumam ser claros */
+  .bg-white, 
+  .bg-slate-50, 
+  .bg-gray-50, 
+  .bg-slate-100, 
+  .bg-gray-100, 
+  .bg-slate-200, 
+  .bg-gray-200,
+  .bg-blue-50,
+  .bg-indigo-50,
+  .bg-emerald-50,
+  .bg-red-50,
+  .bg-yellow-50,
+  .bg-green-50,
+  .bg-sky-50,
+  .bg-cyan-50 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Textos que costumam ser escuros */
+  .text-slate-950, 
+  .text-slate-900, 
+  .text-slate-800, 
+  .text-slate-700, 
+  .text-gray-950, 
+  .text-gray-900, 
+  .text-gray-800, 
+  .text-gray-700,
+  .text-slate-600,
+  .text-gray-600,
+  .text-blue-900,
+  .text-indigo-900,
+  .text-emerald-900,
+  .text-red-900,
+  .text-yellow-900,
+  .text-green-900,
+  .text-sky-900,
+  .text-cyan-900 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Bordas que costumam ser claras */
+  .border-slate-100, 
+  .border-slate-200, 
+  .border-slate-300, 
+  .border-gray-100, 
+  .border-gray-200, 
+  .border-gray-300,
+  .border-white,
+  .border-slate-50,
+  .border-gray-50,
+  .border-blue-50,
+  .border-indigo-50 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Sombras que podem parecer estranhas em fundo escuro */
+  .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5) !important;
+  }
+
+  /* Divisores (Separators) */
+  .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+  .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: hsl(var(--border)) !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
