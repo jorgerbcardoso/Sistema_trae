@@ -6,67 +6,42 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <meta name="color-scheme" content="dark" />
       <title>Sistema Presto</title>
-      
-      <!-- FORÇAR TEMA ESCURO (SEM SUPORTE A LIGHT) -->
-      <style>
-        :root, html, body {
-          color-scheme: dark !important;
-        }
-        /* Esconder qualquer elemento que force tema claro */
-        .light { display: none !important; }
+    
+    <!-- FORÇAR TEMA ESCURO ABSOLUTO -->
+    <style>
+      html {
+        background-color: #020617 !important;
+        color: #f8fafc !important;
+        color-scheme: dark !important;
+      }
+      body {
+        background-color: #020617 !important;
+        margin: 0;
+      }
+      /* Neutralizar qualquer tentativa de forçar branco */
+      .bg-white, .bg-slate-50, .bg-gray-50, .bg-blue-50 {
+        background-color: #020617 !important;
+      }
+      .text-slate-900, .text-slate-950, .text-gray-900, .text-black {
+        color: #f8fafc !important;
+      }
+    </style>
+    
+    <script>
+      (function() {
+        const doc = document.documentElement;
+        doc.classList.add('dark');
+        doc.classList.remove('light');
+        doc.style.colorScheme = 'dark';
         
-        /* Garantir fundo escuro no body como fallback */
-        body {
-          background-color: #020617;
-          color: #f8fafc;
-        }
-      </style>
-      
-      <script>
-        (function() {
-          // Bloqueio ultra-persistente do tema escuro
-          function forceDarkOnly() {
-            const html = document.documentElement;
-            
-            // 1. Garantir classes
-            if (!html.classList.contains('dark')) html.classList.add('dark');
-            if (html.classList.contains('light')) html.classList.remove('light');
-            
-            // 2. Forçar atributos de estilo e meta
-            html.style.setProperty('color-scheme', 'dark', 'important');
-            html.setAttribute('data-theme', 'dark');
-            
-            // 3. Bloquear localStorage
-            localStorage.setItem('theme', 'dark');
-            localStorage.setItem('presto_theme', 'dark');
-            localStorage.setItem('nativa-theme', 'dark');
-          }
-          
-          // Execução imediata e em múltiplos eventos
-          forceDarkOnly();
-          window.addEventListener('DOMContentLoaded', forceDarkOnly);
-          window.addEventListener('load', forceDarkOnly);
-          
-          // Observador de mutação para evitar que scripts externos mudem a classe
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach(() => {
-              const html = document.documentElement;
-              if (html.classList.contains('light') || !html.classList.contains('dark')) {
-                forceDarkOnly();
-              }
-            });
-          });
-          
-          observer.observe(document.documentElement, { 
-            attributes: true, 
-            attributeFilter: ['class', 'style'] 
-          });
-
-          // Intervalo de segurança (último recurso)
-          setInterval(forceDarkOnly, 1000);
-        })();
-      </script>
-    </head>
+        const observer = new MutationObserver(() => {
+          if (!doc.classList.contains('dark')) doc.classList.add('dark');
+          if (doc.classList.contains('light')) doc.classList.remove('light');
+        });
+        observer.observe(doc, { attributes: true, attributeFilter: ['class'] });
+      })();
+    </script>
+  </head>
 
     <body>
       <div id="root"></div>

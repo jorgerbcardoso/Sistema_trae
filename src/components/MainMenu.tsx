@@ -105,22 +105,8 @@ export function MainMenu() {
   useEffect(() => {
     const loadMenu = async () => {
       try {
-        // ✅ Respeitar use_mock_data do usuário
-        const useMock = user?.use_mock_data ?? true;
-        
-        let result;
-        
-        if (ENVIRONMENT.useMockData || ENVIRONMENT.isFigmaMake) {
-          // Usar dados mockados diretamente
-          result = await getMenu(user?.domain || 'VCS', user?.username, user?.is_admin);
-        } else {
-          // Tentar backend real, com fallback para mock
-          try {
-            result = await getMenu(user?.domain || 'VCS', user?.username, user?.is_admin);
-          } catch (backendError) {
-            result = await mockGetMenu(user?.domain || 'VCS', user?.username);
-          }
-        }
+        // 🔥 CRÍTICO: Buscar menu real do backend
+        const result = await getMenu(user?.domain || 'VCS', user?.username, user?.is_admin);
         
         if (result.success && result.menu.sections) {
           // Converter formato do mockData para o formato esperado pelo MainMenu

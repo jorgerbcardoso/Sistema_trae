@@ -250,8 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
       
       // ✅ PASSO 2: Determinar se usa MOCK ou BACKEND
-      // 🔧 MODIFICAÇÃO: Em localhost, SEMPRE usar BACKEND real
-      const USE_MOCK = hostname === 'localhost' ? false : !isRealProduction;
+      // 🔧 REGRA DE OURO: Se não for Figma Make, usar BACKEND real.
+      const isFigmaMake = hostname.includes('figma.com') || hostname.includes('fig.run') || window.location.href.includes('figma');
+      const USE_MOCK = isFigmaMake;
       
       // ✅ PASSO 3: Buscar informações do domínio
       let domainInfo: any = null;

@@ -1,155 +1,158 @@
 @import "tailwindcss";
 
 @theme {
-  /* Cores de Fundo e Texto */
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
+  /* ✅ FORÇAR MAPEAMENTO DE CORES DO TEMA ESCURO COMO PADRÃO ABSOLUTO */
+  --color-white: #020617;
+  --color-black: #f8fafc;
+  
+  --color-slate-50: #020617;
+  --color-slate-100: #0f172a;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-600: #94a3b8;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;
+  --color-slate-950: #f8fafc;
+
+  --color-gray-50: #020617;
+  --color-gray-100: #0f172a;
+  --color-gray-200: #1e293b;
+  --color-gray-300: #334155;
+  --color-gray-400: #475569;
+  --color-gray-500: #64748b;
+  --color-gray-600: #94a3b8;
+  --color-gray-700: #cbd5e1;
+  --color-gray-800: #e2e8f0;
+  --color-gray-900: #f1f5f9;
+  --color-gray-950: #f8fafc;
+
+  --color-zinc-50: #020617;
+  --color-zinc-100: #0f172a;
+  --color-zinc-900: #f1f5f9;
+
+  --color-blue-50: #020617;
+  --color-blue-100: #0f172a;
+  --color-blue-900: #f1f5f9;
+
+  --color-indigo-50: #020617;
+  --color-indigo-100: #0f172a;
+  --color-indigo-900: #f1f5f9;
+
+  --color-emerald-50: #020617;
+  --color-emerald-900: #f1f5f9;
+
+  --color-red-50: #020617;
+  --color-red-900: #f1f5f9;
+
+  --color-yellow-50: #020617;
+  --color-yellow-900: #f1f5f9;
+
+  /* Cores de Fundo e Texto do Sistema */
+  --color-background: #020617;
+  --color-foreground: #f8fafc;
 
   /* Cores do Card */
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card: #020617;
+  --color-card-foreground: #f8fafc;
 
   /* Cores do Popover */
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover: #020617;
+  --color-popover-foreground: #f8fafc;
 
   /* Cores Primárias e Secundárias */
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-primary: #f8fafc;
+  --color-primary-foreground: #020617;
+  --color-secondary: #1e293b;
+  --color-secondary-foreground: #f8fafc;
 
   /* Cores Muted e Accent */
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #1e293b;
+  --color-accent-foreground: #f8fafc;
 
   /* Cores de Erro/Destrutivo */
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #f8fafc;
 
   /* Bordas e Inputs */
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  --color-border: #1e293b;
+  --color-input: #1e293b;
+  --color-ring: #cbd5e1;
 
   /* Bordas */
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-lg: 0.625rem;
+  --radius-md: calc(0.625rem - 2px);
+  --radius-sm: calc(0.625rem - 4px);
   
-  /* Forçar as classes dark: a estarem sempre ativas ou serem redundantes */
-  --dark-mode: class;
+  --dark-mode: selector;
 }
 
-/* ✅ RESET ABSOLUTO: IGNORAR PREFERÊNCIA DO NAVEGADOR */
+/* ✅ RESET GLOBAL AGRESSIVO: TEMA ESCURO ÚNICO */
 :root, html, body {
-  background-color: #020617; /* slate-950 */
-  color: #f8fafc; /* slate-50 */
+  background-color: #020617 !important;
+  color: #f8fafc !important;
   color-scheme: dark !important;
 }
 
-/* ✅ ANULAR MEDIA QUERY DO NAVEGADOR */
-@media (prefers-color-scheme: light) {
-  :root, html, body {
-    color-scheme: dark !important;
+/* ✅ NEUTRALIZAÇÃO TOTAL DE CLASSES "LIGHT" (BRUTE FORCE) */
+@layer base {
+  /* Forçar fundo escuro e texto claro em tudo */
+  * {
+    border-color: #1e293b !important;
   }
-}
-
-/* ✅ FORÇAR VARIÁVEIS DO TEMA ESCURO EM TODOS OS ESTADOS */
-:root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
-  --radius: 0.625rem;
-}
-
-/* ✅ SOBRESCREVER CLASSES UTILITÁRIAS "LIGHT" (BRUTE FORCE) */
-@layer utilities {
-  /* Backgrounds que costumam ser claros */
-  .bg-white, 
-  .bg-slate-50, 
-  .bg-gray-50, 
-  .bg-slate-100, 
-  .bg-gray-100, 
-  .bg-slate-200, 
-  .bg-gray-200,
-  .bg-blue-50,
-  .bg-indigo-50,
-  .bg-emerald-50,
-  .bg-red-50,
-  .bg-yellow-50,
-  .bg-green-50,
-  .bg-sky-50,
-  .bg-cyan-50 {
-    background-color: hsl(var(--card)) !important;
+  
+  /* Reset de backgrounds comuns que insistem em ser brancos */
+  .bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-blue-50, .bg-indigo-50, .bg-emerald-50, .bg-red-50, .bg-yellow-50, .bg-green-50, .bg-sky-50, .bg-cyan-50 {
+    background-color: #020617 !important;
+    background-image: none !important;
+  }
+  
+  /* Reset de backgrounds de seções e cards */
+  .bg-slate-100, .bg-gray-100, .bg-zinc-100, .bg-blue-100, .bg-indigo-100, .bg-slate-200, .bg-gray-200 {
+    background-color: #0f172a !important;
+    background-image: none !important;
   }
 
-  /* Textos que costumam ser escuros */
-  .text-slate-950, 
-  .text-slate-900, 
-  .text-slate-800, 
-  .text-slate-700, 
-  .text-gray-950, 
-  .text-gray-900, 
-  .text-gray-800, 
-  .text-gray-700,
-  .text-slate-600,
-  .text-gray-600,
-  .text-blue-900,
-  .text-indigo-900,
-  .text-emerald-900,
-  .text-red-900,
-  .text-yellow-900,
-  .text-green-900,
-  .text-sky-900,
-  .text-cyan-900 {
-    color: hsl(var(--foreground)) !important;
+  /* Reset de textos que insistem em ser escuros (ileguíveis no dark) */
+  .text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700, 
+  .text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, 
+  .text-zinc-950, .text-zinc-900, .text-black,
+  .text-blue-950, .text-blue-900, .text-blue-800,
+  .text-indigo-950, .text-indigo-900, .text-indigo-800,
+  .text-emerald-950, .text-emerald-900,
+  .text-red-950, .text-red-900,
+  .text-yellow-950, .text-yellow-900 {
+    color: #f8fafc !important;
+  }
+  
+  .text-slate-600, .text-gray-600, .text-slate-500, .text-gray-500, .text-zinc-600, .text-zinc-500 {
+    color: #94a3b8 !important;
   }
 
-  /* Bordas que costumam ser claras */
-  .border-slate-100, 
-  .border-slate-200, 
-  .border-slate-300, 
-  .border-gray-100, 
-  .border-gray-200, 
-  .border-gray-300,
-  .border-white,
-  .border-slate-50,
-  .border-gray-50,
-  .border-blue-50,
-  .border-indigo-50 {
-    border-color: hsl(var(--border)) !important;
+  /* Bordas claras */
+  .border-white, .border-slate-50, .border-slate-100, .border-slate-200, .border-slate-300, 
+  .border-gray-50, .border-gray-100, .border-gray-200, .border-gray-300,
+  .border-blue-100, .border-blue-200, .border-indigo-100, .border-indigo-200 {
+    border-color: #1e293b !important;
   }
 
-  /* Sombras que podem parecer estranhas em fundo escuro */
+  /* Sombras */
   .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5) !important;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5) !important;
   }
+}
 
-  /* Divisores (Separators) */
-  .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-  .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
-  .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-  .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
-    border-color: hsl(var(--border)) !important;
+@layer utilities {
+  /* Anular gradientes claros */
+  .from-blue-50, .from-slate-50, .from-white, .via-white, .to-white, .from-slate-100, .from-blue-100, .from-indigo-50, .from-blue-200, .to-indigo-100, .to-slate-200, .to-purple-50 {
+    --tw-gradient-from: #020617 !important;
+    --tw-gradient-to: #020617 !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+    background-image: none !important;
   }
 }
 
