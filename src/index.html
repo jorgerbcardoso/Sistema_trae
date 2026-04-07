@@ -6,23 +6,25 @@
     <meta name="color-scheme" content="dark" />
     <title>Sistema Presto</title>
     
-    <!-- FORÇAR TEMA ESCURO ABSOLUTO -->
+    <!-- FORÇAR TEMA ESCURO ABSOLUTO E NEUTRALIZAR TEMA CLARO -->
     <style>
-      html {
+      :root, html, body {
         background-color: #020617 !important;
         color: #f8fafc !important;
         color-scheme: dark !important;
       }
       body {
-        background-color: #020617 !important;
         margin: 0;
       }
-      /* Neutralizar qualquer tentativa de forçar branco */
-      .bg-white, .bg-slate-50, .bg-gray-50, .bg-blue-50 {
+      /* Neutralizar qualquer tentativa de forçar cores claras via classes Tailwind v3/v4 */
+      .bg-white, .bg-slate-50, .bg-gray-50, .bg-blue-50, .bg-slate-100, .bg-gray-100 {
         background-color: #020617 !important;
       }
-      .text-slate-900, .text-slate-950, .text-gray-900, .text-black {
+      .text-slate-900, .text-slate-950, .text-gray-900, .text-black, .text-slate-800 {
         color: #f8fafc !important;
+      }
+      .border-slate-200, .border-gray-200, .border-slate-300 {
+        border-color: #1e293b !important;
       }
     </style>
     
