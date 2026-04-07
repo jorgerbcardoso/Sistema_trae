@@ -27,6 +27,23 @@
   --radius-lg: 0.625rem;
 }
 
+/* ✅ NUCLEAR OVERRIDE: NEUTRALIZAR CLASSES CLARAS DIRETAMENTE NO CSS */
+.bg-white, 
+.bg-slate-50, 
+.bg-gray-50, 
+.bg-zinc-50, 
+.bg-neutral-50 {
+  background-color: #020617 !important;
+}
+
+.text-black, 
+.text-slate-900, 
+.text-slate-950, 
+.text-gray-900, 
+.text-gray-950 {
+  color: #f8fafc !important;
+}
+
 /* ✅ DEFINIÇÃO DAS VARIÁVEIS CSS PARA USO VIA VAR() */
 :root, .dark {
   --background: 222.2 84% 4.9%;
@@ -50,48 +67,19 @@
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
   
-  /* ✅ FORÇAR COLOR-SCHEME DARK EM NÍVEL DE VARIÁVEL */
+  /* ✅ FORÇAR COLOR-SCHEME DARK */
   color-scheme: dark !important;
 }
 
-/* ✅ TRAVA DE TEMA ESCURO: IGNORAR NAVEGADOR E FORÇAR CLASSES DARK EM TUDO */
+/* ✅ TRAVA DE TEMA ESCURO ABSOLUTA: IGNORAR NAVEGADOR */
 html, body, :root {
   background-color: #020617 !important;
   color: #f8fafc !important;
   color-scheme: dark !important;
 }
 
-/* ✅ NEUTRALIZAR QUALQUER TENTATIVA DO NAVEGADOR DE USAR TEMA CLARO */
-@media (prefers-color-scheme: light) {
-  :root, html, body {
-    background-color: #020617 !important;
-    color: #f8fafc !important;
-    color-scheme: dark !important;
-  }
-  
-  /* Garantir que todas as variáveis continuem escuras mesmo se o navegador preferir light */
-  :root {
-    --background: 222.2 84% 4.9% !important;
-    --foreground: 210 40% 98% !important;
-    --card: 222.2 84% 4.9% !important;
-    --card-foreground: 210 40% 98% !important;
-    --popover: 222.2 84% 4.9% !important;
-    --popover-foreground: 210 40% 98% !important;
-    --primary: 210 40% 98% !important;
-    --primary-foreground: 222.2 47.4% 11.2% !important;
-    --secondary: 217.2 32.6% 17.5% !important;
-    --secondary-foreground: 210 40% 98% !important;
-    --muted: 217.2 32.6% 17.5% !important;
-    --muted-foreground: 215 20.2% 65.1% !important;
-    --accent: 217.2 32.6% 17.5% !important;
-    --accent-foreground: 210 40% 98% !important;
-    --destructive: 0 62.8% 30.6% !important;
-    --destructive-foreground: 210 40% 98% !important;
-    --border: 217.2 32.6% 17.5% !important;
-    --input: 217.2 32.6% 17.5% !important;
-    --ring: 212.7 26.8% 83.9% !important;
-  }
-}
+/* ✅ REMOVER TOTALMENTE A DETECÇÃO DE PREFERS-COLOR-SCHEME LIGHT */
+/* (Removido o bloco @media prefers-color-scheme: light para evitar ambiguidades) */
 
 @layer base {
   body {
