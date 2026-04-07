@@ -1,32 +1,34 @@
 @import "tailwindcss";
 
 @theme {
-  /* ✅ DEFINIÇÃO ABSOLUTA DE CORES EM HEX (TEMA ESCURO É O ÚNICO TEMA) */
-  --color-background: #020617;
-  --color-foreground: #f8fafc;
-  --color-card: #020617;
-  --color-card-foreground: #f8fafc;
-  --color-popover: #020617;
-  --color-popover-foreground: #f8fafc;
-  --color-primary: #f8fafc;
-  --color-primary-foreground: #0f172a;
-  --color-secondary: #1e293b;
-  --color-secondary-foreground: #f8fafc;
-  --color-muted: #1e293b;
-  --color-muted-foreground: #94a3b8;
-  --color-accent: #1e293b;
-  --color-accent-foreground: #f8fafc;
-  --color-destructive: #7f1d1d;
-  --color-destructive-foreground: #f8fafc;
-  --color-border: #1e293b;
-  --color-input: #1e293b;
-  --color-ring: #cbd5e1;
+  --dark-mode: selector;
+
+  /* ✅ Variáveis do Tailwind v4 mapeadas para as variáveis CSS */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
   --radius-lg: 0.625rem;
 }
 
-/* ✅ VARIÁVEIS CSS GLOBAIS EM HEX (FORÇADAS EM QUALQUER CONTEXTO) */
-:root, .dark, .light, [data-theme], html, body, * {
-  --background: 222.2 84% 4.9%; /* Mantido apenas para compatibilidade legada se houver hsl() */
+/* ✅ DEFINIÇÃO GLOBAL E IMUTÁVEL */
+:root, .dark, [data-theme="dark"], [data-theme="light"] {
+  --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --card: 222.2 84% 4.9%;
   --card-foreground: 210 40% 98%;
@@ -47,32 +49,24 @@
   --ring: 212.7 26.8% 83.9%;
   --radius: 0.625rem;
 
-  /* ✅ FORÇAR TEMA ESCURO ABSOLUTO */
+  /* Força o navegador a renderizar controles internos (scrollbar, inputs) como dark */
   color-scheme: dark !important;
 }
 
-/* ✅ TRAVA DE TEMA ESCURO ABSOLUTA: IGNORAR NAVEGADOR */
-html, body, :root {
-  background-color: #020617 !important;
-  color: #f8fafc !important;
-  color-scheme: dark !important;
+/* ✅ NEUTRALIZAR PREFERÊNCIA DO SISTEMA (O PONTO CHAVE) */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: dark !important;
+  }
 }
 
-/* ✅ NUCLEAR OVERRIDE: Neutralizar utilitários de cor clara do Tailwind e Shadcn */
-* {
-  border-color: #1e293b !important;
+/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias de "Modo Claro" */
+.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100 {
+  background-color: hsl(var(--background)) !important;
 }
 
-.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100, .bg-blue-50 {
-  background-color: #020617 !important;
-}
-
-.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-gray-950, .text-zinc-900, .text-neutral-900 {
-  color: #f8fafc !important;
-}
-
-.border-white, .border-slate-200, .border-gray-200, .border-zinc-200, .border-slate-300 {
-  border-color: #1e293b !important;
+.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-neutral-950 {
+  color: hsl(var(--foreground)) !important;
 }
 
 @layer base {

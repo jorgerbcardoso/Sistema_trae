@@ -4,7 +4,7 @@ export default {
     "./index.html",
     "./**/*.{js,ts,jsx,tsx}",
   ],
-  // ✅ REMOVIDO darkMode: 'class' PARA DESATIVAR TOTALMENTE A LÓGICA DE TEMAS
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
