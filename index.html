@@ -47,33 +47,29 @@
     </script>
     
     <style>
-      /* NUCLEAR OVERRIDE: Neutralizar qualquer utilitário de cor clara */
-      :root, html, body {
+      /* NUCLEAR RESET: FORÇAR CORES HEX EM TODOS OS ELEMENTOS */
+      * {
+        background-color: transparent; /* Permitir herança do body se não houver classe */
+        color: #f8fafc !important;
+        border-color: #1e293b !important;
+      }
+
+      html, body, :root {
         background-color: #020617 !important;
         color: #f8fafc !important;
         color-scheme: dark !important;
       }
 
-      /* Sobrescrever classes utilitárias comuns do Tailwind que trazem branco */
-      .bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, 
-      .bg-white\/10, .bg-white\/20, .bg-white\/50, .bg-white\/80, .bg-white\/90 {
+      /* Neutralizar especificamente classes de fundo branco */
+      .bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100, .bg-blue-50,
+      [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-gray-50"] {
         background-color: #020617 !important;
       }
 
-      .text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-gray-950,
-      .text-zinc-900, .text-zinc-950, .text-neutral-900, .text-neutral-950 {
-        color: #f8fafc !important;
-      }
-
-      .border-white, .border-slate-200, .border-gray-200, .border-zinc-200 {
-        border-color: #1e293b !important;
-      }
-
-      /* Garantir que inputs e textareas herdem o fundo escuro */
+      /* Inputs e Textareas precisam de fundo ligeiramente diferente para contraste */
       input, textarea, select {
         background-color: #0f172a !important;
         color: #f8fafc !important;
-        border-color: #1e293b !important;
       }
     </style>
   </head>

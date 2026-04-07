@@ -1,15 +1,82 @@
 
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="pt-BR" class="dark" style="color-scheme: dark">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="color-scheme" content="dark" />
       <title>Sistema Presto</title>
-      <script type="module" crossorigin src="/sistema/assets/index-Cov9yakl.js"></script>
-      <link rel="modulepreload" crossorigin href="/sistema/assets/recharts-vendor-n9GrbQ-m.js">
-      <link rel="modulepreload" crossorigin href="/sistema/assets/react-vendor-BBrNNvXy.js">
-      <link rel="stylesheet" crossorigin href="/sistema/assets/index-DJFDdAVv.css">
-    </head>
+    
+    <!-- NUCLEAR FORCE DARK MODE (LOCKDOWN) -->
+    <script>
+      (function() {
+        const doc = document.documentElement;
+        
+        // 1. Forçar classes e atributos IMEDIATAMENTE
+        const forceDark = () => {
+          if (!doc.classList.contains('dark')) doc.classList.add('dark');
+          if (doc.classList.contains('light')) doc.classList.remove('light');
+          if (doc.getAttribute('data-theme') !== 'dark') doc.setAttribute('data-theme', 'dark');
+          if (doc.style.colorScheme !== 'dark') {
+            doc.style.setProperty('color-scheme', 'dark', 'important');
+          }
+        };
+
+        forceDark();
+
+        // 2. Bloquear qualquer mudança de tema (MutationObserver)
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && (mutation.attributeName === 'class' || mutation.attributeName === 'style' || mutation.attributeName === 'data-theme')) {
+              forceDark();
+            }
+          });
+        });
+
+        observer.observe(doc, { 
+          attributes: true, 
+          attributeFilter: ['class', 'style', 'data-theme'] 
+        });
+
+        // 3. Forçar dark mode em nível de sistema para o navegador
+        const meta = document.createElement('meta');
+        meta.name = 'color-scheme';
+        meta.content = 'dark';
+        document.head.appendChild(meta);
+      })();
+    </script>
+    
+    <style>
+      /* NUCLEAR RESET: FORÇAR CORES HEX EM TODOS OS ELEMENTOS */
+      * {
+        background-color: transparent; /* Permitir herança do body se não houver classe */
+        color: #f8fafc !important;
+        border-color: #1e293b !important;
+      }
+
+      html, body, :root {
+        background-color: #020617 !important;
+        color: #f8fafc !important;
+        color-scheme: dark !important;
+      }
+
+      /* Neutralizar especificamente classes de fundo branco */
+      .bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100, .bg-blue-50,
+      [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-gray-50"] {
+        background-color: #020617 !important;
+      }
+
+      /* Inputs e Textareas precisam de fundo ligeiramente diferente para contraste */
+      input, textarea, select {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+      }
+    </style>
+    <script type="module" crossorigin src="/sistema/assets/index-BgPGdr5W.js"></script>
+    <link rel="modulepreload" crossorigin href="/sistema/assets/recharts-vendor-n9GrbQ-m.js">
+    <link rel="modulepreload" crossorigin href="/sistema/assets/react-vendor-BBrNNvXy.js">
+    <link rel="stylesheet" crossorigin href="/sistema/assets/index-BFOV5Qi8.css">
+  </head>
 
     <body>
       <div id="root"></div>
