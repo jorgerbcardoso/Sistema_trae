@@ -58,7 +58,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { SortableTableHeader, useSortableTable } from '@/components/table/SortableTableHeader';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Tooltip as UITooltip,
@@ -227,8 +226,7 @@ export default function AprovacaoDespesas() {
   const ITENS_POR_PAGINA = 50; // ✅ PADRÃO DO SISTEMA
   
   // ✅ ORDENAÇÃO
-  type SortField = 'aprovada' | 'lancamento' | 'data_inclusao' | 'data_pagamento' | 'evento' | 'fornecedor' | 'valor_final' | 'unidade';
-  const { sortField, sortDirection, handleSort, sortData } = useSortableTable<SortField>('data_pagamento', 'desc');
+  const [ordenacao, setOrdenacao] = useState<'status' | 'data' | 'evento'>('status');
 
   // ✅ ESTADOS DOS DIALOGS
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -371,29 +369,58 @@ export default function AprovacaoDespesas() {
 
   // ✅ PAGINAÇÃO - CALCULAR DADOS
   const totalPaginas = Math.ceil(despesas.length / ITENS_POR_PAGINA);
+  const indiceInicio = (paginaAtual - 1) * ITENS_POR_PAGINA + 1;
+  const indiceFim = Math.min(paginaAtual * ITENS_POR_PAGINA, despesas.length);
   
-  // ✅ RESETAR PARA PÁGINA 1 QUANDO CARREGAR DESPESAS
+  // ✅ RESETAR PARA PÁGINA 1 QUANDO CARREGAR DESPESAS OU MUDAR ORDENAÇÃO
   useEffect(() => {
     setPaginaAtual(1);
-  }, [despesas.length]);
+  }, [despesas.length, ordenacao]);
   
   // ✅ DADOS ORDENADOS
   const despesasOrdenadas = useMemo(() => {
-    return sortData(despesas);
-  }, [despesas, sortField, sortDirection]);
+    const despesasClone = [...despesas];
+    
+    switch (ordenacao) {
+      case 'status':
+        // Não aprovadas primeiro, depois aprovadas
+        return despesasClone.sort((a, b) => {
+          if (a.aprovada === b.aprovada) {
+            // Se mesmo status, ordenar por data decrescente
+            return new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime();
+          }
+          return a.aprovada ? 1 : -1;
+        });
+        
+      case 'data':
+        // Data decrescente (mais recente primeiro)
+        return despesasClone.sort((a, b) => {
+          return new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime();
+        });
+        
+      case 'evento':
+        // Ordenar por código de evento (crescente)
+        return despesasClone.sort((a, b) => {
+          return a.evento.localeCompare(b.evento);
+        });
+        
+      default:
+        return despesasClone;
+    }
+  }, [despesas, ordenacao]);
   
-  // ✅ TOGGLE LINHA (INDIVIDUAL)
-  const handleRowClick = async (despesa: Despesa) => {
-    if (despesa.aprovada) return; // Não permite selecionar aprovadas na listagem (seria desaprovação individual)
+  // ✅ TOGGLE CARD CLICÁVEL (INDIVIDUAL)
+  const handleCardClick = async (seqLancamento: number, aprovada: boolean) => {
+    if (aprovada) return; // Não permite selecionar aprovadas na listagem (seria desaprovação individual)
     
     const novasSelecoes = new Set(despesasSelecionadas);
-    const estaSelecionado = novasSelecoes.has(despesa.seq_lancamento);
+    const estaSelecionado = novasSelecoes.has(seqLancamento);
     
     // 1. Atualizar UI imediatamente para melhor UX
     if (estaSelecionado) {
-      novasSelecoes.delete(despesa.seq_lancamento);
+      novasSelecoes.delete(seqLancamento);
     } else {
-      novasSelecoes.add(despesa.seq_lancamento);
+      novasSelecoes.add(seqLancamento);
     }
     setDespesasSelecionadas(novasSelecoes);
 
@@ -402,7 +429,7 @@ export default function AprovacaoDespesas() {
       await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=TOGGLE_INDIVIDUAL', {
         method: 'POST',
         body: JSON.stringify({
-          seq_parcela: despesa.seq_lancamento,
+          seq_parcela: seqLancamento,
           selecionado: !estaSelecionado
         })
       });
@@ -815,7 +842,7 @@ export default function AprovacaoDespesas() {
         </CardContent>
       </Card>
 
-      {/* ✅ LISTA DE DESPESAS (TABLE) */}
+      {/* ✅ LISTA DE DESPESAS (CARDS CLICÁVEIS - MOBILE FIRST) */}
       <Card className="mb-6 overflow-hidden">
         <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -826,11 +853,30 @@ export default function AprovacaoDespesas() {
               </CardDescription>
             </div>
             
-            <div className="flex items-center gap-2">
-               <Button 
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              {/* ✅ SELECT DE ORDENAÇÃO */}
+              {despesas.length > 0 && (
+                <div className="w-full md:w-48">
+                  <Select
+                    value={ordenacao}
+                    onValueChange={(value: 'status' | 'data' | 'evento') => setOrdenacao(value)}
+                  >
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-900">
+                      <SelectValue placeholder="Ordenar por..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="status">Status (Pendentes primeiro)</SelectItem>
+                      <SelectItem value="data">Data (Mais recentes)</SelectItem>
+                      <SelectItem value="evento">Evento (A-Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <Button 
                 onClick={handleAprovarMassa} 
                 disabled={loading || despesasSelecionadas.size === 0}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white"
               >
                 <CheckCheck className="h-4 w-4 mr-2" />
                 Aprovar Selecionadas ({despesasSelecionadas.size})
@@ -838,192 +884,195 @@ export default function AprovacaoDespesas() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900">
+        <CardContent className="p-4 md:p-6 bg-slate-50/30 dark:bg-slate-900/10">
+          {/* ✅ ORIENTAÇÃO AO USUÁRIO */}
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-xl">
             <p className="text-sm text-blue-900 dark:text-blue-100 flex items-start gap-2">
               <span className="text-blue-600 dark:text-blue-400 font-bold">💡</span>
               <span>
-                <strong>Dica:</strong> Marque as despesas na coluna de seleção para aprovação em massa. Clique no ícone de balão para ver/editar observações.
+                <strong>Dica:</strong> Clique nos cards das despesas pendentes para selecioná-las. Use o ícone de balão para ver/editar observações no SSW.
               </span>
             </p>
           </div>
 
-          <ScrollArea className="w-full">
-            <div className="min-w-[1200px]">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
-                    <TableHead className="w-[50px]">
-                      <Checkbox 
-                        checked={despesasSelecionadas.size === despesas.filter(d => !d.aprovada).length && despesas.length > 0}
-                        onCheckedChange={toggleSelecionarTodas}
-                      />
-                    </TableHead>
-                    <SortableTableHeader<SortField> field="aprovada" currentField={sortField} direction={sortDirection} onSort={handleSort}>Status</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="lancamento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Lançamento</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="unidade" currentField={sortField} direction={sortDirection} onSort={handleSort}>Unid</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="data_inclusao" currentField={sortField} direction={sortDirection} onSort={handleSort}>Inclusão</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="data_pagamento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Pagamento</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="fornecedor" currentField={sortField} direction={sortDirection} onSort={handleSort}>Fornecedor</SortableTableHeader>
-                    <SortableTableHeader<SortField> field="evento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Evento</SortableTableHeader>
-                    <TableHead>Histórico/Descrição</TableHead>
-                    <SortableTableHeader<SortField> field="valor_final" currentField={sortField} direction={sortDirection} onSort={handleSort} className="text-right">Valor</SortableTableHeader>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={11} className="h-32 text-center">
-                        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-                      </TableCell>
-                    </TableRow>
-                  ) : despesasOrdenadas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
-                        Nenhuma despesa encontrada
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    despesasOrdenadas
-                      .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
-                      .map((despesa) => (
-                        <TableRow 
-                          key={despesa.seq_lancamento}
-                          className={`
-                            hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors
-                            ${despesasSelecionadas.has(despesa.seq_lancamento) && !despesa.aprovada ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}
-                          `}
-                        >
-                          <TableCell>
-                            {!despesa.aprovada && (
-                              <Checkbox 
-                                checked={despesasSelecionadas.has(despesa.seq_lancamento)}
-                                onCheckedChange={() => handleRowClick(despesa)}
-                              />
-                            )}
-                          </TableCell>
-                          <TableCell>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+              <p className="text-muted-foreground animate-pulse">Carregando despesas...</p>
+            </div>
+          ) : despesas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
+              <FileText className="h-16 w-12 mb-4 opacity-20" />
+              <p className="font-medium text-lg">Nenhuma despesa encontrada</p>
+              <p className="text-sm">Ajuste os filtros de busca acima</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {despesasOrdenadas
+                .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
+                .map((despesa, index) => (
+                <motion.div
+                  key={despesa.seq_lancamento}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: (index % 10) * 0.03 }}
+                >
+                  <Card 
+                    className={`
+                      relative group border-l-4 transition-all overflow-hidden
+                      ${despesa.aprovada 
+                        ? 'border-l-green-500 bg-white/80 dark:bg-slate-900/80 opacity-80' 
+                        : 'border-l-amber-500 bg-white dark:bg-slate-900 cursor-pointer hover:shadow-lg hover:-translate-y-0.5'}
+                      ${despesasSelecionadas.has(despesa.seq_lancamento) && !despesa.aprovada ? 'ring-2 ring-blue-500 border-l-blue-600 bg-blue-50/30 dark:bg-blue-900/10' : ''}
+                    `}
+                    onClick={() => handleCardClick(despesa.seq_lancamento, despesa.aprovada || false)}
+                  >
+                    <CardContent className="p-4 md:p-5">
+                      <div className="flex flex-col md:flex-row gap-4 md:items-start justify-between">
+                        {/* COLUNA ESQUERDA: IDENTIFICAÇÃO */}
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-2xl font-mono font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                              {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
+                            </span>
                             {despesa.aprovada ? (
-                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                APROVADA
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> APROVADA
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-                                <Clock className="h-3 w-3 mr-1" />
-                                PENDENTE
+                              <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200">
+                                <Clock className="h-3 w-3 mr-1" /> PENDENTE
                               </Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="font-mono font-bold text-xs">
-                            {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
-                          </TableCell>
-                          <TableCell className="text-xs font-semibold">{despesa.unidade}</TableCell>
-                          <TableCell className="text-xs">{formatarDataBR(despesa.data_inclusao)}</TableCell>
-                          <TableCell className="text-xs">{formatarDataBR(despesa.data_pagamento)}</TableCell>
-                          <TableCell className="text-xs max-w-[150px] truncate" title={despesa.fornecedor}>
-                            {despesa.fornecedor}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            <span className="font-bold">{despesa.evento}</span> - {despesa.evento_descricao}
-                          </TableCell>
-                          <TableCell className="text-xs max-w-[200px] truncate" title={despesa.historico || despesa.descricao}>
-                            {despesa.historico || despesa.descricao}
-                          </TableCell>
-                          <TableCell className="text-right font-bold">
-                            {formatarValorBR(despesa.valor_final)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              {/* TOOLTIP COM MAIS INFO */}
-                              <TooltipProvider>
-                                <UITooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <Info className="h-4 w-4 text-blue-500" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="w-80 p-0">
-                                    <div className="bg-slate-900 text-white p-4 rounded-md shadow-xl border border-slate-700">
-                                      <p className="text-xs font-bold uppercase mb-2 border-b border-slate-700 pb-1">Detalhes Adicionais</p>
-                                      <div className="grid grid-cols-2 gap-y-2 text-[11px]">
-                                        <div><p className="text-slate-400">Compentência</p><p>{despesa.competencia}</p></div>
-                                        <div><p className="text-slate-400">Boleto</p><p>{despesa.boleto || '-'}</p></div>
-                                        <div><p className="text-slate-400">Vencimento</p><p>{formatarDataBR(despesa.data_vencimento)}</p></div>
-                                        <div><p className="text-slate-400">Usuário</p><p>{despesa.usuario_lancamento}</p></div>
-                                        <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
-                                          <p className="text-slate-400 mb-1">Valores:</p>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                            <div className="flex justify-between"><span>Parcela:</span> <span>{formatarValorBR(despesa.valor_parcela)}</span></div>
-                                            <div className="flex justify-between"><span>Juros:</span> <span>{formatarValorBR(despesa.juros)}</span></div>
-                                            <div className="flex justify-between"><span>Desconto:</span> <span>{formatarValorBR(despesa.desconto)}</span></div>
-                                            <div className="flex justify-between"><span>Final:</span> <span className="font-bold">{formatarValorBR(despesa.valor_final)}</span></div>
-                                          </div>
-                                        </div>
-                                        <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
-                                          <p className="text-slate-400 mb-1">BI Orçamentário:</p>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                            <div className="flex justify-between"><span>Orçado:</span> <span>{formatarValorBR(despesa.orcamento)}</span></div>
-                                            <div className="flex justify-between"><span>Comprometido:</span> <span>{formatarValorBR(despesa.comprometido)}</span></div>
-                                            <div className="flex justify-between"><span>Saldo:</span> <span className={`font-bold ${despesa.saldo < 0 ? 'text-red-400' : 'text-green-400'}`}>{formatarValorBR(despesa.saldo)}</span></div>
-                                          </div>
-                                        </div>
-                                        {despesa.repasse && (
-                                          <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
-                                            <p className="text-slate-400">Repasse</p><p>{despesa.repasse}</p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </TooltipContent>
-                                </UITooltip>
-                              </TooltipProvider>
+                            <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-400">
+                              UNID: {despesa.unidade}
+                            </span>
+                          </div>
 
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={(e) => handleAbrirObs(e, despesa)}
-                                title="Observações"
-                              >
-                                <MessageSquare className={`h-4 w-4 ${despesa.observacao ? 'text-blue-600 fill-blue-100' : 'text-slate-400'}`} />
-                              </Button>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                              {despesa.evento} - {despesa.evento_descricao}
+                            </p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                              Fornecedor: <span className="text-slate-900 dark:text-slate-200">{despesa.fornecedor || 'NÃO INFORMADO'}</span>
+                            </p>
+                          </div>
 
-                              {despesa.aprovada && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  onClick={(e) => handleEstornoIndividual(e, despesa.seq_lancamento, despesa.lancamento)}
-                                  title="Estornar Aprovação"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
+                          {despesa.historico && (
+                            <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 italic">
+                                "{despesa.historico}"
+                              </p>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
+                          )}
+                        </div>
+
+                        {/* COLUNA CENTRAL: DATAS E INFO */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 py-3 md:py-0 border-y md:border-y-0 md:border-x border-slate-100 dark:border-slate-800 md:px-6">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Vencimento</p>
+                            <p className="text-xs font-semibold">{formatarDataBR(despesa.data_vencimento)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Pagamento</p>
+                            <p className="text-xs font-semibold">{formatarDataBR(despesa.data_pagamento)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Inclusão</p>
+                            <p className="text-xs font-semibold">{formatarDataBR(despesa.data_inclusao)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Usuário</p>
+                            <p className="text-xs font-semibold">{despesa.usuario_lancamento}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">Competência</p>
+                            <p className="text-xs font-semibold">{despesa.competencia}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">NF/Boleto</p>
+                            <p className="text-xs font-semibold truncate max-w-[80px]" title={despesa.boleto || despesa.nf}>
+                              {despesa.boleto || despesa.nf || '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* COLUNA DIREITA: VALORES E BI */}
+                        <div className="md:text-right space-y-3 min-w-[180px]">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Valor Total</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white">
+                              {formatarValorBR(despesa.valor_final)}
+                            </p>
+                          </div>
+
+                          <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg space-y-1">
+                            <p className="text-[10px] text-blue-700 dark:text-blue-400 uppercase font-bold text-center border-b border-blue-100 dark:border-blue-800 pb-1 mb-1">BI Orçamentário</p>
+                            <div className="flex justify-between text-[10px]">
+                              <span className="text-muted-foreground">Orçado:</span>
+                              <span className="font-bold">{formatarValorBR(despesa.orcamento)}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px]">
+                              <span className="text-muted-foreground">Saldo:</span>
+                              <span className={`font-bold ${despesa.saldo < 0 ? 'text-red-500' : 'text-green-600'}`}>{formatarValorBR(despesa.saldo)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RODAPÉ DO CARD: AÇÕES */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-8 px-3 rounded-full text-xs font-medium transition-colors ${
+                              despesa.observacao ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' : 'text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                            onClick={(e) => handleAbrirObs(e, despesa)}
+                          >
+                            <MessageSquare className={`h-3.5 w-3.5 mr-1.5 ${despesa.observacao ? 'fill-blue-500' : ''}`} />
+                            {despesa.observacao ? 'Ver Observação' : 'Adicionar Obs'}
+                          </Button>
+                          
+                          {despesa.veiculo && (
+                            <span className="text-[10px] font-bold text-slate-500 uppercase px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">
+                              🚛 {despesa.veiculo}
+                            </span>
+                          )}
+                        </div>
+
+                        {despesa.aprovada && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full text-xs font-bold"
+                            onClick={(e) => handleEstornoIndividual(e, despesa.seq_lancamento, despesa.lancamento)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Estornar Aprovação
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          )}
 
           {/* PAGINAÇÃO */}
           {despesas.length > 0 && (
-            <div className="p-4 border-t bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Mostrando {Math.min(despesas.length, (paginaAtual - 1) * ITENS_POR_PAGINA + 1)} a {Math.min(despesas.length, paginaAtual * ITENS_POR_PAGINA)} de {despesas.length} despesas
+            <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4 border-t pt-6">
+              <div className="text-sm text-muted-foreground font-medium">
+                Mostrando <span className="text-slate-900 dark:text-slate-100">{indiceInicio}</span> a <span className="text-slate-900 dark:text-slate-100">{indiceFim}</span> de <span className="text-slate-900 dark:text-slate-100">{despesas.length}</span> despesas
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPaginaAtual(1)}
                   disabled={paginaAtual === 1}
+                  className="h-9 w-9 p-0"
                 >
                   <ChevronsLeft className="h-4 w-4" />
                 </Button>
@@ -1032,17 +1081,21 @@ export default function AprovacaoDespesas() {
                   size="sm"
                   onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
                   disabled={paginaAtual === 1}
+                  className="h-9 w-9 p-0"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <div className="text-sm font-medium px-4">
-                  Página {paginaAtual} de {totalPaginas}
+                
+                <div className="flex items-center bg-white dark:bg-slate-900 border rounded-md px-3 h-9">
+                  <span className="text-sm font-bold">Página {paginaAtual} de {totalPaginas}</span>
                 </div>
+
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
                   disabled={paginaAtual === totalPaginas}
+                  className="h-9 w-9 p-0"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -1051,6 +1104,7 @@ export default function AprovacaoDespesas() {
                   size="sm"
                   onClick={() => setPaginaAtual(totalPaginas)}
                   disabled={paginaAtual === totalPaginas}
+                  className="h-9 w-9 p-0"
                 >
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
