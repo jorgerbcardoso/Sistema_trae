@@ -44,10 +44,10 @@ define('PASSWORD_HASH_COST', 10);
 // ============================================
 date_default_timezone_set(API_TIMEZONE);
 
-// Forçar exibição de erros para diagnóstico
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// Forçar log de erros, mas NÃO imprimir no output (para não quebrar JSON)
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED); // Ignorar avisos de depreciação
 
 ini_set('log_errors', 1);
 ini_set('error_log', '/var/www/html/tmp/php_debug.log');

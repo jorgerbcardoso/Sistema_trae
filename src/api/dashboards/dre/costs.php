@@ -39,11 +39,11 @@ try {
     $domain = $auth['domain'];
 
     // Validar e sanitizar inputs
-    $period = filter_var($_GET['period'] ?? 'month', FILTER_SANITIZE_STRING);
-    $viewMode = filter_var($_GET['view_mode'] ?? 'GERAL', FILTER_SANITIZE_STRING);
-    $startDate = filter_var($_GET['start_date'] ?? date('Y-m-01'), FILTER_SANITIZE_STRING);
-    $endDate = filter_var($_GET['end_date'] ?? date('Y-m-t'), FILTER_SANITIZE_STRING);
-    $groupBy = filter_var($_GET['group_by'] ?? 'EVENTOS', FILTER_SANITIZE_STRING); // ✅ NOVO: group_by
+    $period = isset($_GET['period']) ? trim((string)$_GET['period']) : 'month';
+    $viewMode = isset($_GET['view_mode']) ? trim((string)$_GET['view_mode']) : 'GERAL';
+    $startDate = isset($_GET['start_date']) ? trim((string)$_GET['start_date']) : date('Y-m-01');
+    $endDate = isset($_GET['end_date']) ? trim((string)$_GET['end_date']) : date('Y-m-t');
+    $groupBy = isset($_GET['group_by']) ? trim((string)$_GET['group_by']) : 'EVENTOS'; // ✅ NOVO: group_by
 
     // Validar formato de datas
     if (!validateDate($startDate) || !validateDate($endDate)) {
