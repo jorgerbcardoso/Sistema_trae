@@ -176,43 +176,20 @@ const MOCK_DESPESAS_PENDENTES: Despesa[] = [
     fornecedor: 'POSTO SHELL',
     observacao: 'Abastecimento completo',
     usuario_lancamento: 'admin',
-    data_lancamento: '2026-02-26',
+    data_inclusao: '2026-02-26',
+    data_vencimento: '2026-03-26',
+    data_pagamento: '2026-03-26',
+    competencia: '02/2026',
+    boleto: 'BOL123',
+    orcamento: 1000,
+    comprometido: 450,
+    saldo: 550,
+    valor_parcela: 450,
+    juros: 0,
+    desconto: 0,
+    valor_final: 450,
+    repasse: '',
     aprovada: false
-  },
-  {
-    seq_lancamento: 1002,
-    lancamento: '130068-22',
-    data: '2026-02-27',
-    tipo_lancamento: 'DESPESA',
-    evento: '102',
-    evento_descricao: 'PEDÁGIO',
-    veiculo: 'XYZ-5678',
-    motorista: 'MARIA SANTOS',
-    unidade: 'MTZ',
-    valor: 85.50,
-    nf: '67890',
-    fornecedor: 'CONCESSIONÁRIA ABC',
-    usuario_lancamento: 'admin',
-    data_lancamento: '2026-02-27',
-    aprovada: false
-  },
-  {
-    seq_lancamento: 1003,
-    lancamento: '130068-23',
-    data: '2026-02-25',
-    tipo_lancamento: 'DESPESA',
-    evento: '103',
-    evento_descricao: 'MANUTENÇÃO',
-    veiculo: 'DEF-9012',
-    motorista: 'CARLOS SOUZA',
-    unidade: 'DMN',
-    valor: 1200.00,
-    nf: '11111',
-    fornecedor: 'OFICINA MECÂNICA XYZ',
-    observacao: 'Troca de óleo e filtros',
-    usuario_lancamento: 'admin',
-    data_lancamento: '2026-02-25',
-    aprovada: true
   }
 ];
 
@@ -447,7 +424,7 @@ export default function AprovacaoDespesas() {
   const aprovarSelecionadas = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=APROVAR', {
+      await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=APROVAR', {
         method: 'POST',
         body: JSON.stringify({
           seq_parcelas: Array.from(despesasSelecionadas)
@@ -523,7 +500,6 @@ export default function AprovacaoDespesas() {
     setLoading(true);
     try {
       // ✅ 1. LER OBSERVAÇÃO DO SSW EM TEMPO REAL (act=COM)
-      // Agora passando também o nro_lancamento para o Passo 0 (PES + f8)
       const data = await apiFetch(`/sistema/api/operacoes/aprovacao-despesas.php?act=LER_OBSERVACAO&seq_parcela=${despesa.seq_lancamento}&nro_lancamento=${despesa.lancamento}`);
       
       setObsDialog({
@@ -551,7 +527,7 @@ export default function AprovacaoDespesas() {
         method: 'POST',
         body: JSON.stringify({
           seq_parcela: obsDialog.seq,
-          nro_lancamento: obsDialog.nro, // ✅ Enviar número para o Passo 0 (PES + f8)
+          nro_lancamento: obsDialog.nro, 
           observacao: obsDialog.texto
         })
       });
@@ -839,9 +815,9 @@ export default function AprovacaoDespesas() {
         </CardContent>
       </Card>
 
-      {/* ✅ LISTA DE DESPESAS (CARDS CLICÁVEIS - MOBILE FIRST) */}
-      <Card className="mb-6">
-        <CardHeader>
+      {/* ✅ LISTA DE DESPESAS (TABLE) */}
+      <Card className="mb-6 overflow-hidden">
+        <CardHeader className="border-b bg-slate-50/50 dark:bg-slate-900/50">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex-1">
               <CardTitle>Despesas</CardTitle>
@@ -850,346 +826,237 @@ export default function AprovacaoDespesas() {
               </CardDescription>
             </div>
             
-            {/* ✅ SELECT DE ORDENAÇÃO */}
-            {despesas.length > 0 && (
-              <div className="w-full md:w-48">
-                <Label className="text-xs mb-2 block">Ordenar por:</Label>
-                <Select
-                  value={ordenacao}
-                  onValueChange={(value: 'status' | 'data' | 'evento') => setOrdenacao(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="status">Status</SelectItem>
-                    <SelectItem value="data">Data</SelectItem>
-                    <SelectItem value="evento">Evento</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+               <Button 
+                onClick={handleAprovarMassa} 
+                disabled={loading || despesasSelecionadas.size === 0}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCheck className="h-4 w-4 mr-2" />
+                Aprovar Selecionadas ({despesasSelecionadas.size})
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {/* ✅ ORIENTAÇÃO AO USUÁRIO */}
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <CardContent className="p-0">
+          <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900">
             <p className="text-sm text-blue-900 dark:text-blue-100 flex items-start gap-2">
-              <span className="text-blue-600 dark:text-blue-400 font-bold mt-0.5">💡</span>
+              <span className="text-blue-600 dark:text-blue-400 font-bold">💡</span>
               <span>
-                <strong>Dica:</strong> Clique sobre as despesas ainda não aprovadas, e que deseja aprovar, para efetuar a aprovação em massa.
+                <strong>Dica:</strong> Marque as despesas na coluna de seleção para aprovação em massa. Clique no ícone de balão para ver/editar observações.
               </span>
             </p>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : despesas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <FileText className="h-12 w-12 mb-4 opacity-20" />
-              <p>Nenhuma despesa encontrada</p>
-              <p className="text-sm mt-2">Ajuste os filtros e tente novamente</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {despesasOrdenadas.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA).map((despesa, index) => (
-                <motion.div
-                  key={despesa.seq_lancamento}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                >
-                  <Card 
-                    className={`
-                      border-l-4 transition-all
-                      ${despesa.aprovada 
-                        ? 'border-l-green-500 bg-green-50/30 dark:bg-green-950/10' 
-                        : 'border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10 cursor-pointer hover:shadow-md hover:border-l-amber-600'}
-                      ${despesasSelecionadas.has(despesa.seq_lancamento) && !despesa.aprovada ? 'ring-2 ring-blue-500 bg-blue-50/20 dark:bg-blue-950/20' : ''}
-                    `}
-                    onClick={() => handleCardClick(despesa.seq_lancamento, despesa.aprovada || false)}
-                  >
-                    <CardContent className="p-3 md:p-4">
-                      {/* MOBILE: Layout empilhado */}
-                      <div className="space-y-3">
-                        {/* CABEÇALHO */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            {/* ✅ NRO_LANCAMENTO EM DESTAQUE */}
-                            <div className="flex items-center gap-3 flex-wrap mb-2">
-                              <div className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100 font-mono tracking-tight">
-                                {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
-                              </div>
-                              {despesa.data_inclusao && (
-                                <div className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 flex flex-col">
-                                  <span className="text-[10px] text-muted-foreground leading-none mb-1">INCLUSÃO</span>
-                                  <span className="text-xs font-mono font-bold leading-none">
-                                    {new Date(despesa.data_inclusao).toLocaleDateString('pt-BR')}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-semibold text-sm md:text-base text-muted-foreground">
-                                {despesa.evento} - {despesa.evento_descricao}
-                              </span>
-                              {despesa.aprovada ? (
-                                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full flex items-center gap-1">
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Aprovada
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Pendente
-                                </span>
-                              )}
-                            </div>
-                            {despesa.veiculo && (
-                              <p className="text-sm text-muted-foreground">
-                                {despesa.veiculo} • {despesa.motorista}
-                              </p>
+          <ScrollArea className="w-full">
+            <div className="min-w-[1200px]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
+                    <TableHead className="w-[50px]">
+                      <Checkbox 
+                        checked={despesasSelecionadas.size === despesas.filter(d => !d.aprovada).length && despesas.length > 0}
+                        onCheckedChange={toggleSelecionarTodas}
+                      />
+                    </TableHead>
+                    <SortableTableHeader<SortField> field="aprovada" currentField={sortField} direction={sortDirection} onSort={handleSort}>Status</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="lancamento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Lançamento</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="unidade" currentField={sortField} direction={sortDirection} onSort={handleSort}>Unid</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="data_inclusao" currentField={sortField} direction={sortDirection} onSort={handleSort}>Inclusão</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="data_pagamento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Pagamento</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="fornecedor" currentField={sortField} direction={sortDirection} onSort={handleSort}>Fornecedor</SortableTableHeader>
+                    <SortableTableHeader<SortField> field="evento" currentField={sortField} direction={sortDirection} onSort={handleSort}>Evento</SortableTableHeader>
+                    <TableHead>Histórico/Descrição</TableHead>
+                    <SortableTableHeader<SortField> field="valor_final" currentField={sortField} direction={sortDirection} onSort={handleSort} className="text-right">Valor</SortableTableHeader>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="h-32 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  ) : despesasOrdenadas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                        Nenhuma despesa encontrada
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    despesasOrdenadas
+                      .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
+                      .map((despesa) => (
+                        <TableRow 
+                          key={despesa.seq_lancamento}
+                          className={`
+                            hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors
+                            ${despesasSelecionadas.has(despesa.seq_lancamento) && !despesa.aprovada ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}
+                          `}
+                        >
+                          <TableCell>
+                            {!despesa.aprovada && (
+                              <Checkbox 
+                                checked={despesasSelecionadas.has(despesa.seq_lancamento)}
+                                onCheckedChange={() => handleRowClick(despesa)}
+                              />
                             )}
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-base md:text-lg font-semibold text-slate-700 dark:text-slate-300">
-                              {formatCurrency(despesa.valor)}
+                          </TableCell>
+                          <TableCell>
+                            {despesa.aprovada ? (
+                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                APROVADA
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                                <Clock className="h-3 w-3 mr-1" />
+                                PENDENTE
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono font-bold text-xs">
+                            {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
+                          </TableCell>
+                          <TableCell className="text-xs font-semibold">{despesa.unidade}</TableCell>
+                          <TableCell className="text-xs">{formatarDataBR(despesa.data_inclusao)}</TableCell>
+                          <TableCell className="text-xs">{formatarDataBR(despesa.data_pagamento)}</TableCell>
+                          <TableCell className="text-xs max-w-[150px] truncate" title={despesa.fornecedor}>
+                            {despesa.fornecedor}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <span className="font-bold">{despesa.evento}</span> - {despesa.evento_descricao}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate" title={despesa.historico || despesa.descricao}>
+                            {despesa.historico || despesa.descricao}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
+                            {formatarValorBR(despesa.valor_final)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* TOOLTIP COM MAIS INFO */}
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <Info className="h-4 w-4 text-blue-500" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="w-80 p-0">
+                                    <div className="bg-slate-900 text-white p-4 rounded-md shadow-xl border border-slate-700">
+                                      <p className="text-xs font-bold uppercase mb-2 border-b border-slate-700 pb-1">Detalhes Adicionais</p>
+                                      <div className="grid grid-cols-2 gap-y-2 text-[11px]">
+                                        <div><p className="text-slate-400">Compentência</p><p>{despesa.competencia}</p></div>
+                                        <div><p className="text-slate-400">Boleto</p><p>{despesa.boleto || '-'}</p></div>
+                                        <div><p className="text-slate-400">Vencimento</p><p>{formatarDataBR(despesa.data_vencimento)}</p></div>
+                                        <div><p className="text-slate-400">Usuário</p><p>{despesa.usuario_lancamento}</p></div>
+                                        <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
+                                          <p className="text-slate-400 mb-1">Valores:</p>
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                            <div className="flex justify-between"><span>Parcela:</span> <span>{formatarValorBR(despesa.valor_parcela)}</span></div>
+                                            <div className="flex justify-between"><span>Juros:</span> <span>{formatarValorBR(despesa.juros)}</span></div>
+                                            <div className="flex justify-between"><span>Desconto:</span> <span>{formatarValorBR(despesa.desconto)}</span></div>
+                                            <div className="flex justify-between"><span>Final:</span> <span className="font-bold">{formatarValorBR(despesa.valor_final)}</span></div>
+                                          </div>
+                                        </div>
+                                        <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
+                                          <p className="text-slate-400 mb-1">BI Orçamentário:</p>
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                            <div className="flex justify-between"><span>Orçado:</span> <span>{formatarValorBR(despesa.orcamento)}</span></div>
+                                            <div className="flex justify-between"><span>Comprometido:</span> <span>{formatarValorBR(despesa.comprometido)}</span></div>
+                                            <div className="flex justify-between"><span>Saldo:</span> <span className={`font-bold ${despesa.saldo < 0 ? 'text-red-400' : 'text-green-400'}`}>{formatarValorBR(despesa.saldo)}</span></div>
+                                          </div>
+                                        </div>
+                                        {despesa.repasse && (
+                                          <div className="col-span-2 border-t border-slate-700 pt-2 mt-1">
+                                            <p className="text-slate-400">Repasse</p><p>{despesa.repasse}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => handleAbrirObs(e, despesa)}
+                                title="Observações"
+                              >
+                                <MessageSquare className={`h-4 w-4 ${despesa.observacao ? 'text-blue-600 fill-blue-100' : 'text-slate-400'}`} />
+                              </Button>
+
+                              {despesa.aprovada && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  onClick={(e) => handleEstornoIndividual(e, despesa.seq_lancamento, despesa.lancamento)}
+                                  title="Estornar Aprovação"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
-                          </div>
-                        </div>
-
-                        {/* DETALHES */}
-                        <div className="grid grid-cols-2 gap-3 text-xs md:text-sm">
-                          {despesa.fornecedor && (
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-0.5">Fornecedor</p>
-                              <p className="font-medium truncate">{despesa.fornecedor}</p>
-                            </div>
-                          )}
-                          {despesa.nf && (
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-0.5">NF</p>
-                              <p className="font-medium">{despesa.nf}</p>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-0.5">Pagamento</p>
-                            <p className="font-medium flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(despesa.data).toLocaleDateString('pt-BR')}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* HISTÓRICO (f5) */}
-                        {despesa.historico && (
-                          <div className="p-2 bg-slate-50 dark:bg-slate-900/50 rounded-md border border-slate-200/50 dark:border-slate-800/50">
-                            <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Histórico</p>
-                            <p className="text-sm leading-tight text-slate-700 dark:text-slate-300 italic">
-                              "{despesa.historico}"
-                            </p>
-                          </div>
-                        )}
-
-                        {/* OBSERVAÇÃO (se houver) */}
-                        {despesa.observacao && (
-                          <div className="pt-2 border-t">
-                            <p className="text-xs text-muted-foreground mb-0.5">Observação</p>
-                            <p className="text-sm">{despesa.observacao}</p>
-                          </div>
-                        )}
-
-                        {/* AÇÕES (SE APROVADA) */}
-                        {despesa.aprovada && (
-                          <div className="pt-2 border-t flex flex-wrap gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex-1 md:flex-none"
-                              onClick={(e) => handleEstornoIndividual(e, despesa.seq_lancamento, despesa.lancamento)}
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Remover Aprovação
-                            </Button>
-                            
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 md:flex-none"
-                              onClick={(e) => handleAbrirObs(e, despesa)}
-                              disabled={loading}
-                            >
-                              <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                              Visualizar/Incluir observação
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* AÇÕES (SE NÃO APROVADA) */}
-                        {!despesa.aprovada && (
-                          <div className="pt-2 border-t flex justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => handleAbrirObs(e, despesa)}
-                              disabled={loading}
-                            >
-                              <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                              Visualizar/Incluir observação
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-          
-          {/* ✅ PAGINAÇÃO MOBILE-FRIENDLY */}
-          {!loading && despesas.length > 0 && totalPaginas > 1 && (
-            <div className="mt-6 space-y-4">
-              {/* INFO DE REGISTROS */}
-              <div className="text-center text-sm text-muted-foreground">
-                Mostrando {indiceInicio} a {indiceFim} de {despesas.length} despesas
-              </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
 
-              {/* CONTROLES DE NAVEGAÇÃO */}
-              <div className="flex items-center justify-center gap-2">
-                {/* PRIMEIRA PÁGINA */}
+          {/* PAGINAÇÃO */}
+          {despesas.length > 0 && (
+            <div className="p-4 border-t bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {Math.min(despesas.length, (paginaAtual - 1) * ITENS_POR_PAGINA + 1)} a {Math.min(despesas.length, paginaAtual * ITENS_POR_PAGINA)} de {despesas.length} despesas
+              </div>
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="sm"
                   onClick={() => setPaginaAtual(1)}
                   disabled={paginaAtual === 1}
-                  className="h-10 w-10"
                 >
                   <ChevronsLeft className="h-4 w-4" />
                 </Button>
-
-                {/* PÁGINA ANTERIOR */}
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                  size="sm"
+                  onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
                   disabled={paginaAtual === 1}
-                  className="h-10 w-10"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-
-                {/* INDICADOR DE PÁGINA */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
-                  <span className="text-sm font-medium">
-                    Página {paginaAtual} de {totalPaginas}
-                  </span>
+                <div className="text-sm font-medium px-4">
+                  Página {paginaAtual} de {totalPaginas}
                 </div>
-
-                {/* PRÓXIMA PÁGINA */}
                 <Button
                   variant="outline"
-                  size="icon"
-                  onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                  size="sm"
+                  onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
                   disabled={paginaAtual === totalPaginas}
-                  className="h-10 w-10"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-
-                {/* ÚLTIMA PÁGINA */}
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="sm"
                   onClick={() => setPaginaAtual(totalPaginas)}
                   disabled={paginaAtual === totalPaginas}
-                  className="h-10 w-10"
                 >
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
               </div>
-
-              {/* BOTÕES DE PÁGINA DIRETA (APENAS DESKTOP) */}
-              <div className="hidden md:flex items-center justify-center gap-2 flex-wrap">
-                {Array.from({ length: Math.min(10, totalPaginas) }, (_, i) => {
-                  // Mostrar páginas próximas à atual
-                  let pagina;
-                  if (totalPaginas <= 10) {
-                    pagina = i + 1;
-                  } else {
-                    if (paginaAtual <= 5) {
-                      pagina = i + 1;
-                    } else if (paginaAtual >= totalPaginas - 4) {
-                      pagina = totalPaginas - 9 + i;
-                    } else {
-                      pagina = paginaAtual - 5 + i;
-                    }
-                  }
-                  
-                  return (
-                    <Button
-                      key={pagina}
-                      variant={paginaAtual === pagina ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPaginaAtual(pagina)}
-                      className="h-9 w-9"
-                    >
-                      {pagina}
-                    </Button>
-                  );
-                })}
-              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* ✅ AÇÕES EM MASSA - MOVIDO PARA BAIXO E MOBILE FRIENDLY */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ações em Massa</CardTitle>
-          <CardDescription>Aprovar despesas selecionadas</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {despesasSelecionadas.size}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Despesas selecionadas
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Button
-              className="w-full"
-              onClick={handleAprovarMassa}
-              disabled={despesasSelecionadas.size === 0 || loading}
-            >
-              <CheckCheck className="h-4 w-4 mr-2" />
-              Aprovar Selecionadas
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={toggleSelecionarTodas}
-              disabled={despesas.filter(d => !d.aprovada).length === 0}
-            >
-              {despesasSelecionadas.size === despesas.filter(d => !d.aprovada).length
-                ? 'Desselecionar Todas'
-                : 'Selecionar Todas'}
-            </Button>
-          </div>
-
-          <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground">
-              💡 <strong>Dica:</strong> Toque em uma despesa para selecioná-la. Use os filtros para encontrar despesas específicas e aprovar em lote.
-            </p>
-          </div>
         </CardContent>
       </Card>
 

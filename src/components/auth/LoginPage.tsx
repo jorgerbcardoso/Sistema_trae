@@ -32,6 +32,20 @@ export function LoginPage() {
   const [secretPassword, setSecretPassword] = useState('');
   const [secretError, setSecretError] = useState('');
   
+  // ✅ Detectar se o navegador está em modo claro
+  const [isBrowserLight, setIsBrowserLight] = useState(false);
+
+  useEffect(() => {
+    // Verificar preferência inicial
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+    setIsBrowserLight(mediaQuery.matches);
+
+    // Ouvir mudanças em tempo real
+    const handler = (e: MediaQueryListEvent) => setIsBrowserLight(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+  
   // ✅ SEMPRE chamar hooks antes de qualquer return condicional
   const navigate = useNavigate();
   
@@ -240,10 +254,14 @@ export function LoginPage() {
         className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
         style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
       >
-        {/* Overlay escuro - SEMPRE ESCURO PARA MANTER CONTRASTE COM LOGO BRANCA */}
-        <div className="absolute inset-0 bg-black/60"></div>
+        {/* Overlay - CLARO ou ESCURO baseado no navegador */}
+        <div className={`absolute inset-0 ${isBrowserLight ? 'bg-white/60' : 'bg-black/60'}`}></div>
         
-        <Card className="w-full max-w-md shadow-2xl bg-slate-900/85 backdrop-blur-[4px] border-slate-700 relative z-10">
+        <Card className={`w-full max-w-md shadow-2xl relative z-10 backdrop-blur-md border ${
+          isBrowserLight 
+            ? 'bg-white/50 border-white/20' 
+            : 'bg-slate-900/75 border-slate-700'
+        }`}>
           {/* Botão de Ajuda */}
           <div className="absolute top-[13px] right-[13px] z-20">
             <div className="relative">
@@ -251,17 +269,29 @@ export function LoginPage() {
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-10 w-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer p-0"
+                className={`h-10 w-10 rounded-full cursor-pointer p-0 ${
+                  isBrowserLight
+                    ? 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white'
+                }`}
                 onClick={() => setShowHelp(!showHelp)}
               >
                 <HelpCircle className="h-5 w-5" />
               </Button>
               
               {showHelp && (
-                <div className="absolute top-12 right-0 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 z-20">
+                <div className={`absolute top-12 right-0 w-56 border rounded-lg shadow-xl p-2 z-20 ${
+                  isBrowserLight
+                    ? 'bg-white border-slate-200'
+                    : 'bg-slate-800 border-slate-700'
+                }`}>
                   <a
                     href="mailto:contato@webpresto.com.br"
-                    className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                    className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                      isBrowserLight
+                        ? 'text-slate-700 hover:bg-slate-100'
+                        : 'text-slate-200 hover:bg-slate-700'
+                    }`}
                     onClick={() => setShowHelp(false)}
                   >
                     <Mail className="h-4 w-4" />
@@ -271,7 +301,11 @@ export function LoginPage() {
                     href="https://wa.me/5563991330276"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                    className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                      isBrowserLight
+                        ? 'text-slate-700 hover:bg-slate-100'
+                        : 'text-slate-200 hover:bg-slate-700'
+                    }`}
                     onClick={() => setShowHelp(false)}
                   >
                     <MessageCircle className="h-4 w-4" />
@@ -284,26 +318,26 @@ export function LoginPage() {
           
           <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
             <div className="flex justify-center mb-6">
-              <ImageWithFallback
-                src="https://webpresto.com.br/images/logo-branca.png"
-                alt="Logo"
-                className="h-16 object-contain"
-              />
-            </div>
-            <CardTitle className="text-2xl text-white">Recuperar Senha</CardTitle>
-            <CardDescription className="text-slate-300 text-sm">
+            <ImageWithFallback
+              src={isBrowserLight ? "https://webpresto.com.br/images/logo_preta.png" : "https://webpresto.com.br/images/logo-branca.png"}
+              alt="Logo"
+              className="h-16 object-contain"
+            />
+          </div>
+            <CardTitle className={`text-2xl ${isBrowserLight ? 'text-slate-900' : 'text-white'}`}>Recuperar Senha</CardTitle>
+            <CardDescription className={`text-sm ${isBrowserLight ? 'text-slate-600' : 'text-slate-300'}`}>
               Digite seu email e domínio para receber o link de recuperação
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleForgotPassword}>
-            <CardContent className="space-y-4 pt-6">{/* Adicionado pt-6 para afastar do header */}
+            <CardContent className="space-y-4 pt-6">
               {error && (
-                <Alert variant="destructive" className="bg-red-900/20 border-red-800 text-red-300">
+                <Alert variant="destructive" className={`${isBrowserLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800 text-red-300'}`}>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
               {resetMessage && (
-                <Alert className="bg-green-900/20 border-green-800 text-green-300">
+                <Alert className={`${isBrowserLight ? 'bg-green-50 border-green-200 text-green-800' : 'bg-green-900/20 border-green-800 text-green-300'}`}>
                   <AlertDescription className="whitespace-pre-wrap">{resetMessage}</AlertDescription>
                 </Alert>
               )}
@@ -315,14 +349,18 @@ export function LoginPage() {
                   placeholder="Domínio"
                   value={domain}
                   onChange={(e) => setDomain(e.target.value.toUpperCase())}
-                  className="pl-10 uppercase bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                  className={`pl-10 uppercase ${
+                    isBrowserLight 
+                      ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                      : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                  }`}
                   maxLength={3}
                   required
                   disabled={isLoading}
                   autoFocus
                 />
               </div>
-              <div className="pb-6">{/* Adicionado pb-6 para criar espaço antes do botão */}
+              <div className="pb-6">
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                   <Input
@@ -331,7 +369,11 @@ export function LoginPage() {
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                    className={`pl-10 ${
+                      isBrowserLight 
+                        ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                        : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                    }`}
                     required
                     disabled={isLoading}
                   />
@@ -356,7 +398,9 @@ export function LoginPage() {
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-slate-300 hover:text-white hover:bg-slate-800/50 cursor-pointer"
+                className={`w-full cursor-pointer ${
+                  isBrowserLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                }`}
                 onClick={() => setShowForgotPassword(false)}
                 disabled={isLoading}
               >
@@ -374,10 +418,14 @@ export function LoginPage() {
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
     >
-      {/* Overlay escuro - SEMPRE ESCURO PARA MANTER CONTRASTE COM LOGO BRANCA */}
-      <div className="absolute inset-0 bg-black/60"></div>
+      {/* Overlay - CLARO ou ESCURO baseado no navegador */}
+      <div className={`absolute inset-0 ${isBrowserLight ? 'bg-white/60' : 'bg-black/60'}`}></div>
       
-      <Card className="w-full max-w-md shadow-2xl bg-slate-900/85 backdrop-blur-[4px] border-slate-700 relative z-10">
+      <Card className={`w-full max-w-md shadow-2xl relative z-10 backdrop-blur-md border ${
+        isBrowserLight 
+          ? 'bg-white/50 border-white/20' 
+          : 'bg-slate-900/75 border-slate-700'
+      }`}>
         {/* Botão de Ajuda */}
         <div className="absolute top-[13px] right-[13px] z-20">
           <div className="relative">
@@ -385,17 +433,29 @@ export function LoginPage() {
               type="button"
               size="sm"
               variant="ghost"
-              className="h-10 w-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer p-0"
+              className={`h-10 w-10 rounded-full cursor-pointer p-0 ${
+                isBrowserLight
+                  ? 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white'
+              }`}
               onClick={() => setShowHelp(!showHelp)}
             >
               <HelpCircle className="h-5 w-5" />
             </Button>
             
             {showHelp && (
-              <div className="absolute top-12 right-0 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 z-20">
+              <div className={`absolute top-12 right-0 w-56 border rounded-lg shadow-xl p-2 z-20 ${
+                isBrowserLight
+                  ? 'bg-white border-slate-200'
+                  : 'bg-slate-800 border-slate-700'
+              }`}>
                 <a
                   href="mailto:contato@webpresto.com.br"
-                  className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                  className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                    isBrowserLight
+                      ? 'text-slate-700 hover:bg-slate-100'
+                      : 'text-slate-200 hover:bg-slate-700'
+                  }`}
                   onClick={() => setShowHelp(false)}
                 >
                   <Mail className="h-4 w-4" />
@@ -405,7 +465,11 @@ export function LoginPage() {
                   href="https://wa.me/5563991330276"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                  className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                    isBrowserLight
+                      ? 'text-slate-700 hover:bg-slate-100'
+                      : 'text-slate-200 hover:bg-slate-700'
+                  }`}
                   onClick={() => setShowHelp(false)}
                 >
                   <MessageCircle className="h-4 w-4" />
@@ -419,7 +483,7 @@ export function LoginPage() {
         <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
           <div className="flex justify-center mb-6">
             <ImageWithFallback
-              src="https://webpresto.com.br/images/logo-branca.png"
+              src={isBrowserLight ? "https://webpresto.com.br/images/logo_preta.png" : "https://webpresto.com.br/images/logo-branca.png"}
               alt="Logo"
               className="h-20 object-contain"
             />
@@ -428,7 +492,7 @@ export function LoginPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 relative">
             {error && (
-              <Alert variant="destructive" className="bg-red-900/20 border-red-800 text-red-300">
+              <Alert variant="destructive" className={`${isBrowserLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800 text-red-300'}`}>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -440,7 +504,11 @@ export function LoginPage() {
                 placeholder="Domínio"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
+                className={`pl-10 ${
+                  isBrowserLight 
+                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                    : 'bg-background/50 border-border text-foreground placeholder:text-muted-foreground'
+                }`}
                 maxLength={3}
                 required
                 disabled={isLoading}
@@ -455,7 +523,11 @@ export function LoginPage() {
                 placeholder="Login"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
+                className={`pl-10 ${
+                  isBrowserLight 
+                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                    : 'bg-background/50 border-border text-foreground placeholder:text-muted-foreground'
+                }`}
                 required
                 disabled={isLoading}
               />
@@ -468,7 +540,11 @@ export function LoginPage() {
                 placeholder="Senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 bg-background/50 border-border text-foreground placeholder:text-muted-foreground"
+                className={`pl-10 ${
+                  isBrowserLight 
+                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                    : 'bg-background/50 border-border text-foreground placeholder:text-muted-foreground'
+                }`}
                 required
                 disabled={isLoading}
               />
@@ -493,7 +569,9 @@ export function LoginPage() {
             
             <button
               type="button"
-              className="w-full text-sm text-slate-300 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
+              className={`w-full text-sm transition-colors cursor-pointer bg-transparent border-none ${
+                isBrowserLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+              }`}
               onClick={() => setShowForgotPassword(true)}
               disabled={isLoading}
             >
@@ -504,17 +582,21 @@ export function LoginPage() {
       </Card>
       
       <Dialog open={showSecretDialog} onOpenChange={setShowSecretDialog}>
-        <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-700 text-white">
+        <DialogContent className={`sm:max-w-[425px] border backdrop-blur-md ${
+          isBrowserLight 
+            ? 'bg-white/70 border-white/20 text-slate-900' 
+            : 'bg-slate-900/80 border-slate-700 text-white'
+        }`}>
           <DialogHeader>
-            <DialogTitle className="text-xl text-white">Login Secreto</DialogTitle>
-            <DialogDescription className="text-sm text-slate-300">
+            <DialogTitle className={`text-xl ${isBrowserLight ? 'text-slate-900' : 'text-white'}`}>Login Secreto</DialogTitle>
+            <DialogDescription className={`text-sm ${isBrowserLight ? 'text-slate-600' : 'text-slate-300'}`}>
               Digite a senha secreta para acessar o sistema.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSecretLogin}>
-            <CardContent className="space-y-4">{/* Removido pb-6 para reduzir altura */}
+            <CardContent className="space-y-4">
               {secretError && (
-                <Alert variant="destructive" className="bg-red-900/20 border-red-800 text-red-300">
+                <Alert variant="destructive" className={`${isBrowserLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800 text-red-300'}`}>
                   <AlertDescription>{secretError}</AlertDescription>
                 </Alert>
               )}
@@ -526,13 +608,17 @@ export function LoginPage() {
                   placeholder="Senha Secreta"
                   value={secretPassword}
                   onChange={(e) => setSecretPassword(e.target.value)}
-                  className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                  className={`pl-10 ${
+                    isBrowserLight 
+                      ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                      : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                  }`}
                   required
                   disabled={isLoading}
                 />
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col space-y-4 pt-4 pb-4">{/* Reduzido padding vertical */}
+            <CardFooter className="flex flex-col space-y-4 pt-4 pb-4">
               <Button
                 type="submit"
                 className="w-full cursor-pointer"
@@ -550,7 +636,9 @@ export function LoginPage() {
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-slate-300 hover:text-white hover:bg-slate-800/50 cursor-pointer"
+                className={`w-full cursor-pointer ${
+                  isBrowserLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                }`}
                 onClick={() => setShowSecretDialog(false)}
                 disabled={isLoading}
               >

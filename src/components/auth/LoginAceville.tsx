@@ -41,6 +41,20 @@ export function LoginAceville() {
   const { login, user } = auth;
   const navigate = useNavigate();
 
+  // ✅ Detectar se o navegador está em modo claro
+  const [isBrowserLight, setIsBrowserLight] = useState(false);
+
+  useEffect(() => {
+    // Verificar preferência inicial
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+    setIsBrowserLight(mediaQuery.matches);
+
+    // Ouvir mudanças em tempo real
+    const handler = (e: MediaQueryListEvent) => setIsBrowserLight(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
   // Domínio fixo para Aceville
   const ACEVILLE_DOMAIN = 'ACV';
 
@@ -208,10 +222,14 @@ export function LoginAceville() {
         className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
         style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
       >
-        {/* Overlay escuro */}
-        <div className="absolute inset-0 bg-black/40"></div>
+        {/* Overlay - CLARO ou ESCURO baseado no navegador */}
+        <div className={`absolute inset-0 ${isBrowserLight ? 'bg-white/60' : 'bg-black/60'}`}></div>
         
-        <Card className="w-full max-w-md shadow-2xl bg-slate-900/75 backdrop-blur-[2px] border-slate-700 relative z-10">
+        <Card className={`w-full max-w-md shadow-2xl relative z-10 backdrop-blur-md border ${
+          isBrowserLight 
+            ? 'bg-white/50 border-white/20' 
+            : 'bg-slate-900/75 border-slate-700'
+        }`}>
           <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
             <div className="flex justify-center mb-6">
               <ImageWithFallback
@@ -220,20 +238,20 @@ export function LoginAceville() {
                 className="h-20 object-contain"
               />
             </div>
-            <CardTitle className="text-2xl text-white">Recuperar Senha</CardTitle>
-            <CardDescription className="text-slate-300">
+            <CardTitle className={`text-2xl ${isBrowserLight ? 'text-slate-900' : 'text-white'}`}>Recuperar Senha</CardTitle>
+            <CardDescription className={`text-sm ${isBrowserLight ? 'text-slate-600' : 'text-slate-300'}`}>
               Digite seu email para receber o link de recuperação
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleForgotPassword}>
             <CardContent className="space-y-4 pt-6 pb-6">
               {error && (
-                <Alert variant="destructive" className="bg-red-900/20 border-red-800 text-red-300">
+                <Alert variant="destructive" className={`${isBrowserLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800 text-red-300'}`}>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
               {resetMessage && (
-                <Alert className="bg-green-900/20 border-green-800 text-green-300">
+                <Alert className={`${isBrowserLight ? 'bg-green-50 border-green-200 text-green-800' : 'bg-green-900/20 border-green-800 text-green-300'}`}>
                   <AlertDescription>{resetMessage}</AlertDescription>
                 </Alert>
               )}
@@ -245,7 +263,11 @@ export function LoginAceville() {
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                  className={`pl-10 ${
+                    isBrowserLight 
+                      ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                      : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                  }`}
                   required
                   disabled={isLoading}
                   autoFocus
@@ -271,7 +293,9 @@ export function LoginAceville() {
               <Button
                 type="button"
                 variant="ghost"
-                className="w-full text-slate-300 hover:text-white hover:bg-slate-800/50 cursor-pointer"
+                className={`w-full cursor-pointer ${
+                  isBrowserLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                }`}
                 onClick={() => {
                   setShowForgotPassword(false);
                   setError('');
@@ -282,7 +306,7 @@ export function LoginAceville() {
                 Voltar ao Login
               </Button>
               
-              <div className="text-center text-xs text-slate-400">
+              <div className={`text-center text-xs ${isBrowserLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Aceville Transportes - Joinville/SC
               </div>
             </CardFooter>
@@ -297,10 +321,14 @@ export function LoginAceville() {
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
     >
-      {/* Overlay escuro */}
-      <div className="absolute inset-0 bg-black/40"></div>
+      {/* Overlay - CLARO ou ESCURO baseado no navegador */}
+      <div className={`absolute inset-0 ${isBrowserLight ? 'bg-white/60' : 'bg-black/60'}`}></div>
       
-      <Card className="w-full max-w-md shadow-2xl bg-slate-900/75 backdrop-blur-[2px] border-slate-700 relative z-10">
+      <Card className={`w-full max-w-md shadow-2xl relative z-10 backdrop-blur-md border ${
+        isBrowserLight 
+          ? 'bg-white/50 border-white/20' 
+          : 'bg-slate-900/75 border-slate-700'
+      }`}>
         {/* Botão de Ajuda */}
         <div className="absolute top-[13px] right-[13px] z-20">
           <div className="relative">
@@ -308,17 +336,29 @@ export function LoginAceville() {
               type="button"
               size="sm"
               variant="ghost"
-              className="h-10 w-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer p-0"
+              className={`h-10 w-10 rounded-full cursor-pointer p-0 ${
+                isBrowserLight
+                  ? 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white'
+              }`}
               onClick={() => setShowHelp(!showHelp)}
             >
               <HelpCircle className="h-5 w-5" />
             </Button>
             
             {showHelp && (
-              <div className="absolute top-12 right-0 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 z-20">
+              <div className={`absolute top-12 right-0 w-56 border rounded-lg shadow-xl p-2 z-20 ${
+                isBrowserLight
+                  ? 'bg-white border-slate-200'
+                  : 'bg-slate-800 border-slate-700'
+              }`}>
                 <a
                   href="mailto:gerencia.inovacao@aceville.com.br"
-                  className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                  className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                    isBrowserLight
+                      ? 'text-slate-700 hover:bg-slate-100'
+                      : 'text-slate-200 hover:bg-slate-700'
+                  }`}
                   onClick={() => setShowHelp(false)}
                 >
                   <Mail className="h-4 w-4" />
@@ -328,7 +368,11 @@ export function LoginAceville() {
                   href="https://wa.me/5547999075228"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 px-3 py-2 text-slate-200 hover:bg-slate-700 rounded transition-colors no-underline cursor-pointer"
+                  className={`flex items-center gap-3 px-3 py-2 rounded transition-colors no-underline cursor-pointer ${
+                    isBrowserLight
+                      ? 'text-slate-700 hover:bg-slate-100'
+                      : 'text-slate-200 hover:bg-slate-700'
+                  }`}
                   onClick={() => setShowHelp(false)}
                 >
                   <MessageCircle className="h-4 w-4" />
@@ -351,7 +395,7 @@ export function LoginAceville() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 relative">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className={`${isBrowserLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-900/20 border-red-800 text-red-300'}`}>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -363,7 +407,11 @@ export function LoginAceville() {
                 placeholder="Usuário"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                className={`pl-10 ${
+                  isBrowserLight 
+                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                    : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                }`}
                 required
                 disabled={isLoading}
                 autoFocus
@@ -377,7 +425,11 @@ export function LoginAceville() {
                 placeholder="Senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400"
+                className={`pl-10 ${
+                  isBrowserLight 
+                    ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400' 
+                    : 'bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-400'
+                }`}
                 required
                 disabled={isLoading}
               />
@@ -404,14 +456,16 @@ export function LoginAceville() {
             
             <button
               type="button"
-              className="w-full text-sm text-slate-300 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
+              className={`w-full text-sm transition-colors cursor-pointer bg-transparent border-none ${
+                isBrowserLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-300 hover:text-white'
+              }`}
               onClick={() => setShowForgotPassword(true)}
               disabled={isLoading}
             >
               Esqueci minha senha
             </button>
             
-            <div className="text-center text-xs text-slate-400">
+            <div className={`text-center text-xs ${isBrowserLight ? 'text-slate-500' : 'text-slate-400'}`}>
               Aceville Transportes - Joinville/SC
             </div>
           </CardFooter>

@@ -96,3 +96,24 @@ export function formatarNumeroSolicitacao(unidade: string, seq: number | string)
   // Formatar: AAA + 6 dígitos (ex: MTZ000001)
   return `${unidade.trim().toUpperCase()}${num.toString().padStart(6, '0')}`;
 }
+
+/**
+ * Formata valor monetário no padrão brasileiro (R$ 1.234,56)
+ */
+export function formatarValorBR(value: number): string {
+  return formatCurrency(value, true);
+}
+
+/**
+ * Formata data no padrão brasileiro (DD/MM/YYYY)
+ * Aceita objeto Date ou string ISO
+ */
+export function formatarDataBR(date: Date | string | null | undefined): string {
+  if (!date) return '-';
+  
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(d.getTime())) return '-';
+  
+  return d.toLocaleDateString('pt-BR');
+}
