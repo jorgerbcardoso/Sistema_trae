@@ -44,6 +44,11 @@ define('PASSWORD_HASH_COST', 10);
 // ============================================
 date_default_timezone_set(API_TIMEZONE);
 
+// Forçar exibição de erros para diagnóstico
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 ini_set('log_errors', 1);
 ini_set('error_log', '/var/www/html/tmp/php_debug.log');
 
@@ -67,7 +72,9 @@ function getDBConnection() {
     $conn = @pg_connect($connectionString);
 
     if (!$conn) {
-        throw new Exception('Não foi possível conectar ao banco de dados');
+        $error = error_get_last();
+        $pgError = function_exists('pg_last_error') ? @pg_last_error() : 'Extensão PGSQL não encontrada';
+        throw new Exception('Não foi possível conectar ao banco de dados: ' . ($error['message'] ?? $pgError));
     }
 
     return $conn;
@@ -614,9 +621,9 @@ function sql($query, $params = [], $conn = null) {
         if ($createdConnection && $conn) {
             closeDBConnection($conn);
         }
-        // Lançar erro para ser capturado pelo catch externo
+        // Registrar no log e re-lançar para o catch do script principal
         error_log("SQL Error: " . $e->getMessage());
-        return false;
+        throw $e;
     }
 }
 

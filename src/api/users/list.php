@@ -124,5 +124,5 @@ try {
     if (isset($conn)) {
         closeDBConnection($conn);
     }
-    returnError('Erro ao listar usuários', 500);
+    returnError('Erro ao listar usuários: ' . $e->getMessage(), 500);
 }
