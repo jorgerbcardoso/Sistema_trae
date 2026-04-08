@@ -102,7 +102,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
                     variant="outline"
                     size="icon"
                     onClick={handlePrint}
-                    className="hidden md:flex dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                    className="hidden md:flex border-border hover:bg-accent print:hidden"
                   >
                     <Printer className="w-4 h-4" />
                   </Button>
@@ -121,7 +121,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
                     variant="outline"
                     size="icon"
                     onClick={handleLogout}
-                    className="hidden md:flex border-slate-600 hover:bg-slate-800 print:hidden"
+                    className="hidden md:flex border-border hover:bg-accent print:hidden"
                   >
                     <LogOut className="w-4 h-4" />
                   </Button>

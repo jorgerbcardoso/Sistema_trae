@@ -43,10 +43,10 @@ export function LoginPage() {
     console.warn('⚠️ [LoginPage] AuthContext não disponível ainda');
     // Retornar loading state temporário
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-          <span className="text-gray-600">Carregando...</span>
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-muted-foreground">Carregando...</span>
         </div>
       </div>
     );
@@ -240,10 +240,10 @@ export function LoginPage() {
         className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
         style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
       >
-        {/* Overlay escuro */}
-        <div className="absolute inset-0 bg-black/40"></div>
+        {/* Overlay escuro - SEMPRE ESCURO PARA MANTER CONTRASTE COM LOGO BRANCA */}
+        <div className="absolute inset-0 bg-black/60"></div>
         
-        <Card className="w-full max-w-md shadow-2xl bg-slate-900/75 backdrop-blur-[2px] border-slate-700 relative z-10">
+        <Card className="w-full max-w-md shadow-2xl bg-slate-900/85 backdrop-blur-[4px] border-slate-700 relative z-10">
           {/* Botão de Ajuda */}
           <div className="absolute top-[13px] right-[13px] z-20">
             <div className="relative">
@@ -374,10 +374,10 @@ export function LoginPage() {
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: 'url(https://webpresto.com.br/images/fundo-site.png)' }}
     >
-      {/* Overlay escuro */}
-      <div className="absolute inset-0 bg-black/40"></div>
+      {/* Overlay escuro - SEMPRE ESCURO PARA MANTER CONTRASTE COM LOGO BRANCA */}
+      <div className="absolute inset-0 bg-black/60"></div>
       
-      <Card className="w-full max-w-md shadow-2xl bg-slate-900/75 backdrop-blur-[2px] border-slate-700 relative z-10">
+      <Card className="w-full max-w-md shadow-2xl bg-slate-900/85 backdrop-blur-[4px] border-slate-700 relative z-10">
         {/* Botão de Ajuda */}
         <div className="absolute top-[13px] right-[13px] z-20">
           <div className="relative">

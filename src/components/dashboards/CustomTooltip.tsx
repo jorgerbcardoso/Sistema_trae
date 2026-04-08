@@ -8,11 +8,28 @@
 import React from 'react';
 
 export function useTooltipStyle() {
-  // ✅ TEMA ÚNICO: SEMPRE ESCURO
+  const [isDark, setIsDark] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+
+    checkTheme();
+
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return {
-    backgroundColor: '#1e293b',
-    border: `1px solid #475569`,
+    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+    border: `1px solid ${isDark ? '#475569' : '#e2e8f0'}`,
     borderRadius: '8px',
-    color: '#f1f5f9'
+    color: isDark ? '#f1f5f9' : '#0f172a'
   };
 }

@@ -421,17 +421,17 @@ export function MainMenu() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-400">Carregando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-background">
       {/* Header Moderno com Glassmorphism */}
       <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
@@ -442,7 +442,7 @@ export function MainMenu() {
                 key={theme}
                 src={getLogoUrl(user?.domain, theme)}
                 alt="Logo"
-                className="relative h-10 w-10 object-contain p-1 bg-slate-800 rounded-lg"
+                className="relative h-10 w-10 object-contain p-1 bg-muted rounded-lg border border-border"
               />
             </div>
 
@@ -450,19 +450,19 @@ export function MainMenu() {
             <div className="flex-1 min-w-0">
               {shouldShowSystemName(user?.domain) ? (
                 <>
-                  <h1 className="text-slate-100 header-title-main truncate">
+                  <h1 className="text-foreground header-title-main truncate">
                     {user?.client_name || 'VIAÇÃO CRUZEIRO DO SUL'}
                   </h1>
-                  <p className="text-slate-400 header-subtitle-main hidden md:block truncate">
+                  <p className="text-muted-foreground header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
               ) : (
                 <>
-                  <h1 className="text-slate-100 header-title-main truncate">
+                  <h1 className="text-foreground header-title-main truncate">
                     {user?.client_name || 'Sistema de Gestão'}
                   </h1>
-                  <p className="text-slate-400 header-subtitle-main hidden md:block truncate">
+                  <p className="text-muted-foreground header-subtitle-main hidden md:block truncate">
                     Sistema de Gestão
                   </p>
                 </>
@@ -476,7 +476,7 @@ export function MainMenu() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowUnidadeSelector(true)}
-                className="border-slate-600 hover:bg-slate-800 hidden md:flex hover:shadow-md transition-all hover:scale-105 header-title-main lowercase first-letter:uppercase"
+                className="border-border hover:bg-accent hidden md:flex hover:shadow-md transition-all hover:scale-105 header-title-main lowercase first-letter:uppercase text-foreground"
                 disabled={!user?.troca_unidade}
               >
                 <Building2 className="w-4 h-4 mr-2" />
@@ -491,16 +491,16 @@ export function MainMenu() {
                 className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
               >
-                <Avatar className="h-9 w-9 ring-2 ring-blue-500/20 ring-offset-2 dark:ring-offset-slate-900 transition-all hover:ring-blue-500/50">
+                <Avatar className="h-9 w-9 ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-all hover:ring-primary/50">
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-bold">
                     {getInitials(user?.full_name || user?.username || 'U')}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block">
-                  <p className="header-title-main text-slate-900 dark:text-slate-100">
+                  <p className="header-title-main text-foreground">
                     {user?.full_name || user?.username}
                   </p>
-                  <p className="header-subtitle-main text-slate-500 dark:text-slate-400">
+                  <p className="header-subtitle-main text-muted-foreground">
                     {user?.email}
                   </p>
                 </div>
@@ -516,7 +516,7 @@ export function MainMenu() {
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="dark:border-slate-600 dark:hover:bg-slate-800 hover:shadow-md transition-all hover:scale-105 hover:border-red-300 hover:text-red-600 dark:hover:border-red-700 dark:hover:text-red-400"
+              className="border-border hover:bg-accent hover:shadow-md transition-all hover:scale-105 hover:border-red-300 hover:text-red-600 dark:hover:border-red-700 dark:hover:text-red-400 text-foreground"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
@@ -529,13 +529,13 @@ export function MainMenu() {
       <main className="container mx-auto px-6 py-8">
         {/* Header com Gradiente */}
         <div className="mb-8">
-          <div className="relative p-6 rounded-2xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 dark:from-blue-500/20 dark:via-purple-500/20 dark:to-pink-500/20 border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl opacity-5 dark:opacity-10"></div>
+          <div className="relative p-6 rounded-2xl bg-gradient-to-r from-blue-50/80 via-purple-50/80 to-pink-50/80 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 border border-border/50 backdrop-blur-sm">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl opacity-[0.03] dark:opacity-10"></div>
             <div className="relative">
               <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent mb-2">
                 Bem-vindo(a), {user?.full_name?.split(' ')[0] || user?.username}!
               </h2>
-              <p className="text-slate-600 dark:text-slate-400 font-medium">
+              <p className="text-muted-foreground font-medium">
                 Selecione um módulo para começar
               </p>
             </div>
@@ -581,7 +581,7 @@ export function MainMenu() {
                       </div>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-lg text-foreground flex items-center gap-2 mb-1">
                         {section.section.name}
                         <Badge 
                           variant="secondary" 
@@ -598,14 +598,14 @@ export function MainMenu() {
                           </Badge>
                         )}
                       </h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                      <p className="text-sm text-muted-foreground font-medium">
                         {section.section.description}
                       </p>
                     </div>
                   </div>
                   <div 
-                    className={`text-slate-400 dark:text-slate-500 transition-all duration-300 ${
-                      isExpanded ? 'rotate-0 text-blue-600 dark:text-blue-400' : 'rotate-[-90deg]'
+                    className={`text-muted-foreground transition-all duration-300 ${
+                      isExpanded ? 'rotate-0 text-primary' : 'rotate-[-90deg]'
                     }`}
                   >
                     <ChevronDown className="w-6 h-6" />
@@ -620,14 +620,14 @@ export function MainMenu() {
                     opacity: isExpanded ? 1 : 0
                   }}
                 >
-                  <div className="p-5 pt-2 border-t border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-b from-slate-50/30 to-transparent dark:from-slate-950/30">
+                  <div className="p-5 pt-2 border-t border-border/50 bg-gradient-to-b from-muted/30 to-transparent dark:from-background/30">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                       {section.items.map((item) => {
                         return (
                           <Card
                             key={item.code}
-                            className={`relative overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group border-slate-200/50 dark:border-slate-700/50 hover:-translate-y-1 ${
-                              !item.is_available ? 'opacity-60' : 'hover:border-blue-300 dark:hover:border-blue-700'
+                            className={`relative overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group border-border/50 hover:-translate-y-1 ${
+                              !item.is_available ? 'opacity-60' : 'hover:border-primary/30'
                             }`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -635,30 +635,30 @@ export function MainMenu() {
                             }}
                           >
                             {/* Gradiente de fundo no hover */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/30 dark:via-purple-950/30 dark:to-pink-950/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-purple-50/50 to-pink-50/50 dark:from-blue-950/20 dark:via-purple-950/20 dark:to-pink-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                             
                             <CardHeader className="relative p-4 pb-3">
                               <div className="flex items-center gap-3 mb-3">
                                 <div className={`relative p-2 rounded-lg transition-all duration-200 ${
                                   item.is_available 
-                                    ? 'bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 group-hover:from-blue-200 group-hover:to-purple-200 dark:group-hover:from-blue-800/50 dark:group-hover:to-purple-800/50 group-hover:scale-110' 
-                                    : 'bg-slate-100 dark:bg-slate-800'
+                                    ? 'bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 group-hover:scale-110' 
+                                    : 'bg-muted'
                                 }`}>
                                   <div className={`${
                                     item.is_available 
-                                      ? 'text-blue-600 dark:text-blue-400' 
-                                      : 'text-slate-400'
+                                      ? 'text-primary' 
+                                      : 'text-muted-foreground'
                                   }`}>
                                     {getIconComponent(item.icon)}
                                   </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">
+                                  <CardTitle className="text-sm font-bold leading-tight text-foreground">
                                     {item.name}
                                   </CardTitle>
                                 </div>
                               </div>
-                              <CardDescription className="text-xs line-clamp-2 font-medium text-slate-600 dark:text-slate-400">
+                              <CardDescription className="text-xs line-clamp-2 font-medium text-muted-foreground">
                                 {item.description}
                               </CardDescription>
                             </CardHeader>
@@ -673,13 +673,13 @@ export function MainMenu() {
           })}
 
           {menuSections.length === 0 && (
-            <Card className="text-center py-12">
+            <Card className="text-center py-12 bg-card border-border">
               <CardContent>
-                <Package className="h-16 w-16 mx-auto text-slate-400 mb-4" />
-                <h3 className="text-xl text-slate-900 dark:text-slate-100 mb-2">
+                <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl text-foreground font-bold mb-2">
                   Nenhum menu disponível
                 </h3>
-                <p className="text-slate-600 dark:text-slate-400">
+                <p className="text-muted-foreground">
                   Entre em contato com o administrador
                 </p>
               </CardContent>
@@ -690,24 +690,24 @@ export function MainMenu() {
 
       {/* ✅ NOVO: Dialog de Troca de Unidade */}
       <Dialog open={showUnidadeSelector} onOpenChange={setShowUnidadeSelector}>
-        <DialogContent className="dark:bg-slate-900">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="dark:text-slate-100">Trocar Unidade</DialogTitle>
-            <DialogDescription className="dark:text-slate-400">
+            <DialogTitle className="text-foreground">Trocar Unidade</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Selecione a unidade que deseja operar
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label className="dark:text-slate-200">Unidade Atual</Label>
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+              <Label className="text-foreground">Unidade Atual</Label>
+              <div className="p-3 bg-muted rounded border border-border">
+                <p className="text-sm font-medium text-primary">
                   {user?.unidade_atual || 'Nenhuma'}
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="dark:text-slate-200">Nova Unidade</Label>
+              <Label className="text-foreground">Nova Unidade</Label>
               <FilterSelectUnidadeSingle
                 value={selectedUnidade}
                 onChange={setSelectedUnidade}
@@ -719,7 +719,7 @@ export function MainMenu() {
             <Button
               variant="outline"
               onClick={() => setShowUnidadeSelector(false)}
-              className="dark:border-slate-600 dark:hover:bg-slate-800"
+              className="border-border hover:bg-accent text-foreground"
             >
               Cancelar
             </Button>

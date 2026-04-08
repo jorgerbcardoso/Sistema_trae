@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,9 @@ import {
   ChevronsRight,
   MessageSquare,
   Send,
-  Trash2
+  Trash2,
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -56,6 +58,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { SortableTableHeader, useSortableTable } from '@/components/table/SortableTableHeader';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ✅ TIPO DA DESPESA
 interface Despesa {
@@ -72,11 +82,21 @@ interface Despesa {
   nf?: string;
   fornecedor?: string;
   observacao?: string;
-  historico?: string; // ✅ NOVO: f5
+  historico?: string;
   usuario_lancamento: string;
-  data_lancamento: string;
-  data_inclusao: string; // ✅ NOVO: f2
-  data_pagamento: string; // ✅ NOVO: f7
+  data_inclusao: string;
+  data_vencimento: string;
+  data_pagamento: string;
+  competencia: string;
+  boleto: string;
+  orcamento: number;
+  comprometido: number;
+  saldo: number;
+  valor_parcela: number;
+  juros: number;
+  desconto: number;
+  valor_final: number;
+  repasse: string;
   aprovada?: boolean;
 }
 
@@ -227,10 +247,11 @@ export default function AprovacaoDespesas() {
   
   // ✅ PAGINAÇÃO
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const ITENS_POR_PAGINA = 20;
+  const ITENS_POR_PAGINA = 50; // ✅ PADRÃO DO SISTEMA
   
   // ✅ ORDENAÇÃO
-  const [ordenacao, setOrdenacao] = useState<'status' | 'data' | 'evento'>('status');
+  type SortField = 'aprovada' | 'lancamento' | 'data_inclusao' | 'data_pagamento' | 'evento' | 'fornecedor' | 'valor_final' | 'unidade';
+  const { sortField, sortDirection, handleSort, sortData } = useSortableTable<SortField>('data_pagamento', 'desc');
 
   // ✅ ESTADOS DOS DIALOGS
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -256,22 +277,6 @@ export default function AprovacaoDespesas() {
   const carregarDespesas = async () => {
     setLoading(true);
     try {
-      // ✅ DETECTAR AMBIENTE
-      const isFigmaMake = window.location.hostname.includes('figma') || 
-                          window.location.hostname === 'localhost';
-      
-      if (isFigmaMake) {
-        // ✅ MODO DESENVOLVIMENTO: Usar dados mock
-        console.log('🎭 MODO DESENVOLVIMENTO: Usando dados mock');
-        const despesasMock = MOCK_DESPESAS_PENDENTES;
-        const despesasFiltradas = aplicarFiltros(despesasMock);
-        setDespesas(despesasFiltradas);
-        calcularIndicadores(despesasFiltradas);
-        calcularEventosTotais(despesasFiltradas);
-        setLoading(false);
-        return;
-      }
-      
       // ✅ MODO PRODUÇÃO: Integração com API SSW
       const params = new URLSearchParams({
         periodo_inicio: filtros.periodo_inicio,
@@ -289,35 +294,24 @@ export default function AprovacaoDespesas() {
       
       const data = await apiFetch(`/sistema/api/operacoes/aprovacao-despesas.php?act=LISTAR&${params.toString()}`);
       
-      // ✅ ORDENAR POR DATA DE PAGAMENTO (DECRESCENTE)
-      const despesasOrdenadas = (data.despesas || []).sort((a: Despesa, b: Despesa) => {
-        return new Date(b.data).getTime() - new Date(a.data).getTime();
-      });
-      
-      setDespesas(despesasOrdenadas);
+      const despesasRecebidas = (data.despesas || []);
+      setDespesas(despesasRecebidas);
       
       // ✅ INICIALIZAR SELEÇÃO COM DESPESAS QUE JÁ VÊM MARCADAS (aprovada === true)
       const iniciais = new Set<number>();
-      despesasOrdenadas.forEach((d: Despesa) => {
+      despesasRecebidas.forEach((d: Despesa) => {
         if (d.aprovada) {
           iniciais.add(d.seq_lancamento);
         }
       });
       setDespesasSelecionadas(iniciais);
 
-      calcularIndicadores(despesasOrdenadas);
-      calcularEventosTotais(despesasOrdenadas);
+      calcularIndicadores(despesasRecebidas);
+      calcularEventosTotais(despesasRecebidas);
       
     } catch (error) {
       console.error('Erro ao carregar despesas:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao carregar despesas');
-      
-      // ✅ FALLBACK: Usar dados mock em caso de erro
-      const despesasMock = MOCK_DESPESAS_PENDENTES;
-      const despesasFiltradas = aplicarFiltros(despesasMock);
-      setDespesas(despesasFiltradas);
-      calcularIndicadores(despesasFiltradas);
-      calcularEventosTotais(despesasFiltradas);
     } finally {
       setLoading(false);
     }
@@ -400,63 +394,29 @@ export default function AprovacaoDespesas() {
 
   // ✅ PAGINAÇÃO - CALCULAR DADOS
   const totalPaginas = Math.ceil(despesas.length / ITENS_POR_PAGINA);
-  const indiceInicio = (paginaAtual - 1) * ITENS_POR_PAGINA + 1;
-  const indiceFim = Math.min(paginaAtual * ITENS_POR_PAGINA, despesas.length);
   
   // ✅ RESETAR PARA PÁGINA 1 QUANDO CARREGAR DESPESAS
   useEffect(() => {
     setPaginaAtual(1);
   }, [despesas.length]);
   
-  // ✅ RESETAR PARA PÁGINA 1 QUANDO MUDAR ORDENAÇÃO
-  useEffect(() => {
-    setPaginaAtual(1);
-  }, [ordenacao]);
-
-  // ✅ APLICAR ORDENAÇÃO
-  const despesasOrdenadas = React.useMemo(() => {
-    const despesasClone = [...despesas];
-    
-    switch (ordenacao) {
-      case 'status':
-        // Não aprovadas primeiro, depois aprovadas
-        return despesasClone.sort((a, b) => {
-          if (a.aprovada === b.aprovada) {
-            // Se mesmo status, ordenar por data decrescente
-            return new Date(b.data).getTime() - new Date(a.data).getTime();
-          }
-          return a.aprovada ? 1 : -1;
-        });
-        
-      case 'data':
-        // Data decrescente (mais recente primeiro)
-        return despesasClone.sort((a, b) => {
-          return new Date(b.data).getTime() - new Date(a.data).getTime();
-        });
-        
-      case 'evento':
-        // Ordenar por código de evento (crescente)
-        return despesasClone.sort((a, b) => {
-          return a.evento.localeCompare(b.evento);
-        });
-        
-      default:
-        return despesasClone;
-    }
-  }, [despesas, ordenacao]);
+  // ✅ DADOS ORDENADOS
+  const despesasOrdenadas = useMemo(() => {
+    return sortData(despesas);
+  }, [despesas, sortField, sortDirection]);
   
-  // ✅ TOGGLE CARD CLICÁVEL (INDIVIDUAL)
-  const handleCardClick = async (seqLancamento: number, aprovada: boolean) => {
-    if (aprovada) return; // Não permite selecionar aprovadas na listagem (seria desaprovação individual)
+  // ✅ TOGGLE LINHA (INDIVIDUAL)
+  const handleRowClick = async (despesa: Despesa) => {
+    if (despesa.aprovada) return; // Não permite selecionar aprovadas na listagem (seria desaprovação individual)
     
     const novasSelecoes = new Set(despesasSelecionadas);
-    const estaSelecionado = novasSelecoes.has(seqLancamento);
+    const estaSelecionado = novasSelecoes.has(despesa.seq_lancamento);
     
     // 1. Atualizar UI imediatamente para melhor UX
     if (estaSelecionado) {
-      novasSelecoes.delete(seqLancamento);
+      novasSelecoes.delete(despesa.seq_lancamento);
     } else {
-      novasSelecoes.add(seqLancamento);
+      novasSelecoes.add(despesa.seq_lancamento);
     }
     setDespesasSelecionadas(novasSelecoes);
 
@@ -465,15 +425,13 @@ export default function AprovacaoDespesas() {
       await apiFetch('/sistema/api/operacoes/aprovacao-despesas.php?act=TOGGLE_INDIVIDUAL', {
         method: 'POST',
         body: JSON.stringify({
-          seq_parcela: seqLancamento,
+          seq_parcela: despesa.seq_lancamento,
           selecionado: !estaSelecionado
         })
       });
-      // toast.success(`Despesa ${estaSelecionado ? 'desmarcada' : 'marcada'} com sucesso`);
     } catch (error) {
       console.error('Erro no toggle individual:', error);
       toast.error('Erro ao comunicar marcação ao SSW');
-      // Reverter UI em caso de erro real (opcional, aqui como é simulação vamos manter)
     }
   };
 
@@ -617,8 +575,7 @@ export default function AprovacaoDespesas() {
   return (
     <AdminLayout
       title="Aprovação de Despesas"
-      subtitle="Gerencie e aprove despesas pendentes"
-      icon={FileCheck}
+      description="Gerencie e aprove despesas pendentes"
     >
       {/* ✅ BOTÃO TOGGLE FILTROS */}
       <div className="mb-4">

@@ -77,7 +77,7 @@ export function FinanceiroDashboard() {
     <div className="flex items-center gap-2 md:gap-4">
       {/* Seletor de Modalidade - apenas para domínios MISTA */}
       {showModalidadeSelector && (
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -85,8 +85,8 @@ export function FinanceiroDashboard() {
                   onClick={() => setViewMode('GERAL')}
                   className={`flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-md transition-all ${
                     viewMode === 'GERAL'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
@@ -106,8 +106,8 @@ export function FinanceiroDashboard() {
                   onClick={() => setViewMode('CARGAS')}
                   className={`flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-md transition-all ${
                     viewMode === 'CARGAS'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,8 +129,8 @@ export function FinanceiroDashboard() {
                   onClick={() => setViewMode('PASSAGEIROS')}
                   className={`flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-md transition-all ${
                     viewMode === 'PASSAGEIROS'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,8 +150,8 @@ export function FinanceiroDashboard() {
       {/* Filtro de Período */}
       <div className="flex items-center gap-2">
         <div className="text-right print:block">
-          <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden md:block">Período</p>
-          <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{formatPeriod(period)}</p>
+          <p className="text-muted-foreground text-xs md:text-sm hidden md:block">Período</p>
+          <p className="text-foreground text-xs md:text-base">{formatPeriod(period)}</p>
         </div>
         <TooltipProvider>
           <Tooltip>
@@ -176,16 +176,16 @@ export function FinanceiroDashboard() {
       headerActions={headerActions}
     >
       {/* Menu de Tabs */}
-      <div className="fixed top-12 md:top-16 left-0 right-0 z-30 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-700 print:relative">
+      <div className="fixed top-12 md:top-16 left-0 right-0 z-30 bg-card border-b border-border shadow-sm print:relative">
         <div className="container mx-auto px-3 md:px-6 flex justify-center py-2 md:py-3">
-          <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+          <div className="inline-flex items-center bg-muted rounded-lg p-1">
             {modules.overview && (
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`flex items-center gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md transition-all ${
                   activeTab === 'overview'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <PieChart className="w-4 h-4" />
@@ -197,8 +197,8 @@ export function FinanceiroDashboard() {
                 onClick={() => setActiveTab('revenue')}
                 className={`flex items-center gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md transition-all ${
                   activeTab === 'revenue'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <DollarSign className="w-4 h-4" />
@@ -210,8 +210,8 @@ export function FinanceiroDashboard() {
                 onClick={() => setActiveTab('costs')}
                 className={`flex items-center gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md transition-all ${
                   activeTab === 'costs'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Wallet className="w-4 h-4" />
@@ -223,8 +223,8 @@ export function FinanceiroDashboard() {
                 onClick={() => setActiveTab('profitability')}
                 className={`flex items-center gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-md transition-all ${
                   activeTab === 'profitability'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <TrendingUp className="w-4 h-4" />

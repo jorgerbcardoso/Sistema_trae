@@ -39,8 +39,8 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
     return (
       <div className="flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-          <p className="text-sm text-slate-600 dark:text-slate-400">Carregando dados financeiros...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <p className="text-sm text-muted-foreground">Carregando dados financeiros...</p>
         </div>
       </div>
     );
@@ -50,8 +50,8 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <p className="text-red-600 dark:text-red-400">Erro ao carregar dados</p>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">{error}</p>
+          <p className="text-destructive font-semibold">Erro ao carregar dados</p>
+          <p className="text-sm text-muted-foreground mt-2">{error}</p>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
   if (!data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-slate-600 dark:text-slate-400">Nenhum dado disponível</p>
+        <p className="text-muted-foreground">Nenhum dado disponível</p>
       </div>
     );
   }
@@ -599,19 +599,19 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
     isNegative?: boolean;
   }) => {
     const baseClasses = isHighlight 
-      ? "py-2 font-bold border-b" 
-      : `py-2 ${isSubItem ? 'pl-6' : ''} border-b ${isHighlight ? 'border-slate-200 dark:border-slate-700' : 'border-slate-100 dark:border-slate-800'}`;
+      ? "py-2 font-bold border-b border-border" 
+      : `py-2 ${isSubItem ? 'pl-6' : ''} border-b border-border/50`;
     
     const textClasses = isSubItem 
-      ? "text-slate-600 dark:text-slate-400" 
-      : "text-slate-900 dark:text-slate-100";
+      ? "text-muted-foreground" 
+      : "text-foreground";
     
     // ✅ CORREÇÃO: Se for highlight (Lucro Líquido) e valor negativo, usar vermelho
     const valueClasses = isNegative 
-      ? "text-red-600 dark:text-red-400" 
+      ? "text-destructive" 
       : isHighlight && !isSubItem
-      ? total < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
-      : "text-slate-900 dark:text-slate-100";
+      ? total < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"
+      : "text-foreground";
 
     return (
       <div className={`flex justify-between items-center ${baseClasses}`}>
@@ -626,8 +626,8 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
   return (
     <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Dashboard Financeiro</h2>
-        <p className="text-slate-500 dark:text-slate-400">Visão geral de receitas, despesas e indicadores financeiros</p>
+        <h2 className="text-2xl font-semibold text-foreground mb-1">Dashboard Financeiro</h2>
+        <p className="text-muted-foreground">Visão geral de receitas, despesas e indicadores financeiros</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -641,7 +641,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 gap-1 px-2"
+                className="h-7 text-blue-700 dark:text-blue-300 hover:bg-blue-200/50 dark:hover:bg-blue-800 gap-1 px-2"
                 onClick={handleExportReceitas}
                 title="Exportar dados de receitas"
               >
@@ -651,10 +651,10 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-blue-900 dark:text-blue-100">
+            <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
               R$ {(totalReceita / 1000000).toFixed(2)}M
             </div>
-            <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 mt-1">
+            <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
               +12.5% vs per. ant.
             </div>
@@ -671,7 +671,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 gap-1 px-2"
+                className="h-7 text-red-700 dark:text-red-300 hover:bg-red-200/50 dark:hover:bg-red-800 gap-1 px-2"
                 onClick={handleExportDespesas}
                 title="Exportar dados de despesas"
               >
@@ -681,28 +681,28 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-red-900 dark:text-red-100">
+            <div className="text-2xl font-bold text-red-900 dark:text-red-100">
               R$ {(totalDespesas / 1000000).toFixed(2)}M
             </div>
-            <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400 mt-1">
+            <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
               +9.8% vs per. ant.
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+            <CardTitle className="text-sm text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
               Lucro Líquido
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-green-900 dark:text-green-100">
+            <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
               R$ {(totalLucro / 1000000).toFixed(2)}M
             </div>
-            <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 mt-1">
+            <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
               +18.2% vs per. ant.
             </div>
@@ -717,10 +717,10 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-purple-900 dark:text-purple-100">
+            <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
               {margemLucro.toFixed(1)}%
             </div>
-            <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 mt-1">
+            <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
               +1.2 p.p. vs per. ant.
             </div>
@@ -729,16 +729,16 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle>Evolução Mensal (R$)</CardTitle>
+            <CardTitle className="text-foreground">Evolução Mensal (R$)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
-                <XAxis dataKey="month" stroke="#64748b" className="dark:stroke-slate-400" />
-                <YAxis stroke="#64748b" className="dark:stroke-slate-400" />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                <XAxis dataKey="month" stroke="currentColor" className="opacity-50 text-[10px]" />
+                <YAxis stroke="currentColor" className="opacity-50 text-[10px]" />
                 <Tooltip 
                   contentStyle={tooltipStyle}
                   formatter={(value: number) => `R$ ${value.toLocaleString()}`}
@@ -752,16 +752,16 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle>Performance por Unidade</CardTitle>
+            <CardTitle className="text-foreground">Performance por Unidade</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={unitData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
-                <XAxis type="number" stroke="#64748b" className="dark:stroke-slate-400" />
-                <YAxis dataKey="unidade" type="category" stroke="#64748b" className="dark:stroke-slate-400" />
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                <XAxis type="number" stroke="currentColor" className="opacity-50 text-[10px]" />
+                <YAxis dataKey="unidade" type="category" stroke="currentColor" className="opacity-50 text-[10px]" />
                 <Tooltip 
                   contentStyle={tooltipStyle}
                   formatter={(value: number) => `R$ ${value.toLocaleString()}`}
@@ -775,15 +775,15 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
         </Card>
       </div>
 
-      <Card>
+      <Card className="bg-card border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Demonstração do Resultado - Resumo</CardTitle>
+            <CardTitle className="text-foreground">Demonstração do Resultado - Resumo</CardTitle>
             <Button 
               variant="outline" 
               size="sm"
               onClick={handlePrintDetailed}
-              className="flex items-center gap-2 print:hidden"
+              className="flex items-center gap-2 border-border hover:bg-accent text-foreground print:hidden"
             >
               <Printer className="w-4 h-4" />
               Imprimir DRE Detalhado

@@ -26,7 +26,7 @@
   --radius-lg: 0.625rem;
 }
 
-/* ✅ DEFINIÇÃO ORIGINAL DO TEMA DARK PRESTO */
+/* ✅ DEFINIÇÃO DO TEMA DARK (PADRÃO) */
 :root, .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -51,15 +51,54 @@
   color-scheme: dark;
 }
 
-/* ✅ REMOVIDO BLOCO @media (prefers-color-scheme: light) */
-
-/* ✅ NUCLEAR OVERRIDE: Neutralizar classes utilitárias que trazem cores claras */
-.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100 {
-  background-color: hsl(222.2 84% 4.9%) !important;
+/* ☀️ TEMA CLARO OFICIAL (ALTO CONTRASTE) */
+/* Aplicado se a classe .light estiver presente OU se a preferência for light e NÃO houver a classe .dark */
+:root.light {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%; 
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 35%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 85%;
+  --input: 214.3 31.8% 85%;
+  --ring: 221.2 83.2% 53.3%;
+  color-scheme: light;
 }
 
-.text-black, .text-slate-900, .text-slate-950, .text-gray-900, .text-gray-950, .text-zinc-900 {
-  color: hsl(210 40% 98%) !important;
+@media (prefers-color-scheme: light) {
+  :root:not(.dark) {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%; 
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 35%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 85%;
+    --input: 214.3 31.8% 85%;
+    --ring: 221.2 83.2% 53.3%;
+    color-scheme: light;
+  }
 }
 
 @layer base {
