@@ -47,7 +47,7 @@ export const DOMAIN_LOGOS: Record<string, DomainLogoConfig> = {
     logoLight: 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
     logoDark: 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
     loginLogo: 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
-    favicon: 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
+    favicon: 'https://webpresto.com.br/images/logos_clientes/aceville_favicon.png',
     showSystemName: false, // NÃO mostrar "Sistema Presto"
     systemTitle: 'Aceville - Sistema de Gestão'
   }

@@ -30,7 +30,7 @@ try {
     $correctFavicons = [
         'XXX' => 'https://webpresto.com.br/favicon.png',
         'VCS' => 'https://webpresto.com.br/favicon.png',
-        'ACV' => 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
+        'ACV' => 'https://webpresto.com.br/images/logos_clientes/aceville_favicon.png',
         // Todos os outros domínios devem ter NULL ou '' (vazio)
     ];
     
