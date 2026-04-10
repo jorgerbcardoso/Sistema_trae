@@ -27,6 +27,7 @@ import {
   ArrowUpCircle,
   ClipboardCheck,
   Calculator,
+  HelpCircle,
   CheckSquare,
   CheckCircle,
   ShoppingBag,
@@ -49,6 +50,7 @@ import { getLogoUrl, shouldShowSystemName } from '../config/clientLogos';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useNavigate } from 'react-router';
 import { UserProfileDropdown } from './UserProfileDropdown';
+import { HelpCenter } from './HelpCenter';
 import { mockGetMenu } from '../mocks/mockData';
 import { useTheme } from './ThemeProvider';
 import { Badge } from './ui/badge';
@@ -64,6 +66,10 @@ export function MainMenu() {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [showUnidadeSelector, setShowUnidadeSelector] = useState(false);
   const [selectedUnidade, setSelectedUnidade] = useState<string>('');
+  
+  // ✅ NOVO: Controle da Central de Ajuda
+  const [helpModule, setHelpModule] = useState<'estoque' | 'compras' | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   
   // ✅ NOVO: Controle de seções expandidas com localStorage
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
@@ -583,6 +589,7 @@ export function MainMenu() {
                     <div className="flex-1">
                       <h3 className="font-bold text-lg text-foreground flex items-center gap-2 mb-1">
                         {section.section.name}
+                        
                         <Badge 
                           variant="secondary" 
                           className="text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
@@ -603,12 +610,30 @@ export function MainMenu() {
                       </p>
                     </div>
                   </div>
-                  <div 
-                    className={`text-muted-foreground transition-all duration-300 ${
-                      isExpanded ? 'rotate-0 text-primary' : 'rotate-[-90deg]'
-                    }`}
-                  >
-                    <ChevronDown className="w-6 h-6" />
+                  <div className="flex items-center gap-2">
+                    {/* Ícone de Ajuda (?) para Estoque e Compras - COM MAIS DESTAQUE (ESTILO ÍCONE DE ITEM) */}
+                    {(section.section.code === 'ESTOQUE' || section.section.code === 'COMPRAS') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 w-10 p-0 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-600 dark:text-blue-400 transition-all hover:scale-110 hover:shadow-md border border-blue-200/50 dark:border-blue-800/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setHelpModule(section.section.code === 'ESTOQUE' ? 'estoque' : 'compras');
+                          setShowHelp(true);
+                        }}
+                      >
+                        <HelpCircle className="h-6 w-6" />
+                      </Button>
+                    )}
+                    
+                    <div 
+                      className={`text-muted-foreground transition-all duration-300 ${
+                        isExpanded ? 'rotate-0 text-primary' : 'rotate-[-90deg]'
+                      }`}
+                    >
+                      <ChevronDown className="w-6 h-6" />
+                    </div>
                   </div>
                 </div>
 
@@ -731,6 +756,16 @@ export function MainMenu() {
               Confirmar Troca
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ NOVO: Dialog da Central de Ajuda */}
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="max-w-[98vw] w-[98vw] p-0 overflow-hidden border-none shadow-none bg-transparent [&>button]:hidden">
+          <HelpCenter 
+            module={helpModule || 'estoque'} 
+            onClose={() => setShowHelp(false)} 
+          />
         </DialogContent>
       </Dialog>
     </div>

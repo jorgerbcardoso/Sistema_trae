@@ -438,7 +438,6 @@ export function CadastroEstoques() {
                 <FilterSelectUnidadeSingle
                   value={formData.unidade}
                   onChange={(value) => setFormData({ ...formData, unidade: value })}
-                  label="Unidade"
                   disabled={editando}
                 />
               ) : (
