@@ -108,6 +108,17 @@
 - ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
 - ✅ **ESPERA DE CARREGAMENTO (PDF)**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.
 
+### 18. **CENTRAL DE AJUDA (MÓDULOS)**
+- ✅ **ACIONAMENTO**: Botão `HelpCircle` estilizado como ícone de item (`h-10 w-10`, `rounded-xl`, `bg-gradient-to-br from-blue-100 to-purple-100`), posicionado estrategicamente (ex: ao lado do expansor de módulo).
+- ✅ **LARGURA DO DIALOG**: Deve ocupar quase todo o `width` disponível na tela (`max-w-[98vw] w-[98vw]`).
+- ✅ **LOGO NO CABEÇALHO**: 
+  - Se `domain === 'ACV'`: `https://www.webpresto.com.br/images/logos_clientes/aceville.png`
+  - Demais domínios: `https://sistema.webpresto.com.br/images/logo-branca-simples.png`
+- ✅ **RODAPÉ (ACV)**: Para o domínio **ACV**, **REMOVER** a frase "Desenvolvido por Presto Tecnologia".
+- ✅ **TÍTULO**: Usar o formato **"MÓDULO [NOME DO MÓDULO]"** (ex: MÓDULO ESTOQUE).
+- ✅ **BOTÃO DE FECHAR**: Ocultar o botão de fechar padrão do Dialog (`[&>button]:hidden`) e utilizar um botão `X` interno ao cabeçalho do componente de ajuda.
+- ✅ **SCROLL**: O conteúdo deve possuir scroll vertical independente do cabeçalho fixo.
+
 ---
 
 ## 📁 ESTRUTURA DE ARQUIVOS

@@ -250,6 +250,52 @@ return (
 );
 ```
 
+### **7. Central de Ajuda (Módulos)**
+
+#### **Botão de Acionamento**
+```typescript
+<Button
+  variant="ghost"
+  size="sm"
+  className="h-10 w-10 p-0 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-600 dark:text-blue-400 transition-all hover:scale-110 hover:shadow-md border border-blue-200/50 dark:border-blue-800/30"
+  onClick={(e) => {
+    e.stopPropagation();
+    setHelpModule('estoque');
+    setShowHelp(true);
+  }}
+>
+  <HelpCircle className="h-6 w-6" />
+</Button>
+```
+
+#### **Implementação do Dialog**
+```typescript
+<Dialog open={showHelp} onOpenChange={setShowHelp}>
+  {/* [&>button]:hidden oculta o 'X' padrão para usar o interno do HelpCenter */}
+  <DialogContent className="max-w-[98vw] w-[98vw] p-0 overflow-hidden border-none shadow-none bg-transparent [&>button]:hidden">
+    <HelpCenter 
+      module={helpModule || 'estoque'} 
+      onClose={() => setShowHelp(false)} 
+    />
+  </DialogContent>
+</Dialog>
+```
+
+#### **Lógica de Logos (HelpCenter)**
+```typescript
+const isACV = user?.domain === 'ACV';
+const logoUrl = isACV 
+  ? "https://www.webpresto.com.br/images/logos_clientes/aceville.png" 
+  : "https://sistema.webpresto.com.br/images/logo-branca-simples.png";
+
+// No componente
+<img 
+  src={logoUrl} 
+  alt={isACV ? "Aceville" : "Presto Tecnologia"} 
+  className={`h-4 object-contain ${!isACV ? 'brightness-0 dark:brightness-100' : ''}`}
+/>
+```
+
 ---
 
 ## PHP

@@ -1,0 +1,28 @@
+Manual de Utilização do Módulo Compras:
+1. Cadastro de Usuários: no cadastro de usuários há a seção Setores. Os setores/departamentos devem ser cadastrados aqui e, depois, os usuários poderão ser vinculados aos seus respectivos setores.
+2. IMPORTANTE: haverá setores que serão responsáveis por COMPRAS. Usuários desses setores serão os responsáveis pelo primeiro nível de aprovação de compras (pré-pedido). Chamaremos estes usuários de COMPRADORES.
+3. Cadastro de Fornecedores: os fornecedores listados aqui são importados do SSW todas as madrugadas. Mas, opcionalmente, o usuário pode IMPORTAR em tempo real os fonecedores do TMS.
+4. Cadastro de Centros de Custo: cada unidade poderá ter diversos centros de custo, de forma que a formatação do centro de custo sempre será AAA000000, onde AAA é a unidade e 000000 é o número do centro de custo.
+5. Solicitações de Compra: aqui os colaboradores, mesmo não tendo familiaridade com os itens e códigos, poderão criar suas solicitações.
+  5.1. Quando a solicitação é criada, o usuário informará qual é o centro de custo que vai consumir a compra e também o setor responsável pela compra (setor do APROVADOR).
+  5.2. Aqui, caso necessário, também pode já ser informada a placa do veículo para o qual a compra deverá ser feita.
+  5.3. Aqui não serão usados os códigos reais dos itens. Apenas descrições.
+6. Ordens de Compra: nesta tela os APROVADORES poderão criar ordens de compra diretas, sem necessidade de uma solicitação prévia.
+  6.1. Também na tela de Ordens de Compra, os APROVADORES terão acesso às solicitações.
+  6.2. Os COMPRADORES poderão converter as Solicitações em Ordens de Compra, agora sim definindo os códigos dos itens e reais quantidades.
+  6.3. Após a conversão da Solicitação em Ordem de Compra, caso o COMPRADOR já saiba com quem irá comprar e o valor dos itens, poderá também converter a Ordem de Compra em Pedido. Este pedido ainda passará pelo segundo nível de aprovação (normalmente da diretoria).
+  6.4. Caso o COMPRADOR deseje montar um Orçamento para a sua compra, ele deve acessar a tela Aprovação de Ordens de Compra, e aprová-la informando que deseja ORÇAR.
+7. Pedidos: Aqui o universo de Ordens de Compra aprovadas com ORÇAR = NÃO poderão ser selecionadas para montagem de um pedido junto ao fornecedor determinado. Este pedido gerado ainda passará pelo segundo nível de aprovação (diretoria).
+8. Orçamentos: Ordens de Compra aprovadas com ORÇAR = SIM cairão aqui. Nesta tela o COMPRADOR poderá eleger as ordens a serem compradas, e também selecionar diversos fornecedores.
+  8.1. Haverá a possibilidade de envio de COLETA DE PREÇOS ao emaiol cadastrado no fornecedor. Com isso, o fornecedor receberá um acesso temporário ao sistema para preencher preços, prazo de entrega e condição de pagamento.
+  8.2. Quando o fornecedor efetuar o preenchimento das informações, o COMPRADOR é notificado por e-mail.
+  8.3. Opcionalmente, o comprador pode preencher essas informações manualmente, para cada cotação.
+  8.4. Após os preenchimentos serem feitos, é possível montarmos o MAPA do orçamento. O sistema irá sugerir o fornecedor com melhor prazo de entrega.
+  8.5. O comprador poderá selecionar de quais fornecedores vai comprar cada item, podendo, inclusive comprar parte dos itens com um fornecedor, e parte com outro.
+  8.6. Após o preenchimento das melhores opções de compra, o COMPRADOR solicita a APROVAÇÃO do orçamento para o segundo nível de aprovação (diretor).
+  8.7. Quando o diretor aprova o orçamento, o(s) pedido(s) são automaticamente gerados e, opcionalmente, enviados aos fornecedores. O COMPRADOR também é notificado sobre a aprovação.
+9. Com os pedidos criados, seja a partir de Solicitações, Pedidos Manuais ou Orçamentos, o processo de compra está finalizado.
+10. Link com o módulo ESTOQUE. Quando o pedido for entregue, na tela de ENTRADA NO ESTOQUE, o usuário informará a NOTA FISCAL do pedido do fornecedor.
+  10.1. Com isso, não apenas o estoque é alimentado e o pedido baixado, como também o lançamento no CONTAS A PAGAR do SSW é feito.
+  10.2. Para o lançamento no contas a pagar, serão solicitadas as datas de vencimento, pagamento e evento a serem utilizados.
+  10.3. Após a entrada, o número do lançamento no contas a pagar é automaticamente vinculado ao pedido.

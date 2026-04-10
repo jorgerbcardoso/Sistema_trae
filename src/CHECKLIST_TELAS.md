@@ -210,6 +210,23 @@ Use este checklist para validar TODAS as telas antes de fazer commit.
 
 ---
 
+## 📖 CENTRAL DE AJUDA
+
+### **Estrutura e Layout**
+- [ ] Dialog configurado com `max-w-[98vw] w-[98vw]`
+- [ ] Botão de fechar padrão oculto via `[&>button]:hidden`
+- [ ] Botão de fechar (`X`) interno ao cabeçalho do HelpCenter
+- [ ] Conteúdo do manual com scroll vertical (`ScrollArea`)
+- [ ] Título no formato: "MÓDULO [NOME DO MÓDULO]" (sem badge separado)
+- [ ] Cards de fluxo (`StepBox`) com width adequado e texto legível
+
+### **Identidade Visual e Domínio**
+- [ ] Logo Aceville (`aceville.png`) exibida quando `domain === 'ACV'`
+- [ ] Logo Presto (`logo-branca-simples.png`) exibida nos demais domínios
+- [ ] Frase "Desenvolvido por Presto Tecnologia" **removida** no rodapé do domínio ACV
+
+---
+
 ## 🔒 SEGURANÇA E PERMISSÕES
 
 ### **Autenticação**
