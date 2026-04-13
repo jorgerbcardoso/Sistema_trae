@@ -260,19 +260,32 @@ echo json_encode(['success' => true, 'message' => 'OK']);
 
 ### **Padrões Obrigatórios**
 
-1. **Assunto**: Sempre concatenar com nome da empresa
-2. **Logo**: Usar logo da empresa (ou do sistema)
-3. **Assinatura**: Nome e email do usuário (nunca "Sistema Presto")
-4. **Copyright**: © 2026 Sistema Presto
-5. **Números de Documentos**: SEMPRE sem "#" no formato AAA000000
+1. **Assunto**: Sempre concatenar com nome da empresa: `$this->formatarAssunto("Assunto", $empresa['name'])`.
+2. **Logo**: Usar logo da empresa (prioridade 1) ou logo do sistema (prioridade 2). SEMPRE passar a URL da logo para o método `sendEmail` para incorporação automática como **CID (Embedded Image)**.
+3. **Assinatura**: Nome e email do usuário solicitante (nunca "Sistema Presto").
+4. **Copyright**: © 2026 Sistema Presto.
+5. **Números de Documentos**: SEMPRE no formato `AAA000000` (unidade + 6 dígitos). **NUNCA** usar "#" antes do número.
+6. **Layout (Compatibilidade)**:
+   - ✅ **OBRIGATÓRIO**: Usar layout baseado em **TABELAS** (`<table>`, `<tr>`, `<td>`).
+   - ✅ **OBRIGATÓRIO**: CSS **ESTRITAMENTE INLINE** em todas as tags.
+   - ✅ **OBRIGATÓRIO**: Usar o método `wrapInMainTemplate` do `EmailService.php` para garantir o "Shell" padrão.
+   - ❌ **PROIBIDO**: Usar `<div>`, `flex`, `grid`, `gradients`, `box-shadow` ou classes CSS externas/style tags (são ignoradas por Outlook/Gmail).
+7. **Fontes**: Usar fontes seguras para email (Arial, Helvetica, sans-serif).
 
-### **Exemplo**
+### **Exemplo de Fluxo**
 ```php
 $empresa = $this->getEmpresaInfo($domain);
 $usuario = $this->getUserInfo($domain, $username);
-$nro_solicitacao = $unidade . str_pad($seq, 6, '0', STR_PAD_LEFT); // MTZ000123
+$nro_solicitacao = $unidade . str_pad($seq, 6, '0', STR_PAD_LEFT); // Ex: MTZ000123
 
-$subject = $this->formatarAssunto("Solicitação de Compra", $empresa['name']);
+$subject = $this->formatarAssunto("Nova Solicitação de Compra", $empresa['name']);
+$inner_content = "<h1>Título</h1><p>Conteúdo aqui...</p>";
+
+// O wrapInMainTemplate já garante a estrutura de tabelas e CSS inline básica
+$html_body = $this->wrapInMainTemplate($inner_content, $domain, $empresa, $usuario);
+
+// Enviar passando a logo para virar CID
+return $this->sendEmail($to_email, $to_name, $subject, $html_body, '', [], $domain, $empresa['logo_url']);
 ```
 
 ---
