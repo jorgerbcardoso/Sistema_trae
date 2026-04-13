@@ -314,55 +314,60 @@ const logoUrl = isACV
 
 ---
 
+## 📄 PADRÕES DE IMPRESSÃO E PDF
+
+Para garantir a consistência entre a impressão no navegador (client-side) e a geração de PDF no servidor (server-side/e-mail), as seguintes regras devem ser rigorosamente seguidas:
+
+### **1. Cabeçalho e Logotipos**
+- **Posicionamento**: A logo da **Empresa/Cliente** deve ficar à **esquerda**. A logo do **Sistema Presto** deve ficar à **direita**.
+- **Regra do Domínio ACV (Aceville)**:
+  - A logo do **Sistema Presto NÃO deve ser exibida**.
+  - O texto do cabeçalho deve ser apenas "PEDIDO DE COMPRA".
+- **Outros Domínios**:
+  - O texto do cabeçalho deve ser `[nome da empresa] by PRESTO`, onde o nome da empresa vem da coluna `name` da tabela `domains`.
+
+### **2. Compatibilidade (wkhtmltopdf)**
+- **NÃO UTILIZAR**: `Flexbox` (`display: flex`) ou `Grid` (`display: grid`) no HTML destinado ao PDF do backend. O `wkhtmltopdf` tem suporte limitado a essas tecnologias.
+- **UTILIZAR**: Tabelas (`<table>`) para estruturar o layout (colunas, alinhamentos) e `floats` se necessário.
+- **Imagens**: Devem ser convertidas para `Base64` no backend para garantir que sejam renderizadas corretamente no PDF.
+
+---
+
 ## PHP
 
-### **1. Estrutura Base**
-
+### **1. Estrutura de API**
 ```php
 <?php
 /**
- * API: Nome da API
- * Descrição: O que faz
- * Métodos: GET, POST
+ * NOME DO ENDPOINT
+ * Descrição curta do que faz
  */
 
-require_once __DIR__ . '/../config.php';
+// ✅ INCLUIR SEMPRE O CONFIG
+require_once __DIR__ . '/config.php';
 
-// CONFIGURAÇÃO INICIAL
-handleOptionsRequest();
-
-// AUTENTICAÇÃO
-$auth = authenticateAndGetUser();
-$user = $auth['user'];
-$domain = $auth['domain'];
-
-// RECEBER PARÂMETROS
-$method = $_SERVER['REQUEST_METHOD'];
-
-// VALIDAR DOMÍNIO
-if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
-    msg('Domínio inválido', 'error');
+// ✅ VALIDAR MÉTODOS (Opcional, mas recomendado)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    returnError('Método não permitido', 405);
 }
 
-// MOCK
-if (shouldUseMockData($domain)) {
-    $mockData = getMockData();
-    respondJson(['success' => true, 'data' => $mockData]);
-    exit;
+// ✅ OBTER DADOS DO JSON
+$json = file_get_contents('php://input');
+$data = json_decode($json, true);
+
+// ✅ VALIDAR CAMPOS OBRIGATÓRIOS
+if (empty($data['seq_pedido'])) {
+    returnError('O código do pedido é obrigatório');
 }
 
-// BANCO DE DADOS
-$conn = connect();
-$prefix = strtolower($domain) . '_';
-
-// ROTEAMENTO
-if ($method === 'GET') {
-    handleGet($conn, $prefix, $user);
-} elseif ($method === 'POST') {
-    handlePost($conn, $prefix, $user);
-} else {
-    http_response_code(405);
-    respondJson(['success' => false, 'message' => 'Método não permitido']);
+try {
+    // Lógica
+    
+    // ✅ RESPOSTA PADRONIZADA
+    returnSuccess(['message' => 'Operação realizada com sucesso']);
+} catch (Exception $e) {
+    error_log("Erro em endpoint.php: " . $e->getMessage());
+    returnError('Erro interno ao processar a solicitação');
 }
 ```
 

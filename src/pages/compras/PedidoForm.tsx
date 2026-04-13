@@ -1495,14 +1495,16 @@ export default function PedidoForm() {
             <div ref={printRef}>
               <div className="header">
                 <div className="header-left">
-                  <img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" className="logo" />
+                  <img src={clientLogo} alt="Logo Empresa" className="logo" />
                   <div className="header-info">
                     <h1>PEDIDO DE COMPRA</h1>
-                    <p>Sistema PRESTO - Gestão de Transportadoras</p>
+                    <p>{user?.domain?.toUpperCase() === 'ACV' ? 'PEDIDO DE COMPRA' : `${clientConfig?.name || 'Transportadora'} by PRESTO`}</p>
                   </div>
                 </div>
                 <div className="header-right">
-                  <img src={clientLogo} alt="Logo Empresa" />
+                  {user?.domain?.toUpperCase() !== 'ACV' && (
+                    <img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" />
+                  )}
                 </div>
               </div>
 

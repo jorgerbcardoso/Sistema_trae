@@ -359,21 +359,27 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     $is_pedido_orcado = ($pedido['seq_orcamento'] > 0);
     $usuario = strtolower($pedido['login_inclusao'] ?? '');
     
-    // Buscar logo do cliente
-    $query_domain = "SELECT logo_light FROM domains WHERE domain = $1";
+    // Buscar dados do domínio (logo e nome)
+    $query_domain = "SELECT name, logo_light FROM domains WHERE domain = $1";
     $result_domain = sql($query_domain, [strtoupper($dominio)], $g_sql);
     $domain_data = pg_fetch_assoc($result_domain);
+    
+    $nome_empresa = $domain_data['name'] ?? 'Transportadora';
     $logo_cliente_url = $domain_data['logo_light'] ?? 'https://webpresto.com.br/images/logo_rel.png';
     
     // Carregar imagens em Base64
     $logoPrestoBase64 = carregarImagemBase64('https://webpresto.com.br/images/logo_rel.png');
     $logoClienteBase64 = carregarImagemBase64($logo_cliente_url);
     
-    // Regra ACV (Aceville): Substituir logo Presto pela logo do cliente
-    if (strtoupper($dominio) === 'ACV') {
-        $logoPrestoBase64 = $logoClienteBase64;
-    }
+    // ✅ REGRA: Inverter logos (Empresa na esquerda, Presto na direita)
+    // ✅ REGRA ACV: Para o domínio ACV, a logo da Presto não deve ser exibida.
+    $is_aceville = (strtoupper($dominio) === 'ACV');
+    
+    // Cabeçalho Texto: [nome da empresa] by PRESTO (exceto ACV)
+    $cabecalho_texto = $is_aceville ? 'PEDIDO DE COMPRA' : $nome_empresa . ' by PRESTO';
 
+    // Montar HTML do Cabeçalho baseado nas regras
+    $html_header = '
     // Configuração de Status (Simplificada para o PDF)
     $status_label = 'AGUARDANDO APROVAÇÃO';
     $status_class = 'status-aguardando';
@@ -572,101 +578,7 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     </style>
 </head>
 <body>
-    <table class="header">
-        <tr>
-            <td style="width: 50%;">
-                <table>
-                    <tr>
-                        <td>' . ($logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" class="logo">' : '') . '</td>
-                        <td class="header-info" style="padding-left: 15px;">
-                            <h1>PEDIDO DE COMPRA</h1>
-                            <p>Sistema PRESTO - Gestão de Transportadoras</p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-            <td style="width: 50%; text-align: right;">
-                ' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" style="max-width: 100px; max-height: 45px;">' : '') . '
-            </td>
-        </tr>
-    </table>
-
-    <div class="section">
-        <div class="pedido-numero">' . $nro_pedido_formatado . '</div>
-        <span class="pedido-tipo">' . ($is_pedido_orcado ? 'VIA ORÇAMENTO' : 'MANUAL') . '</span>
-        <span class="status-badge ' . $status_class . '">' . $status_label . '</span>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Informações do Pedido</div>
-        <table class="info-table">
-            <tr>
-                <td style="width: 33%;">
-                    <div class="info-label">Unidade</div>
-                    <div class="info-value">' . htmlspecialchars($pedido['unidade']) . '</div>
-                </td>
-                <td style="width: 33%;">
-                    <div class="info-label">Data de Inclusão</div>
-                    <div class="info-value">' . $data_pedido . ' às ' . $hora_pedido . '</div>
-                </td>
-                <td style="width: 33%;">
-                    <div class="info-label">Usuário</div>
-                    <div class="info-value">' . $usuario . '</div>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Fornecedor</div>
-        <div class="fornecedor-box">
-            <div class="fornecedor-nome">' . htmlspecialchars($pedido['fornecedor_nome']) . '</div>
-            <div class="fornecedor-info">
-                <strong>CNPJ:</strong> ' . htmlspecialchars($pedido['fornecedor_cnpj'] ?? 'N/A') . '
-                ' . ($pedido['fornecedor_telefone'] ? ' | <strong>Telefone:</strong> ' . htmlspecialchars($pedido['fornecedor_telefone']) : '') . '
-                ' . ($pedido['fornecedor_email'] ? ' | <strong>E-mail:</strong> ' . htmlspecialchars($pedido['fornecedor_email']) : '') . '
-                ' . ($pedido['fornecedor_cidade'] ? ' | <strong>Cidade:</strong> ' . htmlspecialchars($pedido['fornecedor_cidade']) : '') . '
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Itens do Pedido</div>
-        <table class="itens-table">
-            <thead>
-                <tr>
-                    <th style="width: 12%;">Código</th>
-                    <th style="width: 38%;">Descrição</th>
-                    <th style="width: 8%; text-align: center;">Unid.</th>
-                    <th style="width: 12%; text-align: right;">Quantidade</th>
-                    <th style="width: 15%; text-align: right;">Vlr. Unit. (R$)</th>
-                    <th style="width: 15%; text-align: right;">Vlr. Total (R$)</th>
-                </tr>
-            </thead>
-            <tbody>
-                ' . $html_itens . '
-            </tbody>
-        </table>
-    </div>
-
-    ' . ($pedido['observacao'] ? '
-    <div class="section">
-        <div class="section-title">Observações</div>
-        <div class="observacoes">' . nl2br(htmlspecialchars($pedido['observacao'])) . '</div>
-    </div>' : '') . '
-
-    <div class="total-section">
-        <span class="total-label">VALOR TOTAL DO PEDIDO</span>
-        <span class="total-value">R$ ' . number_format($total_geral, 2, ',', '.') . '</span>
-        <div style="clear: both;"></div>
-    </div>
-
-    <div class="footer">
-        <p>Sistema PRESTO - Gestão de Transportadoras | www.webpresto.com.br</p>
-        <p>Gerado em ' . date('d/m/Y') . ' às ' . date('H:i:s') . '</p>
-    </div>
-</body>
-</html>';
+    ' . $html_header . '
 
     return $html;
 }
