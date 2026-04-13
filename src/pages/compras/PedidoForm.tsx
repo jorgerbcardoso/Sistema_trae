@@ -359,8 +359,14 @@ export default function PedidoForm() {
         );
         
         if (data.success) {
-          // ✅ Filtrar usuário 'presto' da lista de aprovadores
-          const aprovadoresFiltrados = (data.data || []).filter((u: any) => u.username?.toLowerCase() !== 'presto');
+          // ✅ Ajustar para exibir o usuário 'presto' apenas se o usuário logado for 'presto'
+          const aprovadoresFiltrados = (data.data || []).filter((u: any) => {
+            const isPrestoUser = u.username?.toLowerCase() === 'presto';
+            const loggedAsPresto = user?.username?.toLowerCase() === 'presto';
+            
+            if (isPrestoUser && !loggedAsPresto) return false;
+            return true;
+          });
           setUsuariosAprovadores(aprovadoresFiltrados);
         }
       }

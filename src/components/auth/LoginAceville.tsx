@@ -10,6 +10,7 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { setFaviconByDomain } from '../../utils/faviconManager';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
+import { getLogoUrl } from '../../config/clientLogos';
 
 export function LoginAceville() {
   const [username, setUsername] = useState('');

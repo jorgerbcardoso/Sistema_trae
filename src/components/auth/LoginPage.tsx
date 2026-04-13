@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { getLogoUrl } from '../../config/clientLogos';
 
 export function LoginPage() {
   const [domain, setDomain] = useState('');
