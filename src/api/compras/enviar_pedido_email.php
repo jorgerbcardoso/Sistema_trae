@@ -270,6 +270,8 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
         $wkhtmltopdf_path = '/usr/bin/wkhtmltopdf';
     } elseif (file_exists('/bin/wkhtmltopdf')) {
         $wkhtmltopdf_path = '/bin/wkhtmltopdf';
+    } elseif (file_exists('/var/www/html/bin/wkhtmltopdf')) {
+        $wkhtmltopdf_path = '/var/www/html/bin/wkhtmltopdf';
     }
     
     if (!$wkhtmltopdf_path) {
@@ -280,12 +282,30 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
     
     error_log("✅ [PDF-PEDIDO] wkhtmltopdf encontrado em: " . $wkhtmltopdf_path);
     
-    // Verificar se /tmp é gravável
-    if (!is_writable('/tmp')) {
-        error_log("❌ [PDF-PEDIDO] Diretório /tmp não tem permissão de escrita!");
-        @unlink($temp_html);
-        return null;
+    // ✅ TENTAR DIRETÓRIO ALTERNATIVO SE /tmp NÃO FOR GRAVÁVEL
+    $temp_dir = '/tmp';
+    if (!is_writable($temp_dir)) {
+        $alt_temp = '/var/www/html/sistema/api/tmp';
+        if (!file_exists($alt_temp)) {
+            @mkdir($alt_temp, 0777, true);
+        }
+        
+        if (is_writable($alt_temp)) {
+            $temp_dir = $alt_temp;
+            error_log("⚠️ [PDF-PEDIDO] /tmp não gravável, usando: " . $temp_dir);
+        } else {
+            error_log("❌ [PDF-PEDIDO] Nenhum diretório temporário gravável encontrado!");
+            @unlink($temp_html);
+            return null;
+        }
     }
+
+    $temp_html = $temp_dir . '/' . uniqid() . '.html';
+    $temp_pdf = $temp_dir . '/' . $filename;
+    
+    // Salvar HTML temporário
+    file_put_contents($temp_html, $html);
+    error_log("📄 [PDF-PEDIDO] HTML salvo em: " . $temp_html);
     
     // ✅ Gerar PDF (retrato, A4)
     // Usar escapeshellarg para cada argumento individualmente em vez de escapeshellcmd no comando todo

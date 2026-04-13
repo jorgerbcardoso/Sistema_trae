@@ -260,12 +260,36 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
         $wkhtmltopdf_path = '/usr/bin/wkhtmltopdf';
     } elseif (file_exists('/bin/wkhtmltopdf')) {
         $wkhtmltopdf_path = '/bin/wkhtmltopdf';
+    } elseif (file_exists('/var/www/html/bin/wkhtmltopdf')) {
+        $wkhtmltopdf_path = '/var/www/html/bin/wkhtmltopdf';
     }
     
-    if (!$wkhtmltopdf_path || !is_writable('/tmp')) {
+    if (!$wkhtmltopdf_path) {
         @unlink($temp_html);
         return null;
     }
+
+    // ✅ TENTAR DIRETÓRIO ALTERNATIVO SE /tmp NÃO FOR GRAVÁVEL
+    $temp_dir = '/tmp';
+    if (!is_writable($temp_dir)) {
+        $alt_temp = '/var/www/html/sistema/api/tmp';
+        if (!file_exists($alt_temp)) {
+            @mkdir($alt_temp, 0777, true);
+        }
+        
+        if (is_writable($alt_temp)) {
+            $temp_dir = $alt_temp;
+        } else {
+            @unlink($temp_html);
+            return null;
+        }
+    }
+
+    $temp_html = $temp_dir . '/' . uniqid() . '.html';
+    $temp_pdf = $temp_dir . '/' . $filename;
+    
+    // Salvar HTML temporário
+    file_put_contents($temp_html, $html);
     
     // ✅ Gerar PDF (retrato, A4)
     $cmd = $wkhtmltopdf_path . 

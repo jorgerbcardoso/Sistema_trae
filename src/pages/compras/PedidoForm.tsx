@@ -1190,7 +1190,7 @@ export default function PedidoForm() {
                 <Button 
                   onClick={() => setDialogSolicitarAprovacao(true)} 
                   variant="default"
-                  className="gap-2 w-full sm:w-auto"
+                  className="gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
                 >
                   <UserCheck className="size-4" />
                   Solicitar Aprovação
@@ -1202,7 +1202,7 @@ export default function PedidoForm() {
                 <Button 
                   onClick={handleAprovarPedido} 
                   variant="default"
-                  className="gap-2 w-full sm:w-auto"
+                  className="gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
                   disabled={aprovandoPedido}
                 >
                   {aprovandoPedido ? (
@@ -1220,12 +1220,20 @@ export default function PedidoForm() {
               )}
 
               {/* BOTÃO: Enviar Pedido */}
-              <Button onClick={abrirDialogEnviarFornecedor} variant="outline" className="gap-2 w-full sm:w-auto border-blue-200 hover:border-blue-400 text-blue-600">
+              <Button 
+                onClick={abrirDialogEnviarFornecedor} 
+                variant="default" 
+                className="gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
+              >
                 <Mail className="size-4" />
                 Enviar Pedido
               </Button>
               
-              <Button onClick={imprimirPedido} variant="outline" className="gap-2 w-full sm:w-auto">
+              <Button 
+                onClick={imprimirPedido} 
+                variant="default" 
+                className="gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-lg"
+              >
                 <Printer className="size-4" />
                 Imprimir Pedido
               </Button>
