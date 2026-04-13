@@ -92,7 +92,16 @@
   - Dark: `bg-slate-700` (hover: `bg-slate-600`)
 - ✅ **LARGURA**: 8px para vertical e horizontal.
 
-### 17. **LOGOTIPOS EM IMPRESSÕES (PDF E EXCEL)**
+### 17. **LOGOTIPOS DO SISTEMA (CABEÇALHOS E LOGIN)**
+- ✅ **PRIORIDADE DE EXIBIÇÃO**: 
+  1. `logo_light` / `logo_dark` cadastradas no domínio (banco de dados).
+  2. Logo específica por domínio (ex: Aceville para `ACV`).
+  3. Logo padrão Presto (demais domínios).
+- ✅ **TEMAS**: A escolha entre light/dark deve seguir a preferência do sistema/navegador do usuário.
+- ✅ **IMPLEMENTAÇÃO**: Usar sempre a função `getLogoUrl(domain, theme, clientConfig)` para garantir a aplicação da prioridade.
+- ❌ **URLS HARDCODED**: Evitar o uso de URLs de logotipos fixas nos componentes; centralizar na `clientLogos.ts`.
+
+### 18. **LOGOTIPOS EM IMPRESSÕES (PDF E EXCEL)**
 - ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão ou exportações Excel.
 - ✅ **LÓGICA DE POSICIONAMENTO (PDF/HTML)**:
   - **LADO ESQUERDO (Logo Cliente)**: 

@@ -20,6 +20,7 @@ export function LoginAceville() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [resetMessage, setResetMessage] = useState('');
+  const [clientConfig, setClientConfig] = useState<any>(null);
   
   // ✅ SEGURANÇA: Verificar se AuthContext está disponível
   let auth;
@@ -62,6 +63,29 @@ export function LoginAceville() {
   useEffect(() => {
     setFaviconByDomain('ACV');
     document.title = 'Aceville - Sistema de Gestão';
+
+    // ✅ Buscar config do domínio para carregar logos prioritárias
+    const fetchDomainConfig = async () => {
+      try {
+        const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/domains/check.php?domain=ACV`);
+        const data = await response.json();
+        if (data.success && data.domain) {
+          // Extrair logos da config se existirem
+          const config: any = {};
+          if (data.domain.logo_light || data.domain.logo_dark) {
+            config.theme = {
+              logo_light: data.domain.logo_light,
+              logo_dark: data.domain.logo_dark
+            };
+          }
+          setClientConfig(config);
+        }
+      } catch (error) {
+        console.warn('⚠️ [LoginAceville] Erro ao carregar config do domínio:', error);
+      }
+    };
+
+    fetchDomainConfig();
   }, []);
 
   // Carregar valores salvos do localStorage
@@ -233,7 +257,7 @@ export function LoginAceville() {
           <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
             <div className="flex justify-center mb-6">
               <ImageWithFallback
-                src="https://www.webpresto.com.br/images/logos_clientes/aceville.png"
+                src={getLogoUrl(ACEVILLE_DOMAIN, isBrowserLight ? 'light' : 'dark', clientConfig)}
                 alt="Aceville Transportes"
                 className="h-20 object-contain"
               />
@@ -386,7 +410,7 @@ export function LoginAceville() {
         <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
           <div className="flex justify-center mb-6">
             <ImageWithFallback
-              src="https://www.webpresto.com.br/images/logos_clientes/aceville.png"
+              src={getLogoUrl(ACEVILLE_DOMAIN, isBrowserLight ? 'light' : 'dark', clientConfig)}
               alt="Aceville Transportes"
               className="h-20 object-contain"
             />

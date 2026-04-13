@@ -13,6 +13,7 @@ Use este checklist para validar TODAS as telas antes de fazer commit.
 - [ ] Props `title` e `description` preenchidas
 - [ ] Título em MAIÚSCULAS
 - [ ] Dashboard usa estrutura própria (não usa AdminLayout)
+- [ ] Logotipo segue a prioridade (`logo_light`/`logo_dark` > Domínio > Presto)
 
 ### **Responsividade**
 - [ ] Layout funciona em mobile (< 768px)

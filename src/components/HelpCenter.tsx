@@ -27,7 +27,8 @@ import {
   ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getLogoConfig } from '../config/clientLogos';
+import { useTheme } from './ThemeProvider';
+import { getLogoUrl } from '../config/clientLogos';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
@@ -39,8 +40,8 @@ interface HelpCenterProps {
 }
 
 export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
-  const { user } = useAuth();
-  const logoConfig = getLogoConfig(user?.domain);
+  const { user, clientConfig } = useAuth();
+  const { theme } = useTheme();
   const isACV = user?.domain === 'ACV';
 
   // Configurações de cores baseadas no módulo
@@ -70,14 +71,11 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-950 border shadow-sm">
               <img 
-                src={isACV 
-                  ? "https://www.webpresto.com.br/images/logos_clientes/aceville.png" 
-                  : "https://sistema.webpresto.com.br/images/logo-branca-simples.png"
-                } 
+                src={getLogoUrl(user?.domain, theme, clientConfig)} 
                 alt={isACV ? "Aceville" : "Presto Tecnologia"} 
                 className={`h-4 object-contain ${!isACV ? 'brightness-0 dark:brightness-100' : ''}`}
               />
-              <span className="text-xs font-semibold text-slate-500">{logoConfig.clientName}</span>
+              <span className="text-xs font-semibold text-slate-500">{user?.clientName || 'Cliente'}</span>
             </div>
           </div>
         </div>
@@ -120,7 +118,7 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
           )}
 
           <footer className="pt-8 text-center text-sm text-muted-foreground border-t">
-            <p>© {new Date().getFullYear()} {logoConfig.clientName} - Todos os direitos reservados</p>
+            <p>© {new Date().getFullYear()} {user?.clientName || 'Cliente'} - Todos os direitos reservados</p>
             {!isACV && <p>Desenvolvido por Presto Tecnologia</p>}
           </footer>
         </div>

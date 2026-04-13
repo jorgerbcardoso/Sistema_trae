@@ -18,12 +18,12 @@ interface AppLayoutProps {
  * REGRA: Todas as páginas internas devem usar este layout
  */
 export function AppLayout({ children, showBackButton = true }: AppLayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, clientConfig } = useAuth();
   const navigate = useNavigate();
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = React.useState(false);
   const { theme } = useTheme();
 
-  const logoUrl = getLogoUrl(user?.domain || '', theme);
+  const logoUrl = getLogoUrl(user?.domain || '', theme, clientConfig);
   const showSystemName = shouldShowSystemName(user?.domain || '');
 
   const handleBackToMenu = () => {

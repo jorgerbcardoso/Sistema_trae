@@ -129,6 +129,22 @@ const formatarHora = (hora: string): string => {
 const hora = "14:30:45";
 ```
 
+#### **Logotipos do Sistema (Prioridade)**
+```typescript
+// ✅ CORRETO - Usar getLogoUrl com clientConfig para respeitar prioridade do banco
+const { user, clientConfig } = useAuth();
+const { theme } = useTheme();
+
+<ImageWithFallback 
+  src={getLogoUrl(user?.domain, theme, clientConfig)}
+  alt="Logo" 
+/>
+
+// ❌ ERRADO - URLs fixas ou sem considerar logos customizadas do banco
+<img src="https://webpresto.com.br/logo.png" />
+<img src={isACV ? logoACV : logoPresto} />
+```
+
 #### **Logotipos em Impressões/Relatórios**
 ```typescript
 // ✅ CORRETO - Usar URLs absolutas e lógica de domínio

@@ -16,7 +16,7 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, title, description }: AdminLayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, clientConfig } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -67,8 +67,8 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               <span className="hidden md:inline menu-button-text">Menu</span>
             </Button>
             <ImageWithFallback 
-              key={theme}
-              src={getLogoUrl(user?.domain, theme)}
+              key={`${theme}-${user?.domain}-${clientConfig?.theme?.logo_light}-${clientConfig?.theme?.logo_dark}`}
+              src={getLogoUrl(user?.domain, theme, clientConfig)}
               alt="Logo" 
               className="h-6 md:h-8 w-6 md:w-8 object-contain" 
             />

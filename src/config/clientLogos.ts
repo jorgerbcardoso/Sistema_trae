@@ -82,10 +82,27 @@ export function getLogoConfig(domain?: string): DomainLogoConfig {
 }
 
 /**
- * Retorna a URL do logo baseado no domínio e tema
+ * Retorna a URL do logotipo do cliente baseada no domínio e tema
+ * PRIORIDADE: logo_light/logo_dark do clientConfig > Logo específica do domínio > Logo Presto
  */
-export function getLogoUrl(domain: string | undefined, theme: 'light' | 'dark'): string {
+export function getLogoUrl(
+  domain?: string, 
+  theme: 'light' | 'dark' = 'light',
+  clientConfig?: { theme?: { logo_light?: string; logo_dark?: string } } | null
+): string {
+  // 1. Prioridade máxima: Logos customizadas do clientConfig (banco de dados)
+  if (clientConfig?.theme) {
+    if (theme === 'dark' && clientConfig.theme.logo_dark) {
+      return clientConfig.theme.logo_dark;
+    }
+    if (theme === 'light' && clientConfig.theme.logo_light) {
+      return clientConfig.theme.logo_light;
+    }
+  }
+
+  // 2. Segunda prioridade: Logos estáticas por domínio (ou fallback)
   const config = getLogoConfig(domain);
+  
   return theme === 'dark' ? config.logoDark : config.logoLight;
 }
 

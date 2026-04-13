@@ -59,7 +59,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from './ui/label';
 
 export function MainMenu() {
-  const { user, logout, changeUnidade } = useAuth();
+  const { user, logout, changeUnidade, clientConfig } = useAuth();
   const navigate = useNavigate();
   const [menuSections, setMenuSections] = useState<MenuSection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -445,8 +445,8 @@ export function MainMenu() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg blur-sm opacity-50 animate-pulse"></div>
               <ImageWithFallback
-                key={theme}
-                src={getLogoUrl(user?.domain, theme)}
+                key={`${theme}-${user?.domain}-${clientConfig?.theme?.logo_light}-${clientConfig?.theme?.logo_dark}`}
+                src={getLogoUrl(user?.domain, theme, clientConfig)}
                 alt="Logo"
                 className="relative h-10 w-10 object-contain p-1 bg-muted rounded-lg border border-border"
               />

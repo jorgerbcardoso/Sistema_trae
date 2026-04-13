@@ -31,6 +31,7 @@ export function LoginPage() {
   const [showSecretDialog, setShowSecretDialog] = useState(false);
   const [secretPassword, setSecretPassword] = useState('');
   const [secretError, setSecretError] = useState('');
+  const [clientConfig, setClientConfig] = useState<any>(null);
   
   // ✅ Detectar se o navegador está em modo claro
   const [isBrowserLight, setIsBrowserLight] = useState(false);
@@ -46,6 +47,37 @@ export function LoginPage() {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
   
+  // ✅ Buscar config do domínio para carregar logos prioritárias
+  useEffect(() => {
+    const fetchDomainConfig = async () => {
+      if (domain.length === 3) {
+        try {
+          const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/domains/check.php?domain=${domain.toUpperCase()}`);
+          const data = await response.json();
+          if (data.success && data.domain) {
+            const config: any = {};
+            if (data.domain.logo_light || data.domain.logo_dark) {
+              config.theme = {
+                logo_light: data.domain.logo_light,
+                logo_dark: data.domain.logo_dark
+              };
+            }
+            setClientConfig(config);
+          } else {
+            setClientConfig(null);
+          }
+        } catch (error) {
+          console.warn('⚠️ [Login] Erro ao carregar config do domínio:', error);
+          setClientConfig(null);
+        }
+      } else {
+        setClientConfig(null);
+      }
+    };
+
+    fetchDomainConfig();
+  }, [domain]);
+
   // ✅ SEMPRE chamar hooks antes de qualquer return condicional
   const navigate = useNavigate();
   
@@ -319,7 +351,7 @@ export function LoginPage() {
           <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
             <div className="flex justify-center mb-6">
             <ImageWithFallback
-              src={isBrowserLight ? "https://webpresto.com.br/images/logo_preta.png" : "https://webpresto.com.br/images/logo-branca.png"}
+              src={getLogoUrl(domain, isBrowserLight ? 'light' : 'dark', clientConfig)}
               alt="Logo"
               className="h-16 object-contain"
             />
@@ -483,7 +515,7 @@ export function LoginPage() {
         <CardHeader className="space-y-1 text-center" style={{ paddingTop: '60px' }}>
           <div className="flex justify-center mb-6">
             <ImageWithFallback
-              src={isBrowserLight ? "https://webpresto.com.br/images/logo_preta.png" : "https://webpresto.com.br/images/logo-branca.png"}
+              src={getLogoUrl(domain, isBrowserLight ? 'light' : 'dark', clientConfig)}
               alt="Logo"
               className="h-20 object-contain"
             />

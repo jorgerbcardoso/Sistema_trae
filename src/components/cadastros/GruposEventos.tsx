@@ -61,7 +61,7 @@ interface EventoComGrupo {
 const ITEMS_PER_PAGE = 100;
 
 export function GruposEventos() {
-  const { user, logout } = useAuth();
+  const { user, logout, clientConfig } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [grupos, setGrupos] = useState<GrupoEvento[]>([]);
@@ -741,8 +741,8 @@ export function GruposEventos() {
               <span className="hidden md:inline menu-button-text">Menu</span>
             </Button>
             <ImageWithFallback 
-              key={theme}
-              src={getLogoUrl(user?.domain, theme)}
+              key={`${theme}-${user?.domain}-${clientConfig?.theme?.logo_light}-${clientConfig?.theme?.logo_dark}`}
+              src={getLogoUrl(user?.domain, theme, clientConfig)}
               alt="Logo" 
               className="h-6 md:h-8 w-6 md:w-8 object-contain" 
             />
