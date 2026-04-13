@@ -257,22 +257,39 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
     
     // Verificar se wkhtmltopdf existe
     $wkhtmltopdf_path = null;
-    if (file_exists('/usr/local/bin/wkhtmltopdf')) {
+    
+    // 1. Tentar encontrar via 'which'
+    $which_path = trim(shell_exec('which wkhtmltopdf 2>/dev/null'));
+    if (!empty($which_path) && file_exists($which_path)) {
+        $wkhtmltopdf_path = $which_path;
+    }
+    // 2. Caminhos comuns
+    elseif (file_exists('/usr/local/bin/wkhtmltopdf')) {
         $wkhtmltopdf_path = '/usr/local/bin/wkhtmltopdf';
     } elseif (file_exists('/usr/bin/wkhtmltopdf')) {
         $wkhtmltopdf_path = '/usr/bin/wkhtmltopdf';
+    } elseif (file_exists('/bin/wkhtmltopdf')) {
+        $wkhtmltopdf_path = '/bin/wkhtmltopdf';
     }
     
     if (!$wkhtmltopdf_path) {
-        error_log("❌ [PDF-PEDIDO] wkhtmltopdf NÃO ENCONTRADO!");
+        error_log("❌ [PDF-PEDIDO] wkhtmltopdf NÃO ENCONTRADO em nenhum caminho conhecido!");
         @unlink($temp_html);
         return null;
     }
     
     error_log("✅ [PDF-PEDIDO] wkhtmltopdf encontrado em: " . $wkhtmltopdf_path);
     
+    // Verificar se /tmp é gravável
+    if (!is_writable('/tmp')) {
+        error_log("❌ [PDF-PEDIDO] Diretório /tmp não tem permissão de escrita!");
+        @unlink($temp_html);
+        return null;
+    }
+    
     // ✅ Gerar PDF (retrato, A4)
-    $cmd = escapeshellcmd($wkhtmltopdf_path) . 
+    // Usar escapeshellarg para cada argumento individualmente em vez de escapeshellcmd no comando todo
+    $cmd = $wkhtmltopdf_path . 
            ' --enable-local-file-access' .
            ' --page-size A4' .
            ' --orientation Portrait' .
@@ -286,10 +303,14 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
     
     error_log("🔧 [PDF-PEDIDO] Executando comando: " . $cmd);
     
+    $output = [];
+    $return_var = -1;
     exec($cmd, $output, $return_var);
     
     error_log("🔧 [PDF-PEDIDO] Código de retorno: " . $return_var);
-    error_log("🔧 [PDF-PEDIDO] Output: " . implode("\n", $output));
+    if (!empty($output)) {
+        error_log("🔧 [PDF-PEDIDO] Output: " . implode("\n", $output));
+    }
     
     if ($return_var === 0 && file_exists($temp_pdf)) {
         $pdf_size = filesize($temp_pdf);
@@ -306,7 +327,10 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
             'filename' => $filename
         ];
     } else {
-        error_log("❌ [PDF-PEDIDO] Falha ao gerar PDF!");
+        error_log("❌ [PDF-PEDIDO] Falha ao gerar PDF! Return var: " . $return_var);
+        if (!empty($output)) {
+            error_log("❌ [PDF-PEDIDO] Output: " . implode("\n", $output));
+        }
         @unlink($temp_html);
         @unlink($temp_pdf);
         return null;
@@ -316,6 +340,8 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
 /**
  * Gerar HTML do PDF do Pedido
  * ✅ MESMO LAYOUT DA IMPRESSÃO DO PEDIDO NO FRONTEND!
+ * ⚠️ ATENÇÃO: wkhtmltopdf (Debian) NÃO SUPORTA BEM FLEXBOX/GRID!
+ * ✅ USAR TABELAS PARA LAYOUT PARA MÁXIMA COMPATIBILIDADE
  */
 function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     $nro_pedido_formatado = $pedido['unidade'] . str_pad($pedido['nro_pedido'], 7, '0', STR_PAD_LEFT);
@@ -377,12 +403,14 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
         }
         
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            width: 100%;
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 3px solid #2563eb;
+        }
+        
+        .header td {
+            vertical-align: top;
         }
         
         .header-left img {
@@ -433,10 +461,14 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             padding-bottom: 5px;
         }
         
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+        .info-table {
+            width: 100%;
+        }
+        
+        .info-table td {
+            width: 50%;
+            padding: 5px;
+            vertical-align: top;
         }
         
         .info-item {
@@ -456,13 +488,13 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             font-size: 10pt;
         }
         
-        table {
+        .items-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
         
-        th {
+        .items-table th {
             background-color: #2563eb;
             color: white;
             padding: 10px 8px;
@@ -473,7 +505,7 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             border: 1px solid #1e40af;
         }
         
-        td {
+        .items-table td {
             padding: 8px;
             border: 1px solid #e5e7eb;
             font-size: 9pt;
@@ -524,17 +556,19 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">' . 
-            ($logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" alt="Sistema Presto">' : '<h2>Sistema Presto</h2>') .
-        '</div>
-        <div class="header-right">' .
-            ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" alt="Logo Empresa">' : '') .
-            '<div style="font-size: 9pt; color: #6b7280;">
-                <div>' . $data_pedido . ' - ' . $hora_pedido . '</div>
-            </div>
-        </div>
-    </div>
+    <table class="header">
+        <tr>
+            <td class="header-left">
+                ' . ($logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" alt="Sistema Presto">' : '<h2>Sistema Presto</h2>') . '
+            </td>
+            <td class="header-right">
+                ' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" alt="Logo Empresa">' : '') . '
+                <div style="font-size: 9pt; color: #6b7280;">
+                    <div>' . $data_pedido . ' - ' . $hora_pedido . '</div>
+                </div>
+            </td>
+        </tr>
+    </table>
     
     <div class="title">
         <h1>PEDIDO DE COMPRA</h1>
@@ -543,38 +577,50 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     
     <div class="info-section">
         <h2>DADOS DO FORNECEDOR</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Fornecedor</span>
-                <span class="info-value">' . htmlspecialchars($pedido['fornecedor_nome']) . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">CNPJ</span>
-                <span class="info-value">' . htmlspecialchars($pedido['fornecedor_cnpj'] ?? '-') . '</span>
-            </div>
-        </div>
+        <table class="info-table">
+            <tr>
+                <td>
+                    <div class="info-item">
+                        <span class="info-label">Fornecedor</span>
+                        <span class="info-value">' . htmlspecialchars($pedido['fornecedor_nome']) . '</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="info-item">
+                        <span class="info-label">CNPJ</span>
+                        <span class="info-value">' . htmlspecialchars($pedido['fornecedor_cnpj'] ?? '-') . '</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
     
     <div class="info-section">
         <h2>DADOS DO PEDIDO</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Data do Pedido</span>
-                <span class="info-value">' . $data_pedido . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Unidade</span>
-                <span class="info-value">' . htmlspecialchars($pedido['unidade']) . '</span>
-            </div>' .
-            ($pedido['nro_orcamento'] ? '
-            <div class="info-item">
-                <span class="info-label">Orçamento Origem</span>
-                <span class="info-value">' . $pedido['unidade'] . str_pad($pedido['nro_orcamento'], 7, '0', STR_PAD_LEFT) . '</span>
-            </div>' : '') .
-        '</div>
+        <table class="info-table">
+            <tr>
+                <td>
+                    <div class="info-item">
+                        <span class="info-label">Data do Pedido</span>
+                        <span class="info-value">' . $data_pedido . '</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Unidade</span>
+                        <span class="info-value">' . htmlspecialchars($pedido['unidade']) . '</span>
+                    </div>
+                </td>
+                <td>' .
+                    ($pedido['nro_orcamento'] ? '
+                    <div class="info-item">
+                        <span class="info-label">Orçamento Origem</span>
+                        <span class="info-value">' . $pedido['unidade'] . str_pad($pedido['nro_orcamento'], 7, '0', STR_PAD_LEFT) . '</span>
+                    </div>' : '') . '
+                </td>
+            </tr>
+        </table>
     </div>
     
-    <table>
+    <table class="items-table">
         <thead>
             <tr>
                 <th style="width: 100px;">Código</th>

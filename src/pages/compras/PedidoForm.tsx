@@ -1219,13 +1219,11 @@ export default function PedidoForm() {
                 </Button>
               )}
 
-              {/* BOTÃO: Enviar ao Fornecedor (APENAS se status NÃO for 'A') */}
-              {pedido.status !== 'A' && (
-                <Button onClick={abrirDialogEnviarFornecedor} variant="outline" className="gap-2 w-full sm:w-auto">
-                  <Mail className="size-4" />
-                  Enviar ao Fornecedor
-                </Button>
-              )}
+              {/* BOTÃO: Enviar Pedido */}
+              <Button onClick={abrirDialogEnviarFornecedor} variant="outline" className="gap-2 w-full sm:w-auto border-blue-200 hover:border-blue-400 text-blue-600">
+                <Mail className="size-4" />
+                Enviar Pedido
+              </Button>
               
               <Button onClick={imprimirPedido} variant="outline" className="gap-2 w-full sm:w-auto">
                 <Printer className="size-4" />

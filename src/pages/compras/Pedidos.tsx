@@ -28,7 +28,9 @@ import {
   Eye,
   MapPin,
   Package,
-  Hourglass
+  Hourglass,
+  Mail,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
@@ -38,6 +40,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { MOCK_PEDIDOS, MOCK_PEDIDO_ITENS } from '../../utils/estoqueModData';
 import { MOCK_FORNECEDORES } from '../../mocks/estoqueComprasMocks';
 import { SortableTableHeader, useSortableTable } from '../../components/table/SortableTableHeader';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Label } from "../../components/ui/label";
 
 interface Pedido {
   seq_pedido: number;
@@ -67,6 +77,12 @@ export default function Pedidos() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [ordensCompraDisp, setOrdensCompraDisp] = useState(0);
 
+  // ✅ Dialog de Envio de Email
+  const [dialogEnviarEmail, setDialogEnviarEmail] = useState(false);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [emailFornecedor, setEmailFornecedor] = useState('');
+  const [pedidoParaEnvio, setPedidoParaEnvio] = useState<Pedido | null>(null);
+
   // Filtros
   const [filtroDataInicio, setFiltroDataInicio] = useState(() => {
     // ✅ Padrão: 30 dias atrás
@@ -88,6 +104,73 @@ export default function Pedidos() {
     carregarPedidos();
     carregarOrdensCompraDisp();
   }, []);
+
+  // ✅ Abrir dialog de envio
+  const abrirDialogEnvio = async (pedido: Pedido) => {
+    setPedidoParaEnvio(pedido);
+    
+    // Buscar email do fornecedor (se não estiver no objeto pedido)
+    let email = '';
+    try {
+      if (ENVIRONMENT.isFigmaMake) {
+        const forn = MOCK_FORNECEDORES.find(f => f.seq_fornecedor === pedido.seq_fornecedor);
+        email = forn?.email || '';
+      } else {
+        // Buscar detalhes do pedido para pegar o email do fornecedor
+        const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/pedidos.php?seq_pedido=${pedido.seq_pedido}&action=detalhes`);
+        if (data.success && data.data?.fornecedor?.email) {
+          email = data.data.fornecedor.email;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar email do fornecedor:', error);
+    }
+    
+    setEmailFornecedor(email);
+    setDialogEnviarEmail(true);
+  };
+
+  // ✅ Enviar pedido por email
+  const enviarPedido = async () => {
+    if (!pedidoParaEnvio || !emailFornecedor || !emailFornecedor.trim()) {
+      toast.error('Informe o email do fornecedor');
+      return;
+    }
+
+    // Validar email básico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailFornecedor.trim())) {
+      toast.error('Email inválido');
+      return;
+    }
+
+    setEnviandoEmail(true);
+    try {
+      if (ENVIRONMENT.isFigmaMake) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        toast.success(`Pedido enviado com sucesso para ${emailFornecedor}`);
+        setDialogEnviarEmail(false);
+      } else {
+        const response = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/enviar_pedido_email.php`, {
+          method: 'POST',
+          body: JSON.stringify({
+            seq_pedido: pedidoParaEnvio.seq_pedido,
+            email_fornecedor: emailFornecedor.trim()
+          })
+        });
+
+        if (response.success) {
+          setDialogEnviarEmail(false);
+          // Toast já é exibido pelo backend via msg()
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao enviar pedido:', error);
+      toast.error('Erro ao conectar com o servidor');
+    } finally {
+      setEnviandoEmail(false);
+    }
+  };
 
   const carregarOrdensCompraDisp = async () => {
     try {
@@ -505,15 +588,30 @@ export default function Pedidos() {
                           R$ {formatarValor(pedido.vlr_total)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/compras/pedidos/visualizar/${pedido.seq_pedido}`)}
-                            className="gap-2"
-                          >
-                            <Eye className="size-4" />
-                            Visualizar
-                          </Button>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/compras/pedidos/visualizar/${pedido.seq_pedido}`)}
+                              className="gap-2"
+                            >
+                              <Eye className="size-4" />
+                              Visualizar
+                            </Button>
+                            
+                            {/* ✅ BOTÃO ENVIAR PEDIDO (Disponível se aprovado ou entregue) */}
+                            {(pedido.status === 'P' || pedido.status === 'E') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => abrirDialogEnvio(pedido)}
+                                className="gap-2 border-blue-200 hover:border-blue-400 text-blue-600"
+                              >
+                                <Mail className="size-4" />
+                                Enviar
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -523,6 +621,71 @@ export default function Pedidos() {
             )}
           </CardContent>
         </Card>
+
+        {/* ✅ Dialog de Envio ao Fornecedor */}
+        <Dialog open={dialogEnviarEmail} onOpenChange={setDialogEnviarEmail}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="size-6 text-blue-600" />
+                Enviar Pedido ao Fornecedor
+              </DialogTitle>
+              <DialogDescription>
+                Confirme o email do fornecedor para enviar o pedido {pedidoParaEnvio?.nro_pedido_formatado} em PDF
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-fornecedor">Email do Fornecedor</Label>
+                <Input
+                  id="email-fornecedor"
+                  type="email"
+                  placeholder="fornecedor@empresa.com"
+                  value={emailFornecedor}
+                  onChange={(e) => setEmailFornecedor(e.target.value)}
+                  disabled={enviandoEmail}
+                />
+              </div>
+
+              <div className="text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-200 dark:border-blue-900">
+                <p className="flex items-start gap-2">
+                  <Info className="size-4 mt-0.5 flex-shrink-0" />
+                  <span>
+                    O pedido será enviado em PDF com todos os detalhes exibidos na impressão.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDialogEnviarEmail(false)}
+                disabled={enviandoEmail}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={enviarPedido}
+                disabled={enviandoEmail}
+                className="gap-2"
+              >
+                {enviandoEmail ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="size-4" />
+                    Enviar
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );
