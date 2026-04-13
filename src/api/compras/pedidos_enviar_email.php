@@ -249,25 +249,15 @@ function gerarPdfPedidoInterno($g_sql, $prefix, $seq_pedido, $dominio) {
     // Salvar HTML temporário
     file_put_contents($temp_html, $html);
     
-    // Verificar se wkhtmltopdf existe
-    $wkhtmltopdf_path = null;
-    $which_path = trim(shell_exec('which wkhtmltopdf 2>/dev/null'));
-    if (!empty($which_path) && file_exists($which_path)) {
-        $wkhtmltopdf_path = $which_path;
-    } elseif (file_exists('/usr/local/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/usr/local/bin/wkhtmltopdf';
-    } elseif (file_exists('/usr/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/usr/bin/wkhtmltopdf';
-    } elseif (file_exists('/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/bin/wkhtmltopdf';
-    } elseif (file_exists('/var/www/html/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/var/www/html/bin/wkhtmltopdf';
-    }
+    // ✅ USAR HELPER CENTRALIZADO PARA ENCONTRAR WKHTMLTOPDF
+    $wkhtmltopdf_path = getWkhtmltopdfPath();
     
     if (!$wkhtmltopdf_path) {
         @unlink($temp_html);
         return null;
     }
+    
+    error_log("✅ [PDF-PEDIDO-BATCH] wkhtmltopdf encontrado em: " . $wkhtmltopdf_path);
 
     // ✅ TENTAR DIRETÓRIO ALTERNATIVO SE /tmp NÃO FOR GRAVÁVEL
     $temp_dir = '/tmp';

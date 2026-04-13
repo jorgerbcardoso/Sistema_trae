@@ -44,6 +44,12 @@ define('PASSWORD_HASH_COST', 10);
 // ============================================
 date_default_timezone_set(API_TIMEZONE);
 
+// ============================================
+// CONFIGURAÇÃO WKHTMLTOPDF
+// ============================================
+// Se o wkhtmltopdf estiver em um caminho customizado, defina aqui:
+// define('WKHTMLTOPDF_CUSTOM_PATH', '/usr/bin/wkhtmltopdf');
+
 // Forçar log de erros, mas NÃO imprimir no output (para não quebrar JSON)
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
@@ -181,6 +187,57 @@ function hashPassword($password) {
  */
 function verifyPassword($password, $hash) {
     return password_verify($password, $hash);
+}
+
+/**
+ * Obter o caminho do executável wkhtmltopdf
+ * ✅ Centraliza a detecção para todos os módulos (compras, estoque, etc)
+ */
+function getWkhtmltopdfPath() {
+    // 1. Tentar caminho definido manualmente
+    if (defined('WKHTMLTOPDF_CUSTOM_PATH') && file_exists(WKHTMLTOPDF_CUSTOM_PATH)) {
+        return WKHTMLTOPDF_CUSTOM_PATH;
+    }
+
+    // 2. Tentar encontrar via 'which' (Linux)
+    $which_path = trim(@shell_exec('which wkhtmltopdf 2>/dev/null'));
+    if (!empty($which_path) && @file_exists($which_path)) {
+        return $which_path;
+    }
+
+    // 3. Caminhos comuns no Linux/Debian
+    $common_paths = [
+        '/usr/local/bin/wkhtmltopdf',
+        '/usr/bin/wkhtmltopdf',
+        '/bin/wkhtmltopdf',
+        '/usr/sbin/wkhtmltopdf',
+        '/sbin/wkhtmltopdf',
+        '/var/www/html/bin/wkhtmltopdf',
+        '/usr/local/bin/wkhtmltoimage', // Às vezes instalado junto
+    ];
+
+    foreach ($common_paths as $path) {
+        if (@file_exists($path)) {
+            error_log("🔍 [WKHTMLTOPDF] Encontrado em caminho comum: " . $path);
+            return $path;
+        }
+    }
+
+    // 4. Fallback: Se estiver no Windows (desenvolvimento)
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $win_paths = [
+            'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+            'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe',
+        ];
+        foreach ($win_paths as $path) {
+            if (@file_exists($path)) {
+                return $path;
+            }
+        }
+    }
+
+    error_log("❌ [WKHTMLTOPDF] NENHUM EXECUTÁVEL ENCONTRADO NO SERVIDOR!");
+    return null;
 }
 
 /**

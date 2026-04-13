@@ -340,13 +340,8 @@ function gerarPdfMapaInterno($g_sql, $prefix, $seq_orcamento, $dominio) {
     file_put_contents($temp_html, $html);
     error_log("📄 [PDF] HTML salvo em: " . $temp_html);
     
-    // Verificar se wkhtmltopdf existe
-    $wkhtmltopdf_path = null;
-    if (file_exists('/usr/local/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/usr/local/bin/wkhtmltopdf';
-    } elseif (file_exists('/usr/bin/wkhtmltopdf')) {
-        $wkhtmltopdf_path = '/usr/bin/wkhtmltopdf';
-    }
+    // ✅ USAR HELPER CENTRALIZADO PARA ENCONTRAR WKHTMLTOPDF
+    $wkhtmltopdf_path = getWkhtmltopdfPath();
     
     if (!$wkhtmltopdf_path) {
         error_log("❌ [PDF] wkhtmltopdf NÃO ENCONTRADO! Instale com: sudo apt-get install wkhtmltopdf");
