@@ -272,70 +272,80 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             </tr>';
     }
     
-    // ✅ HTML COMPLETO DO PDF (seguindo EXATAMENTE o padrão dos pedidos)
+    // ✅ REGRA: Inverter logos (Empresa na esquerda, Presto na direita)
+    // ✅ REGRA ACV: Para o domínio ACV, a logo da Presto não deve ser exibida.
+    $is_aceville = (strtoupper($dominio) === 'ACV');
+    
+    // Cabeçalho Texto: [nome da empresa] by PRESTO (exceto ACV)
+    $cabecalho_texto = $is_aceville ? 'SISTEMA DE ESTOQUE' : $nome_empresa . ' by PRESTO';
+
+    // Montar HTML do Cabeçalho baseado nas regras
+    $html_header = '
+    <table class="header">
+        <tr>
+            <td style="width: 50%;">
+                <table>
+                    <tr>
+                        <td>' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" class="logo" width="150" height="60">' : '') . '</td>
+                        <td class="header-info" style="padding-left: 15px;">
+                            <h1 style="font-size: 16pt; color: #2563eb; margin-bottom: 3px; text-transform: uppercase;">INVENTÁRIO DE ESTOQUE</h1>
+                            <p style="font-size: 10pt; color: #666;">' . $cabecalho_texto . '</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+            <td style="width: 50%; text-align: right;">
+                ' . (!$is_aceville && $logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" class="logo-presto" width="100" height="40">' : '') . '
+            </td>
+        </tr>
+    </table>';
+
+    // ✅ HTML COMPLETO DO PDF
     $html = '
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventário ' . $nroInventarioFormatado . '</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 10mm; 
             font-size: 10pt;
             line-height: 1.4;
             color: #1f2937;
-            padding: 20px;
+            background: #fff;
         }
-        
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            width: 100%;
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 3px solid #2563eb;
         }
-        
-        .header-left img {
-            max-width: 180px;
-            max-height: 60px;
+        .logo {
+            width: 150px;
+            height: 60px;
+            object-fit: contain;
         }
-        
-        .header-right {
-            text-align: right;
+        .logo-presto {
+            width: 100px;
+            height: 40px;
+            object-fit: contain;
         }
-        
-        .header-right img {
-            max-width: 120px;
-            max-height: 50px;
-            margin-bottom: 5px;
-        }
-        
         .title {
             text-align: center;
             margin: 20px 0;
         }
-        
         .title h1 {
             font-size: 18pt;
             color: #2563eb;
             margin-bottom: 5px;
         }
-        
         .title p {
             font-size: 14pt;
             font-weight: bold;
             color: #1f2937;
         }
-        
         .info-section {
             background-color: #f9fafb;
             border: 1px solid #e5e7eb;
@@ -343,7 +353,6 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             padding: 15px;
             margin-bottom: 20px;
         }
-        
         .info-section h2 {
             font-size: 12pt;
             color: #2563eb;
@@ -351,17 +360,13 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             border-bottom: 2px solid #2563eb;
             padding-bottom: 5px;
         }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
         }
-        
         .info-item {
             margin-bottom: 8px;
         }
-        
         .info-label {
             font-weight: 600;
             color: #6b7280;
@@ -369,19 +374,16 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             display: block;
             margin-bottom: 2px;
         }
-        
         .info-value {
             color: #1f2937;
             font-size: 10pt;
         }
-        
-        table {
+        table.itens-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
-        
-        th {
+        table.itens-table th {
             background-color: #2563eb;
             color: white;
             padding: 10px 8px;
@@ -391,28 +393,23 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             text-transform: uppercase;
             border: 1px solid #1e40af;
         }
-        
-        td {
+        table.itens-table td {
             padding: 8px;
             border: 1px solid #e5e7eb;
             font-size: 9pt;
         }
-        
         tbody tr:nth-child(even) {
             background-color: #f9fafb;
         }
-        
         .total-row {
             background-color: #dbeafe !important;
             font-weight: bold;
             font-size: 11pt;
         }
-        
         .total-row td {
             padding: 12px 8px;
             border: 2px solid #2563eb;
         }
-        
         .observacao {
             background-color: #fef3c7;
             border-left: 4px solid #f59e0b;
@@ -420,18 +417,15 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             margin-bottom: 20px;
             border-radius: 4px;
         }
-        
         .observacao h3 {
             font-size: 10pt;
             color: #92400e;
             margin-bottom: 5px;
         }
-        
         .observacao p {
             font-size: 9pt;
             color: #78350f;
         }
-        
         .footer {
             text-align: center;
             font-size: 8pt;
@@ -440,18 +434,15 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
             padding-top: 15px;
             border-top: 1px solid #e5e7eb;
         }
-        
         .signature-section {
             margin-top: 40px;
             text-align: center;
         }
-        
         .signature-line {
             border-top: 2px solid #1f2937;
             width: 300px;
             margin: 40px auto 10px;
         }
-        
         .signature-label {
             font-size: 10pt;
             color: #6b7280;
@@ -460,17 +451,7 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-left">' . 
-            ($logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" alt="Sistema Presto">' : '<h2>Sistema Presto</h2>') .
-        '</div>
-        <div class="header-right">' .
-            ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" alt="Logo Empresa">' : '') .
-            '<div style="font-size: 9pt; color: #6b7280;">
-                <div>' . $inventario['data_inclusao'] . ' - ' . $inventario['hora_inclusao'] . '</div>
-            </div>
-        </div>
-    </div>
+    ' . $html_header . '
     
     <div class="title">
         <h1>FICHA DE INVENTÁRIO</h1>
@@ -479,49 +460,69 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
     
     <div class="info-section">
         <h2>DADOS DO INVENTÁRIO</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Número</span>
-                <span class="info-value">' . $nroInventarioFormatado . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Status</span>
-                <span class="info-value" style="' . ($statusTexto === 'FINALIZADO' ? 'color: #059669; font-weight: bold;' : 'color: #d97706; font-weight: bold;') . '">' . $statusTexto . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Data de Criação</span>
-                <span class="info-value">' . htmlspecialchars($inventario['data_inclusao'] . ' ' . $inventario['hora_inclusao']) . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Empresa</span>
-                <span class="info-value">' . htmlspecialchars($nome_empresa) . '</span>
-            </div>
-        </div>
+        <table class="info-table">
+            <tr>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Número</span>
+                        <span class="info-value">' . $nroInventarioFormatado . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Status</span>
+                        <span class="info-value" style="' . ($statusTexto === 'FINALIZADO' ? 'color: #059669; font-weight: bold;' : 'color: #d97706; font-weight: bold;') . '">' . $statusTexto . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Data de Criação</span>
+                        <span class="info-value">' . htmlspecialchars($inventario['data_inclusao'] . ' ' . $inventario['hora_inclusao']) . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Empresa</span>
+                        <span class="info-value">' . htmlspecialchars($nome_empresa) . '</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
     
     <div class="info-section">
         <h2>DADOS DO ESTOQUE</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <span class="info-label">Estoque</span>
-                <span class="info-value">' . htmlspecialchars($nroEstoqueFormatado) . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Descrição</span>
-                <span class="info-value">' . htmlspecialchars($inventario['estoque_descricao']) . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Unidade</span>
-                <span class="info-value">' . htmlspecialchars($inventario['unidade']) . '</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Total de Posições</span>
-                <span class="info-value">' . count($posicoes) . '</span>
-            </div>
-        </div>
+        <table class="info-table">
+            <tr>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Estoque</span>
+                        <span class="info-value">' . htmlspecialchars($nroEstoqueFormatado) . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Descrição</span>
+                        <span class="info-value">' . htmlspecialchars($inventario['estoque_descricao']) . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Unidade</span>
+                        <span class="info-value">' . htmlspecialchars($inventario['unidade']) . '</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="info-item">
+                        <span class="info-label">Total de Posições</span>
+                        <span class="info-value">' . count($posicoes) . '</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
     
-    <table>
+    <table class="itens-table">
         <thead>
             <tr>
                 <th style="width: 60px; text-align: center;">RUA</th>

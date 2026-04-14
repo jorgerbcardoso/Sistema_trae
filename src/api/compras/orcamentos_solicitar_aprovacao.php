@@ -405,17 +405,45 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
     $hora_atual = date('H:i');
     
     // ✅ BUSCAR LOGO DO CLIENTE DA TABELA DOMAINS
-    $query_domain = "SELECT logo_light FROM domains WHERE domain = $1";
+    $query_domain = "SELECT name, logo_light FROM domains WHERE domain = $1";
     $result_domain = sql($g_sql, $query_domain, false, array(strtoupper($dominio)));
     $domain_data = pg_fetch_assoc($result_domain);
-    $logo_cliente_url = $domain_data['logo_light'] ?? null;
     
-    error_log("🔍 [PDF] Logo do cliente (domínio {$dominio}): " . ($logo_cliente_url ?? 'não encontrada'));
+    $nome_empresa = $domain_data['name'] ?? 'Transportadora';
+    $logo_cliente_url = $domain_data['logo_light'] ?? 'https://webpresto.com.br/images/logo_rel.png';
     
-    // ✅ CARREGAR IMAGENS E CONVERTER PARA BASE64 (para funcionar no PDF!)
+    // ✅ CARREGAR IMAGENS E CONVERTER PARA BASE64
     $logoPrestoBase64 = carregarImagemBase64('https://webpresto.com.br/images/logo_rel.png');
-    $logoClienteBase64 = $logo_cliente_url ? carregarImagemBase64($logo_cliente_url) : null;
+    $logoClienteBase64 = carregarImagemBase64($logo_cliente_url);
     
+    // ✅ REGRA: Inverter logos (Empresa na esquerda, Presto na direita)
+    // ✅ REGRA ACV: Para o domínio ACV, a logo da Presto não deve ser exibida.
+    $is_aceville = (strtoupper($dominio) === 'ACV');
+    
+    // Cabeçalho Texto: [nome da empresa] by PRESTO (exceto ACV)
+    $cabecalho_texto = $is_aceville ? 'MAPA DE COTAÇÃO' : $nome_empresa . ' by PRESTO';
+
+    // Montar HTML do Cabeçalho baseado nas regras
+    $html_header = '
+    <table class="header-table" style="width: 100%; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid #2563eb;">
+        <tr>
+            <td style="width: 50%;">
+                <table style="border-collapse: collapse;">
+                    <tr>
+                        <td>' . ($logoClienteBase64 ? '<img src="data:image/png;base64,' . $logoClienteBase64 . '" class="logo" width="150" height="60" style="width: 150px; height: 60px; object-fit: contain;">' : '') . '</td>
+                        <td style="padding-left: 15px;">
+                            <h1 style="font-size: 18pt; font-weight: bold; margin: 0; color: #1e40af; text-transform: uppercase;">MAPA DE COTAÇÃO</h1>
+                            <p style="font-size: 10pt; color: #6b7280; margin: 3px 0 0 0;">' . $cabecalho_texto . '</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+            <td style="width: 50%; text-align: right;">
+                ' . (!$is_aceville && $logoPrestoBase64 ? '<img src="data:image/png;base64,' . $logoPrestoBase64 . '" class="logo-presto" width="100" height="40" style="width: 100px; height: 40px; object-fit: contain;">' : '') . '
+            </td>
+        </tr>
+    </table>';
+
     // Calcular totais
     $totalEstoque = 0;
     $totalSelecionado = 0;
@@ -503,68 +531,36 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: Arial, sans-serif; 
-            padding: 15mm; 
+            padding: 10mm; 
             font-size: 11pt;
             color: #000;
-        }
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #2563eb;
-        }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            background: #fff;
         }
         .logo {
-            height: 50px;
+            width: 150px;
+            height: 60px;
+            object-fit: contain;
         }
-        .header-info h1 {
-            font-size: 18pt;
-            font-weight: bold;
-            margin: 0;
-            color: #1e40af;
+        .logo-presto {
+            width: 100px;
+            height: 40px;
+            object-fit: contain;
         }
-        .header-info p {
-            font-size: 9pt;
-            color: #6b7280;
-            margin: 3px 0 0 0;
-        }
-        .header-right img {
-            height: 45px;
-        }
-        .header-right {
-            min-width: 100px;
-        }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-bottom: 20px;
             padding: 10px;
             background-color: #f3f4f6;
             border-radius: 6px;
         }
-        .info-grid strong {
-            font-size: 8pt;
-            color: #6b7280;
-        }
-        .info-grid p {
-            font-size: 10pt;
-            font-weight: bold;
-            margin: 2px 0 0 0;
-        }
-        table {
+        table.itens-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 8pt;
             margin-bottom: 20px;
         }
-        th {
+        table.itens-table th {
             background-color: #2563eb;
             color: #fff;
             padding: 6px 4px;
@@ -579,20 +575,6 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
             border-radius: 6px;
             border: 2px solid #2563eb;
         }
-        .resumo-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 15px;
-            font-size: 9pt;
-        }
-        .resumo-grid strong {
-            color: #6b7280;
-        }
-        .resumo-grid p {
-            font-size: 12pt;
-            font-weight: bold;
-            margin: 3px 0 0 0;
-        }
         .footer {
             margin-top: 20px;
             padding-top: 10px;
@@ -601,42 +583,29 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
             color: #9ca3af;
             font-size: 7pt;
         }
-        @media print {
-            @page { size: landscape; margin: 10mm; }
-            body { padding: 10mm; }
-        }
     </style>
 </head>
 <body>
-    <div class=\"header\">
-        <div class=\"header-left\">
-            <img src=\"data:image/png;base64,{$logoPrestoBase64}\" alt=\"Sistema Presto\" class=\"logo\" />
-            <div class=\"header-info\">
-                <h1>MAPA DE COTAÇÃO</h1>
-                <p>Sistema PRESTO - Gestão de Transportadoras</p>
-            </div>
-        </div>
-        <div class=\"header-right\">
-            " . ($logoClienteBase64 ? "<img src=\"data:image/png;base64,{$logoClienteBase64}\" alt=\"Logo Empresa\" />" : "") . "
-        </div>
-    </div>
+    {$html_header}
 
-    <div class=\"info-grid\">
-        <div>
-            <strong>ORÇAMENTO:</strong>
-            <p>{$nro_orcamento_completo}</p>
-        </div>
-        <div>
-            <strong>STATUS:</strong>
-            <p>{$orcamento['status']}</p>
-        </div>
-        <div>
-            <strong>DATA:</strong>
-            <p>{$data_atual}</p>
-        </div>
-    </div>
+    <table class=\"info-table\">
+        <tr>
+            <td style=\"width: 33%;\">
+                <strong style=\"font-size: 8pt; color: #6b7280;\">ORÇAMENTO:</strong>
+                <p style=\"font-size: 10pt; font-weight: bold; margin: 2px 0 0 0;\">{$nro_orcamento_completo}</p>
+            </td>
+            <td style=\"width: 33%;\">
+                <strong style=\"font-size: 8pt; color: #6b7280;\">STATUS:</strong>
+                <p style=\"font-size: 10pt; font-weight: bold; margin: 2px 0 0 0;\">{$orcamento['status']}</p>
+            </td>
+            <td style=\"width: 33%;\">
+                <strong style=\"font-size: 8pt; color: #6b7280;\">DATA:</strong>
+                <p style=\"font-size: 10pt; font-weight: bold; margin: 2px 0 0 0;\">{$data_atual}</p>
+            </td>
+        </tr>
+    </table>
 
-    <table>
+    <table class=\"itens-table\">
         <thead>
             <tr>
                 <th style=\"text-align: left;\">Código</th>
@@ -647,6 +616,46 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
                 {$cabecalhosFornecedores}
             </tr>
         </thead>
+        <tbody>
+            {$tabelaHTML}
+        </tbody>
+        <tfoot>
+            <tr style=\"background-color: #e5e7eb; font-weight: bold;\">
+                <td colspan=\"4\" style=\"padding: 6px 4px; border: 1px solid #d1d5db; text-align: right;\">TOTAIS POR FORNECEDOR:</td>
+                <td style=\"padding: 6px 4px; border: 1px solid #d1d5db; text-align: right;\">R$ " . number_format($totalEstoque, 2, ',', '.') . "</td>
+                {$linhaTotais}
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class=\"resumo\">
+        <table style=\"width: 100%; border-collapse: collapse;\">
+            <tr>
+                <td style=\"width: 25%;\">
+                    <strong style=\"font-size: 9pt; color: #6b7280;\">TOTAL ESTIMADO:</strong>
+                    <p style=\"font-size: 12pt; font-weight: bold; margin: 3px 0 0 0;\">R$ " . number_format($totalEstoque, 2, ',', '.') . "</p>
+                </td>
+                <td style=\"width: 25%;\">
+                    <strong style=\"font-size: 9pt; color: #6b7280;\">TOTAL SELECIONADO:</strong>
+                    <p style=\"font-size: 12pt; font-weight: bold; margin: 3px 0 0 0; color: #059669;\">R$ " . number_format($totalSelecionado, 2, ',', '.') . "</p>
+                </td>
+                <td style=\"width: 25%;\">
+                    <strong style=\"font-size: 9pt; color: #6b7280;\">ECONOMIA:</strong>
+                    <p style=\"font-size: 12pt; font-weight: bold; margin: 3px 0 0 0; color: #2563eb;\">R$ " . number_format($economia, 2, ',', '.') . "</p>
+                </td>
+                <td style=\"width: 25%;\">
+                    <strong style=\"font-size: 9pt; color: #6b7280;\">PERCENTUAL:</strong>
+                    <p style=\"font-size: 12pt; font-weight: bold; margin: 3px 0 0 0; color: #2563eb;\">" . number_format($percentual, 1, ',', '.') . "%</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class=\"footer\">
+        <p>Sistema PRESTO - Gestão de Transportadoras | Gerado em " . date('d/m/Y H:i') . "</p>
+    </div>
+</body>
+</html>";
         <tbody>
             {$tabelaHTML}
         </tbody>

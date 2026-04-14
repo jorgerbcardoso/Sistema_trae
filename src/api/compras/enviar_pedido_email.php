@@ -380,6 +380,25 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
 
     // Montar HTML do Cabeçalho baseado nas regras
     $html_header = '
+    <table class="header">
+        <tr>
+            <td style="width: 50%;">
+                <table>
+                    <tr>
+                        <td>' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" class="logo" width="150" height="60">' : '') . '</td>
+                        <td class="header-info" style="padding-left: 15px;">
+                            <h1>PEDIDO DE COMPRA</h1>
+                            <p>' . $cabecalho_texto . '</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+            <td style="width: 50%; text-align: right;">
+                ' . (!$is_aceville && $logoPrestoBase64 ? '<img src="' . $logoPrestoBase64 . '" class="logo-presto" width="100" height="40">' : '') . '
+            </td>
+        </tr>
+    </table>';
+
     // Configuração de Status (Simplificada para o PDF)
     $status_label = 'AGUARDANDO APROVAÇÃO';
     $status_class = 'status-aguardando';
@@ -432,8 +451,14 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             border-bottom: 3px solid #2563eb;
         }
         .logo {
-            max-width: 120px;
-            max-height: 50px;
+            width: 150px;
+            height: 60px;
+            object-fit: contain;
+        }
+        .logo-presto {
+            width: 100px;
+            height: 40px;
+            object-fit: contain;
         }
         .header-info h1 {
             font-size: 16pt;
