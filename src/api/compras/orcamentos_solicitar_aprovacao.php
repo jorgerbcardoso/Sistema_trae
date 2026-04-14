@@ -430,7 +430,7 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
             <td style="width: 50%;">
                 <table style="border-collapse: collapse;">
                     <tr>
-                        <td>' . ($logoClienteBase64 ? '<img src="data:image/png;base64,' . $logoClienteBase64 . '" class="logo" width="150" height="60" style="width: 150px; height: 60px; object-fit: contain;">' : '') . '</td>
+                        <td>' . ($logoClienteBase64 ? '<img src="data:image/png;base64,' . $logoClienteBase64 . '" class="logo" width="100" height="40" style="width: 100px; height: 40px; object-fit: contain;">' : '') . '</td>
                         <td style="padding-left: 15px;">
                             <h1 style="font-size: 18pt; font-weight: bold; margin: 0; color: #1e40af; text-transform: uppercase;">MAPA DE COTAÇÃO</h1>
                             <p style="font-size: 10pt; color: #6b7280; margin: 3px 0 0 0;">' . $cabecalho_texto . '</p>
@@ -536,12 +536,7 @@ function gerarHtmlPdfInterno($orcamento, $fornecedores, $itens, $dominio) {
             color: #000;
             background: #fff;
         }
-        .logo {
-            width: 150px;
-            height: 60px;
-            object-fit: contain;
-        }
-        .logo-presto {
+        .logo, .logo-presto {
             width: 100px;
             height: 40px;
             object-fit: contain;

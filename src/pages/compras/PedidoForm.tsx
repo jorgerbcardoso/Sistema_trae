@@ -612,24 +612,7 @@ export default function PedidoForm() {
       return;
     }
 
-    // 🚨 CRÍTICO: Pegar logo do cliente da config e substituir no HTML
-    const logoCliente = clientConfig?.theme?.logo_light || '';
-    let htmlContent = printContent.innerHTML;
-    
-    // Substituir APENAS a imagem da logo do cliente (que tem alt="Logo Empresa")
-    htmlContent = htmlContent.replace(
-      /<img[^>]*alt="Logo Empresa"[^>]*>/gi,
-      `<img src="${logoCliente}" alt="Logo Empresa" />`
-    );
-    
-    // 🎨 REGRA: Se for ACV, substituir TAMBÉM a logo da Presto pela logo do cliente
-    const isAceville = user?.domain?.toUpperCase() === 'ACV';
-    if (isAceville) {
-      htmlContent = htmlContent.replace(
-        /<img[^>]*alt="Sistema Presto"[^>]*>/gi,
-        `<img src="${logoCliente}" alt="Sistema Presto" class="logo" />`
-      );
-    }
+    const htmlContent = printContent.innerHTML;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -640,9 +623,10 @@ export default function PedidoForm() {
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
               font-family: Arial, sans-serif; 
-              padding: 15mm; 
+              padding: 10mm; 
               font-size: 11pt;
               color: #000;
+              background: #fff;
             }
             .header {
               display: flex;
@@ -657,24 +641,20 @@ export default function PedidoForm() {
               align-items: center;
               gap: 15px;
             }
-            .logo {
-              width: 150px !important;
-              height: 60px !important;
-              max-width: 150px !important;
-              max-height: 60px !important;
-              object-fit: contain !important;
-            }
-            .logo-presto {
+            /* ✅ TAMANHO ÚNICO E PADRONIZADO PARA AMBAS AS LOGOS */
+            .logo, .logo-presto {
               width: 100px !important;
               height: 40px !important;
               max-width: 100px !important;
               max-height: 40px !important;
               object-fit: contain !important;
+              display: block !important;
             }
             .header-info h1 {
               font-size: 16pt;
               color: #2563eb;
               margin-bottom: 3px;
+              text-transform: uppercase;
             }
             .header-info p {
               font-size: 10pt;
@@ -697,9 +677,11 @@ export default function PedidoForm() {
               border-radius: 12px;
               font-size: 9pt;
               font-weight: bold;
+              text-transform: uppercase;
             }
             .section {
               margin-bottom: 20px;
+              width: 100%;
             }
             .section-title {
               font-size: 11pt;
@@ -767,12 +749,8 @@ export default function PedidoForm() {
             tr:nth-child(even) {
               background-color: #f9fafb;
             }
-            .text-right {
-              text-align: right;
-            }
-            .text-center {
-              text-align: center;
-            }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
             .total-section {
               margin-top: 15px;
               background: #eff6ff;
@@ -816,45 +794,32 @@ export default function PedidoForm() {
               border-radius: 12px;
               font-weight: bold;
               font-size: 9pt;
+              text-transform: uppercase;
             }
-            .status-aguardando {
-              background: #fef3c7;
-              color: #92400e;
-              border: 1px solid #fcd34d;
-            }
-            .status-aprovado {
-              background: #d1fae5;
-              color: #065f46;
-              border: 1px solid #6ee7b7;
-            }
-            .status-entregue {
-              background: #dbeafe;
-              color: #1e40af;
-              border: 1px solid #93c5fd;
-            }
-            .status-finalizado {
-              background: #d1fae5;
-              color: #065f46;
-              border: 1px solid #6ee7b7;
-            }
+            .status-aguardando { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+            .status-aprovado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+            .status-entregue { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+            .status-finalizado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+            
             @media print {
-              body { padding: 10mm; }
+              body { padding: 0; }
+              @page { margin: 10mm; }
             }
           </style>
         </head>
         <body>
           ${htmlContent}
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          </script>
         </body>
       </html>
     `);
 
     printWindow.document.close();
-    printWindow.focus();
-    
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
   };
 
   // ✅ NOVO: Abrir dialog para enviar pedido ao fornecedor

@@ -258,14 +258,9 @@ export default function RelatorioMovimentacao() {
             align-items: center;
             gap: 10px;
           }
-          .logo {
-            width: 150px !important;
+          .logo, .logo-presto {
+            width: 120px !important;
             height: 45px !important;
-            object-fit: contain !important;
-          }
-          .logo-presto {
-            width: 100px !important;
-            height: 35px !important;
             object-fit: contain !important;
           }
           .header-info h1 {

@@ -326,7 +326,21 @@ Para garantir a consistência entre a impressão no navegador (client-side) e a 
 - **Outros Domínios**:
   - O texto do cabeçalho deve ser `[nome da empresa] by PRESTO`, onde o nome da empresa vem da coluna `name` da tabela `domains`.
 
-### **2. Compatibilidade (wkhtmltopdf)**
+### **2. Dimensões das Logotipos**
+- **Padronização**: Ambas as logos (Empresa e Presto) devem ter o mesmo tamanho visual.
+- **Tamanho Padrão**: `120px` de largura por `45px` de altura.
+- **CSS Obrigatório**:
+```css
+.logo, .logo-presto {
+  width: 120px !important;
+  height: 45px !important;
+  max-width: 120px !important;
+  max-height: 45px !important;
+  object-fit: contain !important;
+}
+```
+
+### **3. Compatibilidade (wkhtmltopdf)**
 - **NÃO UTILIZAR**: `Flexbox` (`display: flex`) ou `Grid` (`display: grid`) no HTML destinado ao PDF do backend. O `wkhtmltopdf` tem suporte limitado a essas tecnologias.
 - **UTILIZAR**: Tabelas (`<table>`) para estruturar o layout (colunas, alinhamentos) e `floats` se necessário.
 - **Imagens**: Devem ser convertidas para `Base64` no backend para garantir que sejam renderizadas corretamente no PDF.

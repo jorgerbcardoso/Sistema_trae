@@ -384,7 +384,7 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             <td style="width: 50%;">
                 <table>
                     <tr>
-                        <td>' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" class="logo" width="150" height="60">' : '') . '</td>
+                        <td>' . ($logoClienteBase64 ? '<img src="' . $logoClienteBase64 . '" class="logo" width="100" height="40">' : '') . '</td>
                         <td class="header-info" style="padding-left: 15px;">
                             <h1>PEDIDO DE COMPRA</h1>
                             <p>' . $cabecalho_texto . '</p>
@@ -418,12 +418,7 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
             padding-bottom: 15px;
             border-bottom: 3px solid #2563eb;
         }
-        .logo {
-            width: 150px;
-            height: 60px;
-            object-fit: contain;
-        }
-        .logo-presto {
+        .logo, .logo-presto {
             width: 100px;
             height: 40px;
             object-fit: contain;
