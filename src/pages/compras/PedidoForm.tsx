@@ -658,14 +658,18 @@ export default function PedidoForm() {
               gap: 15px;
             }
             .logo {
-              width: 150px;
-              height: 60px;
-              object-fit: contain;
+              width: 150px !important;
+              height: 60px !important;
+              max-width: 150px !important;
+              max-height: 60px !important;
+              object-fit: contain !important;
             }
             .logo-presto {
-              width: 100px;
-              height: 40px;
-              object-fit: contain;
+              width: 100px !important;
+              height: 40px !important;
+              max-width: 100px !important;
+              max-height: 40px !important;
+              object-fit: contain !important;
             }
             .header-info h1 {
               font-size: 16pt;
@@ -1497,7 +1501,7 @@ export default function PedidoForm() {
             <div ref={printRef}>
               <div className="header">
                 <div className="header-left">
-                  <img src={clientLogo} alt="Logo Empresa" className="logo" width="150" height="60" />
+                  <img src={clientLogo} alt="Logo Empresa" className="logo" />
                   <div className="header-info">
                     <h1>PEDIDO DE COMPRA</h1>
                     <p>{user?.domain?.toUpperCase() === 'ACV' ? 'PEDIDO DE COMPRA' : `${clientConfig?.name || 'Transportadora'} by PRESTO`}</p>
@@ -1505,7 +1509,7 @@ export default function PedidoForm() {
                 </div>
                 <div className="header-right">
                   {user?.domain?.toUpperCase() !== 'ACV' && (
-                    <img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" className="logo-presto" width="100" height="40" />
+                    <img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" className="logo-presto" />
                   )}
                 </div>
               </div>

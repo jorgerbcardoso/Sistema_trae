@@ -211,6 +211,7 @@ export default function RelatorioMovimentacao() {
 
     // 🚨 CRÍTICO: Pegar logo do cliente da config
     const logoEmpresa = clientConfig?.theme?.logo_light || '';
+    const nomeEmpresa = clientConfig?.name || 'Transportadora';
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -222,11 +223,9 @@ export default function RelatorioMovimentacao() {
     const dataFim = filters.data_fim ? new Date(filters.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
     const tipoDescricao = obterDescricaoTipo(filters.tipo || 'TODOS');
 
-    // Obter domínio do usuário para logo do cliente
+    // Obter domínio do usuário para regras de logo
     const dominio = user?.domain?.toUpperCase() || 'PRESTO';
-    const logoUrl = dominio === 'ACV' 
-      ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png'
-      : 'https://webpresto.com.br/images/logo_rel.png';
+    const isAceville = dominio === 'ACV';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -260,9 +259,14 @@ export default function RelatorioMovimentacao() {
             gap: 10px;
           }
           .logo {
-            max-width: 150px;
-            max-height: 45px;
-            object-fit: contain;
+            width: 150px !important;
+            height: 45px !important;
+            object-fit: contain !important;
+          }
+          .logo-presto {
+            width: 100px !important;
+            height: 35px !important;
+            object-fit: contain !important;
           }
           .header-info h1 {
             font-size: 12pt;
@@ -275,13 +279,6 @@ export default function RelatorioMovimentacao() {
           }
           .header-right {
             text-align: right;
-          }
-          .header-right img {
-            max-width: 120px;
-            max-height: 40px;
-            display: block;
-            margin-left: auto;
-            object-fit: contain;
           }
           .filters-section {
             background: #f3f4f6;
@@ -439,19 +436,14 @@ export default function RelatorioMovimentacao() {
       <body>
         <div class="header">
           <div class="header-left">
-            <img src="${logoUrl}" alt="Logo Cliente" class="logo" />
+            <img src="${logoEmpresa}" alt="Logo Empresa" class="logo" />
             <div class="header-info">
               <h1>RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE</h1>
-              <p>Sistema de Gestão</p>
+              <p>${isAceville ? 'RELATÓRIO DE MOVIMENTAÇÃO' : `${nomeEmpresa} by PRESTO`}</p>
             </div>
           </div>
           <div class="header-right">
-            ${dominio !== 'ACV' ? `
-              <img 
-                src="https://webpresto.com.br/images/logo_rel.png" 
-                alt="Sistema Presto" 
-              />
-            ` : ''}
+            ${!isAceville ? `<img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" class="logo-presto" />` : ''}
           </div>
         </div>
 
