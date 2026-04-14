@@ -598,12 +598,87 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
         }
         .status-aguardando { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
         .status-aprovado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-        .status-entregue { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
-        .status-finalizado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
     </style>
 </head>
 <body>
     ' . $html_header . '
+    
+    <div class="section">
+        <div class="pedido-numero">' . $nro_pedido_formatado . '</div>
+        <span class="pedido-tipo">' . ($is_pedido_orcado ? 'VIA ORÇAMENTO' : 'MANUAL') . '</span>
+        <span class="status-badge ' . $status_class . '">' . $status_label . '</span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Informações do Pedido</div>
+        <table class="info-table">
+            <tr>
+                <td style="width: 33%;">
+                    <div class="info-label">Unidade</div>
+                    <div class="info-value">' . htmlspecialchars($pedido['unidade']) . '</div>
+                </td>
+                <td style="width: 33%;">
+                    <div class="info-label">Data de Inclusão</div>
+                    <div class="info-value">' . $data_pedido . ' às ' . $hora_pedido . '</div>
+                </td>
+                <td style="width: 33%;">
+                    <div class="info-label">Usuário</div>
+                    <div class="info-value">' . $usuario . '</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Fornecedor</div>
+        <div class="fornecedor-box">
+            <div class="fornecedor-nome">' . htmlspecialchars($pedido['fornecedor_nome']) . '</div>
+            <div class="fornecedor-info">
+                <strong>CNPJ:</strong> ' . htmlspecialchars($pedido['fornecedor_cnpj'] ?? 'N/A') . '
+                ' . ($pedido['fornecedor_telefone'] ? ' | <strong>Telefone:</strong> ' . htmlspecialchars($pedido['fornecedor_telefone']) : '') . '
+                ' . ($pedido['fornecedor_email'] ? ' | <strong>E-mail:</strong> ' . htmlspecialchars($pedido['fornecedor_email']) : '') . '
+                ' . ($pedido['fornecedor_cidade'] ? ' | <strong>Cidade:</strong> ' . htmlspecialchars($pedido['fornecedor_cidade']) : '') . '
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Itens do Pedido</div>
+        <table class="itens-table">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">Código</th>
+                    <th style="width: 38%;">Descrição</th>
+                    <th style="width: 8%; text-align: center;">Unid.</th>
+                    <th style="width: 12%; text-align: right;">Quantidade</th>
+                    <th style="width: 15%; text-align: right;">Vlr. Unit. (R$)</th>
+                    <th style="width: 15%; text-align: right;">Vlr. Total (R$)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ' . $html_itens . '
+            </tbody>
+        </table>
+    </div>
+
+    ' . ($pedido['observacao'] ? '
+    <div class="section">
+        <div class="section-title">Observações</div>
+        <div class="observacoes">' . nl2br(htmlspecialchars($pedido['observacao'])) . '</div>
+    </div>' : '') . '
+
+    <div class="total-section">
+        <span class="total-label">VALOR TOTAL DO PEDIDO</span>
+        <span class="total-value">R$ ' . number_format($total_geral, 2, ',', '.') . '</span>
+        <div style="clear: both;"></div>
+    </div>
+
+    <div class="footer">
+        <p>Sistema PRESTO - Gestão de Transportadoras | www.webpresto.com.br</p>
+        <p>Gerado em ' . date('d/m/Y') . ' às ' . date('H:i:s') . '</p>
+    </div>
+</body>
+</html>';
 
     return $html;
 }

@@ -21,7 +21,7 @@ export const DOMAIN_LOGOS: Record<string, DomainLogoConfig> = {
     domain: 'XXX',
     clientName: 'Sistema Presto',
     logoLight: 'https://webpresto.com.br/images/logo-verde-simples.png',
-    logoDark: 'https://sistema.webpresto.com.br/images/logo-branca-simples.png',
+    logoDark: 'https://sistema.webpresto.com.br/images/logo-branca.png',
     loginLogo: 'https://webpresto.com.br/images/logo-branca.png',
     favicon: 'https://webpresto.com.br/favicon.png', // ✅ CORRIGIDO: usar .png
     showSystemName: true,
@@ -33,7 +33,7 @@ export const DOMAIN_LOGOS: Record<string, DomainLogoConfig> = {
     domain: 'VCS',
     clientName: 'Viação Cruzeiro do Sul',
     logoLight: 'https://webpresto.com.br/images/logo-verde-simples.png',
-    logoDark: 'https://sistema.webpresto.com.br/images/logo-branca-simples.png',
+    logoDark: 'https://sistema.webpresto.com.br/images/logo-branca.png',
     loginLogo: 'https://webpresto.com.br/images/logo-branca.png',
     favicon: 'https://webpresto.com.br/favicon.png', // ✅ CORRIGIDO: usar .png
     showSystemName: true,
@@ -70,7 +70,7 @@ export function getLogoConfig(domain?: string): DomainLogoConfig {
       domain: domain,
       clientName: `Empresa ${domain}`,
       logoLight: 'https://webpresto.com.br/images/logo-verde-simples.png',
-      logoDark: 'https://sistema.webpresto.com.br/images/logo-branca-simples.png',
+      logoDark: 'https://sistema.webpresto.com.br/images/logo-branca.png',
       loginLogo: 'https://webpresto.com.br/images/logo-branca.png',
       favicon: 'https://webpresto.com.br/favicon.png', // ✅ CORRIGIDO: usar .png no fallback
       showSystemName: true,
