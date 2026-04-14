@@ -1469,7 +1469,7 @@ export default function PedidoForm() {
                   <img src={clientLogo} alt="Logo Empresa" className="logo" />
                   <div className="header-info">
                     <h1>PEDIDO DE COMPRA</h1>
-                    <p>{user?.domain?.toUpperCase() === 'ACV' ? 'PEDIDO DE COMPRA' : `${clientConfig?.name || 'Transportadora'} by PRESTO`}</p>
+                    <p>{user?.domain?.toUpperCase() === 'ACV' ? 'ACEVILLE TRANSPORTES' : `${clientConfig?.name || 'Transportadora'} by PRESTO`}</p>
                   </div>
                 </div>
                 <div className="header-right">
@@ -1566,7 +1566,7 @@ export default function PedidoForm() {
               </div>
 
               <div className="footer">
-                <p>Sistema PRESTO - Gestão de Transportadoras | www.webpresto.com.br</p>
+                <p>{user?.domain?.toUpperCase() === 'ACV' ? 'ACEVILLE TRANSPORTES' : `${clientConfig?.name || 'Transportadora'} by PRESTO`}</p>
                 <p>Impresso em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
               </div>
             </div>

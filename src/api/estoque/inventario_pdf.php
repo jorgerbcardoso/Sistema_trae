@@ -277,7 +277,7 @@ function gerarHtmlPdfInventario($inventario, $posicoes, $domain, $g_sql) {
     $is_aceville = (strtoupper($dominio) === 'ACV');
     
     // Cabeçalho Texto: [nome da empresa] by PRESTO (exceto ACV)
-    $cabecalho_texto = $is_aceville ? 'SISTEMA DE ESTOQUE' : $nome_empresa . ' by PRESTO';
+    $cabecalho_texto = $is_aceville ? $nome_empresa : $nome_empresa . ' by PRESTO';
 
     // Montar HTML do Cabeçalho baseado nas regras
     $html_header = '

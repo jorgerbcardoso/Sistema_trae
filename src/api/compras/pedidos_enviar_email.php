@@ -344,7 +344,7 @@ function gerarHtmlPdfPedido($pedido, $itens, $dominio, $g_sql) {
     $is_aceville = (strtoupper($dominio) === 'ACV');
     
     // Cabeçalho Texto: [nome da empresa] by PRESTO (exceto ACV)
-    $cabecalho_texto = $is_aceville ? 'PEDIDO DE COMPRA' : $nome_empresa . ' by PRESTO';
+    $cabecalho_texto = $is_aceville ? 'ACEVILLE TRANSPORTES' : $nome_empresa . ' by PRESTO';
 
     // Configuração de Status (Simplificada para o PDF)
     $status_label = 'AGUARDANDO APROVAÇÃO';
