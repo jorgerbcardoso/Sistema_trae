@@ -497,6 +497,12 @@ function getCurrentUser() {
     // ✅ SISTEMA SSW: Pegar username e domain de cookies/headers e buscar dados no banco
     global $usuario, $dominio, $unid;
     
+    // ✅ CACHE EM MEMÓRIA (Evita múltiplas consultas e erros de pg_prepare)
+    static $cachedUser = null;
+    if ($cachedUser !== null) {
+        return $cachedUser;
+    }
+    
     // Definir valores padrão se não existirem
     if (!isset($usuario)) $usuario = 'PRESTO';
     if (!isset($dominio)) $dominio = 'DMN';
@@ -524,40 +530,40 @@ function getCurrentUser() {
         $conn = getDBConnection();
         
         // Buscar usuário pelo username e domain
-        $stmt = pg_prepare($conn, "get_current_user", 
+        $stmtName = "get_current_user_" . md5($username . $domain); // Nome único para evitar erro de re-prepare
+        $stmt = @pg_prepare($conn, $stmtName, 
             "SELECT id, username, email, full_name, is_admin, domain, unidade, troca_unidade, nro_setor, unidades, aprova_orcamento
              FROM users 
              WHERE UPPER(username) = $1 AND UPPER(domain) = $2 AND is_active = true
              LIMIT 1");
         
-        if ($stmt) {
-            $result = pg_execute($conn, "get_current_user", [$username, $domain]);
+        $result = @pg_execute($conn, $stmtName, [$username, $domain]);
+        
+        if ($result && pg_num_rows($result) > 0) {
+            $userData = pg_fetch_assoc($result);
             
-            if ($result && pg_num_rows($result) > 0) {
-                $userData = pg_fetch_assoc($result);
-                
-                // Retornar dados REAIS do banco
-                $currentUser = [
-                    'id' => (int)$userData['id'],
-                    'user_id' => (int)$userData['id'],
-                    'username' => $userData['username'],
-                    'email' => $userData['email'],
-                    'full_name' => $userData['full_name'],
-                    'is_admin' => pgBoolToPHP($userData['is_admin']), // ✅ REAL do banco
-                    'domain' => $userData['domain'],
-                    'client_id' => 1,
-                    'client_name' => 'Cliente ' . $userData['domain'],
-                    'unidade' => $userData['unidade'] ?? $unidade,
-                    'troca_unidade' => pgBoolToPHP($userData['troca_unidade']),
-                    'aprova_orcamento' => pgBoolToPHP($userData['aprova_orcamento']), // ✅ ADICIONADO
-                    'nro_setor' => $userData['nro_setor'] ? (int)$userData['nro_setor'] : null,
-                    'unidades' => $userData['unidades'] ?? '',
-                    'unidade_atual' => $unidade // ✅ CRÍTICO: Usa header X-Unidade
-                ];
-                
-                closeDBConnection($conn);
-                return $currentUser;
-            }
+            // Retornar dados REAIS do banco
+            $currentUser = [
+                'id' => (int)$userData['id'],
+                'user_id' => (int)$userData['id'],
+                'username' => $userData['username'],
+                'email' => $userData['email'],
+                'full_name' => $userData['full_name'],
+                'is_admin' => pgBoolToPHP($userData['is_admin']), // ✅ REAL do banco
+                'domain' => $userData['domain'],
+                'client_id' => 1,
+                'client_name' => 'Cliente ' . $userData['domain'],
+                'unidade' => $userData['unidade'] ?? $unidade,
+                'troca_unidade' => pgBoolToPHP($userData['troca_unidade']),
+                'aprova_orcamento' => pgBoolToPHP($userData['aprova_orcamento']), // ✅ ADICIONADO
+                'nro_setor' => $userData['nro_setor'] ? (int)$userData['nro_setor'] : null,
+                'unidades' => $userData['unidades'] ?? '',
+                'unidade_atual' => $unidade // ✅ CRÍTICO: Usa header X-Unidade
+            ];
+            
+            closeDBConnection($conn);
+            $cachedUser = $currentUser;
+            return $currentUser;
         }
         
         closeDBConnection($conn);
@@ -569,7 +575,7 @@ function getCurrentUser() {
     // ============================================
     // ✅ FALLBACK: Se não encontrar no banco, retornar dados padrão
     // ============================================
-    return [
+    $fallbackUser = [
         'id' => 1,
         'user_id' => 1,
         'username' => $username,
@@ -583,6 +589,8 @@ function getCurrentUser() {
         'troca_unidade' => true,
         'unidade_atual' => $unidade
     ];
+    $cachedUser = $fallbackUser;
+    return $fallbackUser;
 }
 
 // ============================================

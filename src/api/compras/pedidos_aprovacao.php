@@ -136,11 +136,11 @@ try {
                 </p>
             ";
             
-            $emailService->enviarEmail(
+            $emailService->sendEmail(
                 $pedido['email_solicitante'],
+                $pedido['nome_solicitante'],
                 $assunto,
-                $corpo,
-                $pedido['nome_solicitante']
+                $corpo
             );
             $email_enviado = true;
         } catch (Exception $e) {
