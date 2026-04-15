@@ -1239,7 +1239,7 @@ export default function CadastroOrdensCompra() {
       } else {
         // ✅ Enviar para múltiplos aprovadores
         for (const aprovadorId of aprovadoresSelecionados) {
-          await apiFetch(
+          const response = await apiFetch(
             `${ENVIRONMENT.apiBaseUrl}/compras/pedidos_solicitar_aprovacao.php`,
             {
               method: 'POST',
@@ -1249,6 +1249,11 @@ export default function CadastroOrdensCompra() {
               })
             }
           );
+
+          if (!response.success) {
+            toast.error(response.message || 'Erro ao solicitar aprovação');
+            return; // Interromper se um falhar
+          }
         }
         
         toast.success(`Solicitação enviada para ${aprovadoresSelecionados.length} aprovador(es)!`);

@@ -283,7 +283,7 @@ export default function AprovacaoOrdensCompra() {
         
         toast.success('Ordem de compra aprovada com sucesso!');
       } else {
-        await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/aprovar_ordens_compra.php`, {
+        const response = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/aprovar_ordens_compra.php`, {
           method: 'PUT',
           body: JSON.stringify({
             seq_ordem_compra: ordemParaAprovar.seq_ordem_compra,
@@ -292,8 +292,14 @@ export default function AprovacaoOrdensCompra() {
           })
         });
         
-        toast.success('Ordem de compra aprovada com sucesso!');
-        await carregarOrdens();
+        if (response.success) {
+          toast.success(response.message || 'Ordem de compra aprovada com sucesso!');
+          await carregarOrdens();
+        } else {
+          toast.error(response.message || 'Erro ao aprovar ordem');
+          setProcessando(false);
+          return;
+        }
       }
 
       setMostrarModalAprovacao(false);
@@ -390,7 +396,7 @@ export default function AprovacaoOrdensCompra() {
         
         toast.success('Aprovação estornada com sucesso!');
       } else {
-        await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/aprovar_ordens_compra.php`, {
+        const response = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/aprovar_ordens_compra.php`, {
           method: 'PUT',
           body: JSON.stringify({
             seq_ordem_compra: ordem.seq_ordem_compra,
@@ -398,7 +404,12 @@ export default function AprovacaoOrdensCompra() {
           })
         });
         
-        await carregarOrdens();
+        if (response.success) {
+          toast.success(response.message || 'Aprovação estornada com sucesso!');
+          await carregarOrdens();
+        } else {
+          toast.error(response.message || 'Erro ao estornar aprovação');
+        }
       }
     } catch (error) {
       console.error('Erro ao estornar aprovação:', error);

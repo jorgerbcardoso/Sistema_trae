@@ -396,7 +396,7 @@ export default function PedidoForm() {
       } else {
         // ✅ Enviar para múltiplos aprovadores
         for (const aprovadorId of aprovadoresSelecionados) {
-          await apiFetch(
+          const response = await apiFetch(
             `${ENVIRONMENT.apiBaseUrl}/compras/pedidos_solicitar_aprovacao.php`,
             {
               method: 'POST',
@@ -406,6 +406,11 @@ export default function PedidoForm() {
               })
             }
           );
+
+          if (!response.success) {
+            toast.error(response.message || 'Erro ao solicitar aprovação');
+            return; // Interromper se falhar
+          }
         }
       }
 
@@ -441,7 +446,7 @@ export default function PedidoForm() {
         toast.success('Pedido aprovado!');
         navigate('/compras/pedidos');
       } else {
-        await apiFetch(
+        const response = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/compras/pedidos_aprovacao.php`,
           {
             method: 'POST',
@@ -451,8 +456,15 @@ export default function PedidoForm() {
           }
         );
 
-        // ✅ Redirecionar para lista de pedidos após aprovação
-        setTimeout(() => navigate('/compras/pedidos'), 500);
+        if (response.success) {
+          toast.success(response.message || 'Pedido aprovado com sucesso!');
+          // ✅ Redirecionar para lista de pedidos após aprovação
+          setTimeout(() => navigate('/compras/pedidos'), 500);
+        } else {
+          // Se success=false, apiFetch não mostra toast se não houver 'toast' no JSON
+          // O backend retorna message mas não o objeto toast.
+          toast.error(response.message || 'Erro ao aprovar pedido');
+        }
       }
     } catch (error) {
       console.error('Erro ao aprovar pedido:', error);
