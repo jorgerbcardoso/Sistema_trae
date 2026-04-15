@@ -34,7 +34,7 @@ $dominio = strtolower($currentUser['domain']);
 $prefix = $dominio . '_';
 
 // ✅ Verificar se usuário tem permissão de aprovação
-if ($currentUser['aprova_orcamento'] !== 't' && $currentUser['aprova_orcamento'] !== true) {
+if (!$currentUser['aprova_orcamento']) {
     http_response_code(403);
     echo json_encode([
         'success' => false,

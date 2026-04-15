@@ -143,7 +143,7 @@ function validarTokenPedido($g_sql, $prefix, $data, $username, $dominio) {
     }
     
     // ✅ VERIFICAR SE USUÁRIO TEM PERMISSÃO DE APROVAÇÃO
-    if ($aprovador['aprova_orcamento'] !== 't') {
+    if (!pgBoolToPHP($aprovador['aprova_orcamento'])) {
         http_response_code(403);
         echo json_encode([
             'success' => false,

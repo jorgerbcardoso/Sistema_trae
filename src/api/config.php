@@ -111,7 +111,8 @@ function pgBoolToPHP($value) {
     }
 
     if (is_string($value)) {
-        return $value === 't' || $value === 'true' || $value === '1';
+        $v = strtolower(trim($value));
+        return $v === 't' || $v === 'true' || $v === '1' || $v === 's' || $v === 'sim' || $v === 'y' || $v === 'yes';
     }
 
     return (bool)$value;
@@ -524,7 +525,7 @@ function getCurrentUser() {
         
         // Buscar usuário pelo username e domain
         $stmt = pg_prepare($conn, "get_current_user", 
-            "SELECT id, username, email, full_name, is_admin, domain, unidade, troca_unidade, nro_setor, unidades
+            "SELECT id, username, email, full_name, is_admin, domain, unidade, troca_unidade, nro_setor, unidades, aprova_orcamento
              FROM users 
              WHERE UPPER(username) = $1 AND UPPER(domain) = $2 AND is_active = true
              LIMIT 1");
@@ -548,6 +549,7 @@ function getCurrentUser() {
                     'client_name' => 'Cliente ' . $userData['domain'],
                     'unidade' => $userData['unidade'] ?? $unidade,
                     'troca_unidade' => pgBoolToPHP($userData['troca_unidade']),
+                    'aprova_orcamento' => pgBoolToPHP($userData['aprova_orcamento']), // ✅ ADICIONADO
                     'nro_setor' => $userData['nro_setor'] ? (int)$userData['nro_setor'] : null,
                     'unidades' => $userData['unidades'] ?? '',
                     'unidade_atual' => $unidade // ✅ CRÍTICO: Usa header X-Unidade

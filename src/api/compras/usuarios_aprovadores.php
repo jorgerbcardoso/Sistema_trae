@@ -40,6 +40,7 @@ function listarUsuariosAprovadores($g_sql, $dominio) {
     $currentUsername = strtolower($currentUser['username']);
     
     // Buscar usuários com aprova_orcamento = true e is_active = true
+    // ✅ Suporta tanto boolean quanto char(1) 'S'/'T'
     $query = "SELECT 
                 id,
                 username,
@@ -47,7 +48,7 @@ function listarUsuariosAprovadores($g_sql, $dominio) {
                 email
               FROM users
               WHERE domain = $1 
-              AND aprova_orcamento = true 
+              AND (aprova_orcamento = true OR aprova_orcamento::text IN ('t', 'S', 'T'))
               AND is_active = true
               ORDER BY full_name";
     

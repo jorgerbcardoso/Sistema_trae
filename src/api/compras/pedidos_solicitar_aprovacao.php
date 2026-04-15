@@ -102,7 +102,7 @@ function solicitarAprovacaoPedido($g_sql, $prefix, $data, $username, $dominio) {
     $aprovador = pg_fetch_assoc($result_aprovador);
     
     // Verificar se usuário tem permissão de aprovação
-    if ($aprovador['aprova_orcamento'] !== 't') {
+    if (!pgBoolToPHP($aprovador['aprova_orcamento'])) {
         http_response_code(400);
         echo json_encode([
             'success' => false,
