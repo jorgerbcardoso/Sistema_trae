@@ -602,12 +602,9 @@ try {
                 exit;
             }
             
-            // Se está finalizando, adicionar campos de finalização
+            // Se está finalizando, manter apenas o status (outras colunas podem não existir)
             if (isset($input['status']) && $input['status'] === 'ENTREGUE') {
-                $fields[] = "data_fin = CURRENT_DATE";
-                $fields[] = "hora_fin = CURRENT_TIME";
-                $fields[] = "login_fin = $" . $paramCount++;
-                $params[] = $login;
+                // Não adicionar campos extras como data_fin, login_fin, etc.
             }
             
             $params[] = $seqPedido;

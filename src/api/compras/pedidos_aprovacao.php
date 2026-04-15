@@ -97,18 +97,14 @@ try {
         throw new Exception("Pedido não pode ser aprovado. Status atual: $status_atual");
     }
     
-    // ✅ 3. Aprovar pedido (atualizar status para 'P' - APROVADO)
+    // ✅ 3. Aprovar pedido (atualizar APENAS o status para 'P' - APROVADO)
     $query_aprovar = "
         UPDATE {$tabela_pedido} 
-        SET 
-            status = 'P',
-            login_aprovacao = $1,
-            data_aprovacao = CURRENT_DATE,
-            hora_aprovacao = TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI')
-        WHERE seq_pedido = $2 
+        SET status = 'P'
+        WHERE seq_pedido = $1 
     ";
     
-    sql($g_sql, $query_aprovar, false, array($usuario_aprovador, $seq_pedido));
+    sql($g_sql, $query_aprovar, false, array($seq_pedido));
     
     // ✅ 4. Enviar email para o solicitante (opcional)
     $email_enviado = false;
