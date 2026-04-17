@@ -75,7 +75,7 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
                 alt={isACV ? "Aceville" : "Presto Tecnologia"} 
                 className={`h-4 object-contain ${!isACV ? 'brightness-0 dark:brightness-100' : ''}`}
               />
-              <span className="text-xs font-semibold text-slate-500">{user?.clientName || 'Cliente'}</span>
+              <span className="text-xs font-semibold text-slate-500">{user?.client_name || user?.clientName || 'Cliente'}</span>
             </div>
           </div>
         </div>
@@ -118,7 +118,7 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
           )}
 
           <footer className="pt-8 text-center text-sm text-muted-foreground border-t">
-            <p>© {new Date().getFullYear()} {user?.clientName || 'Cliente'} - Todos os direitos reservados</p>
+            <p>© {new Date().getFullYear()} {user?.client_name || user?.clientName || 'Cliente'} - Todos os direitos reservados</p>
             {!isACV && <p>Desenvolvido por Presto Tecnologia</p>}
           </footer>
         </div>
