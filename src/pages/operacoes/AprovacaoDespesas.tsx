@@ -939,23 +939,26 @@ export default function AprovacaoDespesas() {
                               {formatarNroLancamento(despesa.unidade, despesa.lancamento)}
                             </span>
                             {despesa.aprovada ? (
-                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200">
-                                <CheckCircle2 className="h-3 w-3 mr-1" /> 
-                                APROVADA
+                              <div className="flex flex-col gap-1">
+                                <Badge className="bg-green-600 text-white border-none shadow-sm w-fit">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" /> 
+                                  APROVADA
+                                </Badge>
                                 {despesa.login_aprovacao_presto && despesa.data_aprovacao_presto && (
-                                  <span className="ml-1 opacity-80 text-[10px]">
-                                    ({despesa.login_aprovacao_presto} {formatarDataBR(despesa.data_aprovacao_presto).substring(0, 8)} {despesa.hora_aprovacao_presto?.substring(0, 5)})
-                                  </span>
+                                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md border border-green-100 dark:border-green-800">
+                                    <span className="uppercase">{despesa.login_aprovacao_presto}</span>
+                                    <span className="opacity-40">•</span>
+                                    <span>{formatarDataBR(despesa.data_aprovacao_presto).substring(0, 8)}</span>
+                                    <span className="opacity-40">•</span>
+                                    <span>{despesa.hora_aprovacao_presto?.substring(0, 5)}</span>
+                                  </div>
                                 )}
-                              </Badge>
+                              </div>
                             ) : (
                               <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200">
                                 <Clock className="h-3 w-3 mr-1" /> PENDENTE
                               </Badge>
                             )}
-                            <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-400">
-                              UNID: {despesa.unidade}
-                            </span>
                           </div>
 
                           <div>
@@ -977,7 +980,7 @@ export default function AprovacaoDespesas() {
                         </div>
 
                         {/* COLUNA CENTRAL: DATAS E INFO */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 py-3 md:py-0 border-y md:border-y-0 md:border-x border-slate-100 dark:border-slate-800 md:px-6">
+                        <div className="grid grid-cols-2 md:grid-cols-2 gap-x-6 gap-y-3 py-3 md:py-0 border-y md:border-y-0 md:border-x border-slate-100 dark:border-slate-800 md:px-6">
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Vencimento</p>
                             <p className="text-xs font-semibold">{formatarDataBR(despesa.data_vencimento)}</p>
@@ -998,33 +1001,15 @@ export default function AprovacaoDespesas() {
                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Competência</p>
                             <p className="text-xs font-semibold">{despesa.competencia}</p>
                           </div>
-                          <div>
-                            <p className="text-[10px] text-muted-foreground uppercase font-bold">NF/Boleto</p>
-                            <p className="text-xs font-semibold truncate max-w-[80px]" title={despesa.boleto || despesa.nf}>
-                              {despesa.boleto || despesa.nf || '-'}
-                            </p>
-                          </div>
                         </div>
 
-                        {/* COLUNA DIREITA: VALORES E BI */}
-                        <div className="md:text-right space-y-3 min-w-[180px]">
+                        {/* COLUNA DIREITA: VALORES */}
+                        <div className="md:text-right space-y-3 min-w-[180px] flex flex-col justify-center">
                           <div>
                             <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Valor Total</p>
-                            <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            <p className="text-3xl font-black text-slate-900 dark:text-white">
                               {formatarValorBR(despesa.valor_final)}
                             </p>
-                          </div>
-
-                          <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg space-y-1">
-                            <p className="text-[10px] text-blue-700 dark:text-blue-400 uppercase font-bold text-center border-b border-blue-100 dark:border-blue-800 pb-1 mb-1">BI Orçamentário</p>
-                            <div className="flex justify-between text-[10px]">
-                              <span className="text-muted-foreground">Orçado:</span>
-                              <span className="font-bold">{formatarValorBR(despesa.orcamento)}</span>
-                            </div>
-                            <div className="flex justify-between text-[10px]">
-                              <span className="text-muted-foreground">Saldo:</span>
-                              <span className={`font-bold ${despesa.saldo < 0 ? 'text-red-500' : 'text-green-600'}`}>{formatarValorBR(despesa.saldo)}</span>
-                            </div>
                           </div>
                         </div>
                       </div>
