@@ -134,8 +134,42 @@ function listarDespesas($userData) {
         // Chamar SSW1196
         $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
         
+        // ✅ SALVAR HTML PARA USO NA APROVAÇÃO (EXTRAIR NRO_LANCTO)
+        $_SESSION['ssw_last_listar_html'] = $html;
+        
         // Parsear XML do retorno
         $despesas = parsearXMLDespesas($html);
+        
+        // ✅ BUSCAR DADOS DE APROVAÇÃO DO BANCO PRESTO
+        $domain = strtolower($userData['domain']);
+        $tabela_despesa = $domain . '_despesa';
+        
+        $nros_lancto = [];
+        foreach ($despesas as $d) {
+            $nro = explode('-', $d['lancamento'])[0];
+            if ($nro) $nros_lancto[] = intval($nro);
+        }
+        
+        if (!empty($nros_lancto)) {
+            $list = implode(',', $nros_lancto);
+            $query_banco = "SELECT nro_lancto, data_aprovacao, hora_aprovacao, login_aprovacao FROM {$tabela_despesa} WHERE nro_lancto IN ({$list})";
+            $res_banco = sql($g_sql, $query_banco);
+            
+            $dados_aprovacao = [];
+            while ($row = pg_fetch_assoc($res_banco)) {
+                $dados_aprovacao[$row['nro_lancto']] = $row;
+            }
+            
+            // Mesclar dados
+            foreach ($despesas as &$d) {
+                $nro = explode('-', $d['lancamento'])[0];
+                if (isset($dados_aprovacao[$nro])) {
+                    $d['data_aprovacao_presto'] = $dados_aprovacao[$nro]['data_aprovacao'];
+                    $d['hora_aprovacao_presto'] = $dados_aprovacao[$nro]['hora_aprovacao'];
+                    $d['login_aprovacao_presto'] = $dados_aprovacao[$nro]['login_aprovacao'];
+                }
+            }
+        }
         
         // Retornar JSON
         echo json_encode([
@@ -233,9 +267,49 @@ function aprovarDespesas($userData, $g_sql) {
             return;
         }
         
+        // ✅ ATUALIZAR TABELA [DOMINIO]_DESPESA COM DADOS DA APROVAÇÃO
+        $domain = strtolower($userData['domain']);
+        $tabela_despesa = $domain . '_despesa';
+        $username = $userData['username'];
+        
+        // Obter número do lançamento de cada seq_parcela (precisamos re-parsear ou buscar no banco)
+        // Como o frontend enviou apenas os seq_parcelas (IDs internos do SSW), 
+        // a forma mais segura é buscar os números de lançamento no SSW novamente ou confiar que o banco já tem.
+        // Mas o prompt diz: "para encontrar os registros... deve-se pegar o NÚMERO DO LANÇAMENTO que é exibido na lista SEM A UNIDADE"
+        // Isso implica que o backend sabe quais lançamentos estão sendo aprovados.
+        
+        // Vamos buscar os números de lançamento dos seqs que foram aprovados
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $last_html = $_SESSION['ssw_last_listar_html'] ?? '';
+        $lancamentos_para_atualizar = [];
+        
+        if (!empty($last_html)) {
+            $todas_despesas = parsearXMLDespesas($last_html);
+            foreach ($todas_despesas as $d) {
+                if (in_array($d['seq_lancamento'], $seq_parcelas)) {
+                    // Pegar apenas a parte numérica do lançamento (ex: 141113-30 -> 141113)
+                    $nro_lancto_clean = explode('-', $d['lancamento'])[0];
+                    $lancamentos_para_atualizar[] = $nro_lancto_clean;
+                }
+            }
+        }
+        
+        // Atualizar no banco de dados
+        if (!empty($lancamentos_para_atualizar)) {
+            $lancamentos_list = implode(',', array_map('intval', $lancamentos_para_atualizar));
+            $query_update = "
+                UPDATE {$tabela_despesa}
+                SET data_aprovacao = CURRENT_DATE,
+                    hora_aprovacao = CURRENT_TIME,
+                    login_aprovacao = $1
+                WHERE nro_lancto IN ({$lancamentos_list})
+            ";
+            sql($g_sql, $query_update, false, array($username));
+        }
+        
         respondJson([
             'success' => true,
-            'message' => 'Aprovação em massa enviada com sucesso ao SSW'
+            'message' => 'Aprovação em massa enviada com sucesso ao SSW e gravada no banco Presto'
         ]);
         
     } catch (Exception $e) {

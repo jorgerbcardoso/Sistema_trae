@@ -97,6 +97,9 @@ interface Despesa {
   valor_final: number;
   repasse: string;
   aprovada?: boolean;
+  data_aprovacao_presto?: string;
+  hora_aprovacao_presto?: string;
+  login_aprovacao_presto?: string;
 }
 
 // ✅ FORMATAR NRO_LANCTO NO PADRÃO AAA000000
@@ -937,7 +940,13 @@ export default function AprovacaoDespesas() {
                             </span>
                             {despesa.aprovada ? (
                               <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200">
-                                <CheckCircle2 className="h-3 w-3 mr-1" /> APROVADA
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> 
+                                APROVADA
+                                {despesa.login_aprovacao_presto && despesa.data_aprovacao_presto && (
+                                  <span className="ml-1 opacity-80 text-[10px]">
+                                    ({despesa.login_aprovacao_presto} {formatarDataBR(despesa.data_aprovacao_presto).substring(0, 8)} {despesa.hora_aprovacao_presto?.substring(0, 5)})
+                                  </span>
+                                )}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200">
