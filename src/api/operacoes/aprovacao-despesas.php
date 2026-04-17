@@ -53,7 +53,7 @@ try {
     
     switch ($act) {
         case 'LISTAR':
-            listarDespesas($userData);
+            listarDespesas($userData, $g_sql);
             break;
             
         case 'TOGGLE_INDIVIDUAL':
@@ -93,7 +93,7 @@ try {
 // ================================================================
 // FUNÇÃO: LISTAR DESPESAS
 // ================================================================
-function listarDespesas($userData) {
+function listarDespesas($userData, $g_sql) {
     try {
         // Parâmetros do filtro
         $periodo_inicio = $_GET['periodo_inicio'] ?? '';
@@ -156,8 +156,10 @@ function listarDespesas($userData) {
             $res_banco = sql($g_sql, $query_banco);
             
             $dados_aprovacao = [];
-            while ($row = pg_fetch_assoc($res_banco)) {
-                $dados_aprovacao[$row['nro_lancto']] = $row;
+            if ($res_banco) {
+                while ($row = pg_fetch_assoc($res_banco)) {
+                    $dados_aprovacao[$row['nro_lancto']] = $row;
+                }
             }
             
             // Mesclar dados
