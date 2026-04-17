@@ -522,10 +522,17 @@ function parsearXMLDespesas($html) {
             // Extrair seq_parcela do campo f22
             $seq_lancamento = (string)$r->f22;
             
-            // Extrair número do lançamento do f0 (remover HTML)
+            // Extrair número do lançamento do f0 (remover HTML e sufixos)
             $f0_raw = (string)$r->f0;
-            preg_match('/(\d{6}-\d{2})/', $f0_raw, $lancamento_match);
-            $lancamento = isset($lancamento_match[1]) ? $lancamento_match[1] : '';
+            // O formato pode vir como 90648-09 dentro de tags <u> e <a>
+            // Capturamos apenas a parte numérica antes do traço
+            if (preg_match('/(\d+)-\d+/', $f0_raw, $lancamento_match)) {
+                $lancamento = $lancamento_match[1];
+            } else {
+                // Fallback: tentar pegar qualquer número de pelo menos 5 dígitos (ex: MTZ169292 -> 169292)
+                preg_match('/(\d{5,})/', $f0_raw, $lancamento_match);
+                $lancamento = isset($lancamento_match[1]) ? $lancamento_match[1] : '';
+            }
             
             // Converter data de DD/MM/AA para YYYY-MM-DD
             $data_inclusao = converterDataDeSSW((string)$r->f2);

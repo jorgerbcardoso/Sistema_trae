@@ -69,7 +69,7 @@ import {
 // ✅ TIPO DA DESPESA
 interface Despesa {
   seq_lancamento: number;
-  lancamento?: string; // ✅ Formato: 130068-21
+  lancamento?: string; // ✅ Apenas o número ou formato "130068-21"
   data: string;
   tipo_lancamento: string;
   evento: string;
