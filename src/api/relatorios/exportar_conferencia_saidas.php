@@ -92,7 +92,8 @@ try {
                     if ($dominioUpper !== 'XXX') {
                         $logoUrl = ''; // Não exibir se for apenas a logo do sistema
                     } else {
-                        $logoUrl = $logo_light;
+                        // Domínio XXX (Presto) pode exibir a logo no Excel
+                        $logoUrl = 'https://webpresto.com.br/images/logo_rel.png';
                     }
                 } else {
                     // Garantir URL absoluta (seguindo padrão do EmailService.php)
@@ -120,33 +121,35 @@ try {
     // 🖼️ INSERIR LOGO
     $logoAdicionada = false;
     
-    try {
-        $logoContent = @file_get_contents($logoUrl);
-        
-        if ($logoContent !== false) {
-            $tempLogoPath = sys_get_temp_dir() . '/logo_' . uniqid() . '.png';
-            file_put_contents($tempLogoPath, $logoContent);
+    if (!empty($logoUrl)) {
+        try {
+            $logoContent = @file_get_contents($logoUrl);
             
-            $drawing = new Drawing();
-            $drawing->setName('Logo');
-            $drawing->setDescription('Logo do Cliente');
-            $drawing->setPath($tempLogoPath);
-            $drawing->setCoordinates('A1');
-            $drawing->setHeight(60);
-            $drawing->setOffsetX(10);
-            $drawing->setOffsetY(10);
-            $drawing->setWorksheet($sheet);
-            
-            $logoAdicionada = true;
-            
-            register_shutdown_function(function() use ($tempLogoPath) {
-                if (file_exists($tempLogoPath)) {
-                    @unlink($tempLogoPath);
-                }
-            });
+            if ($logoContent !== false) {
+                $tempLogoPath = sys_get_temp_dir() . '/logo_' . uniqid() . '.png';
+                file_put_contents($tempLogoPath, $logoContent);
+                
+                $drawing = new Drawing();
+                $drawing->setName('Logo');
+                $drawing->setDescription('Logo do Cliente');
+                $drawing->setPath($tempLogoPath);
+                $drawing->setCoordinates('A1');
+                $drawing->setHeight(60);
+                $drawing->setOffsetX(10);
+                $drawing->setOffsetY(10);
+                $drawing->setWorksheet($sheet);
+                
+                $logoAdicionada = true;
+                
+                register_shutdown_function(function() use ($tempLogoPath) {
+                    if (file_exists($tempLogoPath)) {
+                        @unlink($tempLogoPath);
+                    }
+                });
+            }
+        } catch (Exception $e) {
+            // Ignorar erros de logo
         }
-    } catch (Exception $e) {
-        // Ignorar erros de logo
     }
     
     // 📋 CABEÇALHO
