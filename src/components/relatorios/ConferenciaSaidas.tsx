@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
-import { getLogoUrl } from '../../config/clientLogos';
+import { getLogoUrl, getCompanyLogoUrl } from '../../config/clientLogos';
 import { useTheme } from '../ThemeProvider';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Button } from '../ui/button';
@@ -279,8 +279,8 @@ export function ConferenciaSaidas() {
     const dominio = user?.domain?.toUpperCase() || 'PRESTO';
     const isACV = (dominio === 'ACV');
     
-    // Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts > Presto
-    const logoEmpresa = getLogoUrl(dominio, 'light', clientConfig);
+    // Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts (SEM fallback Presto)
+    const logoEmpresa = getCompanyLogoUrl(dominio, clientConfig);
     
     // Logo Direita (Sistema): Sempre Presto, EXCETO para ACV
     const logoPresto = 'https://webpresto.com.br/images/logo_rel.png';

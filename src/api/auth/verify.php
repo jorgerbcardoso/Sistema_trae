@@ -42,7 +42,7 @@ try {
         $stmt = pg_prepare($conn, "verify_token",
             "SELECT s.user_id, s.domain, s.expires_at, s.last_activity,
                     u.username, u.email, u.full_name, u.is_admin, u.unidade, u.troca_unidade, u.nro_setor, u.unidades,
-                    d.id as domain_id, d.name as domain_name, d.modalidade, d.controla_linhas, d.favicon_url
+                    d.id as domain_id, d.name as domain_name, d.modalidade, d.controla_linhas, d.favicon_url, d.logo_light, d.logo_dark
              FROM sessions s
              INNER JOIN users u ON s.user_id = u.id
              INNER JOIN domains d ON s.domain = d.domain
@@ -106,7 +106,11 @@ try {
             'client_config' => [
                 'modalidade' => $data['modalidade'] ?? 'CARGAS',
                 'controla_linhas' => pgBoolToPHP($data['controla_linhas'] ?? false),
-                'favicon_url' => $data['favicon_url'] ?? ''  // ✨ NOVO: Favicon do cliente do banco
+                'favicon_url' => $data['favicon_url'] ?? '',
+                'theme' => [
+                    'logo_light' => $data['logo_light'] ?? '',
+                    'logo_dark' => $data['logo_dark'] ?? ''
+                ]
             ]
         ]);
         

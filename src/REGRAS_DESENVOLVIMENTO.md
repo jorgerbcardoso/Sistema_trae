@@ -105,15 +105,17 @@
 - ✅ URL ABSOLUTA: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão ou exportações Excel.
 - ✅ LÓGICA DE POSICIONAMENTO (PDF/HTML):
   - LADO ESQUERDO (Logo Empresa/Cliente):
-    - PRIORIDADE: `logo_light` do banco de dados > Logo específica do domínio em `DOMAIN_LOGOS` > Logo Presto (`https://webpresto.com.br/images/logo_rel.png`).
+    - Deve exibir EXCLUSIVAMENTE a logo da empresa.
+    - PRIORIDADE: `logo_light` do banco de dados (apenas se for diferente da logo Presto) > Logo customizada em `DOMAIN_LOGOS`.
+    - ⚠️ **ATENÇÃO**: Se o domínio não possuir logo própria cadastrada (ou se a logo cadastrada for a da Presto), o lado esquerdo deve ficar **VAZIO** ou exibir apenas o nome da empresa em texto. Nunca exibir a logo Presto na esquerda se ela já estiver na direita.
   - LADO DIREITO (Logo Sistema):
     - Se domain === 'ACV': **NÃO EXIBIR** a logo do sistema (Presto).
     - Demais domínios: Exibir logo Presto (`https://webpresto.com.br/images/logo_rel.png`).
 - ✅ LÓGICA PARA EXCEL:
   - Usar sempre a Logo da Empresa (mesma prioridade do LADO ESQUERDO acima).
-  - A logo da Presto (sistema) geralmente não é incluída no Excel para manter a planilha limpa, a menos que o domínio seja XXX.
+  - Nunca exibir a logo Presto (sistema) no Excel, exceto para o domínio XXX.
 - ✅ REGRA CRÍTICA PARA ACV: A logo da Presto não deve aparecer em NENHUM lugar (nem esquerda, nem direita) nos relatórios do domínio ACV.
-- ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"**.
+- ✅ CABEÇALHO: O texto abaixo do título do documento deve ser sempre "Sistema de Gestão".
 - ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
 - ✅ **ESPERA DE CARREGAMENTO (PDF)**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.
 

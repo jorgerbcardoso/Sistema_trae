@@ -25,6 +25,7 @@ import {
   Eye
 } from 'lucide-react';
 import { ENVIRONMENT } from '../../config/environment';
+import { getLogoUrl, getCompanyLogoUrl } from '../../config/clientLogos';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -209,9 +210,13 @@ export default function RelatorioMovimentacao() {
       return;
     }
 
-    // 🚨 CRÍTICO: Pegar logo do cliente da config
-    const logoEmpresa = clientConfig?.theme?.logo_light || '';
-    const nomeEmpresa = clientConfig?.name || 'Transportadora';
+    // 🏢 LÓGICA DE LOGOS PARA RELATÓRIOS
+    const dominio = user?.domain?.toUpperCase() || 'PRESTO';
+    const isAceville = dominio === 'ACV';
+    
+    // Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts (SEM fallback Presto)
+    const logoEmpresa = getCompanyLogoUrl(dominio, clientConfig);
+    const nomeEmpresa = clientConfig?.name || user?.client_name || 'Transportadora';
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -222,10 +227,6 @@ export default function RelatorioMovimentacao() {
     const dataInicio = filters.data_inicio ? new Date(filters.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
     const dataFim = filters.data_fim ? new Date(filters.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
     const tipoDescricao = obterDescricaoTipo(filters.tipo || 'TODOS');
-
-    // Obter domínio do usuário para regras de logo
-    const dominio = user?.domain?.toUpperCase() || 'PRESTO';
-    const isAceville = dominio === 'ACV';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -262,6 +263,13 @@ export default function RelatorioMovimentacao() {
             width: 120px !important;
             height: 45px !important;
             object-fit: contain !important;
+          }
+          .logo-text {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1e40af;
+            margin-right: 15px;
+            max-width: 250px;
           }
           .header-info h1 {
             font-size: 12pt;
@@ -429,18 +437,18 @@ export default function RelatorioMovimentacao() {
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="header-left">
-            <img src="${logoEmpresa}" alt="Logo Empresa" class="logo" />
-            <div class="header-info">
-              <h1>RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE</h1>
-              <p>${isAceville ? 'RELATÓRIO DE MOVIMENTAÇÃO' : `${nomeEmpresa} by PRESTO`}</p>
+          <div class="header">
+            <div class="header-left">
+              ${logoEmpresa ? `<img src="${logoEmpresa}" alt="Logo Empresa" class="logo" />` : `<div class="logo-text">${nomeEmpresa}</div>`}
+              <div class="header-info">
+                <h1>RELATÓRIO DE MOVIMENTAÇÃO DE ESTOQUE</h1>
+                <p>Sistema de Gestão</p>
+              </div>
+            </div>
+            <div class="header-right">
+              ${!isAceville ? `<img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" class="logo-presto" />` : ''}
             </div>
           </div>
-          <div class="header-right">
-            ${!isAceville ? `<img src="https://webpresto.com.br/images/logo_rel.png" alt="Sistema Presto" class="logo-presto" />` : ''}
-          </div>
-        </div>
 
         <div class="filters-section">
           <div class="filters-left">

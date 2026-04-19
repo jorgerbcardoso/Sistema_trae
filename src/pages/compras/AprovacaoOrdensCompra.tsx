@@ -44,6 +44,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getLogoUrl, getCompanyLogoUrl } from '../../config/clientLogos';
 import { ENVIRONMENT } from '../../config/environment';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { apiFetch } from '../../utils/apiUtils';
@@ -82,7 +83,7 @@ interface OrdemCompra {
 export default function AprovacaoOrdensCompra() {
   usePageTitle('Aprovação de Ordens de Compra');
 
-  const { user } = useAuth();
+  const { user, clientConfig } = useAuth();
   const [ordens, setOrdens] = useState<OrdemCompra[]>([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState(false);
@@ -596,10 +597,16 @@ export default function AprovacaoOrdensCompra() {
       return;
     }
 
-    // Logo do cliente e Presto
-    const logoUrl = user?.domain?.toUpperCase() === 'ACV' 
-      ? 'https://webpresto.com.br/images/logos_clientes/aceville.png'
-      : 'https://webpresto.com.br/images/logo_rel.png';
+    // 🏢 LÓGICA DE LOGOS PARA RELATÓRIOS
+    const dominio = user?.domain?.toUpperCase() || 'PRESTO';
+    const isACV = (dominio === 'ACV');
+    
+    // Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts (SEM fallback Presto)
+    const logoEmpresa = getCompanyLogoUrl(dominio, clientConfig);
+    const nomeEmpresa = clientConfig?.name || user?.client_name || 'Transportadora';
+    
+    // Logo Direita (Sistema): Sempre Presto, EXCETO para ACV
+    const logoPresto = 'https://webpresto.com.br/images/logo_rel.png';
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -627,10 +634,16 @@ export default function AprovacaoOrdensCompra() {
               align-items: center;
               gap: 15px;
             }
-            .logo {
+            .logo, .logo-presto {
               max-width: 180px;
               max-height: 60px;
               object-fit: contain;
+            }
+            .logo-text {
+              font-size: 16pt;
+              font-weight: bold;
+              color: #1e40af;
+              margin-right: 15px;
             }
             .header-info h1 {
               font-size: 16pt;
@@ -763,13 +776,14 @@ export default function AprovacaoOrdensCompra() {
         <body>
           <div class="header">
             <div class="header-left">
-              <img src="${logoUrl}" alt="Sistema Presto" class="logo" />
+              ${logoEmpresa ? `<img src="${logoEmpresa}" alt="Logo Empresa" class="logo" />` : `<div class="logo-text">${nomeEmpresa}</div>`}
               <div class="header-info">
-                <h1>Ordem de Compra</h1>
+                <h1>ORDEM DE COMPRA</h1>
                 <p>Sistema de Gestão</p>
               </div>
             </div>
             <div class="header-right">
+              ${!isACV ? `<img src="${logoPresto}" alt="Sistema Presto" class="logo-presto" />` : ''}
               <div class="documento-numero">${ordemDetalhes.unidade}${String(ordemDetalhes.nro_ordem_compra).padStart(6, '0')}</div>
               <div class="status-badge ${ordemDetalhes.aprovada === 'S' ? 'status-aprovada' : ordemDetalhes.aprovada === 'R' ? 'status-reprovada' : 'status-pendente'}">
                 ${ordemDetalhes.aprovada === 'S' ? 'APROVADA' : ordemDetalhes.aprovada === 'R' ? 'REPROVADA' : 'PENDENTE'}

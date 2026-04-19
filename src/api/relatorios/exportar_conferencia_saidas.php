@@ -63,19 +63,16 @@ try {
         throw new Exception('Período obrigatório');
     }
     
-    // 🏢 LÓGICA DE LOGO PARA EXCEL
+    // 🏢 LÓGICA DE LOGO PARA EXCEL (Logo da Empresa apenas)
     $dominioUpper = strtoupper($dominio);
     $isACV = ($dominioUpper === 'ACV');
     
-    // Fallbacks hardcoded (sincronizados com clientLogos.ts)
-    $fallbacks = [
-        'ACV' => 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
-        'VCS' => 'https://webpresto.com.br/images/logo-verde-simples.png',
-        'XXX' => 'https://webpresto.com.br/images/logo-verde-simples.png',
-        'DEFAULT' => 'https://webpresto.com.br/images/logo_rel.png'
-    ];
+    // Logo padrão da empresa (SÓ usar se não tiver nada no banco)
+    $logoUrl = '';
+    if ($isACV) {
+        $logoUrl = 'https://www.webpresto.com.br/images/logos_clientes/aceville.png';
+    }
     
-    $logoUrl = $fallbacks[$dominioUpper] ?? $fallbacks['DEFAULT'];
     $nomeCliente = '';
     
     try {
@@ -84,18 +81,29 @@ try {
         
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo = pg_fetch_assoc($resultLogo);
-            // 1. PRIORIDADE: Logo do banco de dados (se existir)
+            // 1. PRIORIDADE: Logo do banco de dados
             if (!empty($rowLogo['logo_light'])) {
                 $logo_light = $rowLogo['logo_light'];
                 
-                // Garantir URL absoluta (seguindo padrão do EmailService.php)
-                if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
-                    $logoUrl = $logo_light;
+                // Se for a logo padrão da Presto e NÃO formos o domínio XXX, NÃO EXIBIR na esquerda
+                // O usuário quer a logo da EMPRESA. Se for igual a da Presto, ele vê duas logos iguais.
+                if (strpos($logo_light, 'logo-verde-simples.png') !== false || 
+                    strpos($logo_light, 'logo_rel.png') !== false) {
+                    if ($dominioUpper !== 'XXX') {
+                        $logoUrl = ''; // Não exibir se for apenas a logo do sistema
+                    } else {
+                        $logoUrl = $logo_light;
+                    }
                 } else {
-                    $protocol = 'https';
-                    $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
-                    $logo_path = ltrim($logo_light, '/');
-                    $logoUrl = "{$protocol}://{$host}/{$logo_path}";
+                    // Garantir URL absoluta (seguindo padrão do EmailService.php)
+                    if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
+                        $logoUrl = $logo_light;
+                    } else {
+                        $protocol = 'https';
+                        $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+                        $logo_path = ltrim($logo_light, '/');
+                        $logoUrl = "{$protocol}://{$host}/{$logo_path}";
+                    }
                 }
             }
             $nomeCliente = $rowLogo['name'] ?? '';

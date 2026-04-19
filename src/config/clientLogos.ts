@@ -82,6 +82,40 @@ export function getLogoConfig(domain?: string): DomainLogoConfig {
 }
 
 /**
+ * Retorna a URL do logotipo da empresa para relatórios
+ * Garante que NÃO retorna a logo da Presto se a empresa não tiver logo própria
+ */
+export function getCompanyLogoUrl(
+  domain?: string, 
+  clientConfig?: { theme?: { logo_light?: string; logo_dark?: string } } | null
+): string {
+  const dominioUpper = domain?.toUpperCase();
+  
+  // 1. PRIORIDADE: Logo customizada do banco de dados
+  if (clientConfig?.theme?.logo_light) {
+    const logo = clientConfig.theme.logo_light;
+    // Se for a logo padrão da Presto e não formos o domínio XXX, retornar vazio
+    if ((logo.includes('logo-verde-simples.png') || logo.includes('logo_rel.png')) && dominioUpper !== 'XXX') {
+      return '';
+    }
+    return logo;
+  }
+
+  // 2. SEGUNDA PRIORIDADE: Logo específica do domínio (se não for Presto)
+  const config = getLogoConfig(domain);
+  if (config.logoLight && !config.logoLight.includes('webpresto.com.br')) {
+    return config.logoLight;
+  }
+  
+  // Caso especial para ACV (garantir que sempre tenha logo)
+  if (dominioUpper === 'ACV') {
+    return 'https://www.webpresto.com.br/images/logos_clientes/aceville.png';
+  }
+
+  return '';
+}
+
+/**
  * Retorna a URL do logotipo do cliente baseada no domínio e tema
  * PRIORIDADE: logo_light/logo_dark do clientConfig > Logo específica do domínio > Logo Presto
  */
