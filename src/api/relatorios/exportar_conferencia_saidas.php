@@ -78,7 +78,7 @@ try {
             
             // 1. PRIORIDADE ABSOLUTA: Logo do banco de dados (coluna logo_light)
             if (!empty($rowLogo['logo_light'])) {
-                $logo_light = $rowLogo['logo_light'];
+                $logo_light = trim($rowLogo['logo_light']);
                 
                 // Se for URL absoluta, usar como está
                 if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
@@ -91,7 +91,7 @@ try {
                     $logoUrl = "{$protocol}://{$host}/{$logo_path}";
                 }
 
-                error_log("📊 [Excel Export] Domínio: $dominioUpper | Logo do Banco: $logo_light | URL Final: $logoUrl");
+                error_log("📊 [Excel Export] Domínio: $dominioUpper | Logo do Banco: '$logo_light' | URL Final: $logoUrl");
             }
             $nomeCliente = $rowLogo['name'] ?? '';
         }
@@ -112,74 +112,94 @@ try {
             $logoContent = false;
             $localLogoPath = '';
             $hostname = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
-            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/var/www/html';
             
-            // 1️⃣ Tentar localmente pelo DOCUMENT_ROOT ou relativo
-            if (strpos($logoUrl, $hostname) !== false || strpos($logoUrl, 'http') === false) {
-                $urlPath = parse_url($logoUrl, PHP_URL_PATH);
-                if ($urlPath) {
-                    $pathsToTry = [
-                        rtrim($docRoot, '/') . $urlPath,                                // Raiz do servidor
-                        rtrim($docRoot, '/') . str_replace('/sistema/', '/', $urlPath), // Sem subfolder /sistema/
-                        __DIR__ . '/../../' . ltrim(str_replace('/sistema/', '', $urlPath), '/'), // Relativo ao script
-                        __DIR__ . '/../../../../' . ltrim($urlPath, '/')                // Relativo mais acima
-                    ];
-                    
-                    foreach ($pathsToTry as $p) {
-                        if (file_exists($p)) {
-                            $localLogoPath = realpath($p);
-                            error_log("🔍 [Excel Export] Encontrado localmente em: $localLogoPath");
+            // 1️⃣ TENTATIVA LOCAL: Subir níveis de diretório para encontrar o arquivo físico
+            // Isso é o mais rápido e seguro se estiver no mesmo servidor
+            $urlPath = parse_url($logoUrl, PHP_URL_PATH);
+            if ($urlPath) {
+                // Caminhos para testar subindo até 6 níveis (suficiente para /var/www/html/...)
+                $currentSearchDir = __DIR__;
+                for ($i = 0; $i < 6; $i++) {
+                    $potentialPath = rtrim($currentSearchDir, DIRECTORY_SEPARATOR) . $urlPath;
+                    if (file_exists($potentialPath)) {
+                        $localLogoPath = realpath($potentialPath);
+                        error_log("🔍 [Excel Export] Logo encontrada no disco: $localLogoPath (Nível $i)");
+                        break;
+                    }
+                    // Se não achou com o path completo, tenta sem o subfolder /sistema/ se ele existir na URL
+                    if (strpos($urlPath, '/sistema/') === 0) {
+                        $cleanPath = substr($urlPath, 8); // remove /sistema
+                        $potentialPathAlt = rtrim($currentSearchDir, DIRECTORY_SEPARATOR) . $cleanPath;
+                        if (file_exists($potentialPathAlt)) {
+                            $localLogoPath = realpath($potentialPathAlt);
+                            error_log("🔍 [Excel Export] Logo encontrada no disco (alt): $localLogoPath");
                             break;
                         }
                     }
+                    $currentSearchDir = dirname($currentSearchDir);
                 }
             }
 
-            // 2️⃣ Se achou localmente, ler arquivo
+            // 2️⃣ SE ACHOU LOCAL, LER ARQUIVO
             if ($localLogoPath) {
                 $logoContent = @file_get_contents($localLogoPath);
             }
 
-            // 3️⃣ Se NÃO achou ou falhou na leitura local, usar cURL (ignora SSL e loopback issues)
-            if ($logoContent === false) {
-                error_log("🌐 [Excel Export] Tentando carregar via cURL: $logoUrl");
+            // 3️⃣ SE NÃO ACHOU LOCAL, USAR cURL (Loopback ou Externo)
+            if ($logoContent === false || empty($logoContent)) {
+                error_log("🌐 [Excel Export] Tentando cURL para: $logoUrl");
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $logoUrl);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); // Ignorar erros SSL
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); // Ignora erro SSL
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrestoSystem/1.0');
                 $logoContent = curl_exec($ch);
+                
+                if ($logoContent === false) {
+                    error_log("❌ [Excel Export] cURL falhou: " . curl_error($ch));
+                } else {
+                    error_log("✅ [Excel Export] cURL obteve " . strlen($logoContent) . " bytes");
+                }
                 curl_close($ch);
             }
 
+            // 4️⃣ PROCESSAR E INSERIR NO EXCEL
             if ($logoContent !== false && !empty($logoContent)) {
                 $tempLogoPath = sys_get_temp_dir() . '/logo_' . uniqid() . '.png';
                 file_put_contents($tempLogoPath, $logoContent);
                 
                 if (file_exists($tempLogoPath) && filesize($tempLogoPath) > 0) {
-                    $drawing = new Drawing();
-                    $drawing->setName('Logo');
-                    $drawing->setDescription('Logo do Cliente');
-                    $drawing->setPath($tempLogoPath);
-                    $drawing->setCoordinates('A1');
-                    $drawing->setHeight(60);
-                    $drawing->setOffsetX(10);
-                    $drawing->setOffsetY(10);
-                    $drawing->setWorksheet($sheet);
-                    
-                    $logoAdicionada = true;
-                    error_log("✅ [Excel Export] Logo inserida com sucesso no Excel");
+                    // Verificar se é uma imagem válida
+                    $imageSize = @getimagesize($tempLogoPath);
+                    if ($imageSize !== false) {
+                        $drawing = new Drawing();
+                        $drawing->setName('Logo');
+                        $drawing->setDescription('Logo do Cliente');
+                        $drawing->setPath($tempLogoPath);
+                        $drawing->setCoordinates('A1');
+                        $drawing->setHeight(60);
+                        $drawing->setOffsetX(10);
+                        $drawing->setOffsetY(10);
+                        $drawing->setWorksheet($sheet);
+                        
+                        $logoAdicionada = true;
+                        error_log("✨ [Excel Export] Logo inserida com sucesso no Excel!");
+                    } else {
+                        error_log("⚠️ [Excel Export] Arquivo baixado não é uma imagem válida");
+                    }
                     
                     register_shutdown_function(function() use ($tempLogoPath) {
                         if (file_exists($tempLogoPath)) { @unlink($tempLogoPath); }
                     });
                 }
             } else {
-                error_log("⚠️ [Excel Export] Falha TOTAL ao carregar logo");
+                error_log("💀 [Excel Export] FALHA TOTAL ao carregar a logo para o Excel");
             }
         } catch (Exception $e) {
-            error_log("❌ [Excel Export] Erro ao processar logo no Excel: " . $e->getMessage());
+            error_log("❌ [Excel Export] Erro crítico no processamento da logo: " . $e->getMessage());
         }
     }
     
