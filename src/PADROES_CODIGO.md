@@ -147,41 +147,56 @@ const { theme } = useTheme();
 
 #### **Logotipos em Impressões/Relatórios**
 ```typescript
-// ✅ CORRETO - Usar URLs absolutas e lógica de domínio
+// ✅ CORRETO - Usar URLs absolutas e lógica de prioridade (Banco > clientLogos.ts > Presto)
+const { user, clientConfig } = useAuth();
 const dominio = user?.domain?.toUpperCase() || 'PRESTO';
-const logoUrl = dominio === 'ACV' 
-  ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png'
-  : 'https://webpresto.com.br/images/logo_rel.png';
+const isACV = (dominio === 'ACV');
+
+// Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts > Presto
+const logoEmpresa = getLogoUrl(dominio, 'light', clientConfig);
+
+// Logo Direita (Sistema): Sempre Presto, EXCETO para ACV
+const logoPresto = 'https://webpresto.com.br/images/logo_rel.png';
 
 // No HTML da impressão
 <div class="header">
   <div class="header-left">
-    <img src="${logoUrl}" class="logo" />
+    <img src="${logoEmpresa}" class="logo" />
     <div class="header-info">
       <h1>Título do Documento</h1>
       <p>Sistema de Gestão</p> <!-- ✅ SEMPRE "Sistema de Gestão" -->
     </div>
   </div>
   <div class="header-right">
-     ${dominio !== 'ACV' ? `<img src="https://webpresto.com.br/images/logo_rel.png" />` : ''}
+     ${!isACV ? `<img src="${logoPresto}" class="logo-sistema" />` : ''}
    </div>
  </div>
- 
- // Script para aguardar imagens antes de imprimir
- <script>
-   let imagesLoaded = 0;
-   const totalImages = ${dominio !== 'ACV' ? 2 : 1};
-   function checkAllImagesLoaded() {
-    imagesLoaded++;
-    if (imagesLoaded >= totalImages) {
-      setTimeout(() => window.print(), 500);
+```
+
+#### **Logotipos em Exportação Excel (PHP)**
+```php
+// ✅ CORRETO - Usar prioridade e URLs absolutas
+$dominioUpper = strtoupper($dominio);
+$isACV = ($dominioUpper === 'ACV');
+
+// Fallbacks hardcoded (sincronizados com clientLogos.ts)
+$fallbacks = [
+    'ACV' => 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
+    'VCS' => 'https://webpresto.com.br/images/logo-verde-simples.png',
+    'DEFAULT' => 'https://webpresto.com.br/images/logo_rel.png'
+];
+
+$logoUrl = $fallbacks[$dominioUpper] ?? $fallbacks['DEFAULT'];
+
+// Buscar logo customizada no banco de dados
+$sqlLogo = "SELECT logo_light FROM domains WHERE domain = $1 LIMIT 1";
+$resultLogo = sql($g_sql, $sqlLogo, false, [$dominioUpper]);
+if ($resultLogo && pg_num_rows($resultLogo) > 0) {
+    $rowLogo = pg_fetch_assoc($resultLogo);
+    if (!empty($rowLogo['logo_light'])) {
+        $logoUrl = $rowLogo['logo_light'];
     }
-  }
-  document.querySelectorAll('img').forEach(img => {
-    if (img.complete) checkAllImagesLoaded();
-    else { img.onload = checkAllImagesLoaded; img.onerror = checkAllImagesLoaded; }
-  });
-</script>
+}
 ```
 
 // ❌ ERRADO - Caminhos relativos (quebram na janela de impressão)

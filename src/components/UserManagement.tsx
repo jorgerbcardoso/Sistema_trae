@@ -361,7 +361,8 @@ export function UserManagement() {
         payload.password = editPassword; // NÃO converter para minúsculas!
       }
 
-      const response = await fetch('/sistema/api/users/update.php', {
+      // ✅ USAR apiFetch para interceptação automática de toasts
+      const data = await apiFetch('/sistema/api/users/update.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -370,55 +371,8 @@ export function UserManagement() {
         body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
-
-      // DEBUG: Log da resposta para verificar formato
-      console.log('📨 [UserManagement] Resposta da API:', data);
-
-      // Verificar se tem mensagem toast da API
-      if (data.toast) {
-        const toastType = data.toast.type || 'info';
-        const message = data.toast.message;
-        
-        console.log('🎨 [UserManagement] Toast detectado:', { type: toastType, message });
-        
-        switch (toastType) {
-          case 'success':
-            toast.success(message);
-            break;
-          case 'error':
-            toast.error(message);
-            break;
-          case 'warning':
-            toast.warning(message);
-            break;
-          case 'info':
-          default:
-            toast.info(message);
-            break;
-        }
-        
-        // Se foi sucesso, limpar form e recarregar
-        if (data.success) {
-          setEditingUser(null);
-          setEditFullName('');
-          setEditEmail('');
-          setEditPassword('');
-          setEditIsAdmin(false);
-          setEditUnidade('');
-          setEditTrocaUnidade(true);
-          setEditAprovaOrcamento(false);
-          setEditNroSetor(null);
-          setEditSetorDescricao('');
-          setShowEditDialog(false); // ✅ Fechar dialog
-          await loadUsers();
-        }
-        return;
-      }
-
-      // Processar resposta normal
-      if (response.ok && data.success) {
-        toast.success('Usuário atualizado com sucesso!');
+      // Se foi sucesso, limpar form e recarregar
+      if (data.success) {
         setEditingUser(null);
         setEditFullName('');
         setEditEmail('');
@@ -431,14 +385,9 @@ export function UserManagement() {
         setEditSetorDescricao('');
         setShowEditDialog(false); // ✅ Fechar dialog
         await loadUsers();
-      } else {
-        // ✅ CORRIGIDO: Verificar data.error primeiro (padrão da API), depois data.message
-        toast.error(data.error || data.message || 'Erro ao atualizar usuário');
       }
     } catch (err: any) {
-      // ✅ CORRIGIDO: Mostrar mensagem de erro do catch se disponível
-      toast.error(err.message || 'Erro ao atualizar usuário');
-      console.error(err);
+      console.error('❌ Erro ao atualizar usuário:', err);
     } finally {
       setIsLoading(false);
     }
@@ -452,7 +401,8 @@ export function UserManagement() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/sistema/api/users/delete.php', {
+      // ✅ USAR apiFetch para interceptação automática de toasts
+      const data = await apiFetch('/sistema/api/users/delete.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -461,51 +411,12 @@ export function UserManagement() {
         body: JSON.stringify({ user_id: userId })
       });
 
-      const data = await response.json();
-
-      // DEBUG: Log da resposta para verificar formato
-      console.log('📨 [UserManagement] Resposta da API:', data);
-
-      // Verificar se tem mensagem toast da API
-      if (data.toast) {
-        const toastType = data.toast.type || 'info';
-        const message = data.toast.message;
-        
-        console.log('🎨 [UserManagement] Toast detectado:', { type: toastType, message });
-        
-        switch (toastType) {
-          case 'success':
-            toast.success(message);
-            break;
-          case 'error':
-            toast.error(message);
-            break;
-          case 'warning':
-            toast.warning(message);
-            break;
-          case 'info':
-          default:
-            toast.info(message);
-            break;
-        }
-        
-        // Se foi sucesso, recarregar
-        if (data.success) {
-          await loadUsers();
-        }
-        return;
-      }
-
-      // Processar resposta normal
-      if (response.ok && data.success) {
-        toast.success('Usuário desativado com sucesso!');
+      // Se foi sucesso, recarregar
+      if (data.success) {
         await loadUsers();
-      } else {
-        toast.error(data.message || 'Erro ao desativar usuário');
       }
     } catch (err: any) {
-      toast.error('Erro ao desativar usuário');
-      console.error(err);
+      console.error('❌ Erro ao desativar usuário:', err);
     } finally {
       setIsLoading(false);
     }
@@ -520,7 +431,8 @@ export function UserManagement() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/sistema/api/users/reactivate.php', {
+      // ✅ USAR apiFetch para interceptação automática de toasts
+      const data = await apiFetch('/sistema/api/users/reactivate.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -529,51 +441,12 @@ export function UserManagement() {
         body: JSON.stringify({ user_id: userId })
       });
 
-      const data = await response.json();
-
-      // DEBUG: Log da resposta para verificar formato
-      console.log('📨 [UserManagement] Resposta da API (reativate):', data);
-
-      // Verificar se tem mensagem toast da API
-      if (data.toast) {
-        const toastType = data.toast.type || 'info';
-        const message = data.toast.message;
-        
-        console.log('🎨 [UserManagement] Toast detectado:', { type: toastType, message });
-        
-        switch (toastType) {
-          case 'success':
-            toast.success(message);
-            break;
-          case 'error':
-            toast.error(message);
-            break;
-          case 'warning':
-            toast.warning(message);
-            break;
-          case 'info':
-          default:
-            toast.info(message);
-            break;
-        }
-        
-        // Se foi sucesso, recarregar
-        if (data.success) {
-          await loadUsers();
-        }
-        return;
-      }
-
-      // Processar resposta normal
-      if (response.ok && data.success) {
-        toast.success('Usuário reativado com sucesso!');
+      // Se foi sucesso, recarregar
+      if (data.success) {
         await loadUsers();
-      } else {
-        toast.error(data.message || 'Erro ao reativar usuário');
       }
     } catch (err: any) {
-      toast.error('Erro ao reativar usuário');
-      console.error(err);
+      console.error('❌ Erro ao reativar usuário:', err);
     } finally {
       setIsLoading(false);
     }

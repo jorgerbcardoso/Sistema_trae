@@ -65,7 +65,7 @@ export function handleApiResponse(
     }
     return true;
   } else {
-    const errorMsg = data.message || defaultErrorMessage || 'Erro ao processar requisição';
+    const errorMsg = data.error || data.message || defaultErrorMessage || 'Erro ao processar requisição';
     toast.error(errorMsg);
     return false;
   }

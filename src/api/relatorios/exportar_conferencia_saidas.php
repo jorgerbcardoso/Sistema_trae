@@ -63,30 +63,45 @@ try {
         throw new Exception('Período obrigatório');
     }
     
-    // 🏢 BUSCAR LOGO DO CLIENTE (PostgreSQL)
-    // ✅ PADRÃO OBRIGATÓRIO: Se for ACV, usar a logo da Aceville. Caso contrário, Presto.
-    $isACV = (strtoupper($dominio) === 'ACV');
-    $logoUrl = $isACV 
-        ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png' 
-        : 'https://webpresto.com.br/images/logo_rel.png';
+    // 🏢 LÓGICA DE LOGO PARA EXCEL
+    $dominioUpper = strtoupper($dominio);
+    $isACV = ($dominioUpper === 'ACV');
     
+    // Fallbacks hardcoded (sincronizados com clientLogos.ts)
+    $fallbacks = [
+        'ACV' => 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
+        'VCS' => 'https://webpresto.com.br/images/logo-verde-simples.png',
+        'XXX' => 'https://webpresto.com.br/images/logo-verde-simples.png',
+        'DEFAULT' => 'https://webpresto.com.br/images/logo_rel.png'
+    ];
+    
+    $logoUrl = $fallbacks[$dominioUpper] ?? $fallbacks['DEFAULT'];
     $nomeCliente = '';
     
     try {
         $sqlLogo = "SELECT logo_light, name FROM domains WHERE domain = $1 LIMIT 1";
-        $resultLogo = sql($g_sql, $sqlLogo, false, [$dominio]);
+        $resultLogo = sql($g_sql, $sqlLogo, false, [$dominioUpper]);
         
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo = pg_fetch_assoc($resultLogo);
-            // Se NÃO for ACV e tiver logo no banco, usa a do banco. 
-            // Se for ACV, mantemos a que fixamos acima.
-            if (!$isACV && !empty($rowLogo['logo_light'])) {
-                $logoUrl = $rowLogo['logo_light'];
+            // 1. PRIORIDADE: Logo do banco de dados (se existir)
+            if (!empty($rowLogo['logo_light'])) {
+                $logo_light = $rowLogo['logo_light'];
+                
+                // Garantir URL absoluta (seguindo padrão do EmailService.php)
+                if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
+                    $logoUrl = $logo_light;
+                } else {
+                    $protocol = 'https';
+                    $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+                    $logo_path = ltrim($logo_light, '/');
+                    $logoUrl = "{$protocol}://{$host}/{$logo_path}";
+                }
             }
             $nomeCliente = $rowLogo['name'] ?? '';
         }
     } catch (Exception $e) {
-        // Ignorar erro de logo
+        // Ignorar erro de busca no banco
     }
     
     // 📊 CRIAR PLANILHA EXCEL

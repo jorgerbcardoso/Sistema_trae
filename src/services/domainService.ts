@@ -306,36 +306,39 @@ export function resetDomainOverride(domainCode: string): void {
  * - Outros → Verifica atributo data_source do domínio
  */
 export function shouldUseMockData(domainCode: string): boolean {
-  // Forçar BACKEND real em localhost
   const hostname = window.location.hostname;
-  console.log('🔍 [shouldUseMockData] hostname:', hostname, 'domainCode:', domainCode);
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    console.log('🔍 [shouldUseMockData] Forçando BACKEND real em localhost');
-    return false;
-  }
-
-  // Detectar ambiente Figma Make (incluindo todas as possíveis URLs)
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
+  // Detectar ambiente Figma Make
   const isFigmaMake = hostname.includes('figma.com') ||
                       hostname.includes('esm.sh') ||
                       hostname.includes('fig.run') ||
-                      hostname === '' || // Hostname vazio no Figma Make
+                      hostname === '' ||
                       window.location.href.includes('figma');
   
   // Figma Make sempre usa MOCK
   if (isFigmaMake) {
     return true;
   }
+
+  // Em produção (não localhost e não Figma), SEMPRE preferir BACKEND
+  // a menos que o domínio não exista nos MOCK_DOMAINS (domínio novo)
+  if (!isLocalhost && !isFigmaMake) {
+    // Se o domínio for um dos "base" (VCS, ACV, XXX), forçar BACKEND em produção
+    const baseDomainCodes = ['VCS', 'ACV', 'XXX'];
+    if (baseDomainCodes.includes(domainCode.toUpperCase())) {
+      return false;
+    }
+  }
   
-  // Localhost: verificar configuração do domínio
+  // Localhost ou domínio customizado: verificar configuração
   const domain = getDomain(domainCode);
   
   if (!domain) {
-    return true;
+    return !isLocalhost; // Default to MOCK if not found, unless localhost
   }
   
-  const useMock = domain.data_source === 'MOCK';
-  
-  return useMock;
+  return domain.data_source === 'MOCK';
 }
 
 /**

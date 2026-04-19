@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           // Usar API real
           
-          // 🆕 TENTAR RECUPERAR USUÁRIO DO LOCALSTORAGE PRIMEIRO
+          // 🆕 TENTAR RECUPERAR USUÁRIO DO LOCALSTORAGE PRIMEIRO (para rapidez na UI)
           const storedUser = localStorage.getItem('presto_user');
           if (storedUser) {
             try {
@@ -182,14 +182,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setClientConfig(JSON.parse(storedConfig));
               }
               
-              setLoading(false);
-              return;
+              // ✅ NÃO RETORNAR! Continuar para verificar token e atualizar dados do usuário
+              console.log('🔄 [AuthContext] Usuário carregado do cache, verificando dados frescos...');
             } catch (error) {
-              // Erro ao parsear
+              console.error('❌ [AuthContext] Erro ao parsear usuário do cache:', error);
             }
           }
           
-          // Se não tiver no localStorage, verificar com o backend
+          // Verificar com o backend para obter os dados MAIS RECENTES
           const response = await fetch(`${API_BASE_URL}/auth/verify.php`, {
             headers: {
               'Authorization': `Bearer ${storedToken}`
@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           
           if (!response.ok) {
-            throw new Error('Token inválido');
+            throw new Error('Token inválido ou expirado');
           }
           
           const data = await response.json();
@@ -210,18 +210,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               use_mock_data: domainInfo?.data_source === 'MOCK' || false
             };
             
+            console.log('✅ [AuthContext] Dados frescos recebidos:', {
+              full_name: userWithMockFlag.full_name,
+              email: userWithMockFlag.email
+            });
+
             setUser(userWithMockFlag);
             setToken(storedToken);
             setClientConfig(data.client_config);
             
-            // Salvar no localStorage
+            // ✅ Atualizar localStorage com os dados frescos
             localStorage.setItem('presto_user', JSON.stringify(userWithMockFlag));
             if (data.client_config) {
               localStorage.setItem('presto_client_config', JSON.stringify(data.client_config));
             }
           } else {
+            console.warn('⚠️ [AuthContext] Token não autenticado no backend');
             localStorage.removeItem('auth_token');
             localStorage.removeItem('presto_user');
+            setUser(null);
             setToken(null);
           }
         }

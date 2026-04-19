@@ -210,6 +210,13 @@ export async function handleAPIResponse(response: Response, suppressToast = fals
       console.log('📎 [apiUtils] Dados extras detectados no toast:', data.toast.extra_data);
       Object.assign(data, data.toast.extra_data);
     }
+  } else if (data.success === false && !suppressToast) {
+    // ✅ NOVO: Se não tem objeto toast, mas tem error ou message em uma resposta de erro, exibir como toast
+    const errorMessage = data.error || data.message;
+    if (errorMessage) {
+      console.log('❌ [apiUtils] Erro detectado (sem objeto toast):', errorMessage);
+      toast.error(errorMessage, { closeButton: true });
+    }
   } else {
     console.log('⚠️ [apiUtils] Nenhum toast encontrado na resposta');
   }

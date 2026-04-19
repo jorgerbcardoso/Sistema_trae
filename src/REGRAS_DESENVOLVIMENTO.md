@@ -101,18 +101,18 @@
 - ✅ **IMPLEMENTAÇÃO**: Usar sempre a função `getLogoUrl(domain, theme, clientConfig)` para garantir a aplicação da prioridade.
 - ❌ **URLS HARDCODED**: Evitar o uso de URLs de logotipos fixas nos componentes; centralizar na `clientLogos.ts`.
 
-### 18. **LOGOTIPOS EM IMPRESSÕES (PDF E EXCEL)**
-- ✅ **URL ABSOLUTA**: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão ou exportações Excel.
-- ✅ **LÓGICA DE POSICIONAMENTO (PDF/HTML)**:
-  - **LADO ESQUERDO (Logo Cliente)**: 
-    - Se `domain === 'ACV'`: `https://sistema.webpresto.com.br/images/logos_clientes/aceville.png`
-    - Demais domínios: `https://webpresto.com.br/images/logo_rel.png`
-  - **LADO DIREITO (Logo Sistema)**: 
-    - Se `domain === 'ACV'`: **EXCLUIR** a logo do sistema (Presto).
-    - Demais domínios: `https://webpresto.com.br/images/logo_rel.png` (Logo oficial do Presto).
-- ✅ **LÓGICA EXCEL**:
-  - Usar apenas **UMA** logo (do cliente) no cabeçalho.
-  - Se `domain === 'ACV'`: Usar obrigatoriamente `https://sistema.webpresto.com.br/images/logos_clientes/aceville.png`.
+### 18. LOGOTIPOS EM IMPRESSÕES (PDF E EXCEL)
+- ✅ URL ABSOLUTA: Usar sempre URLs absolutas (`https://...`) para imagens em janelas de impressão ou exportações Excel.
+- ✅ LÓGICA DE POSICIONAMENTO (PDF/HTML):
+  - LADO ESQUERDO (Logo Empresa/Cliente):
+    - PRIORIDADE: `logo_light` do banco de dados > Logo específica do domínio em `DOMAIN_LOGOS` > Logo Presto (`https://webpresto.com.br/images/logo_rel.png`).
+  - LADO DIREITO (Logo Sistema):
+    - Se domain === 'ACV': **NÃO EXIBIR** a logo do sistema (Presto).
+    - Demais domínios: Exibir logo Presto (`https://webpresto.com.br/images/logo_rel.png`).
+- ✅ LÓGICA PARA EXCEL:
+  - Usar sempre a Logo da Empresa (mesma prioridade do LADO ESQUERDO acima).
+  - A logo da Presto (sistema) geralmente não é incluída no Excel para manter a planilha limpa, a menos que o domínio seja XXX.
+- ✅ REGRA CRÍTICA PARA ACV: A logo da Presto não deve aparecer em NENHUM lugar (nem esquerda, nem direita) nos relatórios do domínio ACV.
 - ✅ **CABEÇALHO**: O texto abaixo do título do documento deve ser sempre **"Sistema de Gestão"**.
 - ❌ **CAMINHOS RELATIVOS**: Nunca usar `/sistema/logo.png` em impressões (causa erro de carregamento).
 - ✅ **ESPERA DE CARREGAMENTO (PDF)**: Sempre incluir o script de verificação de carregamento de imagens antes de disparar o `window.print()`.

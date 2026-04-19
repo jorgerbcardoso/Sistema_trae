@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
+import { getLogoUrl } from '../../config/clientLogos';
 import { useTheme } from '../ThemeProvider';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Button } from '../ui/button';
@@ -39,7 +40,7 @@ type SortField = keyof Manifesto;
 type SortDirection = 'asc' | 'desc';
 
 export function ConferenciaSaidas() {
-  const { user, logout } = useAuth();
+  const { user, logout, clientConfig } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -274,11 +275,15 @@ export function ConferenciaSaidas() {
       return;
     }
 
-    // Logo do cliente e Presto
+    // 🏢 LÓGICA DE LOGOS PARA RELATÓRIOS
     const dominio = user?.domain?.toUpperCase() || 'PRESTO';
-    const logoUrl = dominio === 'ACV' 
-      ? 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png'
-      : 'https://webpresto.com.br/images/logo_rel.png';
+    const isACV = (dominio === 'ACV');
+    
+    // Logo Esquerda (Empresa): prioridade banco de dados > clientLogos.ts > Presto
+    const logoEmpresa = getLogoUrl(dominio, 'light', clientConfig);
+    
+    // Logo Direita (Sistema): Sempre Presto, EXCETO para ACV
+    const logoPresto = 'https://webpresto.com.br/images/logo_rel.png';
 
     const renderTableHtml = (list: Manifesto[], title: string, totals: any) => {
       if (list.length === 0) return '';
@@ -422,19 +427,14 @@ export function ConferenciaSaidas() {
         <body>
           <div class="header">
             <div class="header-left">
-              <img src="${logoUrl}" alt="Logo Cliente" class="logo" />
+              <img src="${logoEmpresa}" alt="Logo Empresa" class="logo" />
               <div class="header-info">
                 <h1>Conferência de Saídas</h1>
                 <p>Sistema de Gestão</p>
               </div>
             </div>
             <div class="header-right">
-              ${dominio !== 'ACV' ? `
-                <img 
-                  src="https://webpresto.com.br/images/logo_rel.png" 
-                  alt="Sistema Presto" 
-                />
-              ` : ''}
+              ${!isACV ? `<img src="${logoPresto}" alt="Sistema Presto" />` : ''}
               <div style="margin-top: 5px; font-size: 8pt; color: #666;">
                 Período: ${new Date(filters.periodoEmissaoInicio + 'T12:00:00').toLocaleDateString('pt-BR')} até ${new Date(filters.periodoEmissaoFim + 'T12:00:00').toLocaleDateString('pt-BR')}<br/>
                 Origem: ${filters.unidadeOrigem || 'TODAS'} | Destino: ${filters.unidadeDestino || 'TODAS'}
