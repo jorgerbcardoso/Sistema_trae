@@ -63,143 +63,83 @@ try {
         throw new Exception('Período obrigatório');
     }
     
-    // 🏢 LÓGICA DE LOGO PARA EXCEL (Logo da Empresa apenas)
+    // 🏢 LÓGICA DE LOGO PARA EXCEL (Simples e Direta)
     $dominioUpper = strtoupper($dominio);
-    
     $logoUrl = '';
     $nomeCliente = '';
     
+    // 1️⃣ Buscar no banco de dados (prioridade absoluta)
     try {
         $sqlLogo = "SELECT logo_light, name FROM domains WHERE domain = $1 LIMIT 1";
         $resultLogo = sql($g_sql, $sqlLogo, false, [$dominioUpper]);
-        
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo = pg_fetch_assoc($resultLogo);
-            
-            // 1. PRIORIDADE ABSOLUTA: Logo do banco de dados (coluna logo_light)
-            if (!empty($rowLogo['logo_light'])) {
-                $logo_light = trim($rowLogo['logo_light']);
-                
-                // Se for URL absoluta, usar como está
-                if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
-                    $logoUrl = $logo_light;
-                } else {
-                    // Se for caminho relativo, converter para absoluto
-                    $protocol = 'https';
-                    $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
-                    $logo_path = ltrim($logo_light, '/');
-                    $logoUrl = "{$protocol}://{$host}/{$logo_path}";
-                }
-
-                error_log("📊 [Excel Export] Domínio: $dominioUpper | Logo do Banco: '$logo_light' | URL Final: $logoUrl");
-            }
+            $logoUrl = trim($rowLogo['logo_light'] ?? '');
             $nomeCliente = $rowLogo['name'] ?? '';
         }
     } catch (Exception $e) {
-        error_log("❌ [Excel Export] Erro ao buscar logo: " . $e->getMessage());
+        error_log("❌ [Excel] Erro SQL: " . $e->getMessage());
     }
-    
+
+    // 2️⃣ Fallbacks se o banco estiver vazio
+    if (empty($logoUrl)) {
+        if ($dominioUpper === 'ACV') {
+            $logoUrl = 'https://sistema.webpresto.com.br/images/logos_clientes/aceville.png';
+        } elseif ($dominioUpper === 'TOP') {
+            $logoUrl = 'https://sistema.webpresto.com.br/images/logos_clientes/logo_top.png';
+        }
+    }
+
+    // 3️⃣ Garantir URL absoluta para o Excel
+    if (!empty($logoUrl) && strpos($logoUrl, 'http') === false) {
+        $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+        $logoUrl = "https://{$host}/" . ltrim($logoUrl, '/');
+    }
+
+    error_log("📊 [Excel] Domínio: $dominioUpper | URL Logo: $logoUrl");
+
     // 📊 CRIAR PLANILHA EXCEL
     $spreadsheet = new Spreadsheet();
     $sheet = $spreadsheet->getActiveSheet();
     $sheet->setTitle('Conferência de Saídas');
     
-    // 🖼️ INSERIR LOGO
+    // 🖼️ INSERIR LOGO (Método Direto)
     $logoAdicionada = false;
-    
     if (!empty($logoUrl)) {
         try {
-            $logoContent = false;
-            $localLogoPath = '';
-            $hostname = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
-            
-            // 1️⃣ TENTATIVA LOCAL: Subir níveis de diretório para encontrar o arquivo físico
-            // Isso é o mais rápido e seguro se estiver no mesmo servidor
-            $urlPath = parse_url($logoUrl, PHP_URL_PATH);
-            if ($urlPath) {
-                // Caminhos para testar subindo até 6 níveis (suficiente para /var/www/html/...)
-                $currentSearchDir = __DIR__;
-                for ($i = 0; $i < 6; $i++) {
-                    $potentialPath = rtrim($currentSearchDir, DIRECTORY_SEPARATOR) . $urlPath;
-                    if (file_exists($potentialPath)) {
-                        $localLogoPath = realpath($potentialPath);
-                        error_log("🔍 [Excel Export] Logo encontrada no disco: $localLogoPath (Nível $i)");
-                        break;
-                    }
-                    // Se não achou com o path completo, tenta sem o subfolder /sistema/ se ele existir na URL
-                    if (strpos($urlPath, '/sistema/') === 0) {
-                        $cleanPath = substr($urlPath, 8); // remove /sistema
-                        $potentialPathAlt = rtrim($currentSearchDir, DIRECTORY_SEPARATOR) . $cleanPath;
-                        if (file_exists($potentialPathAlt)) {
-                            $localLogoPath = realpath($potentialPathAlt);
-                            error_log("🔍 [Excel Export] Logo encontrada no disco (alt): $localLogoPath");
-                            break;
-                        }
-                    }
-                    $currentSearchDir = dirname($currentSearchDir);
-                }
-            }
-
-            // 2️⃣ SE ACHOU LOCAL, LER ARQUIVO
-            if ($localLogoPath) {
-                $logoContent = @file_get_contents($localLogoPath);
-            }
-
-            // 3️⃣ SE NÃO ACHOU LOCAL, USAR cURL (Loopback ou Externo)
-            if ($logoContent === false || empty($logoContent)) {
-                error_log("🌐 [Excel Export] Tentando cURL para: $logoUrl");
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $logoUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0); // Ignora erro SSL
-                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrestoSystem/1.0');
-                $logoContent = curl_exec($ch);
-                
-                if ($logoContent === false) {
-                    error_log("❌ [Excel Export] cURL falhou: " . curl_error($ch));
-                } else {
-                    error_log("✅ [Excel Export] cURL obteve " . strlen($logoContent) . " bytes");
-                }
-                curl_close($ch);
-            }
-
-            // 4️⃣ PROCESSAR E INSERIR NO EXCEL
-            if ($logoContent !== false && !empty($logoContent)) {
-                $tempLogoPath = sys_get_temp_dir() . '/logo_' . uniqid() . '.png';
-                file_put_contents($tempLogoPath, $logoContent);
-                
-                if (file_exists($tempLogoPath) && filesize($tempLogoPath) > 0) {
-                    // Verificar se é uma imagem válida
-                    $imageSize = @getimagesize($tempLogoPath);
-                    if ($imageSize !== false) {
-                        $drawing = new Drawing();
-                        $drawing->setName('Logo');
-                        $drawing->setDescription('Logo do Cliente');
-                        $drawing->setPath($tempLogoPath);
-                        $drawing->setCoordinates('A1');
-                        $drawing->setHeight(60);
-                        $drawing->setOffsetX(10);
-                        $drawing->setOffsetY(10);
-                        $drawing->setWorksheet($sheet);
-                        
-                        $logoAdicionada = true;
-                        error_log("✨ [Excel Export] Logo inserida com sucesso no Excel!");
-                    } else {
-                        error_log("⚠️ [Excel Export] Arquivo baixado não é uma imagem válida");
-                    }
-                    
-                    register_shutdown_function(function() use ($tempLogoPath) {
-                        if (file_exists($tempLogoPath)) { @unlink($tempLogoPath); }
-                    });
-                }
-            } else {
-                error_log("💀 [Excel Export] FALHA TOTAL ao carregar a logo para o Excel");
-            }
+            $drawing = new Drawing();
+            $drawing->setName('Logo');
+            $drawing->setPath($logoUrl); // PhpSpreadsheet aceita URLs se o allow_url_fopen estiver ON
+            $drawing->setCoordinates('A1');
+            $drawing->setHeight(60);
+            $drawing->setOffsetX(10);
+            $drawing->setOffsetY(10);
+            $drawing->setWorksheet($sheet);
+            $logoAdicionada = true;
+            error_log("✅ [Excel] Logo inserida via URL direta");
         } catch (Exception $e) {
-            error_log("❌ [Excel Export] Erro crítico no processamento da logo: " . $e->getMessage());
+            error_log("⚠️ [Excel] Falha via URL direta, tentando Proxy local...");
+            // Backup: Tentar via Proxy (se for imagem do próprio servidor)
+            try {
+                $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/var/www/html';
+                $urlPath = parse_url($logoUrl, PHP_URL_PATH);
+                $localPath = rtrim($docRoot, '/') . $urlPath;
+                if (!file_exists($localPath)) {
+                    $localPath = rtrim($docRoot, '/') . str_replace('/sistema/', '/', $urlPath);
+                }
+                
+                if (file_exists($localPath)) {
+                    $drawing = new Drawing();
+                    $drawing->setPath($localPath);
+                    $drawing->setCoordinates('A1');
+                    $drawing->setHeight(60);
+                    $drawing->setWorksheet($sheet);
+                    $logoAdicionada = true;
+                    error_log("✅ [Excel] Logo inserida via caminho local: $localPath");
+                }
+            } catch (Exception $e2) {
+                error_log("💀 [Excel] Falha total na logo: " . $e2->getMessage());
+            }
         }
     }
     
