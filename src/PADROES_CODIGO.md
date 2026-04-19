@@ -182,7 +182,7 @@ $isACV = ($dominioUpper === 'ACV');
 // Fallbacks hardcoded (sincronizados com clientLogos.ts)
 $fallbacks = [
     'ACV' => 'https://www.webpresto.com.br/images/logos_clientes/aceville.png',
-    'VCS' => 'https://webpresto.com.br/images/logo-verde-simples.png',
+    'VCS' => 'https://sistema.webpresto.com.br/images/logo_preta.png',
     'DEFAULT' => 'https://webpresto.com.br/images/logo_rel.png'
 ];
 
