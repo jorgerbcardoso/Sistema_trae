@@ -86,29 +86,29 @@ try {
             if (!empty($rowLogo['logo_light'])) {
                 $logo_light = $rowLogo['logo_light'];
                 
-                // Garantir URL absoluta
+                // Se for URL absoluta, usar como está
                 if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
                     $logoUrl = $logo_light;
                 } else {
+                    // Se for caminho relativo, converter para absoluto
                     $protocol = 'https';
                     $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
                     $logo_path = ltrim($logo_light, '/');
                     $logoUrl = "{$protocol}://{$host}/{$logo_path}";
                 }
 
-                // Se for a logo padrão da Presto e NÃO formos o domínio XXX, 
-                // verificamos se o usuário quer mesmo exibir (evitar duas logos iguais no PDF, 
-                // mas no Excel como só tem uma, geralmente é desejado se estiver no banco).
-                // No entanto, seguindo a regra de "Logo da Empresa", se a empresa cadastrou a logo da presto, 
-                // vamos assumir que essa é a logo dela por enquanto, a menos que seja ACV.
-                if ($isACV) {
+                // 🚨 DEBUG: Logar URL da logo para o error_log do servidor
+                error_log("📊 [Excel Export] Domínio: $dominioUpper | Logo do Banco: $logo_light | URL Final: $logoUrl");
+                
+                // Exceção ACV: Se for ACV e a logo do banco não for a da Aceville, forçar a correta
+                if ($isACV && strpos($logoUrl, 'aceville') === false) {
                     $logoUrl = 'https://www.webpresto.com.br/images/logos_clientes/aceville.png';
                 }
             }
             $nomeCliente = $rowLogo['name'] ?? '';
         }
     } catch (Exception $e) {
-        // Ignorar erro de busca no banco
+        error_log("❌ [Excel Export] Erro ao buscar logo: " . $e->getMessage());
     }
     
     // 📊 CRIAR PLANILHA EXCEL
@@ -121,7 +121,27 @@ try {
     
     if (!empty($logoUrl)) {
         try {
-            $logoContent = @file_get_contents($logoUrl);
+            // 🚨 Tentar converter URL absoluta para caminho local para o file_get_contents funcionar melhor
+            $localLogoPath = '';
+            $hostname = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+            
+            if (strpos($logoUrl, $hostname) !== false) {
+                // É uma imagem deste servidor! Tentar pegar o caminho real no disco
+                $relativePath = parse_url($logoUrl, PHP_URL_PATH);
+                if ($relativePath) {
+                    // Remover o prefixo da URL (como /sistema/) e adicionar o DOCUMENT_ROOT
+                    $cleanPath = str_replace('/sistema/', '', $relativePath);
+                    $potentialPath = __DIR__ . '/../../' . ltrim($cleanPath, '/');
+                    if (file_exists($potentialPath)) {
+                        $localLogoPath = realpath($potentialPath);
+                    }
+                }
+            }
+
+            $sourcePath = $localLogoPath ?: $logoUrl;
+            error_log("🖼️ [Excel Export] Tentando carregar logo de: $sourcePath");
+            
+            $logoContent = @file_get_contents($sourcePath);
             
             if ($logoContent !== false) {
                 $tempLogoPath = sys_get_temp_dir() . '/logo_' . uniqid() . '.png';
@@ -138,15 +158,18 @@ try {
                 $drawing->setWorksheet($sheet);
                 
                 $logoAdicionada = true;
+                error_log("✅ [Excel Export] Logo inserida com sucesso no Excel");
                 
                 register_shutdown_function(function() use ($tempLogoPath) {
                     if (file_exists($tempLogoPath)) {
                         @unlink($tempLogoPath);
                     }
                 });
+            } else {
+                error_log("⚠️ [Excel Export] Falha ao carregar conteúdo da logo: $sourcePath");
             }
         } catch (Exception $e) {
-            // Ignorar erros de logo
+            error_log("❌ [Excel Export] Erro ao processar logo no Excel: " . $e->getMessage());
         }
     }
     
