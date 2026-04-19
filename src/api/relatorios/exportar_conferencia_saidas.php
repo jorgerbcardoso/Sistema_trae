@@ -81,30 +81,28 @@ try {
         
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo = pg_fetch_assoc($resultLogo);
-            // 1. PRIORIDADE: Logo do banco de dados
+            
+            // 1. PRIORIDADE ABSOLUTA: Logo do banco de dados (coluna logo_light)
             if (!empty($rowLogo['logo_light'])) {
                 $logo_light = $rowLogo['logo_light'];
                 
-                // Se for a logo padrão da Presto e NÃO formos o domínio XXX, NÃO EXIBIR na esquerda
-                // O usuário quer a logo da EMPRESA. Se for igual a da Presto, ele vê duas logos iguais.
-                if (strpos($logo_light, 'logo-verde-simples.png') !== false || 
-                    strpos($logo_light, 'logo_rel.png') !== false) {
-                    if ($dominioUpper !== 'XXX') {
-                        $logoUrl = ''; // Não exibir se for apenas a logo do sistema
-                    } else {
-                        // Domínio XXX (Presto) pode exibir a logo no Excel
-                        $logoUrl = 'https://webpresto.com.br/images/logo_rel.png';
-                    }
+                // Garantir URL absoluta
+                if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
+                    $logoUrl = $logo_light;
                 } else {
-                    // Garantir URL absoluta (seguindo padrão do EmailService.php)
-                    if (strpos($logo_light, 'http://') === 0 || strpos($logo_light, 'https://') === 0) {
-                        $logoUrl = $logo_light;
-                    } else {
-                        $protocol = 'https';
-                        $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
-                        $logo_path = ltrim($logo_light, '/');
-                        $logoUrl = "{$protocol}://{$host}/{$logo_path}";
-                    }
+                    $protocol = 'https';
+                    $host = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+                    $logo_path = ltrim($logo_light, '/');
+                    $logoUrl = "{$protocol}://{$host}/{$logo_path}";
+                }
+
+                // Se for a logo padrão da Presto e NÃO formos o domínio XXX, 
+                // verificamos se o usuário quer mesmo exibir (evitar duas logos iguais no PDF, 
+                // mas no Excel como só tem uma, geralmente é desejado se estiver no banco).
+                // No entanto, seguindo a regra de "Logo da Empresa", se a empresa cadastrou a logo da presto, 
+                // vamos assumir que essa é a logo dela por enquanto, a menos que seja ACV.
+                if ($isACV) {
+                    $logoUrl = 'https://www.webpresto.com.br/images/logos_clientes/aceville.png';
                 }
             }
             $nomeCliente = $rowLogo['name'] ?? '';
