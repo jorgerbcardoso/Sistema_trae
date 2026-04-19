@@ -124,22 +124,29 @@ try {
             // 🚨 Tentar converter URL absoluta para caminho local para o file_get_contents funcionar melhor
             $localLogoPath = '';
             $hostname = $_SERVER['HTTP_HOST'] ?? 'sistema.webpresto.com.br';
+            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '/var/www/html';
             
             if (strpos($logoUrl, $hostname) !== false) {
                 // É uma imagem deste servidor! Tentar pegar o caminho real no disco
-                $relativePath = parse_url($logoUrl, PHP_URL_PATH);
-                if ($relativePath) {
-                    // Remover o prefixo da URL (como /sistema/) e adicionar o DOCUMENT_ROOT
-                    $cleanPath = str_replace('/sistema/', '', $relativePath);
-                    $potentialPath = __DIR__ . '/../../' . ltrim($cleanPath, '/');
+                $urlPath = parse_url($logoUrl, PHP_URL_PATH);
+                if ($urlPath) {
+                    // Tentar caminho absoluto baseado no DOCUMENT_ROOT
+                    $potentialPath = rtrim($docRoot, '/') . $urlPath;
                     if (file_exists($potentialPath)) {
                         $localLogoPath = realpath($potentialPath);
+                    } else {
+                        // Tentar caminhos alternativos se o DOCUMENT_ROOT não bater (ex: /var/www/html/ vs /var/www/html/sistema/)
+                        $cleanPath = str_replace('/sistema/', '/', $urlPath);
+                        $altPath = rtrim($docRoot, '/') . $cleanPath;
+                        if (file_exists($altPath)) {
+                            $localLogoPath = realpath($altPath);
+                        }
                     }
                 }
             }
 
             $sourcePath = $localLogoPath ?: $logoUrl;
-            error_log("🖼️ [Excel Export] Tentando carregar logo de: $sourcePath");
+            error_log("🖼️ [Excel Export] Tentando carregar logo de: $sourcePath (Local: " . ($localLogoPath ? 'SIM' : 'NÃO') . ")");
             
             $logoContent = @file_get_contents($sourcePath);
             
