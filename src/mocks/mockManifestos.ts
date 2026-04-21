@@ -11,6 +11,7 @@ export interface Manifesto {
   placaCarreta: string | null;
   totalFrete: number;
   ctrb: number;
+  codigoCtrb: string; // ✅ NOVO: Código da CTRB (texto)
   pedagio: number;
   pesoTotal: number;
   dataEmissao: string; // YYYY-MM-DD

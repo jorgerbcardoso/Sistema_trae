@@ -94,7 +94,21 @@ export function ManifestosTable({
                 )}
               </Button>
             </th>
-            {/* ✅ ALINHADO À DIREITA: CTRB */}
+            {/* ✅ NOVO: CTRB (código) após Total Frete */}
+            <th className="px-4 py-3 text-center text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onToggleSort('codigoCtrb')}
+                className="flex items-center mx-auto"
+              >
+                CTRB
+                {sortField === 'codigoCtrb' && (
+                  <ArrowUpDown className="w-4 h-4 ml-2" />
+                )}
+              </Button>
+            </th>
+            {/* ✅ ALINHADO À DIREITA: Vlr. CTRB (antigo CTRB) */}
             <th className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
               <Button
                 variant="ghost"
@@ -102,22 +116,8 @@ export function ManifestosTable({
                 onClick={() => onToggleSort('ctrb')}
                 className="flex items-center ml-auto"
               >
-                CTRB
+                Vlr. CTRB
                 {sortField === 'ctrb' && (
-                  <ArrowUpDown className="w-4 h-4 ml-2" />
-                )}
-              </Button>
-            </th>
-            {/* ✅ ALINHADO À DIREITA: Pedágio */}
-            <th className="px-4 py-3 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onToggleSort('pedagio')}
-                className="flex items-center ml-auto"
-              >
-                Pedágio
-                {sortField === 'pedagio' && (
                   <ArrowUpDown className="w-4 h-4 ml-2" />
                 )}
               </Button>
@@ -191,13 +191,13 @@ export function ManifestosTable({
               <td className="px-4 py-3 text-sm text-right font-medium text-green-700 dark:text-green-400">
                 {formatCurrency(manifesto.totalFrete)}
               </td>
-              {/* ✅ ALINHADO À DIREITA: CTRB */}
+              {/* ✅ NOVO: CTRB (código) após Total Frete */}
+              <td className="px-4 py-3 text-sm font-mono text-center text-slate-700 dark:text-slate-300">
+                {manifesto.codigoCtrb || '-'}
+              </td>
+              {/* ✅ ALINHADO À DIREITA: Vlr. CTRB (antigo CTRB) */}
               <td className="px-4 py-3 text-sm text-right text-blue-700 dark:text-blue-400">
                 {formatCurrency(manifesto.ctrb)}
-              </td>
-              {/* ✅ ALINHADO À DIREITA: Pedágio */}
-              <td className="px-4 py-3 text-sm text-right text-orange-700 dark:text-orange-400">
-                {formatCurrency(manifesto.pedagio)}
               </td>
               {/* ✅ ALINHADO À DIREITA: Peso (Kg) */}
               <td className="px-4 py-3 text-sm text-right text-slate-700 dark:text-slate-300">
@@ -221,11 +221,11 @@ export function ManifestosTable({
               <td className="px-4 py-3 text-sm text-right text-green-700 dark:text-green-400">
                 {formatCurrency(totalFrete || 0)}
               </td>
+              <td className="px-4 py-3 text-sm text-center text-slate-900 dark:text-slate-100">
+                {/* Espaço reservado para CTRB (código) - não tem total */}
+              </td>
               <td className="px-4 py-3 text-sm text-right text-blue-700 dark:text-blue-400">
                 {formatCurrency(totalCtrb || 0)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-orange-700 dark:text-orange-400">
-                {formatCurrency(totalPedagio || 0)}
               </td>
               <td className="px-4 py-3 text-sm text-right text-slate-900 dark:text-slate-100">
                 {formatPeso(totalPeso || 0)}

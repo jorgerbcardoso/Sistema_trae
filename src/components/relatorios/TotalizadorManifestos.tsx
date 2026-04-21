@@ -2,7 +2,6 @@ interface TotalizadorManifestosProps {
   qtdRegistros: number;
   totalFrete: number;
   totalCtrb: number;
-  totalPedagio: number;
   totalPeso: number;
   formatCurrency: (value: number) => string;
   formatPeso: (value: number) => string;
@@ -12,7 +11,6 @@ export function TotalizadorManifestos({
   qtdRegistros,
   totalFrete,
   totalCtrb,
-  totalPedagio,
   totalPeso,
   formatCurrency,
   formatPeso
@@ -32,15 +30,9 @@ export function TotalizadorManifestos({
           </div>
         </div>
         <div className="col-span-1 text-right">
-          <div className="text-xs text-slate-600 dark:text-slate-400">CTRB</div>
+          <div className="text-xs text-slate-600 dark:text-slate-400">Vlr. CTRB</div>
           <div className="text-sm font-bold text-blue-700 dark:text-blue-400">
             {formatCurrency(totalCtrb)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="text-xs text-slate-600 dark:text-slate-400">Pedágio</div>
-          <div className="text-sm font-bold text-orange-700 dark:text-orange-400">
-            {formatCurrency(totalPedagio)}
           </div>
         </div>
         <div className="col-span-1 text-right">

@@ -298,8 +298,8 @@ export function ConferenciaSaidas() {
                 <th style="text-align: center;">Destino</th>
                 <th style="text-align: center;">Placa</th>
                 <th style="text-align: right;">Total Frete</th>
-                <th style="text-align: right;">CTRB</th>
-                <th style="text-align: right;">Pedágio</th>
+                <th style="text-align: center;">CTRB</th>
+                <th style="text-align: right;">Vlr. CTRB</th>
                 <th style="text-align: right;">Peso (Kg)</th>
                 <th style="text-align: center;">Emissão</th>
                 <th style="text-align: center;">Saída</th>
@@ -312,8 +312,8 @@ export function ConferenciaSaidas() {
                   <td style="text-align: center;">${m.siglaDestino}</td>
                   <td style="text-align: center; font-family: monospace;">${m.placa}${m.placaCarreta ? ' + ' + m.placaCarreta : ''}</td>
                   <td style="text-align: right;">${formatCurrency(m.totalFrete)}</td>
+                  <td style="text-align: center; font-family: monospace;">${m.codigoCtrb || '-'}</td>
                   <td style="text-align: right;">${formatCurrency(m.ctrb)}</td>
-                  <td style="text-align: right;">${formatCurrency(m.pedagio)}</td>
                   <td style="text-align: right;">${formatPeso(m.pesoTotal)}</td>
                   <td style="text-align: center; font-family: monospace;">${m.dataEmissao || '-'}</td>
                   <td style="text-align: center; font-family: monospace;">${m.horarioSaida || '-'}</td>
@@ -322,8 +322,8 @@ export function ConferenciaSaidas() {
               <tr style="background-color: #f3f4f6; font-weight: bold;">
                 <td colspan="3" style="text-align: center;">TOTAL</td>
                 <td style="text-align: right;">${formatCurrency(totals.totalFrete)}</td>
+                <td style="text-align: center;"></td>
                 <td style="text-align: right;">${formatCurrency(totals.totalCtrb)}</td>
-                <td style="text-align: right;">${formatCurrency(totals.totalPedagio)}</td>
                 <td style="text-align: right;">${formatPeso(totals.totalPeso)}</td>
                 <td colspan="2"></td>
               </tr>
