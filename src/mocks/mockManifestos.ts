@@ -30,7 +30,6 @@ export interface Manifesto {
   motorista?: string;
   cubagem?: number;
   vlrMercadoria?: number;
-  codigoCtrb?: string;
   dataInicioDescarga?: string | null;
   horaInicioDescarga?: string | null;
   dataFimDescarga?: string | null;
@@ -119,6 +118,7 @@ const generateMockManifestos = (): Manifesto[] => {
         placaCarreta: carreta,
         totalFrete,
         ctrb,
+        codigoCtrb: `CTRB${String((idCounter % 12) + 1).padStart(5, '0')}`,
         pedagio,
         pesoTotal,
         dataEmissao: formatDate(dataEmissao),

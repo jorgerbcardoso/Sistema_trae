@@ -228,9 +228,7 @@ try {
         $linhaInicio = 6;
     }
     
-    // 📋 CABEÇALHOS DAS COLUNAS
-    $linhaCabecalho = $linhaInicio;
-    
+    $ultimaColuna = 'T';
     $headers = [
         'A' => 'Manifesto',
         'B' => 'Origem',
@@ -238,30 +236,22 @@ try {
         'D' => 'Placa',
         'E' => 'Placa Carreta',
         'F' => 'Total Frete',
-        'G' => 'CTRB',
-        'H' => 'Código CTRB (SSW)',
-        'I' => 'Pedágio',
-        'J' => 'Peso (Kg)',
-        'K' => 'Peso Calc. (Kg)',
-        'L' => 'Cubagem (m³)',
-        'M' => 'Data Emissão',
-        'N' => 'Data Prev. Chegada',
-        'O' => 'Horário Fim Carga',
-        'P' => 'Saída Efetiva',
-        'Q' => 'Cidade Destino',
-        'R' => 'Proprietário',
-        'S' => 'Motorista',
-        'T' => 'Telefone',
-        'U' => 'Tipo Propriedade',
-        'V' => 'Distância',
-        'W' => 'Frete / Km'
+        'G' => 'Peso (Kg)',
+        'H' => 'Peso Calc. (Kg)',
+        'I' => 'Cubagem (m³)',
+        'J' => 'Data Emissão',
+        'K' => 'Data Prev. Chegada',
+        'L' => 'Horário Fim Carga',
+        'M' => 'Saída Efetiva',
+        'N' => 'Cidade Destino',
+        'O' => 'Proprietário',
+        'P' => 'Motorista',
+        'Q' => 'Telefone',
+        'R' => 'Tipo Propriedade',
+        'S' => 'Distância',
+        'T' => 'Frete / Km'
     ];
-    
-    foreach ($headers as $col => $value) {
-        $sheet->setCellValue($col . $linhaCabecalho, $value);
-    }
-    
-    // 🎨 Estilizar cabeçalho
+
     $headerStyle = [
         'font' => [
             'bold' => true,
@@ -283,166 +273,383 @@ try {
             ]
         ]
     ];
-    
-    $sheet->getStyle('A' . $linhaCabecalho . ':W' . $linhaCabecalho)->applyFromArray($headerStyle);
-    $sheet->getRowDimension($linhaCabecalho)->setRowHeight(25);
-    
-    // 📝 PREENCHER DADOS
-    $linhaAtual = $linhaCabecalho + 1;
-    $processedCtrbsExcel = []; // 🆕 Para evitar duplicidade de valores de CTRB/Pedágio no Excel
-    
-    foreach ($manifestos as $manifesto) {
-        $ctrbId = trim($manifesto['codigoCtrb'] ?? '');
-        $vlrCtrb = floatval($manifesto['ctrb'] ?? 0);
-        $vlrPedagio = floatval($manifesto['pedagio'] ?? 0);
 
-        // 🛡️ LÓGICA DE DEDUPLICAÇÃO PARA TOTAIS DO EXCEL
-        if (!empty($ctrbId) && $ctrbId !== '-') {
-            if (isset($processedCtrbsExcel[$ctrbId])) {
-                $vlrCtrb = 0;
-                $vlrPedagio = 0;
-            } else {
-                $processedCtrbsExcel[$ctrbId] = true;
-            }
-        }
+    $sectionStyle = [
+        'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '1E3A8A']],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'DBEAFE']
+        ],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_LEFT,
+            'vertical' => Alignment::VERTICAL_CENTER
+        ],
+        'borders' => [
+            'allBorders' => [
+                'borderStyle' => Border::BORDER_MEDIUM,
+                'color' => ['rgb' => '93C5FD']
+            ]
+        ]
+    ];
 
-        $sheet->setCellValue('A' . $linhaAtual, $manifesto['numero']);
-        $sheet->setCellValue('B' . $linhaAtual, $manifesto['siglaOrigem']);
-        $sheet->setCellValue('C' . $linhaAtual, $manifesto['siglaDestino']);
-        $sheet->setCellValue('D' . $linhaAtual, $manifesto['placa']);
-        $sheet->setCellValue('E' . $linhaAtual, $manifesto['placaCarreta'] ?: '-');
-        $sheet->setCellValue('F' . $linhaAtual, floatval($manifesto['totalFrete']));
-        $sheet->setCellValue('G' . $linhaAtual, $vlrCtrb); // 🛡️ Valor deduplicado
-        $sheet->setCellValue('H' . $linhaAtual, $manifesto['codigoCtrb'] ?: '-');
-        $sheet->setCellValue('I' . $linhaAtual, $vlrPedagio); // 🛡️ Valor deduplicado
-        $sheet->setCellValue('J' . $linhaAtual, floatval($manifesto['pesoTotal']));
-        $sheet->setCellValue('K' . $linhaAtual, $manifesto['pesoCalc'] ? floatval($manifesto['pesoCalc']) : 0);
-        $sheet->setCellValue('L' . $linhaAtual, $manifesto['cubagem'] ? floatval($manifesto['cubagem']) : 0);
-        
-        // ✅ FORMATAR DATAS COMO DD/MM/YYYY
-        if (!empty($manifesto['dataEmissao']) && $manifesto['dataEmissao'] !== '-') {
-            $dataEmissao = date('d/m/Y', strtotime($manifesto['dataEmissao']));
-            $sheet->setCellValue('M' . $linhaAtual, $dataEmissao);
-        } else {
-            $sheet->setCellValue('M' . $linhaAtual, '-');
-        }
-        
-        if (!empty($manifesto['dataPrevisaoChegada']) && $manifesto['dataPrevisaoChegada'] !== '-') {
-            $dataPrevChegada = date('d/m/Y', strtotime($manifesto['dataPrevisaoChegada']));
-            $sheet->setCellValue('N' . $linhaAtual, $dataPrevChegada);
-        } else {
-            $sheet->setCellValue('N' . $linhaAtual, '-');
-        }
-        
-        $sheet->setCellValue('O' . $linhaAtual, $manifesto['horarioTerminoCarga'] ?: '-');
-        
-        // ✅ COLUNAS P (Saída Efetiva) - DEIXAR EM BRANCO (usuário preenche)
-        $sheet->setCellValue('P' . $linhaAtual, '');
-        
-        $sheet->setCellValue('Q' . $linhaAtual, $manifesto['nomeDestino'] ?: '-');
-        $sheet->setCellValue('R' . $linhaAtual, $manifesto['proprietario'] ?: '-');
-        $sheet->setCellValue('S' . $linhaAtual, $manifesto['motorista'] ?: '-');
-        $sheet->setCellValue('T' . $linhaAtual, $manifesto['telefone'] ?: '-');
-        $sheet->setCellValue('U' . $linhaAtual, $manifesto['tpPropriedade'] === 'F' ? 'FROTA' : 'TERCEIRO');
-        $sheet->setCellValue('V' . $linhaAtual, $manifesto['distancia'] ? intval($manifesto['distancia']) : 0);
-        
-        // ✅ FRETE / KM: Fórmula = Total Frete (F) / Distância (V)
-        // Se distância for 0 ou vazia, deixar em branco para evitar divisão por zero
-        $distancia = $manifesto['distancia'] ? intval($manifesto['distancia']) : 0;
-        if ($distancia > 0) {
-            $sheet->setCellValue('W' . $linhaAtual, '=F' . $linhaAtual . '/V' . $linhaAtual);
-        } else {
-            $sheet->setCellValue('W' . $linhaAtual, '-');
-        }
-        
-        if ($linhaAtual % 2 === 0) {
-            $sheet->getStyle('A' . $linhaAtual . ':W' . $linhaAtual)->applyFromArray([
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'F8FAFC']
-                ]
-            ]);
-        }
-        
-        $linhaAtual++;
-    }
-    
-    $ultimaLinhaDados = $linhaAtual - 1;
-    
-    // 🎨 Formatar valores monetários
-    $sheet->getStyle('F' . ($linhaCabecalho + 1) . ':F' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('G' . ($linhaCabecalho + 1) . ':G' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('I' . ($linhaCabecalho + 1) . ':I' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('W' . ($linhaCabecalho + 1) . ':W' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    
-    // 🎨 Formatar peso e cubagem
-    $sheet->getStyle('J' . ($linhaCabecalho + 1) . ':J' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('#,##0.00');
-    $sheet->getStyle('K' . ($linhaCabecalho + 1) . ':K' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('#,##0.00');
-    $sheet->getStyle('L' . ($linhaCabecalho + 1) . ':L' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('#,##0.00');
-    
-    // 🎨 Formatar distância (número inteiro)
-    $sheet->getStyle('V' . ($linhaCabecalho + 1) . ':V' . $ultimaLinhaDados)->getNumberFormat()->setFormatCode('#,##0');
-    
-    // 🎨 Centralizar
-    $sheet->getStyle('A' . ($linhaCabecalho + 1) . ':E' . $ultimaLinhaDados)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle('M' . ($linhaCabecalho + 1) . ':W' . $ultimaLinhaDados)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    
-    // 🎨 Alinhar direita
-    $sheet->getStyle('F' . ($linhaCabecalho + 1) . ':K' . $ultimaLinhaDados)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    
-    // 🎨 Bordas
-    $sheet->getStyle('A' . $linhaCabecalho . ':W' . $ultimaLinhaDados)->applyFromArray([
+    $sectionSummaryStyle = [
+        'font' => ['bold' => true, 'size' => 10],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_CENTER,
+            'vertical' => Alignment::VERTICAL_CENTER,
+            'wrapText' => true
+        ],
+        'borders' => [
+            'allBorders' => [
+                'borderStyle' => Border::BORDER_THIN,
+                'color' => ['rgb' => 'BFDBFE']
+            ]
+        ]
+    ];
+
+    $groupStyle = [
+        'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '0F172A']],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'EFF6FF']
+        ],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_LEFT,
+            'vertical' => Alignment::VERTICAL_CENTER
+        ],
+        'borders' => [
+            'allBorders' => [
+                'borderStyle' => Border::BORDER_THIN,
+                'color' => ['rgb' => 'BFDBFE']
+            ]
+        ]
+    ];
+
+    $groupMetaStyle = [
+        'font' => ['size' => 10, 'color' => ['rgb' => '334155']],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'FFFFFF']
+        ],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_LEFT,
+            'vertical' => Alignment::VERTICAL_CENTER
+        ],
+        'borders' => [
+            'allBorders' => [
+                'borderStyle' => Border::BORDER_THIN,
+                'color' => ['rgb' => 'DBEAFE']
+            ]
+        ]
+    ];
+
+    $subtotalStyle = [
+        'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '334155']],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'F8FAFC']
+        ],
         'borders' => [
             'allBorders' => [
                 'borderStyle' => Border::BORDER_THIN,
                 'color' => ['rgb' => 'CBD5E1']
             ]
         ]
-    ]);
-    
-    // 📏 Auto-ajustar colunas
-    foreach (range('A', 'W') as $col) {
-        $sheet->getColumnDimension($col)->setAutoSize(true);
-    }
-    
-    // ❄️ Congelar cabeçalho
-    $sheet->freezePane('A' . ($linhaCabecalho + 1));
-    
-    // 📊 Linha TOTAL
-    $linhaTotais = $ultimaLinhaDados + 2;
-    
-    $sheet->setCellValue('A' . $linhaTotais, 'TOTAL');
-    $sheet->mergeCells('A' . $linhaTotais . ':E' . $linhaTotais);
-    $sheet->setCellValue('F' . $linhaTotais, '=SUM(F' . ($linhaCabecalho + 1) . ':F' . $ultimaLinhaDados . ')');
-    $sheet->setCellValue('G' . $linhaTotais, '=SUM(G' . ($linhaCabecalho + 1) . ':G' . $ultimaLinhaDados . ')');
-    $sheet->setCellValue('I' . $linhaTotais, '=SUM(I' . ($linhaCabecalho + 1) . ':I' . $ultimaLinhaDados . ')');
-    $sheet->setCellValue('J' . $linhaTotais, '=SUM(J' . ($linhaCabecalho + 1) . ':J' . $ultimaLinhaDados . ')');
-    
-    // 🎨 Estilizar TOTAL
-    $totalStyle = [
-        'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '1E3A8A']],
-        'fill' => [
-            'fillType' => Fill::FILL_SOLID,
-            'startColor' => ['rgb' => 'DBEAFE']
+    ];
+
+    $agruparPorCtrb = function(array $listaManifestos): array {
+        $grupos = [];
+
+        foreach ($listaManifestos as $manifesto) {
+            $ctrbKey = trim($manifesto['codigoCtrb'] ?? '');
+            if ($ctrbKey === '') {
+                $ctrbKey = '__SEM_CTRB__';
+            }
+
+            if (!isset($grupos[$ctrbKey])) {
+                $grupos[$ctrbKey] = [];
+            }
+
+            $grupos[$ctrbKey][] = $manifesto;
+        }
+
+        $resultado = [];
+
+        foreach ($grupos as $ctrbKey => $itens) {
+            $valorCtrb = 0;
+            $valorPedagio = 0;
+            $totalFrete = 0;
+            $totalPeso = 0;
+
+            foreach ($itens as $item) {
+                $valorCtrb = max($valorCtrb, floatval($item['ctrb'] ?? 0));
+                $valorPedagio = max($valorPedagio, floatval($item['pedagio'] ?? 0));
+                $totalFrete += floatval($item['totalFrete'] ?? 0);
+                $totalPeso += floatval($item['pesoTotal'] ?? 0);
+            }
+
+            $resultado[] = [
+                'codigoCtrb' => $ctrbKey === '__SEM_CTRB__' ? '' : $ctrbKey,
+                'displayCtrb' => $ctrbKey === '__SEM_CTRB__' ? 'SEM CTRB' : $ctrbKey,
+                'valorCtrb' => $valorCtrb,
+                'valorPedagio' => $valorPedagio,
+                'totalFrete' => $totalFrete,
+                'totalPeso' => $totalPeso,
+                'percentualCtrb' => $totalFrete > 0 ? ($valorCtrb / $totalFrete) * 100 : 0,
+                'qtdManifestos' => count($itens),
+                'manifestos' => $itens
+            ];
+        }
+
+        return $resultado;
+    };
+
+    $calcularTotaisSecao = function(array $grupos): array {
+        $totalFrete = 0;
+        $totalPeso = 0;
+        $qtdManifestos = 0;
+
+        foreach ($grupos as $grupo) {
+            $totalFrete += $grupo['totalFrete'];
+            $totalPeso += $grupo['totalPeso'];
+            $qtdManifestos += $grupo['qtdManifestos'];
+        }
+
+        return [
+            'totalFrete' => $totalFrete,
+            'totalPeso' => $totalPeso,
+            'qtdManifestos' => $qtdManifestos,
+            'qtdGrupos' => count($grupos)
+        ];
+    };
+
+    $manifestosFrota = array_values(array_filter($manifestos, function($manifesto) {
+        return ($manifesto['tpPropriedade'] ?? null) === 'F';
+    }));
+
+    $manifestosTerceiros = array_values(array_filter($manifestos, function($manifesto) {
+        return ($manifesto['tpPropriedade'] ?? null) !== 'F';
+    }));
+
+    $secoes = [
+        [
+            'titulo' => 'VEÍCULOS FROTA',
+            'grupos' => $agruparPorCtrb($manifestosFrota)
         ],
-        'borders' => [
-            'allBorders' => [
-                'borderStyle' => Border::BORDER_MEDIUM,
-                'color' => ['rgb' => '2563EB']
-            ]
+        [
+            'titulo' => 'VEÍCULOS TERCEIROS',
+            'grupos' => $agruparPorCtrb($manifestosTerceiros)
         ]
     ];
-    
-    $sheet->getStyle('A' . $linhaTotais . ':W' . $linhaTotais)->applyFromArray($totalStyle);
-    $sheet->getStyle('A' . $linhaTotais)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle('F' . $linhaTotais . ':J' . $linhaTotais)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    $sheet->getRowDimension($linhaTotais)->setRowHeight(25);
-    
-    // 🎨 Formatar TOTAL
-    $sheet->getStyle('F' . $linhaTotais)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('G' . $linhaTotais)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('I' . $linhaTotais)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('J' . $linhaTotais)->getNumberFormat()->setFormatCode('#,##0.00');
+
+    $linhaAtual = $linhaInicio;
+    $primeiraLinhaDados = null;
+
+    foreach ($secoes as $secao) {
+        if (count($secao['grupos']) === 0) {
+            continue;
+        }
+
+        $totaisSecao = $calcularTotaisSecao($secao['grupos']);
+
+        $sheet->setCellValue('A' . $linhaAtual, $secao['titulo']);
+        $sheet->mergeCells('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+        $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($sectionStyle);
+        $sheet->getRowDimension($linhaAtual)->setRowHeight(22);
+        $linhaAtual++;
+
+        $sheet->setCellValue('A' . $linhaAtual, "Grupos CTRB\n" . $totaisSecao['qtdGrupos']);
+        $sheet->mergeCells('A' . $linhaAtual . ':D' . $linhaAtual);
+        $sheet->setCellValue('E' . $linhaAtual, "Manifestos\n" . $totaisSecao['qtdManifestos']);
+        $sheet->mergeCells('E' . $linhaAtual . ':H' . $linhaAtual);
+        $sheet->setCellValue('I' . $linhaAtual, "Total Frete\nR$ " . number_format($totaisSecao['totalFrete'], 2, ',', '.'));
+        $sheet->mergeCells('I' . $linhaAtual . ':L' . $linhaAtual);
+        $sheet->setCellValue('M' . $linhaAtual, "Peso Total\n" . number_format($totaisSecao['totalPeso'], 2, ',', '.'));
+        $sheet->mergeCells('M' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+
+        $sheet->getStyle('A' . $linhaAtual . ':D' . $linhaAtual)->applyFromArray(array_merge($sectionSummaryStyle, [
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'F8FAFC']
+            ]
+        ]));
+        $sheet->getStyle('E' . $linhaAtual . ':H' . $linhaAtual)->applyFromArray(array_merge($sectionSummaryStyle, [
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'F8FAFC']
+            ]
+        ]));
+        $sheet->getStyle('I' . $linhaAtual . ':L' . $linhaAtual)->applyFromArray(array_merge($sectionSummaryStyle, [
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '047857']],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'ECFDF5']
+            ]
+        ]));
+        $sheet->getStyle('M' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray(array_merge($sectionSummaryStyle, [
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '0369A1']],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'F0F9FF']
+            ]
+        ]));
+        $sheet->getRowDimension($linhaAtual)->setRowHeight(34);
+        $linhaAtual++;
+
+        foreach ($secao['grupos'] as $grupo) {
+            $sheet->setCellValue('A' . $linhaAtual, 'CTRB: ' . $grupo['displayCtrb']);
+            $sheet->mergeCells('A' . $linhaAtual . ':J' . $linhaAtual);
+            $sheet->setCellValue('K' . $linhaAtual, 'Manifestos: ' . $grupo['qtdManifestos']);
+            $sheet->mergeCells('K' . $linhaAtual . ':N' . $linhaAtual);
+            $sheet->setCellValue('O' . $linhaAtual, 'Vlr. CTRB: R$ ' . number_format($grupo['valorCtrb'], 2, ',', '.'));
+            $sheet->mergeCells('O' . $linhaAtual . ':Q' . $linhaAtual);
+            $sheet->setCellValue('R' . $linhaAtual, 'Pedágio: R$ ' . number_format($grupo['valorPedagio'], 2, ',', '.'));
+            $sheet->mergeCells('R' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+            $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($groupStyle);
+            $sheet->getRowDimension($linhaAtual)->setRowHeight(20);
+            $linhaAtual++;
+
+            $sheet->setCellValue(
+                'A' . $linhaAtual,
+                sprintf(
+                    'Participação CTRB/Frete: %.1f%% | Peso do grupo: %s',
+                    $grupo['percentualCtrb'],
+                    number_format($grupo['totalPeso'], 2, ',', '.')
+                )
+            );
+            $sheet->mergeCells('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+            $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($groupMetaStyle);
+            $sheet->getRowDimension($linhaAtual)->setRowHeight(18);
+            $linhaAtual++;
+
+            foreach ($headers as $col => $value) {
+                $sheet->setCellValue($col . $linhaAtual, $value);
+            }
+            $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($headerStyle);
+            $sheet->getRowDimension($linhaAtual)->setRowHeight(22);
+            $linhaAtual++;
+
+            if ($primeiraLinhaDados === null) {
+                $primeiraLinhaDados = $linhaAtual;
+            }
+
+            foreach ($grupo['manifestos'] as $manifesto) {
+                $sheet->setCellValue('A' . $linhaAtual, $manifesto['numero']);
+                $sheet->setCellValue('B' . $linhaAtual, $manifesto['siglaOrigem']);
+                $sheet->setCellValue('C' . $linhaAtual, $manifesto['siglaDestino']);
+                $sheet->setCellValue('D' . $linhaAtual, $manifesto['placa']);
+                $sheet->setCellValue('E' . $linhaAtual, $manifesto['placaCarreta'] ?: '-');
+                $sheet->setCellValue('F' . $linhaAtual, floatval($manifesto['totalFrete']));
+                $sheet->setCellValue('G' . $linhaAtual, floatval($manifesto['pesoTotal']));
+                $sheet->setCellValue('H' . $linhaAtual, $manifesto['pesoCalc'] ? floatval($manifesto['pesoCalc']) : 0);
+                $sheet->setCellValue('I' . $linhaAtual, $manifesto['cubagem'] ? floatval($manifesto['cubagem']) : 0);
+
+                if (!empty($manifesto['dataEmissao']) && $manifesto['dataEmissao'] !== '-') {
+                    $sheet->setCellValue('J' . $linhaAtual, date('d/m/Y', strtotime($manifesto['dataEmissao'])));
+                } else {
+                    $sheet->setCellValue('J' . $linhaAtual, '-');
+                }
+
+                if (!empty($manifesto['dataPrevisaoChegada']) && $manifesto['dataPrevisaoChegada'] !== '-') {
+                    $sheet->setCellValue('K' . $linhaAtual, date('d/m/Y', strtotime($manifesto['dataPrevisaoChegada'])));
+                } else {
+                    $sheet->setCellValue('K' . $linhaAtual, '-');
+                }
+
+                $sheet->setCellValue('L' . $linhaAtual, $manifesto['horarioTerminoCarga'] ?: '-');
+                $sheet->setCellValue('M' . $linhaAtual, '');
+                $sheet->setCellValue('N' . $linhaAtual, $manifesto['nomeDestino'] ?: '-');
+                $sheet->setCellValue('O' . $linhaAtual, $manifesto['proprietario'] ?: '-');
+                $sheet->setCellValue('P' . $linhaAtual, $manifesto['motorista'] ?: '-');
+                $sheet->setCellValue('Q' . $linhaAtual, $manifesto['telefone'] ?: '-');
+                $sheet->setCellValue('R' . $linhaAtual, $manifesto['tpPropriedade'] === 'F' ? 'FROTA' : 'TERCEIRO');
+                $sheet->setCellValue('S' . $linhaAtual, $manifesto['distancia'] ? intval($manifesto['distancia']) : 0);
+
+                $distancia = $manifesto['distancia'] ? intval($manifesto['distancia']) : 0;
+                if ($distancia > 0) {
+                    $sheet->setCellValue('T' . $linhaAtual, '=F' . $linhaAtual . '/S' . $linhaAtual);
+                } else {
+                    $sheet->setCellValue('T' . $linhaAtual, '-');
+                }
+
+                $sheet->getStyle('F' . $linhaAtual . ':F' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+                $sheet->getStyle('G' . $linhaAtual . ':I' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle('S' . $linhaAtual . ':S' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle('T' . $linhaAtual . ':T' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+
+                $sheet->getStyle('A' . $linhaAtual . ':E' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('F' . $linhaAtual . ':I' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle('J' . $linhaAtual . ':T' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => 'CBD5E1']
+                        ]
+                    ]
+                ]);
+
+                if ($linhaAtual % 2 === 0) {
+                    $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray([
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'F8FAFC']
+                        ]
+                    ]);
+                }
+
+                $linhaAtual++;
+            }
+
+            $textoSubtotal = sprintf(
+                'SUBTOTAL (%d manifestos)',
+                $grupo['qtdManifestos']
+            );
+            $textoIndicador = sprintf(
+                'CTRB representa %.1f%% do frete',
+                $grupo['percentualCtrb']
+            );
+
+            $sheet->setCellValue('A' . $linhaAtual, $textoSubtotal);
+            $sheet->mergeCells('A' . $linhaAtual . ':E' . $linhaAtual);
+            $sheet->setCellValue('F' . $linhaAtual, $grupo['totalFrete']);
+            $sheet->setCellValue('G' . $linhaAtual, $grupo['totalPeso']);
+            $sheet->setCellValue('H' . $linhaAtual, $textoIndicador);
+            $sheet->mergeCells('H' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+            $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($subtotalStyle);
+            $sheet->getStyle('F' . $linhaAtual . ':F' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+            $sheet->getStyle('G' . $linhaAtual . ':G' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('F' . $linhaAtual . ':G' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getRowDimension($linhaAtual)->setRowHeight(20);
+            $linhaAtual += 2;
+        }
+
+        $sheet->setCellValue('A' . $linhaAtual, 'TOTAL DA SEÇÃO');
+        $sheet->mergeCells('A' . $linhaAtual . ':E' . $linhaAtual);
+        $sheet->setCellValue('F' . $linhaAtual, $totaisSecao['totalFrete']);
+        $sheet->setCellValue('G' . $linhaAtual, $totaisSecao['totalPeso']);
+        $sheet->setCellValue('H' . $linhaAtual, sprintf(
+            '%d grupos CTRB | %d manifestos',
+            $totaisSecao['qtdGrupos'],
+            $totaisSecao['qtdManifestos']
+        ));
+        $sheet->mergeCells('H' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual);
+        $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($sectionStyle);
+        $sheet->getStyle('F' . $linhaAtual . ':F' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+        $sheet->getStyle('G' . $linhaAtual . ':G' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('F' . $linhaAtual . ':G' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $linhaAtual += 2;
+    }
+
+    $ultimaLinhaDados = $linhaAtual - 1;
+
+    foreach (range('A', $ultimaColuna) as $col) {
+        $sheet->getColumnDimension($col)->setAutoSize(true);
+    }
+
+    if ($primeiraLinhaDados !== null) {
+        $sheet->freezePane('A' . $primeiraLinhaDados);
+    }
     
     // 💾 SALVAR EM ARQUIVO TEMPORÁRIO
     $filename = 'Conferencia_Saidas_' . date('Ymd_His') . '.xlsx';

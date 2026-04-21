@@ -34,7 +34,7 @@ import {
   type Manifesto,
   type ManifestosFilters 
 } from '../../services/conferenciaSaidasService';
-import { ManifestosTable } from './ManifestosTable';
+import { ManifestosTable, type ManifestoGroup } from './ManifestosTable';
 
 type SortField = keyof Manifesto;
 type SortDirection = 'asc' | 'desc';
@@ -212,6 +212,47 @@ export function ConferenciaSaidas() {
     });
   };
 
+  const buildManifestoGroups = (manifestosList: Manifesto[]): ManifestoGroup[] => {
+    const groupedManifestos = new Map<string, Manifesto[]>();
+
+    manifestosList.forEach((manifesto) => {
+      const ctrbKey = manifesto.codigoCtrb?.trim() || '__SEM_CTRB__';
+
+      if (!groupedManifestos.has(ctrbKey)) {
+        groupedManifestos.set(ctrbKey, []);
+      }
+
+      groupedManifestos.get(ctrbKey)?.push(manifesto);
+    });
+
+    return Array.from(groupedManifestos.entries()).map(([ctrbKey, groupManifestos]) => {
+      const valorCtrb = groupManifestos.reduce((max, manifesto) => Math.max(max, manifesto.ctrb || 0), 0);
+      const valorPedagio = groupManifestos.reduce((max, manifesto) => Math.max(max, manifesto.pedagio || 0), 0);
+      const totalFrete = groupManifestos.reduce((sum, manifesto) => sum + manifesto.totalFrete, 0);
+      const totalPeso = groupManifestos.reduce((sum, manifesto) => sum + manifesto.pesoTotal, 0);
+
+      return {
+        key: ctrbKey,
+        codigoCtrb: ctrbKey === '__SEM_CTRB__' ? '' : ctrbKey,
+        displayCtrb: ctrbKey === '__SEM_CTRB__' ? 'SEM CTRB' : ctrbKey,
+        valorCtrb,
+        valorPedagio,
+        totalFrete,
+        totalPeso,
+        percentualCtrb: totalFrete > 0 ? (valorCtrb / totalFrete) * 100 : 0,
+        qtdManifestos: groupManifestos.length,
+        manifestos: groupManifestos,
+      };
+    });
+  };
+
+  const calculateSectionSummary = (groups: ManifestoGroup[]) => ({
+    totalFrete: groups.reduce((sum, group) => sum + group.totalFrete, 0),
+    totalPeso: groups.reduce((sum, group) => sum + group.totalPeso, 0),
+    qtdRegistros: groups.reduce((sum, group) => sum + group.qtdManifestos, 0),
+    qtdGrupos: groups.length,
+  });
+
   // ✅ SEPARAR MANIFESTOS: FROTA vs TERCEIROS
   const rawManifestosFrota = manifestos.filter(m => m.tpPropriedade === 'F');
   const rawManifestosTerceiros = manifestos.filter(m => m.tpPropriedade !== 'F');
@@ -229,19 +270,11 @@ export function ConferenciaSaidas() {
     ? sortManifestos(manifestosTerceirosSorted, sortFieldTerceiros, sortDirectionTerceiros)
     : manifestosTerceirosSorted;
 
-  // ✅ CALCULAR TOTALIZADORES (TODOS os registros de cada lista)
-  const calculateTotals = (manifestosList: Manifesto[]) => {
-    return {
-      totalFrete: manifestosList.reduce((sum, m) => sum + m.totalFrete, 0),
-      totalCtrb: manifestosList.reduce((sum, m) => sum + m.ctrb, 0),
-      totalPedagio: manifestosList.reduce((sum, m) => sum + m.pedagio, 0),
-      totalPeso: manifestosList.reduce((sum, m) => sum + m.pesoTotal, 0),
-      qtdRegistros: manifestosList.length
-    };
-  };
+  const gruposFrota = buildManifestoGroups(manifestosFrota);
+  const gruposTerceiros = buildManifestoGroups(manifestosTerceiros);
 
-  const totalsFrota = manifestosFrota.length > 0 ? calculateTotals(manifestosFrota) : null;
-  const totalsTerceiros = manifestosTerceiros.length > 0 ? calculateTotals(manifestosTerceiros) : null;
+  const totalsFrota = gruposFrota.length > 0 ? calculateSectionSummary(gruposFrota) : null;
+  const totalsTerceiros = gruposTerceiros.length > 0 ? calculateSectionSummary(gruposTerceiros) : null;
 
   // Função para alternar a direção de ordenação
   const toggleSortDirectionFrota = (field: SortField) => {
@@ -285,50 +318,117 @@ export function ConferenciaSaidas() {
     // Logo Direita (Sistema): Sempre Presto, EXCETO para ACV
     const logoPresto = 'https://webpresto.com.br/images/logo_rel.png';
 
-    const renderTableHtml = (list: Manifesto[], title: string, totals: any) => {
-      if (list.length === 0) return '';
-      
+    const renderTableHtml = (
+      groups: ManifestoGroup[],
+      title: string,
+      totals: { totalFrete: number; totalPeso: number; qtdRegistros: number; qtdGrupos: number } | null
+    ) => {
+      if (groups.length === 0 || !totals) return '';
+
+      const formatPercent = (value: number) =>
+        `${new Intl.NumberFormat('pt-BR', {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }).format(value)}%`;
+
       return `
         <div class="section">
-          <div class="section-title">${title} (${list.length} registros)</div>
-          <table>
-            <thead>
-              <tr>
-                <th style="text-align: center;">Manifesto</th>
-                <th style="text-align: center;">Destino</th>
-                <th style="text-align: center;">Placa</th>
-                <th style="text-align: right;">Total Frete</th>
-                <th style="text-align: center;">CTRB</th>
-                <th style="text-align: right;">Vlr. CTRB</th>
-                <th style="text-align: right;">Peso (Kg)</th>
-                <th style="text-align: center;">Emissão</th>
-                <th style="text-align: center;">Saída</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${list.map(m => `
-                <tr>
-                  <td style="text-align: center; font-family: monospace;">${m.numero}</td>
-                  <td style="text-align: center;">${m.siglaDestino}</td>
-                  <td style="text-align: center; font-family: monospace;">${m.placa}${m.placaCarreta ? ' + ' + m.placaCarreta : ''}</td>
-                  <td style="text-align: right;">${formatCurrency(m.totalFrete)}</td>
-                  <td style="text-align: center; font-family: monospace;">${m.codigoCtrb || '-'}</td>
-                  <td style="text-align: right;">${formatCurrency(m.ctrb)}</td>
-                  <td style="text-align: right;">${formatPeso(m.pesoTotal)}</td>
-                  <td style="text-align: center; font-family: monospace;">${m.dataEmissao || '-'}</td>
-                  <td style="text-align: center; font-family: monospace;">${m.horarioSaida || '-'}</td>
-                </tr>
-              `).join('')}
-              <tr style="background-color: #f3f4f6; font-weight: bold;">
-                <td colspan="3" style="text-align: center;">TOTAL</td>
-                <td style="text-align: right;">${formatCurrency(totals.totalFrete)}</td>
-                <td style="text-align: center;"></td>
-                <td style="text-align: right;">${formatCurrency(totals.totalCtrb)}</td>
-                <td style="text-align: right;">${formatPeso(totals.totalPeso)}</td>
-                <td colspan="2"></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="section-head">
+            <div>
+              <div class="section-title">${title}</div>
+              <div class="section-subtitle">Grupos organizados por CTRB para leitura operacional, conferencia de frete e peso.</div>
+            </div>
+          </div>
+          <div class="section-summary">
+            <div class="summary-box">
+              <span class="summary-label">Grupos CTRB</span>
+              <strong>${totals.qtdGrupos}</strong>
+            </div>
+            <div class="summary-box">
+              <span class="summary-label">Manifestos</span>
+              <strong>${totals.qtdRegistros}</strong>
+            </div>
+            <div class="summary-box">
+              <span class="summary-label">Total Frete</span>
+              <strong>${formatCurrency(totals.totalFrete)}</strong>
+            </div>
+            <div class="summary-box">
+              <span class="summary-label">Peso Total</span>
+              <strong>${formatPeso(totals.totalPeso)}</strong>
+            </div>
+          </div>
+
+          ${groups.map(group => `
+            <div class="group-card">
+              <div class="group-header">
+                <div class="group-main">
+                  <div class="group-label">Grupo CTRB</div>
+                  <div class="group-code-row">
+                    <div class="group-code">${group.displayCtrb}</div>
+                    <div class="group-badge">${group.qtdManifestos} ${group.qtdManifestos === 1 ? 'manifesto' : 'manifestos'}</div>
+                  </div>
+                  <div class="group-meta">Frete acumulado do grupo: <strong>${formatCurrency(group.totalFrete)}</strong></div>
+                </div>
+                <div class="group-kpis">
+                  <div class="group-kpi">
+                    <span>Vlr. CTRB</span>
+                    <strong>${formatCurrency(group.valorCtrb)}</strong>
+                  </div>
+                  <div class="group-kpi">
+                    <span>Pedágio</span>
+                    <strong>${formatCurrency(group.valorPedagio)}</strong>
+                  </div>
+                  <div class="group-kpi">
+                    <span>CTRB/Frete</span>
+                    <strong>${formatPercent(group.percentualCtrb)}</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="group-progress-wrap">
+                <div class="group-progress-head">
+                  <span>Participacao do CTRB sobre o frete do grupo</span>
+                  <strong>${formatPercent(group.percentualCtrb)}</strong>
+                </div>
+                <div class="group-progress-track">
+                  <div class="group-progress-bar" style="width: ${Math.min(group.percentualCtrb, 100)}%;"></div>
+                </div>
+                <div class="group-weight-box">Peso do grupo: <strong>${formatPeso(group.totalPeso)}</strong></div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="text-align: center;">Manifesto</th>
+                    <th style="text-align: center;">Destino</th>
+                    <th style="text-align: center;">Placa</th>
+                    <th style="text-align: right;">Total Frete</th>
+                    <th style="text-align: right;">Peso (Kg)</th>
+                    <th style="text-align: center;">Emissão</th>
+                    <th style="text-align: center;">Saída</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${group.manifestos.map(m => `
+                    <tr>
+                      <td style="text-align: center; font-family: monospace;">${m.numero}</td>
+                      <td style="text-align: center;">${m.siglaDestino}</td>
+                      <td style="text-align: center; font-family: monospace;">${m.placa}${m.placaCarreta ? ' + ' + m.placaCarreta : ''}</td>
+                      <td style="text-align: right;">${formatCurrency(m.totalFrete)}</td>
+                      <td style="text-align: right;">${formatPeso(m.pesoTotal)}</td>
+                      <td style="text-align: center; font-family: monospace;">${m.dataEmissao || '-'}</td>
+                      <td style="text-align: center; font-family: monospace;">${m.horarioSaida || '-'}</td>
+                    </tr>
+                  `).join('')}
+                  <tr class="subtotal-row">
+                    <td colspan="3" style="text-align: center;">Subtotal</td>
+                    <td style="text-align: right;">${formatCurrency(group.totalFrete)}</td>
+                    <td style="text-align: right;">${formatPeso(group.totalPeso)}</td>
+                    <td colspan="2" style="text-align: right;">CTRB representa ${formatPercent(group.percentualCtrb)} do frete</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          `).join('')}
         </div>
       `;
     };
@@ -383,19 +483,148 @@ export function ConferenciaSaidas() {
             .section {
               margin-bottom: 20px;
             }
+            .section-head {
+              display: flex;
+              justify-content: space-between;
+              align-items: end;
+              margin-bottom: 8px;
+            }
             .section-title {
               font-size: 10pt;
               font-weight: bold;
               color: #1e40af;
-              margin-bottom: 8px;
+              margin-bottom: 2px;
               padding-bottom: 4px;
-              border-bottom: 1px solid #e5e7eb;
               text-transform: uppercase;
+            }
+            .section-subtitle {
+              font-size: 7.5pt;
+              color: #64748b;
+              margin-bottom: 6px;
+            }
+            .section-summary {
+              display: flex;
+              gap: 8px;
+              margin-bottom: 10px;
+            }
+            .summary-box {
+              flex: 1;
+              border: 1px solid #dbeafe;
+              background: #ffffff;
+              border-radius: 10px;
+              padding: 8px;
+            }
+            .summary-label {
+              display: block;
+              font-size: 7pt;
+              text-transform: uppercase;
+              color: #1d4ed8;
+              margin-bottom: 3px;
+            }
+            .group-card {
+              margin-bottom: 12px;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              overflow: hidden;
+            }
+            .group-header {
+              display: flex;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 10px 12px;
+              background: linear-gradient(90deg, #f8fafc 0%, #eff6ff 50%, #f8fafc 100%);
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .group-main {
+              flex: 1;
+            }
+            .group-label {
+              font-size: 7pt;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.12em;
+            }
+            .group-code-row {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-top: 2px;
+            }
+            .group-code {
+              font-size: 11pt;
+              font-family: monospace;
+              font-weight: bold;
+              color: #0f172a;
+            }
+            .group-badge {
+              font-size: 7pt;
+              font-weight: bold;
+              color: #334155;
+              background: #e2e8f0;
+              border-radius: 999px;
+              padding: 3px 8px;
+            }
+            .group-meta {
+              margin-top: 2px;
+              font-size: 7.5pt;
+              color: #475569;
+            }
+            .group-kpis {
+              display: flex;
+              gap: 8px;
+            }
+            .group-kpi {
+              min-width: 90px;
+              border: 1px solid #dbeafe;
+              background: #ffffff;
+              border-radius: 8px;
+              padding: 6px 8px;
+            }
+            .group-kpi span {
+              display: block;
+              font-size: 7pt;
+              color: #64748b;
+              text-transform: uppercase;
+              margin-bottom: 2px;
+            }
+            .group-kpi strong {
+              font-size: 8pt;
+              color: #0f172a;
+            }
+            .group-progress-wrap {
+              padding: 8px 12px 10px;
+              background: #ffffff;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .group-progress-head {
+              display: flex;
+              justify-content: space-between;
+              gap: 8px;
+              font-size: 7pt;
+              color: #64748b;
+              margin-bottom: 4px;
+              text-transform: uppercase;
+            }
+            .group-progress-track {
+              height: 7px;
+              border-radius: 999px;
+              background: #e2e8f0;
+              overflow: hidden;
+            }
+            .group-progress-bar {
+              height: 100%;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #8b5cf6 0%, #3b82f6 100%);
+            }
+            .group-weight-box {
+              margin-top: 6px;
+              font-size: 7.5pt;
+              color: #475569;
+              text-align: right;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 5px;
               font-size: 8pt;
             }
             th {
@@ -409,6 +638,10 @@ export function ConferenciaSaidas() {
             td {
               border: 1px solid #e5e7eb;
               padding: 5px 4px;
+            }
+            .subtotal-row {
+              background-color: #f1f5f9;
+              font-weight: bold;
             }
             .footer {
               margin-top: 30px;
@@ -442,8 +675,8 @@ export function ConferenciaSaidas() {
             </div>
           </div>
 
-          ${renderTableHtml(manifestosFrota, 'VEÍCULOS FROTA', totalsFrota)}
-          ${renderTableHtml(manifestosTerceiros, 'VEÍCULOS TERCEIROS', totalsTerceiros)}
+          ${renderTableHtml(gruposFrota, 'VEÍCULOS FROTA', totalsFrota)}
+          ${renderTableHtml(gruposTerceiros, 'VEÍCULOS TERCEIROS', totalsTerceiros)}
 
           <div class="footer">
             Documento gerado em ${new Date().toLocaleString('pt-BR')} por ${user?.username?.toUpperCase()}<br/>
@@ -645,46 +878,66 @@ export function ConferenciaSaidas() {
                 <>
                   {/* ✅ BLOCO 1: VEÍCULOS FROTA */}
                   {manifestosFrota.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">
-                        VEÍCULOS FROTA ({manifestosFrota.length} {manifestosFrota.length === 1 ? 'manifesto' : 'manifestos'})
-                      </h3>
-                      
+                    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/30">
+                      <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        VEÍCULOS FROTA ({totalsFrota?.qtdGrupos || 0} {totalsFrota?.qtdGrupos === 1 ? 'CTRB' : 'CTRBs'} / {manifestosFrota.length} {manifestosFrota.length === 1 ? 'manifesto' : 'manifestos'})
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            Grupos de frete organizados por CTRB para leitura operacional e conferencia.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs font-medium">
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Frete: {formatCurrency(totalsFrota?.totalFrete || 0)}
+                          </span>
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                            Peso: {formatPeso(totalsFrota?.totalPeso || 0)}
+                          </span>
+                        </div>
+                      </div>
+
                       <ManifestosTable
-                        manifestos={manifestosFrota}
+                        groups={gruposFrota}
                         sortField={sortFieldFrota}
                         sortDirection={sortDirectionFrota}
                         onToggleSort={toggleSortDirectionFrota}
                         formatCurrency={formatCurrency}
                         formatPeso={formatPeso}
-                        totalFrete={totalsFrota?.totalFrete}
-                        totalCtrb={totalsFrota?.totalCtrb}
-                        totalPedagio={totalsFrota?.totalPedagio}
-                        totalPeso={totalsFrota?.totalPeso}
-                        qtdRegistros={totalsFrota?.qtdRegistros}
                       />
                     </div>
                   )}
 
                   {/* ✅ BLOCO 2: VEÍCULOS TERCEIROS */}
                   {manifestosTerceiros.length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4">
-                        VEÍCULOS TERCEIROS ({manifestosTerceiros.length} {manifestosTerceiros.length === 1 ? 'manifesto' : 'manifestos'})
-                      </h3>
-                      
+                    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/30">
+                      <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                        VEÍCULOS TERCEIROS ({totalsTerceiros?.qtdGrupos || 0} {totalsTerceiros?.qtdGrupos === 1 ? 'CTRB' : 'CTRBs'} / {manifestosTerceiros.length} {manifestosTerceiros.length === 1 ? 'manifesto' : 'manifestos'})
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            Segmentacao por CTRB para evidenciar frete, peso e participacao do conhecimento.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs font-medium">
+                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Frete: {formatCurrency(totalsTerceiros?.totalFrete || 0)}
+                          </span>
+                          <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                            Peso: {formatPeso(totalsTerceiros?.totalPeso || 0)}
+                          </span>
+                        </div>
+                      </div>
+
                       <ManifestosTable
-                        manifestos={manifestosTerceiros}
+                        groups={gruposTerceiros}
                         sortField={sortFieldTerceiros}
                         sortDirection={sortDirectionTerceiros}
                         onToggleSort={toggleSortDirectionTerceiros}
                         formatCurrency={formatCurrency}
                         formatPeso={formatPeso}
-                        totalFrete={totalsTerceiros?.totalFrete}
-                        totalCtrb={totalsTerceiros?.totalCtrb}
-                        totalPedagio={totalsTerceiros?.totalPedagio}
-                        totalPeso={totalsTerceiros?.totalPeso}
-                        qtdRegistros={totalsTerceiros?.qtdRegistros}
                       />
                     </div>
                   )}
