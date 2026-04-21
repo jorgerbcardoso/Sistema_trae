@@ -107,6 +107,7 @@ try {
 
     // ✅ ARRAY PARA ARMAZENAR OS MANIFESTOS
     $manifestos = [];
+    $processedCtrbs = []; // 🆕 Para evitar duplicidade de valores de CTRB em manifestos diferentes
 
     // Lendo os manifestos
     for ($i = 0; $i < ($count - 1); $i++)
@@ -149,6 +150,17 @@ try {
       $ctrbNormalizado = '';
       if (trim($ctrb) != '') {
         $ctrbNormalizado = substr(trim($ctrb), 0, 9);
+      }
+
+      // 🛡️ LÓGICA DE DEDUPLICAÇÃO DE VALORES (CTRB)
+      // Se o mesmo CTRB aparece em vários manifestos, o valor deve ser exibido apenas no primeiro
+      $vlr_ctrb_final = strtofloat($vlr_ctrb);
+      if (!empty($ctrbNormalizado)) {
+          if (isset($processedCtrbs[$ctrbNormalizado])) {
+              $vlr_ctrb_final = 0;
+          } else {
+              $processedCtrbs[$ctrbNormalizado] = true;
+          }
       }
 
       // Trata as datas
@@ -198,7 +210,7 @@ try {
           'placa' => $placa_veiculo,
           'placaCarreta' => !empty($carreta) ? $carreta : null,
           'totalFrete' => strtofloat ($vlr_frete),
-          'ctrb' => strtofloat ($vlr_ctrb),
+          'ctrb' => $vlr_ctrb_final, // 🛡️ Valor deduplicado
           'pedagio' => $vlr_pedagio,
           'pesoTotal' => strtofloat ($peso),
           'dataEmissao' => date('d/m/y', strtotime($data_inclusao_formatada)),
@@ -352,9 +364,23 @@ try {
             }
             
             // Atualizar manifestos com vlr_pedagio
+            $processedPedagios = []; // 🆕 Para evitar duplicidade de valores de pedágio em manifestos diferentes
             foreach ($manifestos as &$manifesto) {
                 $ctrb = trim($manifesto['codigoCtrb']);
-                $manifesto['pedagio'] = $pedagioMap[$ctrb] ?? 0;
+                $pedagioValor = $pedagioMap[$ctrb] ?? 0;
+
+                if (!empty($ctrb)) {
+                    if (isset($processedPedagios[$ctrb])) {
+                        $manifesto['pedagio'] = 0;
+                    } else {
+                        $manifesto['pedagio'] = $pedagioValor;
+                        if ($pedagioValor > 0) {
+                            $processedPedagios[$ctrb] = true;
+                        }
+                    }
+                } else {
+                    $manifesto['pedagio'] = 0;
+                }
             }
             unset($manifesto); // Liberar referência
         }

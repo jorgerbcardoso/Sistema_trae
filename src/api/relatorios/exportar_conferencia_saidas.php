@@ -289,17 +289,32 @@ try {
     
     // 📝 PREENCHER DADOS
     $linhaAtual = $linhaCabecalho + 1;
+    $processedCtrbsExcel = []; // 🆕 Para evitar duplicidade de valores de CTRB/Pedágio no Excel
     
     foreach ($manifestos as $manifesto) {
+        $ctrbId = trim($manifesto['codigoCtrb'] ?? '');
+        $vlrCtrb = floatval($manifesto['ctrb'] ?? 0);
+        $vlrPedagio = floatval($manifesto['pedagio'] ?? 0);
+
+        // 🛡️ LÓGICA DE DEDUPLICAÇÃO PARA TOTAIS DO EXCEL
+        if (!empty($ctrbId) && $ctrbId !== '-') {
+            if (isset($processedCtrbsExcel[$ctrbId])) {
+                $vlrCtrb = 0;
+                $vlrPedagio = 0;
+            } else {
+                $processedCtrbsExcel[$ctrbId] = true;
+            }
+        }
+
         $sheet->setCellValue('A' . $linhaAtual, $manifesto['numero']);
         $sheet->setCellValue('B' . $linhaAtual, $manifesto['siglaOrigem']);
         $sheet->setCellValue('C' . $linhaAtual, $manifesto['siglaDestino']);
         $sheet->setCellValue('D' . $linhaAtual, $manifesto['placa']);
         $sheet->setCellValue('E' . $linhaAtual, $manifesto['placaCarreta'] ?: '-');
         $sheet->setCellValue('F' . $linhaAtual, floatval($manifesto['totalFrete']));
-        $sheet->setCellValue('G' . $linhaAtual, floatval($manifesto['ctrb']));
+        $sheet->setCellValue('G' . $linhaAtual, $vlrCtrb); // 🛡️ Valor deduplicado
         $sheet->setCellValue('H' . $linhaAtual, $manifesto['codigoCtrb'] ?: '-');
-        $sheet->setCellValue('I' . $linhaAtual, floatval($manifesto['pedagio']));
+        $sheet->setCellValue('I' . $linhaAtual, $vlrPedagio); // 🛡️ Valor deduplicado
         $sheet->setCellValue('J' . $linhaAtual, floatval($manifesto['pesoTotal']));
         $sheet->setCellValue('K' . $linhaAtual, $manifesto['pesoCalc'] ? floatval($manifesto['pesoCalc']) : 0);
         $sheet->setCellValue('L' . $linhaAtual, $manifesto['cubagem'] ? floatval($manifesto['cubagem']) : 0);
