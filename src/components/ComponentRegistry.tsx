@@ -11,6 +11,7 @@ import { PerformanceEntregas } from './dashboards/PerformanceEntregas';
 import { PerformanceColetas } from './dashboards/PerformanceColetas';
 import { FluxoCaixa } from './dashboards/FluxoCaixa';
 import { FinanceiroDashboard } from './dashboards/FinanceiroDashboard';
+import { CentralAgendamento } from './dashboards/CentralAgendamento';
 import { UserManagement } from './UserManagement';
 import { DomainManagement } from './DomainManagement';
 import { CadastroEventos } from './cadastros/CadastroEventos';
@@ -101,6 +102,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'dashboards/PerformanceColetas': PerformanceColetas,
   'dashboards/FluxoCaixa': FluxoCaixa,
   'dashboards/FinanceiroDashboard': FinanceiroDashboard,
+  'dashboards/CentralAgendamento': CentralAgendamento,
   
   // Outros dashboards (lazy load quando implementados)
   'dashboards/OperacionalDashboard': () => <InDevelopment name="Dashboard Operacional" />,

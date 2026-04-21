@@ -13,6 +13,7 @@ import { LinhasDashboard } from './components/dashboards/LinhasDashboard';
 import { PerformanceEntregas } from './components/dashboards/PerformanceEntregas';
 import { PerformanceColetas } from './components/dashboards/PerformanceColetas';
 import { FluxoCaixa } from './components/dashboards/FluxoCaixa';
+import { CentralAgendamento } from './components/dashboards/CentralAgendamento';
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
@@ -163,6 +164,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <FluxoCaixa />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'dashboards/central-agendamento',
+        element: (
+          <ProtectedRoute>
+            <CentralAgendamento />
           </ProtectedRoute>
         )
       },
