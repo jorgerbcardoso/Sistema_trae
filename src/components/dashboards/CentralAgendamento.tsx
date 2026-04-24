@@ -41,6 +41,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { FilterSelectCliente } from './FilterSelectCliente';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
 import { CalendarioAgendamentos, DiaAgendamento } from './CalendarioAgendamentos';
+import { PerformanceCronologicaAgendamentos, DiaPerformanceAgendamento } from './PerformanceCronologicaAgendamentos';
 import { toast } from 'sonner';
 
 interface ClienteAgendavel {
@@ -175,6 +176,10 @@ export function CentralAgendamento() {
   const [calendarioPeriodo, setCalendarioPeriodo] = useState<7 | 15 | 30>(7);
   const [calendarioDias, setCalendarioDias] = useState<DiaAgendamento[]>([]);
   const [isLoadingCalendario, setIsLoadingCalendario] = useState(false);
+
+  const [performancePeriodo, setPerformancePeriodo] = useState<7 | 15 | 30>(7);
+  const [performanceDias, setPerformanceDias] = useState<DiaPerformanceAgendamento[]>([]);
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
   const [agendEmail, setAgendEmail] = useState('');
   const [agendData, setAgendData] = useState('');
   const [isSendingAgend, setIsSendingAgend] = useState(false);
@@ -213,6 +218,10 @@ export function CentralAgendamento() {
   useEffect(() => {
     carregarCalendario();
   }, [filters, calendarioPeriodo]);
+
+  useEffect(() => {
+    carregarPerformance();
+  }, [filters, performancePeriodo]);
 
   const totalAgendaveis = useMemo(
     () => clientes.filter((cliente) => cliente.agenda).length,
@@ -403,6 +412,29 @@ export function CentralAgendamento() {
       toast.error(error.message || 'Erro ao carregar calendário');
     } finally {
       setIsLoadingCalendario(false);
+    }
+  };
+
+  const carregarPerformance = async () => {
+    try {
+      setIsLoadingPerformance(true);
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_performance_agendamentos.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ periodo: performancePeriodo, filters }),
+        },
+        true
+      );
+      if (response.success) {
+        setPerformanceDias(response.data?.diasData || []);
+      } else {
+        toast.error(response.message || 'Erro ao carregar performance');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao carregar performance');
+    } finally {
+      setIsLoadingPerformance(false);
     }
   };
 
@@ -774,6 +806,13 @@ export function CentralAgendamento() {
             setPeriodo={setCalendarioPeriodo}
             diasData={calendarioDias}
             loading={isLoadingCalendario}
+          />
+
+          <PerformanceCronologicaAgendamentos
+            periodo={performancePeriodo}
+            setPeriodo={setPerformancePeriodo}
+            diasData={performanceDias}
+            loading={isLoadingPerformance}
           />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
