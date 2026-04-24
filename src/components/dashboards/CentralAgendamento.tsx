@@ -523,20 +523,13 @@ export function CentralAgendamento() {
               return (
                 <Card
                   key={relógio.id}
-                  className={`${cfg.bgColor}${relógio.destaque ? ' ring-2 ring-green-400 dark:ring-green-600 ring-offset-2' : ''}`}
+                  className={cfg.bgColor}
                 >
                   <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
-                        {Icone && <Icone className="w-4 h-4" />}
-                        {relógio.nome}
-                      </CardTitle>
-                      {relógio.destaque && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-600 text-white">
-                          Principal
-                        </span>
-                      )}
-                    </div>
+                    <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
+                      {Icone && <Icone className="w-4 h-4" />}
+                      {relógio.nome}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
@@ -545,7 +538,7 @@ export function CentralAgendamento() {
                           <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                         ) : (
                           <>
-                            <div className={`font-bold tabular-nums ${relógio.destaque ? 'text-3xl' : 'text-2xl'} ${cfg.textColor}`}>
+                            <div className={`text-2xl font-bold tabular-nums ${cfg.textColor}`}>
                               {relógio.percentual.toFixed(1)}%
                             </div>
                             <p className={`text-sm mt-1 ${cfg.textColor}`}>

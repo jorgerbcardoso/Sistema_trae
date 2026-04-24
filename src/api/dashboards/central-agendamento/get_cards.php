@@ -85,6 +85,7 @@ $query = "
                  (cte.data_entrega IS NULL     AND cte.data_prev_ent < CURRENT_DATE)
               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)
              )
+            AND c.ult_ocor_agend = 15
             THEN 1 END
         ) AS agendamentos_perdidos,
 
