@@ -238,7 +238,7 @@ export function CentralAgendamento() {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl h-[80vh] overflow-hidden flex flex-col">
+          <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
             <DialogHeader className="shrink-0">
               <DialogTitle>Clientes Agendáveis</DialogTitle>
               <DialogDescription>
@@ -246,7 +246,7 @@ export function CentralAgendamento() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-hidden">
+            <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-4 overflow-hidden">
               <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -280,7 +280,7 @@ export function CentralAgendamento() {
                 <span className="text-xs">Limite técnico de 500 registros por busca</span>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 flex flex-1 min-h-0 flex-col overflow-hidden">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
                 <div className="grid grid-cols-[80px_minmax(0,1fr)_220px_110px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                   <span>Agenda</span>
                   <span>Cliente</span>
