@@ -7,7 +7,7 @@ validateRequestMethod('POST');
 
 $auth = authenticateAndGetUser();
 $domain   = $auth['domain'];
-$username = $auth['username'];
+$username = $auth['user']['username'] ?? '';
 
 $input        = getRequestInput();
 $email        = trim($input['email']        ?? '');

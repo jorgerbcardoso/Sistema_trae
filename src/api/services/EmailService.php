@@ -1622,14 +1622,25 @@ HTML;
                 </tr>
             </table>
 
-            <p style="margin: 0 0 8px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #6b7280;">
+            <p style="margin: 0 0 16px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #6b7280;">
                 Por favor, confirme a disponibilidade para a data sugerida ou entre em contato para combinarmos uma data alternativa.
             </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 0 0 8px; background-color: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px;">
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <p style="margin: 0 0 6px; font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em;">&#128073; Você pode responder este e-mail!</p>
+                        <p style="margin: 0; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #78350f;">
+                            Basta <strong>responder esta mensagem</strong> confirmando o agendamento ou sugerindo uma nova data. Sua resposta chegará diretamente ao responsável pela solicitação.
+                        </p>
+                    </td>
+                </tr>
+            </table>
 HTML;
 
         $html_body = $this->wrapInMainTemplate($inner_content, $domain, $empresa, $usuario, '#059669');
 
-        $text_body = "Olá {$to_name},\n\nSolicitamos o agendamento de entrega de {$total_ctes} CT-e(s) para a data sugerida de {$data_formatada}.\n\nPor favor, confirme a disponibilidade ou entre em contato.\n\nAtenciosamente,\n{$usuario['nome']}\n{$usuario['email']}";
+        $text_body = "Olá {$to_name},\n\nSolicitamos o agendamento de entrega de {$total_ctes} CT-e(s) para a data sugerida de {$data_formatada}.\n\nPor favor, confirme a disponibilidade ou entre em contato.\n\n>>> Você pode RESPONDER este e-mail diretamente com a confirmação! Sua resposta chegará ao responsável pela solicitação. <<<\n\nAtenciosamente,\n{$usuario['nome']}\n{$usuario['email']}";
 
         return $this->sendEmail($to_email, $to_name, $subject, $html_body, $text_body, [], $domain, $empresa['logo_url'], $usuario['email'], $usuario['nome']);
     }
