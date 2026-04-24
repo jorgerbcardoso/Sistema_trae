@@ -92,6 +92,7 @@ if ($cardId === 1) {
         SELECT complemento
         FROM {$domain}_cte_ocorrencia co
         WHERE co.seq_cte = cte.seq_cte
+          AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)
         ORDER BY co.data_inclusao DESC, co.hora_inclusao DESC
         LIMIT 1
     ) ultima_ocor ON true";
@@ -114,6 +115,7 @@ $query = "
         cte.nome_pag,
         cte.nome_dest,
         cte.cnpj_dest,
+        COALESCE(c.email, '') AS email_dest,
         {$ultimaOcorSelect}
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_cliente c       ON cte.cnpj_dest = c.cnpj
@@ -139,6 +141,7 @@ while ($row = pg_fetch_assoc($result)) {
         'nome_pag'     => $row['nome_pag'],
         'nome_dest'    => $row['nome_dest'],
         'cnpj_dest'    => $row['cnpj_dest'],
+        'email_dest'   => $row['email_dest'],
         'ult_ocor'     => $row['ult_ocor'],
     ];
 }

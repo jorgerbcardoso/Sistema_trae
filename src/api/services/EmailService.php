@@ -328,7 +328,7 @@ HTML;
      * @param string $logo_url (Opcional) URL da logo para incorporar como CID
      * @return array ['success' => bool, 'message' => string]
      */
-    public function sendEmail($to_email, $to_name, $subject, $html_body, $text_body = '', $attachments = [], $domain = '', $logo_url = null) {
+    public function sendEmail($to_email, $to_name, $subject, $html_body, $text_body = '', $attachments = [], $domain = '', $logo_url = null, $reply_to_email = null, $reply_to_name = null) {
         error_log("[EmailService] sendEmail INICIADO - Para: {$to_email}");
         try {
             $mail = new PHPMailer(true);
@@ -391,8 +391,12 @@ HTML;
             $mail->setFrom($from_email, $from_name);
             $mail->addAddress($to_email, $to_name);
 
-            // Reply-To (opcional)
-            $mail->addReplyTo($from_email, $from_name);
+            // Reply-To
+            if ($reply_to_email) {
+                $mail->addReplyTo($reply_to_email, $reply_to_name ?: $reply_to_email);
+            } else {
+                $mail->addReplyTo($from_email, $from_name);
+            }
 
             // ====================================================================
             // CONTEÚDO DO EMAIL
@@ -1627,6 +1631,6 @@ HTML;
 
         $text_body = "Olá {$to_name},\n\nSolicitamos o agendamento de entrega de {$total_ctes} CT-e(s) para a data sugerida de {$data_formatada}.\n\nPor favor, confirme a disponibilidade ou entre em contato.\n\nAtenciosamente,\n{$usuario['nome']}\n{$usuario['email']}";
 
-        return $this->sendEmail($to_email, $to_name, $subject, $html_body, $text_body, [], $domain, $empresa['logo_url']);
+        return $this->sendEmail($to_email, $to_name, $subject, $html_body, $text_body, [], $domain, $empresa['logo_url'], $usuario['email'], $usuario['nome']);
     }
 }

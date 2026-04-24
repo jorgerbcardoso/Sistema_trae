@@ -57,6 +57,7 @@ interface Cte {
   nome_pag: string;
   nome_dest: string;
   cnpj_dest: string;
+  email_dest: string;
   ult_ocor: string;
 }
 
@@ -385,23 +386,11 @@ export function CentralAgendamento() {
         true
       );
       if (response.success) {
-        setCtes(response.data?.ctes || []);
+        const ctesData: Cte[] = response.data?.ctes || [];
+        setCtes(ctesData);
 
-        if (relógio.id === 1 && response.data?.ctes?.length > 0) {
-          const primeiroDestCnpj = response.data.ctes[0].cnpj_dest;
-          const emailResult = await apiFetch(
-            `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/clientes_agendaveis_list.php`,
-            { method: 'POST', body: JSON.stringify({ search: '' }) },
-            true
-          );
-          if (emailResult.success) {
-            const clienteEncontrado = (emailResult.clientes || []).find(
-              (c: any) => c.cnpj === primeiroDestCnpj
-            );
-            if (clienteEncontrado?.email) {
-              setAgendEmail(clienteEncontrado.email);
-            }
-          }
+        if (relógio.id === 1 && ctesData.length > 0) {
+          setAgendEmail(ctesData[0].email_dest || '');
         }
       } else {
         toast.error(response.message || 'Erro ao carregar CT-es');
@@ -421,35 +410,26 @@ export function CentralAgendamento() {
       }
       setSelectedCtes((prev) => new Set(prev).add(cte.nro_cte));
       setSelectedCnpjDest(cte.cnpj_dest);
+      if (!selectedCnpjDest) {
+        setAgendEmail(cte.email_dest || '');
+      }
     } else {
       setSelectedCtes((prev) => {
         const next = new Set(prev);
         next.delete(cte.nro_cte);
-        if (next.size === 0) setSelectedCnpjDest(null);
+        if (next.size === 0) {
+          setSelectedCnpjDest(null);
+          setAgendEmail('');
+        }
         return next;
       });
     }
   };
 
-  const abrirDialogAgendamento = async () => {
+  const abrirDialogAgendamento = () => {
     if (selectedCtes.size === 0) {
       toast.warning('Selecione ao menos um CT-e');
       return;
-    }
-    if (!agendEmail && selectedCnpjDest) {
-      try {
-        const emailResult = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/clientes_agendaveis_list.php`,
-          { method: 'POST', body: JSON.stringify({ search: '' }) },
-          true
-        );
-        if (emailResult.success) {
-          const cliente = (emailResult.clientes || []).find(
-            (c: any) => c.cnpj === selectedCnpjDest
-          );
-          if (cliente?.email) setAgendEmail(cliente.email);
-        }
-      } catch {}
     }
     setAgendData('');
     setAgendDialogOpen(true);
