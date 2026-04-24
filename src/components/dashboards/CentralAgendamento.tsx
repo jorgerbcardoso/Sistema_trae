@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Calendar, Check, Filter, Loader2, Search, Settings2, X } from 'lucide-react';
+import { 
+  Building2, 
+  Calendar, 
+  Check, 
+  CheckCircle, 
+  Clock, 
+  ClockCheck, 
+  Filter, 
+  Loader2, 
+  Search, 
+  Settings2, 
+  X,
+  AlertCircle
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
@@ -117,6 +130,18 @@ export function CentralAgendamento() {
     cnpjDestinatario: '',
   });
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
+  const [relógios, setRelógios] = useState<Relógio[]>([]);
+  const [isLoadingRelógios, setIsLoadingRelógios] = useState(false);
+
+  interface Relógio {
+    id: number;
+    nome: string;
+    descricao: string;
+    quantidade: number;
+    percentual: number;
+    cor: string;
+    icone: string;
+  }
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -125,6 +150,10 @@ export function CentralAgendamento() {
 
     loadClientes(searchTerm);
   }, [isDialogOpen, searchTerm]);
+
+  useEffect(() => {
+    carregarRelógios();
+  }, [filters]);
 
   const totalAgendaveis = useMemo(
     () => clientes.filter((cliente) => cliente.agenda).length,
@@ -185,6 +214,16 @@ export function CentralAgendamento() {
     };
 
     setTempFilters(emptyFilters);
+  };
+
+  const getIcone = (nome: string) => {
+    const icones: Record<string, React.ElementType> = {
+      CheckCircle,
+      Clock,
+      ClockCheck,
+      AlertCircle
+    };
+    return icones[nome] || null;
   };
 
   const getPeriodDisplay = () => {
@@ -255,6 +294,34 @@ export function CentralAgendamento() {
         next.delete(cliente.cnpj);
         return next;
       });
+    }
+  };
+
+  const carregarRelógios = async () => {
+    try {
+      setIsLoadingRelógios(true);
+
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_cards.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ filters }),
+        },
+        true
+      );
+
+      if (response.success) {
+        setRelógios(response.relógios || []);
+      } else {
+        setRelógios([]);
+        toast.error(response.message || 'Erro ao carregar relógios');
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar relógios:', error);
+      setRelógios([]);
+      toast.error(error.message || 'Erro ao carregar relógios');
+    } finally {
+      setIsLoadingRelógios(false);
     }
   };
 
@@ -426,78 +493,52 @@ export function CentralAgendamento() {
         </div>
 
         <div className="grid gap-6">
-          <div>
-            <Card>
-              <CardHeader>
-              <CardTitle>Central de Agendamento</CardTitle>
-              <CardDescription>
-                Dashboard para gestão de agendamentos de coletas, entregas e recursos
-              </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-6">
-                  <div className="text-4xl mb-4">AG</div>
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
-                    Central de Agendamento
-                  </h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Sistema de gestão de agendamentos em desenvolvimento
-                  </p>
-
-                  <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                    <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Funcionalidades previstas:
-                    </h4>
-                    <ul className="text-left text-sm text-slate-600 dark:text-slate-400 space-y-1">
-                      <li>• Agendamento de coletas e entregas</li>
-                      <li>• Calendário de recursos e veículos</li>
-                      <li>• Controle de prazos e horários</li>
-                      <li>• Dashboard de performance</li>
-                    </ul>
-                  </div>
-
-                  <div className="mt-4 text-xs text-slate-500 dark:text-slate-500">
-                    Versão: 1.0.0 | Status: Desenvolvimento
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* CARDS DE RELOGIOS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {isLoadingRelógios ? (
+              <div className="col-span-1 md:col-span-2 lg:col-span-4 flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                <span className="ml-3 text-slate-500 dark:text-slate-400">Carregando relógios...</span>
+              </div>
+            ) : relógios.length === 0 ? (
+              <div className="col-span-1 md:col-span-2 lg:col-span-4 flex flex-col items-center justify-center py-12">
+                <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
+                <p className="text-slate-500 dark:text-slate-400">Nenhum dado encontrado para os filtros selecionados</p>
+              </div>
+            ) : (
+              relógios.map((relógio) => {
+                const Icone = getIcone(relógio.icone);
+                return (
+                  <Card key={relógio.id} className="border-l-4" style={{ borderLeftColor: relógio.cor }}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-2">
+                        {Icone && <Icone className="h-5 w-5" style={{ color: relógio.cor }} />}
+                        <CardTitle className="text-sm font-semibold" style={{ color: relógio.cor }}>
+                          {relógio.nome}
+                        </CardTitle>
+                      </div>
+                      <CardDescription className="text-xs mt-1">{relógio.descricao}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <div className="text-3xl font-bold" style={{ color: relógio.cor }}>
+                            {relógio.quantidade}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            {relógio.percentual}% do total
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Métrica 1</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-slate-500 dark:text-slate-500">Em desenvolvimento</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Métrica 2</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-slate-500 dark:text-slate-500">Em desenvolvimento</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Métrica 3</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-slate-500 dark:text-slate-500">Em desenvolvimento</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <div className="grid gap-6">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
             <DialogHeader className="shrink-0">
               <DialogTitle>Clientes Agendáveis</DialogTitle>
@@ -597,6 +638,7 @@ export function CentralAgendamento() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
       </main>
     </DashboardLayout>
   );
