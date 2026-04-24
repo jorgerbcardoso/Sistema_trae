@@ -41,11 +41,10 @@ interface Filters {
   cnpjDestinatario: string;
 }
 
-function getLastMonthPeriod() {
+function getLast30DaysPeriod() {
   const now = new Date();
-  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const firstDay = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-  const lastDay = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+  const past = new Date();
+  past.setDate(now.getDate() - 30);
 
   const formatDate = (date: Date) => {
     const year = date.getFullYear();
@@ -55,8 +54,8 @@ function getLastMonthPeriod() {
   };
 
   return {
-    inicio: formatDate(firstDay),
-    fim: formatDate(lastDay)
+    inicio: formatDate(past),
+    fim: formatDate(now)
   };
 }
 
@@ -100,7 +99,7 @@ function formatPeriodDisplay(inicio: string, fim: string): string {
 export function CentralAgendamento() {
   const { user } = useAuth();
   usePageTitle('Central de Agendamento');
-  const defaultPeriod = getLastMonthPeriod();
+  const defaultPeriod = getLast30DaysPeriod();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -266,16 +265,6 @@ export function CentralAgendamento() {
         <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{getPeriodDisplay()}</p>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => setIsDialogOpen(true)}
-        className="gap-2 dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
-      >
-        <Settings2 className="h-4 w-4" />
-        <span className="hidden md:inline">Clientes Agendáveis</span>
-      </Button>
-
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
         <TooltipProvider>
           <Tooltip>
@@ -409,6 +398,16 @@ export function CentralAgendamento() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsDialogOpen(true)}
+        className="gap-2 dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+      >
+        <Settings2 className="h-4 w-4" />
+        <span className="hidden md:inline">Clientes Agendáveis</span>
+      </Button>
     </div>
   );
 
