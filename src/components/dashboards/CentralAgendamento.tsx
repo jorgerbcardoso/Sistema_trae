@@ -9,7 +9,9 @@ import {
   ClockCheck, 
   Filter, 
   Loader2, 
+  Mail,
   Search, 
+  Send,
   Settings2, 
   X,
   AlertCircle,
@@ -45,6 +47,17 @@ interface ClienteAgendavel {
   nome: string;
   cidade: string;
   agenda: boolean;
+}
+
+interface Cte {
+  ser_cte: string;
+  nro_cte: string;
+  data_emissao: string;
+  data_prev_ent: string;
+  nome_pag: string;
+  nome_dest: string;
+  cnpj_dest: string;
+  ult_ocor: string;
 }
 
 interface Filters {
@@ -142,6 +155,19 @@ export function CentralAgendamento() {
     { id: 5, nome: 'Agendamentos Perdidos',      descricao: 'Sem entrega no prazo ou entregues com atraso',              quantidade: 0, percentual: 0, cor: '#ef4444', icone: 'AlertCircle'   },
   ]);
   const [isLoadingRelógios, setIsLoadingRelógios] = useState(false);
+
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
+  const [cardDialogId, setCardDialogId] = useState<number | null>(null);
+  const [cardDialogNome, setCardDialogNome] = useState('');
+  const [ctes, setCtes] = useState<Cte[]>([]);
+  const [isLoadingCtes, setIsLoadingCtes] = useState(false);
+  const [selectedCtes, setSelectedCtes] = useState<Set<string>>(new Set());
+  const [selectedCnpjDest, setSelectedCnpjDest] = useState<string | null>(null);
+
+  const [agendDialogOpen, setAgendDialogOpen] = useState(false);
+  const [agendEmail, setAgendEmail] = useState('');
+  const [agendData, setAgendData] = useState('');
+  const [isSendingAgend, setIsSendingAgend] = useState(false);
 
   interface Relógio {
     id: number;
@@ -343,6 +369,128 @@ export function CentralAgendamento() {
     }
   };
 
+  const abrirCardDialog = async (relógio: Relógio) => {
+    setCardDialogId(relógio.id);
+    setCardDialogNome(relógio.nome);
+    setSelectedCtes(new Set());
+    setSelectedCnpjDest(null);
+    setCtes([]);
+    setCardDialogOpen(true);
+    setIsLoadingCtes(true);
+
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_ctes_card.php`,
+        { method: 'POST', body: JSON.stringify({ cardId: relógio.id, filters }) },
+        true
+      );
+      if (response.success) {
+        setCtes(response.data?.ctes || []);
+
+        if (relógio.id === 1 && response.data?.ctes?.length > 0) {
+          const primeiroDestCnpj = response.data.ctes[0].cnpj_dest;
+          const emailResult = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/clientes_agendaveis_list.php`,
+            { method: 'POST', body: JSON.stringify({ search: '' }) },
+            true
+          );
+          if (emailResult.success) {
+            const clienteEncontrado = (emailResult.clientes || []).find(
+              (c: any) => c.cnpj === primeiroDestCnpj
+            );
+            if (clienteEncontrado?.email) {
+              setAgendEmail(clienteEncontrado.email);
+            }
+          }
+        }
+      } else {
+        toast.error(response.message || 'Erro ao carregar CT-es');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao carregar CT-es');
+    } finally {
+      setIsLoadingCtes(false);
+    }
+  };
+
+  const handleToggleCte = (cte: Cte, checked: boolean) => {
+    if (checked) {
+      if (selectedCnpjDest && selectedCnpjDest !== cte.cnpj_dest) {
+        toast.warning('Selecione apenas CT-es do mesmo destinatário');
+        return;
+      }
+      setSelectedCtes((prev) => new Set(prev).add(cte.nro_cte));
+      setSelectedCnpjDest(cte.cnpj_dest);
+    } else {
+      setSelectedCtes((prev) => {
+        const next = new Set(prev);
+        next.delete(cte.nro_cte);
+        if (next.size === 0) setSelectedCnpjDest(null);
+        return next;
+      });
+    }
+  };
+
+  const abrirDialogAgendamento = async () => {
+    if (selectedCtes.size === 0) {
+      toast.warning('Selecione ao menos um CT-e');
+      return;
+    }
+    if (!agendEmail && selectedCnpjDest) {
+      try {
+        const emailResult = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/clientes_agendaveis_list.php`,
+          { method: 'POST', body: JSON.stringify({ search: '' }) },
+          true
+        );
+        if (emailResult.success) {
+          const cliente = (emailResult.clientes || []).find(
+            (c: any) => c.cnpj === selectedCnpjDest
+          );
+          if (cliente?.email) setAgendEmail(cliente.email);
+        }
+      } catch {}
+    }
+    setAgendData('');
+    setAgendDialogOpen(true);
+  };
+
+  const handleSolicitarAgendamento = async () => {
+    if (!agendEmail || !agendData) {
+      toast.warning('Informe o e-mail e a data sugerida');
+      return;
+    }
+    setIsSendingAgend(true);
+    try {
+      const ctesSelecionados = ctes.filter((c) => selectedCtes.has(c.nro_cte));
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/solicitar_agendamento.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            email: agendEmail,
+            dataSugerida: agendData,
+            cnpjDest: selectedCnpjDest,
+            ctes: ctesSelecionados,
+          }),
+        },
+        true
+      );
+      if (response.success) {
+        toast.success('Solicitação de agendamento enviada com sucesso!');
+        setAgendDialogOpen(false);
+        setSelectedCtes(new Set());
+        setSelectedCnpjDest(null);
+      } else {
+        toast.error(response.message || 'Erro ao enviar solicitação');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao enviar solicitação');
+    } finally {
+      setIsSendingAgend(false);
+    }
+  };
+
   const headerActions = (
     <div className="flex items-center gap-2 md:gap-4">
       <div className="text-right print:block">
@@ -523,11 +671,12 @@ export function CentralAgendamento() {
               return (
                 <Card
                   key={relógio.id}
-                  className={cfg.bgColor}
+                  className={`${cfg.bgColor} cursor-pointer transition-shadow hover:shadow-md`}
+                  onClick={() => abrirCardDialog(relógio)}
                 >
                   <CardHeader className="pb-2">
                     <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
-                      {Icone && <Icone className="w-4 h-4" />}
+                      {Icone && <Icone className="w-4 h-4 shrink-0" />}
                       {relógio.nome}
                     </CardTitle>
                   </CardHeader>
@@ -673,6 +822,144 @@ export function CentralAgendamento() {
           </DialogContent>
         </Dialog>
         </div>
+
+        <Dialog open={cardDialogOpen} onOpenChange={(open) => { setCardDialogOpen(open); if (!open) { setSelectedCtes(new Set()); setSelectedCnpjDest(null); } }}>
+          <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>{cardDialogNome}</DialogTitle>
+              <DialogDescription>
+                {cardDialogId === 1
+                  ? 'Selecione CT-es do mesmo destinatário para solicitar agendamento.'
+                  : 'Lista de CT-es neste grupo.'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className={`grid h-full min-h-0 gap-3 overflow-hidden ${cardDialogId === 1 ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-rows-[minmax(0,1fr)]'}`}>
+              {cardDialogId === 1 && (
+                <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 dark:border-indigo-800 dark:bg-indigo-950">
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                    Selecione CT-es de <strong>um único destinatário</strong> por vez para solicitar agendamento.
+                    {selectedCtes.size > 0 && (
+                      <span className="ml-2 font-semibold">{selectedCtes.size} selecionado{selectedCtes.size !== 1 ? 's' : ''}</span>
+                    )}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="shrink-0 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    disabled={selectedCtes.size === 0}
+                    onClick={abrirDialogAgendamento}
+                  >
+                    <Mail className="h-4 w-4" />
+                    Solicitar Agendamento
+                  </Button>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]'}`}>
+                  {cardDialogId === 1 && <span></span>}
+                  <span>CT-e</span>
+                  <span>Pagador</span>
+                  <span>Destinatário</span>
+                  <span>Emissão</span>
+                  <span>Prev. Entrega</span>
+                  <span>Últ. Ocorrência</span>
+                </div>
+
+                <div className="min-h-0 overflow-y-auto">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {isLoadingCtes ? (
+                      <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando CT-es...
+                      </div>
+                    ) : ctes.length === 0 ? (
+                      <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                        <CheckCircle className="h-6 w-6" />
+                        Nenhum CT-e encontrado neste grupo.
+                      </div>
+                    ) : (
+                      ctes.map((cte) => {
+                        const isSelected = selectedCtes.has(cte.nro_cte);
+                        const isDisabled = cardDialogId === 1 && !!selectedCnpjDest && selectedCnpjDest !== cte.cnpj_dest;
+                        return (
+                          <div
+                            key={`${cte.ser_cte}-${cte.nro_cte}`}
+                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
+                          >
+                            {cardDialogId === 1 && (
+                              <div className="flex items-center">
+                                <Checkbox
+                                  checked={isSelected}
+                                  disabled={isDisabled}
+                                  onCheckedChange={(checked) => handleToggleCte(cte, !!checked)}
+                                />
+                              </div>
+                            )}
+                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{cte.nro_cte}</span>
+                            <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
+                            <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
+                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
+                            <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={agendDialogOpen} onOpenChange={setAgendDialogOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Solicitar Agendamento</DialogTitle>
+              <DialogDescription>
+                Informe a data sugerida e o e-mail do destinatário. O e-mail será salvo no cadastro do cliente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-100">Data Sugerida</Label>
+                <Input
+                  type="date"
+                  value={agendData}
+                  onChange={(e) => setAgendData(e.target.value)}
+                  className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-100">E-mail do Cliente</Label>
+                <Input
+                  type="email"
+                  placeholder="email@cliente.com.br"
+                  value={agendEmail}
+                  onChange={(e) => setAgendEmail(e.target.value)}
+                  className="dark:bg-slate-800 dark:border-slate-700"
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {selectedCtes.size} CT-e{selectedCtes.size !== 1 ? 's' : ''} selecionado{selectedCtes.size !== 1 ? 's' : ''} para agendamento.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+              <Button variant="outline" onClick={() => setAgendDialogOpen(false)} className="dark:border-slate-700">
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSolicitarAgendamento}
+                disabled={isSendingAgend || !agendEmail || !agendData}
+                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {isSendingAgend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Enviar Solicitação
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </DashboardLayout>
   );

@@ -1551,4 +1551,82 @@ HTML;
 
         return $this->sendEmail($to_email, $to_name, $subject, $html_body, '', [], $domain, $empresa['logo_url']);
     }
+
+    public function sendSolicitacaoAgendamento($to_email, $to_name, $data_sugerida, $ctes, $domain, $username) {
+        $empresa = $this->getEmpresaInfo($domain);
+        $usuario = $this->getUserInfo($domain, $username);
+
+        $subject = $this->formatarAssunto("Solicitação de Agendamento de Entrega", $empresa['name']);
+
+        $data_formatada = date('d/m/Y', strtotime($data_sugerida));
+
+        $linhas_ctes = '';
+        foreach ($ctes as $cte) {
+            $ser  = htmlspecialchars($cte['ser_cte'] ?? '');
+            $nro  = htmlspecialchars($cte['nro_cte'] ?? '');
+            $emit = htmlspecialchars($cte['data_emissao'] ?? '');
+            $prev = htmlspecialchars($cte['data_prev_ent'] ?? '');
+            $pag  = htmlspecialchars($cte['nome_pag'] ?? '');
+            $linhas_ctes .= "
+                <tr>
+                    <td style=\"padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif; font-size: 13px; color: #374151;\">{$ser}{$nro}</td>
+                    <td style=\"padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif; font-size: 13px; color: #374151;\">{$emit}</td>
+                    <td style=\"padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif; font-size: 13px; color: #374151;\">{$prev}</td>
+                    <td style=\"padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-family: Arial, sans-serif; font-size: 13px; color: #374151;\">{$pag}</td>
+                </tr>";
+        }
+
+        $total_ctes = count($ctes);
+
+        $inner_content = <<<HTML
+            <h1 style="margin: 0 0 20px; font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; color: #111827; text-align: center;">
+                Solicitação de Agendamento de Entrega
+            </h1>
+
+            <p style="margin: 0 0 16px; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #4b5563;">
+                Olá <strong>{$to_name}</strong>,
+            </p>
+
+            <p style="margin: 0 0 16px; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.6; color: #4b5563;">
+                Gostaríamos de agendar a entrega dos conhecimentos de transporte listados abaixo.
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 0 0 24px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
+                <thead>
+                    <tr style="background-color: #059669;">
+                        <th style="padding: 10px 12px; text-align: left; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.05em;">CT-e</th>
+                        <th style="padding: 10px 12px; text-align: left; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.05em;">Emissão</th>
+                        <th style="padding: 10px 12px; text-align: left; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.05em;">Prev. Entrega</th>
+                        <th style="padding: 10px 12px; text-align: left; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.05em;">Pagador</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {$linhas_ctes}
+                </tbody>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 0 0 24px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                <tr>
+                    <td style="padding: 16px 20px;">
+                        <p style="margin: 0 0 6px; font-family: Arial, sans-serif; font-size: 13px; color: #166534; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Data Sugerida para Agendamento</p>
+                        <p style="margin: 0; font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; color: #15803d;">{$data_formatada}</p>
+                    </td>
+                    <td style="padding: 16px 20px; text-align: right;">
+                        <p style="margin: 0 0 6px; font-family: Arial, sans-serif; font-size: 13px; color: #166534; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Total de CT-es</p>
+                        <p style="margin: 0; font-family: Arial, sans-serif; font-size: 22px; font-weight: bold; color: #15803d;">{$total_ctes}</p>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="margin: 0 0 8px; font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #6b7280;">
+                Por favor, confirme a disponibilidade para a data sugerida ou entre em contato para combinarmos uma data alternativa.
+            </p>
+HTML;
+
+        $html_body = $this->wrapInMainTemplate($inner_content, $domain, $empresa, $usuario, '#059669');
+
+        $text_body = "Olá {$to_name},\n\nSolicitamos o agendamento de entrega de {$total_ctes} CT-e(s) para a data sugerida de {$data_formatada}.\n\nPor favor, confirme a disponibilidade ou entre em contato.\n\nAtenciosamente,\n{$usuario['nome']}\n{$usuario['email']}";
+
+        return $this->sendEmail($to_email, $to_name, $subject, $html_body, $text_body, [], $domain, $empresa['logo_url']);
+    }
 }
