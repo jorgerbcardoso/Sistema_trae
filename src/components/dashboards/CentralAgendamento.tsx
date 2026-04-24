@@ -536,9 +536,8 @@ export function CentralAgendamento() {
               })
             )}
           </div>
-        </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
             <DialogHeader className="shrink-0">
               <DialogTitle>Clientes Agendáveis</DialogTitle>
