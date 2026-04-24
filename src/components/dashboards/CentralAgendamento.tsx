@@ -658,6 +658,11 @@ export function CentralAgendamento() {
           </p>
         </div>
 
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+          <Calendar className="h-4 w-4 shrink-0" />
+          Clique nos cards para visualizar os CT-es do grupo.
+        </div>
+
         <div className="grid gap-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             {relógios.map((relógio) => {
@@ -674,7 +679,7 @@ export function CentralAgendamento() {
                   className={`${cfg.bgColor} cursor-pointer transition-shadow hover:shadow-md`}
                   onClick={() => abrirCardDialog(relógio)}
                 >
-                  <CardHeader className="pb-2">
+                  <CardHeader className="pb-2 min-h-[56px]">
                     <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
                       {Icone && <Icone className="w-4 h-4 shrink-0" />}
                       {relógio.nome}
@@ -896,7 +901,7 @@ export function CentralAgendamento() {
                                 />
                               </div>
                             )}
-                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{cte.nro_cte}</span>
+                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
                             <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                             <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
