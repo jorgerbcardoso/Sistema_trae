@@ -239,15 +239,15 @@ export function CentralAgendamento() {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader className="shrink-0">
               <DialogTitle>Clientes Agendáveis</DialogTitle>
               <DialogDescription>
                 Defina quais clientes agendam mercadorias com recorrência. A listagem traz até 500 registros, priorizando os clientes já marcados.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 min-h-0 overflow-hidden">
               <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -281,7 +281,7 @@ export function CentralAgendamento() {
                 <span className="text-xs">Limite técnico de 500 registros por busca</span>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 flex h-full min-h-0 flex-col">
                 <div className="grid grid-cols-[80px_minmax(0,1fr)_220px_110px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                   <span>Agenda</span>
                   <span>Cliente</span>
@@ -289,7 +289,7 @@ export function CentralAgendamento() {
                   <span className="text-right">CNPJ</span>
                 </div>
 
-                <ScrollArea className="h-[420px]">
+                <ScrollArea className="flex-1 min-h-0">
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {isLoadingClientes ? (
                       <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
