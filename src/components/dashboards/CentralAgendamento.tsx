@@ -312,7 +312,7 @@ export function CentralAgendamento() {
       );
 
       if (response.success) {
-        setRelógios(response.relógios || []);
+        setRelógios(response.data?.relogios || []);
       } else {
         setRelógios([]);
         toast.error(response.message || 'Erro ao carregar relógios');
@@ -638,7 +638,7 @@ export function CentralAgendamento() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+        </div>
       </main>
     </DashboardLayout>
   );

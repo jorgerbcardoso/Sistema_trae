@@ -160,7 +160,7 @@ pg_free_result($result);
 $query = "
     SELECT
         -- Relógio 1: CT-es Agendáveis (cliente marcado com agenda=true E ult_ocor_agend IS NULL ou 0)
-        COUNT(CASE WHEN c.cliente_agenda IS NOT NULL AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0) THEN 1 END) as agendaveis,
+        COUNT(CASE WHEN c.agenda = true AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0) THEN 1 END) as agendaveis,
 
         -- Relógio 2: Aguardando Agendamento (ult_ocor_agend = 14)
         COUNT(CASE WHEN cte.ult_ocor_agend = 14 THEN 1 END) as aguardando_agendamento,
@@ -199,7 +199,7 @@ $agendamentosPerdidos = (int)$row['agendamentos_perdidos'];
 // ✅ CALCULAR PERCENTUAIS (baseado no total de CT-es filtrados)
 $totalFiltrado = $agendaveis + $aguardandoAgendamento + $agendadosNoPrazo + $agendamentosPerdidos;
 
-$relógios = [
+$relogios = [
     [
         'id' => 1,
         'nome' => 'CT-es Agendáveis',
@@ -241,6 +241,6 @@ $relógios = [
 respondJson([
     'success' => true,
     'data' => [
-        'relógios' => $relógios
+        'relogios' => $relogios
     ]
 ]);
