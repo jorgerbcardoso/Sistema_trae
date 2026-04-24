@@ -131,7 +131,12 @@ export function CentralAgendamento() {
     cnpjDestinatario: '',
   });
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
-  const [relógios, setRelógios] = useState<Relógio[]>([]);
+  const [relógios, setRelógios] = useState<Relógio[]>([
+    { id: 1, nome: 'CT-es Agendáveis',       descricao: 'Clientes agendáveis sem ocorrência de agendamento',    quantidade: 0, percentual: 0, cor: '#10b981', icone: 'CheckCircle' },
+    { id: 2, nome: 'Aguardando Agendamento', descricao: 'CT-es com ocorrência 14 (aguardando agendamento)',      quantidade: 0, percentual: 0, cor: '#3b82f6', icone: 'Clock'        },
+    { id: 3, nome: 'Agendados no Prazo',     descricao: 'Ocorrência 15 com previsão de entrega futura',         quantidade: 0, percentual: 0, cor: '#10b981', icone: 'ClockCheck'   },
+    { id: 4, nome: 'Agendamentos Perdidos',  descricao: 'Ocorrência 15 com previsão de entrega vencida',        quantidade: 0, percentual: 0, cor: '#ef4444', icone: 'AlertCircle'  },
+  ]);
   const [isLoadingRelógios, setIsLoadingRelógios] = useState(false);
 
   interface Relógio {
@@ -496,46 +501,39 @@ export function CentralAgendamento() {
         <div className="grid gap-6">
           {/* CARDS DE RELOGIOS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {isLoadingRelógios ? (
-              <div className="col-span-1 md:col-span-2 lg:col-span-4 flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                <span className="ml-3 text-slate-500 dark:text-slate-400">Carregando relógios...</span>
-              </div>
-            ) : relógios.length === 0 ? (
-              <div className="col-span-1 md:col-span-2 lg:col-span-4 flex flex-col items-center justify-center py-12">
-                <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-slate-500 dark:text-slate-400">Nenhum dado encontrado para os filtros selecionados</p>
-              </div>
-            ) : (
-              relógios.map((relógio) => {
-                const Icone = getIcone(relógio.icone);
-                return (
-                  <Card key={relógio.id} className="border-l-4" style={{ borderLeftColor: relógio.cor }}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2">
-                        {Icone && <Icone className="h-5 w-5" style={{ color: relógio.cor }} />}
-                        <CardTitle className="text-sm font-semibold" style={{ color: relógio.cor }}>
-                          {relógio.nome}
-                        </CardTitle>
+            {relógios.map((relógio) => {
+              const Icone = getIcone(relógio.icone);
+              return (
+                <Card key={relógio.id} className="relative overflow-hidden border-l-4" style={{ borderLeftColor: relógio.cor }}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      {Icone && <Icone className="h-5 w-5 shrink-0" style={{ color: relógio.cor }} />}
+                      <CardTitle className="text-sm font-semibold leading-tight" style={{ color: relógio.cor }}>
+                        {relógio.nome}
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-xs mt-1">{relógio.descricao}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingRelógios ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        <span className="text-sm text-slate-400">Carregando...</span>
                       </div>
-                      <CardDescription className="text-xs mt-1">{relógio.descricao}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <div className="text-3xl font-bold" style={{ color: relógio.cor }}>
-                            {relógio.quantidade}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {relógio.percentual}% do total
-                          </div>
+                    ) : (
+                      <div>
+                        <div className="text-4xl font-bold tabular-nums" style={{ color: relógio.cor }}>
+                          {relógio.quantidade}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          {relógio.percentual}% do total filtrado
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
