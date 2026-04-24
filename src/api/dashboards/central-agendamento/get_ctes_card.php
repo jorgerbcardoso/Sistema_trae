@@ -80,32 +80,6 @@ switch ($cardId) {
 
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
-$ultimaOcorJoin = '';
-$ultimaOcorSelect = "CASE
-            WHEN cte.ult_ocor_agend IS NOT NULL AND cte.ult_ocor_agend <> 0
-            THEN CAST(cte.ult_ocor_agend AS TEXT) || ' - ' || COALESCE(ocor.descricao, '')
-            ELSE ''
-        END AS ult_ocor";
-
-if ($cardId === 1) {
-    $ultimaOcorJoin = "LEFT JOIN LATERAL (
-        SELECT complemento
-        FROM {$domain}_cte_ocorrencia co
-        WHERE co.seq_cte = cte.seq_cte
-          AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)
-        ORDER BY co.data_inclusao DESC, co.hora_inclusao DESC
-        LIMIT 1
-    ) ultima_ocor ON true";
-
-    $ultimaOcorSelect = "CASE
-            WHEN cte.ult_ocor_agend IS NOT NULL AND cte.ult_ocor_agend <> 0
-            THEN CAST(cte.ult_ocor_agend AS TEXT) || ' - ' || COALESCE(ocor.descricao, '')
-            WHEN ultima_ocor.complemento IS NOT NULL AND ultima_ocor.complemento <> ''
-            THEN ultima_ocor.complemento
-            ELSE ''
-        END AS ult_ocor";
-}
-
 $query = "
     SELECT
         cte.ser_cte,
@@ -117,11 +91,14 @@ $query = "
         cte.nome_dest,
         cte.cnpj_dest,
         COALESCE(c.email, '') AS email_dest,
-        {$ultimaOcorSelect}
+        CASE
+            WHEN cte.ult_ocor IS NOT NULL AND cte.ult_ocor <> 0
+            THEN LPAD(cte.ult_ocor::text, 2, '0') || ' - ' || COALESCE(ocor.descricao, '')
+            ELSE ''
+        END AS ult_ocor
     FROM {$domain}_cte cte
-    LEFT JOIN {$domain}_cliente c       ON cte.cnpj_dest = c.cnpj
-    LEFT JOIN {$domain}_ocorrencia ocor ON cte.ult_ocor_agend::text = ocor.codigo::text
-    {$ultimaOcorJoin}
+    LEFT JOIN {$domain}_cliente    c    ON cte.cnpj_dest = c.cnpj
+    LEFT JOIN {$domain}_ocorrencia ocor ON cte.ult_ocor  = ocor.codigo
     $whereClause
     ORDER BY cte.cnpj_dest, cte.nome_dest, cte.data_emissao DESC
 ";
