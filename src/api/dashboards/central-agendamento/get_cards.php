@@ -87,9 +87,7 @@ $query = "
              )
             AND cte.ult_ocor_agend = 15
             THEN 1 END
-        ) AS agendamentos_perdidos,
-
-        COUNT(*) AS total_filtrado
+        ) AS agendamentos_perdidos
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj
     $whereClause
@@ -103,14 +101,15 @@ if (!$result) {
 
 $row = pg_fetch_assoc($result);
 
-$agendaveis           = (int)($row['agendaveis']            ?? 0);
-$aguardando           = (int)($row['aguardando_agendamento'] ?? 0);
-$agendadosNoPrazo     = (int)($row['agendados_no_prazo']    ?? 0);
-$cumpridos            = (int)($row['agendamentos_cumpridos'] ?? 0);
-$perdidos             = (int)($row['agendamentos_perdidos']  ?? 0);
-$totalFiltrado        = (int)($row['total_filtrado']         ?? 0);
+$agendaveis       = (int)($row['agendaveis']            ?? 0);
+$aguardando       = (int)($row['aguardando_agendamento'] ?? 0);
+$agendadosNoPrazo = (int)($row['agendados_no_prazo']    ?? 0);
+$cumpridos        = (int)($row['agendamentos_cumpridos'] ?? 0);
+$perdidos         = (int)($row['agendamentos_perdidos']  ?? 0);
 
-$pct = fn($v) => $totalFiltrado > 0 ? round(($v / $totalFiltrado) * 100, 1) : 0;
+$total = $agendaveis + $aguardando + $agendadosNoPrazo + $cumpridos + $perdidos;
+
+$pct = fn($v) => $total > 0 ? round(($v / $total) * 100, 1) : 0;
 
 respondJson([
     'success' => true,
@@ -163,6 +162,6 @@ respondJson([
                 'icone'     => 'AlertCircle',
             ],
         ],
-        'totalFiltrado' => $totalFiltrado,
+        'totalFiltrado' => $total,
     ],
 ]);
