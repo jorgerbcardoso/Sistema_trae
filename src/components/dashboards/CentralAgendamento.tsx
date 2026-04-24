@@ -40,6 +40,7 @@ import { Label } from '../ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectCliente } from './FilterSelectCliente';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
+import { CalendarioAgendamentos, DiaAgendamento } from './CalendarioAgendamentos';
 import { toast } from 'sonner';
 
 interface ClienteAgendavel {
@@ -170,6 +171,10 @@ export function CentralAgendamento() {
   const [pendingCte, setPendingCte] = useState<Cte | null>(null);
 
   const [agendDialogOpen, setAgendDialogOpen] = useState(false);
+
+  const [calendarioPeriodo, setCalendarioPeriodo] = useState<7 | 15 | 30>(15);
+  const [calendarioDias, setCalendarioDias] = useState<DiaAgendamento[]>([]);
+  const [isLoadingCalendario, setIsLoadingCalendario] = useState(false);
   const [agendEmail, setAgendEmail] = useState('');
   const [agendData, setAgendData] = useState('');
   const [isSendingAgend, setIsSendingAgend] = useState(false);
@@ -204,6 +209,10 @@ export function CentralAgendamento() {
   useEffect(() => {
     carregarRelógios();
   }, [filters]);
+
+  useEffect(() => {
+    carregarCalendario();
+  }, [filters, calendarioPeriodo]);
 
   const totalAgendaveis = useMemo(
     () => clientes.filter((cliente) => cliente.agenda).length,
@@ -371,6 +380,29 @@ export function CentralAgendamento() {
       toast.error(error.message || 'Erro ao carregar relógios');
     } finally {
       setIsLoadingRelógios(false);
+    }
+  };
+
+  const carregarCalendario = async () => {
+    try {
+      setIsLoadingCalendario(true);
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_calendario_agendamentos.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ periodo: calendarioPeriodo, filters }),
+        },
+        true
+      );
+      if (response.success) {
+        setCalendarioDias(response.data?.diasData || []);
+      } else {
+        toast.error(response.message || 'Erro ao carregar calendário');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao carregar calendário');
+    } finally {
+      setIsLoadingCalendario(false);
     }
   };
 
@@ -736,6 +768,13 @@ export function CentralAgendamento() {
               );
             })}
           </div>
+
+          <CalendarioAgendamentos
+            periodo={calendarioPeriodo}
+            setPeriodo={setCalendarioPeriodo}
+            diasData={calendarioDias}
+            loading={isLoadingCalendario}
+          />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
