@@ -172,7 +172,7 @@ export function CentralAgendamento() {
 
   const [agendDialogOpen, setAgendDialogOpen] = useState(false);
 
-  const [calendarioPeriodo, setCalendarioPeriodo] = useState<7 | 15 | 30>(15);
+  const [calendarioPeriodo, setCalendarioPeriodo] = useState<7 | 15 | 30>(7);
   const [calendarioDias, setCalendarioDias] = useState<DiaAgendamento[]>([]);
   const [isLoadingCalendario, setIsLoadingCalendario] = useState(false);
   const [agendEmail, setAgendEmail] = useState('');

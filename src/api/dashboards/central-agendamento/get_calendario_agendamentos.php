@@ -51,7 +51,7 @@ $query = "
     WITH dias AS (
         SELECT generate_series(
             CURRENT_DATE - INTERVAL '{$periodo} days',
-            CURRENT_DATE + INTERVAL '{$periodo} days',
+            CURRENT_DATE + INTERVAL '7 days',
             '1 day'::interval
         )::date AS dia
     ),

@@ -73,11 +73,11 @@ export function CalendarioAgendamentos({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         ) : (
-          <div className={`grid gap-3 ${
-            periodo === 7  ? 'grid-cols-7' :
-            periodo === 15 ? 'grid-cols-5 md:grid-cols-8' :
-            'grid-cols-5 md:grid-cols-7 lg:grid-cols-10'
-          }`}>
+          <div className="overflow-x-auto">
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${diasData.length}, minmax(80px, 1fr))` }}
+          >
             {diasData.map((dia, index) => {
               const performance = dia.agendados > 0
                 ? (dia.entregues / dia.agendados) * 100
@@ -168,6 +168,7 @@ export function CalendarioAgendamentos({
                 </div>
               );
             })}
+          </div>
           </div>
         )}
       </CardContent>
