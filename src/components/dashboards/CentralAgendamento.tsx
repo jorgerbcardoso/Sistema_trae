@@ -11,7 +11,8 @@ import {
   Search, 
   Settings2, 
   X,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
