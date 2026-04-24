@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Building2, 
   Calendar, 
+  CalendarCheck,
   Check, 
   CheckCircle, 
   Clock, 
@@ -12,8 +13,9 @@ import {
   Settings2, 
   X,
   AlertCircle,
-  FileText
 } from 'lucide-react';
+import { PieChart, Pie, Cell } from 'recharts';
+import { useTheme } from '../ThemeProvider';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
@@ -112,6 +114,7 @@ function formatPeriodDisplay(inicio: string, fim: string): string {
  */
 export function CentralAgendamento() {
   const { user } = useAuth();
+  const { theme } = useTheme();
   usePageTitle('Central de Agendamento');
   const defaultPeriod = getLast30DaysPeriod();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -132,10 +135,11 @@ export function CentralAgendamento() {
   });
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
   const [relógios, setRelógios] = useState<Relógio[]>([
-    { id: 1, nome: 'CT-es Agendáveis',       descricao: 'Clientes agendáveis sem ocorrência de agendamento',    quantidade: 0, percentual: 0, cor: '#10b981', icone: 'CheckCircle' },
-    { id: 2, nome: 'Aguardando Agendamento', descricao: 'CT-es com ocorrência 14 (aguardando agendamento)',      quantidade: 0, percentual: 0, cor: '#3b82f6', icone: 'Clock'        },
-    { id: 3, nome: 'Agendados no Prazo',     descricao: 'Ocorrência 15 com previsão de entrega futura',         quantidade: 0, percentual: 0, cor: '#10b981', icone: 'ClockCheck'   },
-    { id: 4, nome: 'Agendamentos Perdidos',  descricao: 'Ocorrência 15 com previsão de entrega vencida',        quantidade: 0, percentual: 0, cor: '#ef4444', icone: 'AlertCircle'  },
+    { id: 1, nome: 'CT-es Agendáveis',          descricao: 'Clientes agendáveis sem ocorrência de agendamento',         quantidade: 0, percentual: 0, cor: '#6366f1', icone: 'CalendarCheck' },
+    { id: 2, nome: 'Aguardando Agendamento',     descricao: 'CT-es com ocorrência 14 (aguardando agendamento)',          quantidade: 0, percentual: 0, cor: '#3b82f6', icone: 'Clock'         },
+    { id: 3, nome: 'Agendados ainda no Prazo',   descricao: 'Ocorrência 15, previsão futura e sem entrega registrada',   quantidade: 0, percentual: 0, cor: '#10b981', icone: 'ClockCheck'    },
+    { id: 4, nome: 'Agendamentos Cumpridos',     descricao: 'Entregues dentro do prazo previsto',                        quantidade: 0, percentual: 0, cor: '#059669', icone: 'CheckCircle', destaque: true },
+    { id: 5, nome: 'Agendamentos Perdidos',      descricao: 'Sem entrega no prazo ou entregues com atraso',              quantidade: 0, percentual: 0, cor: '#ef4444', icone: 'AlertCircle'   },
   ]);
   const [isLoadingRelógios, setIsLoadingRelógios] = useState(false);
 
@@ -147,7 +151,16 @@ export function CentralAgendamento() {
     percentual: number;
     cor: string;
     icone: string;
+    destaque?: boolean;
   }
+
+  const cardConfig: Record<number, { bgColor: string; textColor: string; emptyColor: string; emptyColorDark: string }> = {
+    1: { bgColor: 'bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800', textColor: 'text-indigo-700 dark:text-indigo-300', emptyColor: '#e0e7ff', emptyColorDark: '#1e1b4b' },
+    2: { bgColor: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',     textColor: 'text-blue-700 dark:text-blue-300',   emptyColor: '#dbeafe', emptyColorDark: '#1e3a8a' },
+    3: { bgColor: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800', textColor: 'text-emerald-700 dark:text-emerald-300', emptyColor: '#d1fae5', emptyColorDark: '#064e3b' },
+    4: { bgColor: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800',   textColor: 'text-green-700 dark:text-green-300',   emptyColor: '#dcfce7', emptyColorDark: '#14532d' },
+    5: { bgColor: 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800',             textColor: 'text-red-700 dark:text-red-300',     emptyColor: '#fee2e2', emptyColorDark: '#7f1d1d' },
+  };
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -224,10 +237,11 @@ export function CentralAgendamento() {
 
   const getIcone = (nome: string) => {
     const icones: Record<string, React.ElementType> = {
+      CalendarCheck,
       CheckCircle,
       Clock,
       ClockCheck,
-      AlertCircle
+      AlertCircle,
     };
     return icones[nome] || null;
   };
@@ -316,15 +330,13 @@ export function CentralAgendamento() {
         true
       );
 
-      if (response.success) {
-        setRelógios(response.data?.relogios || []);
-      } else {
-        setRelógios([]);
+      if (response.success && Array.isArray(response.data?.relogios) && response.data.relogios.length > 0) {
+        setRelógios(response.data.relogios);
+      } else if (!response.success) {
         toast.error(response.message || 'Erro ao carregar relógios');
       }
     } catch (error: any) {
       console.error('Erro ao carregar relógios:', error);
-      setRelógios([]);
       toast.error(error.message || 'Erro ao carregar relógios');
     } finally {
       setIsLoadingRelógios(false);
@@ -499,37 +511,68 @@ export function CentralAgendamento() {
         </div>
 
         <div className="grid gap-6">
-          {/* CARDS DE RELOGIOS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             {relógios.map((relógio) => {
               const Icone = getIcone(relógio.icone);
+              const cfg = cardConfig[relógio.id] ?? cardConfig[1];
+              const donutData = [
+                { name: 'value', value: relógio.percentual },
+                { name: 'empty', value: Math.max(0, 100 - relógio.percentual) },
+              ];
+
               return (
-                <Card key={relógio.id} className="relative overflow-hidden border-l-4" style={{ borderLeftColor: relógio.cor }}>
+                <Card
+                  key={relógio.id}
+                  className={`${cfg.bgColor}${relógio.destaque ? ' ring-2 ring-green-400 dark:ring-green-600 ring-offset-2' : ''}`}
+                >
                   <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      {Icone && <Icone className="h-5 w-5 shrink-0" style={{ color: relógio.cor }} />}
-                      <CardTitle className="text-sm font-semibold leading-tight" style={{ color: relógio.cor }}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
+                        {Icone && <Icone className="w-4 h-4" />}
                         {relógio.nome}
                       </CardTitle>
+                      {relógio.destaque && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-600 text-white">
+                          Principal
+                        </span>
+                      )}
                     </div>
-                    <CardDescription className="text-xs mt-1">{relógio.descricao}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {isLoadingRelógios ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                        <span className="text-sm text-slate-400">Carregando...</span>
-                      </div>
-                    ) : (
+                    <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-4xl font-bold tabular-nums" style={{ color: relógio.cor }}>
-                          {relógio.quantidade}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          {relógio.percentual}% do total filtrado
-                        </div>
+                        {isLoadingRelógios ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        ) : (
+                          <>
+                            <div className={`font-bold tabular-nums ${relógio.destaque ? 'text-3xl' : 'text-2xl'} ${cfg.textColor}`}>
+                              {relógio.percentual.toFixed(1)}%
+                            </div>
+                            <p className={`text-sm mt-1 ${cfg.textColor}`}>
+                              {relógio.quantidade} CT-e{relógio.quantidade !== 1 ? 's' : ''}
+                            </p>
+                          </>
+                        )}
                       </div>
-                    )}
+                      <div style={{ width: 80, height: 80 }}>
+                        <PieChart width={80} height={80}>
+                          <Pie
+                            data={donutData}
+                            cx={40}
+                            cy={40}
+                            innerRadius={20}
+                            outerRadius={35}
+                            startAngle={90}
+                            endAngle={-270}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            <Cell fill={relógio.cor} />
+                            <Cell fill={theme === 'dark' ? cfg.emptyColorDark : cfg.emptyColor} />
+                          </Pie>
+                        </PieChart>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               );

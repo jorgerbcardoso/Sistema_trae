@@ -55,10 +55,39 @@ $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
 $query = "
     SELECT
-        COUNT(CASE WHEN c.agenda = true AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0) THEN 1 END) AS agendaveis,
-        COUNT(CASE WHEN cte.ult_ocor_agend = 14 THEN 1 END) AS aguardando_agendamento,
-        COUNT(CASE WHEN cte.ult_ocor_agend = 15 AND cte.data_prev_ent >= CURRENT_DATE THEN 1 END) AS agendados_no_prazo,
-        COUNT(CASE WHEN cte.ult_ocor_agend = 15 AND cte.data_prev_ent < CURRENT_DATE THEN 1 END) AS agendamentos_perdidos,
+        COUNT(CASE
+            WHEN c.agenda = true
+             AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)
+            THEN 1 END
+        ) AS agendaveis,
+
+        COUNT(CASE
+            WHEN cte.ult_ocor_agend = 14
+            THEN 1 END
+        ) AS aguardando_agendamento,
+
+        COUNT(CASE
+            WHEN cte.ult_ocor_agend = 15
+             AND cte.data_prev_ent >= CURRENT_DATE
+             AND cte.data_entrega IS NULL
+            THEN 1 END
+        ) AS agendados_no_prazo,
+
+        COUNT(CASE
+            WHEN cte.ult_ocor_agend = 15
+             AND cte.data_entrega IS NOT NULL
+             AND cte.data_entrega <= cte.data_prev_ent
+            THEN 1 END
+        ) AS agendamentos_cumpridos,
+
+        COUNT(CASE
+            WHEN (
+                 (cte.data_entrega IS NULL     AND cte.data_prev_ent < CURRENT_DATE)
+              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)
+             )
+            THEN 1 END
+        ) AS agendamentos_perdidos,
+
         COUNT(*) AS total_filtrado
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj
@@ -73,11 +102,12 @@ if (!$result) {
 
 $row = pg_fetch_assoc($result);
 
-$agendaveis          = (int)($row['agendaveis'] ?? 0);
-$aguardando          = (int)($row['aguardando_agendamento'] ?? 0);
-$agendadosNoPrazo    = (int)($row['agendados_no_prazo'] ?? 0);
-$agendamentosPerdidos = (int)($row['agendamentos_perdidos'] ?? 0);
-$totalFiltrado       = (int)($row['total_filtrado'] ?? 0);
+$agendaveis           = (int)($row['agendaveis']            ?? 0);
+$aguardando           = (int)($row['aguardando_agendamento'] ?? 0);
+$agendadosNoPrazo     = (int)($row['agendados_no_prazo']    ?? 0);
+$cumpridos            = (int)($row['agendamentos_cumpridos'] ?? 0);
+$perdidos             = (int)($row['agendamentos_perdidos']  ?? 0);
+$totalFiltrado        = (int)($row['total_filtrado']         ?? 0);
 
 $pct = fn($v) => $totalFiltrado > 0 ? round(($v / $totalFiltrado) * 100, 1) : 0;
 
@@ -91,8 +121,8 @@ respondJson([
                 'descricao' => 'Clientes agendáveis sem ocorrência de agendamento',
                 'quantidade' => $agendaveis,
                 'percentual' => $pct($agendaveis),
-                'cor'       => '#10b981',
-                'icone'     => 'CheckCircle',
+                'cor'       => '#6366f1',
+                'icone'     => 'CalendarCheck',
             ],
             [
                 'id'        => 2,
@@ -105,8 +135,8 @@ respondJson([
             ],
             [
                 'id'        => 3,
-                'nome'      => 'Agendados no Prazo',
-                'descricao' => 'Ocorrência 15 com previsão de entrega futura',
+                'nome'      => 'Agendados ainda no Prazo',
+                'descricao' => 'Ocorrência 15, previsão futura e sem entrega registrada',
                 'quantidade' => $agendadosNoPrazo,
                 'percentual' => $pct($agendadosNoPrazo),
                 'cor'       => '#10b981',
@@ -114,10 +144,20 @@ respondJson([
             ],
             [
                 'id'        => 4,
+                'nome'      => 'Agendamentos Cumpridos',
+                'descricao' => 'Entregues dentro do prazo previsto',
+                'quantidade' => $cumpridos,
+                'percentual' => $pct($cumpridos),
+                'cor'       => '#059669',
+                'icone'     => 'CheckCircle',
+                'destaque'  => true,
+            ],
+            [
+                'id'        => 5,
                 'nome'      => 'Agendamentos Perdidos',
-                'descricao' => 'Ocorrência 15 com previsão de entrega vencida',
-                'quantidade' => $agendamentosPerdidos,
-                'percentual' => $pct($agendamentosPerdidos),
+                'descricao' => 'Sem entrega no prazo ou entregues com atraso',
+                'quantidade' => $perdidos,
+                'percentual' => $pct($perdidos),
                 'cor'       => '#ef4444',
                 'icone'     => 'AlertCircle',
             ],
