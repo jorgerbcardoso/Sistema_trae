@@ -112,6 +112,7 @@ $query = "
         cte.nro_cte,
         TO_CHAR(cte.data_emissao, 'DD/MM/YYYY')  AS data_emissao,
         TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
+        TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
         cte.nome_pag,
         cte.nome_dest,
         cte.cnpj_dest,
@@ -119,10 +120,10 @@ $query = "
         {$ultimaOcorSelect}
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_cliente c       ON cte.cnpj_dest = c.cnpj
-    LEFT JOIN {$domain}_ocorrencia ocor ON cte.ult_ocor_agend = ocor.codigo
+    LEFT JOIN {$domain}_ocorrencia ocor ON cte.ult_ocor_agend::text = ocor.codigo::text
     {$ultimaOcorJoin}
     $whereClause
-    ORDER BY cte.nome_dest, cte.data_emissao DESC
+    ORDER BY cte.cnpj_dest, cte.nome_dest, cte.data_emissao DESC
 ";
 
 $result = pg_query_params($conn, $query, $params);
@@ -140,8 +141,9 @@ while ($row = pg_fetch_assoc($result)) {
         'data_prev_ent'=> $row['data_prev_ent'],
         'nome_pag'     => $row['nome_pag'],
         'nome_dest'    => $row['nome_dest'],
-        'cnpj_dest'    => $row['cnpj_dest'],
-        'email_dest'   => $row['email_dest'],
+        'cnpj_dest'       => $row['cnpj_dest'],
+        'email_dest'      => $row['email_dest'],
+        'data_prev_ent_iso' => $row['data_prev_ent_iso'],
         'ult_ocor'     => $row['ult_ocor'],
     ];
 }

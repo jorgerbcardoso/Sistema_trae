@@ -54,6 +54,7 @@ interface Cte {
   nro_cte: string;
   data_emissao: string;
   data_prev_ent: string;
+  data_prev_ent_iso: string;
   nome_pag: string;
   nome_dest: string;
   cnpj_dest: string;
@@ -412,6 +413,7 @@ export function CentralAgendamento() {
       setSelectedCnpjDest(cte.cnpj_dest);
       if (!selectedCnpjDest) {
         setAgendEmail(cte.email_dest || '');
+        setAgendData(cte.data_prev_ent_iso || '');
       }
     } else {
       setSelectedCtes((prev) => {
@@ -431,7 +433,6 @@ export function CentralAgendamento() {
       toast.warning('Selecione ao menos um CT-e');
       return;
     }
-    setAgendData('');
     setAgendDialogOpen(true);
   };
 
@@ -659,7 +660,7 @@ export function CentralAgendamento() {
                   className={`${cfg.bgColor} cursor-pointer transition-shadow hover:shadow-md`}
                   onClick={() => abrirCardDialog(relógio)}
                 >
-                  <CardHeader className="pb-2 min-h-[56px]">
+                  <CardHeader className="pb-2 h-[56px]">
                     <CardTitle className={`text-sm ${cfg.textColor} flex items-center gap-2`}>
                       {Icone && <Icone className="w-4 h-4 shrink-0" />}
                       {relógio.nome}
