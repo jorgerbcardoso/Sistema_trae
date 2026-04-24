@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 
@@ -289,7 +288,7 @@ export function CentralAgendamento() {
                   <span className="text-right">CNPJ</span>
                 </div>
 
-                <ScrollArea className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {isLoadingClientes ? (
                       <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -308,7 +307,7 @@ export function CentralAgendamento() {
                         return (
                           <label
                             key={cliente.cnpj}
-                            className="grid cursor-pointer grid-cols-[80px_minmax(0,1fr)_220px_110px] gap-3 px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                            className="grid cursor-pointer grid-cols-[80px_minmax(0,1fr)_220px_110px] gap-3 px-4 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50"
                           >
                             <div className="flex items-center">
                               <Checkbox
@@ -321,14 +320,11 @@ export function CentralAgendamento() {
                               <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                                 {cliente.nome || 'CLIENTE SEM NOME'}
                               </div>
-                              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                {cliente.agenda ? 'Cliente recorrente para agendamento' : 'Não marcado para agendamento'}
-                              </div>
                             </div>
-                            <div className="truncate text-sm text-slate-600 dark:text-slate-300">
+                            <div className="truncate self-center text-sm text-slate-600 dark:text-slate-300">
                               {cliente.cidade || '-'}
                             </div>
-                            <div className="text-right text-xs font-mono text-slate-500 dark:text-slate-400">
+                            <div className="self-center text-right text-xs font-mono text-slate-500 dark:text-slate-400">
                               {isSaving ? 'Salvando...' : cliente.cnpj}
                             </div>
                           </label>
@@ -336,7 +332,7 @@ export function CentralAgendamento() {
                       })
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           </DialogContent>
