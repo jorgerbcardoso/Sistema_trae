@@ -166,6 +166,9 @@ export function CentralAgendamento() {
   const [selectedCtes, setSelectedCtes] = useState<Set<string>>(new Set());
   const [selectedCnpjDest, setSelectedCnpjDest] = useState<string | null>(null);
 
+  const [confirmAllDialogOpen, setConfirmAllDialogOpen] = useState(false);
+  const [pendingCte, setPendingCte] = useState<Cte | null>(null);
+
   const [agendDialogOpen, setAgendDialogOpen] = useState(false);
   const [agendEmail, setAgendEmail] = useState('');
   const [agendData, setAgendData] = useState('');
@@ -403,18 +406,30 @@ export function CentralAgendamento() {
     }
   };
 
+  const selecionarCte = (cte: Cte) => {
+    setSelectedCtes((prev) => new Set(prev).add(cte.nro_cte));
+    setSelectedCnpjDest(cte.cnpj_dest);
+    if (!selectedCnpjDest) {
+      setAgendEmail(cte.email_dest || '');
+      setAgendData(cte.data_prev_ent_iso || '');
+    }
+  };
+
   const handleToggleCte = (cte: Cte, checked: boolean) => {
     if (checked) {
       if (selectedCnpjDest && selectedCnpjDest !== cte.cnpj_dest) {
         toast.warning('Selecione apenas CT-es do mesmo destinatário');
         return;
       }
-      setSelectedCtes((prev) => new Set(prev).add(cte.nro_cte));
-      setSelectedCnpjDest(cte.cnpj_dest);
       if (!selectedCnpjDest) {
-        setAgendEmail(cte.email_dest || '');
-        setAgendData(cte.data_prev_ent_iso || '');
+        const outrosCtesDest = ctes.filter((c) => c.cnpj_dest === cte.cnpj_dest && c.nro_cte !== cte.nro_cte);
+        if (outrosCtesDest.length > 0) {
+          setPendingCte(cte);
+          setConfirmAllDialogOpen(true);
+          return;
+        }
       }
+      selecionarCte(cte);
     } else {
       setSelectedCtes((prev) => {
         const next = new Set(prev);
@@ -426,6 +441,21 @@ export function CentralAgendamento() {
         return next;
       });
     }
+  };
+
+  const handleConfirmAllDest = (marcarTodos: boolean) => {
+    if (!pendingCte) return;
+    setConfirmAllDialogOpen(false);
+    if (marcarTodos) {
+      const ctesDoDest = ctes.filter((c) => c.cnpj_dest === pendingCte.cnpj_dest);
+      setSelectedCtes(new Set(ctesDoDest.map((c) => c.nro_cte)));
+      setSelectedCnpjDest(pendingCte.cnpj_dest);
+      setAgendEmail(pendingCte.email_dest || '');
+      setAgendData(pendingCte.data_prev_ent_iso || '');
+    } else {
+      selecionarCte(pendingCte);
+    }
+    setPendingCte(null);
   };
 
   const abrirDialogAgendamento = () => {
@@ -842,11 +872,12 @@ export function CentralAgendamento() {
               )}
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]'}`}>
+                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
                   {cardDialogId === 1 && <span></span>}
                   <span>CT-e</span>
                   <span>Pagador</span>
                   <span>Destinatário</span>
+                  <span>CNPJ</span>
                   <span>Emissão</span>
                   <span>Prev. Entrega</span>
                   <span>Últ. Ocorrência</span>
@@ -871,7 +902,7 @@ export function CentralAgendamento() {
                         return (
                           <div
                             key={`${cte.ser_cte}-${cte.nro_cte}`}
-                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
+                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
                           >
                             {cardDialogId === 1 && (
                               <div className="flex items-center">
@@ -885,6 +916,7 @@ export function CentralAgendamento() {
                             <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
                             <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                             <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
+                            <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
                             <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
@@ -895,6 +927,25 @@ export function CentralAgendamento() {
                   </div>
                 </div>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={confirmAllDialogOpen} onOpenChange={setConfirmAllDialogOpen}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Marcar todos os CT-es?</DialogTitle>
+              <DialogDescription>
+                Deseja marcar todos os CT-es deste destinatário?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+              <Button variant="outline" onClick={() => handleConfirmAllDest(false)} className="dark:border-slate-700">
+                Não
+              </Button>
+              <Button onClick={() => handleConfirmAllDest(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                Sim
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
