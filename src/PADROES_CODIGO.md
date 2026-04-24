@@ -12,6 +12,63 @@
 
 ## TypeScript/React
 
+### **0. Padrão de Dashboards**
+
+Todo componente de dashboard DEVE seguir esta estrutura:
+
+```tsx
+export function MeuDashboard() {
+  const { user } = useAuth();
+  usePageTitle('Nome do Dashboard');
+
+  const headerActions = (
+    <div className="flex items-center gap-2 md:gap-4">
+      {/* Exibição do período ativo */}
+      <div className="text-right">
+        <p className="text-slate-500 dark:text-slate-400 text-xs hidden md:block">Período</p>
+        <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{getPeriodDisplay()}</p>
+      </div>
+      {/* Botão de filtros */}
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="icon">
+            <Filter className="w-4 h-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          {/* campos de filtro */}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+
+  return (
+    <DashboardLayout
+      title="Nome do Dashboard"
+      description={user?.client_name}
+      headerActions={headerActions}
+    >
+      <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Subtítulo Descritivo</h2>
+          <p className="text-slate-500 dark:text-slate-400">Descrição curta da funcionalidade</p>
+        </div>
+        {/* conteúdo */}
+      </main>
+    </DashboardLayout>
+  );
+}
+```
+
+**Regras obrigatórias:**
+- `DashboardLayout` com `title` (nome da tela) e `description={user?.client_name}` (nome da empresa na segunda linha do cabeçalho)
+- Wrapper interno: `<main className="container mx-auto px-3 md:px-6 py-6 space-y-6">`
+- Título interno: `<h2 className="text-2xl font-semibold ...">` — nunca `text-3xl`
+- Filtros: sempre via `Dialog` com `tempFilters` + `applyFilters` + `cancelFilters` + `clearFilters`
+- Período padrão: mês anterior completo (ou mês atual se dia > 10)
+
+---
+
 ### **1. Componentes**
 
 #### **Estrutura Padrão**
@@ -62,6 +119,46 @@ export default function MeuComponente() {
   );
 }
 ```
+
+#### **Dashboards: Cabeçalho e Título Interno**
+```typescript
+// ✅ CORRETO - Dashboards devem usar DashboardLayout com título no header
+// e nome da empresa (client_name) na segunda linha do cabeçalho.
+const { user } = useAuth();
+
+return (
+  <DashboardLayout
+    title="Nome do Dashboard"
+    description={user?.client_name}
+    headerActions={<MeusFiltrosOuAcoes />}
+  >
+    <div>
+      <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">
+        Título interno do painel
+      </h2>
+      <p className="text-slate-500 dark:text-slate-400">
+        Subtítulo descritivo do conteúdo
+      </p>
+    </div>
+  </DashboardLayout>
+);
+
+// ❌ ERRADO - Recriar cabeçalho manual dentro da tela
+return (
+  <DashboardLayout>
+    <div className="flex items-center justify-between">
+      <h1 className="text-3xl font-bold">Nome do Dashboard</h1>
+    </div>
+  </DashboardLayout>
+);
+```
+
+- Para dashboards, o cabeçalho oficial é o do `DashboardLayout`
+- O `title` vai na primeira linha do header
+- O `description` deve usar `user?.client_name` para exibir o nome da empresa na segunda linha
+- Filtros e botões do painel devem ir em `headerActions`
+- O título interno do conteúdo deve seguir o padrão `text-2xl font-semibold`
+- Evitar `h1 text-3xl` dentro do corpo da tela quando já existe header padrão
 
 ### **2. Hooks**
 

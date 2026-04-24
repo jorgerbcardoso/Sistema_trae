@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Calendar, Loader2, Search, Settings2 } from 'lucide-react';
+import { Building2, Calendar, Check, Filter, Loader2, Search, Settings2, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
@@ -15,8 +15,13 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '../ui/dialog';
 import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { FilterSelectCliente } from './FilterSelectCliente';
+import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
 import { toast } from 'sonner';
 
 interface ClienteAgendavel {
@@ -24,6 +29,66 @@ interface ClienteAgendavel {
   nome: string;
   cidade: string;
   agenda: boolean;
+}
+
+interface Filters {
+  periodoEmissaoInicio: string;
+  periodoEmissaoFim: string;
+  periodoPrevisaoInicio: string;
+  periodoPrevisaoFim: string;
+  unidadeDestino: string[];
+  cnpjPagador: string;
+  cnpjDestinatario: string;
+}
+
+function getLastMonthPeriod() {
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const firstDay = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+  const lastDay = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    inicio: formatDate(firstDay),
+    fim: formatDate(lastDay)
+  };
+}
+
+function formatPeriodDisplay(inicio: string, fim: string): string {
+  if (!inicio && !fim) return '';
+
+  const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  const parseDate = (dateStr: string) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('-');
+    return {
+      year: parseInt(parts[0], 10),
+      month: parseInt(parts[1], 10),
+      day: parseInt(parts[2], 10)
+    };
+  };
+
+  const start = parseDate(inicio);
+  const end = parseDate(fim);
+
+  if (!start || !end) return '';
+
+  if (start.month === end.month && start.year === end.year) {
+    return `${MONTHS[start.month - 1]} ${start.year}`;
+  }
+
+  if (start.year === end.year) {
+    return `${MONTHS[start.month - 1]} - ${MONTHS[end.month - 1]} ${start.year}`;
+  }
+
+  return `${MONTHS[start.month - 1]} ${start.year} - ${MONTHS[end.month - 1]} ${end.year}`;
 }
 
 /**
@@ -35,12 +100,24 @@ interface ClienteAgendavel {
 export function CentralAgendamento() {
   const { user } = useAuth();
   usePageTitle('Central de Agendamento');
+  const defaultPeriod = getLastMonthPeriod();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
   const [clientes, setClientes] = useState<ClienteAgendavel[]>([]);
   const [isLoadingClientes, setIsLoadingClientes] = useState(false);
   const [savingCnpjs, setSavingCnpjs] = useState<Set<string>>(new Set());
+  const [filters, setFilters] = useState<Filters>({
+    periodoEmissaoInicio: defaultPeriod.inicio,
+    periodoEmissaoFim: defaultPeriod.fim,
+    periodoPrevisaoInicio: '',
+    periodoPrevisaoFim: '',
+    unidadeDestino: [],
+    cnpjPagador: '',
+    cnpjDestinatario: '',
+  });
+  const [tempFilters, setTempFilters] = useState<Filters>(filters);
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -85,6 +162,43 @@ export function CentralAgendamento() {
 
   const handleSearch = () => {
     setSearchTerm(searchDraft.trim());
+  };
+
+  const applyFilters = () => {
+    setFilters({ ...tempFilters });
+    setShowFilters(false);
+  };
+
+  const cancelFilters = () => {
+    setTempFilters({ ...filters });
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters: Filters = {
+      periodoEmissaoInicio: '',
+      periodoEmissaoFim: '',
+      periodoPrevisaoInicio: '',
+      periodoPrevisaoFim: '',
+      unidadeDestino: [],
+      cnpjPagador: '',
+      cnpjDestinatario: '',
+    };
+
+    setTempFilters(emptyFilters);
+  };
+
+  const getPeriodDisplay = () => {
+    const emissionPeriod = formatPeriodDisplay(filters.periodoEmissaoInicio, filters.periodoEmissaoFim);
+    const previsaoPeriod = formatPeriodDisplay(filters.periodoPrevisaoInicio, filters.periodoPrevisaoFim);
+
+    if (emissionPeriod && previsaoPeriod) {
+      return `${emissionPeriod} | Prev.: ${previsaoPeriod}`;
+    }
+
+    if (emissionPeriod) return emissionPeriod;
+    if (previsaoPeriod) return `Prev.: ${previsaoPeriod}`;
+    return 'Sem período definido';
   };
 
   const handleToggleAgenda = async (cliente: ClienteAgendavel, checked: boolean) => {
@@ -145,64 +259,211 @@ export function CentralAgendamento() {
     }
   };
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              Central de Agendamento
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">
-              Dashboard para gestão e acompanhamento de agendamentos
-            </p>
+  const headerActions = (
+    <div className="flex items-center gap-2 md:gap-4">
+      <div className="text-right print:block">
+        <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden md:block">Período</p>
+        <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{getPeriodDisplay()}</p>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsDialogOpen(true)}
+        className="gap-2 dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+      >
+        <Settings2 className="h-4 w-4" />
+        <span className="hidden md:inline">Clientes Agendáveis</span>
+      </Button>
+
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                >
+                  <Filter className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Filtrar Período</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <DialogContent className="sm:max-w-[700px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto overscroll-contain">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros de Pesquisa</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Personalize a visualização filtrando por período, unidade e empresas
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <Label className="text-slate-900 dark:text-slate-100">Período de Emissão</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoEmissaoInicio}
+                    onChange={(e) => setTempFilters({...tempFilters, periodoEmissaoInicio: e.target.value})}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoEmissaoFim}
+                    onChange={(e) => setTempFilters({...tempFilters, periodoEmissaoFim: e.target.value})}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Label className="text-slate-900 dark:text-slate-100">Período de Previsão de Entrega</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoPrevisaoInicio}
+                    onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoInicio: e.target.value})}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoPrevisaoFim}
+                    onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoFim: e.target.value})}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-100">Unidade(s) Destino</Label>
+                <FilterSelectUnidadeOrdered
+                  value={tempFilters.unidadeDestino}
+                  onChange={(value) => setTempFilters({...tempFilters, unidadeDestino: value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-100">CNPJ Pagador</Label>
+                <FilterSelectCliente
+                  type="pagador"
+                  value={tempFilters.cnpjPagador}
+                  onChange={(value) => setTempFilters({...tempFilters, cnpjPagador: value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-900 dark:text-slate-100">CNPJ Destinatário</Label>
+                <FilterSelectCliente
+                  type="destinatario"
+                  value={tempFilters.cnpjDestinatario}
+                  onChange={(value) => setTempFilters({...tempFilters, cnpjDestinatario: value})}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="dark:border-slate-700 dark:hover:bg-slate-800"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Limpar Tudo
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={cancelFilters}
+                  className="dark:border-slate-700 dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={applyFilters}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Aplicar Filtros
+                </Button>
+              </div>
+            </div>
           </div>
-          <Button
-            type="button"
-            onClick={() => setIsDialogOpen(true)}
-            className="gap-2"
-          >
-            <Settings2 className="h-4 w-4" />
-            Clientes Agendáveis
-          </Button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+
+  return (
+    <DashboardLayout
+      title="Central de Agendamento"
+      description={user?.client_name}
+      headerActions={headerActions}
+    >
+      <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Central de Agendamento</h2>
+          <p className="text-slate-500 dark:text-slate-400">
+            Acompanhamento de mercadorias agendadas, filtros operacionais e análises de performance
+          </p>
         </div>
 
         <div className="grid gap-6">
-          <Card>
-            <CardHeader>
+          <div>
+            <Card>
+              <CardHeader>
               <CardTitle>Central de Agendamento</CardTitle>
               <CardDescription>
                 Dashboard para gestão de agendamentos de coletas, entregas e recursos
               </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-6">
-                <div className="text-4xl mb-4">AG</div>
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
-                  Central de Agendamento
-                </h3>
-                <p className="text-slate-600 dark:text-slate-400 text-sm">
-                  Sistema de gestão de agendamentos em desenvolvimento
-                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-6">
+                  <div className="text-4xl mb-4">AG</div>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                    Central de Agendamento
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    Sistema de gestão de agendamentos em desenvolvimento
+                  </p>
 
-                <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Funcionalidades previstas:
-                  </h4>
-                  <ul className="text-left text-sm text-slate-600 dark:text-slate-400 space-y-1">
-                    <li>• Agendamento de coletas e entregas</li>
-                    <li>• Calendário de recursos e veículos</li>
-                    <li>• Controle de prazos e horários</li>
-                    <li>• Dashboard de performance</li>
-                  </ul>
-                </div>
+                  <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Funcionalidades previstas:
+                    </h4>
+                    <ul className="text-left text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                      <li>• Agendamento de coletas e entregas</li>
+                      <li>• Calendário de recursos e veículos</li>
+                      <li>• Controle de prazos e horários</li>
+                      <li>• Dashboard de performance</li>
+                    </ul>
+                  </div>
 
-                <div className="mt-4 text-xs text-slate-500 dark:text-slate-500">
-                  Versão: 1.0.0 | Status: Desenvolvimento
+                  <div className="mt-4 text-xs text-slate-500 dark:text-slate-500">
+                    Versão: 1.0.0 | Status: Desenvolvimento
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
@@ -337,7 +598,7 @@ export function CentralAgendamento() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </main>
     </DashboardLayout>
   );
 }
