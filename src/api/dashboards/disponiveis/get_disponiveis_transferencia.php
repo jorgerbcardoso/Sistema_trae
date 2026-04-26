@@ -285,7 +285,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if ($idx === 2) {
+        if ($idx === 3) {
             $raw = trim(substr($bl, 120, 35));
             if (!empty($raw)) {
                 $partes = explode('-', $raw, 2);
