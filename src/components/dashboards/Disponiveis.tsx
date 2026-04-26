@@ -66,6 +66,8 @@ interface Coleta {
   nroColeta: string;
   remetente: string;
   cidadeRem: string;
+  cidadeDest: string;
+  unidadeDest: string;
   dataHoreLim: string;
   coletada: string;
   valMerc: string;
@@ -87,6 +89,7 @@ interface GrupoDestino {
   nome: string;
   armazem: Cte[];
   transito: Cte[];
+  coletas: Coleta[];
   totalCtes: number;
   totalVol: number;
   totalPeso: number;
@@ -193,7 +196,7 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
 
 function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino; maxPeso: number; maxCubagem: number }) {
   const [aberto, setAberto] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
+  const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
 
   const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
   const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
@@ -287,6 +290,16 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               Em Trânsito
               <Badge className={`text-xs ${piorTransito ? `${BG_INDICADOR[piorTransito]} ${TEXTO_INDICADOR[piorTransito]}` : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{grupo.transito.length}</Badge>
             </button>
+            {grupo.coletas.length > 0 && (
+              <button
+                onClick={() => setAbaAtiva('coletas')}
+                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'coletas' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              >
+                <PackageSearch className="w-4 h-4" />
+                Coletas
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">{grupo.coletas.length}</Badge>
+              </button>
+            )}
           </div>
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
@@ -298,6 +311,40 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               grupo.transito.length > 0
                 ? <TabelaCtes ctes={grupo.transito} tipo="transito" />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e em trânsito para este destino.</p>
+            )}
+            {abaAtiva === 'coletas' && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <th className="px-3 py-2 text-left font-semibold">Coleta</th>
+                      <th className="px-3 py-2 text-left font-semibold">Remetente</th>
+                      <th className="px-3 py-2 text-left font-semibold">Cidade Dest.</th>
+                      <th className="px-3 py-2 text-left font-semibold">Limite</th>
+                      <th className="px-3 py-2 text-left font-semibold">Coletada</th>
+                      <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
+                      <th className="px-3 py-2 text-right font-semibold">Vol.</th>
+                      <th className="px-3 py-2 text-right font-semibold">Peso (kg)</th>
+                      <th className="px-3 py-2 text-left font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grupo.coletas.map((c, i) => (
+                      <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                        <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">{c.serColeta} {c.nroColeta}</td>
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[120px] truncate">{c.remetente}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.cidadeDest || '-'}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.dataHoreLim}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.coletada || '-'}</td>
+                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.valMerc}</td>
+                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.qtdeVol}</td>
+                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.peso}</td>
+                        <td className="px-3 py-2"><StatusColetaBadge coleta={c} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -461,7 +508,7 @@ export function Disponiveis() {
     for (const cte of dados.ctes) {
       const key = cte.unidadeDest;
       if (!map[key]) {
-        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -472,6 +519,17 @@ export function Disponiveis() {
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+    }
+    for (const coleta of dados.coletas) {
+      const key = coleta.unidadeDest;
+      if (!key) continue;
+      if (!map[key]) {
+        map[key] = { sigla: key, nome: coleta.cidadeDest || key, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+      }
+      map[key].coletas.push(coleta);
+      const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;
+      map[key].totalPeso    += pesoColeta;
+      map[key].totalCubagem += pesoColeta * 0.0033333333333333;
     }
     const lista = Object.values(map);
     const mult = ordemDir === 'desc' ? -1 : 1;
@@ -749,22 +807,6 @@ export function Disponiveis() {
                       );
                     })()}
                   </div>
-                </div>
-              )}
-
-              {dados.coletas.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center gap-2">
-                    <PackageSearch className="w-4 h-4 text-green-500" />
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Coletas em Andamento</h2>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">({dados.coletas.length} coletas)</span>
-                    {coletasAtrasadas > 0 && (
-                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">
-                        <AlertTriangle className="w-3 h-3 mr-1" />{coletasAtrasadas} atrasada{coletasAtrasadas > 1 ? 's' : ''}
-                      </Badge>
-                    )}
-                  </div>
-                  <TabelaColetas coletas={dados.coletas} />
                 </div>
               )}
 

@@ -22,6 +22,19 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 
 ssw_login($domain);
 
+$url0083  = 'https://sistema.ssw.inf.br/bin/ssw0083?act=REL&f1=C&f3=' . strtolower($sigla) . '&f17=N';
+$file0083 = ssw_go($url0083);
+$file0083 = str_replace("\r\n", "\n", str_replace("\r", "\n", $file0083));
+$cidadeMap = [];
+foreach (explode("\n", $file0083) as $cl) {
+    $uf      = trim(substr($cl, 0, 2));
+    $cidade  = trim(substr($cl, 3, 30));
+    $unidade = trim(substr($cl, 37, 3));
+    if (strlen($uf) === 2 && !empty($cidade) && !empty($unidade)) {
+        $cidadeMap[strtoupper($cidade)] = $unidade;
+    }
+}
+
 ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
 
 $agora        = time();
@@ -240,7 +253,7 @@ $coletas    = [];
 $blocoAtual = [];
 $isResumo   = false;
 
-$flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
+$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
     if (empty($blocoAtual)) return;
 
     $linhaBloco = implode("\n", $blocoAtual);
@@ -260,18 +273,24 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
 
     $remetente   = '';
     $cidadeRem   = '';
+    $cidadeDest  = '';
+    $unidadeDest = '';
     $dataHoreLim = '';
     $coletada    = '';
     $valMerc     = '';
     $qtdeVol     = '';
     $peso        = '';
 
-    foreach ($blocoAtual as $bl) {
+    foreach ($blocoAtual as $idx => $bl) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if (strlen(trim($bl)) > 100 && preg_match('/\b([A-Z][A-Z\s]+-[A-Z]{2})\s*$/', trim($bl), $mci)) {
-            $cidadeRem = trim($mci[1]);
+        if ($idx === 2) {
+            $raw = trim(substr($bl, 120, 35));
+            if (!empty($raw)) {
+                $partes = explode('-', $raw, 2);
+                $cidadeDest = trim($partes[0]);
+            }
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
             $dataHoreLim = trim($mdh[1]);
@@ -288,6 +307,10 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
         if (preg_match('/COLETADA:\s+(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mco)) {
             $coletada = trim($mco[1]);
         }
+    }
+
+    if (!empty($cidadeDest)) {
+        $unidadeDest = $cidadeMap[strtoupper($cidadeDest)] ?? '';
     }
 
     $statusColeta = 'pendente';
@@ -323,6 +346,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
         'nroColeta'    => $nroColeta,
         'remetente'    => $remetente,
         'cidadeRem'    => $cidadeRem,
+        'cidadeDest'   => $cidadeDest,
+        'unidadeDest'  => $unidadeDest,
         'dataHoreLim'  => $dataHoreLim,
         'coletada'     => $coletada,
         'valMerc'      => $valMerc,
