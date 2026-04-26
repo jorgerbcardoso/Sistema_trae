@@ -14,6 +14,7 @@ import { PerformanceEntregas } from './components/dashboards/PerformanceEntregas
 import { PerformanceColetas } from './components/dashboards/PerformanceColetas';
 import { FluxoCaixa } from './components/dashboards/FluxoCaixa';
 import { CentralAgendamento } from './components/dashboards/CentralAgendamento';
+import { Disponiveis } from './components/dashboards/Disponiveis';
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
@@ -172,6 +173,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CentralAgendamento />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'dashboards/disponiveis',
+        element: (
+          <ProtectedRoute>
+            <Disponiveis />
           </ProtectedRoute>
         )
       },
