@@ -285,12 +285,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if ($idx === 3) {
-            $raw = trim(substr($bl, 120, 35));
-            if (!empty($raw)) {
-                $partes = explode('-', $raw, 2);
-                $cidadeDest = trim($partes[0]);
-            }
+        if (preg_match('/\bDEST:/', $bl) && preg_match('/([A-Z][A-Z\s]+)-([A-Z]{2})\s*$/', trim($bl), $mdest)) {
+            $cidadeDest = trim($mdest[1]);
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
             $dataHoreLim = trim($mdh[1]);
