@@ -22,15 +22,19 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 
 ssw_login($domain);
 
-$url0083  = 'https://sistema.ssw.inf.br/bin/ssw0083?act=REL&f1=C&f3=' . strtolower($sigla) . '&f17=N';
-$file0083 = ssw_go($url0083);
-$file0083 = str_replace("\r\n", "\n", str_replace("\r", "\n", $file0083));
+$str0083 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0083?act=REL&f1=C&f3=' . strtolower($sigla) . '&f17=N');
+$str0083 = urldecode($str0083);
+$act0083 = ssw_get_act($str0083);
+$arq0083 = ssw_get_arq($str0083);
+$file0083 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act0083 . '&filename=' . $arq0083 . '&path=&down=1&nw=0');
 $cidadeMap = [];
-foreach (explode("\n", $file0083) as $cl) {
+$linhas0083 = explode("\r", $file0083);
+foreach ($linhas0083 as $cl) {
+    $cl = str_replace(chr(10), '', $cl);
     $uf      = trim(substr($cl, 0, 2));
     $cidade  = trim(substr($cl, 3, 30));
     $unidade = trim(substr($cl, 37, 3));
-    if (strlen($uf) === 2 && !empty($cidade) && !empty($unidade)) {
+    if (strlen($uf) === 2 && ctype_alpha($uf) && !empty($cidade) && !empty($unidade)) {
         $cidadeMap[$uf . '|' . strtoupper($cidade)] = $unidade;
     }
 }
@@ -396,7 +400,7 @@ respondJson([
         'coletas'        => $coletas,
         'sigla'          => $sigla,
         'geradoEm'       => date('d/m/Y H:i:s'),
-        '_debug0083'     => array_slice($cidadeMap, 0, 20, true),
-        '_debug0083raw'  => substr($file0083, 0, 500),
+        '_debug0083count' => count($cidadeMap),
+        '_debug0083sample' => array_slice($cidadeMap, 0, 5, true),
     ],
 ]);
