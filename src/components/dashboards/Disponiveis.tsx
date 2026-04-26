@@ -6,14 +6,7 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
-import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
+
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { toast } from 'sonner';
@@ -393,9 +386,7 @@ export function Disponiveis() {
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
 
-  const [sigla, setSigla] = useState<string>(isMTZ ? '' : unidadeLogada);
-  const [dialogUnidade, setDialogUnidade] = useState<boolean>(isMTZ);
-  const [unidadeTemp, setUnidadeTemp] = useState<string>('');
+  const [sigla] = useState<string>(unidadeLogada);
 
   const [dados, setDados] = useState<DadosTransferencia | null>(null);
   const [loading, setLoading] = useState(false);
@@ -430,6 +421,10 @@ export function Disponiveis() {
   }, [sigla]);
 
   useEffect(() => {
+    if (isMTZ) {
+      toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
+      return;
+    }
     if (sigla) carregar();
   }, [sigla]);
 
@@ -447,11 +442,7 @@ export function Disponiveis() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [sigla, carregar]);
 
-  const confirmarUnidade = () => {
-    if (!unidadeTemp) return;
-    setSigla(unidadeTemp);
-    setDialogUnidade(false);
-  };
+
 
   const grupos: GrupoDestino[] = React.useMemo(() => {
     if (!dados) return [];
@@ -492,65 +483,38 @@ export function Disponiveis() {
       description={user?.client_name}
       headerActions={
         <div className="flex items-center gap-3">
-          {sigla && (
-            <div className="flex items-center gap-2">
-              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-sm px-3 py-1">
-                <Building2 className="w-3.5 h-3.5 mr-1.5" />
-                {sigla}
-              </Badge>
-              {isMTZ && (
-                <Button variant="outline" size="sm" onClick={() => setDialogUnidade(true)} className="dark:border-slate-600 text-xs">
-                  Trocar
-                </Button>
-              )}
-            </div>
+          {sigla && !isMTZ && (
+            <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-sm px-3 py-1">
+              <Building2 className="w-3.5 h-3.5 mr-1.5" />
+              {sigla}
+            </Badge>
           )}
-          {ultimaAtualizacao && (
+          {ultimaAtualizacao && !isMTZ && (
             <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               <Timer className="w-3.5 h-3.5" />
               <span>Atualiza em {minutos}:{String(segundos).padStart(2, '0')}</span>
             </div>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => carregar()}
-            disabled={loading || !sigla}
-            className="dark:border-slate-600"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            <span className="ml-1.5">Atualizar</span>
-          </Button>
+          {!isMTZ && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => carregar()}
+              disabled={loading || !sigla}
+              className="dark:border-slate-600"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              <span className="ml-1.5">Atualizar</span>
+            </Button>
+          )}
         </div>
       }
     >
-      <Dialog open={dialogUnidade} onOpenChange={(o) => { if (!o && !sigla) return; setDialogUnidade(o); }}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Selecionar Unidade</DialogTitle>
-            <DialogDescription>Escolha a unidade que deseja visualizar no painel.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <FilterSelectUnidadeSingle
-              value={unidadeTemp}
-              onChange={setUnidadeTemp}
-              label="Unidade"
-            />
-            <Button
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-              onClick={confirmarUnidade}
-              disabled={!unidadeTemp}
-            >
-              Confirmar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {!sigla ? (
+      {isMTZ ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
           <Building2 className="w-16 h-16 mb-4 opacity-30" />
-          <p className="text-lg font-medium">Selecione uma unidade para visualizar o painel</p>
+          <p className="text-lg font-medium">Acesso não disponível para a unidade MTZ</p>
+          <p className="text-sm mt-1">Faça login em uma unidade específica para visualizar este painel.</p>
         </div>
       ) : loading && !dados ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
