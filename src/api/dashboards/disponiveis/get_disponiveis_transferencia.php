@@ -100,8 +100,8 @@ foreach ($linhas as $linha) {
     $peso        = trim(substr($linha, 133, 7));
     $m3          = trim(substr($linha, 141, 6));
     $qvol        = trim(substr($linha, 148, 7));
-    $manifesto   = trim(substr($linha, 161, 9));
-    $prevChegada = trim(substr($linha, 173, 11));
+    $manifesto   = trim(substr($linha, 162, 11));
+    $prevChegada = trim(substr($linha, 174, 11));
 
     $emTransito = !empty($prevChegada);
 

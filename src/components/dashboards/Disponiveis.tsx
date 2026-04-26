@@ -198,11 +198,15 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
   const [barCubagem, setBarCubagem] = useState(0);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setBarPeso(maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0);
-      setBarCubagem(maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0);
-    }, 50);
-    return () => clearTimeout(t);
+    setBarPeso(0);
+    setBarCubagem(0);
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setBarPeso(maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0);
+        setBarCubagem(maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0);
+      });
+    });
+    return () => cancelAnimationFrame(raf1);
   }, [grupo.totalPeso, grupo.totalCubagem, maxPeso, maxCubagem]);
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
@@ -253,7 +257,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${barPeso}%`, background: 'linear-gradient(90deg, #b45309, #d97706, #f59e0b)' }}
+                  style={{ width: `${barPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
                 />
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
               </div>
@@ -266,7 +270,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${barCubagem}%`, background: 'linear-gradient(90deg, #0f766e, #0d9488, #2dd4bf)' }}
+                  style={{ width: `${barCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
                 />
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
               </div>
