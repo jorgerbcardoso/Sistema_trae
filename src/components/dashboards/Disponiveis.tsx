@@ -194,6 +194,16 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
 function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino; maxPeso: number; maxCubagem: number }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
+  const [barPeso, setBarPeso] = useState(0);
+  const [barCubagem, setBarCubagem] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBarPeso(maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0);
+      setBarCubagem(maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [grupo.totalPeso, grupo.totalCubagem, maxPeso, maxCubagem]);
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
   const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
@@ -236,31 +246,29 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
         <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
         <span className="flex items-center justify-center px-2">
           {(() => {
-            const pct = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
             const label = grupo.totalPeso >= 1000
               ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
               : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
             return (
-              <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a)' }}
+                  style={{ width: `${barPeso}%`, background: 'linear-gradient(90deg, #b45309, #d97706, #f59e0b)' }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-100 z-10">{label}</span>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
               </div>
             );
           })()}
         </span>
         <span className="flex items-center justify-center px-2">
           {(() => {
-            const pct = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
             return (
-              <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #0d9488, #2dd4bf, #99f6e4)' }}
+                  style={{ width: `${barCubagem}%`, background: 'linear-gradient(90deg, #0f766e, #0d9488, #2dd4bf)' }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-100 z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
               </div>
             );
           })()}
@@ -622,7 +630,7 @@ export function Disponiveis() {
                           </div>
                           <div style={{ width: 80, height: 80 }}>
                             <PieChart width={80} height={80}>
-                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" isAnimationActive={false}>
+                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" animationBegin={0} animationDuration={800}>
                                 <Cell fill={c.cor} />
                                 <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
                               </Pie>
