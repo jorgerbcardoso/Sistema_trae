@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../ThemeProvider';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Card, CardContent } from '../ui/card';
@@ -348,7 +349,7 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
 export function Disponiveis() {
   usePageTitle('Disponíveis no Armazém');
   const { user } = useAuth();
-  const { theme } = useTheme();
+  useTheme();
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
