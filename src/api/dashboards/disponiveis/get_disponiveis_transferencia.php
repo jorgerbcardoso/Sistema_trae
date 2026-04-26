@@ -392,9 +392,11 @@ $flush157();
 respondJson([
     'success' => true,
     'data'    => [
-        'ctes'    => $ctes,
-        'coletas' => $coletas,
-        'sigla'   => $sigla,
-        'geradoEm' => date('d/m/Y H:i:s'),
+        'ctes'           => $ctes,
+        'coletas'        => $coletas,
+        'sigla'          => $sigla,
+        'geradoEm'       => date('d/m/Y H:i:s'),
+        '_debug0083'     => array_slice($cidadeMap, 0, 20, true),
+        '_debug0083raw'  => substr($file0083, 0, 500),
     ],
 ]);
