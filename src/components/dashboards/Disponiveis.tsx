@@ -349,7 +349,7 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
 export function Disponiveis() {
   usePageTitle('Disponíveis no Armazém');
   const { user } = useAuth();
-  useTheme();
+  const { theme } = useTheme();
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
@@ -515,7 +515,7 @@ export function Disponiveis() {
       ) : loading && !dados ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
           <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-          <p className="text-base">Consultando SSW...</p>
+          <p className="text-base">Aguarde...</p>
           <p className="text-sm mt-1">Isso pode levar alguns segundos</p>
         </div>
       ) : dados ? (
