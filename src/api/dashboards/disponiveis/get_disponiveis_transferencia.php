@@ -31,7 +31,7 @@ foreach (explode("\n", $file0083) as $cl) {
     $cidade  = trim(substr($cl, 3, 30));
     $unidade = trim(substr($cl, 37, 3));
     if (strlen($uf) === 2 && !empty($cidade) && !empty($unidade)) {
-        $cidadeMap[strtoupper($cidade)] = $unidade;
+        $cidadeMap[$uf . '|' . strtoupper($cidade)] = $unidade;
     }
 }
 
@@ -274,6 +274,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
     $remetente   = '';
     $cidadeRem   = '';
     $cidadeDest  = '';
+    $ufDest      = '';
     $unidadeDest = '';
     $dataHoreLim = '';
     $coletada    = '';
@@ -287,6 +288,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         }
         if (preg_match('/\bDEST:/', $bl) && preg_match('/([A-Z][A-Z\s]+)-([A-Z]{2})\s*$/', trim($bl), $mdest)) {
             $cidadeDest = trim($mdest[1]);
+            $ufDest     = trim($mdest[2]);
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
             $dataHoreLim = trim($mdh[1]);
@@ -305,8 +307,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         }
     }
 
-    if (!empty($cidadeDest)) {
-        $unidadeDest = $cidadeMap[strtoupper($cidadeDest)] ?? '';
+    if (!empty($cidadeDest) && !empty($ufDest)) {
+        $unidadeDest = $cidadeMap[$ufDest . '|' . strtoupper($cidadeDest)] ?? '';
     }
 
     $statusColeta = 'pendente';
