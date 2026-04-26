@@ -101,7 +101,7 @@ foreach ($linhas as $linha) {
     $m3          = trim(substr($linha, 141, 6));
     $qvol        = trim(substr($linha, 148, 7));
     $manifesto   = trim(substr($linha, 162, 9));
-    $prevChegada = trim(substr($linha, 174, 11));
+    $prevChegada = trim(substr($linha, 174, 12));
 
     $emTransito = !empty($prevChegada);
 
@@ -232,13 +232,13 @@ if (substr($str157, 0, 5) === '<foc ') {
 $str157   = urldecode($str157);
 $act157   = ssw_get_act($str157);
 $arq157   = ssw_get_arq($str157);
-$file157  = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act157 . '&filename=' . $arq157 . '&path=&down=1&nw=0');
-$linhas157 = explode("\r", $file157);
+$file157   = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act157 . '&filename=' . $arq157 . '&path=&down=1&nw=0');
+$file157   = str_replace("\r\n", "\n", str_replace("\r", "\n", $file157));
+$linhas157 = explode("\n", $file157);
 
-$coletas       = [];
-$blocoAtual    = [];
-$dentroBloco   = false;
-$isResumo157   = false;
+$coletas    = [];
+$blocoAtual = [];
+$isResumo   = false;
 
 $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
     if (empty($blocoAtual)) return;
@@ -270,8 +270,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if (strlen($bl) > 145) {
-            $cidadeRem = trim(substr($bl, 120, 25));
+        if (strlen(trim($bl)) > 100 && preg_match('/\b([A-Z][A-Z\s]+-[A-Z]{2})\s*$/', trim($bl), $mci)) {
+            $cidadeRem = trim($mci[1]);
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
             $dataHoreLim = trim($mdh[1]);
@@ -290,9 +290,9 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
         }
     }
 
-    $statusColeta  = 'pendente';
-    $atrasoColeta  = null;
-    $limiteTs      = null;
+    $statusColeta = 'pendente';
+    $atrasoColeta = null;
+    $limiteTs     = null;
 
     if (!empty($dataHoreLim) && preg_match('/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/', $dataHoreLim, $ml)) {
         $anoAtual = date('Y');
@@ -336,27 +336,28 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora) {
 };
 
 foreach ($linhas157 as $linha) {
-    if (strpos($linha, 'RELACAO DAS COLETAS') !== false) {
+    if (strpos($linha, 'R E S U M O') !== false) {
         $flush157();
-        $isResumo157 = false;
+        $isResumo = true;
         continue;
     }
+    if ($isResumo) continue;
+
+    if (strpos($linha, 'RELACAO DAS COLETAS') !== false) continue;
     if (strpos($linha, 'PERIODO DE COLETA') !== false) continue;
-    if (strpos($linha, '====') !== false) continue;
     if (strpos($linha, 'ssw0157') !== false) continue;
     if (strpos($linha, 'PAG:') !== false) continue;
+    if (preg_match('/^={5,}/', trim($linha))) continue;
 
     if (preg_match('/^([A-Z]{3})\s+(\d+)\s+-/', $linha)) {
         $flush157();
         $blocoAtual[] = $linha;
-        $dentroBloco  = true;
         continue;
     }
 
-    if ($dentroBloco) {
-        if (trim($linha) === '----' . str_repeat('-', 100) || preg_match('/^-{10,}$/', trim($linha))) {
+    if (!empty($blocoAtual)) {
+        if (preg_match('/^-{10,}/', trim($linha))) {
             $flush157();
-            $dentroBloco = false;
             continue;
         }
         $blocoAtual[] = $linha;
