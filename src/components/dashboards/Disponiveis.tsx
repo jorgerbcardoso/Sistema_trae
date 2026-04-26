@@ -221,7 +221,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 70px minmax(100px,1fr) minmax(80px,1fr)' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -239,6 +239,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
         </span>
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.coletas.length > 0 ? grupo.coletas.length : '-'}</span>
         <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
         <span className="flex items-center justify-center px-2">
           {(() => {
@@ -287,16 +288,16 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'transito' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
               <Truck className="w-4 h-4" />
-              Em Trânsito
-              <Badge className={`text-xs ${piorTransito ? `${BG_INDICADOR[piorTransito]} ${TEXTO_INDICADOR[piorTransito]}` : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{grupo.transito.length}</Badge>
+              Em Transferência
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.transito.length}</Badge>
             </button>
             {grupo.coletas.length > 0 && (
               <button
                 onClick={() => setAbaAtiva('coletas')}
                 className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'coletas' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
               >
-                <PackageSearch className="w-4 h-4" />
-                Coletas
+                <Package className="w-4 h-4" />
+                Em Coleta
                 <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">{grupo.coletas.length}</Badge>
               </button>
             )}
@@ -440,7 +441,7 @@ export function Disponiveis() {
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega'>('transferencia');
 
-  type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
+  type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'coletas' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
   const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes' as any);
   const [ordemDir, setOrdemDir]   = useState<'asc' | 'desc'>('desc');
 
@@ -521,8 +522,7 @@ export function Disponiveis() {
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
     for (const coleta of dados.coletas) {
-      const key = coleta.unidadeDest;
-      if (!key) continue;
+      const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
         map[key] = { sigla: key, nome: coleta.cidadeDest || key, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
       }
@@ -538,6 +538,7 @@ export function Disponiveis() {
         case 'sigla':        return mult * a.sigla.localeCompare(b.sigla);
         case 'armazem':      return mult * (a.armazem.length - b.armazem.length);
         case 'transito':     return mult * (a.transito.length - b.transito.length);
+        case 'coletas':      return mult * (a.coletas.length - b.coletas.length);
         case 'totalVol':     return mult * (a.totalVol - b.totalVol);
         case 'totalPeso':    return mult * (a.totalPeso - b.totalPeso);
         case 'totalCubagem': return mult * (a.totalCubagem - b.totalCubagem);
@@ -623,6 +624,7 @@ export function Disponiveis() {
                 valor: totalArmazem,
                 pct: pctArmazem,
                 label: 'No Armazém',
+                unidade: 'CT-e',
                 sub: null,
               },
               {
@@ -637,6 +639,7 @@ export function Disponiveis() {
                 valor: totalTransito,
                 pct: pctTransito,
                 label: 'Em Trânsito',
+                unidade: 'CT-e',
                 sub: ctesTransitoAlerta > 0 ? `${ctesTransitoAlerta} com atraso` : null,
               },
               {
@@ -651,6 +654,7 @@ export function Disponiveis() {
                 valor: totalColetas,
                 pct: pctColetas,
                 label: 'Coletas',
+                unidade: 'Coleta',
                 sub: coletasAtrasadas > 0 ? `${coletasAtrasadas} atrasada${coletasAtrasadas > 1 ? 's' : ''}` : null,
               },
             ];
@@ -676,7 +680,7 @@ export function Disponiveis() {
                               {c.label}
                             </div>
                             <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
-                            <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} CT-e{c.valor !== 1 ? 's' : ''}</p>
+                            <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} {c.unidade}{c.valor !== 1 ? 's' : ''}</p>
                             {c.sub && <p className={`text-xs mt-0.5 font-semibold ${c.textColor} opacity-80`}>{c.sub}</p>}
                           </div>
                           <div style={{ width: 80, height: 80 }}>
@@ -785,13 +789,14 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 70px minmax(100px,1fr) minmax(80px,1fr)' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
                             <ThBtn col="piorSaida" center>Perf. saída</ThBtn>
                             <ThBtn col="armazem" center>Piso</ThBtn>
                             <ThBtn col="transito" center>Trans.</ThBtn>
+                            <ThBtn col="coletas" center>Coletas</ThBtn>
                             <ThBtn col="totalVol" center>Volumes</ThBtn>
                             <ThBtn col="totalPeso" center>Peso</ThBtn>
                             <ThBtn col="totalCubagem" center>Cubagem</ThBtn>
