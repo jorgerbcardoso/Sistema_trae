@@ -194,20 +194,9 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
 function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino; maxPeso: number; maxCubagem: number }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
-  const [barPeso, setBarPeso] = useState(0);
-  const [barCubagem, setBarCubagem] = useState(0);
 
-  useEffect(() => {
-    setBarPeso(0);
-    setBarCubagem(0);
-    const raf1 = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setBarPeso(maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0);
-        setBarCubagem(maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0);
-      });
-    });
-    return () => cancelAnimationFrame(raf1);
-  }, [grupo.totalPeso, grupo.totalCubagem, maxPeso, maxCubagem]);
+  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
+  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
   const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
@@ -257,7 +246,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${barPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
+                  style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
                 />
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
               </div>
@@ -270,7 +259,7 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${barCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
+                  style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
                 />
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
               </div>
@@ -753,7 +742,7 @@ export function Disponiveis() {
                               {(() => {
                                 const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
                                 const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
-                                return grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                                return grupos.map((g, i) => <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
                               })()}
                             </div>
                         </>
