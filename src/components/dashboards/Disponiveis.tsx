@@ -191,7 +191,7 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
   );
 }
 
-function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
+function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino; maxPeso: number; maxCubagem: number }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
 
@@ -202,18 +202,20 @@ function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
       return (ORDEM_IND[v] ?? 0) > (ORDEM_IND[p] ?? 0) ? v : p;
     }, null);
 
-  const piorSaida    = getPior([...grupo.armazem, ...grupo.transito], 'indicadorSaida');
   const piorTransito = getPior(grupo.transito, 'atrasoTransf');
 
-  const prevChegadaMin = grupo.transito
-    .map(c => c.prevChegada).filter(Boolean)
-    .sort()[0] ?? null;
+  const pctEntregueNoPrazo = (() => {
+    const comEntrega = [...grupo.armazem, ...grupo.transito].filter(c => c.indicadorSaida !== null);
+    if (comEntrega.length === 0) return null;
+    const noPrazo = comEntrega.filter(c => c.indicadorSaida === 'verde').length;
+    return Math.round((noPrazo / comEntrega.length) * 100);
+  })();
 
   return (
-    <div className={`overflow-hidden ${piorTransito ? BG_INDICADOR[piorTransito] : ''}`}>
+    <div className="overflow-hidden">
       <button
-        className="w-full grid px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 70px 70px 80px 90px 70px' }}
+        className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 70px minmax(100px,1fr) minmax(80px,1fr)' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -224,19 +226,39 @@ function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
           {grupo.sigla}
         </span>
         <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nome}</span>
-        <span className="flex items-center justify-center">
-          <IndicadorDot cor={piorSaida} title={piorSaida ? `Saída: ${piorSaida}` : 'Sem manifesto'} />
-        </span>
-        <span className="flex items-center justify-center">
-          {piorTransito
-            ? <span className={`text-xs font-semibold ${TEXTO_INDICADOR[piorTransito]}`}>{prevChegadaMin ?? <IndicadorDot cor={piorTransito} />}</span>
+        <span className="flex items-center justify-end">
+          {pctEntregueNoPrazo !== null
+            ? <span className={`text-xs font-bold ${pctEntregueNoPrazo >= 80 ? 'text-green-600 dark:text-green-400' : pctEntregueNoPrazo >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{pctEntregueNoPrazo}%</span>
             : <span className="text-xs text-slate-400">-</span>}
         </span>
         <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
         <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
-        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
-        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalCubagem.toFixed(2)}</span>
+        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
+        <span className="flex items-center px-1">
+          {(() => {
+            const pct = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
+            const label = grupo.totalPeso >= 1000
+              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
+              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
+            return (
+              <div className="relative w-full h-5 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className="absolute inset-y-0 left-0 rounded bg-amber-400 dark:bg-amber-600 transition-all" style={{ width: `${pct}%` }} />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 mix-blend-normal z-10">{label}</span>
+              </div>
+            );
+          })()}
+        </span>
+        <span className="flex items-center px-1">
+          {(() => {
+            const pct = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
+            return (
+              <div className="relative w-full h-5 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className="absolute inset-y-0 left-0 rounded bg-teal-400 dark:bg-teal-600 transition-all" style={{ width: `${pct}%` }} />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+              </div>
+            );
+          })()}
+        </span>
       </button>
 
       {aberto && (
@@ -256,7 +278,7 @@ function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
             >
               <Truck className="w-4 h-4" />
               Em Trânsito
-              <Badge className={`text-xs ${piorAtrasoTransito ? `${BG_INDICADOR[piorAtrasoTransito]} ${TEXTO_INDICADOR[piorAtrasoTransito]}` : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{grupo.transito.length}</Badge>
+              <Badge className={`text-xs ${piorTransito ? `${BG_INDICADOR[piorTransito]} ${TEXTO_INDICADOR[piorTransito]}` : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{grupo.transito.length}</Badge>
             </button>
           </div>
           <div className="bg-white dark:bg-slate-900 p-2">
@@ -698,21 +720,24 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 70px 70px 80px 90px 70px' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 70px minmax(100px,1fr) minmax(80px,1fr)' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
-                            <ThBtn col="piorSaida" right>Saída</ThBtn>
-                            <ThBtn col="piorTransito" right>Prev. Chegada</ThBtn>
+                            <ThBtn col="piorSaida" right>Perf. Saída</ThBtn>
                             <ThBtn col="armazem" right>Piso</ThBtn>
                             <ThBtn col="transito" right>Trânsito</ThBtn>
                             <ThBtn col="totalVol" right>Volumes</ThBtn>
                             <ThBtn col="totalPeso" right>Peso</ThBtn>
-                            <ThBtn col="totalCubagem" right>m³</ThBtn>
+                            <ThBtn col="totalCubagem" right>Cubagem</ThBtn>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} />)}
-                          </div>
+                              {(() => {
+                                const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
+                                const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
+                                return grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                              })()}
+                            </div>
                         </>
                       );
                     })()}
