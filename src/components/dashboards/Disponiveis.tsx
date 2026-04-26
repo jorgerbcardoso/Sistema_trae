@@ -226,35 +226,41 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
           {grupo.sigla}
         </span>
         <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nome}</span>
-        <span className="flex items-center justify-end">
+        <span className="flex items-center justify-center">
           {pctEntregueNoPrazo !== null
             ? <span className={`text-xs font-bold ${pctEntregueNoPrazo >= 80 ? 'text-green-600 dark:text-green-400' : pctEntregueNoPrazo >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{pctEntregueNoPrazo}%</span>
             : <span className="text-xs text-slate-400">-</span>}
         </span>
-        <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
-        <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
-        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center px-1">
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
+        <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
+        <span className="flex items-center justify-center px-2">
           {(() => {
             const pct = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
             const label = grupo.totalPeso >= 1000
               ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
               : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
             return (
-              <div className="relative w-full h-5 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div className="absolute inset-y-0 left-0 rounded bg-amber-400 dark:bg-amber-600 transition-all" style={{ width: `${pct}%` }} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 mix-blend-normal z-10">{label}</span>
+              <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a)' }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-100 z-10">{label}</span>
               </div>
             );
           })()}
         </span>
-        <span className="flex items-center px-1">
+        <span className="flex items-center justify-center px-2">
           {(() => {
             const pct = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
             return (
-              <div className="relative w-full h-5 rounded bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div className="absolute inset-y-0 left-0 rounded bg-teal-400 dark:bg-teal-600 transition-all" style={{ width: `${pct}%` }} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-200 z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+              <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #0d9488, #2dd4bf, #99f6e4)' }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-100 z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
               </div>
             );
           })()}
@@ -616,7 +622,7 @@ export function Disponiveis() {
                           </div>
                           <div style={{ width: 80, height: 80 }}>
                             <PieChart width={80} height={80}>
-                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none">
+                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" isAnimationActive={false}>
                                 <Cell fill={c.cor} />
                                 <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
                               </Pie>
@@ -706,15 +712,15 @@ export function Disponiveis() {
                         if (ordemCol === col) setOrdemDir(d => d === 'desc' ? 'asc' : 'desc');
                         else { setOrdemCol(col as any); setOrdemDir('desc'); }
                       };
-                      const ThBtn = ({ col, children, right }: { col: string; children: React.ReactNode; right?: boolean }) => (
+                      const ThBtn = ({ col, children, center }: { col: string; children: React.ReactNode; center?: boolean }) => (
                         <button
                           onClick={() => toggleOrdem(col)}
-                          className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${right ? 'justify-end w-full' : ''}`}
+                          className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${center ? 'justify-center w-full' : ''}`}
                         >
                           {children}
                           {ordemCol === col
-                            ? (ordemDir === 'desc' ? <ChevronDown className="w-3 h-3" /> : <ChevronDown className="w-3 h-3 rotate-180" />)
-                            : <span className="w-3 h-3 opacity-30">↕</span>}
+                            ? (ordemDir === 'desc' ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />)
+                            : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
                         </button>
                       );
                       return (
@@ -724,12 +730,12 @@ export function Disponiveis() {
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
-                            <ThBtn col="piorSaida" right>Perf. Saída</ThBtn>
-                            <ThBtn col="armazem" right>Piso</ThBtn>
-                            <ThBtn col="transito" right>Trânsito</ThBtn>
-                            <ThBtn col="totalVol" right>Volumes</ThBtn>
-                            <ThBtn col="totalPeso" right>Peso</ThBtn>
-                            <ThBtn col="totalCubagem" right>Cubagem</ThBtn>
+                            <ThBtn col="piorSaida" center>Perf. saída</ThBtn>
+                            <ThBtn col="armazem" center>Piso</ThBtn>
+                            <ThBtn col="transito" center>Trans.</ThBtn>
+                            <ThBtn col="totalVol" center>Volumes</ThBtn>
+                            <ThBtn col="totalPeso" center>Peso</ThBtn>
+                            <ThBtn col="totalCubagem" center>Cubagem</ThBtn>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
                               {(() => {
