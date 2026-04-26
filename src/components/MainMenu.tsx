@@ -329,6 +329,16 @@ export function MainMenu() {
       });
       return;
     }
+
+    if (item.code === 'dashboard_disponiveis') {
+      const unidadeAtual = user?.unidade_atual || user?.unidade || '';
+      if (!unidadeAtual || unidadeAtual === 'MTZ') {
+        toast.error('Acesso não permitido para a unidade MTZ.', {
+          description: 'Troque para uma unidade específica antes de acessar este painel.'
+        });
+        return;
+      }
+    }
     
     navigate(item.route_path);
   };
@@ -715,7 +725,7 @@ export function MainMenu() {
 
       {/* ✅ NOVO: Dialog de Troca de Unidade */}
       <Dialog open={showUnidadeSelector} onOpenChange={setShowUnidadeSelector}>
-        <DialogContent className="bg-card border-border">
+        <DialogContent className="sm:max-w-md bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Trocar Unidade</DialogTitle>
             <DialogDescription className="text-muted-foreground">
