@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../ThemeProvider';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { DashboardLayout } from '../layouts/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -159,7 +159,6 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
             <th className="px-3 py-2 text-left font-semibold">Manifesto</th>
             {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
             <th className="px-3 py-2 text-center font-semibold">Saída</th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-center font-semibold">Trânsito</th>}
           </tr>
         </thead>
         <tbody>
@@ -183,11 +182,6 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
               <td className="px-3 py-2 text-center">
                 <IndicadorDot cor={cte.indicadorSaida} title={cte.indicadorSaida ? `Atraso saída: ${cte.indicadorSaida}` : 'Sem manifesto'} />
               </td>
-              {tipo === 'transito' && (
-                <td className="px-3 py-2 text-center">
-                  <IndicadorDot cor={cte.atrasoTransf} title={cte.atrasoTransf ? `Atraso trânsito: ${cte.atrasoTransf}` : undefined} />
-                </td>
-              )}
             </tr>
           ))}
         </tbody>
@@ -200,75 +194,48 @@ function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
 
-  const piorAtrasoTransito = grupo.transito.reduce<string | null>((pior, cte) => {
-    const ordem = ['vermelho', 'laranja', 'amarelo', 'verde'];
-    if (!cte.atrasoTransf) return pior;
-    if (!pior) return cte.atrasoTransf;
-    return ordem.indexOf(cte.atrasoTransf) < ordem.indexOf(pior) ? cte.atrasoTransf : pior;
-  }, null);
+  const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+  const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
+    ctes.reduce<string | null>((p, c) => {
+      const v = c[campo]; if (!v) return p; if (!p) return v;
+      return (ORDEM_IND[v] ?? 0) > (ORDEM_IND[p] ?? 0) ? v : p;
+    }, null);
 
-  const piorSaida = [...grupo.armazem, ...grupo.transito].reduce<string | null>((pior, cte) => {
-    const ordem = ['vermelho', 'laranja', 'amarelo', 'verde'];
-    if (!cte.indicadorSaida) return pior;
-    if (!pior) return cte.indicadorSaida;
-    return ordem.indexOf(cte.indicadorSaida) < ordem.indexOf(pior) ? cte.indicadorSaida : pior;
-  }, null);
+  const piorSaida    = getPior([...grupo.armazem, ...grupo.transito], 'indicadorSaida');
+  const piorTransito = getPior(grupo.transito, 'atrasoTransf');
+
+  const prevChegadaMin = grupo.transito
+    .map(c => c.prevChegada).filter(Boolean)
+    .sort()[0] ?? null;
 
   return (
-    <div className={`border rounded-xl overflow-hidden ${piorAtrasoTransito ? BG_INDICADOR[piorAtrasoTransito] : 'border-slate-200 dark:border-slate-700'}`}>
+    <div className={`overflow-hidden ${piorTransito ? BG_INDICADOR[piorTransito] : ''}`}>
       <button
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        className="w-full grid px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 80px 80px 90px 80px 80px' }}
         onClick={() => setAberto(!aberto)}
       >
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {aberto ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
-            <Building2 className="w-5 h-5 text-indigo-500" />
-            <span className="font-bold text-slate-900 dark:text-slate-100 text-base">{grupo.sigla}</span>
-            <span className="text-slate-500 dark:text-slate-400 text-sm">{grupo.nome}</span>
-          </div>
-          <div className="flex items-center gap-3 ml-4">
-            {piorSaida && (
-              <span className={`flex items-center gap-1 text-xs font-medium ${TEXTO_INDICADOR[piorSaida]}`}>
-                <IndicadorDot cor={piorSaida} />
-                Saída
-              </span>
-            )}
-            {piorAtrasoTransito && (
-              <span className={`flex items-center gap-1 text-xs font-medium ${TEXTO_INDICADOR[piorAtrasoTransito]}`}>
-                <IndicadorDot cor={piorAtrasoTransito} />
-                Trânsito
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-6 text-sm">
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-            <Warehouse className="w-4 h-4" />
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{grupo.armazem.length}</span>
-            <span>piso</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-            <Truck className="w-4 h-4" />
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{grupo.transito.length}</span>
-            <span>trânsito</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-            <Package className="w-4 h-4" />
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{grupo.totalVol}</span>
-            <span>vol</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-            <Weight className="w-4 h-4" />
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-            <span>kg</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-            <Box className="w-4 h-4" />
-            <span className="font-semibold text-slate-900 dark:text-slate-100">{grupo.totalCubagem.toFixed(2)}</span>
-            <span>m³</span>
-          </div>
-        </div>
+        <span className="flex items-center">
+          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        </span>
+        <span className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
+          <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          {grupo.sigla}
+        </span>
+        <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nome}</span>
+        <span className="flex items-center justify-center">
+          <IndicadorDot cor={piorSaida} title={piorSaida ? `Saída: ${piorSaida}` : 'Sem manifesto'} />
+        </span>
+        <span className="flex items-center justify-center">
+          {piorTransito
+            ? <span className={`text-xs font-semibold ${TEXTO_INDICADOR[piorTransito]}`}>{prevChegadaMin ?? <IndicadorDot cor={piorTransito} />}</span>
+            : <span className="text-xs text-slate-400">-</span>}
+        </span>
+        <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
+        <span className="flex items-center justify-end font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
+        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalVol.toLocaleString('pt-BR')}</span>
+        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+        <span className="flex items-center justify-end text-slate-600 dark:text-slate-400">{grupo.totalCubagem.toFixed(2)}</span>
       </button>
 
       {aberto && (
@@ -396,6 +363,10 @@ export function Disponiveis() {
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega'>('transferencia');
 
+  type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
+  const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes' as any);
+  const [ordemDir, setOrdemDir]   = useState<'asc' | 'desc'>('desc');
+
   const carregar = useCallback(async (siglaParam?: string) => {
     const s = siglaParam ?? sigla;
     if (!s) return;
@@ -444,6 +415,16 @@ export function Disponiveis() {
 
 
 
+  const ORDEM_INDICADOR: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+
+  const getPiorIndicador = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf'): string | null =>
+    ctes.reduce<string | null>((pior, cte) => {
+      const v = cte[campo];
+      if (!v) return pior;
+      if (!pior) return v;
+      return (ORDEM_INDICADOR[v] ?? 0) > (ORDEM_INDICADOR[pior] ?? 0) ? v : pior;
+    }, null);
+
   const grupos: GrupoDestino[] = React.useMemo(() => {
     if (!dados) return [];
     const map: Record<string, GrupoDestino> = {};
@@ -458,12 +439,26 @@ export function Disponiveis() {
         map[key].armazem.push(cte);
       }
       map[key].totalCtes++;
-      map[key].totalVol    += parseInt(cte.qtdeVol) || 0;
-      map[key].totalPeso   += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
+      map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
+      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
-    return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
-  }, [dados]);
+    const lista = Object.values(map);
+    const mult = ordemDir === 'desc' ? -1 : 1;
+    return lista.sort((a, b) => {
+      switch (ordemCol as string) {
+        case 'sigla':        return mult * a.sigla.localeCompare(b.sigla);
+        case 'armazem':      return mult * (a.armazem.length - b.armazem.length);
+        case 'transito':     return mult * (a.transito.length - b.transito.length);
+        case 'totalVol':     return mult * (a.totalVol - b.totalVol);
+        case 'totalPeso':    return mult * (a.totalPeso - b.totalPeso);
+        case 'totalCubagem': return mult * (a.totalCubagem - b.totalCubagem);
+        case 'piorSaida':    return mult * ((ORDEM_INDICADOR[getPiorIndicador([...a.armazem, ...a.transito], 'indicadorSaida') ?? ''] ?? 0) - (ORDEM_INDICADOR[getPiorIndicador([...b.armazem, ...b.transito], 'indicadorSaida') ?? ''] ?? 0));
+        case 'piorTransito': return mult * ((ORDEM_INDICADOR[getPiorIndicador(a.transito, 'atrasoTransf') ?? ''] ?? 0) - (ORDEM_INDICADOR[getPiorIndicador(b.transito, 'atrasoTransf') ?? ''] ?? 0));
+        default:             return mult * (b.totalCtes - a.totalCtes);
+      }
+    });
+  }, [dados, ordemCol, ordemDir]);
 
   const totalArmazem  = dados?.ctes.filter(c => !c.emTransito).length ?? 0;
   const totalTransito = dados?.ctes.filter(c => c.emTransito).length ?? 0;
@@ -524,86 +519,76 @@ export function Disponiveis() {
         </div>
       ) : dados ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/40">
-                    <Warehouse className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          {(() => {
+            const totalCtes = totalArmazem + totalTransito + totalColetas;
+            const pctArmazem  = totalCtes > 0 ? Math.round((totalArmazem  / totalCtes) * 100) : 0;
+            const pctTransito = totalCtes > 0 ? Math.round((totalTransito / totalCtes) * 100) : 0;
+            const pctColetas  = totalCtes > 0 ? Math.round((totalColetas  / totalCtes) * 100) : 0;
+
+            const CardDonut = ({ valor, pct, label, icon: Icon, cor, corBg, corTexto, alerta }: {
+              valor: number; pct: number; label: React.ReactNode; icon: any;
+              cor: string; corBg: string; corTexto: string; alerta?: boolean;
+            }) => {
+              const pieData = [{ value: pct }, { value: 100 - pct }];
+              return (
+                <Card className={`dark:bg-slate-900 ${alerta ? 'border-orange-300 dark:border-orange-700' : 'dark:border-slate-700'}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${corBg}`}>
+                          <Icon className={`w-5 h-5 ${corTexto}`} />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{valor}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                        </div>
+                      </div>
+                      <div className="relative w-14 h-14">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={18} outerRadius={26} startAngle={90} endAngle={-270} dataKey="value" strokeWidth={0}>
+                              <Cell fill={cor} />
+                              <Cell fill="transparent" />
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold" style={{ color: cor }}>{pct}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            };
+
+            const CardSimples = ({ valor, label, icon: Icon, corBg, corTexto }: {
+              valor: string; label: string; icon: any; corBg: string; corTexto: string;
+            }) => (
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${corBg}`}>
+                      <Icon className={`w-4 h-4 ${corTexto}`} />
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{valor}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalArmazem}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">No Armazém</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={`dark:bg-slate-900 ${ctesTransitoAlerta > 0 ? 'border-orange-300 dark:border-orange-700' : 'dark:border-slate-700'}`}>
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${ctesTransitoAlerta > 0 ? 'bg-orange-100 dark:bg-orange-900/40' : 'bg-blue-100 dark:bg-blue-900/40'}`}>
-                    <Truck className={`w-5 h-5 ${ctesTransitoAlerta > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalTransito}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Em Trânsito {ctesTransitoAlerta > 0 && <span className="text-orange-500">({ctesTransitoAlerta} ⚠)</span>}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={`dark:bg-slate-900 ${coletasAtrasadas > 0 ? 'border-red-300 dark:border-red-700' : 'dark:border-slate-700'}`}>
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${coletasAtrasadas > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-green-100 dark:bg-green-900/40'}`}>
-                    <PackageSearch className={`w-5 h-5 ${coletasAtrasadas > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalColetas}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Coletas {coletasAtrasadas > 0 && <span className="text-red-500">({coletasAtrasadas} atras.)</span>}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/40">
-                    <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalVol.toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Volumes</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/40">
-                    <Weight className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{(totalPeso / 1000).toFixed(1)}t</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Peso Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/40">
-                    <Box className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalCubagem.toFixed(1)}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Cubagem (m³)</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            );
+
+            return (
+              <div className="grid grid-cols-3 gap-4">
+                <CardDonut valor={totalArmazem}  pct={pctArmazem}  label="No Armazém"  icon={Warehouse}    cor="#6366f1" corBg="bg-indigo-100 dark:bg-indigo-900/40" corTexto="text-indigo-600 dark:text-indigo-400" />
+                <CardDonut valor={totalTransito} pct={pctTransito} label={<>Em Trânsito {ctesTransitoAlerta > 0 && <span className="text-orange-500">({ctesTransitoAlerta} ⚠)</span>}</>} icon={Truck} cor={ctesTransitoAlerta > 0 ? '#f97316' : '#3b82f6'} corBg={ctesTransitoAlerta > 0 ? 'bg-orange-100 dark:bg-orange-900/40' : 'bg-blue-100 dark:bg-blue-900/40'} corTexto={ctesTransitoAlerta > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'} alerta={ctesTransitoAlerta > 0} />
+                <CardDonut valor={totalColetas}  pct={pctColetas}  label={<>Coletas {coletasAtrasadas > 0 && <span className="text-red-500">({coletasAtrasadas} atras.)</span>}</>} icon={PackageSearch} cor={coletasAtrasadas > 0 ? '#ef4444' : '#22c55e'} corBg={coletasAtrasadas > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-green-100 dark:bg-green-900/40'} corTexto={coletasAtrasadas > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} alerta={coletasAtrasadas > 0} />
+                <CardSimples valor={totalVol.toLocaleString('pt-BR')} label="Volumes"      icon={Package} corBg="bg-purple-100 dark:bg-purple-900/40" corTexto="text-purple-600 dark:text-purple-400" />
+                <CardSimples valor={`${(totalPeso / 1000).toFixed(1)}t`}  label="Peso Total"   icon={Weight}  corBg="bg-amber-100 dark:bg-amber-900/40"  corTexto="text-amber-600 dark:text-amber-400" />
+                <CardSimples valor={`${totalCubagem.toFixed(1)} m³`}       label="Cubagem"      icon={Box}     corBg="bg-teal-100 dark:bg-teal-900/40"   corTexto="text-teal-600 dark:text-teal-400" />
+              </div>
+            );
+          })()}
 
           <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button
@@ -628,13 +613,72 @@ export function Disponiveis() {
             <div className="space-y-4">
               {grupos.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-500" />
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Destino</h2>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">({grupos.length} destinos)</span>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-indigo-500" />
+                        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Destino</h2>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">({grupos.length} destinos)</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                          <ChevronRight className="w-3 h-3" />clique em um destino para expandir
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3">
+                        <span className="font-medium text-slate-600 dark:text-slate-300">Indicador Saída:</span>
+                        {(['verde','amarelo','laranja','vermelho'] as const).map(cor => (
+                          <span key={cor} className="flex items-center gap-1">
+                            <IndicadorDot cor={cor} />
+                            <span className={TEXTO_INDICADOR[cor]}>
+                              {cor === 'verde' ? '≤1 dia' : cor === 'amarelo' ? '2 dias' : cor === 'laranja' ? '3 dias' : '4+ dias'}
+                            </span>
+                          </span>
+                        ))}
+                        <span className="flex items-center gap-1">
+                          <IndicadorDot cor={null} />
+                          <span>sem manifesto</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    {grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} />)}
+
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    {(() => {
+                      const toggleOrdem = (col: string) => {
+                        if (ordemCol === col) setOrdemDir(d => d === 'desc' ? 'asc' : 'desc');
+                        else { setOrdemCol(col as any); setOrdemDir('desc'); }
+                      };
+                      const ThBtn = ({ col, children, right }: { col: string; children: React.ReactNode; right?: boolean }) => (
+                        <button
+                          onClick={() => toggleOrdem(col)}
+                          className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${right ? 'ml-auto' : ''}`}
+                        >
+                          {children}
+                          {ordemCol === col
+                            ? (ordemDir === 'desc' ? <ChevronDown className="w-3 h-3" /> : <ChevronDown className="w-3 h-3 rotate-180" />)
+                            : <span className="w-3 h-3 opacity-30">↕</span>}
+                        </button>
+                      );
+                      return (
+                        <>
+                          <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 80px 80px 90px 80px 80px' }}>
+                            <span />
+                            <ThBtn col="sigla">Destino</ThBtn>
+                            <span />
+                            <ThBtn col="piorSaida">Saída</ThBtn>
+                            <ThBtn col="piorTransito">Trânsito</ThBtn>
+                            <ThBtn col="armazem">Piso</ThBtn>
+                            <ThBtn col="transito">Trânsito</ThBtn>
+                            <ThBtn col="totalVol">Volumes</ThBtn>
+                            <ThBtn col="totalPeso">Peso</ThBtn>
+                            <ThBtn col="totalCubagem">m³</ThBtn>
+                          </div>
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} />)}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

@@ -205,9 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (data.authenticated) {
             // Buscar use_mock_data do domínio
             const domainInfo = getDomain(data.user.domain);
+            const cachedUser = (() => { try { return JSON.parse(localStorage.getItem('presto_user') || '{}'); } catch { return {}; } })();
             const userWithMockFlag = {
               ...data.user,
-              use_mock_data: domainInfo?.data_source === 'MOCK' || false
+              use_mock_data: domainInfo?.data_source === 'MOCK' || false,
+              unidade_atual: cachedUser.unidade_atual || data.user.unidade_atual || data.user.unidade,
             };
             
             console.log('✅ [AuthContext] Dados frescos recebidos:', {
