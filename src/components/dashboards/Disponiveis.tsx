@@ -213,7 +213,7 @@ function GrupoDestinoCard({ grupo }: { grupo: GrupoDestino }) {
     <div className={`overflow-hidden ${piorTransito ? BG_INDICADOR[piorTransito] : ''}`}>
       <button
         className="w-full grid px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 80px 80px 90px 80px 80px' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 70px 70px 80px 90px 70px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -526,67 +526,103 @@ export function Disponiveis() {
             const pctTransito = totalCtes > 0 ? Math.round((totalTransito / totalCtes) * 100) : 0;
             const pctColetas  = totalCtes > 0 ? Math.round((totalColetas  / totalCtes) * 100) : 0;
 
-            const CardDonut = ({ valor, pct, label, icon: Icon, cor, corBg, corTexto, alerta }: {
-              valor: number; pct: number; label: React.ReactNode; icon: any;
-              cor: string; corBg: string; corTexto: string; alerta?: boolean;
-            }) => {
-              const pieData = [{ value: pct }, { value: 100 - pct }];
-              return (
-                <Card className={`dark:bg-slate-900 ${alerta ? 'border-orange-300 dark:border-orange-700' : 'dark:border-slate-700'}`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${corBg}`}>
-                          <Icon className={`w-5 h-5 ${corTexto}`} />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{valor}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-                        </div>
-                      </div>
-                      <div className="relative w-14 h-14">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={18} outerRadius={26} startAngle={90} endAngle={-270} dataKey="value" strokeWidth={0}>
-                              <Cell fill={cor} />
-                              <Cell fill="transparent" />
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold" style={{ color: cor }}>{pct}%</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            };
+            const cardsDonut = [
+              {
+                bgColor: 'bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800',
+                textColor: 'text-indigo-700 dark:text-indigo-300',
+                emptyColor: '#e0e7ff', emptyColorDark: '#1e1b4b',
+                cor: '#6366f1',
+                icon: Warehouse,
+                valor: totalArmazem,
+                pct: pctArmazem,
+                label: 'No Armazém',
+                sub: null,
+              },
+              {
+                bgColor: ctesTransitoAlerta > 0
+                  ? 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800'
+                  : 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',
+                textColor: ctesTransitoAlerta > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
+                emptyColor: ctesTransitoAlerta > 0 ? '#ffedd5' : '#dbeafe',
+                emptyColorDark: ctesTransitoAlerta > 0 ? '#431407' : '#1e3a8a',
+                cor: ctesTransitoAlerta > 0 ? '#f97316' : '#3b82f6',
+                icon: Truck,
+                valor: totalTransito,
+                pct: pctTransito,
+                label: 'Em Trânsito',
+                sub: ctesTransitoAlerta > 0 ? `${ctesTransitoAlerta} com atraso` : null,
+              },
+              {
+                bgColor: coletasAtrasadas > 0
+                  ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800'
+                  : 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800',
+                textColor: coletasAtrasadas > 0 ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300',
+                emptyColor: coletasAtrasadas > 0 ? '#fee2e2' : '#d1fae5',
+                emptyColorDark: coletasAtrasadas > 0 ? '#7f1d1d' : '#064e3b',
+                cor: coletasAtrasadas > 0 ? '#ef4444' : '#10b981',
+                icon: PackageSearch,
+                valor: totalColetas,
+                pct: pctColetas,
+                label: 'Coletas',
+                sub: coletasAtrasadas > 0 ? `${coletasAtrasadas} atrasada${coletasAtrasadas > 1 ? 's' : ''}` : null,
+              },
+            ];
 
-            const CardSimples = ({ valor, label, icon: Icon, corBg, corTexto }: {
-              valor: string; label: string; icon: any; corBg: string; corTexto: string;
-            }) => (
-              <Card className="dark:bg-slate-900 dark:border-slate-700">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${corBg}`}>
-                      <Icon className={`w-4 h-4 ${corTexto}`} />
-                    </div>
-                    <div>
-                      <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{valor}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
+            const cardsSimples = [
+              { valor: totalVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
+              { valor: `${(totalPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
+              { valor: `${totalCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
+            ];
 
             return (
               <div className="grid grid-cols-3 gap-4">
-                <CardDonut valor={totalArmazem}  pct={pctArmazem}  label="No Armazém"  icon={Warehouse}    cor="#6366f1" corBg="bg-indigo-100 dark:bg-indigo-900/40" corTexto="text-indigo-600 dark:text-indigo-400" />
-                <CardDonut valor={totalTransito} pct={pctTransito} label={<>Em Trânsito {ctesTransitoAlerta > 0 && <span className="text-orange-500">({ctesTransitoAlerta} ⚠)</span>}</>} icon={Truck} cor={ctesTransitoAlerta > 0 ? '#f97316' : '#3b82f6'} corBg={ctesTransitoAlerta > 0 ? 'bg-orange-100 dark:bg-orange-900/40' : 'bg-blue-100 dark:bg-blue-900/40'} corTexto={ctesTransitoAlerta > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'} alerta={ctesTransitoAlerta > 0} />
-                <CardDonut valor={totalColetas}  pct={pctColetas}  label={<>Coletas {coletasAtrasadas > 0 && <span className="text-red-500">({coletasAtrasadas} atras.)</span>}</>} icon={PackageSearch} cor={coletasAtrasadas > 0 ? '#ef4444' : '#22c55e'} corBg={coletasAtrasadas > 0 ? 'bg-red-100 dark:bg-red-900/40' : 'bg-green-100 dark:bg-green-900/40'} corTexto={coletasAtrasadas > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} alerta={coletasAtrasadas > 0} />
-                <CardSimples valor={totalVol.toLocaleString('pt-BR')} label="Volumes"      icon={Package} corBg="bg-purple-100 dark:bg-purple-900/40" corTexto="text-purple-600 dark:text-purple-400" />
-                <CardSimples valor={`${(totalPeso / 1000).toFixed(1)}t`}  label="Peso Total"   icon={Weight}  corBg="bg-amber-100 dark:bg-amber-900/40"  corTexto="text-amber-600 dark:text-amber-400" />
-                <CardSimples valor={`${totalCubagem.toFixed(1)} m³`}       label="Cubagem"      icon={Box}     corBg="bg-teal-100 dark:bg-teal-900/40"   corTexto="text-teal-600 dark:text-teal-400" />
+                {cardsDonut.map((c, i) => {
+                  const Icon = c.icon;
+                  const donutData = [{ value: c.pct }, { value: Math.max(0, 100 - c.pct) }];
+                  return (
+                    <Card key={i} className={`${c.bgColor}`}>
+                      <CardContent className="pt-4 pb-3 px-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${c.textColor}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                              {c.label}
+                            </div>
+                            <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
+                            <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} CT-e{c.valor !== 1 ? 's' : ''}</p>
+                            {c.sub && <p className={`text-xs mt-0.5 font-semibold ${c.textColor} opacity-80`}>{c.sub}</p>}
+                          </div>
+                          <div style={{ width: 80, height: 80 }}>
+                            <PieChart width={80} height={80}>
+                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none">
+                                <Cell fill={c.cor} />
+                                <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
+                              </Pie>
+                            </PieChart>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {cardsSimples.map((c, i) => {
+                  const Icon = c.icon;
+                  return (
+                    <Card key={i} className="dark:bg-slate-900 dark:border-slate-700">
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${c.corBg}`}>
+                            <Icon className={`w-4 h-4 ${c.corTexto}`} />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{c.valor}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{c.label}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             );
           })()}
@@ -651,7 +687,7 @@ export function Disponiveis() {
                       const ThBtn = ({ col, children, right }: { col: string; children: React.ReactNode; right?: boolean }) => (
                         <button
                           onClick={() => toggleOrdem(col)}
-                          className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${right ? 'ml-auto' : ''}`}
+                          className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${right ? 'justify-end w-full' : ''}`}
                         >
                           {children}
                           {ordemCol === col
@@ -662,17 +698,17 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 80px 80px 90px 80px 80px' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 80px 70px 70px 80px 90px 70px' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
-                            <ThBtn col="piorSaida">Saída</ThBtn>
-                            <ThBtn col="piorTransito">Trânsito</ThBtn>
-                            <ThBtn col="armazem">Piso</ThBtn>
-                            <ThBtn col="transito">Trânsito</ThBtn>
-                            <ThBtn col="totalVol">Volumes</ThBtn>
-                            <ThBtn col="totalPeso">Peso</ThBtn>
-                            <ThBtn col="totalCubagem">m³</ThBtn>
+                            <ThBtn col="piorSaida" right>Saída</ThBtn>
+                            <ThBtn col="piorTransito" right>Prev. Chegada</ThBtn>
+                            <ThBtn col="armazem" right>Piso</ThBtn>
+                            <ThBtn col="transito" right>Trânsito</ThBtn>
+                            <ThBtn col="totalVol" right>Volumes</ThBtn>
+                            <ThBtn col="totalPeso" right>Peso</ThBtn>
+                            <ThBtn col="totalCubagem" right>m³</ThBtn>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {grupos.map(g => <GrupoDestinoCard key={g.sigla} grupo={g} />)}
