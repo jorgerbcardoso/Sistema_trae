@@ -290,9 +290,12 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if (preg_match('/\bDEST:/', $bl) && preg_match('/([A-Z][A-Z ]+?)\s*-\s*([A-Z]{2})\s*$/', trim($bl), $mdest)) {
-            $ufDest     = trim($mdest[2]);
-            $cidadeDest = trim($mdest[1]) . '-' . $ufDest;
+        if (preg_match('/\bDEST:/', $bl)) {
+            if (preg_match('/\d{8}\s+([A-Z][A-Z ]+?)-([A-Z]{2})\s/', $bl, $mdest) ||
+                preg_match('/([A-Z][A-Z ]+?)\s*-\s*([A-Z]{2})\s*$/', trim($bl), $mdest)) {
+                $ufDest     = trim($mdest[2]);
+                $cidadeDest = trim($mdest[1]) . '-' . $ufDest;
+            }
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
             $dataHoreLim = trim($mdh[1]);
@@ -344,6 +347,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         }
     }
 
+    $paraEntrega = (!empty($unidadeDest) && strtoupper($unidadeDest) === strtoupper($sigla));
+
     $coletas[] = [
         'serColeta'    => $serColeta,
         'nroColeta'    => $nroColeta,
@@ -351,6 +356,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         'cidadeRem'    => $cidadeRem,
         'cidadeDest'   => $cidadeDest,
         'unidadeDest'  => $unidadeDest,
+        'paraEntrega'  => $paraEntrega,
         'dataHoreLim'  => $dataHoreLim,
         'coletada'     => $coletada,
         'valMerc'      => $valMerc,

@@ -68,6 +68,7 @@ interface Coleta {
   cidadeRem: string;
   cidadeDest: string;
   unidadeDest: string;
+  paraEntrega: boolean;
   dataHoreLim: string;
   coletada: string;
   valMerc: string;
@@ -521,7 +522,7 @@ export function Disponiveis() {
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
-    for (const coleta of dados.coletas) {
+    for (const coleta of dados.coletas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
         map[key] = { sigla: key, nome: coleta.cidadeDest || key, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
