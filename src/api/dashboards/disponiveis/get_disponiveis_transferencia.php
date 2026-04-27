@@ -27,15 +27,12 @@ $str0083 = urldecode($str0083);
 $act0083 = ssw_get_act($str0083);
 $arq0083 = ssw_get_arq($str0083);
 $file0083 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act0083 . '&filename=' . $arq0083 . '&path=&down=1&nw=0');
-$cidadeMap = [];
-$linhas0083 = explode("\r", $file0083);
-foreach ($linhas0083 as $cl) {
+$linhas0083 = [];
+foreach (explode("\r", $file0083) as $cl) {
     $cl = str_replace(chr(10), '', $cl);
-    $uf      = trim(substr($cl, 0, 2));
-    $cidade  = trim(substr($cl, 3, 30));
-    $unidade = trim(substr($cl, 37, 3));
-    if (strlen($uf) === 2 && ctype_alpha($uf) && !empty($cidade) && !empty($unidade)) {
-        $cidadeMap[$uf . ' ' . strtoupper($cidade)] = $unidade;
+    $uf = trim(substr($cl, 0, 2));
+    if (strlen($uf) === 2 && ctype_alpha($uf)) {
+        $linhas0083[] = $cl;
     }
 }
 
@@ -317,7 +314,13 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
     }
 
     if (!empty($ufDest) && !empty($nomeDest)) {
-        $unidadeDest = $cidadeMap[$ufDest . ' ' . strtoupper($nomeDest)] ?? '';
+        $prefixo = $ufDest . ' ' . strtoupper($nomeDest);
+        foreach ($linhas0083 as $cl0083) {
+            if (strpos($cl0083, $prefixo) === 0) {
+                $unidadeDest = trim(substr($cl0083, 37, 3));
+                break;
+            }
+        }
     }
 
     $statusColeta = 'pendente';
