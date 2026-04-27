@@ -35,7 +35,7 @@ foreach ($linhas0083 as $cl) {
     $cidade  = trim(substr($cl, 3, 30));
     $unidade = trim(substr($cl, 37, 3));
     if (strlen($uf) === 2 && ctype_alpha($uf) && !empty($cidade) && !empty($unidade)) {
-        $cidadeMap[$uf . '|' . strtoupper($cidade)] = $unidade;
+        $cidadeMap[$uf . ' ' . strtoupper($cidade)] = $unidade;
     }
 }
 
@@ -279,6 +279,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
     $cidadeRem   = '';
     $cidadeDest  = '';
     $ufDest      = '';
+    $nomeDest    = '';
     $unidadeDest = '';
     $dataHoreLim = '';
     $coletada    = '';
@@ -290,11 +291,12 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
             $remetente = trim($mr[1]);
         }
-        if (preg_match('/\bDEST:/', $bl)) {
-            if (preg_match('/\d{8}\s+([A-Z][A-Z ]+?)-([A-Z]{2})\s/', $bl, $mdest) ||
-                preg_match('/([A-Z][A-Z ]+?)\s*-\s*([A-Z]{2})\s*$/', trim($bl), $mdest)) {
-                $ufDest     = trim($mdest[2]);
-                $cidadeDest = trim($mdest[1]) . '-' . $ufDest;
+        if (strpos($bl, 'DEST:') !== false) {
+            $cidadeRaw = trim(substr($bl, 120, 25));
+            if (!empty($cidadeRaw)) {
+                $ufDest     = substr($cidadeRaw, strlen($cidadeRaw) - 2);
+                $nomeDest   = trim(substr($cidadeRaw, 0, strlen($cidadeRaw) - 2));
+                $cidadeDest = $cidadeRaw;
             }
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
@@ -314,9 +316,8 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         }
     }
 
-    if (!empty($cidadeDest) && !empty($ufDest)) {
-        $nomeCidade  = trim(explode('-', $cidadeDest)[0]);
-        $unidadeDest = $cidadeMap[$ufDest . '|' . strtoupper($nomeCidade)] ?? '';
+    if (!empty($ufDest) && !empty($nomeDest)) {
+        $unidadeDest = $cidadeMap[$ufDest . ' ' . strtoupper($nomeDest)] ?? '';
     }
 
     $statusColeta = 'pendente';
