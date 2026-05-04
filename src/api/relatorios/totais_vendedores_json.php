@@ -85,8 +85,11 @@ try {
     $xml = simplexml_load_string($str);
 
     $dadosEncontrados = false;
+    $maxIteracoes = 50; // Limite de segurança
+    $iteracoes = 0;
 
-    for ($i = 0; $i <= count($xml->xpath('rs/r/f0')); $i++) {
+    for ($i = 0; $i <= count($xml->xpath('rs/r/f0')) && $iteracoes < $maxIteracoes; $i++) {
+        $iteracoes++;
         $rel = $xml->xpath('rs/r/f0')[$i];
         $act = $xml->xpath('rs/r/f6')[$i];
         $pro = $xml->xpath('rs/r/f4')[$i]; // Data de processamento no formato "dd/mm/aa hh:mm"
@@ -266,6 +269,10 @@ try {
             'apenas_tele_vendas' => $apenasTeleVendas,
             'mes' => $mesUsuario,
             'ano' => $anoUsuario
+        ],
+        '_debug' => [
+            'iteracoes' => $iteracoes,
+            'relatorio_encontrado' => $dadosEncontrados
         ]
     ]);
 
