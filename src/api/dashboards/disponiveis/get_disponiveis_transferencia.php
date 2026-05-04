@@ -21,20 +21,14 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 }
 
 ssw_login($domain);
+set_time_limit(60);
 
 $str0083 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0083?act=REL&f1=C&f3=' . strtolower($sigla) . '&f17=N');
 $str0083 = urldecode($str0083);
 $act0083 = ssw_get_act($str0083);
 $arq0083 = ssw_get_arq($str0083);
 $file0083 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act0083 . '&filename=' . $arq0083 . '&path=&down=1&nw=0');
-$linhas0083 = [];
-foreach (explode("\r", $file0083) as $cl) {
-    $cl = str_replace(chr(10), '', $cl);
-    $uf = trim(substr($cl, 0, 2));
-    if (strlen($uf) === 2 && ctype_alpha($uf)) {
-        $linhas0083[] = $cl;
-    }
-}
+$linhas0083 = explode ("\n", $file0083);
 
 ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
 
@@ -254,7 +248,7 @@ $coletas    = [];
 $blocoAtual = [];
 $isResumo   = false;
 
-$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
+$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap, $linhas0083) {
     if (empty($blocoAtual)) return;
 
     $linhaBloco = implode("\n", $blocoAtual);
@@ -292,7 +286,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
             $cidadeRaw = trim(substr($bl, 120, 25));
             if (!empty($cidadeRaw)) {
                 $ufDest     = substr($cidadeRaw, strlen($cidadeRaw) - 2);
-                $nomeDest   = trim(substr($cidadeRaw, 0, strlen($cidadeRaw) - 2));
+                $nomeDest   = trim(substr($cidadeRaw, 0, strlen($cidadeRaw) - 3));
                 $cidadeDest = $cidadeRaw;
             }
         }
@@ -313,17 +307,15 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap) {
         }
     }
 
-    if (!empty($ufDest) && !empty($nomeDest)) {
-        $prefixo = $ufDest . ' ' . strtoupper($nomeDest);
-        foreach ($linhas0083 as $cl0083) {
-            if (strpos($cl0083, $prefixo) === 0) {
-                $unidadeDest = trim(substr($cl0083, 37, 3));
-                break;
-            }
-        }
+    foreach ($linhas0083 as $linha)
+    {
+      if (strpos($linha, "$ufDest $nomeDest") !== false)
+      {
+        $unidadeDest = substr ($linha, 37, 3);
+        break;
+      }
     }
 
-    $statusColeta = 'pendente';
     $atrasoColeta = null;
     $limiteTs     = null;
 

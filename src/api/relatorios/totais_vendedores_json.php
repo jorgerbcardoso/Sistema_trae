@@ -74,6 +74,7 @@ try {
     // CONECTAR AO SSW E BUSCAR DADOS
     // ================================================================
     ssw_login($dominio);
+    set_time_limit(60);
 
     // Dispara requisição para 56, e procura o relatório 73
     // Le lista da 156, em ordem decrescente de data de processo
