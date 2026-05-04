@@ -64,6 +64,9 @@ try {
     
     // Se a diferença for >= 2 meses, usar "TOD", senão usar "U90"
     $actParameter = ($diferencaMeses >= 2) ? 'TOD' : 'U90';
+    
+    // Log para debug
+    error_log("totais_vendedores_json: mesUsuario=$mesUsuario, anoUsuario=$anoUsuario, diferencaMeses=$diferencaMeses, actParameter=$actParameter");
 
     // ================================================================
     // CRIAR CONEXÃO POSTGRESQL (PADRÃO OBRIGATÓRIO)
@@ -79,6 +82,8 @@ try {
     // Dispara requisição para 56, e procura o relatório 73
     // Le lista da 156, em ordem decrescente de data de processo
     $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0082?act={$actParameter}"); // Comanda a 156
+    
+    error_log("totais_vendedores_json: XML retornado (primeiros 500 chars): " . substr($str, 0, 500));
 
     $str = substr($str, strpos($str,'<xml'), strlen($str));
     $str = substr($str, 0, strpos($str,'</xml>')) . '</xml>';
