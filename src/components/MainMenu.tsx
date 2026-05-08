@@ -1,39 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import * as LucideIcons from 'lucide-react';
 import { 
   Home, 
   LogOut, 
   Settings, 
   Shield,
-  TrendingUp,
   Package,
-  Truck,
-  BarChart3,
-  UserPlus,
-  Route,
-  DollarSign,
-  FolderPlus,
-  Calendar,
-  FolderOpen,
-  FileText,
-  FileSpreadsheet,
-  Building2,
-  User,
-  RefreshCw,
-  UserCheck,
-  Warehouse,
-  MapPin,
-  Tag,
-  ArrowDownCircle,
-  ArrowUpCircle,
-  ClipboardCheck,
-  Calculator,
   HelpCircle,
-  CheckSquare,
-  CheckCircle,
-  ShoppingBag,
-  ShoppingCart,
   Menu as MenuIcon,
-  Box,
   ChevronDown,
   ChevronRight
 } from 'lucide-react';
@@ -344,41 +318,8 @@ export function MainMenu() {
   };
 
   const getIconComponent = (iconName: string) => {
-    const icons: Record<string, React.ReactNode> = {
-      'TrendingUp': <TrendingUp className="w-5 h-5" />,
-      'Package': <Package className="w-5 h-5" />,
-      'Truck': <Truck className="w-5 h-5" />,
-      'BarChart3': <BarChart3 className="w-5 h-5" />,
-      'UserPlus': <UserPlus className="w-5 h-5" />,
-      'Settings': <Settings className="w-5 h-5" />,
-      'Route': <Route className="w-5 h-5" />,
-      'DollarSign': <DollarSign className="w-5 h-5" />,
-      'FolderPlus': <FolderPlus className="w-5 h-5" />,
-      'Calendar': <Calendar className="w-5 h-5" />,
-      'FolderOpen': <FolderOpen className="w-5 h-5" />,
-      'FileText': <FileText className="w-5 h-5" />,
-      'FileSpreadsheet': <FileSpreadsheet className="w-5 h-5" />,
-      'Building2': <Building2 className="w-5 h-5" />,
-      'User': <User className="w-5 h-5" />,
-      'RefreshCw': <RefreshCw className="w-5 h-5" />,
-      'UserCheck': <UserCheck className="w-5 h-5" />,
-      'Warehouse': <Warehouse className="w-5 h-5" />,
-      'MapPin': <MapPin className="w-5 h-5" />,
-      'Tag': <Tag className="w-5 h-5" />,
-      'ArrowDownCircle': <ArrowDownCircle className="w-5 h-5" />,
-      'ArrowUpCircle': <ArrowUpCircle className="w-5 h-5" />,
-      'ClipboardCheck': <ClipboardCheck className="w-5 h-5" />,
-      'Calculator': <Calculator className="w-5 h-5" />,
-      'CheckSquare': <CheckSquare className="w-5 h-5" />,
-      'CheckCircle': <CheckCircle className="w-5 h-5" />,
-      'ShoppingBag': <ShoppingBag className="w-5 h-5" />,
-      'ShoppingCart': <ShoppingCart className="w-5 h-5" />,
-      'Menu': <MenuIcon className="w-5 h-5" />,
-      'Box': <Box className="w-5 h-5" />,
-      'ChevronDown': <ChevronDown className="w-5 h-5" />,
-      'ChevronRight': <ChevronRight className="w-5 h-5" />
-    };
-    return icons[iconName] || <Package className="w-5 h-5" />;
+    const Icon = (LucideIcons as any)[iconName] || LucideIcons.Package;
+    return <Icon className="w-5 h-5" />;
   };
 
   const getInitials = (name: string) => {

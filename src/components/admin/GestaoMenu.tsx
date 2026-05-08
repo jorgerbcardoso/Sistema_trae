@@ -1,3 +1,4 @@
+import * as LucideIcons from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ENVIRONMENT } from '../../config/environment';
 import {
@@ -525,79 +526,14 @@ export function GestaoMenu() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  // ✅ Função para renderizar ícones dinamicamente
   const getIconComponent = (iconName: string) => {
-    const icons: Record<string, React.ReactNode> = {
-      'TrendingUp': <TrendingUp className="w-5 h-5" />,
-      'Package': <Package className="w-5 h-5" />,
-      'Truck': <Truck className="w-5 h-5" />,
-      'BarChart3': <BarChart3 className="w-5 h-5" />,
-      'UserPlus': <UserPlus className="w-5 h-5" />,
-      'Settings': <Settings className="w-5 h-5" />,
-      'Route': <Route className="w-5 h-5" />,
-      'DollarSign': <DollarSign className="w-5 h-5" />,
-      'FolderPlus': <FolderPlus className="w-5 h-5" />,
-      'Calendar': <Calendar className="w-5 h-5" />,
-      'FolderOpen': <FolderOpen className="w-5 h-5" />,
-      'FileText': <FileText className="w-5 h-5" />,
-      'FileSpreadsheet': <FileSpreadsheet className="w-5 h-5" />,
-      'Building2': <Building2 className="w-5 h-5" />,
-      'User': <User className="w-5 h-5" />,
-      'RefreshCw': <RefreshCw className="w-5 h-5" />,
-      'UserCheck': <UserCheck className="w-5 h-5" />,
-      'Warehouse': <Warehouse className="w-5 h-5" />,
-      'MapPin': <MapPin className="w-5 h-5" />,
-      'Tag': <Tag className="w-5 h-5" />,
-      'ArrowDownCircle': <ArrowDownCircle className="w-5 h-5" />,
-      'ArrowUpCircle': <ArrowUpCircle className="w-5 h-5" />,
-      'ClipboardCheck': <ClipboardCheck className="w-5 h-5" />,
-      'Calculator': <Calculator className="w-5 h-5" />,
-      'CheckSquare': <CheckSquare className="w-5 h-5" />,
-      'CheckCircle': <CheckCircle className="w-5 h-5" />,
-      'ShoppingBag': <ShoppingBag className="w-5 h-5" />,
-      'ShoppingCart': <ShoppingCart className="w-5 h-5" />,
-      'Menu': <Menu className="w-5 h-5" />,
-      'Box': <Box className="w-5 h-5" />,
-      'Shield': <Shield className="w-5 h-5" />,
-    };
-    return icons[iconName] || <Package className="w-5 h-5" />;
+    const Icon = (LucideIcons as any)[iconName] || LucideIcons.Package;
+    return <Icon className="w-5 h-5" />;
   };
 
   const getIconComponentSmall = (iconName: string) => {
-    const icons: Record<string, React.ReactNode> = {
-      'TrendingUp': <TrendingUp className="w-4 h-4" />,
-      'Package': <Package className="w-4 h-4" />,
-      'Truck': <Truck className="w-4 h-4" />,
-      'BarChart3': <BarChart3 className="w-4 h-4" />,
-      'UserPlus': <UserPlus className="w-4 h-4" />,
-      'Settings': <Settings className="w-4 h-4" />,
-      'Route': <Route className="w-4 h-4" />,
-      'DollarSign': <DollarSign className="w-4 h-4" />,
-      'FolderPlus': <FolderPlus className="w-4 h-4" />,
-      'Calendar': <Calendar className="w-4 h-4" />,
-      'FolderOpen': <FolderOpen className="w-4 h-4" />,
-      'FileText': <FileText className="w-4 h-4" />,
-      'FileSpreadsheet': <FileSpreadsheet className="w-4 h-4" />,
-      'Building2': <Building2 className="w-4 h-4" />,
-      'User': <User className="w-4 h-4" />,
-      'RefreshCw': <RefreshCw className="w-4 h-4" />,
-      'UserCheck': <UserCheck className="w-4 h-4" />,
-      'Warehouse': <Warehouse className="w-4 h-4" />,
-      'MapPin': <MapPin className="w-4 h-4" />,
-      'Tag': <Tag className="w-4 h-4" />,
-      'ArrowDownCircle': <ArrowDownCircle className="w-4 h-4" />,
-      'ArrowUpCircle': <ArrowUpCircle className="w-4 h-4" />,
-      'ClipboardCheck': <ClipboardCheck className="w-4 h-4" />,
-      'Calculator': <Calculator className="w-4 h-4" />,
-      'CheckSquare': <CheckSquare className="w-4 h-4" />,
-      'CheckCircle': <CheckCircle className="w-4 h-4" />,
-      'ShoppingBag': <ShoppingBag className="w-4 h-4" />,
-      'ShoppingCart': <ShoppingCart className="w-4 h-4" />,
-      'Menu': <Menu className="w-4 h-4" />,
-      'Box': <Box className="w-4 h-4" />,
-      'Shield': <Shield className="w-4 h-4" />,
-    };
-    return icons[iconName] || <Package className="w-4 h-4" />;
+    const Icon = (LucideIcons as any)[iconName] || LucideIcons.Package;
+    return <Icon className="w-4 h-4" />;
   };
 
   // ================================================================

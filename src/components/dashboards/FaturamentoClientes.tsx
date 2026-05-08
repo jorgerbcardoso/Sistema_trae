@@ -1,0 +1,729 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+  Legend,
+} from 'recharts';
+import {
+  Award,
+  Check,
+  ChevronDown,
+  Filter,
+  Loader2,
+  Package,
+  Search,
+  TrendingUp,
+  Truck,
+  Users,
+  Wallet,
+  Weight,
+  X,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
+import { useTheme } from '../ThemeProvider';
+import { ENVIRONMENT } from '../../config/environment';
+import { apiFetch } from '../../utils/apiUtils';
+import { DashboardLayout } from '../layouts/DashboardLayout';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Badge } from '../ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
+
+function getLastMonthPeriod() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last  = new Date(now.getFullYear(), now.getMonth(), 0);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { inicio: fmt(first), fim: fmt(last) };
+}
+
+function formatPeriodDisplay(inicio: string, fim: string): string {
+  if (!inicio && !fim) return '';
+  const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const p = (s: string) => { const [y,m,d] = s.split('-'); return { year: +y, month: +m, day: +d }; };
+  const s = p(inicio); const e = p(fim);
+  if (s.month === e.month && s.year === e.year) return `${MONTHS[s.month-1]} ${s.year}`;
+  if (s.year === e.year) return `${MONTHS[s.month-1]} – ${MONTHS[e.month-1]} ${s.year}`;
+  return `${MONTHS[s.month-1]} ${s.year} – ${MONTHS[e.month-1]} ${e.year}`;
+}
+
+function fmtBRL(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+}
+function fmtNum(v: number) {
+  return v.toLocaleString('pt-BR');
+}
+function fmtKg(v: number) {
+  if (v >= 1000) return (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' t';
+  return v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' kg';
+}
+
+const PALETTE = [
+  '#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b',
+  '#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316',
+];
+
+interface Filters {
+  periodoEmissaoInicio: string;
+  periodoEmissaoFim: string;
+  tpFrete: string;
+  siglaEmit: string[];
+  siglaDest: string[];
+  cnpjsPagadores: string[];
+}
+
+interface ClienteRanking {
+  cnpj: string;
+  nome: string;
+  qtde_ctes: number;
+  total_frete: number;
+  total_merc: number;
+  total_peso: number;
+  total_volumes: number;
+  ticket_medio: number;
+  qtde_cif: number;
+  qtde_fob: number;
+}
+
+interface Totais {
+  qtde_ctes: number;
+  total_frete: number;
+  total_merc: number;
+  total_peso: number;
+  total_volumes: number;
+  qtde_clientes: number;
+}
+
+interface EvolucaoMes {
+  mes: string;
+  mes_label: string;
+  total_frete: number;
+  qtde_ctes: number;
+}
+
+interface UnidadeFat {
+  sigla: string;
+  total_frete: number;
+  qtde_ctes: number;
+}
+
+interface ClienteOpcao {
+  cnpj: string;
+  nome: string;
+  total_frete: number;
+}
+
+export function FaturamentoClientes() {
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  usePageTitle('Faturamento de Clientes');
+
+  const defaultPeriod = getLastMonthPeriod();
+
+  const [filters, setFilters] = useState<Filters>({
+    periodoEmissaoInicio: defaultPeriod.inicio,
+    periodoEmissaoFim: defaultPeriod.fim,
+    tpFrete: '',
+    siglaEmit: [],
+    siglaDest: [],
+    cnpjsPagadores: [],
+  });
+  const [tempFilters, setTempFilters] = useState<Filters>(filters);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [clientes, setClientes] = useState<ClienteRanking[]>([]);
+  const [totais, setTotais] = useState<Totais | null>(null);
+  const [evolucao, setEvolucao] = useState<EvolucaoMes[]>([]);
+  const [unidades, setUnidades] = useState<UnidadeFat[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
+  const [clienteOpcoes, setClienteOpcoes] = useState<ClienteOpcao[]>([]);
+  const [clienteSearch, setClienteSearch] = useState('');
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [clientesSelecionados, setClientesSelecionados] = useState<ClienteOpcao[]>([]);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [activeBar, setActiveBar] = useState<string | null>(null);
+
+  const carregarDados = useCallback(async (f: Filters) => {
+    setLoading(true);
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_dados.php`,
+        { method: 'POST', body: JSON.stringify({ filters: f }) },
+        true
+      );
+      if (response.success) {
+        setClientes(response.data.clientes || []);
+        setTotais(response.data.totais || null);
+        setEvolucao(response.data.evolucao || []);
+        setUnidades(response.data.unidades || []);
+      } else {
+        toast.error(response.message || 'Erro ao carregar dados');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao carregar dados');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarDados(filters);
+  }, [filters]);
+
+  const buscarClientesOpcoes = useCallback(async (search: string, f: Filters) => {
+    setLoadingClientes(true);
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_top_clientes.php`,
+        { method: 'POST', body: JSON.stringify({ search, filters: f }) },
+        true
+      );
+      if (response.success) {
+        setClienteOpcoes(response.clientes || []);
+      }
+    } catch {
+    } finally {
+      setLoadingClientes(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!clienteDialogOpen) return;
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      buscarClientesOpcoes(clienteSearch, tempFilters);
+    }, 300);
+    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
+  }, [clienteSearch, clienteDialogOpen, tempFilters]);
+
+  const toggleClienteSelecionado = (c: ClienteOpcao) => {
+    setClientesSelecionados(prev => {
+      const exists = prev.find(x => x.cnpj === c.cnpj);
+      if (exists) return prev.filter(x => x.cnpj !== c.cnpj);
+      if (prev.length >= 10) { toast.warning('Máximo de 10 clientes'); return prev; }
+      return [...prev, c];
+    });
+  };
+
+  const confirmarClientes = () => {
+    setTempFilters(prev => ({ ...prev, cnpjsPagadores: clientesSelecionados.map(c => c.cnpj) }));
+    setClienteDialogOpen(false);
+  };
+
+  const applyFilters = () => {
+    setFilters({ ...tempFilters });
+    setShowFilters(false);
+  };
+
+  const cancelFilters = () => {
+    setTempFilters({ ...filters });
+    setClientesSelecionados(filters.cnpjsPagadores.map(cnpj => {
+      const found = clienteOpcoes.find(c => c.cnpj === cnpj);
+      return found || { cnpj, nome: cnpj, total_frete: 0 };
+    }));
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    const empty: Filters = {
+      periodoEmissaoInicio: '',
+      periodoEmissaoFim: '',
+      tpFrete: '',
+      siglaEmit: [],
+      siglaDest: [],
+      cnpjsPagadores: [],
+    };
+    setTempFilters(empty);
+    setClientesSelecionados([]);
+  };
+
+  const totalFreteSelecionados = clientes.reduce((s, c) => s + c.total_frete, 0);
+
+  const isDark = theme === 'dark';
+  const gridColor  = isDark ? '#334155' : '#e2e8f0';
+  const textColor  = isDark ? '#94a3b8' : '#64748b';
+  const tooltipBg  = isDark ? '#1e293b' : '#ffffff';
+  const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
+
+  const headerActions = (
+    <div className="flex items-center gap-2 md:gap-4">
+      <div className="text-right hidden md:block">
+        <p className="text-slate-500 dark:text-slate-400 text-xs">Período</p>
+        <p className="text-slate-900 dark:text-slate-100 text-sm">
+          {formatPeriodDisplay(filters.periodoEmissaoInicio, filters.periodoEmissaoFim) || 'Sem período'}
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => { setTempFilters({ ...filters }); setShowFilters(true); }}
+        className="dark:border-slate-600 dark:hover:bg-slate-800"
+      >
+        <Filter className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
+  return (
+    <DashboardLayout
+      title="Faturamento de Clientes"
+      description={user?.client_name}
+      headerActions={headerActions}
+    >
+      <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
+
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">
+            Faturamento de Clientes
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400">
+            Análise de faturamento por cliente pagador — top 10 por valor de frete
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+          </div>
+        ) : (
+          <>
+            {totais && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { label: 'Faturamento Total', value: fmtBRL(totais.total_frete), icon: Wallet,    color: 'indigo' },
+                  { label: 'Clientes Ativos',   value: fmtNum(totais.qtde_clientes), icon: Users,   color: 'blue'   },
+                  { label: 'CT-es Emitidos',    value: fmtNum(totais.qtde_ctes),     icon: Truck,   color: 'cyan'   },
+                  { label: 'Valor de Mercadoria', value: fmtBRL(totais.total_merc),  icon: TrendingUp, color: 'emerald' },
+                  { label: 'Peso Total',         value: fmtKg(totais.total_peso),    icon: Weight,  color: 'amber'  },
+                  { label: 'Volumes',            value: fmtNum(totais.total_volumes), icon: Package, color: 'rose'   },
+                ].map(({ label, value, icon: Icon, color }) => (
+                  <div
+                    key={label}
+                    className={`rounded-xl border p-4 bg-${color}-50 dark:bg-${color}-950/30 border-${color}-200 dark:border-${color}-800`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon className={`w-4 h-4 text-${color}-600 dark:text-${color}-400`} />
+                      <span className={`text-xs font-medium text-${color}-700 dark:text-${color}-300`}>{label}</span>
+                    </div>
+                    <p className={`text-lg font-bold text-${color}-800 dark:text-${color}-200 leading-tight`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid lg:grid-cols-5 gap-6">
+              <div className="lg:col-span-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-indigo-500" />
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">Ranking de Clientes</h3>
+                  <span className="ml-auto text-xs text-slate-400">por faturamento de frete</span>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {clientes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                      <Users className="w-10 h-10 mb-2" />
+                      <p className="text-sm">Nenhum dado encontrado</p>
+                    </div>
+                  ) : (
+                    clientes.map((c, i) => {
+                      const pct = totalFreteSelecionados > 0 ? (c.total_frete / totalFreteSelecionados) * 100 : 0;
+                      const color = PALETTE[i % PALETTE.length];
+                      return (
+                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                              style={{ backgroundColor: color }}
+                            >
+                              {i + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.nome}</p>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(c.total_frete)}</p>
+                              </div>
+                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
+                                <div
+                                  className="h-1.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%`, backgroundColor: color }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                <span>{c.qtde_ctes} CT-es</span>
+                                <span>·</span>
+                                <span>Ticket: {fmtBRL(c.ticket_medio)}</span>
+                                <span>·</span>
+                                <span>{pct.toFixed(1)}% do total</span>
+                                {c.qtde_cif > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {c.qtde_cif}</Badge>}
+                                {c.qtde_fob > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {c.qtde_fob}</Badge>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 space-y-6">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-cyan-500" />
+                    Distribuição por Unidade Origem
+                  </h3>
+                  {unidades.length === 0 ? (
+                    <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={unidades}
+                          dataKey="total_frete"
+                          nameKey="sigla"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          stroke="none"
+                        >
+                          {unidades.map((u, i) => (
+                            <Cell key={u.sigla} fill={PALETTE[i % PALETTE.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                          formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
+                        />
+                        <Legend
+                          iconType="circle"
+                          iconSize={8}
+                          formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    Participação no Faturamento
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-4">Top clientes selecionados</p>
+                  {clientes.length === 0 ? (
+                    <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart
+                        data={clientes.slice(0, 5).map(c => ({ nome: c.nome.split(' ')[0], frete: c.total_frete, cnpj: c.cnpj }))}
+                        layout="vertical"
+                        margin={{ left: 0, right: 8, top: 0, bottom: 0 }}
+                        onMouseLeave={() => setActiveBar(null)}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
+                        <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                        <YAxis type="category" dataKey="nome" tick={{ fill: textColor, fontSize: 10 }} width={60} />
+                        <RechartsTooltip
+                          contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                          formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
+                        />
+                        <Bar dataKey="frete" radius={[0, 4, 4, 0]} onMouseEnter={(d) => setActiveBar(d.cnpj)}>
+                          {clientes.slice(0, 5).map((c, i) => (
+                            <Cell
+                              key={c.cnpj}
+                              fill={PALETTE[i % PALETTE.length]}
+                              opacity={activeBar && activeBar !== c.cnpj ? 0.4 : 1}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {evolucao.length > 1 && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-indigo-500" />
+                  Evolução Mensal do Faturamento
+                </h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={evolucao} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total_frete"
+                      stroke="#6366f1"
+                      strokeWidth={2.5}
+                      fill="url(#gradFat)"
+                      dot={{ fill: '#6366f1', r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="sm:max-w-[680px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto overscroll-contain">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Personalize a visualização do faturamento
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            <div className="space-y-3">
+              <Label className="text-slate-900 dark:text-slate-100">Período de Emissão</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Início</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoEmissaoInicio}
+                    onChange={e => setTempFilters({ ...tempFilters, periodoEmissaoInicio: e.target.value })}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500">Fim</Label>
+                  <Input
+                    type="date"
+                    value={tempFilters.periodoEmissaoFim}
+                    onChange={e => setTempFilters({ ...tempFilters, periodoEmissaoFim: e.target.value })}
+                    className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-900 dark:text-slate-100">Tipo de Frete</Label>
+              <div className="flex gap-2">
+                {[{ v: '', l: 'Todos' }, { v: 'C', l: 'CIF' }, { v: 'F', l: 'FOB' }].map(({ v, l }) => (
+                  <button
+                    key={v}
+                    onClick={() => setTempFilters({ ...tempFilters, tpFrete: v })}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      tempFilters.tpFrete === v
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-900 dark:text-slate-100">Unidade(s) Origem</Label>
+              <FilterSelectUnidadeOrdered
+                value={tempFilters.siglaEmit}
+                onChange={v => setTempFilters({ ...tempFilters, siglaEmit: v })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-900 dark:text-slate-100">Unidade(s) Destino</Label>
+              <FilterSelectUnidadeOrdered
+                value={tempFilters.siglaDest}
+                onChange={v => setTempFilters({ ...tempFilters, siglaDest: v })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-900 dark:text-slate-100">Clientes Pagadores</Label>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Por padrão exibe os 10 maiores. Selecione até 10 clientes específicos.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full justify-between dark:border-slate-600 dark:hover:bg-slate-800"
+                onClick={() => {
+                  setClienteSearch('');
+                  setClientesSelecionados(
+                    tempFilters.cnpjsPagadores.map(cnpj => {
+                      const found = clienteOpcoes.find(c => c.cnpj === cnpj);
+                      return found || { cnpj, nome: cnpj, total_frete: 0 };
+                    })
+                  );
+                  setClienteDialogOpen(true);
+                }}
+              >
+                <span className="text-slate-600 dark:text-slate-300">
+                  {tempFilters.cnpjsPagadores.length === 0
+                    ? 'Top 10 automático'
+                    : `${tempFilters.cnpjsPagadores.length} cliente(s) selecionado(s)`}
+                </span>
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </Button>
+              {tempFilters.cnpjsPagadores.length > 0 && (
+                <button
+                  className="text-xs text-red-500 hover:underline"
+                  onClick={() => setTempFilters({ ...tempFilters, cnpjsPagadores: [] })}
+                >
+                  Limpar seleção (voltar ao top 10)
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <Button variant="outline" onClick={clearFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
+              <X className="w-4 h-4 mr-2" />
+              Limpar Tudo
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={cancelFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
+                Cancelar
+              </Button>
+              <Button onClick={applyFilters} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Check className="w-4 h-4 mr-2" />
+                Aplicar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clienteDialogOpen} onOpenChange={setClienteDialogOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white dark:bg-slate-900">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Selecionar Clientes</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Selecione até 10 clientes. Ordenados por faturamento no período.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Input
+                value={clienteSearch}
+                onChange={e => setClienteSearch(e.target.value)}
+                placeholder="Buscar por nome..."
+                className="pl-9 dark:bg-slate-800 dark:border-slate-700"
+              />
+            </div>
+
+            {clientesSelecionados.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {clientesSelecionados.map(c => (
+                  <Badge
+                    key={c.cnpj}
+                    variant="secondary"
+                    className="gap-1 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30"
+                    onClick={() => toggleClienteSelecionado(c)}
+                  >
+                    {c.nome.split(' ').slice(0, 2).join(' ')}
+                    <X className="w-3 h-3" />
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-y-auto min-h-0">
+              {loadingClientes ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Carregando...</span>
+                </div>
+              ) : clienteOpcoes.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+                  Nenhum cliente encontrado
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {clienteOpcoes.map((c, i) => {
+                    const selected = clientesSelecionados.some(x => x.cnpj === c.cnpj);
+                    return (
+                      <div
+                        key={c.cnpj}
+                        onClick={() => toggleClienteSelecionado(c)}
+                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                          selected
+                            ? 'bg-indigo-50 dark:bg-indigo-950/40'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        }`}
+                      >
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                          style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
+                        >
+                          {i + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{c.nome}</p>
+                          <p className="text-xs text-slate-400">{fmtBRL(c.total_frete)}</p>
+                        </div>
+                        {selected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700">
+              <span className="text-xs text-slate-500">{clientesSelecionados.length}/10 selecionados</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setClienteDialogOpen(false)} className="dark:border-slate-700">
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={confirmarClientes} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  <Check className="w-3.5 h-3.5 mr-1" />
+                  Confirmar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}
