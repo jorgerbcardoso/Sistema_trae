@@ -411,11 +411,12 @@ export function FaturamentoClientes() {
                     <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
                   ) : (() => {
                     const totalGeral = totais?.total_frete ?? 0;
-                    const totalTop = clientes.reduce((s, c) => s + c.total_frete, 0);
-                    const demais = totalGeral - totalTop;
+                    const top5 = clientes.slice(0, 5);
+                    const totalTop5 = top5.reduce((s, c) => s + c.total_frete, 0);
+                    const demais = totalGeral - totalTop5;
                     const pieData = [
-                      ...clientes.map(c => ({ nome: c.nome, value: c.total_frete })),
-                      ...(demais > 0 ? [{ nome: 'Demais', value: demais }] : []),
+                      ...top5.map(c => ({ nome: c.nome, label: c.nome.substring(0, 8), value: c.total_frete })),
+                      ...(demais > 0 ? [{ nome: 'Demais', label: 'Demais', value: demais }] : []),
                     ];
                     return (
                       <ResponsiveContainer width="100%" height={220}>
@@ -423,7 +424,7 @@ export function FaturamentoClientes() {
                           <Pie
                             data={pieData}
                             dataKey="value"
-                            nameKey="nome"
+                            nameKey="label"
                             cx="50%"
                             cy="50%"
                             innerRadius={55}
@@ -437,10 +438,7 @@ export function FaturamentoClientes() {
                           </Pie>
                           <RechartsTooltip
                             contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                            formatter={(v: number, _: any, props: any) => [
-                              `${props.payload.nome}: ${fmtBRL(v)}`,
-                              'Faturamento',
-                            ]}
+                            formatter={(v: number, _: any, props: any) => [`${props.payload.nome}: ${fmtBRL(v)}`]}
                           />
                           <Legend
                             iconType="circle"
@@ -460,39 +458,46 @@ export function FaturamentoClientes() {
                   </h3>
                   {unidades.length === 0 ? (
                     <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={unidades}
-                          dataKey="total_frete"
-                          nameKey="sigla"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={55}
-                          outerRadius={85}
-                          paddingAngle={2}
-                          stroke="none"
-                        >
-                          {unidades.map((u, i) => (
-                            <Cell key={u.sigla} fill={PALETTE[i % PALETTE.length]} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                          formatter={(v: number, _: any, props: any) => [
-                            `${props.payload.sigla}: ${fmtBRL(v)}`,
-                            'Faturamento',
-                          ]}
-                        />
-                        <Legend
-                          iconType="circle"
-                          iconSize={8}
-                          formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
+                  ) : (() => {
+                    const top5u = unidades.slice(0, 5);
+                    const totalTop5u = top5u.reduce((s, u) => s + u.total_frete, 0);
+                    const totalGeral = totais?.total_frete ?? 0;
+                    const demaisU = totalGeral - totalTop5u;
+                    const pieDataU = [
+                      ...top5u.map(u => ({ sigla: u.sigla, value: u.total_frete })),
+                      ...(demaisU > 0 ? [{ sigla: 'Demais', value: demaisU }] : []),
+                    ];
+                    return (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie
+                            data={pieDataU}
+                            dataKey="value"
+                            nameKey="sigla"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={85}
+                            paddingAngle={2}
+                            stroke="none"
+                          >
+                            {pieDataU.map((_, i) => (
+                              <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                            formatter={(v: number, _: any, props: any) => [`${props.payload.sigla}: ${fmtBRL(v)}`]}
+                          />
+                          <Legend
+                            iconType="circle"
+                            iconSize={8}
+                            formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
                 </div>
 
                 <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
@@ -569,87 +574,150 @@ export function FaturamentoClientes() {
               </div>
             )}
 
-            {evolClientes.length > 1 && (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                <div className="mb-4">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-indigo-500" />
-                    Evolução por Cliente — Últimos 12 Meses
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
-                </div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={evolClientes} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                    <RechartsTooltip
-                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                      formatter={(v: number, key: string) => [fmtBRL(v), evolClientesKeys[key] || key]}
-                    />
-                    <Legend
-                      iconType="circle"
-                      iconSize={8}
-                      formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{evolClientesKeys[v] ? evolClientesKeys[v].split(' ')[0] : v}</span>}
-                    />
-                    {Object.entries(evolClientesKeys).map(([cnpj, nome], i) => (
-                      <Line
-                        key={cnpj}
-                        type="monotone"
-                        dataKey={cnpj}
-                        name={cnpj}
-                        stroke={PALETTE[i % PALETTE.length]}
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                        connectNulls
+            {evolClientes.length > 1 && (() => {
+              const totaisPorCnpj: Record<string, number> = {};
+              evolClientes.forEach(row => {
+                Object.entries(evolClientesKeys).forEach(([cnpj]) => {
+                  if (row[cnpj]) totaisPorCnpj[cnpj] = (totaisPorCnpj[cnpj] || 0) + row[cnpj];
+                });
+              });
+              const top5cnpjs = Object.entries(totaisPorCnpj)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([cnpj]) => cnpj);
+              const demaisCnpjs = Object.keys(totaisPorCnpj).filter(c => !top5cnpjs.includes(c));
+              const dataComDemais = evolClientes.map(row => {
+                const novo: any = { mes: row.mes, mes_label: row.mes_label };
+                top5cnpjs.forEach(cnpj => { novo[cnpj] = row[cnpj] ?? null; });
+                if (demaisCnpjs.length > 0) {
+                  novo['__demais__'] = demaisCnpjs.reduce((s, c) => s + (row[c] ?? 0), 0) || null;
+                }
+                return novo;
+              });
+              const linhas = [
+                ...top5cnpjs.map((cnpj, i) => ({ key: cnpj, label: evolClientesKeys[cnpj] || cnpj, color: PALETTE[i % PALETTE.length] })),
+                ...(demaisCnpjs.length > 0 ? [{ key: '__demais__', label: 'Demais', color: '#94a3b8' }] : []),
+              ];
+              return (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-indigo-500" />
+                      Evolução por Cliente — Últimos 12 Meses
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
+                  </div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={dataComDemais} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                      <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                      <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                      <RechartsTooltip
+                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: number, key: string) => {
+                          const l = linhas.find(l => l.key === key);
+                          return [fmtBRL(v), l?.label || key];
+                        }}
                       />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(v) => {
+                          const l = linhas.find(l => l.key === v);
+                          const label = l?.label || v;
+                          return <span style={{ color: textColor, fontSize: 11 }}>{label.substring(0, 8)}</span>;
+                        }}
+                      />
+                      {linhas.map(({ key, color }) => (
+                        <Line
+                          key={key}
+                          type="monotone"
+                          dataKey={key}
+                          name={key}
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 4 }}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
 
-            {evolUnidades.length > 1 && (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                <div className="mb-4">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Truck className="w-5 h-5 text-cyan-500" />
-                    Evolução por Unidade Origem — Últimos 12 Meses
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
-                </div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={evolUnidades} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                    <RechartsTooltip
-                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                      formatter={(v: number, key: string) => [fmtBRL(v), key]}
-                    />
-                    <Legend
-                      iconType="circle"
-                      iconSize={8}
-                      formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
-                    />
-                    {evolUnidadesKeys.map((sigla, i) => (
-                      <Line
-                        key={sigla}
-                        type="monotone"
-                        dataKey={sigla}
-                        name={sigla}
-                        stroke={PALETTE[i % PALETTE.length]}
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                        connectNulls
+            {evolUnidades.length > 1 && (() => {
+              const totaisPorSigla: Record<string, number> = {};
+              evolUnidades.forEach(row => {
+                evolUnidadesKeys.forEach(sigla => {
+                  if (row[sigla]) totaisPorSigla[sigla] = (totaisPorSigla[sigla] || 0) + row[sigla];
+                });
+              });
+              const top5siglas = Object.entries(totaisPorSigla)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([s]) => s);
+              const demaisSiglas = evolUnidadesKeys.filter(s => !top5siglas.includes(s));
+              const dataUnidComDemais = evolUnidades.map(row => {
+                const novo: any = { mes: row.mes, mes_label: row.mes_label };
+                top5siglas.forEach(s => { novo[s] = row[s] ?? null; });
+                if (demaisSiglas.length > 0) {
+                  novo['__demais__'] = demaisSiglas.reduce((sum, s) => sum + (row[s] ?? 0), 0) || null;
+                }
+                return novo;
+              });
+              const linhasU = [
+                ...top5siglas.map((s, i) => ({ key: s, label: s, color: PALETTE[i % PALETTE.length] })),
+                ...(demaisSiglas.length > 0 ? [{ key: '__demais__', label: 'Demais', color: '#94a3b8' }] : []),
+              ];
+              return (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <Truck className="w-5 h-5 text-cyan-500" />
+                      Evolução por Unidade Origem — Últimos 12 Meses
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
+                  </div>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={dataUnidComDemais} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                      <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                      <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                      <RechartsTooltip
+                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: number, key: string) => {
+                          const l = linhasU.find(l => l.key === key);
+                          return [fmtBRL(v), l?.label || key];
+                        }}
                       />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(v) => {
+                          const l = linhasU.find(l => l.key === v);
+                          return <span style={{ color: textColor, fontSize: 11 }}>{l?.label || v}</span>;
+                        }}
+                      />
+                      {linhasU.map(({ key, color }) => (
+                        <Line
+                          key={key}
+                          type="monotone"
+                          dataKey={key}
+                          name={key}
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 4 }}
+                          connectNulls
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
           </>
         )}
       </main>
