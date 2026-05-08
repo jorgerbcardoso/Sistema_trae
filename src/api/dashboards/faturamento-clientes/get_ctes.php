@@ -95,7 +95,6 @@ $query = "
     FROM {$domain}_cte cte
     {$whereClause}
     ORDER BY cte.data_emissao DESC, cte.nro_cte DESC
-    LIMIT 500
 ";
 
 $result = pg_query_params($conn, $query, $params);
