@@ -618,7 +618,7 @@ export function FaturamentoClientes() {
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart
                       data={dataComDemais}
-                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 16 }}
                       onClick={(e: any) => {
                         if (!e?.activePayload?.[0]) return;
                         const mes = e.activeLabel;
@@ -636,15 +636,15 @@ export function FaturamentoClientes() {
                       style={{ cursor: 'pointer' }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                      <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                      <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                      <RechartsTooltip
-                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: number, key: string) => {
-                          const l = linhas.find(l => l.key === key);
-                          return [fmtBRL(v), l?.label || key];
-                        }}
-                      />
+                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} interval={0} angle={-35} textAnchor="end" height={45} />
+                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number, key: string) => {
+                        const l = linhas.find(l => l.key === key);
+                        return [fmtBRL(v), l?.label || key];
+                      }}
+                    />
                       <Legend
                         iconType="circle"
                         iconSize={8}
@@ -722,7 +722,7 @@ export function FaturamentoClientes() {
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart
                       data={dataUnidComDemais}
-                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 16 }}
                       onClick={(e: any) => {
                         if (!e?.activePayload?.[0]) return;
                         const mes = e.activeLabel;
@@ -740,15 +740,15 @@ export function FaturamentoClientes() {
                       style={{ cursor: 'pointer' }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                      <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                      <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                      <RechartsTooltip
-                        contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: number, key: string) => {
-                          const l = linhasU.find(l => l.key === key);
-                          return [fmtBRL(v), l?.label || key];
-                        }}
-                      />
+                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} interval={0} angle={-35} textAnchor="end" height={45} />
+                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number, key: string) => {
+                        const l = linhasU.find(l => l.key === key);
+                        return [fmtBRL(v), l?.label || key];
+                      }}
+                    />
                       <Legend
                         iconType="circle"
                         iconSize={8}
