@@ -182,6 +182,93 @@ while ($row = pg_fetch_assoc($resultUnidades)) {
     ];
 }
 
+$params12 = [];
+$pi12 = 1;
+$where12Conditions = ["cte.status <> 'C'", "cte.data_emissao >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months'"];
+
+if (!empty($filters['tpFrete'])) {
+    $where12Conditions[] = 'cte.tp_frete = $' . $pi12++;
+    $params12[] = $filters['tpFrete'];
+}
+if (!empty($filters['siglaEmit']) && is_array($filters['siglaEmit']) && count($filters['siglaEmit']) > 0) {
+    $phs = [];
+    foreach ($filters['siglaEmit'] as $s) { $phs[] = '$' . $pi12++; $params12[] = $s; }
+    $where12Conditions[] = 'cte.sigla_emit IN (' . implode(', ', $phs) . ')';
+}
+if (!empty($filters['siglaDest']) && is_array($filters['siglaDest']) && count($filters['siglaDest']) > 0) {
+    $phs = [];
+    foreach ($filters['siglaDest'] as $s) { $phs[] = '$' . $pi12++; $params12[] = $s; }
+    $where12Conditions[] = 'cte.sigla_dest IN (' . implode(', ', $phs) . ')';
+}
+
+$where12 = 'WHERE ' . implode(' AND ', $where12Conditions);
+
+$params12Clientes = $params12;
+$pi12c = $pi12;
+if (count($cnpjsSelecionados) > 0) {
+    $phs = [];
+    foreach ($cnpjsSelecionados as $cnpj) { $phs[] = '$' . $pi12c++; $params12Clientes[] = $cnpj; }
+    $where12Clientes = $where12 . ' AND cte.cnpj_pag IN (' . implode(', ', $phs) . ')';
+} else {
+    $where12Clientes = $where12;
+}
+
+$queryEvolClientes = "
+    SELECT
+        TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
+        TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
+        cte.cnpj_pag,
+        cte.nome_pag,
+        SUM(cte.vlr_frete)                    AS total_frete
+    FROM {$domain}_cte cte
+    {$where12Clientes}
+    GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), cte.cnpj_pag, cte.nome_pag
+    ORDER BY mes ASC
+";
+
+$resultEvolClientes = pg_query_params($conn, $queryEvolClientes, $params12Clientes);
+if (!$resultEvolClientes) {
+    respondJson(['success' => false, 'message' => 'Erro na query evolução clientes: ' . pg_last_error($conn)]);
+}
+
+$evolClientesRaw = [];
+$clientesNomes   = [];
+while ($row = pg_fetch_assoc($resultEvolClientes)) {
+    $mes  = $row['mes'];
+    $cnpj = $row['cnpj_pag'];
+    $nome = $row['nome_pag'] ?: 'SEM NOME';
+    if (!isset($evolClientesRaw[$mes])) $evolClientesRaw[$mes] = ['mes' => $mes, 'mes_label' => $row['mes_label']];
+    $evolClientesRaw[$mes][$cnpj] = (float)$row['total_frete'];
+    $clientesNomes[$cnpj] = $nome;
+}
+
+$queryEvolUnidades = "
+    SELECT
+        TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
+        TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
+        COALESCE(cte.sigla_emit, '-')         AS sigla,
+        SUM(cte.vlr_frete)                    AS total_frete
+    FROM {$domain}_cte cte
+    {$where12Clientes}
+    GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), COALESCE(cte.sigla_emit, '-')
+    ORDER BY mes ASC
+";
+
+$resultEvolUnidades = pg_query_params($conn, $queryEvolUnidades, $params12Clientes);
+if (!$resultEvolUnidades) {
+    respondJson(['success' => false, 'message' => 'Erro na query evolução unidades: ' . pg_last_error($conn)]);
+}
+
+$evolUnidadesRaw = [];
+$unidadesSiglas  = [];
+while ($row = pg_fetch_assoc($resultEvolUnidades)) {
+    $mes   = $row['mes'];
+    $sigla = $row['sigla'];
+    if (!isset($evolUnidadesRaw[$mes])) $evolUnidadesRaw[$mes] = ['mes' => $mes, 'mes_label' => $row['mes_label']];
+    $evolUnidadesRaw[$mes][$sigla] = (float)$row['total_frete'];
+    $unidadesSiglas[$sigla] = true;
+}
+
 respondJson([
     'success' => true,
     'data' => [
@@ -194,7 +281,11 @@ respondJson([
             'total_volumes' => (int)($rowTotais['total_volumes'] ?? 0),
             'qtde_clientes' => (int)($rowTotais['qtde_clientes'] ?? 0),
         ],
-        'evolucao'      => $evolucao,
-        'unidades'      => $unidades,
+        'evolucao'          => $evolucao,
+        'unidades'          => $unidades,
+        'evol_clientes'     => array_values($evolClientesRaw),
+        'evol_clientes_keys'=> $clientesNomes,
+        'evol_unidades'     => array_values($evolUnidadesRaw),
+        'evol_unidades_keys'=> array_keys($unidadesSiglas),
     ],
 ]);

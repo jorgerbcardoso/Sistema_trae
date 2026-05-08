@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
   BarChart,
   Bar,
   XAxis,
@@ -156,6 +158,10 @@ export function FaturamentoClientes() {
   const [totais, setTotais] = useState<Totais | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoMes[]>([]);
   const [unidades, setUnidades] = useState<UnidadeFat[]>([]);
+  const [evolClientes, setEvolClientes] = useState<any[]>([]);
+  const [evolClientesKeys, setEvolClientesKeys] = useState<Record<string, string>>({});
+  const [evolUnidades, setEvolUnidades] = useState<any[]>([]);
+  const [evolUnidadesKeys, setEvolUnidadesKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
@@ -180,6 +186,10 @@ export function FaturamentoClientes() {
         setTotais(response.data.totais || null);
         setEvolucao(response.data.evolucao || []);
         setUnidades(response.data.unidades || []);
+        setEvolClientes(response.data.evol_clientes || []);
+        setEvolClientesKeys(response.data.evol_clientes_keys || {});
+        setEvolUnidades(response.data.evol_unidades || []);
+        setEvolUnidadesKeys(response.data.evol_unidades_keys || []);
       } else {
         toast.error(response.message || 'Erro ao carregar dados');
       }
@@ -313,23 +323,24 @@ export function FaturamentoClientes() {
           <>
             {totais && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                  { label: 'Faturamento Total', value: fmtBRL(totais.total_frete), icon: Wallet,    color: 'indigo' },
-                  { label: 'Clientes Ativos',   value: fmtNum(totais.qtde_clientes), icon: Users,   color: 'blue'   },
-                  { label: 'CT-es Emitidos',    value: fmtNum(totais.qtde_ctes),     icon: Truck,   color: 'cyan'   },
-                  { label: 'Valor de Mercadoria', value: fmtBRL(totais.total_merc),  icon: TrendingUp, color: 'emerald' },
-                  { label: 'Peso Total',         value: fmtKg(totais.total_peso),    icon: Weight,  color: 'amber'  },
-                  { label: 'Volumes',            value: fmtNum(totais.total_volumes), icon: Package, color: 'rose'   },
-                ].map(({ label, value, icon: Icon, color }) => (
+                {([
+                  { label: 'Faturamento Total',   value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
+                  { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
+                  { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
+                  { label: 'Valor de Mercadoria', value: fmtBRL(totais.total_merc),     icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
+                  { label: 'Peso Total',          value: fmtKg(totais.total_peso),      icon: Weight,     bg: '#fffbeb', bgDark: '#1c1003', border: '#fde68a', borderDark: '#78350f', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
+                  { label: 'Volumes',             value: fmtNum(totais.total_volumes),  icon: Package,    bg: '#fff1f2', bgDark: '#1f0a0a', border: '#fecdd3', borderDark: '#9f1239', iconColor: '#e11d48', textLabel: '#be123c', textValue: '#881337' },
+                ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
                   <div
                     key={label}
-                    className={`rounded-xl border p-4 bg-${color}-50 dark:bg-${color}-950/30 border-${color}-200 dark:border-${color}-800`}
+                    className="rounded-xl border p-4"
+                    style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Icon className={`w-4 h-4 text-${color}-600 dark:text-${color}-400`} />
-                      <span className={`text-xs font-medium text-${color}-700 dark:text-${color}-300`}>{label}</span>
+                      <Icon className="w-4 h-4" style={{ color: iconColor }} />
+                      <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
                     </div>
-                    <p className={`text-lg font-bold text-${color}-800 dark:text-${color}-200 leading-tight`}>{value}</p>
+                    <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
                   </div>
                 ))}
               </div>
@@ -393,6 +404,57 @@ export function FaturamentoClientes() {
               <div className="lg:col-span-2 space-y-6">
                 <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-500" />
+                    Distribuição por Cliente
+                  </h3>
+                  {clientes.length === 0 ? (
+                    <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
+                  ) : (() => {
+                    const totalGeral = totais?.total_frete ?? 0;
+                    const totalTop = clientes.reduce((s, c) => s + c.total_frete, 0);
+                    const demais = totalGeral - totalTop;
+                    const pieData = [
+                      ...clientes.map(c => ({ nome: c.nome, value: c.total_frete })),
+                      ...(demais > 0 ? [{ nome: 'Demais', value: demais }] : []),
+                    ];
+                    return (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            dataKey="value"
+                            nameKey="nome"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={85}
+                            paddingAngle={2}
+                            stroke="none"
+                          >
+                            {pieData.map((_, i) => (
+                              <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                            formatter={(v: number, _: any, props: any) => [
+                              `${props.payload.nome}: ${fmtBRL(v)}`,
+                              'Faturamento',
+                            ]}
+                          />
+                          <Legend
+                            iconType="circle"
+                            iconSize={8}
+                            formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
                     <Truck className="w-4 h-4 text-cyan-500" />
                     Distribuição por Unidade Origem
                   </h3>
@@ -418,7 +480,10 @@ export function FaturamentoClientes() {
                         </Pie>
                         <RechartsTooltip
                           contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                          formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
+                          formatter={(v: number, _: any, props: any) => [
+                            `${props.payload.sigla}: ${fmtBRL(v)}`,
+                            'Faturamento',
+                          ]}
                         />
                         <Legend
                           iconType="circle"
@@ -500,6 +565,88 @@ export function FaturamentoClientes() {
                       activeDot={{ r: 5 }}
                     />
                   </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {evolClientes.length > 1 && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-indigo-500" />
+                    Evolução por Cliente — Últimos 12 Meses
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
+                </div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={evolClientes} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number, key: string) => [fmtBRL(v), evolClientesKeys[key] || key]}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={8}
+                      formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{evolClientesKeys[v] ? evolClientesKeys[v].split(' ')[0] : v}</span>}
+                    />
+                    {Object.entries(evolClientesKeys).map(([cnpj, nome], i) => (
+                      <Line
+                        key={cnpj}
+                        type="monotone"
+                        dataKey={cnpj}
+                        name={cnpj}
+                        stroke={PALETTE[i % PALETTE.length]}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {evolUnidades.length > 1 && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-cyan-500" />
+                    Evolução por Unidade Origem — Últimos 12 Meses
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
+                </div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={evolUnidades} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      formatter={(v: number, key: string) => [fmtBRL(v), key]}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={8}
+                      formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
+                    />
+                    {evolUnidadesKeys.map((sigla, i) => (
+                      <Line
+                        key={sigla}
+                        type="monotone"
+                        dataKey={sigla}
+                        name={sigla}
+                        stroke={PALETTE[i % PALETTE.length]}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
