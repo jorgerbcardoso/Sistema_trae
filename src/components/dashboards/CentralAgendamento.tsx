@@ -177,6 +177,13 @@ export function CentralAgendamento() {
   const [calendarioDias, setCalendarioDias] = useState<DiaAgendamento[]>([]);
   const [isLoadingCalendario, setIsLoadingCalendario] = useState(false);
 
+  const [calendarioDialogOpen, setCalendarioDialogOpen] = useState(false);
+  const [calendarioDialogData, setCalendarioDialogData] = useState('');
+  const [calendarioDialogTipo, setCalendarioDialogTipo] = useState<'agendados' | 'no_prazo'>('agendados');
+  const [calendarioDialogNome, setCalendarioDialogNome] = useState('');
+  const [ctesCalendario, setCtesCalendario] = useState<Cte[]>([]);
+  const [isLoadingCtesCalendario, setIsLoadingCtesCalendario] = useState(false);
+
   const [performancePeriodo, setPerformancePeriodo] = useState<7 | 15 | 30>(7);
   const [performanceDias, setPerformanceDias] = useState<DiaPerformanceAgendamento[]>([]);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
@@ -435,6 +442,35 @@ export function CentralAgendamento() {
       toast.error(error.message || 'Erro ao carregar performance');
     } finally {
       setIsLoadingPerformance(false);
+    }
+  };
+
+  const abrirCalendarioDialog = async (data: string, tipo: 'agendados' | 'no_prazo') => {
+    const [ano, mes, dia] = data.split('-');
+    const dataFormatada = `${dia}/${mes}/${ano}`;
+    const nomesTipo = { agendados: 'Agendados', no_prazo: 'No Prazo' };
+    setCalendarioDialogData(data);
+    setCalendarioDialogTipo(tipo);
+    setCalendarioDialogNome(`${nomesTipo[tipo]} — ${dataFormatada}`);
+    setCtesCalendario([]);
+    setCalendarioDialogOpen(true);
+    setIsLoadingCtesCalendario(true);
+
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_ctes_calendario.php`,
+        { method: 'POST', body: JSON.stringify({ data, tipo, filters }) },
+        true
+      );
+      if (response.success) {
+        setCtesCalendario(response.data?.ctes || []);
+      } else {
+        toast.error(response.message || 'Erro ao carregar CT-es');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao carregar CT-es');
+    } finally {
+      setIsLoadingCtesCalendario(false);
     }
   };
 
@@ -806,6 +842,7 @@ export function CentralAgendamento() {
             setPeriodo={setCalendarioPeriodo}
             diasData={calendarioDias}
             loading={isLoadingCalendario}
+            onClickDia={abrirCalendarioDialog}
           />
 
           <PerformanceCronologicaAgendamentos
@@ -1072,6 +1109,61 @@ export function CentralAgendamento() {
                 {isSendingAgend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 Enviar Solicitação
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={calendarioDialogOpen} onOpenChange={setCalendarioDialogOpen}>
+          <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>{calendarioDialogNome}</DialogTitle>
+              <DialogDescription>
+                Lista de CT-es neste grupo.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+                <div className="grid grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                  <span>CT-e</span>
+                  <span>Pagador</span>
+                  <span>Destinatário</span>
+                  <span>CNPJ</span>
+                  <span>Emissão</span>
+                  <span>Prev. Entrega</span>
+                  <span>Últ. Ocorrência</span>
+                </div>
+
+                <div className="min-h-0 overflow-y-auto">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {isLoadingCtesCalendario ? (
+                      <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando CT-es...
+                      </div>
+                    ) : ctesCalendario.length === 0 ? (
+                      <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                        <CheckCircle className="h-6 w-6" />
+                        Nenhum CT-e encontrado neste grupo.
+                      </div>
+                    ) : (
+                      ctesCalendario.map((cte) => (
+                        <div
+                          key={`cal-${cte.ser_cte}-${cte.nro_cte}`}
+                          className="grid grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        >
+                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                          <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
+                          <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
+                          <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
+                          <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

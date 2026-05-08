@@ -18,6 +18,7 @@ interface CalendarioAgendamentosProps {
   setPeriodo: (periodo: 7 | 15 | 30) => void;
   diasData: DiaAgendamento[];
   loading: boolean;
+  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo') => void;
 }
 
 export function CalendarioAgendamentos({
@@ -25,6 +26,7 @@ export function CalendarioAgendamentos({
   setPeriodo,
   diasData,
   loading,
+  onClickDia,
 }: CalendarioAgendamentosProps) {
   return (
     <Card className="dark:bg-slate-900 dark:border-slate-700">
@@ -119,16 +121,22 @@ export function CalendarioAgendamentos({
                   </div>
 
                   <div className="hidden md:block space-y-1 text-xs">
-                    <div className="flex justify-between items-center px-2 py-1">
+                    <div
+                      className={`flex justify-between items-center px-2 py-1 rounded ${dia.agendados > 0 && onClickDia ? 'cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : ''}`}
+                      onClick={dia.agendados > 0 && onClickDia ? () => onClickDia(dia.data, 'agendados') : undefined}
+                    >
                       <span className="text-slate-600 dark:text-slate-400">Agendados:</span>
-                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      <span className={`font-semibold text-indigo-600 dark:text-indigo-400 ${dia.agendados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {dia.agendados}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center px-2 py-1">
+                    <div
+                      className={`flex justify-between items-center px-2 py-1 rounded ${dia.entregues > 0 && onClickDia ? 'cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/40' : ''}`}
+                      onClick={dia.entregues > 0 && onClickDia ? () => onClickDia(dia.data, 'no_prazo') : undefined}
+                    >
                       <span className="text-slate-600 dark:text-slate-400">No prazo:</span>
-                      <span className="font-semibold text-green-600 dark:text-green-400">
+                      <span className={`font-semibold text-green-600 dark:text-green-400 ${dia.entregues > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {dia.entregues}
                       </span>
                     </div>
@@ -146,9 +154,12 @@ export function CalendarioAgendamentos({
                   </div>
 
                   <div className="md:hidden space-y-1 text-xs">
-                    <div className="px-2 py-1 text-center">
+                    <div
+                      className={`px-2 py-1 text-center rounded ${dia.agendados > 0 && onClickDia ? 'cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : ''}`}
+                      onClick={dia.agendados > 0 && onClickDia ? () => onClickDia(dia.data, 'agendados') : undefined}
+                    >
                       <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">No prazo</p>
-                      <p className="font-semibold text-green-600 dark:text-green-400">
+                      <p className={`font-semibold text-green-600 dark:text-green-400 ${dia.agendados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {dia.entregues}/{dia.agendados}
                       </p>
                     </div>

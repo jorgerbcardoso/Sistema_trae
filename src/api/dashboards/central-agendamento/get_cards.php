@@ -53,6 +53,8 @@ if (!empty($filters['cnpjDestinatario'])) {
 
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
+$data_hoje = date('Y-m-d');
+
 $query = "
     SELECT
         COUNT(CASE
@@ -63,12 +65,13 @@ $query = "
 
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 14
+             AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS aguardando_agendamento,
 
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 15
-             AND cte.data_prev_ent >= CURRENT_DATE
+             AND cte.data_prev_ent >= '$data_hoje'
              AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS agendados_no_prazo,
@@ -82,7 +85,7 @@ $query = "
 
         COUNT(CASE
             WHEN (
-                 (cte.data_entrega IS NULL     AND cte.data_prev_ent < CURRENT_DATE)
+                 (cte.data_entrega IS NULL     AND cte.data_prev_ent < '$data_hoje')
               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)
              )
             AND cte.ult_ocor_agend = 15

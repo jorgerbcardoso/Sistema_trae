@@ -51,24 +51,6 @@ try {
     // ✅ FILTROS OPCIONAIS - não validar se estão vazios
 
     // ================================================================
-    // DETERMINAR PARÂMETRO ACT BASEADO NO PERÍODO
-    // ================================================================
-    // Se o período for anterior a 2 meses em relação a hoje, usar "TOD" em vez de "U90"
-    $hoje = new DateTime();
-    $periodoUsuario = new DateTime("{$anoUsuario}-{$mesUsuario}-01");
-    
-    // Calcular diferença em meses
-    $diffAnos = $hoje->format('Y') - $periodoUsuario->format('Y');
-    $diffMeses = $hoje->format('n') - $periodoUsuario->format('n');
-    $diferencaMeses = ($diffAnos * 12) + $diffMeses;
-    
-    // Se a diferença for >= 2 meses, usar "TOD", senão usar "U90"
-    $actParameter = ($diferencaMeses >= 2) ? 'TOD' : 'U90';
-    
-    // Log para debug
-    error_log("totais_vendedores_json: mesUsuario=$mesUsuario, anoUsuario=$anoUsuario, diferencaMeses=$diferencaMeses, actParameter=$actParameter");
-
-    // ================================================================
     // CRIAR CONEXÃO POSTGRESQL (PADRÃO OBRIGATÓRIO)
     // ================================================================
     $g_sql = connect();
@@ -79,18 +61,25 @@ try {
     ssw_login($dominio);
     set_time_limit(60);
 
-    // Dispara requisição para 56, e procura o relatório 73
-    // Le lista da 156, em ordem decrescente de data de processo
-    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0082?act={$actParameter}"); // Comanda a 156
-    
-    error_log("totais_vendedores_json: XML retornado (primeiros 500 chars): " . substr($str, 0, 500));
+    // Dispara requisição para 56, filtrando APENAS relatório 073
+    // Usa act=FILCOD&f1=73 para filtrar pelo código do relatório
+    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0082?act=FILCOD&f1=73");
 
     $str = substr($str, strpos($str,'<xml'), strlen($str));
     $str = substr($str, 0, strpos($str,'</xml>')) . '</xml>';
+    
     $xml = simplexml_load_string($str);
-
-    $dadosEncontrados = false;
-    $maxIteracoes = 50; // Limite de segurança
+    
+    if ($xml === false) {
+        error_log("totais_vendedores_json: ERRO - simplexml_load_string falhou");
+        $errors = libxml_get_errors();
+        foreach ($errors as $error) {
+            error_log("totais_vendedores_json: XML Error: " . $error->message);
+        }
+        throw new Exception('Falha ao parsear XML do SSW');
+    }
+    
+    $maxIteracoes = 100; // Limite seguro para encontrar o relatório 073
     $iteracoes = 0;
 
     for ($i = 0; $i <= count($xml->xpath('rs/r/f0')) && $iteracoes < $maxIteracoes; $i++) {
@@ -274,10 +263,6 @@ try {
             'apenas_tele_vendas' => $apenasTeleVendas,
             'mes' => $mesUsuario,
             'ano' => $anoUsuario
-        ],
-        '_debug' => [
-            'iteracoes' => $iteracoes,
-            'relatorio_encontrado' => $dadosEncontrados
         ]
     ]);
 

@@ -366,11 +366,9 @@ HTML;
             // CONFIGURAÇÕES DO SERVIDOR SMTP
             // ====================================================================
 
-            // 🔥 DEBUG SMTP HABILITADO TEMPORARIAMENTE
-            $mail->SMTPDebug = SMTP::DEBUG_SERVER; // Nível 2 - Mostra comandos SMTP
-            $mail->Debugoutput = function($str, $level) {
-                error_log("PHPMAILER DEBUG [$level]: $str");
-            };
+            // Desabilitar debug SMTP para evitar logs poluindo o error_log
+            $mail->SMTPDebug = 0;
+            $mail->Debugoutput = function($str, $level) {};
 
             // Usar SMTP
             $mail->isSMTP();
