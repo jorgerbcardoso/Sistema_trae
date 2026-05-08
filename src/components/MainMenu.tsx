@@ -7,6 +7,8 @@ import {
   Shield,
   Package,
   HelpCircle,
+  Building2,
+  RefreshCw,
   Menu as MenuIcon,
   ChevronDown,
   ChevronRight
