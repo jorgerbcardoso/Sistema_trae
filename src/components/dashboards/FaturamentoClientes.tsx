@@ -347,6 +347,13 @@ export function FaturamentoClientes() {
           </p>
         </div>
 
+        <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-5 py-3 flex items-center gap-3">
+          <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+          <p className="text-sm text-indigo-700 dark:text-indigo-300">
+            <strong>Dica:</strong> Clique em qualquer cliente no ranking, fatia dos gráficos de rosca ou ponto nos gráficos de linha para ver a lista detalhada dos CT-es.
+          </p>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
@@ -755,12 +762,6 @@ export function FaturamentoClientes() {
                 </div>
               );
             })()}
-          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-5 py-3 flex items-center gap-3">
-            <Info className="w-4 h-4 text-indigo-500 shrink-0" />
-            <p className="text-sm text-indigo-700 dark:text-indigo-300">
-              <strong>Dica:</strong> Clique em qualquer cliente no ranking, fatia dos gráficos de rosca ou ponto nos gráficos de linha para ver a lista detalhada dos CT-es.
-            </p>
-          </div>
           </>
         )}
       </main>
@@ -774,12 +775,12 @@ export function FaturamentoClientes() {
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[120px_90px_110px_90px_70px_100px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>CT-e</span>
                 <span>Emissão</span>
-                <span>Destinatário</span>
                 <span className="text-right">Vlr. Merc.</span>
                 <span className="text-right">Peso</span>
+                <span className="text-right">Qtde. Vol.</span>
                 <span className="text-right">Frete</span>
               </div>
               <div className="min-h-0 overflow-y-auto">
@@ -797,16 +798,16 @@ export function FaturamentoClientes() {
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {cteDialogLista.map((cte, idx) => (
                       <div
-                        key={idx}
-                        className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
-                      >
-                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
-                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
-                        <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_dest || cte.nome_pag || '-'}</span>
-                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.vlr_merc)}</span>
-                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKg(cte.peso_real)}</span>
-                        <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{fmtBRL(cte.vlr_frete)}</span>
-                      </div>
+                         key={idx}
+                         className="grid grid-cols-[120px_90px_110px_90px_70px_100px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                       >
+                         <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.vlr_merc)}</span>
+                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKg(cte.peso_real)}</span>
+                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtNum(cte.qtde_vol)}</span>
+                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{fmtBRL(cte.vlr_frete)}</span>
+                       </div>
                     ))}
                   </div>
                 )}
@@ -814,12 +815,12 @@ export function FaturamentoClientes() {
             </div>
 
             {cteDialogTotais && (
-              <div className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[120px_90px_110px_90px_70px_100px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDialogLista.length} CT-es</span>
-                <span />
                 <span />
                 <span className="text-right font-mono">{fmtBRL(cteDialogTotais.vlr_merc)}</span>
                 <span className="text-right font-mono">{fmtKg(cteDialogTotais.peso_real)}</span>
+                <span className="text-right font-mono">{fmtNum(cteDialogTotais.qtde_vol)}</span>
                 <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{fmtBRL(cteDialogTotais.vlr_frete)}</span>
               </div>
             )}
