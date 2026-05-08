@@ -4,8 +4,6 @@ import {
   Area,
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,6 +19,7 @@ import {
   Check,
   ChevronDown,
   Filter,
+  Info,
   Loader2,
   Package,
   Search,
@@ -72,6 +71,10 @@ function formatPeriodDisplay(inicio: string, fim: string): string {
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+}
+function fmtBRLCompact(v: number) {
+  if (v >= 1_000_000) return 'R$ ' + (v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Mi';
+  return fmtBRL(v);
 }
 function fmtNum(v: number) {
   return v.toLocaleString('pt-BR');
@@ -171,7 +174,11 @@ export function FaturamentoClientes() {
   const [clientesSelecionados, setClientesSelecionados] = useState<ClienteOpcao[]>([]);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [activeBar, setActiveBar] = useState<string | null>(null);
+  const [cteDialogOpen, setCteDialogOpen] = useState(false);
+  const [cteDialogTitulo, setCteDialogTitulo] = useState('');
+  const [cteDialogLista, setCteDialogLista] = useState<any[]>([]);
+  const [cteDialogTotais, setCteDialogTotais] = useState<any>(null);
+  const [loadingCtes, setLoadingCtes] = useState(false);
 
   const carregarDados = useCallback(async (f: Filters) => {
     setLoading(true);
@@ -202,6 +209,31 @@ export function FaturamentoClientes() {
 
   useEffect(() => {
     carregarDados(filters);
+  }, [filters]);
+
+  const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string) => {
+    setCteDialogTitulo(titulo);
+    setCteDialogLista([]);
+    setCteDialogTotais(null);
+    setCteDialogOpen(true);
+    setLoadingCtes(true);
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_ctes.php`,
+        { method: 'POST', body: JSON.stringify({ filters, tipo, chave, mes: mes ?? '' }) },
+        true
+      );
+      if (response.success) {
+        setCteDialogLista(response.data.ctes || []);
+        setCteDialogTotais(response.data.totais || null);
+      } else {
+        toast.error(response.message || 'Erro ao carregar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao carregar CT-es');
+    } finally {
+      setLoadingCtes(false);
+    }
   }, [filters]);
 
   const buscarClientesOpcoes = useCallback(async (search: string, f: Filters) => {
@@ -327,7 +359,7 @@ export function FaturamentoClientes() {
                   { label: 'Faturamento Total',   value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
                   { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
                   { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
-                  { label: 'Valor de Mercadoria', value: fmtBRL(totais.total_merc),     icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
+                  { label: 'Valor de Mercadoria', value: fmtBRLCompact(totais.total_merc), icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
                   { label: 'Peso Total',          value: fmtKg(totais.total_peso),      icon: Weight,     bg: '#fffbeb', bgDark: '#1c1003', border: '#fde68a', borderDark: '#78350f', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
                   { label: 'Volumes',             value: fmtNum(totais.total_volumes),  icon: Package,    bg: '#fff1f2', bgDark: '#1f0a0a', border: '#fecdd3', borderDark: '#9f1239', iconColor: '#e11d48', textLabel: '#be123c', textValue: '#881337' },
                 ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
@@ -364,7 +396,7 @@ export function FaturamentoClientes() {
                       const pct = totalFreteSelecionados > 0 ? (c.total_frete / totalFreteSelecionados) * 100 : 0;
                       const color = PALETTE[i % PALETTE.length];
                       return (
-                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => abrirCteDialog(c.nome, 'cliente', c.cnpj)}>
                           <div className="flex items-center gap-3">
                             <div
                               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
@@ -431,6 +463,8 @@ export function FaturamentoClientes() {
                             outerRadius={85}
                             paddingAngle={2}
                             stroke="none"
+                            style={{ cursor: 'pointer' }}
+                            onClick={(d: any) => abrirCteDialog(d.nome, 'cliente', d.nome === 'Demais' ? '__demais__' : (top5.find(c => c.nome === d.nome)?.cnpj ?? ''))}
                           >
                             {pieData.map((_, i) => (
                               <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
@@ -480,6 +514,8 @@ export function FaturamentoClientes() {
                             outerRadius={85}
                             paddingAngle={2}
                             stroke="none"
+                            style={{ cursor: 'pointer' }}
+                            onClick={(d: any) => abrirCteDialog(d.sigla === 'Demais' ? 'Demais Unidades' : `Unidade ${d.sigla}`, 'unidade', d.sigla === 'Demais' ? '__demais__' : d.sigla)}
                           >
                             {pieDataU.map((_, i) => (
                               <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
@@ -500,42 +536,7 @@ export function FaturamentoClientes() {
                   })()}
                 </div>
 
-                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    Participação no Faturamento
-                  </h3>
-                  <p className="text-xs text-slate-400 mb-4">Top clientes selecionados</p>
-                  {clientes.length === 0 ? (
-                    <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <BarChart
-                        data={clientes.slice(0, 5).map(c => ({ nome: c.nome.split(' ')[0], frete: c.total_frete, cnpj: c.cnpj }))}
-                        layout="vertical"
-                        margin={{ left: 0, right: 8, top: 0, bottom: 0 }}
-                        onMouseLeave={() => setActiveBar(null)}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                        <XAxis type="number" tick={{ fill: textColor, fontSize: 10 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                        <YAxis type="category" dataKey="nome" tick={{ fill: textColor, fontSize: 10 }} width={60} />
-                        <RechartsTooltip
-                          contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                          formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
-                        />
-                        <Bar dataKey="frete" radius={[0, 4, 4, 0]} onMouseEnter={(d) => setActiveBar(d.cnpj)}>
-                          {clientes.slice(0, 5).map((c, i) => (
-                            <Cell
-                              key={c.cnpj}
-                              fill={PALETTE[i % PALETTE.length]}
-                              opacity={activeBar && activeBar !== c.cnpj ? 0.4 : 1}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+
               </div>
             </div>
 
@@ -608,7 +609,25 @@ export function FaturamentoClientes() {
                     <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
                   </div>
                   <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={dataComDemais} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <LineChart
+                      data={dataComDemais}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                      onClick={(e: any) => {
+                        if (!e?.activePayload?.[0]) return;
+                        const mes = e.activeLabel;
+                        const mesIso = dataComDemais.find(d => d.mes_label === mes)?.mes ?? '';
+                        const key = e.activePayload[0].dataKey;
+                        const l = linhas.find(l => l.key === key);
+                        if (!l) return;
+                        abrirCteDialog(
+                          `${l.label} — ${mes}`,
+                          'evol_cliente',
+                          key === '__demais__' ? '__demais__' : key,
+                          mesIso
+                        );
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                       <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
                       <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
@@ -681,7 +700,25 @@ export function FaturamentoClientes() {
                     <p className="text-xs text-slate-400 mt-0.5">Independente do período selecionado nos filtros</p>
                   </div>
                   <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={dataUnidComDemais} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <LineChart
+                      data={dataUnidComDemais}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                      onClick={(e: any) => {
+                        if (!e?.activePayload?.[0]) return;
+                        const mes = e.activeLabel;
+                        const mesIso = dataUnidComDemais.find(d => d.mes_label === mes)?.mes ?? '';
+                        const key = e.activePayload[0].dataKey;
+                        const l = linhasU.find(l => l.key === key);
+                        if (!l) return;
+                        abrirCteDialog(
+                          `${l.label === 'Demais' ? 'Demais Unidades' : `Unidade ${l.label}`} — ${mes}`,
+                          'evol_unidade',
+                          key === '__demais__' ? '__demais__' : key,
+                          mesIso
+                        );
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                       <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
                       <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
@@ -718,9 +755,77 @@ export function FaturamentoClientes() {
                 </div>
               );
             })()}
+          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-5 py-3 flex items-center gap-3">
+            <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+            <p className="text-sm text-indigo-700 dark:text-indigo-300">
+              <strong>Dica:</strong> Clique em qualquer cliente no ranking, fatia dos gráficos de rosca ou ponto nos gráficos de linha para ver a lista detalhada dos CT-es.
+            </p>
+          </div>
           </>
         )}
       </main>
+
+      <Dialog open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
+        <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>{cteDialogTitulo}</DialogTitle>
+            <DialogDescription>Lista de CT-es do grupo selecionado</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+              <div className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <span>CT-e</span>
+                <span>Emissão</span>
+                <span>Destinatário</span>
+                <span className="text-right">Vlr. Merc.</span>
+                <span className="text-right">Peso</span>
+                <span className="text-right">Frete</span>
+              </div>
+              <div className="min-h-0 overflow-y-auto">
+                {loadingCtes ? (
+                  <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando CT-es...
+                  </div>
+                ) : cteDialogLista.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                    <Package className="h-6 w-6" />
+                    Nenhum CT-e encontrado.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {cteDialogLista.map((cte, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                      >
+                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                        <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_dest || cte.nome_pag || '-'}</span>
+                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.vlr_merc)}</span>
+                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKg(cte.peso_real)}</span>
+                        <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{fmtBRL(cte.vlr_frete)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {cteDialogTotais && (
+              <div className="grid grid-cols-[100px_90px_1fr_100px_80px_80px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                <span className="text-slate-500 dark:text-slate-400">{cteDialogLista.length} CT-es</span>
+                <span />
+                <span />
+                <span className="text-right font-mono">{fmtBRL(cteDialogTotais.vlr_merc)}</span>
+                <span className="text-right font-mono">{fmtKg(cteDialogTotais.peso_real)}</span>
+                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{fmtBRL(cteDialogTotais.vlr_frete)}</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
         <DialogContent className="sm:max-w-[680px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto overscroll-contain">
