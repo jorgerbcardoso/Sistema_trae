@@ -27,10 +27,11 @@ import {
   Box,
   MapPin,
   Building2,
-  TrendingUp,
   Layers,
   Timer,
   Loader2,
+  Home,
+  ListFilter,
 } from 'lucide-react';
 
 interface Cte {
@@ -83,6 +84,53 @@ interface DadosTransferencia {
   coletas: Coleta[];
   sigla: string;
   geradoEm: string;
+}
+
+interface CteEntrega {
+  ctrc: string;
+  serCte: string;
+  nroCte: number;
+  setor: string;
+  nomeSetor: string;
+  nfiscal: string;
+  pagador: string;
+  destinatario: string;
+  endereco: string;
+  cidade: string;
+  bairro: string;
+  cep: string;
+  prevEnt: string;
+  agendamento: string;
+  vlrMerc: string;
+  peso: string;
+  cubagem: string;
+  qtdeVol: string;
+  frete: string;
+  ultOcor: string;
+  agendObrig: boolean;
+  prevChegada: string;
+  manifesto: string;
+  servAdic: string;
+  diasAtraso: number;
+  emTransito: boolean;
+  atrasoEntrega: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
+}
+
+interface DadosEntrega {
+  ctes: CteEntrega[];
+  sigla: string;
+  geradoEm: string;
+}
+
+interface GrupoSetor {
+  setor: string;
+  nomeSetor: string;
+  armazem: CteEntrega[];
+  transito: CteEntrega[];
+  totalCtes: number;
+  totalVol: number;
+  totalPeso: number;
+  totalCubagem: number;
 }
 
 interface GrupoDestino {
@@ -424,6 +472,178 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
   );
 }
 
+function TabelaEntrega({ ctes, tipo }: { ctes: CteEntrega[]; tipo: 'armazem' | 'transito' }) {
+  if (ctes.length === 0) return null;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            <th className="px-3 py-2 text-left font-semibold">CT-e</th>
+            <th className="px-3 py-2 text-left font-semibold">NF</th>
+            <th className="px-3 py-2 text-left font-semibold">Pagador</th>
+            <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
+            <th className="px-3 py-2 text-left font-semibold">Endereço</th>
+            <th className="px-3 py-2 text-left font-semibold">Cidade</th>
+            <th className="px-3 py-2 text-left font-semibold">CEP</th>
+            <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
+            <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
+            <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
+            <th className="px-3 py-2 text-right font-semibold">Peso</th>
+            <th className="px-3 py-2 text-right font-semibold">Vol.</th>
+            <th className="px-3 py-2 text-right font-semibold">Frete</th>
+            <th className="px-3 py-2 text-left font-semibold">Últ. Ocor.</th>
+            {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
+            <th className="px-3 py-2 text-center font-semibold">Atraso</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ctes.map((cte, i) => (
+            <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
+              <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                {cte.ctrc}
+                {cte.agendObrig && <span className="ml-1 text-orange-500 font-bold" title="Agendamento obrigatório">S</span>}
+              </td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
+              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
+              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[120px] truncate">{cte.endereco}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
+              <td className="px-3 py-2 text-slate-500 dark:text-slate-500">{cte.cep}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
+              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrMerc}</td>
+              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
+              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
+              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.ultOcor || '-'}</td>
+              {tipo === 'transito' && (
+                <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
+              )}
+              <td className="px-3 py-2 text-center">
+                <IndicadorDot
+                  cor={cte.atrasoEntrega}
+                  title={cte.diasAtraso > 0 ? `${cte.diasAtraso} dia(s) em atraso` : 'No prazo'}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GrupoSetorCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoSetor; maxPeso: number; maxCubagem: number }) {
+  const [aberto, setAberto] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
+
+  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
+  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
+
+  const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+
+  const piorAtraso = [...grupo.armazem, ...grupo.transito].reduce<string | null>((p, c) => {
+    const v = c.atrasoEntrega;
+    if (!v) return p;
+    if (!p) return v;
+    return (ORDEM_IND[v] ?? 0) > (ORDEM_IND[p] ?? 0) ? v : p;
+  }, null);
+
+  const temAgendObrig = [...grupo.armazem, ...grupo.transito].some(c => c.agendObrig);
+
+  return (
+    <div className="overflow-hidden">
+      <button
+        className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
+        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
+        onClick={() => setAberto(!aberto)}
+      >
+        <span className="flex items-center">
+          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        </span>
+        <span className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
+          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          {grupo.setor}
+        </span>
+        <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nomeSetor}</span>
+        <span className="flex items-center justify-center">
+          {piorAtraso
+            ? <IndicadorDot cor={piorAtraso} title={`Pior atraso: ${piorAtraso}`} />
+            : <span className="text-xs text-slate-400">-</span>}
+        </span>
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
+        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.totalVol.toLocaleString('pt-BR')}</span>
+        <span className="flex items-center justify-center px-2">
+          {(() => {
+            const label = grupo.totalPeso >= 1000
+              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
+              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
+            return (
+              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #065f46, #059669, #10b981)' }} />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
+              </div>
+            );
+          })()}
+        </span>
+        <span className="flex items-center justify-center px-2">
+          {(() => {
+            return (
+              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #064e3b, #047857, #059669)' }} />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+              </div>
+            );
+          })()}
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-slate-200 dark:border-slate-700">
+          <div className="flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <button
+              onClick={() => setAbaAtiva('armazem')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'armazem' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              <Home className="w-4 h-4" />
+              No Armazém
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.armazem.length}</Badge>
+            </button>
+            <button
+              onClick={() => setAbaAtiva('transito')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'transito' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              <Truck className="w-4 h-4" />
+              A Caminho
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.transito.length}</Badge>
+            </button>
+            {temAgendObrig && (
+              <span className="ml-auto flex items-center gap-1 px-4 text-xs text-orange-600 dark:text-orange-400 font-medium">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Há CT-es com agendamento obrigatório
+              </span>
+            )}
+          </div>
+          <div className="bg-white dark:bg-slate-900 p-2">
+            {abaAtiva === 'armazem' && (
+              grupo.armazem.length > 0
+                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" />
+                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
+            )}
+            {abaAtiva === 'transito' && (
+              grupo.transito.length > 0
+                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" />
+                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Disponiveis() {
   usePageTitle('Disponíveis no Armazém');
   const { user } = useAuth();
@@ -440,7 +660,13 @@ export function Disponiveis() {
   const [countdown, setCountdown] = useState(300);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega'>('transferencia');
+  const [dadosEntrega, setDadosEntrega] = useState<DadosEntrega | null>(null);
+  const [loadingEntrega, setLoadingEntrega] = useState(false);
+  const [erroEntrega, setErroEntrega] = useState<string | null>(null);
+  const [progressoEntrega, setProgressoEntrega] = useState(0);
+  const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 
   type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'coletas' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
   const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes' as any);
@@ -470,12 +696,52 @@ export function Disponiveis() {
     }
   }, [sigla]);
 
+  const carregarEntrega = useCallback(async (siglaParam?: string) => {
+    const s = siglaParam ?? sigla;
+    if (!s) return;
+    setLoadingEntrega(true);
+    setErroEntrega(null);
+    setProgressoEntrega(0);
+
+    if (progressoRef.current) clearInterval(progressoRef.current);
+    progressoRef.current = setInterval(() => {
+      setProgressoEntrega(prev => {
+        if (prev >= 95) { clearInterval(progressoRef.current!); return 95; }
+        return prev + (prev < 60 ? 2 : 1);
+      });
+    }, 600);
+
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_entrega.php`,
+        { method: 'POST', body: JSON.stringify({ sigla: s }) },
+        true
+      );
+      if (progressoRef.current) clearInterval(progressoRef.current);
+      setProgressoEntrega(100);
+      if (res.success) {
+        setDadosEntrega(res.data);
+      } else {
+        setErroEntrega(res.message || 'Erro ao carregar disponíveis para entrega');
+      }
+    } catch (e: any) {
+      if (progressoRef.current) clearInterval(progressoRef.current);
+      setProgressoEntrega(0);
+      setErroEntrega(e.message || 'Erro ao carregar disponíveis para entrega');
+    } finally {
+      setLoadingEntrega(false);
+    }
+  }, [sigla]);
+
   useEffect(() => {
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
       return;
     }
-    if (sigla) carregar();
+    if (sigla) {
+      carregar();
+      carregarEntrega();
+    }
   }, [sigla]);
 
   useEffect(() => {
@@ -559,6 +825,40 @@ export function Disponiveis() {
   const coletasAtrasadas = dados?.coletas.filter(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada').length ?? 0;
   const ctesTransitoAlerta = dados?.ctes.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
 
+  const gruposSetor: GrupoSetor[] = React.useMemo(() => {
+    if (!dadosEntrega) return [];
+    const map: Record<string, GrupoSetor> = {};
+    for (const cte of dadosEntrega.ctes) {
+      const key = cte.setor || 'SEM SETOR';
+      if (!map[key]) {
+        map[key] = { setor: key, nomeSetor: cte.nomeSetor, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+      }
+      if (cte.emTransito) {
+        map[key].transito.push(cte);
+      } else {
+        map[key].armazem.push(cte);
+      }
+      map[key].totalCtes++;
+      map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
+      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
+      map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+    }
+    return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
+  }, [dadosEntrega]);
+
+  const totalEntregaArmazem  = dadosEntrega?.ctes.filter(c => !c.emTransito).length ?? 0;
+  const totalEntregaTransito = dadosEntrega?.ctes.filter(c => c.emTransito).length ?? 0;
+  const totalEntregaVol      = gruposSetor.reduce((s, g) => s + g.totalVol, 0);
+  const totalEntregaPeso     = gruposSetor.reduce((s, g) => s + g.totalPeso, 0);
+  const totalEntregaCubagem  = gruposSetor.reduce((s, g) => s + g.totalCubagem, 0);
+  const entregaAtrasados     = dadosEntrega?.ctes.filter(c => c.diasAtraso > 0).length ?? 0;
+
+  const totalGeralArmazem  = totalArmazem + totalEntregaArmazem;
+  const totalGeralTransito = totalTransito + totalEntregaTransito;
+  const totalGeralVol      = totalVol + totalEntregaVol;
+  const totalGeralPeso     = totalPeso + totalEntregaPeso;
+  const totalGeralCubagem  = totalCubagem + totalEntregaCubagem;
+
   const minutos = Math.floor(countdown / 60);
   const segundos = countdown % 60;
 
@@ -610,10 +910,26 @@ export function Disponiveis() {
       ) : dados ? (
         <div className="space-y-6">
           {(() => {
-            const totalCtes = totalArmazem + totalTransito + totalColetas;
-            const pctArmazem  = totalCtes > 0 ? Math.round((totalArmazem  / totalCtes) * 100) : 0;
-            const pctTransito = totalCtes > 0 ? Math.round((totalTransito / totalCtes) * 100) : 0;
-            const pctColetas  = totalCtes > 0 ? Math.round((totalColetas  / totalCtes) * 100) : 0;
+            const baseArmazem  = totalGeralArmazem;
+            const baseTransito = totalGeralTransito;
+            const totalBase    = baseArmazem + baseTransito + totalColetas;
+            const pctArmazem   = totalBase > 0 ? Math.round((baseArmazem  / totalBase) * 100) : 0;
+            const pctTransito  = totalBase > 0 ? Math.round((baseTransito / totalBase) * 100) : 0;
+            const pctColetas   = totalBase > 0 ? Math.round((totalColetas  / totalBase) * 100) : 0;
+
+            const subArmazem = (() => {
+              const parts = [];
+              if (totalArmazem > 0) parts.push(`${totalArmazem} transf.`);
+              if (totalEntregaArmazem > 0) parts.push(`${totalEntregaArmazem} entrega`);
+              return parts.length > 1 ? parts.join(' + ') : null;
+            })();
+
+            const subTransito = (() => {
+              const parts = [];
+              if (ctesTransitoAlerta > 0) parts.push(`${ctesTransitoAlerta} c/ atraso transf.`);
+              if (entregaAtrasados > 0) parts.push(`${entregaAtrasados} c/ atraso entrega`);
+              return parts.length > 0 ? parts.join(' · ') : null;
+            })();
 
             const cardsDonut = [
               {
@@ -622,26 +938,28 @@ export function Disponiveis() {
                 emptyColor: '#e0e7ff', emptyColorDark: '#1e1b4b',
                 cor: '#6366f1',
                 icon: Warehouse,
-                valor: totalArmazem,
+                valor: baseArmazem,
                 pct: pctArmazem,
                 label: 'No Armazém',
                 unidade: 'CT-e',
-                sub: null,
+                sub: subArmazem,
+                loadingExtra: loadingEntrega,
               },
               {
-                bgColor: ctesTransitoAlerta > 0
+                bgColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0)
                   ? 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',
-                textColor: ctesTransitoAlerta > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
-                emptyColor: ctesTransitoAlerta > 0 ? '#ffedd5' : '#dbeafe',
-                emptyColorDark: ctesTransitoAlerta > 0 ? '#431407' : '#1e3a8a',
-                cor: ctesTransitoAlerta > 0 ? '#f97316' : '#3b82f6',
+                textColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
+                emptyColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#ffedd5' : '#dbeafe',
+                emptyColorDark: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#431407' : '#1e3a8a',
+                cor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#f97316' : '#3b82f6',
                 icon: Truck,
-                valor: totalTransito,
+                valor: baseTransito,
                 pct: pctTransito,
                 label: 'Em Trânsito',
                 unidade: 'CT-e',
-                sub: ctesTransitoAlerta > 0 ? `${ctesTransitoAlerta} com atraso` : null,
+                sub: subTransito,
+                loadingExtra: loadingEntrega,
               },
               {
                 bgColor: coletasAtrasadas > 0
@@ -657,13 +975,14 @@ export function Disponiveis() {
                 label: 'Coletas',
                 unidade: 'Coleta',
                 sub: coletasAtrasadas > 0 ? `${coletasAtrasadas} atrasada${coletasAtrasadas > 1 ? 's' : ''}` : null,
+                loadingExtra: false,
               },
             ];
 
             const cardsSimples = [
-              { valor: totalVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
-              { valor: `${(totalPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
-              { valor: `${totalCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
+              { valor: totalGeralVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
+              { valor: `${(totalGeralPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
+              { valor: `${totalGeralCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
             ];
 
             return (
@@ -675,10 +994,11 @@ export function Disponiveis() {
                     <Card key={i} className={`${c.bgColor}`}>
                       <CardContent className="pt-4 pb-3 px-4">
                         <div className="flex items-center justify-between">
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${c.textColor}`}>
                               <Icon className="w-3.5 h-3.5" />
                               {c.label}
+                              {c.loadingExtra && <Loader2 className="w-3 h-3 animate-spin opacity-60 ml-1" />}
                             </div>
                             <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
                             <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} {c.unidade}{c.valor !== 1 ? 's' : ''}</p>
@@ -730,11 +1050,27 @@ export function Disponiveis() {
             </button>
             <button
               onClick={() => setAbaAtiva('entrega')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'entrega' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'entrega' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              <TrendingUp className="w-4 h-4" />
+              <Home className="w-4 h-4" />
               Disponíveis para Entrega
-              <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">Em breve</Badge>
+              {loadingEntrega
+                ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Carregando...</Badge>
+                : dadosEntrega
+                  ? <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">{totalEntregaArmazem + totalEntregaTransito}</Badge>
+                  : <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
+              }
+            </button>
+            <button
+              onClick={() => setAbaAtiva('todos')}
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'todos' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              <ListFilter className="w-4 h-4" />
+              Todos os Disponíveis
+              {loadingEntrega
+                ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Carregando...</Badge>
+                : <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-xs">{totalGeralArmazem + totalGeralTransito}</Badge>
+              }
             </button>
           </div>
 
@@ -827,10 +1163,183 @@ export function Disponiveis() {
           )}
 
           {abaAtiva === 'entrega' && (
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400 dark:text-slate-500">
-              <TrendingUp className="w-14 h-14 mb-4 opacity-30" />
-              <p className="text-lg font-medium">Disponíveis para Entrega</p>
-              <p className="text-sm mt-1">Esta aba será implementada em breve.</p>
+            <div className="space-y-4">
+              {loadingEntrega && (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Gerando relatório no SSW...</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">O relatório está sendo processado. Isso pode levar até 1 minuto.</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-amber-500 dark:bg-amber-400 transition-all duration-500 ease-out"
+                      style={{ width: `${progressoEntrega}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 text-right">{progressoEntrega}%</p>
+                </div>
+              )}
+
+              {erroEntrega && !loadingEntrega && (
+                <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-5 flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-300">Erro ao carregar disponíveis para entrega</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">{erroEntrega}</p>
+                    <Button variant="outline" size="sm" className="mt-3 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400" onClick={() => carregarEntrega()}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Tentar novamente
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {dadosEntrega && !loadingEntrega && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Home className="w-4 h-4 text-emerald-500" />
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Setor</h2>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">({gruposSetor.length} setores)</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                      <ChevronRight className="w-3 h-3" />clique em um setor para expandir
+                    </span>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Atraso:</span>
+                      {(['verde','amarelo','laranja','vermelho'] as const).map(cor => (
+                        <span key={cor} className="flex items-center gap-1">
+                          <IndicadorDot cor={cor} />
+                          <span className={TEXTO_INDICADOR[cor]}>
+                            {cor === 'verde' ? 'No prazo' : cor === 'amarelo' ? '1-2 dias' : cor === 'laranja' ? '3-5 dias' : '6+ dias'}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      <span />
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span>
+                      <span />
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {(() => {
+                        const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
+                        const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
+                        return gruposSetor.map((g, i) => <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!loadingEntrega && !dadosEntrega && !erroEntrega && (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
+                  <Home className="w-12 h-12 mb-3 opacity-30" />
+                  <p className="text-base font-medium">Nenhum dado disponível</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {abaAtiva === 'todos' && (
+            <div className="space-y-6">
+              {loadingEntrega && (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Aguardando dados de entrega...</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Os dados de transferência já estão disponíveis. Os dados de entrega ainda estão sendo processados.</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-amber-500 dark:bg-amber-400 transition-all duration-500 ease-out" style={{ width: `${progressoEntrega}%` }} />
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 text-right">{progressoEntrega}%</p>
+                </div>
+              )}
+
+              {grupos.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-500" />
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Transferência</h2>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">({grupos.length} destinos · {totalArmazem + totalTransito} CT-es)</span>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Trans.</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Coletas</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {(() => {
+                        const maxPeso    = Math.max(...grupos.map(g => g.totalPeso), 1);
+                        const maxCubagem = Math.max(...grupos.map(g => g.totalCubagem), 1);
+                        return grupos.map((g, i) => <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {dadosEntrega && gruposSetor.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Home className="w-4 h-4 text-emerald-500" />
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Entrega</h2>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">({gruposSetor.length} setores · {totalEntregaArmazem + totalEntregaTransito} CT-es)</span>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span><span />
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {(() => {
+                        const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
+                        const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
+                        return gruposSetor.map((g, i) => <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!loadingEntrega && !dadosEntrega && erroEntrega && (
+                <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-5 flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-300">Dados de entrega indisponíveis</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">{erroEntrega}</p>
+                    <Button variant="outline" size="sm" className="mt-3 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400" onClick={() => carregarEntrega()}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Tentar novamente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
