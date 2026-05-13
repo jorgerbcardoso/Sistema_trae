@@ -32,6 +32,12 @@ import {
   Loader2,
   Home,
   ListFilter,
+  Plus,
+  Trash2,
+  CheckSquare,
+  Square,
+  Car,
+  X,
 } from 'lucide-react';
 
 interface Cte {
@@ -143,6 +149,24 @@ interface GrupoDestino {
   totalVol: number;
   totalPeso: number;
   totalCubagem: number;
+}
+
+interface CteCarregamento {
+  seq_cte: number;
+  login_inclusao: string;
+  data_inclusao: string;
+  hora_inclusao: string;
+}
+
+interface Carregamento {
+  placa_provisoria: string;
+  total_ctes: number;
+  data_criacao: string;
+  hora_criacao: string;
+  login_criacao: string;
+  capacidade_ton: number | null;
+  capacidade_m3: number | null;
+  ctes: CteCarregamento[];
 }
 
 const COR_INDICADOR: Record<string, string> = {
@@ -472,71 +496,124 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
   );
 }
 
-function TabelaEntrega({ ctes, tipo }: { ctes: CteEntrega[]; tipo: 'armazem' | 'transito' }) {
+function TabelaEntrega({
+  ctes,
+  tipo,
+  modoApontamento,
+  ctesSelecionados,
+  ctesNoCarregamento,
+  onToggleCte,
+}: {
+  ctes: CteEntrega[];
+  tipo: 'armazem' | 'transito';
+  modoApontamento?: string | null;
+  ctesSelecionados?: Set<number>;
+  ctesNoCarregamento?: Set<number>;
+  onToggleCte?: (seqCte: number) => void;
+}) {
   if (ctes.length === 0) return null;
+  const emApontamento = !!modoApontamento;
   return (
     <div className="overflow-x-auto">
+      {emApontamento && (
+        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <CheckSquare className="w-3.5 h-3.5 shrink-0" />
+          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
+        </div>
+      )}
       <table className="w-full text-xs">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            {emApontamento && <th className="px-3 py-2 w-8" />}
             <th className="px-3 py-2 text-left font-semibold">CT-e</th>
             <th className="px-3 py-2 text-left font-semibold">NF</th>
             <th className="px-3 py-2 text-left font-semibold">Pagador</th>
             <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
-            <th className="px-3 py-2 text-left font-semibold">Endereço</th>
             <th className="px-3 py-2 text-left font-semibold">Cidade</th>
-            <th className="px-3 py-2 text-left font-semibold">CEP</th>
             <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
             <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
-            <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
             <th className="px-3 py-2 text-right font-semibold">Peso</th>
-            <th className="px-3 py-2 text-right font-semibold">Vol.</th>
             <th className="px-3 py-2 text-right font-semibold">Frete</th>
             <th className="px-3 py-2 text-left font-semibold">Últ. Ocorrência</th>
-            <th className="px-3 py-2 text-left font-semibold">Data Ocor.</th>
             {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
             <th className="px-3 py-2 text-center font-semibold">Atraso</th>
           </tr>
         </thead>
         <tbody>
-          {ctes.map((cte, i) => (
-            <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
-              <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                {cte.ctrc}
-                {cte.agendObrig && <span className="ml-1 text-orange-500 font-bold" title="Agendamento obrigatório">S</span>}
-              </td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
-              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
-              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[120px] truncate">{cte.endereco}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
-              <td className="px-3 py-2 text-slate-500 dark:text-slate-500">{cte.cep}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrMerc}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
-              <td className="px-3 py-2 text-slate-500 dark:text-slate-500 whitespace-nowrap">{cte.dataUltOcor || '-'}</td>
-              {tipo === 'transito' && (
-                <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
-              )}
-              <td className="px-3 py-2 text-center">
-                <IndicadorDot
-                  cor={cte.atrasoEntrega}
-                  title={cte.diasAtraso > 0 ? `${cte.diasAtraso} dia(s) em atraso` : 'No prazo'}
-                />
-              </td>
-            </tr>
-          ))}
+          {ctes.map((cte, i) => {
+            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
+            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
+            const rowBg = jaNoCarregamento
+              ? 'bg-emerald-50 dark:bg-emerald-950/20'
+              : selecionado
+              ? 'bg-amber-50 dark:bg-amber-950/20'
+              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50';
+            return (
+              <tr
+                key={i}
+                className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !jaNoCarregamento ? 'cursor-pointer' : ''}`}
+                onClick={emApontamento && !jaNoCarregamento && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
+              >
+                {emApontamento && (
+                  <td className="px-3 py-2 text-center">
+                    {jaNoCarregamento ? (
+                      <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
+                    ) : selecionado ? (
+                      <CheckSquare className="w-4 h-4 text-amber-500 mx-auto" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
+                    )}
+                  </td>
+                )}
+                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                  {cte.ctrc}
+                  {cte.agendObrig && <span className="ml-1 text-orange-500 font-bold" title="Agendamento obrigatório">S</span>}
+                  {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
+                </td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
+                {tipo === 'transito' && (
+                  <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
+                )}
+                <td className="px-3 py-2 text-center">
+                  <IndicadorDot
+                    cor={cte.atrasoEntrega}
+                    title={cte.diasAtraso > 0 ? `${cte.diasAtraso} dia(s) em atraso` : 'No prazo'}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function GrupoSetorCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoSetor; maxPeso: number; maxCubagem: number }) {
+function GrupoSetorCard({
+  grupo,
+  maxPeso,
+  maxCubagem,
+  modoApontamento,
+  ctesSelecionados,
+  ctesNoCarregamento,
+  onToggleCte,
+}: {
+  grupo: GrupoSetor;
+  maxPeso: number;
+  maxCubagem: number;
+  modoApontamento?: string | null;
+  ctesSelecionados?: Set<number>;
+  ctesNoCarregamento?: Set<number>;
+  onToggleCte?: (seqCte: number) => void;
+}) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
 
@@ -631,16 +708,408 @@ function GrupoSetorCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoSetor; max
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" />
+                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} onToggleCte={onToggleCte} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" />
+                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} onToggleCte={onToggleCte} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface CarregamentoAreaProps {
+  sigla: string;
+  carregamentos: Carregamento[];
+  loadingCarregamentos: boolean;
+  modoApontamento: string | null;
+  onIniciarApontamento: (placa: string) => void;
+  onCancelarApontamento: () => void;
+  onCriarCarregamento: (placa: string) => void;
+  onExcluirCarregamento: (placa: string) => void;
+  onRemoverCte: (placa: string, seqCte: number) => void;
+  ctesEntrega: CteEntrega[];
+}
+
+function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
+  const pct = capacidade > 0 ? Math.min((valor / capacidade) * 100, 100) : 0;
+  const cor = pct >= 100 ? 'bg-red-500' : pct >= 85 ? 'bg-orange-500' : pct >= 60 ? 'bg-yellow-500' : undefined;
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+          {valor.toFixed(valor >= 10 ? 1 : 2)} / {capacidade.toFixed(capacidade >= 10 ? 1 : 2)}
+          {' '}({pct.toFixed(0)}%)
+        </span>
+      </div>
+      <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+        <div
+          className={`h-3 rounded-full transition-all duration-700 ease-out ${cor ?? ''}`}
+          style={{ width: `${pct}%`, background: cor ? undefined : corGradient }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string) => void; onFechar: () => void }) {
+  const [placa, setPlaca] = useState('');
+  const [buscaVeiculo, setBuscaVeiculo] = useState('');
+  const [veiculos, setVeiculos] = useState<{ placa: string; tipo: string; marca: string; modelo: string }[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [modoVeiculo, setModoVeiculo] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const buscarVeiculos = useCallback(async (termo: string) => {
+    if (termo.length < 3) { setVeiculos([]); return; }
+    setBuscando(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/search_veiculos.php`,
+        { method: 'POST', body: JSON.stringify({ search: termo }) },
+        true
+      );
+      if (res.success) setVeiculos(res.data ?? []);
+    } catch {}
+    finally { setBuscando(false); }
+  }, []);
+
+  useEffect(() => {
+    if (!modoVeiculo) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => buscarVeiculos(buscaVeiculo), 400);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [buscaVeiculo, modoVeiculo, buscarVeiculos]);
+
+  const placaFinal = modoVeiculo ? buscaVeiculo : placa;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Novo Carregamento</h3>
+          </div>
+          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setModoVeiculo(false); setBuscaVeiculo(''); setVeiculos([]); }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${!modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
+            >
+              Placa livre
+            </button>
+            <button
+              onClick={() => { setModoVeiculo(true); setPlaca(''); }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
+            >
+              <Car className="w-4 h-4 inline mr-1.5" />Veículo cadastrado
+            </button>
+          </div>
+
+          {!modoVeiculo ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placa / Identificação</label>
+              <input
+                type="text"
+                value={placa}
+                onChange={e => setPlaca(e.target.value.toUpperCase())}
+                placeholder="Ex: ABC1234 ou ROTA-01"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <div className="relative">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar veículo</label>
+              <input
+                type="text"
+                value={buscaVeiculo}
+                onChange={e => setBuscaVeiculo(e.target.value.toUpperCase())}
+                placeholder="Digite a placa, tipo ou modelo..."
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                autoFocus
+              />
+              {buscando && <Loader2 className="absolute right-3 top-8 w-4 h-4 animate-spin text-slate-400" />}
+              {veiculos.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {veiculos.map((v, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setBuscaVeiculo(v.placa); setVeiculos([]); }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">{v.placa}</span>
+                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{v.tipo} · {v.marca} {v.modelo}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" className="flex-1" onClick={onFechar}>Cancelar</Button>
+          <Button
+            className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={!placaFinal.trim()}
+            onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim()); }}
+          >
+            <Plus className="w-4 h-4 mr-1.5" />Criar carregamento
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardCarregamento({
+  carregamento,
+  ctesEntrega,
+  modoApontamento,
+  onIniciarApontamento,
+  onCancelarApontamento,
+  onExcluirCarregamento,
+  onRemoverCte,
+}: {
+  carregamento: Carregamento;
+  ctesEntrega: CteEntrega[];
+  modoApontamento: string | null;
+  onIniciarApontamento: (placa: string) => void;
+  onCancelarApontamento: () => void;
+  onExcluirCarregamento: (placa: string) => void;
+  onRemoverCte: (placa: string, seqCte: number) => void;
+}) {
+  const [expandido, setExpandido] = useState(false);
+  const ativo = modoApontamento === carregamento.placa_provisoria;
+
+  const ctesDetalhados = carregamento.ctes.map(c => {
+    const cteEntrega = ctesEntrega.find(e => e.nroCte === c.seq_cte);
+    return { ...c, cteEntrega };
+  });
+
+  const totalPeso = ctesDetalhados.reduce((s, c) => {
+    if (!c.cteEntrega) return s;
+    return s + (parseFloat(c.cteEntrega.peso.replace('.', '').replace(',', '.')) || 0);
+  }, 0);
+
+  const totalCubagem = ctesDetalhados.reduce((s, c) => {
+    if (!c.cteEntrega) return s;
+    return s + (parseFloat(c.cteEntrega.cubagem.replace(',', '.')) || 0);
+  }, 0);
+
+  const temCapacidade = carregamento.capacidade_ton !== null && carregamento.capacidade_m3 !== null;
+
+  return (
+    <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
+      <div className="px-4 pt-4 pb-3">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`p-1.5 rounded-lg ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
+              <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                Criado em {carregamento.data_criacao} às {carregamento.hora_criacao?.slice(0, 5)} por {carregamento.login_criacao}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
+              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
+            </Badge>
+            {temCapacidade && (
+              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs">
+                <Car className="w-3 h-3 mr-1" />Veículo
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {temCapacidade && (
+          <div className="flex gap-3 mb-3">
+            <BarraCapacidade
+              valor={totalPeso / 1000}
+              capacidade={carregamento.capacidade_ton!}
+              corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
+              label="Peso (ton)"
+            />
+            <BarraCapacidade
+              valor={totalCubagem}
+              capacidade={carregamento.capacidade_m3!}
+              corGradient="linear-gradient(90deg, #0369a1, #0ea5e9)"
+              label="Cubagem (m³)"
+            />
+          </div>
+        )}
+
+        {!temCapacidade && carregamento.total_ctes > 0 && (
+          <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
+            <span><Weight className="w-3 h-3 inline mr-1" />{totalPeso >= 1000 ? `${(totalPeso / 1000).toFixed(2)}t` : `${Math.round(totalPeso)}kg`}</span>
+            <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {!ativo ? (
+            <Button
+              size="sm"
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8"
+              onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}
+            >
+              <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Apontar CT-es
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8"
+              onClick={onCancelarApontamento}
+            >
+              <X className="w-3.5 h-3.5 mr-1.5" />Cancelar apontamento
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700"
+            onClick={() => setExpandido(!expandido)}
+            title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}
+          >
+            {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700"
+            onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)}
+            title="Excluir carregamento"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {expandido && carregamento.ctes.length > 0 && (
+        <div className="border-t border-slate-100 dark:border-slate-800">
+          <div className="max-h-48 overflow-y-auto">
+            {ctesDetalhados.map((c, i) => {
+              const e = c.cteEntrega;
+              return (
+                <div key={i} className="flex items-center gap-2 px-4 py-2 border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs">
+                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 w-24 shrink-0">
+                    {e ? e.ctrc : `#${c.seq_cte}`}
+                  </span>
+                  {e && (
+                    <>
+                      <span className="text-slate-500 dark:text-slate-400 truncate flex-1">{e.destinatario}</span>
+                      <span className="text-slate-400 dark:text-slate-500 shrink-0">{e.cidade}</span>
+                      <span className="text-slate-500 dark:text-slate-400 shrink-0">{Math.round(parseFloat(e.peso.replace('.', '').replace(',', '.')) || 0)}kg</span>
+                    </>
+                  )}
+                  <button
+                    onClick={() => onRemoverCte(carregamento.placa_provisoria, c.seq_cte)}
+                    className="ml-1 text-red-400 hover:text-red-600 shrink-0"
+                    title="Remover CT-e do carregamento"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CarregamentoArea({
+  sigla,
+  carregamentos,
+  loadingCarregamentos,
+  modoApontamento,
+  onIniciarApontamento,
+  onCancelarApontamento,
+  onCriarCarregamento,
+  onExcluirCarregamento,
+  onRemoverCte,
+  ctesEntrega,
+}: CarregamentoAreaProps) {
+  const [modalAberto, setModalAberto] = useState(false);
+
+  const handleCriar = (placa: string) => {
+    setModalAberto(false);
+    onCriarCarregamento(placa);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <div className="flex items-center gap-2">
+          <Truck className="w-4 h-4 text-emerald-500" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
+          {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+          {carregamentos.length > 0 && (
+            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+              {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          {modoApontamento && (
+            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
+              <CheckSquare className="w-3 h-3" />
+              Apontando para: <strong>{modoApontamento}</strong>
+            </Badge>
+          )}
+        </div>
+        <Button
+          size="sm"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8"
+          onClick={() => setModalAberto(true)}
+        >
+          <Plus className="w-3.5 h-3.5 mr-1.5" />Criar carregamento
+        </Button>
+      </div>
+
+      {carregamentos.length === 0 && !loadingCarregamentos ? (
+        <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
+          <Truck className="w-10 h-10 mb-2 opacity-20" />
+          <p className="text-sm">Nenhum carregamento em andamento</p>
+          <p className="text-xs mt-0.5">Clique em "Criar carregamento" para começar</p>
+        </div>
+      ) : (
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {carregamentos.map((c, i) => (
+            <CardCarregamento
+              key={i}
+              carregamento={c}
+              ctesEntrega={ctesEntrega}
+              modoApontamento={modoApontamento}
+              onIniciarApontamento={onIniciarApontamento}
+              onCancelarApontamento={onCancelarApontamento}
+              onExcluirCarregamento={onExcluirCarregamento}
+              onRemoverCte={onRemoverCte}
+            />
+          ))}
+        </div>
+      )}
+
+      {modalAberto && (
+        <ModalCriarCarregamento
+          onConfirmar={handleCriar}
+          onFechar={() => setModalAberto(false)}
+        />
       )}
     </div>
   );
@@ -667,6 +1136,11 @@ export function Disponiveis() {
   const [erroEntrega, setErroEntrega] = useState<string | null>(null);
   const [progressoEntrega, setProgressoEntrega] = useState(0);
   const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [carregamentos, setCarregamentos] = useState<Carregamento[]>([]);
+  const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
+  const [modoApontamento, setModoApontamento] = useState<string | null>(null);
+  const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 
@@ -735,6 +1209,106 @@ export function Disponiveis() {
     }
   }, [sigla]);
 
+  const carregarCarregamentos = useCallback(async () => {
+    setLoadingCarregamentos(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_carregamentos.php`,
+        { method: 'POST', body: JSON.stringify({}) },
+        true
+      );
+      if (res.success) {
+        setCarregamentos(res.carregamentos ?? []);
+      }
+    } catch {}
+    finally { setLoadingCarregamentos(false); }
+  }, []);
+
+  const handleCriarCarregamento = useCallback(async (placa: string) => {
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa, seq_cte: 0 }) },
+        true
+      );
+      if (res.success) {
+        toast.success(`Carregamento ${placa} criado!`);
+        await carregarCarregamentos();
+      } else {
+        toast.error(res.message || 'Erro ao criar carregamento');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao criar carregamento');
+    }
+  }, [carregarCarregamentos]);
+
+  const handleExcluirCarregamento = useCallback(async (placa: string) => {
+    if (!confirm(`Excluir o carregamento "${placa}"? Todos os CT-es serão removidos.`)) return;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'excluir_carregamento', placa }) },
+        true
+      );
+      if (res.success) {
+        toast.success(`Carregamento ${placa} excluído.`);
+        if (modoApontamento === placa) setModoApontamento(null);
+        await carregarCarregamentos();
+      } else {
+        toast.error(res.message || 'Erro ao excluir carregamento');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao excluir');
+    }
+  }, [carregarCarregamentos, modoApontamento]);
+
+  const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'remover_cte', placa, seq_cte: seqCte }) },
+        true
+      );
+      if (res.success) {
+        await carregarCarregamentos();
+      } else {
+        toast.error(res.message || 'Erro ao remover CT-e');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao remover CT-e');
+    }
+  }, [carregarCarregamentos]);
+
+  const handleConfirmarApontamento = useCallback(async () => {
+    if (!modoApontamento || ctesSelecionados.size === 0) return;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: modoApontamento, seq_ctes: Array.from(ctesSelecionados) }) },
+        true
+      );
+      if (res.success) {
+        toast.success(`${res.adicionados ?? ctesSelecionados.size} CT-e(s) adicionado(s) ao carregamento ${modoApontamento}.`);
+        setCtesSelecionados(new Set());
+        setModoApontamento(null);
+        await carregarCarregamentos();
+      } else {
+        toast.error(res.message || 'Erro ao adicionar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao adicionar CT-es');
+    }
+  }, [modoApontamento, ctesSelecionados, carregarCarregamentos]);
+
+  const toggleCte = useCallback((seqCte: number) => {
+    setCtesSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(seqCte)) next.delete(seqCte);
+      else next.add(seqCte);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
@@ -743,6 +1317,7 @@ export function Disponiveis() {
     if (sigla) {
       carregar();
       carregarEntrega();
+      carregarCarregamentos();
     }
   }, [sigla]);
 
@@ -1200,6 +1775,34 @@ export function Disponiveis() {
 
               {dadosEntrega && !loadingEntrega && (
                 <div className="space-y-3">
+                  <CarregamentoArea
+                    sigla={sigla}
+                    carregamentos={carregamentos}
+                    loadingCarregamentos={loadingCarregamentos}
+                    modoApontamento={modoApontamento}
+                    onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
+                    onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}
+                    onCriarCarregamento={handleCriarCarregamento}
+                    onExcluirCarregamento={handleExcluirCarregamento}
+                    onRemoverCte={handleRemoverCte}
+                    ctesEntrega={dadosEntrega.ctes}
+                  />
+
+                  {modoApontamento && ctesSelecionados.size > 0 && (
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+                        <strong>{ctesSelecionados.size}</strong> CT-e{ctesSelecionados.size !== 1 ? 's' : ''} selecionado{ctesSelecionados.size !== 1 ? 's' : ''} para <strong>{modoApontamento}</strong>
+                      </span>
+                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
+                        <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <Home className="w-4 h-4 text-emerald-500" />
                     <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Setor</h2>
@@ -1207,6 +1810,9 @@ export function Disponiveis() {
                     <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
                       <ChevronRight className="w-3 h-3" />clique em um setor para expandir
                     </span>
+                    <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={() => carregarEntrega()}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Atualizar
+                    </Button>
                     <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">
                       <span className="font-medium text-slate-600 dark:text-slate-300">Atraso:</span>
                       {(['verde','amarelo','laranja','vermelho'] as const).map(cor => (
@@ -1237,7 +1843,21 @@ export function Disponiveis() {
                       {(() => {
                         const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
                         const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
-                        return gruposSetor.map((g, i) => <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                        const ctesNoCarregamentoAtual = modoApontamento
+                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
+                          : undefined;
+                        return gruposSetor.map((g, i) => (
+                          <GrupoSetorCard
+                            key={i}
+                            grupo={g}
+                            maxPeso={maxPeso}
+                            maxCubagem={maxCubagem}
+                            modoApontamento={modoApontamento}
+                            ctesSelecionados={ctesSelecionados}
+                            ctesNoCarregamento={ctesNoCarregamentoAtual}
+                            onToggleCte={toggleCte}
+                          />
+                        ));
                       })()}
                     </div>
                   </div>
