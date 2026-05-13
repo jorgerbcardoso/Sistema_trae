@@ -20,40 +20,7 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 }
 
 ssw_login($domain);
-set_time_limit(120);
-
-$agora       = time();
-$agora12h    = $agora + (12 * 3600);
-$dataPrevMan = date('dmy', $agora12h);
-$horaPrevMan = date('Hi', $agora12h);
-
-$url0052 = 'https://sistema.ssw.inf.br/bin/ssw0052?act=ENV'
-    . '&data_prev_man='      . $dataPrevMan
-    . '&hora_prev_man='      . $horaPrevMan
-    . '&tp_cliente_pag=T'
-    . '&tp_pessoa_dest=A'
-    . '&status_ctrc=C'
-    . '&ent_dificil=T'
-    . '&ctrc_pendente=T'
-    . '&lista_pendencias=N'
-    . '&lista_descarregados=T'
-    . '&unid_dest_final=T'
-    . '&lista_reversa=T'
-    . '&a_so_agend_obrig=T'
-    . '&apenas_prioritarios=T'
-    . '&id_tp_produto=T'
-    . '&fg_enderecados=T'
-    . '&relacionar_produtos=N'
-    . '&relatorio_excel=N'
-    . '&button_env_enable=ENV';
-
-$strCmd = ssw_go($url0052);
-
-if (substr($strCmd, 0, 5) === '<foc ') {
-    respondJson(['success' => false, 'message' => 'Erro SSW (0052 cmd): ' . $strCmd]);
-}
-
-sleep(30);
+set_time_limit(60);
 
 $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
 $str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
@@ -63,21 +30,28 @@ $xml1440 = simplexml_load_string($str1440);
 $seqArq = null;
 
 if ($xml1440) {
-    $rows = $xml1440->xpath('rs/r');
-    foreach ($rows as $row) {
-        $opc = (string)($row->f1 ?? '');
-        $sit = (string)($row->f6 ?? '');
-        $seq = (string)($row->f0 ?? '');
+    for ($i = 0; $i <= 100; $i++) {
+        $seq = $xml1440->xpath('rs/r/f0')[$i];
+        $opc = $xml1440->xpath('rs/r/f1')[$i];
+        $usr = $xml1440->xpath('rs/r/f3')[$i];
+        $sit = $xml1440->xpath('rs/r/f6')[$i];
 
-        if (substr($opc, 0, 3) === '156' && strpos($sit, 'Conclu') !== false) {
-            $seqArq = trim($seq);
+        if ($seq === null) break;
+
+        $usr = trim((string)$usr);
+
+        if ((substr($opc, 0, 3) == '081')
+            && (($usr == 'presto') || ($usr == 'damasce1'))
+            && ($sit == 'Conclu&iacute;do')
+        ) {
+            $seqArq = trim((string)$seq);
             break;
         }
     }
 }
 
 if ($seqArq === null) {
-    respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado na fila (opção 156). Tente novamente em alguns instantes.']);
+    respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado na fila do ssw1440. Tente novamente em alguns instantes.']);
 }
 
 $seqFmt  = str_pad((int)$seqArq, 9, '0', STR_PAD_LEFT);
