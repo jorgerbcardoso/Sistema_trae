@@ -41,7 +41,7 @@ foreach ($dominios as $dominio) {
         . '&id_tp_produto=T'
         . '&fg_enderecados=T'
         . '&relacionar_produtos=N'
-        . '&relatorio_excel=N'
+        . '&relatorio_excel=S'
         . '&button_env_enable=ENV';
 
     $str = ssw_go($url0052);

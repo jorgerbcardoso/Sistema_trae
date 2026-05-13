@@ -28,6 +28,7 @@ $str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
 $xml1440 = simplexml_load_string($str1440);
 
 $seqArq = null;
+$debugItens = [];
 
 if ($xml1440) {
     for ($i = 0; $i <= 100; $i++) {
@@ -40,6 +41,28 @@ if ($xml1440) {
 
         $usr = trim((string)$usr);
 
+        $f2  = (string)($xml1440->xpath('rs/r/f2')[$i]  ?? '');
+        $f4  = (string)($xml1440->xpath('rs/r/f4')[$i]  ?? '');
+        $f5  = (string)($xml1440->xpath('rs/r/f5')[$i]  ?? '');
+        $f7  = (string)($xml1440->xpath('rs/r/f7')[$i]  ?? '');
+        $f8  = (string)($xml1440->xpath('rs/r/f8')[$i]  ?? '');
+        $f9  = (string)($xml1440->xpath('rs/r/f9')[$i]  ?? '');
+        $f10 = (string)($xml1440->xpath('rs/r/f10')[$i] ?? '');
+
+        $debugItens[] = [
+            'seq' => trim((string)$seq),
+            'opc' => (string)$opc,
+            'usr' => $usr,
+            'sit' => (string)$sit,
+            'f2'  => $f2,
+            'f4'  => $f4,
+            'f5'  => $f5,
+            'f7'  => $f7,
+            'f8'  => $f8,
+            'f9'  => $f9,
+            'f10' => $f10,
+        ];
+
         if ((substr($opc, 0, 3) == '081')
             && (($usr == 'presto') || ($usr == 'damasce1'))
             && ($sit == 'Conclu&iacute;do')
@@ -51,98 +74,115 @@ if ($xml1440) {
 }
 
 if ($seqArq === null) {
-    respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado na fila do ssw1440. Tente novamente em alguns instantes.']);
+    respondJson([
+        'success' => false,
+        'message' => 'Relatório 081 não encontrado na fila do ssw1440.',
+        'debug'   => $debugItens,
+    ]);
 }
 
-$seqFmt  = str_pad((int)$seqArq, 9, '0', STR_PAD_LEFT);
-$nomeArq = $domain . $seqFmt . '.txt';
+$siglaUnidade = '';
+foreach ($debugItens as $d) {
+    if (substr($d['opc'], 0, 3) == '081') {
+        $siglaUnidade = $d['f4'];
+        break;
+    }
+}
 
-$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq}&filename={$nomeArq}&path=/usr/aws/jobs/{$domain}/&down=1&nw=1");
+$urlDow  = "https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$seqArq}";
+$htmlDow = ssw_go($urlDow);
+
+$nomeArq081 = null;
+$pathArq081 = null;
+
+if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", urldecode($htmlDow), $mDow)) {
+    $nomeArq081 = $mDow[1];
+    $pathArq081 = $mDow[2];
+}
+
+if (!$nomeArq081 || !$pathArq081) {
+    respondJson(['success' => false, 'message' => 'Não foi possível extrair o nome do arquivo 081 do ssw1440.', 'debug' => substr($htmlDow, 0, 500)]);
+}
+
+$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq081}&filename={$nomeArq081}&path={$pathArq081}&down=1&nw=1");
 
 if (empty($file) || strlen($file) < 100) {
-    respondJson(['success' => false, 'message' => 'Arquivo do relatório 081 vazio ou inválido.']);
+    respondJson(['success' => false, 'message' => 'Arquivo do relatório 081 vazio ou inválido.', 'debug' => ['nomeArq' => $nomeArq081, 'path' => $pathArq081, 'fileLen' => strlen($file), 'fileHead' => substr($file, 0, 300)]]);
 }
 
 $file   = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
 $linhas = explode("\n", $file);
 
-$ctes        = [];
-$setorAtual  = '';
-$nomeSetor   = '';
-$emTransito  = false;
-
-$SKIP_PATTERNS = [
-    'CTRCS DISPONIVEIS PARA ENTREGA',
-    'COM OS QUE CHEGAM ATEH',
-    'ssw0052',
-    'UNIDADE:',
-    'CTRC REV/DEV',
-    '---+---',
-    '-------------+',
-    'PAG:',
-];
+$ctes    = [];
+$cabecalho = null;
 
 foreach ($linhas as $linha) {
-    $skip = false;
-    foreach ($SKIP_PATTERNS as $pat) {
-        if (strpos($linha, $pat) !== false) { $skip = true; break; }
-    }
-    if ($skip) continue;
+    $linha = trim($linha);
+    if ($linha === '') continue;
 
-    if (trim($linha) === '') continue;
+    $arr = str_getcsv($linha, ';');
 
-    if (preg_match('/^SETOR:\s*([A-Z0-9]{2,5})\s*(.*)?$/', trim($linha), $ms)) {
-        $setorAtual = trim($ms[1]);
-        $nomeSetor  = trim($ms[2] ?? '');
-        $emTransito = false;
+    if ($cabecalho === null) {
+        $cabecalho = $arr;
         continue;
     }
 
-    if (preg_match('/^\s*\*{4}\s*(NO ARMAZEM|EM TRANSITO)/', $linha, $mt)) {
-        $emTransito = (strpos($mt[1], 'EM TRANSITO') !== false);
-        continue;
-    }
+    if (count($arr) < 10) continue;
 
-    if (preg_match('/INSTRUCAO ENTREGA/', $linha)) continue;
+    $setor       = trim($arr[0]  ?? '');
+    $ctrc        = trim($arr[2]  ?? '');
+    $pagador     = trim($arr[7]  ?? '');
+    $destinata   = trim($arr[8]  ?? '');
+    $endereco    = trim($arr[9]  ?? '');
+    $cidade      = trim($arr[10] ?? '');
+    $bairro      = trim($arr[11] ?? '');
+    $cep         = trim($arr[12] ?? '');
+    $previ       = trim($arr[13] ?? '');
+    $agendamento = trim($arr[14] ?? '');
+    $nfiscal     = trim($arr[15] ?? '');
+    $valMerc     = trim($arr[16] ?? '');
+    $kgRea       = trim($arr[17] ?? '');
+    $m3          = trim($arr[18] ?? '');
+    $qVol        = trim($arr[20] ?? '');
+    $frete       = trim($arr[22] ?? '');
+    $codUltOcor  = trim($arr[23] ?? '');
+    $descUltOcor = trim($arr[24] ?? '');
+    $dataUltOcor = trim($arr[25] ?? '');
+    $flagB       = trim($arr[26] ?? '');
+    $prevChegada = trim($arr[27] ?? '');
+    $manifesto   = trim($arr[28] ?? '');
+    $cnpjDest    = trim($arr[30] ?? '');
 
-    $ctrc = trim(substr($linha, 2, 12));
     if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
 
-    $revDev      = trim(substr($linha, 14, 10));
-    $nfiscal     = trim(substr($linha, 25, 9));
-    $pagador     = trim(substr($linha, 35, 9));
-    $destinata   = trim(substr($linha, 45, 9));
-    $endereco    = trim(substr($linha, 55, 18));
-    $cidade      = trim(substr($linha, 73, 6));
-    $bairro      = trim(substr($linha, 80, 6));
-    $cep         = trim(substr($linha, 87, 9));
-    $previ       = trim(substr($linha, 97, 5));
-    $agendamento = trim(substr($linha, 103, 11));
-    $valMerc     = trim(substr($linha, 115, 9));
-    $kgRea       = trim(substr($linha, 125, 6));
-    $m3          = trim(substr($linha, 132, 5));
-    $qVol        = trim(substr($linha, 138, 6));
-    $frete       = trim(substr($linha, 145, 6));
-    $ultOcor     = trim(substr($linha, 152, 8));
-    $flagB       = trim(substr($linha, 161, 1));
-    $prevChegada = trim(substr($linha, 163, 11));
-    $manifesto   = trim(substr($linha, 175, 13));
-    $servAdic    = trim(substr($linha, 189, 8));
-    $per         = trim(substr($linha, 198, 3));
+    $isEmTransito = !empty($prevChegada) && strpos(strtoupper($prevChegada), 'HOJE') !== false;
 
-    $isEmTransito = !empty($prevChegada) && strpos($prevChegada, 'HOJE') !== false;
+    $hoje     = date('d/m/y');
+    $prevDate = '';
+    if (!empty($previ)) {
+        $parts = explode('/', $previ);
+        if (count($parts) === 3) {
+            $prevDate = $parts[0] . '/' . $parts[1];
+        }
+    }
 
+    $diasAtraso    = 0;
     $atrasoEntrega = null;
-    if (!empty($per)) {
-        $diasAtraso = (int)$per;
-        if ($diasAtraso <= 0) {
-            $atrasoEntrega = 'verde';
-        } elseif ($diasAtraso <= 2) {
-            $atrasoEntrega = 'amarelo';
-        } elseif ($diasAtraso <= 5) {
-            $atrasoEntrega = 'laranja';
-        } else {
-            $atrasoEntrega = 'vermelho';
+    if (!empty($previ) && !$isEmTransito) {
+        $partes = explode('/', $previ);
+        if (count($partes) === 3) {
+            $tsPrevi = mktime(0, 0, 0, (int)$partes[1], (int)$partes[0], (int)('20' . $partes[2]));
+            $tsHoje  = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
+            $diasAtraso = (int)floor(($tsHoje - $tsPrevi) / 86400);
+            if ($diasAtraso <= 0) {
+                $atrasoEntrega = 'verde';
+            } elseif ($diasAtraso <= 2) {
+                $atrasoEntrega = 'amarelo';
+            } elseif ($diasAtraso <= 5) {
+                $atrasoEntrega = 'laranja';
+            } else {
+                $atrasoEntrega = 'vermelho';
+            }
         }
     }
 
@@ -153,28 +193,29 @@ foreach ($linhas as $linha) {
         'ctrc'         => $ctrc,
         'serCte'       => $serCte,
         'nroCte'       => $nroCte,
-        'setor'        => $setorAtual,
-        'nomeSetor'    => $nomeSetor,
+        'setor'        => $setor,
         'nfiscal'      => $nfiscal,
         'pagador'      => $pagador,
         'destinatario' => $destinata,
+        'cnpjDest'     => $cnpjDest,
         'endereco'     => $endereco,
         'cidade'       => $cidade,
         'bairro'       => $bairro,
         'cep'          => $cep,
-        'prevEnt'      => $previ,
+        'prevEnt'      => $prevDate ?: $previ,
         'agendamento'  => $agendamento,
         'vlrMerc'      => $valMerc,
         'peso'         => $kgRea,
         'cubagem'      => $m3,
         'qtdeVol'      => $qVol,
         'frete'        => $frete,
-        'ultOcor'      => $ultOcor,
-        'agendObrig'   => $flagB === 'S',
+        'codUltOcor'   => $codUltOcor,
+        'descUltOcor'  => $descUltOcor,
+        'dataUltOcor'  => $dataUltOcor,
+        'agendObrig'   => ($flagB === 'S'),
         'prevChegada'  => $prevChegada,
         'manifesto'    => $manifesto,
-        'servAdic'     => $servAdic,
-        'diasAtraso'   => (int)$per,
+        'diasAtraso'   => $diasAtraso,
         'emTransito'   => $isEmTransito,
         'atrasoEntrega'=> $atrasoEntrega,
     ];

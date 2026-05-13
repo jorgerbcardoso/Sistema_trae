@@ -91,10 +91,10 @@ interface CteEntrega {
   serCte: string;
   nroCte: number;
   setor: string;
-  nomeSetor: string;
   nfiscal: string;
   pagador: string;
   destinatario: string;
+  cnpjDest: string;
   endereco: string;
   cidade: string;
   bairro: string;
@@ -106,11 +106,12 @@ interface CteEntrega {
   cubagem: string;
   qtdeVol: string;
   frete: string;
-  ultOcor: string;
+  codUltOcor: string;
+  descUltOcor: string;
+  dataUltOcor: string;
   agendObrig: boolean;
   prevChegada: string;
   manifesto: string;
-  servAdic: string;
   diasAtraso: number;
   emTransito: boolean;
   atrasoEntrega: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
@@ -124,7 +125,6 @@ interface DadosEntrega {
 
 interface GrupoSetor {
   setor: string;
-  nomeSetor: string;
   armazem: CteEntrega[];
   transito: CteEntrega[];
   totalCtes: number;
@@ -492,7 +492,8 @@ function TabelaEntrega({ ctes, tipo }: { ctes: CteEntrega[]; tipo: 'armazem' | '
             <th className="px-3 py-2 text-right font-semibold">Peso</th>
             <th className="px-3 py-2 text-right font-semibold">Vol.</th>
             <th className="px-3 py-2 text-right font-semibold">Frete</th>
-            <th className="px-3 py-2 text-left font-semibold">Últ. Ocor.</th>
+            <th className="px-3 py-2 text-left font-semibold">Últ. Ocorrência</th>
+            <th className="px-3 py-2 text-left font-semibold">Data Ocor.</th>
             {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
             <th className="px-3 py-2 text-center font-semibold">Atraso</th>
           </tr>
@@ -516,7 +517,8 @@ function TabelaEntrega({ ctes, tipo }: { ctes: CteEntrega[]; tipo: 'armazem' | '
               <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
               <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
               <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.ultOcor || '-'}</td>
+              <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
+              <td className="px-3 py-2 text-slate-500 dark:text-slate-500 whitespace-nowrap">{cte.dataUltOcor || '-'}</td>
               {tipo === 'transito' && (
                 <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
               )}
@@ -566,7 +568,7 @@ function GrupoSetorCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoSetor; max
           <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           {grupo.setor}
         </span>
-        <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nomeSetor}</span>
+        <span />
         <span className="flex items-center justify-center">
           {piorAtraso
             ? <IndicadorDot cor={piorAtraso} title={`Pior atraso: ${piorAtraso}`} />
@@ -831,7 +833,7 @@ export function Disponiveis() {
     for (const cte of dadosEntrega.ctes) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
-        map[key] = { setor: key, nomeSetor: cte.nomeSetor, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
