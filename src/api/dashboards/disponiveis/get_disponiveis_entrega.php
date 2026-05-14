@@ -31,59 +31,91 @@ register_shutdown_function(function() {
     }
 });
 
-$str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
-$str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
-$str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
-$xml1440 = simplexml_load_string($str1440);
+$agora12h    = time() + (12 * 3600);
+$dataPrevMan = date('dmy', $agora12h);
+$horaPrevMan = date('Hi', $agora12h);
 
-$encontrado = false;
-$nomeArq081 = null;
-$pathArq081 = null;
+$url0052 = 'https://sistema.ssw.inf.br/bin/ssw0052?act=ENV'
+    . '&data_prev_man='      . $dataPrevMan
+    . '&hora_prev_man='      . $horaPrevMan
+    . '&tp_cliente_pag=T'
+    . '&tp_pessoa_dest=A'
+    . '&status_ctrc=C'
+    . '&ent_dificil=T'
+    . '&ctrc_pendente=T'
+    . '&lista_pendencias=N'
+    . '&lista_descarregados=T'
+    . '&unid_dest_final=T'
+    . '&lista_reversa=T'
+    . '&a_so_agend_obrig=T'
+    . '&apenas_prioritarios=T'
+    . '&id_tp_produto=T'
+    . '&fg_enderecados=T'
+    . '&relacionar_produtos=N'
+    . '&relatorio_excel=S'
+    . '&button_env_enable=ENV';
 
-if ($xml1440) {
-    for ($i = 0; $i <= 100; $i++) {
-        $seq = $xml1440->xpath('rs/r/f0')[$i];
-        $opc = $xml1440->xpath('rs/r/f1')[$i];
-        $usr = $xml1440->xpath('rs/r/f3')[$i];
-        $sit = $xml1440->xpath('rs/r/f6')[$i];
-        $f8  = $xml1440->xpath('rs/r/f8')[$i];
+$str0052 = ssw_go($url0052);
 
-        if ($seq === null) break;
+$file = null;
 
-        $usr = trim((string)$usr);
+$actImediato = ssw_get_act(urldecode($str0052));
+$arqImediato = ssw_get_arq(urldecode($str0052));
 
-        if ((substr($opc, 0, 3) == '081')
-            && (($usr == 'presto') || ($usr == 'damasce1'))
-            && ((string)$sit == 'Conclu&iacute;do')
-        ) {
-            $encontrado = true;
-            $f8dec = html_entity_decode((string)$f8);
+if (!empty($actImediato) && !empty($arqImediato)) {
+    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$actImediato}&filename={$arqImediato}&path=&down=1&nw=1");
+}
 
-            if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-                if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
-                    $decoded = urldecode($mVal[1]);
-                    if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
-                        $nomeArq081 = $mArq[1];
-                        $pathArq081 = $mArq[2];
+if (empty($file) || strlen($file) < 100) {
+    $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+    $str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
+    $str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
+    $xml1440 = simplexml_load_string($str1440);
+
+    $encontrado = false;
+    $nomeArq081 = null;
+    $pathArq081 = null;
+
+    if ($xml1440) {
+        for ($i = 0; $i <= 100; $i++) {
+            $seq = $xml1440->xpath('rs/r/f0')[$i];
+            $opc = $xml1440->xpath('rs/r/f1')[$i];
+            $usr = $xml1440->xpath('rs/r/f3')[$i];
+            $sit = $xml1440->xpath('rs/r/f6')[$i];
+            $f8  = $xml1440->xpath('rs/r/f8')[$i];
+
+            if ($seq === null) break;
+
+            $usr = trim((string)$usr);
+
+            if ((substr($opc, 0, 3) == '081')
+                && (($usr == 'presto') || ($usr == 'damasce1'))
+                && ((string)$sit == 'Conclu&iacute;do')
+            ) {
+                $encontrado = true;
+                $f8dec = html_entity_decode((string)$f8);
+
+                if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
+                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
+                        $decoded = urldecode($mVal[1]);
+                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
+                            $nomeArq081 = $mArq[1];
+                            $pathArq081 = $mArq[2];
+                        }
                     }
                 }
+                break;
             }
-            break;
         }
     }
+
+    if (!$encontrado || !$nomeArq081 || !$pathArq081) {
+        respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado (nem gerado imediatamente nem na fila do ssw1440).']);
+    }
+
+    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq081}&filename={$nomeArq081}&path={$pathArq081}&down=1&nw=1");
 }
-
-
-if (!$encontrado) {
-    respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado na fila do ssw1440.']);
-}
-
-if (!$nomeArq081 || !$pathArq081) {
-    respondJson(['success' => false, 'message' => 'Não foi possível extrair o nome do arquivo 081.', 'debug' => ['nomeArq081' => $nomeArq081, 'pathArq081' => $pathArq081]]);
-}
-
-$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq081}&filename={$nomeArq081}&path={$pathArq081}&down=1&nw=1");
 
 if (empty($file) || strlen($file) < 100) {
     respondJson(['success' => false, 'message' => 'Arquivo do relatório 081 vazio ou inválido.']);
