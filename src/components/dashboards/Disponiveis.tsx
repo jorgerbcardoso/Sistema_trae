@@ -886,6 +886,7 @@ interface CarregamentoAreaProps {
   onCriarCarregamento: (placa: string) => void;
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
+  onCarregarSSW: (placa: string) => void;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1049,6 +1050,7 @@ function CardCarregamento({
   onCancelarApontamento,
   onExcluirCarregamento,
   onRemoverCte,
+  onCarregarSSW,
 }: {
   carregamento: Carregamento;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
@@ -1057,6 +1059,7 @@ function CardCarregamento({
   onCancelarApontamento: () => void;
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
+  onCarregarSSW: (placa: string) => void;
 }) {
   const [expandido, setExpandido] = useState(false);
   const ativo = modoApontamento === carregamento.placa_provisoria;
@@ -1070,6 +1073,11 @@ function CardCarregamento({
   const totalCubagem = ctesDetalhados.reduce((s, c) => s + parseCubagem(c.det?.cubagem ?? ''), 0);
   const temCapacidade = carregamento.capacidade_ton !== null && carregamento.capacidade_m3 !== null;
 
+  const primeiroCte = carregamento.ctes.length > 0 ? carregamento.ctes[0] : null;
+  const infoCriacao = primeiroCte
+    ? `${formatData(primeiroCte.data_inclusao)} ${primeiroCte.hora_inclusao?.slice(0, 5)} · ${primeiroCte.login_inclusao}`
+    : null;
+
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
@@ -1080,9 +1088,11 @@ function CardCarregamento({
             </div>
             <div className="min-w-0">
               <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                {formatData(carregamento.data_criacao)} {carregamento.hora_criacao?.slice(0, 5)} · {carregamento.login_criacao}
-              </p>
+              {infoCriacao ? (
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">{infoCriacao}</p>
+              ) : (
+                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -1114,21 +1124,24 @@ function CardCarregamento({
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
-            <span><Weight className="w-3 h-3 inline mr-1" />{totalPeso >= 1000 ? `${(totalPeso / 1000).toFixed(3)}t` : `${Math.round(totalPeso)}kg`}</span>
+            <span><Weight className="w-3 h-3 inline mr-1" />{(totalPeso / 1000).toFixed(3)}t</span>
             <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {!ativo ? (
-            <Button size="sm" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
-              <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Apontar CT-es
+            <Button size="sm" className="flex-1 min-w-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
+              <CheckSquare className="w-3.5 h-3.5 mr-1" />Apontar
             </Button>
           ) : (
-            <Button size="sm" variant="outline" className="flex-1 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
-              <X className="w-3.5 h-3.5 mr-1.5" />Cancelar apontamento
+            <Button size="sm" variant="outline" className="flex-1 min-w-0 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
+              <X className="w-3.5 h-3.5 mr-1" />Cancelar
             </Button>
           )}
+          <Button size="sm" className="flex-1 min-w-0 bg-sky-500 hover:bg-sky-600 text-white text-xs h-8" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
+            <Truck className="w-3.5 h-3.5 mr-1" />SSW
+          </Button>
           <Button size="sm" variant="outline" className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
             {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </Button>
@@ -1141,31 +1154,43 @@ function CardCarregamento({
       {expandido && carregamento.ctes.length > 0 && (
         <div className="border-t border-slate-100 dark:border-slate-800">
           <div className="max-h-52 overflow-y-auto">
-            {ctesDetalhados.map((c, i) => {
-              const d = c.det;
-              const pesoKg = d ? Math.round(parsePeso(d.peso)) : 0;
-              const cub = d ? parseCubagem(d.cubagem) : 0;
-              return (
-                <div key={i} className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs">
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200 shrink-0 w-28">
-                    {d ? d.ctrc : `CTE-${c.seq_cte}`}
-                  </span>
-                  {d ? (
-                    <>
-                      <span className="text-slate-500 dark:text-slate-400 truncate flex-1 min-w-0">{d.destinatario}</span>
-                      <span className="text-slate-400 dark:text-slate-500 shrink-0 hidden sm:inline">{d.cidade}</span>
-                      <span className="text-slate-500 dark:text-slate-400 shrink-0 font-medium">{pesoKg}kg</span>
-                      <span className="text-slate-400 dark:text-slate-500 shrink-0">{cub.toFixed(3)}m³</span>
-                    </>
-                  ) : (
-                    <span className="text-slate-400 dark:text-slate-500 flex-1 italic">Dados não disponíveis</span>
-                  )}
-                  <button onClick={() => onRemoverCte(carregamento.placa_provisoria, c.seq_cte)} className="ml-1 text-red-400 hover:text-red-600 shrink-0" title="Remover CT-e">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              );
-            })}
+            <table className="w-full text-xs table-fixed">
+              <colgroup>
+                <col className="w-[90px]" />
+                <col />
+                <col className="w-[42px]" />
+                <col className="w-[46px]" />
+                <col className="w-[22px]" />
+              </colgroup>
+              <tbody>
+                {ctesDetalhados.map((c, i) => {
+                  const d = c.det;
+                  const pesoTon = d ? (parsePeso(d.peso) / 1000) : 0;
+                  const cub = d ? parseCubagem(d.cubagem) : 0;
+                  return (
+                    <tr key={i} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-2 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {d ? d.ctrc : `#${c.seq_cte}`}
+                      </td>
+                      <td className="px-1 py-1.5 text-slate-500 dark:text-slate-400 truncate">
+                        {d ? d.destinatario : <span className="italic text-slate-300 dark:text-slate-600">—</span>}
+                      </td>
+                      <td className="px-1 py-1.5 text-right text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                        {d ? `${pesoTon.toFixed(3)}t` : '—'}
+                      </td>
+                      <td className="px-1 py-1.5 text-right text-slate-500 dark:text-slate-500 whitespace-nowrap">
+                        {d ? `${cub.toFixed(3)}` : '—'}
+                      </td>
+                      <td className="pr-2 py-1.5 text-center">
+                        <button onClick={() => onRemoverCte(carregamento.placa_provisoria, c.seq_cte)} className="text-red-400 hover:text-red-600" title="Remover">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1183,6 +1208,7 @@ function CarregamentoArea({
   onCriarCarregamento,
   onExcluirCarregamento,
   onRemoverCte,
+  onCarregarSSW,
   todosCtes,
 }: CarregamentoAreaProps) {
   const [modalAberto, setModalAberto] = useState(false);
@@ -1238,6 +1264,7 @@ function CarregamentoArea({
               onCancelarApontamento={onCancelarApontamento}
               onExcluirCarregamento={onExcluirCarregamento}
               onRemoverCte={onRemoverCte}
+              onCarregarSSW={onCarregarSSW}
             />
           ))}
         </div>
@@ -1476,6 +1503,10 @@ export function Disponiveis() {
       else next.add(seqCte);
       return next;
     });
+  }, []);
+
+  const handleCarregarSSW = useCallback((_placa: string) => {
+    toast.info('Em breve: integração com SSW para carregar o manifesto.');
   }, []);
 
   const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
@@ -1803,6 +1834,7 @@ export function Disponiveis() {
             onCriarCarregamento={handleCriarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
+            onCarregarSSW={handleCarregarSSW}
             todosCtes={todosCtes}
           />
 
