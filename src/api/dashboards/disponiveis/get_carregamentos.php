@@ -4,10 +4,17 @@ require_once __DIR__ . '/../../config.php';
 handleOptionsRequest();
 validateRequestMethod('POST');
 
-$auth   = authenticateAndGetUser();
-$domain = $auth['domain'];
-$user   = $auth['user'];
-$unidade = strtoupper(trim($user['unidade'] ?? ''));
+$auth    = authenticateAndGetUser();
+$domain  = $auth['domain'];
+$input   = getRequestInput();
+
+$currentUser = getCurrentUser();
+$unidade = strtoupper(trim(
+    $currentUser['unidade_atual']
+    ?? $currentUser['unidade']
+    ?? $input['unidade']
+    ?? ''
+));
 
 if (empty($unidade)) {
     respondJson(['success' => false, 'message' => 'Unidade do usuário não identificada.']);

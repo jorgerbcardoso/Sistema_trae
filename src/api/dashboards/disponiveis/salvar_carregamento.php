@@ -6,9 +6,16 @@ validateRequestMethod('POST');
 
 $auth   = authenticateAndGetUser();
 $domain = $auth['domain'];
-$user   = $auth['user'];
-$unidade = strtoupper(trim($user['unidade'] ?? ''));
-$login   = $user['username'] ?? '';
+$input  = getRequestInput();
+
+$currentUser = getCurrentUser();
+$unidade = strtoupper(trim(
+    $currentUser['unidade_atual']
+    ?? $currentUser['unidade']
+    ?? $input['unidade']
+    ?? ''
+));
+$login = $currentUser['username'] ?? $auth['user']['username'] ?? '';
 
 if (empty($unidade)) {
     respondJson(['success' => false, 'message' => 'Unidade do usuário não identificada.']);
@@ -17,9 +24,6 @@ if (empty($unidade)) {
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
-
-$input = getRequestInput();
-$acao  = $input['acao'] ?? '';
 
 $tabela = "{$domain}_carregamento";
 

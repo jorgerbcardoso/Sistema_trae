@@ -215,13 +215,35 @@ function StatusColetaBadge({ coleta }: { coleta: Coleta }) {
   return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"><Clock className="w-3 h-3 mr-1" />Pendente</Badge>;
 }
 
-function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' }) {
+function TabelaCtes({
+  ctes,
+  tipo,
+  modoApontamento,
+  ctesSelecionados,
+  ctesNoCarregamento,
+  onToggleCte,
+}: {
+  ctes: Cte[];
+  tipo: 'armazem' | 'transito';
+  modoApontamento?: string | null;
+  ctesSelecionados?: Set<number>;
+  ctesNoCarregamento?: Set<number>;
+  onToggleCte?: (seqCte: number) => void;
+}) {
   if (ctes.length === 0) return null;
+  const emApontamento = !!modoApontamento;
   return (
     <div className="overflow-x-auto">
+      {emApontamento && (
+        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <CheckSquare className="w-3.5 h-3.5 shrink-0" />
+          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
+        </div>
+      )}
       <table className="w-full text-xs">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            {emApontamento && <th className="px-3 py-2 w-8" />}
             <th className="px-3 py-2 text-left font-semibold">CT-e</th>
             <th className="px-3 py-2 text-left font-semibold">Emissão</th>
             <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
@@ -239,35 +261,78 @@ function TabelaCtes({ ctes, tipo }: { ctes: Cte[]; tipo: 'armazem' | 'transito' 
           </tr>
         </thead>
         <tbody>
-          {ctes.map((cte, i) => (
-            <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
-              <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">{cte.ctrc}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
-              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
-              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.pagador}</td>
-              <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
-              <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
-              <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
-              <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{cte.manifesto || '-'}</td>
-              {tipo === 'transito' && (
-                <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{cte.prevChegada}</td>
-              )}
-              <td className="px-3 py-2 text-center">
-                <IndicadorDot cor={cte.indicadorSaida} title={cte.indicadorSaida ? `Atraso saída: ${cte.indicadorSaida}` : 'Sem manifesto'} />
-              </td>
-            </tr>
-          ))}
+          {ctes.map((cte, i) => {
+            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
+            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
+            const rowBg = jaNoCarregamento
+              ? 'bg-emerald-50 dark:bg-emerald-950/20'
+              : selecionado
+              ? 'bg-amber-50 dark:bg-amber-950/20'
+              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50';
+            return (
+              <tr
+                key={i}
+                className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !jaNoCarregamento ? 'cursor-pointer' : ''}`}
+                onClick={emApontamento && !jaNoCarregamento && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
+              >
+                {emApontamento && (
+                  <td className="px-3 py-2 text-center">
+                    {jaNoCarregamento ? (
+                      <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
+                    ) : selecionado ? (
+                      <CheckSquare className="w-4 h-4 text-amber-500 mx-auto" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
+                    )}
+                  </td>
+                )}
+                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
+                  {cte.ctrc}
+                  {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
+                </td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.pagador}</td>
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
+                <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{cte.manifesto || '-'}</td>
+                {tipo === 'transito' && (
+                  <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{cte.prevChegada}</td>
+                )}
+                <td className="px-3 py-2 text-center">
+                  <IndicadorDot cor={cte.indicadorSaida} title={cte.indicadorSaida ? `Atraso saída: ${cte.indicadorSaida}` : 'Sem manifesto'} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino; maxPeso: number; maxCubagem: number }) {
+function GrupoDestinoCard({
+  grupo,
+  maxPeso,
+  maxCubagem,
+  modoApontamento,
+  ctesSelecionados,
+  ctesNoCarregamento,
+  onToggleCte,
+}: {
+  grupo: GrupoDestino;
+  maxPeso: number;
+  maxCubagem: number;
+  modoApontamento?: string | null;
+  ctesSelecionados?: Set<number>;
+  ctesNoCarregamento?: Set<number>;
+  onToggleCte?: (seqCte: number) => void;
+}) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
 
@@ -378,12 +443,12 @@ function GrupoDestinoCard({ grupo, maxPeso, maxCubagem }: { grupo: GrupoDestino;
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" />
+                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} onToggleCte={onToggleCte} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este destino.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaCtes ctes={grupo.transito} tipo="transito" />
+                ? <TabelaCtes ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} onToggleCte={onToggleCte} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e em trânsito para este destino.</p>
             )}
             {abaAtiva === 'coletas' && (
@@ -1616,6 +1681,34 @@ export function Disponiveis() {
             );
           })()}
 
+          <CarregamentoArea
+            sigla={sigla}
+            carregamentos={carregamentos}
+            loadingCarregamentos={loadingCarregamentos}
+            modoApontamento={modoApontamento}
+            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
+            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}
+            onCriarCarregamento={handleCriarCarregamento}
+            onExcluirCarregamento={handleExcluirCarregamento}
+            onRemoverCte={handleRemoverCte}
+            ctesEntrega={dadosEntrega?.ctes ?? []}
+          />
+
+          {modoApontamento && ctesSelecionados.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+              <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+                <strong>{ctesSelecionados.size}</strong> CT-e{ctesSelecionados.size !== 1 ? 's' : ''} selecionado{ctesSelecionados.size !== 1 ? 's' : ''} para <strong>{modoApontamento}</strong>
+              </span>
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
+                <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}>
+                Cancelar
+              </Button>
+            </div>
+          )}
+
           <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setAbaAtiva('transferencia')}
@@ -1719,7 +1812,12 @@ export function Disponiveis() {
                               {(() => {
                                 const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
                                 const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
-                                return grupos.map((g, i) => <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                                const ctesNoCarregamentoAtual = modoApontamento
+                                  ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
+                                  : undefined;
+                                return grupos.map((g, i) => (
+                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} onToggleCte={toggleCte} />
+                                ));
                               })()}
                             </div>
                         </>
@@ -1775,34 +1873,6 @@ export function Disponiveis() {
 
               {dadosEntrega && !loadingEntrega && (
                 <div className="space-y-3">
-                  <CarregamentoArea
-                    sigla={sigla}
-                    carregamentos={carregamentos}
-                    loadingCarregamentos={loadingCarregamentos}
-                    modoApontamento={modoApontamento}
-                    onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
-                    onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}
-                    onCriarCarregamento={handleCriarCarregamento}
-                    onExcluirCarregamento={handleExcluirCarregamento}
-                    onRemoverCte={handleRemoverCte}
-                    ctesEntrega={dadosEntrega.ctes}
-                  />
-
-                  {modoApontamento && ctesSelecionados.size > 0 && (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                      <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span className="text-sm text-amber-800 dark:text-amber-300 flex-1">
-                        <strong>{ctesSelecionados.size}</strong> CT-e{ctesSelecionados.size !== 1 ? 's' : ''} selecionado{ctesSelecionados.size !== 1 ? 's' : ''} para <strong>{modoApontamento}</strong>
-                      </span>
-                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
-                        <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  )}
-
                   <div className="flex items-center gap-2">
                     <Home className="w-4 h-4 text-emerald-500" />
                     <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Setor</h2>
@@ -1914,7 +1984,12 @@ export function Disponiveis() {
                       {(() => {
                         const maxPeso    = Math.max(...grupos.map(g => g.totalPeso), 1);
                         const maxCubagem = Math.max(...grupos.map(g => g.totalCubagem), 1);
-                        return grupos.map((g, i) => <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                        const ctesNoCarregamentoAtual = modoApontamento
+                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
+                          : undefined;
+                        return grupos.map((g, i) => (
+                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} onToggleCte={toggleCte} />
+                        ));
                       })()}
                     </div>
                   </div>
@@ -1943,7 +2018,12 @@ export function Disponiveis() {
                       {(() => {
                         const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
                         const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
-                        return gruposSetor.map((g, i) => <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} />);
+                        const ctesNoCarregamentoAtual = modoApontamento
+                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
+                          : undefined;
+                        return gruposSetor.map((g, i) => (
+                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} onToggleCte={toggleCte} />
+                        ));
                       })()}
                     </div>
                   </div>
