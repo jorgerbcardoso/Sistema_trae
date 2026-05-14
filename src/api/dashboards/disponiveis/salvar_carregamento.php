@@ -7,6 +7,7 @@ validateRequestMethod('POST');
 $auth   = authenticateAndGetUser();
 $domain = $auth['domain'];
 $input  = getRequestInput();
+$acao   = $input['acao'] ?? '';
 
 $currentUser = getCurrentUser();
 $unidade = strtoupper(trim(
