@@ -286,6 +286,7 @@ function TabelaCtes({
             <th className="px-3 py-2 text-right font-semibold">Vlr. NF</th>
             <th className="px-3 py-2 text-right font-semibold">Frete</th>
             <th className="px-3 py-2 text-right font-semibold">Peso</th>
+            <th className="px-3 py-2 text-right font-semibold">M³</th>
             <th className="px-3 py-2 text-right font-semibold">Vol.</th>
             <th className="px-3 py-2 text-left font-semibold">Manifesto</th>
             {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
@@ -339,6 +340,7 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
+                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
                 <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{cte.manifesto || '-'}</td>
                 {tipo === 'transito' && (
@@ -674,6 +676,7 @@ function TabelaEntrega({
             <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
             <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
             <th className="px-3 py-2 text-right font-semibold">Peso</th>
+            <th className="px-3 py-2 text-right font-semibold">M³</th>
             <th className="px-3 py-2 text-right font-semibold">Frete</th>
             <th className="px-3 py-2 text-left font-semibold">Últ. Ocorrência</th>
             {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
@@ -726,6 +729,7 @@ function TabelaEntrega({
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
                 {tipo === 'transito' && (
