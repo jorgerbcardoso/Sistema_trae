@@ -214,10 +214,15 @@ export function FaturamentoClientes() {
     carregarDados(filters, groupBy);
   }, [filters, groupBy]);
 
-  const exportarCteCSV = useCallback(() => {
-    if (!cteDialogLista.length) return;
+  const cteDialogListaRef = useRef<any[]>([]);
+  const cteDialogTituloRef = useRef<string>('');
+
+  const exportarCteCSV = () => {
+    const lista = cteDialogListaRef.current;
+    const titulo = cteDialogTituloRef.current;
+    if (!lista.length) return;
     const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete'];
-    const rows = cteDialogLista.map(c => [
+    const rows = lista.map(c => [
       `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
       c.data_emissao,
       `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
@@ -233,14 +238,16 @@ export function FaturamentoClientes() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ctes_${cteDialogTitulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.download = `ctes_${titulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [cteDialogLista, cteDialogTitulo]);
+  };
 
   const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string) => {
     setCteDialogTitulo(titulo);
+    cteDialogTituloRef.current = titulo;
     setCteDialogLista([]);
+    cteDialogListaRef.current = [];
     setCteDialogTotais(null);
     setCteDialogOpen(true);
     setLoadingCtes(true);
@@ -251,7 +258,9 @@ export function FaturamentoClientes() {
         true
       );
       if (response.success) {
-        setCteDialogLista(response.data.ctes || []);
+        const ctes = response.data.ctes || [];
+        setCteDialogLista(ctes);
+        cteDialogListaRef.current = ctes;
         setCteDialogTotais(response.data.totais || null);
       } else {
         toast.error(response.message || 'Erro ao carregar CT-es');
@@ -850,25 +859,21 @@ export function FaturamentoClientes() {
 
       <Dialog open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
         <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-          <DialogHeader className="shrink-0">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <DialogTitle>{cteDialogTitulo}</DialogTitle>
-                <DialogDescription>Lista de CT-es</DialogDescription>
-              </div>
-              {cteDialogLista.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportarCteCSV}
-                  className="shrink-0 gap-1.5"
-                >
-                  <FileDown className="w-4 h-4" />
-                  Exportar CSV
-                </Button>
-              )}
-            </div>
+          <DialogHeader className="shrink-0 pr-20">
+            <DialogTitle>{cteDialogTitulo}</DialogTitle>
+            <DialogDescription>Lista de CT-es</DialogDescription>
           </DialogHeader>
+          {cteDialogLista.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarCteCSV}
+              className="absolute top-4 right-10 gap-1.5 z-10"
+            >
+              <FileDown className="w-4 h-4" />
+              Exportar CSV
+            </Button>
+          )}
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
