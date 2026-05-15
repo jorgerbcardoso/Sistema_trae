@@ -169,7 +169,7 @@ export async function handleAPIResponse(response: Response, suppressToast = fals
   // ================================================================
   const data = await response.json();
   
-  console.log('📦 [apiUtils] Dados recebidos:', JSON.stringify(data, null, 2));
+  console.log('📦 [apiUtils] Dados recebidos: total de chaves =', Object.keys(data).join(', '));
   
   // ================================================================
   // 4. INTERCEPTAR E EXIBIR TOAST (se houver)

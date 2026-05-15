@@ -1,4 +1,7 @@
 <?php
+ini_set('memory_limit', '256M');
+ini_set('max_execution_time', '120');
+
 require_once __DIR__ . '/../../config.php';
 
 handleOptionsRequest();
@@ -132,7 +135,7 @@ while ($row = pg_fetch_assoc($result)) {
     $totFrete   += (float)$row['vlr_frete'];
 }
 
-respondJson([
+$payload = [
     'success' => true,
     'data' => [
         'ctes'   => $ctes,
@@ -144,4 +147,18 @@ respondJson([
             'vlr_frete' => $totFrete,
         ],
     ],
-]);
+];
+
+$json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($json === false) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Erro ao serializar dados: ' . json_last_error_msg()]);
+    exit;
+}
+
+http_response_code(200);
+header('Content-Type: application/json; charset=utf-8');
+header('Content-Length: ' . mb_strlen($json, '8bit'));
+echo $json;
+exit;
