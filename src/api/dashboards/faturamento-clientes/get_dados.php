@@ -13,6 +13,7 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 
 $input   = getRequestInput();
 $filters = $input['filters'] ?? [];
+$groupBy = isset($input['groupBy']) && $input['groupBy'] === 'clientes' ? 'clientes' : 'grupos';
 
 $conn = connect();
 
@@ -69,48 +70,172 @@ if (count($cnpjsSelecionados) > 0) {
     $whereClauseClientes = $whereClause;
 }
 
-$queryRanking = "
-    SELECT
-        cte.cnpj_pag,
-        cte.nome_pag,
-        COUNT(*)                        AS qtde_ctes,
-        SUM(cte.vlr_frete)              AS total_frete,
-        SUM(cte.vlr_merc)               AS total_merc,
-        SUM(cte.peso_real)              AS total_peso,
-        SUM(cte.qtde_vol)               AS total_volumes,
-        AVG(cte.vlr_frete)              AS ticket_medio,
-        COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END) AS qtde_cif,
-        COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END) AS qtde_fob
-    FROM {$domain}_cte cte
-    {$whereClauseClientes}
-    GROUP BY cte.cnpj_pag, cte.nome_pag
-    ORDER BY total_frete DESC
-    LIMIT 10
-";
+// ============================================================
+// RANKING: modo GRUPOS ou CLIENTES
+// ============================================================
+$LIMIT = 10;
 
-$resultRanking = pg_query_params($conn, $queryRanking, $queryParams);
-if (!$resultRanking) {
-    respondJson(['success' => false, 'message' => 'Erro na query ranking: ' . pg_last_error($conn)]);
+if ($groupBy === 'grupos') {
+    // 1. Buscar top grupos (agrupados por cnpj_principal)
+    $queryGrupos = "
+        SELECT
+            gc.cnpj_principal                                   AS chave,
+            COALESCE(cli.nome, gc.cnpj_principal)               AS nome,
+            COUNT(*)                                            AS qtde_ctes,
+            SUM(cte.vlr_frete)                                  AS total_frete,
+            SUM(cte.vlr_merc)                                   AS total_merc,
+            SUM(cte.peso_real)                                  AS total_peso,
+            SUM(cte.qtde_vol)                                   AS total_volumes,
+            AVG(cte.vlr_frete)                                  AS ticket_medio,
+            COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)     AS qtde_cif,
+            COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)     AS qtde_fob,
+            TRUE                                                AS is_grupo
+        FROM {$domain}_cte cte
+        INNER JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
+        LEFT  JOIN {$domain}_cliente cli      ON cli.cnpj = gc.cnpj_principal
+        {$whereClauseClientes}
+        GROUP BY gc.cnpj_principal, cli.nome
+        ORDER BY total_frete DESC
+        LIMIT {$LIMIT}
+    ";
+
+    $resultGrupos = pg_query_params($conn, $queryGrupos, $queryParams);
+    if (!$resultGrupos) {
+        respondJson(['success' => false, 'message' => 'Erro na query grupos: ' . pg_last_error($conn)]);
+    }
+
+    $clientes = [];
+    $cnpjPrincipaisUsados = [];
+    while ($row = pg_fetch_assoc($resultGrupos)) {
+        $clientes[] = [
+            'cnpj'          => $row['chave'],
+            'nome'          => $row['nome'] ?: 'SEM NOME',
+            'qtde_ctes'     => (int)$row['qtde_ctes'],
+            'total_frete'   => (float)$row['total_frete'],
+            'total_merc'    => (float)$row['total_merc'],
+            'total_peso'    => (float)$row['total_peso'],
+            'total_volumes' => (int)$row['total_volumes'],
+            'ticket_medio'  => (float)$row['ticket_medio'],
+            'qtde_cif'      => (int)$row['qtde_cif'],
+            'qtde_fob'      => (int)$row['qtde_fob'],
+            'is_grupo'      => true,
+        ];
+        $cnpjPrincipaisUsados[] = $row['chave'];
+    }
+
+    // 2. Se não atingiu o limite, completar com clientes individuais sem grupo
+    $faltam = $LIMIT - count($clientes);
+    if ($faltam > 0) {
+        $excluirGruposSql = '';
+        $paramsCompl = $queryParams;
+        $piCompl = $queryParamIndex;
+
+        if (!empty($cnpjPrincipaisUsados)) {
+            $phs = [];
+            foreach ($cnpjPrincipaisUsados as $cp) {
+                $phs[] = '$' . $piCompl++;
+                $paramsCompl[] = $cp;
+            }
+            $excluirGruposSql = "AND cte.cnpj_pag NOT IN (
+                SELECT gc2.cnpj FROM {$domain}_grupo_cliente gc2
+                WHERE gc2.cnpj_principal IN (" . implode(', ', $phs) . ")
+            )";
+        } else {
+            $excluirGruposSql = "AND cte.cnpj_pag NOT IN (
+                SELECT gc2.cnpj FROM {$domain}_grupo_cliente gc2
+            )";
+        }
+
+        $queryCompl = "
+            SELECT
+                cte.cnpj_pag                                        AS chave,
+                cte.nome_pag                                        AS nome,
+                COUNT(*)                                            AS qtde_ctes,
+                SUM(cte.vlr_frete)                                  AS total_frete,
+                SUM(cte.vlr_merc)                                   AS total_merc,
+                SUM(cte.peso_real)                                  AS total_peso,
+                SUM(cte.qtde_vol)                                   AS total_volumes,
+                AVG(cte.vlr_frete)                                  AS ticket_medio,
+                COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)     AS qtde_cif,
+                COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)     AS qtde_fob,
+                FALSE                                               AS is_grupo
+            FROM {$domain}_cte cte
+            {$whereClauseClientes}
+            {$excluirGruposSql}
+            GROUP BY cte.cnpj_pag, cte.nome_pag
+            ORDER BY total_frete DESC
+            LIMIT {$faltam}
+        ";
+
+        $resultCompl = pg_query_params($conn, $queryCompl, $paramsCompl);
+        if ($resultCompl) {
+            while ($row = pg_fetch_assoc($resultCompl)) {
+                $clientes[] = [
+                    'cnpj'          => $row['chave'],
+                    'nome'          => $row['nome'] ?: 'SEM NOME',
+                    'qtde_ctes'     => (int)$row['qtde_ctes'],
+                    'total_frete'   => (float)$row['total_frete'],
+                    'total_merc'    => (float)$row['total_merc'],
+                    'total_peso'    => (float)$row['total_peso'],
+                    'total_volumes' => (int)$row['total_volumes'],
+                    'ticket_medio'  => (float)$row['ticket_medio'],
+                    'qtde_cif'      => (int)$row['qtde_cif'],
+                    'qtde_fob'      => (int)$row['qtde_fob'],
+                    'is_grupo'      => false,
+                ];
+            }
+        }
+
+        usort($clientes, fn($a, $b) => $b['total_frete'] <=> $a['total_frete']);
+    }
+
+} else {
+    // Modo CLIENTES: comportamento original
+    $queryRanking = "
+        SELECT
+            cte.cnpj_pag,
+            cte.nome_pag,
+            COUNT(*)                                            AS qtde_ctes,
+            SUM(cte.vlr_frete)                                  AS total_frete,
+            SUM(cte.vlr_merc)                                   AS total_merc,
+            SUM(cte.peso_real)                                  AS total_peso,
+            SUM(cte.qtde_vol)                                   AS total_volumes,
+            AVG(cte.vlr_frete)                                  AS ticket_medio,
+            COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)     AS qtde_cif,
+            COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)     AS qtde_fob
+        FROM {$domain}_cte cte
+        {$whereClauseClientes}
+        GROUP BY cte.cnpj_pag, cte.nome_pag
+        ORDER BY total_frete DESC
+        LIMIT {$LIMIT}
+    ";
+
+    $resultRanking = pg_query_params($conn, $queryRanking, $queryParams);
+    if (!$resultRanking) {
+        respondJson(['success' => false, 'message' => 'Erro na query ranking: ' . pg_last_error($conn)]);
+    }
+
+    $clientes = [];
+    while ($row = pg_fetch_assoc($resultRanking)) {
+        $clientes[] = [
+            'cnpj'          => $row['cnpj_pag'],
+            'nome'          => $row['nome_pag'] ?: 'SEM NOME',
+            'qtde_ctes'     => (int)$row['qtde_ctes'],
+            'total_frete'   => (float)$row['total_frete'],
+            'total_merc'    => (float)$row['total_merc'],
+            'total_peso'    => (float)$row['total_peso'],
+            'total_volumes' => (int)$row['total_volumes'],
+            'ticket_medio'  => (float)$row['ticket_medio'],
+            'qtde_cif'      => (int)$row['qtde_cif'],
+            'qtde_fob'      => (int)$row['qtde_fob'],
+            'is_grupo'      => false,
+        ];
+    }
 }
 
-$clientes = [];
-$totalGeralFrete = 0;
-while ($row = pg_fetch_assoc($resultRanking)) {
-    $clientes[] = [
-        'cnpj'          => $row['cnpj_pag'],
-        'nome'          => $row['nome_pag'] ?: 'SEM NOME',
-        'qtde_ctes'     => (int)$row['qtde_ctes'],
-        'total_frete'   => (float)$row['total_frete'],
-        'total_merc'    => (float)$row['total_merc'],
-        'total_peso'    => (float)$row['total_peso'],
-        'total_volumes' => (int)$row['total_volumes'],
-        'ticket_medio'  => (float)$row['ticket_medio'],
-        'qtde_cif'      => (int)$row['qtde_cif'],
-        'qtde_fob'      => (int)$row['qtde_fob'],
-    ];
-    $totalGeralFrete += (float)$row['total_frete'];
-}
-
+// ============================================================
+// TOTAIS GERAIS
+// ============================================================
 $queryTotais = "
     SELECT
         COUNT(*)                        AS qtde_ctes,
@@ -129,6 +254,9 @@ if (!$resultTotais) {
 }
 $rowTotais = pg_fetch_assoc($resultTotais);
 
+// ============================================================
+// EVOLUÇÃO MENSAL
+// ============================================================
 $queryEvolucao = "
     SELECT
         TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
@@ -156,6 +284,9 @@ while ($row = pg_fetch_assoc($resultEvolucao)) {
     ];
 }
 
+// ============================================================
+// UNIDADES
+// ============================================================
 $queryUnidades = "
     SELECT
         cte.sigla_emit,
@@ -182,6 +313,9 @@ while ($row = pg_fetch_assoc($resultUnidades)) {
     ];
 }
 
+// ============================================================
+// EVOLUÇÃO 12 MESES POR CLIENTE/GRUPO
+// ============================================================
 $params12 = [];
 $pi12 = 1;
 $where12Conditions = ["cte.status <> 'C'", "cte.data_emissao >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months'"];
@@ -213,35 +347,56 @@ if (count($cnpjsSelecionados) > 0) {
     $where12Clientes = $where12;
 }
 
-$queryEvolClientes = "
-    SELECT
-        TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
-        TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
-        cte.cnpj_pag,
-        cte.nome_pag,
-        SUM(cte.vlr_frete)                    AS total_frete
-    FROM {$domain}_cte cte
-    {$where12Clientes}
-    GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), cte.cnpj_pag, cte.nome_pag
-    ORDER BY mes ASC
-";
+$evolClientesRaw = [];
+$clientesNomes   = [];
+
+if ($groupBy === 'grupos') {
+    $queryEvolClientes = "
+        SELECT
+            TO_CHAR(cte.data_emissao, 'YYYY-MM')        AS mes,
+            TO_CHAR(cte.data_emissao, 'Mon/YY')         AS mes_label,
+            gc.cnpj_principal                            AS chave,
+            COALESCE(cli.nome, gc.cnpj_principal)        AS nome,
+            SUM(cte.vlr_frete)                           AS total_frete
+        FROM {$domain}_cte cte
+        INNER JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
+        LEFT  JOIN {$domain}_cliente cli      ON cli.cnpj = gc.cnpj_principal
+        {$where12Clientes}
+        GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), gc.cnpj_principal, cli.nome
+        ORDER BY mes ASC
+    ";
+} else {
+    $queryEvolClientes = "
+        SELECT
+            TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
+            TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
+            cte.cnpj_pag                          AS chave,
+            cte.nome_pag                          AS nome,
+            SUM(cte.vlr_frete)                    AS total_frete
+        FROM {$domain}_cte cte
+        {$where12Clientes}
+        GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), cte.cnpj_pag, cte.nome_pag
+        ORDER BY mes ASC
+    ";
+}
 
 $resultEvolClientes = pg_query_params($conn, $queryEvolClientes, $params12Clientes);
 if (!$resultEvolClientes) {
     respondJson(['success' => false, 'message' => 'Erro na query evolução clientes: ' . pg_last_error($conn)]);
 }
 
-$evolClientesRaw = [];
-$clientesNomes   = [];
 while ($row = pg_fetch_assoc($resultEvolClientes)) {
-    $mes  = $row['mes'];
-    $cnpj = $row['cnpj_pag'];
-    $nome = $row['nome_pag'] ?: 'SEM NOME';
+    $mes   = $row['mes'];
+    $chave = $row['chave'];
+    $nome  = $row['nome'] ?: 'SEM NOME';
     if (!isset($evolClientesRaw[$mes])) $evolClientesRaw[$mes] = ['mes' => $mes, 'mes_label' => $row['mes_label']];
-    $evolClientesRaw[$mes][$cnpj] = (float)$row['total_frete'];
-    $clientesNomes[$cnpj] = $nome;
+    $evolClientesRaw[$mes][$chave] = (float)$row['total_frete'];
+    $clientesNomes[$chave] = $nome;
 }
 
+// ============================================================
+// EVOLUÇÃO 12 MESES POR UNIDADE
+// ============================================================
 $queryEvolUnidades = "
     SELECT
         TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
@@ -272,8 +427,9 @@ while ($row = pg_fetch_assoc($resultEvolUnidades)) {
 respondJson([
     'success' => true,
     'data' => [
-        'clientes'      => $clientes,
-        'totais'        => [
+        'clientes'           => $clientes,
+        'group_by'           => $groupBy,
+        'totais'             => [
             'qtde_ctes'     => (int)($rowTotais['qtde_ctes'] ?? 0),
             'total_frete'   => (float)($rowTotais['total_frete'] ?? 0),
             'total_merc'    => (float)($rowTotais['total_merc'] ?? 0),
@@ -281,11 +437,11 @@ respondJson([
             'total_volumes' => (int)($rowTotais['total_volumes'] ?? 0),
             'qtde_clientes' => (int)($rowTotais['qtde_clientes'] ?? 0),
         ],
-        'evolucao'          => $evolucao,
-        'unidades'          => $unidades,
-        'evol_clientes'     => array_values($evolClientesRaw),
-        'evol_clientes_keys'=> $clientesNomes,
-        'evol_unidades'     => array_values($evolUnidadesRaw),
-        'evol_unidades_keys'=> array_keys($unidadesSiglas),
+        'evolucao'           => $evolucao,
+        'unidades'           => $unidades,
+        'evol_clientes'      => array_values($evolClientesRaw),
+        'evol_clientes_keys' => $clientesNomes,
+        'evol_unidades'      => array_values($evolUnidadesRaw),
+        'evol_unidades_keys' => array_keys($unidadesSiglas),
     ],
 ]);

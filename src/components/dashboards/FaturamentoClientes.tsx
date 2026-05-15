@@ -109,6 +109,7 @@ interface ClienteRanking {
   ticket_medio: number;
   qtde_cif: number;
   qtde_fob: number;
+  is_grupo?: boolean;
 }
 
 interface Totais {
@@ -166,6 +167,7 @@ export function FaturamentoClientes() {
   const [evolUnidades, setEvolUnidades] = useState<any[]>([]);
   const [evolUnidadesKeys, setEvolUnidadesKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [groupBy, setGroupBy] = useState<'grupos' | 'clientes'>('grupos');
 
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
   const [clienteOpcoes, setClienteOpcoes] = useState<ClienteOpcao[]>([]);
@@ -180,12 +182,12 @@ export function FaturamentoClientes() {
   const [cteDialogTotais, setCteDialogTotais] = useState<any>(null);
   const [loadingCtes, setLoadingCtes] = useState(false);
 
-  const carregarDados = useCallback(async (f: Filters) => {
+  const carregarDados = useCallback(async (f: Filters, gb: 'grupos' | 'clientes' = 'grupos') => {
     setLoading(true);
     try {
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_dados.php`,
-        { method: 'POST', body: JSON.stringify({ filters: f }) },
+        { method: 'POST', body: JSON.stringify({ filters: f, groupBy: gb }) },
         true
       );
       if (response.success) {
@@ -208,8 +210,8 @@ export function FaturamentoClientes() {
   }, []);
 
   useEffect(() => {
-    carregarDados(filters);
-  }, [filters]);
+    carregarDados(filters, groupBy);
+  }, [filters, groupBy]);
 
   const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string) => {
     setCteDialogTitulo(titulo);
@@ -338,13 +340,39 @@ export function FaturamentoClientes() {
     >
       <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
 
-        <div>
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">
-            Faturamento de Clientes
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400">
-            Análise de faturamento por cliente pagador — top 10 por valor de frete
-          </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">
+              Faturamento de Clientes
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400">
+              {groupBy === 'grupos'
+                ? 'Análise de faturamento por grupo de clientes — top 10 por valor de frete'
+                : 'Análise de faturamento por cliente pagador — top 10 por valor de frete'}
+            </p>
+          </div>
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+            <button
+              onClick={() => setGroupBy('grupos')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                groupBy === 'grupos'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Grupos
+            </button>
+            <button
+              onClick={() => setGroupBy('clientes')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                groupBy === 'clientes'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Clientes
+            </button>
+          </div>
         </div>
 
         <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-5 py-3 flex items-center gap-3">
@@ -413,7 +441,10 @@ export function FaturamentoClientes() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between gap-2 mb-1">
-                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{c.nome}</p>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                  {c.nome}
+                                  {c.is_grupo && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">Grupo</Badge>}
+                                </p>
                                 <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(c.total_frete)}</p>
                               </div>
                               <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
