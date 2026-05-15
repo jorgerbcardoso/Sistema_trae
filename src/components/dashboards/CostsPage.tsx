@@ -473,18 +473,33 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
           .join(' ');
       };
 
+      const isPlaceholder = value === 0 && /^(Evento|Grupo)\s+\d+$/i.test(categoryKey);
+
+      if (isPlaceholder) {
+        return (
+          <Card key={categoryKey} className="bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-50 flex flex-col">
+            <CardHeader className="pb-2 h-[72px] flex-shrink-0">
+              <CardTitle className="text-sm text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                <IconComponent className="w-4 h-4 flex-shrink-0" />
+                <span className="leading-tight">—</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-start">
+              <div className="text-slate-400 dark:text-slate-500">R$ 0,00</div>
+              <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Sem dados</div>
+            </CardContent>
+          </Card>
+        );
+      }
+
       return (
         <Card key={categoryKey} className={`bg-gradient-to-br ${classes.bg} ${classes.border} flex flex-col`}>
-          {/* ✅ ALTURA FIXA para o header (garante alinhamento dos valores abaixo) */}
           <CardHeader className="pb-2 h-[72px] flex-shrink-0">
             <div className="flex items-center justify-between">
               <CardTitle className={`text-sm ${classes.title} flex items-center gap-2`}>
-                {/* ✅ Ícone fixo no topo */}
                 <IconComponent className="w-4 h-4 flex-shrink-0" />
-                {/* ✅ Título com Title Case */}
                 <span className="leading-tight">{formatTitle(categoryKey)}</span>
               </CardTitle>
-              {/* ✅ NOVO: Botão CSV no header (mesmo estilo do RevenuePage) */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -497,7 +512,6 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
               </Button>
             </div>
           </CardHeader>
-          {/* ✅ Conteúdo alinhado (valores sempre na mesma posição) */}
           <CardContent className="flex-1 flex flex-col justify-start">
             <div className={classes.value}>
               R$ {(value / 1000000).toFixed(2)}M
