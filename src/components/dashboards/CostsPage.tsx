@@ -473,7 +473,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
           .join(' ');
       };
 
-      const isPlaceholder = value === 0 && /^(Evento|Grupo)\s+\d+$/i.test(categoryKey);
+      const isPlaceholder = value === 0;
 
       if (isPlaceholder) {
         return (
@@ -671,7 +671,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
           {data.unitCategoryTotals && Object.keys(data.unitCategoryTotals).map((unitKey, index) => {
             const value = data.unitCategoryTotals[unitKey] || 0;
             const percentage = totalCosts > 0 ? ((value / totalCosts) * 100).toFixed(1) : '0.0';
-            const isPlaceholder = value === 0 && /^Unidade\s+\d+$/i.test(unitKey);
+            const isPlaceholder = value === 0;
             const color = COLORS[index % COLORS.length];
 
             if (isPlaceholder) {
