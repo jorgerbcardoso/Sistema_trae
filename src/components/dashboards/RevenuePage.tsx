@@ -33,6 +33,7 @@ interface RevenuePageProps {
 }
 
 export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: RevenuePageProps) {
+  const porDestino = unidades.length === 1;
   const tooltipStyle = useTooltipStyle();
   const { user } = useAuth();
   const [showLancamentos, setShowLancamentos] = useState(false);
@@ -248,6 +249,12 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
       )}
 
       {/* Cards de Unidades - Renderização Dinâmica */}
+      {/* Título da seção */}
+      {porDestino && (
+        <div className="text-sm text-slate-500 dark:text-slate-400 -mb-2">
+          Exibindo por <strong>unidade de destino</strong> (1 unidade selecionada)
+        </div>
+      )}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${unitNames.length + 1} gap-4`}>
         {unitNames.map((unitName, index) => {
           const colors = [
@@ -325,7 +332,9 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Receita por Unidade - Evolução Mensal</CardTitle>
+            <CardTitle>
+              {porDestino ? 'Receita por Unidade de Destino - Evolução Mensal' : 'Receita por Unidade - Evolução Mensal'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -362,7 +371,7 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
         <Card>
           <CardHeader>
             <CardTitle>
-              Ticket Médio por Unidade
+              {porDestino ? 'Ticket Médio por Unidade de Destino' : 'Ticket Médio por Unidade'}
               {viewMode === 'CARGAS' && <span className="text-sm text-slate-500 dark:text-slate-400"> (CT-e)</span>}
               {viewMode === 'PASSAGEIROS' && <span className="text-sm text-slate-500 dark:text-slate-400"> (Bilhete)</span>}
             </CardTitle>
@@ -400,7 +409,9 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
 
       <Card>
         <CardHeader>
-          <CardTitle>Comparativo de Receitas por Unidade</CardTitle>
+          <CardTitle>
+            {porDestino ? 'Comparativo de Receitas por Unidade de Destino' : 'Comparativo de Receitas por Unidade'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={350}>

@@ -52,14 +52,22 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
   const [tempPeriod, setTempPeriod] = useState<PeriodRange>(currentPeriod);
   const [tempUnidades, setTempUnidades] = useState<string[]>(selectedUnidades);
 
-  const unidadeAtual = user?.unidade_atual || user?.unidade || '';
-  const isMTZ = unidadeAtual.toUpperCase() === 'MTZ';
+  const unidadeAtual = (user?.unidade_atual || user?.unidade || '').toUpperCase();
+  const isMTZ = unidadeAtual === 'MTZ';
 
   const unidadesDisponiveis = useMemo(() => {
     const csv = user?.unidades || '';
-    if (!csv.trim()) return [];
-    return csv.split(',').map(u => u.trim().toUpperCase()).filter(Boolean);
-  }, [user?.unidades]);
+    const lista = csv.trim()
+      ? csv.split(',').map(u => u.trim().toUpperCase()).filter(Boolean)
+      : [];
+    if (!isMTZ && unidadeAtual && !lista.includes(unidadeAtual)) {
+      lista.unshift(unidadeAtual);
+    }
+    return lista;
+  }, [user?.unidades, unidadeAtual, isMTZ]);
+
+  const naoMTZSemGrupo = !isMTZ && (user?.unidades || '').trim() === '';
+  const unidadeBloqueada = (sigla: string) => !isMTZ && sigla === unidadeAtual;
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
@@ -70,6 +78,7 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
   };
 
   const toggleUnidade = (sigla: string) => {
+    if (unidadeBloqueada(sigla)) return;
     setTempUnidades(prev =>
       prev.includes(sigla) ? prev.filter(u => u !== sigla) : [...prev, sigla]
     );
@@ -294,11 +303,11 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
           </div>
 
           {/* Filtro de Unidades */}
-          {onUnidadesChange && unidadesDisponiveis.length > 0 && (
+          {onUnidadesChange && (
             <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
               <div className="flex items-center justify-between mb-3">
                 <Label className="text-slate-900 dark:text-slate-100">Unidades</Label>
-                {tempUnidades.length > 0 && (
+                {isMTZ && tempUnidades.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setTempUnidades([])}
@@ -309,28 +318,41 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                {tempUnidades.length === 0
-                  ? 'Nenhuma unidade selecionada — exibindo todas'
-                  : `${tempUnidades.length} unidade${tempUnidades.length > 1 ? 's' : ''} selecionada${tempUnidades.length > 1 ? 's' : ''}`}
+                {naoMTZSemGrupo
+                  ? 'Filtro fixo na sua unidade'
+                  : tempUnidades.length === 0
+                    ? 'Nenhuma unidade selecionada — exibindo todas'
+                    : `${tempUnidades.length} unidade${tempUnidades.length > 1 ? 's' : ''} selecionada${tempUnidades.length > 1 ? 's' : ''}`}
               </p>
               <div className="flex flex-wrap gap-2">
-                {unidadesDisponiveis.map((sigla) => {
-                  const selected = tempUnidades.includes(sigla);
-                  return (
-                    <button
-                      key={sigla}
-                      type="button"
-                      onClick={() => toggleUnidade(sigla)}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                        selected
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500'
-                      }`}
-                    >
-                      {sigla}
-                    </button>
-                  );
-                })}
+                {unidadesDisponiveis.length === 0 && isMTZ ? (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                    Nenhuma unidade configurada no seu cadastro. Exibindo todas.
+                  </p>
+                ) : (
+                  unidadesDisponiveis.map((sigla) => {
+                    const selected = tempUnidades.includes(sigla);
+                    const bloqueado = unidadeBloqueada(sigla);
+                    return (
+                      <button
+                        key={sigla}
+                        type="button"
+                        onClick={() => toggleUnidade(sigla)}
+                        disabled={bloqueado}
+                        title={bloqueado ? 'Sua unidade atual — não pode ser removida' : undefined}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                          bloqueado
+                            ? 'bg-blue-600 border-blue-600 text-white opacity-70 cursor-not-allowed'
+                            : selected
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500'
+                        }`}
+                      >
+                        {sigla}{bloqueado ? ' 🔒' : ''}
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}

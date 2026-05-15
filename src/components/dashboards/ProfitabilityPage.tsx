@@ -20,6 +20,7 @@ interface ProfitabilityPageProps {
 }
 
 export function ProfitabilityPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: ProfitabilityPageProps) {
+  const porDestino = unidades.length === 1;
   console.log('🎬 [ProfitabilityPage] Renderizando. viewMode:', viewMode, 'period:', period);
   
   const tooltipStyle = useTooltipStyle();
@@ -277,14 +278,18 @@ export function ProfitabilityPage({ viewMode = 'GERAL', domainModalidade = 'CARG
 
       <Card>
         <CardHeader>
-          <CardTitle>Rentabilidade por Unidade</CardTitle>
+          <CardTitle>
+            {porDestino ? 'Rentabilidade por Unidade de Destino' : 'Rentabilidade por Unidade'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-3 px-4 text-slate-700 dark:text-slate-300">Unidade</th>
+                  <th className="text-left py-3 px-4 text-slate-700 dark:text-slate-300">
+                    {porDestino ? 'Unidade de Destino' : 'Unidade'}
+                  </th>
                   <th className="text-right py-3 px-4 text-slate-700 dark:text-slate-300">Receita</th>
                   <th className="text-right py-3 px-4 text-slate-700 dark:text-slate-300">Custo</th>
                   <th className="text-right py-3 px-4 text-slate-700 dark:text-slate-300">Lucro</th>

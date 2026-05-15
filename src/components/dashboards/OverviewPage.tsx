@@ -24,6 +24,7 @@ interface OverviewPageProps {
 }
 
 export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: OverviewPageProps) {
+  const porDestino = unidades.length === 1;
   const { data, loading, error, isMockData } = useDashboardData<OverviewData>({
     type: 'overview',
     period: periodRangeToDashboardPeriod(period),
@@ -756,7 +757,9 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
 
         <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className="text-foreground">Performance por Unidade</CardTitle>
+            <CardTitle className="text-foreground">
+              {porDestino ? 'Performance por Unidade de Destino' : 'Performance por Unidade'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
