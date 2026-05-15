@@ -23,7 +23,7 @@ $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
 
-if ($tipo === 'periodo' || $tipo === 'cliente' || $tipo === 'unidade') {
+if ($tipo === 'periodo' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo') {
     if (!empty($filters['periodoEmissaoInicio'])) {
         $whereConditions[] = 'cte.data_emissao >= $' . $paramIndex++;
         $params[] = $filters['periodoEmissaoInicio'];
@@ -56,7 +56,12 @@ if (!empty($filters['siglaDest']) && is_array($filters['siglaDest']) && count($f
     $whereConditions[] = 'cte.sigla_dest IN (' . implode(', ', $phs) . ')';
 }
 
-if ($tipo === 'cliente' || $tipo === 'evol_cliente') {
+if ($tipo === 'grupo') {
+    $cnpjPrincipal = pg_escape_string($conn, $chave);
+    $whereConditions[] = "cte.cnpj_pag IN (
+        SELECT cnpj FROM {$domain}_grupo_cliente WHERE cnpj_principal = '{$cnpjPrincipal}'
+    )";
+} elseif ($tipo === 'cliente' || $tipo === 'evol_cliente') {
     if ($chave === '__demais__') {
         $cnpjsSelecionados = !empty($filters['cnpjsPagadores']) && is_array($filters['cnpjsPagadores'])
             ? $filters['cnpjsPagadores'] : [];

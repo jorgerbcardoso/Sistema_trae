@@ -18,6 +18,7 @@ import {
   Award,
   Check,
   ChevronDown,
+  FileDown,
   Filter,
   Info,
   Loader2,
@@ -212,6 +213,30 @@ export function FaturamentoClientes() {
   useEffect(() => {
     carregarDados(filters, groupBy);
   }, [filters, groupBy]);
+
+  const exportarCteCSV = useCallback(() => {
+    if (!cteDialogLista.length) return;
+    const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete'];
+    const rows = cteDialogLista.map(c => [
+      `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
+      c.data_emissao,
+      `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
+      `"${(c.nome_dest || '').replace(/"/g, '""')}"`,
+      c.sigla_emit || '',
+      c.vlr_merc.toFixed(2).replace('.', ','),
+      c.peso_real.toFixed(2).replace('.', ','),
+      c.qtde_vol,
+      c.vlr_frete.toFixed(2).replace('.', ','),
+    ]);
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ctes_${cteDialogTitulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [cteDialogLista, cteDialogTitulo]);
 
   const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string) => {
     setCteDialogTitulo(titulo);
@@ -431,7 +456,7 @@ export function FaturamentoClientes() {
                       const pct = totalFreteSelecionados > 0 ? (c.total_frete / totalFreteSelecionados) * 100 : 0;
                       const color = PALETTE[i % PALETTE.length];
                       return (
-                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => abrirCteDialog(c.nome, 'cliente', c.cnpj)}>
+                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => abrirCteDialog(c.nome, c.is_grupo ? 'grupo' : 'cliente', c.cnpj)}>
                           <div className="flex items-center gap-3">
                             <div
                               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
@@ -826,8 +851,23 @@ export function FaturamentoClientes() {
       <Dialog open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
         <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
           <DialogHeader className="shrink-0">
-            <DialogTitle>{cteDialogTitulo}</DialogTitle>
-            <DialogDescription>Lista de CT-es do grupo selecionado</DialogDescription>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <DialogTitle>{cteDialogTitulo}</DialogTitle>
+                <DialogDescription>Lista de CT-es</DialogDescription>
+              </div>
+              {cteDialogLista.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportarCteCSV}
+                  className="shrink-0 gap-1.5"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Exportar CSV
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
