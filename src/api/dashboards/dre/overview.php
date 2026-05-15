@@ -224,6 +224,8 @@ function getMockOverviewData($period, $startDate, $endDate) {
   {
     $g_sql = connect();
 
+    $apenasUma     = count($unidades) === 1;
+    $colAgrup      = $apenasUma ? 'sigla_dest' : 'sigla_emit';
     $filtroEmit    = buildUnidadesWhereClause($unidades, 'sigla_emit');
     $filtroDespesa = buildDespesasUnidadesClause($unidades);
 
@@ -323,7 +325,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
     }
 
     $units = [];
-    $query = "SELECT SUM (vlr_frete), sigla_emit AS unid " .
+    $query = "SELECT SUM(vlr_frete), {$colAgrup} AS unid " .
               " FROM {$dominio}_cte " .
              " WHERE status <> 'C' " .
                " AND data_emissao BETWEEN '$startDate' AND '$endDate' " .
@@ -335,6 +337,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
     while ($row = pg_fetch_array ($result))
     {
       $unidEsc = pg_escape_string($g_sql, $row['unid']);
+      $colDespesa = $apenasUma ? 'sigla_unidade' : 'sigla_unidade';
       $query = "SELECT SUM (d.vlr_parcela) " .
                 " FROM {$dominio}_despesa d " .
                 "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .

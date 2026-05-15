@@ -99,6 +99,7 @@ interface CostsPageProps {
 }
 
 export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: CostsPageProps) {
+  const apenasUmaUnidade = unidades.length === 1;
   const { user } = useAuth();
   const tooltipStyle = useTooltipStyle();
   
@@ -656,8 +657,26 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
           {data.unitCategoryTotals && Object.keys(data.unitCategoryTotals).map((unitKey, index) => {
             const value = data.unitCategoryTotals[unitKey] || 0;
             const percentage = totalCosts > 0 ? ((value / totalCosts) * 100).toFixed(1) : '0.0';
+            const isPlaceholder = value === 0 && /^Unidade\s+\d+$/i.test(unitKey);
             const color = COLORS[index % COLORS.length];
-            
+
+            if (isPlaceholder) {
+              return (
+                <Card key={unitKey} className="bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-50 flex flex-col">
+                  <CardHeader className="pb-2 h-[72px] flex-shrink-0">
+                    <CardTitle className="text-sm text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                      <Building className="w-4 h-4 flex-shrink-0" />
+                      <span className="leading-tight">—</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-start">
+                    <div className="text-slate-400 dark:text-slate-500">R$ 0,00</div>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Sem dados</div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
             const colorClasses: Record<string, any> = {
               '#ef4444': {
                 bg: 'from-red-50 to-red-100 dark:from-red-950 dark:to-red-900',
@@ -733,7 +752,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
         </div>
 
         {/* Gráficos de Unidades */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {!apenasUmaUnidade && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Distribuição por Unidades</CardTitle>
@@ -800,7 +819,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+        </div>}
       </div>
     </div>
   );

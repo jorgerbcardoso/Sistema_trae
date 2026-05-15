@@ -168,7 +168,11 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-slate-900 dark:text-slate-100 mb-1">Receitas Operacionais</h2>
-          <p className="text-slate-500 dark:text-slate-400">Análise detalhada das receitas por unidade</p>
+          <p className="text-slate-500 dark:text-slate-400">
+          {porDestino
+            ? `Análise detalhada das receitas da unidade ${unidades[0]} por destino`
+            : 'Análise detalhada das receitas por unidade'}
+        </p>
         </div>
         <Button
           onClick={() => setShowLancamentos(true)}
@@ -249,12 +253,6 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
       )}
 
       {/* Cards de Unidades - Renderização Dinâmica */}
-      {/* Título da seção */}
-      {porDestino && (
-        <div className="text-sm text-slate-500 dark:text-slate-400 -mb-2">
-          Exibindo por <strong>unidade de destino</strong> (1 unidade selecionada)
-        </div>
-      )}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${unitNames.length + 1} gap-4`}>
         {unitNames.map((unitName, index) => {
           const colors = [

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Filter, X, Check, Calendar } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -11,6 +11,8 @@ import {
 } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { useAuth } from '../../contexts/AuthContext';
+import { ENVIRONMENT } from '../../config/environment';
+import { apiFetch } from '../../utils/apiUtils';
 
 export interface PeriodRange {
   startMonth: number;
@@ -68,6 +70,24 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
 
   const naoMTZSemGrupo = !isMTZ && (user?.unidades || '').trim() === '';
   const unidadeBloqueada = (sigla: string) => !isMTZ && sigla === unidadeAtual;
+
+  const [unidadesMTZ, setUnidadesMTZ] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isMTZ) return;
+    apiFetch(`${ENVIRONMENT.apiBaseUrl}/search_unidades.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ search: '' }),
+    })
+      .then((res) => {
+        const lista = (res?.unidades || []).map((u: any) => u.sigla as string);
+        setUnidadesMTZ(lista);
+      })
+      .catch(() => {});
+  }, [isMTZ]);
+
+  const unidadesParaExibir = isMTZ ? unidadesMTZ : unidadesDisponiveis;
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
@@ -325,12 +345,12 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
                     : `${tempUnidades.length} unidade${tempUnidades.length > 1 ? 's' : ''} selecionada${tempUnidades.length > 1 ? 's' : ''}`}
               </p>
               <div className="flex flex-wrap gap-2">
-                {unidadesDisponiveis.length === 0 && isMTZ ? (
+                {unidadesParaExibir.length === 0 ? (
                   <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-                    Nenhuma unidade configurada no seu cadastro. Exibindo todas.
+                    {isMTZ ? 'Carregando unidades...' : 'Nenhuma unidade configurada no seu cadastro.'}
                   </p>
                 ) : (
-                  unidadesDisponiveis.map((sigla) => {
+                  unidadesParaExibir.map((sigla) => {
                     const selected = tempUnidades.includes(sigla);
                     const bloqueado = unidadeBloqueada(sigla);
                     return (
