@@ -29,16 +29,18 @@ interface RevenuePageProps {
   viewMode?: 'GERAL' | 'CARGAS' | 'PASSAGEIROS';
   domainModalidade?: string;
   period: PeriodRange;
+  unidades?: string[];
 }
 
-export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period }: RevenuePageProps) {
+export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: RevenuePageProps) {
   const tooltipStyle = useTooltipStyle();
   const { user } = useAuth();
   const [showLancamentos, setShowLancamentos] = useState(false);
   const { data, loading, error, isMockData } = useDashboardData<RevenueData>({
     type: 'revenue',
     period: periodRangeToDashboardPeriod(period),
-    viewMode
+    viewMode,
+    unidades,
   });
 
   // Se estiver mostrando lançamentos, renderizar a página de lançamentos

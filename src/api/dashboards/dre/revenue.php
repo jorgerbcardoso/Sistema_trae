@@ -36,11 +36,13 @@ try {
     $auth = authenticate();
     $domain = $auth['domain'];
 
-    // Validar e sanitizar inputs
-    $period = isset($_GET['period']) ? trim((string)$_GET['period']) : 'month';
-    $viewMode = isset($_GET['view_mode']) ? trim((string)$_GET['view_mode']) : 'GERAL';
+    $period    = isset($_GET['period'])     ? trim((string)$_GET['period'])     : 'month';
+    $viewMode  = isset($_GET['view_mode'])  ? trim((string)$_GET['view_mode'])  : 'GERAL';
     $startDate = isset($_GET['start_date']) ? trim((string)$_GET['start_date']) : date('Y-m-01');
-    $endDate = isset($_GET['end_date']) ? trim((string)$_GET['end_date']) : date('Y-m-t');
+    $endDate   = isset($_GET['end_date'])   ? trim((string)$_GET['end_date'])   : date('Y-m-t');
+    $unidades  = isset($_GET['unidades']) && $_GET['unidades'] !== ''
+                 ? array_filter(array_map('trim', explode(',', $_GET['unidades'])))
+                 : [];
 
     // Validar formato de datas
     if (!validateDate($startDate) || !validateDate($endDate)) {
@@ -58,7 +60,7 @@ try {
     if ($useMockData) {
         $data = getMockRevenueData($period, $viewMode, $startDate, $endDate);
     } else {
-        $data = getRealRevenueData($domain, $period, $viewMode, $startDate, $endDate);
+        $data = getRealRevenueData($domain, $period, $viewMode, $startDate, $endDate, $unidades);
     }
 
     echo json_encode([
@@ -223,35 +225,42 @@ function getMockRevenueData($period, $viewMode, $startDate, $endDate) {
 /**
  * Retorna dados REAIS de receitas do banco
  */
-function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate)
+function buildRevUnidadesClause($unidades) {
+    if (empty($unidades)) return '';
+    $lista = implode("','", array_map('addslashes', $unidades));
+    return " AND sigla_emit IN ('{$lista}')";
+}
+
+function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate, $unidades = [])
 {
     $g_sql = getDBConnection();
 
-    // Validar domínio para evitar SQL injection
     if (!preg_match('/^[a-zA-Z0-9_]+$/', $dominio)) {
         throw new Exception('Domínio inválido');
     }
 
-    // 1. Buscar receita total do período
+    $filtroEmit = buildRevUnidadesClause($unidades);
+    $apenasUmaUnidade = count($unidades) === 1;
+    $colAgrup = $apenasUmaUnidade ? 'sigla_dest' : 'sigla_emit';
+
+    // 1. Receita total do período
     $query = "SELECT COALESCE(SUM(vlr_frete), 0) as total 
               FROM {$dominio}_cte 
               WHERE status <> 'C' 
-                AND data_emissao BETWEEN $1 AND $2";
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit;
     
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
-    if (!$result) {
-        throw new Exception('Erro ao buscar receita total: ' . pg_last_error($g_sql));
-    }
+    if (!$result) throw new Exception('Erro ao buscar receita total: ' . pg_last_error($g_sql));
     
     $row = pg_fetch_array($result);
     $receitaTotal = (float)$row['total'];
 
-    // 2. Encontrar as 3 maiores unidades em faturamento
+    // 2. Encontrar as 3 maiores unidades (emit ou dest conforme filtro)
     $query = "SELECT COALESCE(SUM(vlr_frete), 0) as total_frete,
-                     CASE WHEN tp_frete = 'C' THEN sigla_emit ELSE sigla_dest END AS unid
+                     {$colAgrup} AS unid
               FROM {$dominio}_cte
               WHERE status <> 'C'
-                AND data_emissao BETWEEN $1 AND $2
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 2
               ORDER BY 1 DESC
               LIMIT 3";
@@ -287,7 +296,7 @@ function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate)
         $monthLabel = formatMonthLabel($data_ini);
 
         // Query otimizada: buscar dados de todas as 3 unidades + demais em uma única query
-        $receitas = getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids);
+        $receitas = getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids, $filtroEmit, $colAgrup);
 
         $revenueByUnitCargas[] = [
             'month' => $monthLabel,
@@ -323,7 +332,7 @@ function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate)
     }
 
     // 4. Calcular unitTotals do período selecionado (para cards)
-    $unitTotals = getPeriodTotalsByUnits($g_sql, $dominio, $startDate, $endDate, $unids);
+    $unitTotals = getPeriodTotalsByUnits($g_sql, $dominio, $startDate, $endDate, $unids, $filtroEmit, $colAgrup);
 
     return [
         'period' => [
@@ -344,7 +353,7 @@ function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate)
 /**
  * Busca receita e ticket médio por unidade em um mês (query otimizada)
  */
-function getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids) {
+function getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids, $filtroEmit = '', $colAgrup = 'sigla_emit') {
     $receitas = [
         $unids[1] => ['receita' => 0, 'ticket' => 0, 'count' => 0],
         $unids[2] => ['receita' => 0, 'ticket' => 0, 'count' => 0],
@@ -352,15 +361,14 @@ function getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids
         'Demais' => ['receita' => 0, 'ticket' => 0, 'count' => 0]
     ];
 
-    // Query única que retorna dados de todas as unidades (com COUNT)
     $query = "SELECT 
-                CASE WHEN tp_frete = 'C' THEN sigla_emit ELSE sigla_dest END AS unid,
+                {$colAgrup} AS unid,
                 COALESCE(SUM(vlr_frete), 0) AS total_receita,
                 COALESCE(AVG(vlr_frete), 0) AS ticket_medio,
                 COUNT(*) AS total_ctes
               FROM {$dominio}_cte
               WHERE status <> 'C'
-                AND data_emissao BETWEEN $1 AND $2
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
@@ -393,16 +401,15 @@ function getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids
 /**
  * Busca totais do período por unidade (para cards)
  */
-function getPeriodTotalsByUnits($g_sql, $dominio, $startDate, $endDate, $unids) {
+function getPeriodTotalsByUnits($g_sql, $dominio, $startDate, $endDate, $unids, $filtroEmit = '', $colAgrup = 'sigla_emit') {
     $unitTotals = [];
 
-    // Query única que retorna totais de todas as unidades
     $query = "SELECT 
-                CASE WHEN tp_frete = 'C' THEN sigla_emit ELSE sigla_dest END AS unid,
+                {$colAgrup} AS unid,
                 COALESCE(SUM(vlr_frete), 0) AS total
               FROM {$dominio}_cte
               WHERE status <> 'C'
-                AND data_emissao BETWEEN $1 AND $2
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);

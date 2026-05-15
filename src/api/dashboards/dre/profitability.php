@@ -38,10 +38,13 @@ try {
     $domain = $auth['domain'];
 
     // Validar e sanitizar inputs
-    $period = isset($_GET['period']) ? trim((string)$_GET['period']) : 'month';
-    $viewMode = isset($_GET['view_mode']) ? trim((string)$_GET['view_mode']) : 'GERAL';
+    $period    = isset($_GET['period'])     ? trim((string)$_GET['period'])     : 'month';
+    $viewMode  = isset($_GET['view_mode'])  ? trim((string)$_GET['view_mode'])  : 'GERAL';
     $startDate = isset($_GET['start_date']) ? trim((string)$_GET['start_date']) : date('Y-m-01');
-    $endDate = isset($_GET['end_date']) ? trim((string)$_GET['end_date']) : date('Y-m-t');
+    $endDate   = isset($_GET['end_date'])   ? trim((string)$_GET['end_date'])   : date('Y-m-t');
+    $unidades  = isset($_GET['unidades']) && $_GET['unidades'] !== ''
+                 ? array_filter(array_map('trim', explode(',', $_GET['unidades'])))
+                 : [];
 
     // Validar formato de datas
     if (!validateDate($startDate) || !validateDate($endDate)) {
@@ -58,7 +61,7 @@ try {
     if ($useMockData) {
         $data = getMockProfitabilityData($period, $viewMode, $startDate, $endDate);
     } else {
-        $data = getRealProfitabilityData($domain, $period, $viewMode, $startDate, $endDate);
+        $data = getRealProfitabilityData($domain, $period, $viewMode, $startDate, $endDate, $unidades);
     }
 
     echo json_encode([
@@ -168,45 +171,54 @@ function getMockProfitabilityData($period, $viewMode, $startDate, $endDate) {
 /**
  * Retorna dados REAIS de rentabilidade do banco
  */
-function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $endDate)
+function buildProfUnidadesClause($unidades) {
+    if (empty($unidades)) return '';
+    $lista = implode("','", array_map('addslashes', $unidades));
+    return " AND sigla_emit IN ('{$lista}')";
+}
+
+function buildProfDespesasClause($unidades) {
+    if (empty($unidades)) return '';
+    $lista = implode("','", array_map('addslashes', $unidades));
+    return " AND d.sigla_unidade IN ('{$lista}')";
+}
+
+function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $endDate, $unidades = [])
 {
     $g_sql = connect();
 
-    // Validar domínio para evitar SQL injection
     if (!preg_match('/^[a-zA-Z0-9_]+$/', $dominio)) {
         throw new Exception('Domínio inválido');
     }
 
-    // 1. Buscar receita e custos operacionais do período
+    $filtroEmit    = buildProfUnidadesClause($unidades);
+    $filtroDespesa = buildProfDespesasClause($unidades);
+    $apenasUma     = count($unidades) === 1;
+    $colAgrupUnit  = $apenasUma ? 'sigla_dest' : 'sigla_emit';
+
     $query = "SELECT COALESCE(SUM(vlr_frete), 0) as total
               FROM {$dominio}_cte
               WHERE status <> 'C'
-                AND data_emissao BETWEEN $1 AND $2";
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit;
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
-    if (!$result) {
-        throw new Exception('Erro ao buscar receita: ' . pg_last_error($g_sql));
-    }
+    if (!$result) throw new Exception('Erro ao buscar receita: ' . pg_last_error($g_sql));
     $row = pg_fetch_array($result);
     $receitaTotal = (float)$row['total'];
 
-    // ✅ JOIN com tabela de eventos + filtro considerar='S'
     $query = "SELECT COALESCE(SUM(d.vlr_parcela), 0) as total
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2";
+                AND d.data_vcto BETWEEN $1 AND $2" . $filtroDespesa;
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
-    if (!$result) {
-        throw new Exception('Erro ao buscar custos: ' . pg_last_error($g_sql));
-    }
+    if (!$result) throw new Exception('Erro ao buscar custos: ' . pg_last_error($g_sql));
     $row = pg_fetch_array($result);
     $custosTotal = (float)$row['total'];
 
-    // ✅ CORREÇÃO CRÍTICA: Calcular métricas DO PERÍODO SELECIONADO para os cards
-    $periodMetrics = getMonthlyProfitabilityMetrics($g_sql, $dominio, $startDate, $endDate);
+    $periodMetrics = getMonthlyProfitabilityMetrics($g_sql, $dominio, $startDate, $endDate, $filtroEmit, $filtroDespesa);
 
     // 2. Gerar dados mensais dos últimos 12 meses (PARA GRÁFICOS)
     $profitabilityDataCargas = [];
@@ -218,8 +230,7 @@ function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $end
 
         $monthLabel = formatMonthLabel($data_ini);
 
-        // Buscar receita e despesa do mês (query otimizada)
-        $metricas = getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin);
+        $metricas = getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin, $filtroEmit, $filtroDespesa);
 
         $profitabilityDataCargas[] = [
             'month' => $monthLabel,
@@ -241,7 +252,7 @@ function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $end
     }
 
     // 3. Buscar rentabilidade por unidade DO PERÍODO SELECIONADO (top 5)
-    $unitProfitabilityCargas = getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTotal, $custosTotal);
+    $unitProfitabilityCargas = getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTotal, $custosTotal, $filtroEmit, $filtroDespesa, $colAgrupUnit);
 
     // ✅ CORREÇÃO CRÍTICA: Garantir que CARGAS sempre tenha exatamente 5 itens
     while (count($unitProfitabilityCargas) < 5) {
@@ -335,17 +346,16 @@ function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $end
 /**
  * Calcula métricas de rentabilidade de um mês (query otimizada)
  */
-function getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin) {
-    // Query única que busca receita e custo
+function getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin, $filtroEmit = '', $filtroDespesa = '') {
     $custo = "custo_seguro + custo_pis_cofins + custo_gris + custo_pedagio + " .
              "custo_expedicao + custo_transferencia_real + custo_transbordo + " .
              "custo_vendedor + custo_recepcao + custo_desp_div";
 
     $query = "SELECT " .
-             " (SELECT SUM (vlr_frete)   FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2) as receita," .
-             " (SELECT SUM ($custo)      FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2) as custo_operacional," .
-             " (SELECT SUM (vlr_icms)    FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2) as imposto," .
-             " (SELECT SUM (d.vlr_parcela) FROM {$dominio}_despesa d INNER JOIN {$dominio}_evento e ON d.evento = e.evento WHERE d.status <> 'C' AND e.considerar = 'S' AND d.data_vcto BETWEEN $1 AND $2) as despesas";
+             " (SELECT SUM (vlr_frete)   FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as receita," .
+             " (SELECT SUM ($custo)      FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as custo_operacional," .
+             " (SELECT SUM (vlr_icms)    FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as imposto," .
+             " (SELECT SUM (d.vlr_parcela) FROM {$dominio}_despesa d INNER JOIN {$dominio}_evento e ON d.evento = e.evento WHERE d.status <> 'C' AND e.considerar = 'S' AND d.data_vcto BETWEEN $1 AND $2{$filtroDespesa}) as despesas";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
 
@@ -391,16 +401,15 @@ function getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin) 
 /**
  * Busca rentabilidade por unidade (top 5)
  */
-function getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTotal, $custosTotal) {
+function getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTotal, $custosTotal, $filtroEmit = '', $filtroDespesa = '', $colAgrup = 'sigla_emit') {
     $unitProfitability = [];
 
-    // Buscar top 5 unidades por receita
     $query = "SELECT
-                CASE WHEN tp_frete = 'C' THEN sigla_emit ELSE sigla_dest END AS unid,
+                {$colAgrup} AS unid,
                 COALESCE(SUM(vlr_frete), 0) as receita
               FROM {$dominio}_cte
               WHERE status <> 'C'
-                AND data_emissao BETWEEN $1 AND $2
+                AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1
               ORDER BY 2 DESC
               LIMIT 5";

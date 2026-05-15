@@ -38,8 +38,9 @@ interface UseDashboardDataOptions {
   type: DashboardType;
   period: DashboardPeriod;
   viewMode?: 'GERAL' | 'CARGAS' | 'PASSAGEIROS';
-  groupBy?: 'EVENTOS' | 'GRUPOS'; // ✅ NOVO: Agrupar por eventos ou grupos
-  enabled?: boolean; // Se false, não carrega dados
+  groupBy?: 'EVENTOS' | 'GRUPOS';
+  unidades?: string[];
+  enabled?: boolean;
 }
 
 interface UseDashboardDataReturn<T> {
@@ -54,7 +55,7 @@ export function useDashboardData<T = any>(
   options: UseDashboardDataOptions
 ): UseDashboardDataReturn<T> {
   const { user } = useAuth();
-  const { type, period, viewMode = 'GERAL', groupBy = 'EVENTOS', enabled = true } = options;
+  const { type, period, viewMode = 'GERAL', groupBy = 'EVENTOS', unidades = [], enabled = true } = options;
   
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true); // Começar com loading true
@@ -180,19 +181,19 @@ export function useDashboardData<T = any>(
         
         switch (type) {
           case 'overview':
-            result = await getOverviewData(period, viewMode);
+            result = await getOverviewData(period, viewMode, unidades);
             break;
           case 'revenue':
-            result = await getRevenueData(period, viewMode);
+            result = await getRevenueData(period, viewMode, unidades);
             break;
           case 'costs':
-            result = await getCostsData(period, viewMode, groupBy); // ✅ NOVO: Passar groupBy
+            result = await getCostsData(period, viewMode, groupBy, unidades);
             break;
           case 'lines':
             result = await getLinesData(period, viewMode);
             break;
           case 'profitability':
-            result = await getProfitabilityData(period, viewMode);
+            result = await getProfitabilityData(period, viewMode, unidades);
             break;
           default:
             throw new Error(`Tipo de dashboard inválido: ${type}`);
@@ -251,7 +252,8 @@ export function useDashboardData<T = any>(
     period.startDate, 
     period.endDate, 
     viewMode,
-    groupBy, // ✅ NOVO: Adicionar groupBy nas dependências
+    groupBy,
+    unidades.join(','),
     enabled, 
     user?.domain
   ]);

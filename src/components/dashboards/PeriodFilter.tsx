@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Filter, X, Check, Calendar } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from '../ui/dialog';
 import { Label } from '../ui/label';
+import { useAuth } from '../../contexts/AuthContext';
 
 export interface PeriodRange {
   startMonth: number;
@@ -21,6 +22,8 @@ export interface PeriodRange {
 interface PeriodFilterProps {
   currentPeriod: PeriodRange;
   onPeriodChange: (period: PeriodRange) => void;
+  selectedUnidades?: string[];
+  onUnidadesChange?: (unidades: string[]) => void;
 }
 
 const MONTHS = [
@@ -38,19 +41,41 @@ const MONTHS = [
   { value: 12, label: 'Dezembro' },
 ];
 
-// LIMITE MÍNIMO: 01/01/2025
 const MIN_YEAR = 2025;
 const MIN_MONTH = 1;
 
-// Array de anos a partir de 2025
 const YEARS = Array.from({ length: 10 }, (_, i) => MIN_YEAR + i);
 
-export function PeriodFilter({ currentPeriod, onPeriodChange }: PeriodFilterProps) {
+export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades = [], onUnidadesChange }: PeriodFilterProps) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tempPeriod, setTempPeriod] = useState<PeriodRange>(currentPeriod);
+  const [tempUnidades, setTempUnidades] = useState<string[]>(selectedUnidades);
+
+  const unidadeAtual = user?.unidade_atual || user?.unidade || '';
+  const isMTZ = unidadeAtual.toUpperCase() === 'MTZ';
+
+  const unidadesDisponiveis = useMemo(() => {
+    const csv = user?.unidades || '';
+    if (!csv.trim()) return [];
+    return csv.split(',').map(u => u.trim().toUpperCase()).filter(Boolean);
+  }, [user?.unidades]);
+
+  const handleOpen = (isOpen: boolean) => {
+    if (isOpen) {
+      setTempPeriod(currentPeriod);
+      setTempUnidades(selectedUnidades);
+    }
+    setOpen(isOpen);
+  };
+
+  const toggleUnidade = (sigla: string) => {
+    setTempUnidades(prev =>
+      prev.includes(sigla) ? prev.filter(u => u !== sigla) : [...prev, sigla]
+    );
+  };
 
   const handleApply = () => {
-    // Validar data mínima (01/01/2025)
     const minDate = new Date(MIN_YEAR, MIN_MONTH - 1);
     const startDate = new Date(tempPeriod.startYear, tempPeriod.startMonth - 1);
     const endDate = new Date(tempPeriod.endYear, tempPeriod.endMonth - 1);
@@ -66,11 +91,15 @@ export function PeriodFilter({ currentPeriod, onPeriodChange }: PeriodFilterProp
     }
 
     onPeriodChange(tempPeriod);
+    if (onUnidadesChange) {
+      onUnidadesChange(tempUnidades);
+    }
     setOpen(false);
   };
 
   const handleCancel = () => {
     setTempPeriod(currentPeriod);
+    setTempUnidades(selectedUnidades);
     setOpen(false);
   };
 
@@ -137,7 +166,7 @@ export function PeriodFilter({ currentPeriod, onPeriodChange }: PeriodFilterProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
         <Button
           variant="outline"
@@ -263,6 +292,48 @@ export function PeriodFilter({ currentPeriod, onPeriodChange }: PeriodFilterProp
               </div>
             </div>
           </div>
+
+          {/* Filtro de Unidades */}
+          {onUnidadesChange && unidadesDisponiveis.length > 0 && (
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-slate-900 dark:text-slate-100">Unidades</Label>
+                {tempUnidades.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTempUnidades([])}
+                    className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline"
+                  >
+                    Limpar seleção
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                {tempUnidades.length === 0
+                  ? 'Nenhuma unidade selecionada — exibindo todas'
+                  : `${tempUnidades.length} unidade${tempUnidades.length > 1 ? 's' : ''} selecionada${tempUnidades.length > 1 ? 's' : ''}`}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {unidadesDisponiveis.map((sigla) => {
+                  const selected = tempUnidades.includes(sigla);
+                  return (
+                    <button
+                      key={sigla}
+                      type="button"
+                      onClick={() => toggleUnidade(sigla)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                        selected
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500'
+                      }`}
+                    >
+                      {sigla}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Botões de Ação */}
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">

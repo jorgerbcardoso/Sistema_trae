@@ -16,18 +16,19 @@ interface ProfitabilityPageProps {
   viewMode?: 'GERAL' | 'CARGAS' | 'PASSAGEIROS';
   domainModalidade?: string;
   period: PeriodRange;
+  unidades?: string[];
 }
 
-export function ProfitabilityPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period }: ProfitabilityPageProps) {
+export function ProfitabilityPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: ProfitabilityPageProps) {
   console.log('🎬 [ProfitabilityPage] Renderizando. viewMode:', viewMode, 'period:', period);
   
   const tooltipStyle = useTooltipStyle();
   
-  // Usar o hook para buscar dados (automático: MOCK ou BACKEND)
   const { data, loading, error, isMockData } = useDashboardData<ProfitabilityData>({
     type: 'profitability',
     period: periodRangeToDashboardPeriod(period),
     viewMode,
+    unidades,
   });
 
   console.log('📊 [ProfitabilityPage] Dados recebidos:', { data, loading, error, isMockData });

@@ -39,10 +39,15 @@ export function FinanceiroDashboard() {
   const [period, setPeriod] = useState<PeriodRange>(() => loadPeriod());
   const [viewMode, setViewMode] = useState<'GERAL' | 'CARGAS' | 'PASSAGEIROS'>('GERAL');
   const [activeTab, setActiveTab] = useState<string>(() => {
-    // Tentar restaurar última aba ativa do localStorage
     const savedTab = localStorage.getItem('presto_last_tab');
     return savedTab || 'overview';
   });
+
+  const unidadeAtual = user?.unidade_atual || user?.unidade || '';
+  const isMTZ = unidadeAtual.toUpperCase() === 'MTZ';
+  const [selectedUnidades, setSelectedUnidades] = useState<string[]>(() =>
+    isMTZ ? [] : (unidadeAtual ? [unidadeAtual.toUpperCase()] : [])
+  );
   
   // Determinar domínio e modalidade
   const domainModalidade = MOCK_DOMAINS[user?.domain as keyof typeof MOCK_DOMAINS]?.modalidade || 'CARGAS';
@@ -56,6 +61,10 @@ export function FinanceiroDashboard() {
   const handlePeriodChange = (newPeriod: PeriodRange) => {
     setPeriod(newPeriod);
     savePeriod(newPeriod);
+  };
+
+  const handleUnidadesChange = (unidades: string[]) => {
+    setSelectedUnidades(unidades);
   };
 
   const modules = user?.clientConfig?.modules || {
@@ -157,7 +166,12 @@ export function FinanceiroDashboard() {
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
-                <PeriodFilter currentPeriod={period} onPeriodChange={handlePeriodChange} />
+                <PeriodFilter
+                  currentPeriod={period}
+                  onPeriodChange={handlePeriodChange}
+                  selectedUnidades={selectedUnidades}
+                  onUnidadesChange={handleUnidadesChange}
+                />
               </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -239,10 +253,10 @@ export function FinanceiroDashboard() {
         {/* Conteúdo */}
         <div className="pt-16 md:pt-20 pb-6">
           <div className="space-y-6 mt-0">
-            {modules.overview && activeTab === 'overview' && <OverviewPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} />}
-            {modules.revenue && activeTab === 'revenue' && <RevenuePage viewMode={viewMode} domainModalidade={domainModalidade} period={period} />}
-            {modules.costs && activeTab === 'costs' && <CostsPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} />}
-            {modules.profitability && activeTab === 'profitability' && <ProfitabilityPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} />}
+            {modules.overview && activeTab === 'overview' && <OverviewPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} unidades={selectedUnidades} />}
+            {modules.revenue && activeTab === 'revenue' && <RevenuePage viewMode={viewMode} domainModalidade={domainModalidade} period={period} unidades={selectedUnidades} />}
+            {modules.costs && activeTab === 'costs' && <CostsPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} unidades={selectedUnidades} />}
+            {modules.profitability && activeTab === 'profitability' && <ProfitabilityPage viewMode={viewMode} domainModalidade={domainModalidade} period={period} unidades={selectedUnidades} />}
           </div>
         </div>
       </main>

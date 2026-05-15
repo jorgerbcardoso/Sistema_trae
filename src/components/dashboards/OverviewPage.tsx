@@ -20,13 +20,15 @@ interface OverviewPageProps {
   viewMode?: 'GERAL' | 'CARGAS' | 'PASSAGEIROS';
   domainModalidade?: string;
   period: PeriodRange;
+  unidades?: string[];
 }
 
-export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period }: OverviewPageProps) {
+export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: OverviewPageProps) {
   const { data, loading, error, isMockData } = useDashboardData<OverviewData>({
     type: 'overview',
     period: periodRangeToDashboardPeriod(period),
-    viewMode
+    viewMode,
+    unidades,
   });
   const tooltipStyle = useTooltipStyle();
   const { user, clientConfig } = useAuth();

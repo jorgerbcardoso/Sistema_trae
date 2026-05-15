@@ -43,9 +43,12 @@ try {
 
     $domain = $auth['domain'];
 
-    $period = $_GET['period'] ?? 'month';
+    $period    = $_GET['period']    ?? 'month';
     $startDate = $_GET['start_date'] ?? date('Y-m-01');
-    $endDate = $_GET['end_date'] ?? date('Y-m-t');
+    $endDate   = $_GET['end_date']   ?? date('Y-m-t');
+    $unidades  = isset($_GET['unidades']) && $_GET['unidades'] !== ''
+                 ? array_filter(array_map('trim', explode(',', $_GET['unidades'])))
+                 : [];
 
     file_put_contents('/tmp/overview-debug.log', date('Y-m-d H:i:s') . " - Verificando shouldUseMockData($domain)\n", FILE_APPEND);
 
@@ -57,7 +60,7 @@ try {
     if ($useMockData) {
         $data = getMockOverviewData($period, $startDate, $endDate);
     } else {
-        $data = getRealOverviewData($auth['domain'], $period, $startDate, $endDate);
+        $data = getRealOverviewData($auth['domain'], $period, $startDate, $endDate, $unidades);
     }
 
     file_put_contents('/tmp/overview-debug.log', date('Y-m-d H:i:s') . " - Dados obtidos, retornando JSON\n", FILE_APPEND);
@@ -205,14 +208,29 @@ function getMockOverviewData($period, $startDate, $endDate) {
     ];
 }
 
-  function getRealOverviewData($dominio, $period, $startDate, $endDate)
+  function buildUnidadesWhereClause($unidades, $coluna = 'sigla_emit') {
+    if (empty($unidades)) return '';
+    $lista = implode("','", array_map('pg_escape_string', $unidades));
+    return " AND {$coluna} IN ('{$lista}')";
+  }
+
+  function buildDespesasUnidadesClause($unidades) {
+    if (empty($unidades)) return '';
+    $lista = implode("','", array_map('pg_escape_string', $unidades));
+    return " AND d.sigla_unidade IN ('{$lista}')";
+  }
+
+  function getRealOverviewData($dominio, $period, $startDate, $endDate, $unidades = [])
   {
     $g_sql = connect();
 
-    // Busca receita total e despesa total
-    $query = "SELECT SUM (vlr_frete) FROM $dominio" . "_cte cte " .
+    $filtroEmit    = buildUnidadesWhereClause($unidades, 'sigla_emit');
+    $filtroDespesa = buildDespesasUnidadesClause($unidades);
+
+    $query = "SELECT SUM (vlr_frete) FROM {$dominio}_cte " .
              " WHERE status <> 'C' " .
-               " AND data_emissao BETWEEN '$startDate' AND '$endDate'";
+               " AND data_emissao BETWEEN '$startDate' AND '$endDate'" .
+               $filtroEmit;
 
     $result = sql ($g_sql, $query);
 
@@ -230,11 +248,12 @@ function getMockOverviewData($period, $startDate, $endDate) {
              "  COALESCE(SUM(CASE WHEN COALESCE(e.tipo, 'N') = 'I' THEN d.vlr_parcela ELSE 0 END), 0) as impostos, " .
              "  COALESCE(SUM(CASE WHEN COALESCE(e.tipo, 'N') = 'D' THEN d.vlr_parcela ELSE 0 END), 0) as depreciacao, " .
              "  COALESCE(SUM(CASE WHEN COALESCE(e.tipo, 'N') = 'F' THEN d.vlr_parcela ELSE 0 END), 0) as despesas_financeiras " .
-             "FROM $dominio" . "_despesa d " .
-             "INNER JOIN $dominio" . "_evento e ON d.evento = e.evento " .
+             "FROM {$dominio}_despesa d " .
+             "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
              "WHERE d.status <> 'C' " .
              "  AND e.considerar = 'S' " .
-             "  AND d.data_vcto BETWEEN '$startDate' AND '$endDate'";
+             "  AND d.data_vcto BETWEEN '$startDate' AND '$endDate'" .
+             $filtroDespesa;
 
     $result = sql ($g_sql, $query);
     $row = pg_fetch_array ($result);
@@ -277,19 +296,18 @@ function getMockOverviewData($period, $startDate, $endDate) {
                                 ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
                                 $monthLabel);
 
-      // Buscar receitas e despesas do mês
-      $query = "SELECT SUM (vlr_frete) FROM $dominio" . "_cte WHERE status <> 'C' AND data_emissao BETWEEN '$data_ini' AND '$data_fin'";
+      $query = "SELECT SUM (vlr_frete) FROM {$dominio}_cte WHERE status <> 'C' AND data_emissao BETWEEN '$data_ini' AND '$data_fin'" . $filtroEmit;
       $result = sql ($g_sql, $query);
       $row = pg_fetch_array ($result);
       $receitaMes = (float)$row['sum'];
 
-      // ✅ JOIN com tabela de eventos + filtro considerar='S'
       $query = "SELECT SUM (d.vlr_parcela) " .
-               "FROM $dominio" . "_despesa d " .
-               "INNER JOIN $dominio" . "_evento e ON d.evento = e.evento " .
+               "FROM {$dominio}_despesa d " .
+               "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
                "WHERE d.status <> 'C' " .
                "  AND e.considerar = 'S' " .
-               "  AND d.data_vcto BETWEEN '$data_ini' AND '$data_fin'";
+               "  AND d.data_vcto BETWEEN '$data_ini' AND '$data_fin'" .
+               $filtroDespesa;
       $result = sql ($g_sql, $query);
       $row = pg_fetch_array ($result);
       $despesaMes = (float)$row['sum'];
@@ -304,28 +322,26 @@ function getMockOverviewData($period, $startDate, $endDate) {
                     'lucro'    => $lucroMes];
     }
 
-    // Agora vamos buscar o resultado das 5 maiores unidades.
     $units = [];
-    // Primeiro seleciona as 5 maiores
-    $query = "SELECT SUM (vlr_frete), " .
-                   " CASE WHEN tp_frete = 'C' THEN sigla_emit ELSE sigla_dest END AS unid " .
-              " FROM $dominio" . "_cte " .
+    $query = "SELECT SUM (vlr_frete), sigla_emit AS unid " .
+              " FROM {$dominio}_cte " .
              " WHERE status <> 'C' " .
                " AND data_emissao BETWEEN '$startDate' AND '$endDate' " .
+               $filtroEmit .
              " GROUP BY 2 ORDER BY 1 DESC LIMIT 5";
 
     $result = sql ($g_sql, $query);
 
     while ($row = pg_fetch_array ($result))
     {
-      // ✅ JOIN com tabela de eventos + filtro considerar='S'
+      $unidEsc = pg_escape_string($g_sql, $row['unid']);
       $query = "SELECT SUM (d.vlr_parcela) " .
-                " FROM $dominio" . "_despesa d " .
-                "INNER JOIN $dominio" . "_evento e ON d.evento = e.evento " .
+                " FROM {$dominio}_despesa d " .
+                "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
                " WHERE d.status <> 'C' " .
                  " AND e.considerar = 'S' " .
                  " AND d.data_vcto BETWEEN '$startDate' AND '$endDate' " .
-                 " AND d.sigla_unidade = '" . $row['unid'] . "'";
+                 " AND d.sigla_unidade = '{$unidEsc}'";
 
       $result2 = sql ($g_sql, $query);
       $row2 = pg_fetch_array ($result2);

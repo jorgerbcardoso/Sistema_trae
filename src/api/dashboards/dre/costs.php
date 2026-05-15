@@ -43,7 +43,9 @@ try {
     $viewMode = isset($_GET['view_mode']) ? trim((string)$_GET['view_mode']) : 'GERAL';
     $startDate = isset($_GET['start_date']) ? trim((string)$_GET['start_date']) : date('Y-m-01');
     $endDate = isset($_GET['end_date']) ? trim((string)$_GET['end_date']) : date('Y-m-t');
-    $groupBy = isset($_GET['group_by']) ? trim((string)$_GET['group_by']) : 'EVENTOS'; // ✅ NOVO: group_by
+    $groupBy = isset($_GET['group_by']) ? trim((string)$_GET['group_by']) : 'EVENTOS';
+    $unidadesRaw = isset($_GET['unidades']) ? trim((string)$_GET['unidades']) : '';
+    $unidades = $unidadesRaw !== '' ? array_filter(array_map('trim', explode(',', $unidadesRaw))) : [];
 
     // Validar formato de datas
     if (!validateDate($startDate) || !validateDate($endDate)) {
@@ -65,7 +67,7 @@ try {
     if ($useMockData) {
         $data = getMockCostsData($period, $viewMode, $startDate, $endDate);
     } else {
-        $data = getRealCostsData($domain, $period, $viewMode, $startDate, $endDate, $groupBy); // ✅ NOVO: Passar groupBy
+        $data = getRealCostsData($domain, $period, $viewMode, $startDate, $endDate, $groupBy, $unidades);
     }
 
     echo json_encode([
@@ -250,24 +252,30 @@ function getMockCostsData($period, $viewMode, $startDate, $endDate) {
 /**
  * Retorna dados REAIS de despesas do banco
  */
-function getRealCostsData($dominio, $period, $viewMode, $startDate, $endDate, $groupBy)
+function buildCostsDespesasClause($unidades) {
+    if (empty($unidades)) return '';
+    $conn = connect();
+    $lista = implode("','", array_map(function($u) use ($conn) { return pg_escape_string($conn, $u); }, $unidades));
+    return " AND d.sigla_unidade IN ('{$lista}')";
+}
+
+function getRealCostsData($dominio, $period, $viewMode, $startDate, $endDate, $groupBy, $unidades = [])
 {
     $g_sql = connect();
 
-    // Validar domínio para evitar SQL injection
     if (!preg_match('/^[a-zA-Z0-9_]+$/', $dominio)) {
         throw new Exception('Domínio inválido');
     }
 
-    // ✅ NOVO: Decidir se agrupa por EVENTOS ou GRUPOS
+    $filtroDespesa = buildCostsDespesasClause($unidades);
+
     if ($groupBy === 'GRUPOS') {
-        $data = getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDate, $endDate);
+        $data = getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa);
     } else {
-        $data = getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDate, $endDate);
+        $data = getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa);
     }
 
-    // ✅ SEMPRE buscar dados de UNIDADES (independente do groupBy)
-    $unitsData = getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDate, $endDate);
+    $unitsData = getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa);
     $data['unitCategoryTotals'] = $unitsData['unitCategoryTotals'];
     $data['costsByUnitCargas'] = $unitsData['costsByUnitCargas'];
     $data['costsByUnitPassageiros'] = $unitsData['costsByUnitPassageiros'];
@@ -278,7 +286,7 @@ function getRealCostsData($dominio, $period, $viewMode, $startDate, $endDate, $g
 /**
  * ✅ NOVO: Retorna dados agrupados por GRUPOS DE EVENTOS
  */
-function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDate, $endDate)
+function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa = '')
 {
     // 1. Buscar despesas total do período
     $query = "SELECT COALESCE(SUM(d.vlr_parcela), 0) as total
@@ -286,7 +294,8 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2";
+                AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
     if (!$result) {
@@ -307,6 +316,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao
               ORDER BY total_despesa DESC
               LIMIT 4";
@@ -359,7 +369,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
         $monthLabel = formatMonthLabel($data_ini);
 
         // ✅ NOVO: Buscar despesas por GRUPO do mês
-        $despesas = getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos);
+        $despesas = getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos, $filtroDespesa);
 
         $costsByCategoryCargas[] = [
             'month' => $monthLabel,
@@ -393,7 +403,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
     }
 
     // 4. ✅ NOVO: Calcular categoryTotals do período por GRUPO
-    $categoryTotals = getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos);
+    $categoryTotals = getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos, $filtroDespesa);
 
     return [
         'period' => [
@@ -414,7 +424,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
 /**
  * ✅ RENOMEADO: Retorna dados agrupados por EVENTOS (lógica original)
  */
-function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDate, $endDate)
+function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa = '')
 {
     // 1. Buscar despesas total do período
     $query = "SELECT COALESCE(SUM(d.vlr_parcela), 0) as total
@@ -422,7 +432,8 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2";
+                AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
     if (!$result) {
@@ -442,6 +453,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.evento, e.descricao
               ORDER BY total_despesa DESC
               LIMIT 4";
@@ -489,7 +501,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
         $monthLabel = formatMonthLabel($data_ini);
 
         // Buscar despesas por evento do mês (query otimizada)
-        $despesas = getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos);
+        $despesas = getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos, $filtroDespesa);
 
         $costsByCategoryCargas[] = [
             'month' => $monthLabel,
@@ -524,7 +536,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
     }
 
     // 4. Calcular categoryTotals do período selecionado (para cards)
-    $categoryTotals = getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos);
+    $categoryTotals = getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos, $filtroDespesa);
 
     return [
         'period' => [
@@ -545,7 +557,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
 /**
  * Busca despesas por evento em um mês (query otimizada)
  */
-function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos) {
+function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos, $filtroDespesa = '') {
     $despesas = [
         $eventos[1]['nome'] => 0,
         $eventos[2]['nome'] => 0,
@@ -554,7 +566,6 @@ function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos
         'Demais' => 0
     ];
 
-    // ✅ Query agora busca também o ID do evento (d.evento) e filtra considerar='S'
     $query = "SELECT
                 d.evento as id_evento,
                 e.descricao as nome_evento,
@@ -564,6 +575,7 @@ function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.evento, e.descricao";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
@@ -596,7 +608,7 @@ function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos
 /**
  * ✅ NOVO: Busca despesas por GRUPO em um mês
  */
-function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos) {
+function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos, $filtroDespesa = '') {
     $despesas = [
         $grupos[1]['nome'] => 0,
         $grupos[2]['nome'] => 0,
@@ -605,7 +617,6 @@ function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos)
         'Demais' => 0
     ];
 
-    // ✅ Query busca despesas por grupo e considera eventos com grupo = 0 como "Demais"
     $query = "SELECT
                 COALESCE(ge.grupo, 0) as id_grupo,
                 COALESCE(ge.descricao, 'DEMAIS') as nome_grupo,
@@ -616,6 +627,7 @@ function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos)
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
@@ -648,10 +660,9 @@ function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos)
 /**
  * Busca totais do período por evento (para cards)
  */
-function getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos) {
+function getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos, $filtroDespesa = '') {
     $categoryTotals = [];
 
-    // ✅ Query agora busca também o ID do evento (d.evento) e filtra considerar='S'
     $query = "SELECT
                 d.evento as id_evento,
                 e.descricao as nome_evento,
@@ -661,6 +672,7 @@ function getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos)
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.evento, e.descricao";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -703,10 +715,9 @@ function getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos)
 /**
  * ✅ NOVO: Busca totais do período por GRUPO
  */
-function getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos) {
+function getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos, $filtroDespesa = '') {
     $categoryTotals = [];
 
-    // ✅ Query busca despesas por grupo e considera eventos com grupo = 0 como "Demais"
     $query = "SELECT
                 COALESCE(ge.grupo, 0) as id_grupo,
                 COALESCE(ge.descricao, 'DEMAIS') as nome_grupo,
@@ -717,6 +728,7 @@ function getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos) 
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -759,9 +771,9 @@ function getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos) 
 /**
  * ✅ NOVO: Busca dados de despesas por UNIDADE
  */
-function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDate, $endDate)
+function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDate, $endDate, $filtroDespesa = '')
 {
-    // 1. ✅ NOVO: Encontrar as 4 maiores UNIDADES por valor no período
+    // 1. Encontrar as 4 maiores UNIDADES por valor no período
     $query = "SELECT
                 COALESCE(d.sigla_unidade, 'SEM UNIDADE') as sigla_unidade,
                 COALESCE(SUM(d.vlr_parcela), 0) as total_despesa
@@ -770,6 +782,7 @@ function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDat
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.sigla_unidade
               ORDER BY total_despesa DESC
               LIMIT 4";
@@ -818,7 +831,7 @@ function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDat
         $monthLabel = formatMonthLabel($data_ini);
 
         // Buscar despesas por unidade do mês
-        $despesas = getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades);
+        $despesas = getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades, $filtroDespesa);
 
         $costsByUnitCargas[] = [
             'month' => $monthLabel,
@@ -840,7 +853,7 @@ function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDat
     }
 
     // 3. Calcular categoryTotals do período selecionado (para cards)
-    $unitCategoryTotals = getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades);
+    $unitCategoryTotals = getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades, $filtroDespesa);
 
     return [
         'costsByUnitCargas' => $costsByUnitCargas,
@@ -852,7 +865,7 @@ function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDat
 /**
  * ✅ NOVO: Busca despesas por UNIDADE em um mês
  */
-function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades) {
+function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades, $filtroDespesa = '') {
     $despesas = [
         $unidades[1]['nome'] => 0,
         $unidades[2]['nome'] => 0,
@@ -861,7 +874,6 @@ function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades
         'Demais' => 0
     ];
 
-    // ✅ Query busca despesas por unidade
     $query = "SELECT
                 COALESCE(d.sigla_unidade, 'SEM UNIDADE') as sigla_unidade,
                 COALESCE(SUM(d.vlr_parcela), 0) AS total_despesa
@@ -870,6 +882,7 @@ function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.sigla_unidade";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
@@ -902,10 +915,9 @@ function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades
 /**
  * ✅ NOVO: Busca totais do período por UNIDADE
  */
-function getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades) {
+function getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades, $filtroDespesa = '') {
     $categoryTotals = [];
 
-    // ✅ Query busca despesas por unidade
     $query = "SELECT
                 COALESCE(d.sigla_unidade, 'SEM UNIDADE') as sigla_unidade,
                 COALESCE(SUM(d.vlr_parcela), 0) AS total
@@ -914,6 +926,7 @@ function getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades)
               WHERE d.status <> 'C'
                 AND e.considerar = 'S'
                 AND d.data_vcto BETWEEN $1 AND $2
+                {$filtroDespesa}
               GROUP BY d.sigla_unidade";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);

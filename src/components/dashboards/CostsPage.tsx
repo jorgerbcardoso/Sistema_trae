@@ -95,21 +95,21 @@ interface CostsPageProps {
   viewMode?: 'GERAL' | 'CARGAS' | 'PASSAGEIROS';
   domainModalidade?: string;
   period: PeriodRange;
+  unidades?: string[];
 }
 
-export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period }: CostsPageProps) {
+export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', period, unidades = [] }: CostsPageProps) {
   const { user } = useAuth();
   const tooltipStyle = useTooltipStyle();
   
-  // ✅ NOVO: Estado para agrupar por Eventos ou Grupos
   const [groupBy, setGroupBy] = useState<'EVENTOS' | 'GRUPOS'>('EVENTOS');
   
-  // Usar o hook para buscar dados (automático: MOCK ou BACKEND)
   const { data, loading, error, isMockData } = useDashboardData<CostsData>({
     type: 'costs',
     period: periodRangeToDashboardPeriod(period),
     viewMode,
-    groupBy, // ✅ NOVO: Enviar groupBy para API
+    groupBy,
+    unidades,
   });
   
   // ✅ PROTEÇÃO: Se data for null ou undefined, criar objeto vazio com defaults

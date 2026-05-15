@@ -224,7 +224,8 @@ export interface ProfitabilityData {
  */
 export async function getOverviewData(
   period: DashboardPeriod,
-  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL'
+  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL',
+  unidades: string[] = []
 ): Promise<OverviewData> {
   const params = new URLSearchParams({
     period: period.type,
@@ -234,6 +235,7 @@ export async function getOverviewData(
     ...(period.quarter && { quarter: period.quarter.toString() }),
     ...(period.startDate && { start_date: period.startDate }),
     ...(period.endDate && { end_date: period.endDate }),
+    ...(unidades.length > 0 && { unidades: unidades.join(',') }),
   });
 
   // ✅ apiFetch já retorna JSON processado e intercepta toasts
@@ -252,7 +254,8 @@ export async function getOverviewData(
  */
 export async function getRevenueData(
   period: DashboardPeriod,
-  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL'
+  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL',
+  unidades: string[] = []
 ): Promise<RevenueData> {
   const params = new URLSearchParams({
     period: period.type,
@@ -262,6 +265,7 @@ export async function getRevenueData(
     ...(period.quarter && { quarter: period.quarter.toString() }),
     ...(period.startDate && { start_date: period.startDate }),
     ...(period.endDate && { end_date: period.endDate }),
+    ...(unidades.length > 0 && { unidades: unidades.join(',') }),
   });
 
   // ✅ apiFetch já retorna JSON processado e intercepta toasts
@@ -281,17 +285,19 @@ export async function getRevenueData(
 export async function getCostsData(
   period: DashboardPeriod,
   viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL',
-  groupBy: 'EVENTOS' | 'GRUPOS' = 'EVENTOS' // ✅ NOVO: Agrupar por eventos ou grupos
+  groupBy: 'EVENTOS' | 'GRUPOS' = 'EVENTOS',
+  unidades: string[] = []
 ): Promise<CostsData> {
   const params = new URLSearchParams({
     period: period.type,
     view_mode: viewMode,
-    group_by: groupBy, // ✅ NOVO: Enviar groupBy para API
+    group_by: groupBy,
     ...(period.year && { year: period.year.toString() }),
     ...(period.month && { month: period.month.toString() }),
     ...(period.quarter && { quarter: period.quarter.toString() }),
     ...(period.startDate && { start_date: period.startDate }),
     ...(period.endDate && { end_date: period.endDate }),
+    ...(unidades.length > 0 && { unidades: unidades.join(',') }),
   });
 
   // ✅ apiFetch já retorna JSON processado e intercepta toasts
@@ -338,7 +344,8 @@ export async function getLinesData(
  */
 export async function getProfitabilityData(
   period: DashboardPeriod,
-  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL'
+  viewMode: 'GERAL' | 'CARGAS' | 'PASSAGEIROS' = 'GERAL',
+  unidades: string[] = []
 ): Promise<ProfitabilityData> {
   const params = new URLSearchParams({
     period: period.type,
@@ -348,6 +355,7 @@ export async function getProfitabilityData(
     ...(period.quarter && { quarter: period.quarter.toString() }),
     ...(period.startDate && { start_date: period.startDate }),
     ...(period.endDate && { end_date: period.endDate }),
+    ...(unidades.length > 0 && { unidades: unidades.join(',') }),
   });
 
   // ✅ apiFetch já retorna JSON processado e intercepta toasts
