@@ -47,18 +47,18 @@ if (!isDatabaseConfigured()) {
     msg('BANCO DE DADOS NÃO CONFIGURADO', 'error');
 }
 
-$conn = getDBConnection();
-
 $confirma = ask("⚠️ Atenção! Os dados atuais serão reescritos. Confirma a operação?", "confirm", "confirm_import_unidades");
 
 if (!$confirma) {
-    closeDBConnection($conn);
     msg('Importação cancelada pelo usuário.', 'info');
 }
 
-imp_ssw_uni();
+global $g_sql;
+if (!isset($g_sql) || !$g_sql) {
+    $g_sql = getDBConnection();
+}
 
-closeDBConnection($conn);
+imp_ssw_uni();
 
 msg('Unidades importadas com sucesso!', 'success');
 

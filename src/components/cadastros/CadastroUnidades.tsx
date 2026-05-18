@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Building2, ChevronLeft, ChevronRight, Download, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, ChevronLeft, ChevronRight, Download, Loader2, MapPin, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -14,6 +14,99 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
+
+declare global {
+  interface Window {
+    L: any;
+  }
+}
+
+function useLeafletMap(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  lat: string,
+  lng: string,
+  onMove: (lat: string, lng: string) => void,
+  active: boolean
+) {
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!active) return;
+    if (window.L) { setLoaded(true); return; }
+    const cssId = 'leaflet-css';
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId; link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
+    const scriptId = 'leaflet-js';
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+      script.crossOrigin = '';
+      script.onload = () => setLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      setLoaded(true);
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (!loaded || !active || !containerRef.current) return;
+    const L = window.L;
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; }
+
+    const defaultLat = lat && !isNaN(Number(lat)) ? Number(lat) : -15.7801;
+    const defaultLng = lng && !isNaN(Number(lng)) ? Number(lng) : -47.9292;
+
+    const map = L.map(containerRef.current, { zoomControl: true }).setView([defaultLat, defaultLng], lat ? 13 : 4);
+    containerRef.current.style.zIndex = '1';
+    mapRef.current = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const icon = L.divIcon({
+      html: `<div style="background:#2563eb;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+      className: '', iconAnchor: [7, 7],
+    });
+
+    const marker = L.marker([defaultLat, defaultLng], { draggable: true, icon }).addTo(map);
+    markerRef.current = marker;
+
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      onMove(pos.lat.toFixed(6), pos.lng.toFixed(6));
+    });
+
+    map.on('click', (e: any) => {
+      marker.setLatLng(e.latlng);
+      onMove(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
+    });
+
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, [loaded, active]);
+
+  useEffect(() => {
+    if (!markerRef.current || !mapRef.current) return;
+    const latN = Number(lat); const lngN = Number(lng);
+    if (!isNaN(latN) && !isNaN(lngN) && lat && lng) {
+      markerRef.current.setLatLng([latN, lngN]);
+      mapRef.current.setView([latN, lngN], mapRef.current.getZoom());
+    }
+  }, [lat, lng]);
+
+  return loaded;
+}
 
 interface Unidade {
   sigla: string;
@@ -50,6 +143,36 @@ export function CadastroUnidades() {
     longitude: '',
     unidadesHubby: [] as string[],
   });
+
+  const [addressSearch, setAddressSearch] = useState('');
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleMapMove = useCallback((lat: string, lng: string) => {
+    setFormData((p) => ({ ...p, latitude: lat, longitude: lng }));
+  }, []);
+
+  useLeafletMap(mapContainerRef, formData.latitude, formData.longitude, handleMapMove, isDialogOpen);
+
+  const handleSearchAddress = async () => {
+    if (!addressSearch.trim()) return;
+    setIsSearchingAddress(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressSearch)}&limit=1&countrycodes=br`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
+      const results = await res.json();
+      if (results && results.length > 0) {
+        const { lat, lon } = results[0];
+        setFormData((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lon).toFixed(6) }));
+      } else {
+        toast.error('Endereço não encontrado');
+      }
+    } catch {
+      toast.error('Erro ao buscar endereço');
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
 
   usePageTitle('Cadastro de Unidades');
 
@@ -520,14 +643,54 @@ export function CadastroUnidades() {
                 <Input id="cnpj" value={formData.cnpj} onChange={(e) => setFormData((p) => ({ ...p, cnpj: e.target.value }))} disabled={isSaving} />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input id="latitude" value={formData.latitude} onChange={(e) => setFormData((p) => ({ ...p, latitude: e.target.value }))} disabled={isSaving} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input id="longitude" value={formData.longitude} onChange={(e) => setFormData((p) => ({ ...p, longitude: e.target.value }))} disabled={isSaving} />
+              <div className="col-span-1 md:col-span-2 space-y-3">
+                <Label>Localização</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+                    <Input
+                      placeholder="Buscar endereço..."
+                      value={addressSearch}
+                      onChange={(e) => setAddressSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchAddress(); } }}
+                      className="pl-9"
+                      disabled={isSaving || isSearchingAddress}
+                    />
+                  </div>
+                  <Button type="button" variant="outline" onClick={handleSearchAddress} disabled={isSaving || isSearchingAddress} className="shrink-0">
+                    {isSearchingAddress ? <Loader2 className="size-4 animate-spin" /> : 'Buscar'}
+                  </Button>
+                </div>
+                <div
+                  ref={mapContainerRef}
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden"
+                  style={{ height: 260, zIndex: 1 }}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="latitude" className="text-xs text-slate-500">Latitude</Label>
+                    <Input
+                      id="latitude"
+                      value={formData.latitude}
+                      onChange={(e) => setFormData((p) => ({ ...p, latitude: e.target.value }))}
+                      disabled={isSaving}
+                      className="font-mono text-sm"
+                      placeholder="-23.550520"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="longitude" className="text-xs text-slate-500">Longitude</Label>
+                    <Input
+                      id="longitude"
+                      value={formData.longitude}
+                      onChange={(e) => setFormData((p) => ({ ...p, longitude: e.target.value }))}
+                      disabled={isSaving}
+                      className="font-mono text-sm"
+                      placeholder="-46.633308"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">Clique no mapa ou arraste o marcador para ajustar a posição</p>
               </div>
 
               <div className="col-span-1 md:col-span-2">
