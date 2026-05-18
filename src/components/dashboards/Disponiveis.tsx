@@ -1311,6 +1311,21 @@ export function Disponiveis() {
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
 
+  const [unidadePermiteCarregamento, setUnidadePermiteCarregamento] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!sigla || isMTZ) return;
+    apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/check_unidade_carregamento.php`,
+      { method: 'POST', body: JSON.stringify({ sigla }) },
+      true
+    ).then((res) => {
+      if (res.success) setUnidadePermiteCarregamento(res.efetua_carregamento);
+    }).catch(() => {
+      setUnidadePermiteCarregamento(true);
+    });
+  }, [sigla]);
+
   const ctesJaCarregados = React.useMemo<Map<number, string>>(() => {
     const m = new Map<number, string>();
     for (const car of carregamentos) {
@@ -1689,6 +1704,12 @@ export function Disponiveis() {
           <Building2 className="w-16 h-16 mb-4 opacity-30" />
           <p className="text-lg font-medium">Acesso não disponível para a unidade MTZ</p>
           <p className="text-sm mt-1">Faça login em uma unidade específica para visualizar este painel.</p>
+        </div>
+      ) : unidadePermiteCarregamento === false ? (
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+          <AlertTriangle className="w-16 h-16 mb-4 opacity-40 text-amber-500" />
+          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Unidade não configurada para efetuar carregamentos</p>
+          <p className="text-sm mt-1">Configure a unidade <strong>{sigla}</strong> no <strong>CADASTRO DE UNIDADES</strong>.</p>
         </div>
       ) : loading && !dados ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">

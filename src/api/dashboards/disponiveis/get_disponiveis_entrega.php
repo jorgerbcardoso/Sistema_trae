@@ -81,16 +81,19 @@ if (empty($file) || strlen($file) < 100) {
             $seq = $xml1440->xpath('rs/r/f0')[$i];
             $opc = $xml1440->xpath('rs/r/f1')[$i];
             $usr = $xml1440->xpath('rs/r/f3')[$i];
+            $f4  = $xml1440->xpath('rs/r/f4')[$i];
             $sit = $xml1440->xpath('rs/r/f6')[$i];
             $f8  = $xml1440->xpath('rs/r/f8')[$i];
 
             if ($seq === null) break;
 
-            $usr = trim((string)$usr);
+            $usr    = trim((string)$usr);
+            $unidF4 = strtoupper(trim((string)$f4));
 
             if ((substr($opc, 0, 3) == '081')
                 && (($usr == 'presto') || ($usr == 'damasce1'))
                 && ((string)$sit == 'Conclu&iacute;do')
+                && ($unidF4 === strtoupper($sigla))
             ) {
                 $encontrado = true;
                 $f8dec = html_entity_decode((string)$f8);
