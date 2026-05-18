@@ -7,19 +7,18 @@
  * Inclui CRUD e importação via imp_ssw_uni()
  */
 
-require_once '/var/www/html/sistema/api/config.php';
-require_once '/var/www/html/lib/ssw.php';
+require_once __DIR__ . '/../config.php';
 
-header('Content-Type: application/json; charset=utf-8');
+setupCORS();
+handleOptionsRequest();
 
-// ✅ REGRA OFICIAL: Sempre usar global $g_sql
 global $g_sql;
-
-// ✅ CONECTAR AO BANCO
-if (!isset($g_sql)) {
-    msg('Erro ao conectar ao banco de dados', 'error');
-    http_response_code(500);
-    exit;
+try {
+    if (!isset($g_sql) || !$g_sql) {
+        $g_sql = connect();
+    }
+} catch (Throwable $e) {
+    msg('Erro ao conectar ao banco de dados', 'error', 500);
 }
 
 // ✅ OBTER DOMÍNIO DO HEADER OU PARÂMETRO
