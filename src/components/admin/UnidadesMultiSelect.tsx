@@ -9,6 +9,7 @@ interface UnidadesMultiSelectProps {
   value: string[]; // Array de unidades selecionadas: ['MTZ', 'ACV']
   onChange: (value: string[]) => void;
   domain?: string;
+  label?: string;
 }
 
 interface Unidade {
@@ -16,7 +17,7 @@ interface Unidade {
   nome: string;
 }
 
-export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ' }: UnidadesMultiSelectProps) {
+export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: UnidadesMultiSelectProps) {
   const [search, setSearch] = useState('');
   const [todasUnidades, setTodasUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,7 +97,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ' }: Unidade
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">
-          Unidades Permitidas
+          {label || 'Unidades Permitidas'}
         </Label>
         <div className="flex gap-2">
           <button

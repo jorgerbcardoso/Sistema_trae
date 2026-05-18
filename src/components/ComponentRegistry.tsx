@@ -16,6 +16,7 @@ import { Disponiveis } from './dashboards/Disponiveis';
 import { UserManagement } from './UserManagement';
 import { DomainManagement } from './DomainManagement';
 import { CadastroEventos } from './cadastros/CadastroEventos';
+import { CadastroUnidades } from './cadastros/CadastroUnidades';
 import { GruposEventos } from './cadastros/GruposEventos';
 import { CadastroLinhas } from './cadastros/CadastroLinhas';
 import { Vendedores } from './cadastros/Vendedores';
@@ -122,6 +123,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   // CADASTROS
   // ============================================
   'cadastros/CadastroEventos': CadastroEventos,
+  'cadastros/CadastroUnidades': CadastroUnidades,
   'cadastros/GruposEventos': GruposEventos,
   'cadastros/CadastroLinhas': CadastroLinhas, // ✅ CORRIGIDO: era 'cadastros/linhas'
   'cadastros/Vendedores': Vendedores,

@@ -19,6 +19,7 @@ import { FaturamentoClientes } from './components/dashboards/FaturamentoClientes
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
+import { CadastroUnidades } from './components/cadastros/CadastroUnidades';
 import { GruposEventos } from './components/cadastros/GruposEventos';
 import { CadastroLinhas } from './components/cadastros/CadastroLinhas';
 import { Vendedores } from './components/cadastros/Vendedores';
@@ -200,6 +201,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CadastroEventos />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'cadastros/unidades',
+        element: (
+          <ProtectedRoute>
+            <CadastroUnidades />
           </ProtectedRoute>
         )
       },
