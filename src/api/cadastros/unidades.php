@@ -87,7 +87,8 @@ function listarUnidades($g_sql, $tblUnidade, $dominio) {
             cnpj,
             latitude,
             longitude,
-            unidades_compart
+            unidades_compart,
+            efetua_carregamento
         FROM $tblUnidade
         ORDER BY sigla
     ";
@@ -114,7 +115,8 @@ function listarUnidades($g_sql, $tblUnidade, $dominio) {
             'cnpj' => $row['cnpj'] ?? '',
             'latitude' => $row['latitude'] ?? '',
             'longitude' => $row['longitude'] ?? '',
-            'unidades_compart' => $row['unidades_compart'] ?? ''
+            'unidades_compart' => $row['unidades_compart'] ?? '',
+            'efetua_carregamento' => ($row['efetua_carregamento'] === 't' || $row['efetua_carregamento'] === true)
         ];
         $count++;
     }
@@ -151,6 +153,7 @@ function criarUnidade($g_sql, $tblUnidade, $dominio) {
     $latitude = pg_escape_string($g_sql, trim($input['latitude'] ?? ''));
     $longitude = pg_escape_string($g_sql, trim($input['longitude'] ?? ''));
     $unidadesCompart = pg_escape_string($g_sql, $input['unidades_compart'] ?? '');
+    $efetuaCarregamento = !empty($input['efetua_carregamento']) ? 'true' : 'false';
     
     if (empty($sigla)) {
         msg('Sigla é obrigatória', 'error');
@@ -165,8 +168,8 @@ function criarUnidade($g_sql, $tblUnidade, $dominio) {
     }
     
     $query = "
-        INSERT INTO $tblUnidade (sigla, nome, cnpj, latitude, longitude, unidades_compart)
-        VALUES ('$sigla', '$nome', '$cnpj', '$latitude', '$longitude', '$unidadesCompart')
+        INSERT INTO $tblUnidade (sigla, nome, cnpj, latitude, longitude, unidades_compart, efetua_carregamento)
+        VALUES ('$sigla', '$nome', '$cnpj', '$latitude', '$longitude', '$unidadesCompart', $efetuaCarregamento)
     ";
     
     error_log("🔍 Query: " . $query);
@@ -215,6 +218,7 @@ function atualizarUnidade($g_sql, $tblUnidade, $dominio) {
     $latitude = pg_escape_string($g_sql, trim($input['latitude'] ?? ''));
     $longitude = pg_escape_string($g_sql, trim($input['longitude'] ?? ''));
     $unidadesCompart = pg_escape_string($g_sql, $input['unidades_compart'] ?? '');
+    $efetuaCarregamento = !empty($input['efetua_carregamento']) ? 'true' : 'false';
     
     if (empty($sigla)) {
         msg('Sigla é obrigatória', 'error');
@@ -235,7 +239,8 @@ function atualizarUnidade($g_sql, $tblUnidade, $dominio) {
             cnpj = '$cnpj',
             latitude = '$latitude',
             longitude = '$longitude',
-            unidades_compart = '$unidadesCompart'
+            unidades_compart = '$unidadesCompart',
+            efetua_carregamento = $efetuaCarregamento
         WHERE sigla = '$sigla'
     ";
     

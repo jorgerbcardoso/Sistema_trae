@@ -14,6 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
+import { Switch } from '../ui/switch';
 
 declare global {
   interface Window {
@@ -115,6 +116,7 @@ interface Unidade {
   latitude: string;
   longitude: string;
   unidades_compart: string;
+  efetua_carregamento: boolean;
 }
 
 const ITEMS_PER_PAGE = 100;
@@ -142,6 +144,7 @@ export function CadastroUnidades() {
     latitude: '',
     longitude: '',
     unidadesHubby: [] as string[],
+    efetuaCarregamento: false,
   });
 
   const [addressSearch, setAddressSearch] = useState('');
@@ -237,6 +240,7 @@ export function CadastroUnidades() {
       latitude: '',
       longitude: '',
       unidadesHubby: [],
+      efetuaCarregamento: false,
     });
     setSelectedUnidade(null);
     setIsEditing(false);
@@ -251,6 +255,7 @@ export function CadastroUnidades() {
       latitude: unidade.latitude,
       longitude: unidade.longitude,
       unidadesHubby: parseUnidadesCompart(unidade.unidades_compart),
+      efetuaCarregamento: unidade.efetua_carregamento ?? false,
     });
     setSelectedUnidade(unidade);
     setIsEditing(true);
@@ -286,6 +291,7 @@ export function CadastroUnidades() {
         latitude: formData.latitude.trim(),
         longitude: formData.longitude.trim(),
         unidades_compart: formData.unidadesHubby.join(','),
+        efetua_carregamento: formData.efetuaCarregamento,
       };
 
       const token = localStorage.getItem('auth_token');
@@ -313,6 +319,7 @@ export function CadastroUnidades() {
           latitude: '',
           longitude: '',
           unidadesHubby: [],
+          efetuaCarregamento: false,
         });
         await loadUnidades();
       } else {
@@ -556,6 +563,10 @@ export function CadastroUnidades() {
                         Unidades do Hubby
                         {getSortIcon('unidades_compart')}
                       </TableHead>
+                      <TableHead className="w-[140px] cursor-pointer text-center" onClick={() => handleSort('efetua_carregamento')}>
+                        Ef. Carregamento
+                        {getSortIcon('efetua_carregamento')}
+                      </TableHead>
                       <TableHead className="w-[120px] text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -568,6 +579,13 @@ export function CadastroUnidades() {
                         <TableCell>{u.latitude || '-'}</TableCell>
                         <TableCell>{u.longitude || '-'}</TableCell>
                         <TableCell>{u.unidades_compart || '-'}</TableCell>
+                        <TableCell className="text-center">
+                          {u.efetua_carregamento ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Sim</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Não</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="sm" onClick={() => handleEdit(u)} className="h-8 w-8 p-0">
@@ -645,6 +663,16 @@ export function CadastroUnidades() {
               <div className="space-y-2">
                 <Label htmlFor="cnpj">CNPJ</Label>
                 <Input id="cnpj" value={formData.cnpj} onChange={(e) => setFormData((p) => ({ ...p, cnpj: e.target.value }))} disabled={isSaving} />
+              </div>
+
+              <div className="flex items-center gap-3 col-span-1 md:col-span-2 py-1">
+                <Switch
+                  id="efetua_carregamento"
+                  checked={formData.efetuaCarregamento}
+                  onCheckedChange={(v) => setFormData((p) => ({ ...p, efetuaCarregamento: v }))}
+                  disabled={isSaving}
+                />
+                <Label htmlFor="efetua_carregamento" className="cursor-pointer">Efetua Carregamento</Label>
               </div>
 
               <div className="col-span-1 md:col-span-2 space-y-3">
