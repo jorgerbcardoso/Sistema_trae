@@ -744,7 +744,14 @@ function validateRequestMethod($allowedMethods) {
  * @return array Input decodificado
  */
 function getRequestInput() {
-    return json_decode(file_get_contents('php://input'), true) ?? [];
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $raw = file_get_contents('php://input');
+    $cached = json_decode($raw, true) ?? [];
+    return $cached;
 }
 
 /**
