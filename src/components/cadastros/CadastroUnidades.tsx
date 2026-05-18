@@ -158,26 +158,18 @@ export function CadastroUnidades() {
     if (!addressSearch.trim()) return;
     setIsSearchingAddress(true);
     try {
-      const queries = [
-        addressSearch.trim(),
-        `${addressSearch.trim()}, Brasil`,
-      ];
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(addressSearch.trim())}&limit=5&lang=pt&bbox=-73.9872,-33.7683,-34.7299,5.2717`;
+      const res = await fetch(url);
+      const data = await res.json();
 
-      let found = false;
-      for (const q of queries) {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=br&addressdetails=1`;
-        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'SistemaPresto/1.0' } });
-        const results = await res.json();
-        if (results && results.length > 0) {
-          const { lat, lon } = results[0];
-          setFormData((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lon).toFixed(6) }));
-          found = true;
-          break;
-        }
-      }
+      const features = data?.features ?? [];
+      const brFeature = features.find((f: any) => f.properties?.country_code === 'br') ?? features[0];
 
-      if (!found) {
-        toast.error('Endereço não encontrado. Tente incluir a cidade e o estado. Ex: "Rua Henrique Coelho Netto, 478, São Paulo, SP"');
+      if (brFeature) {
+        const [lon, lat] = brFeature.geometry.coordinates;
+        setFormData((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lon).toFixed(6) }));
+      } else {
+        toast.error('Endereço não encontrado');
       }
     } catch {
       toast.error('Erro ao buscar endereço');
@@ -661,7 +653,7 @@ export function CadastroUnidades() {
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
                     <Input
-                      placeholder="Ex: Rua das Flores, 100, São Paulo, SP"
+                      placeholder="Ex: Henrique Coelho Netto, 478"
                       value={addressSearch}
                       onChange={(e) => setAddressSearch(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchAddress(); } }}
