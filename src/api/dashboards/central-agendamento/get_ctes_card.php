@@ -52,13 +52,15 @@ if (!empty($filters['cnpjDestinatario'])) {
     $params[] = $filters['cnpjDestinatario'];
 }
 
+$ocorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
+
 switch ($cardId) {
     case 1:
         $whereConditions[] = "c.agenda = true";
         $whereConditions[] = "(cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)";
         break;
     case 2:
-        $whereConditions[] = "cte.ult_ocor_agend = 14";
+        $whereConditions[] = "cte.ult_ocor_agend = $ocorAguardando";
         break;
     case 3:
         $whereConditions[] = "cte.ult_ocor_agend = 15";

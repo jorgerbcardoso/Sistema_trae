@@ -54,6 +54,7 @@ if (!empty($filters['cnpjDestinatario'])) {
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
 $data_hoje = date('Y-m-d');
+$ocorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
 
 $query = "
     SELECT
@@ -64,7 +65,7 @@ $query = "
         ) AS agendaveis,
 
         COUNT(CASE
-            WHEN cte.ult_ocor_agend = 14
+            WHEN cte.ult_ocor_agend = $ocorAguardando
              AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS aguardando_agendamento,
@@ -130,7 +131,7 @@ respondJson([
             [
                 'id'        => 2,
                 'nome'      => 'Aguardando Agendamento',
-                'descricao' => 'CT-es com ocorrência 14 (aguardando agendamento)',
+                'descricao' => "CT-es com ocorrência $ocorAguardando (aguardando agendamento)",
                 'quantidade' => $aguardando,
                 'percentual' => $pct($aguardando),
                 'cor'       => '#3b82f6',
