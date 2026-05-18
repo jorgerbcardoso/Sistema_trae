@@ -158,7 +158,7 @@ export function CadastroUnidades() {
     if (!addressSearch.trim()) return;
     setIsSearchingAddress(true);
     try {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(addressSearch.trim())}&limit=5&lang=pt&bbox=-73.9872,-33.7683,-34.7299,5.2717`;
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(addressSearch.trim())}&limit=5&lang=en&bbox=-73.9872,-33.7683,-34.7299,5.2717`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -653,7 +653,7 @@ export function CadastroUnidades() {
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
                     <Input
-                      placeholder="Ex: Henrique Coelho Netto, 478"
+                      placeholder="Ex: Av. Paulista, 1000"
                       value={addressSearch}
                       onChange={(e) => setAddressSearch(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchAddress(); } }}
