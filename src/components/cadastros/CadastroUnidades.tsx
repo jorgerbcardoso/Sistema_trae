@@ -158,14 +158,26 @@ export function CadastroUnidades() {
     if (!addressSearch.trim()) return;
     setIsSearchingAddress(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressSearch)}&limit=1&countrycodes=br`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR' } });
-      const results = await res.json();
-      if (results && results.length > 0) {
-        const { lat, lon } = results[0];
-        setFormData((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lon).toFixed(6) }));
-      } else {
-        toast.error('Endereço não encontrado');
+      const queries = [
+        addressSearch.trim(),
+        `${addressSearch.trim()}, Brasil`,
+      ];
+
+      let found = false;
+      for (const q of queries) {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&countrycodes=br&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'SistemaPresto/1.0' } });
+        const results = await res.json();
+        if (results && results.length > 0) {
+          const { lat, lon } = results[0];
+          setFormData((p) => ({ ...p, latitude: Number(lat).toFixed(6), longitude: Number(lon).toFixed(6) }));
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        toast.error('Endereço não encontrado. Tente incluir a cidade e o estado. Ex: "Rua Henrique Coelho Netto, 478, São Paulo, SP"');
       }
     } catch {
       toast.error('Erro ao buscar endereço');
@@ -649,7 +661,7 @@ export function CadastroUnidades() {
                   <div className="relative flex-1">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
                     <Input
-                      placeholder="Buscar endereço..."
+                      placeholder="Ex: Rua das Flores, 100, São Paulo, SP"
                       value={addressSearch}
                       onChange={(e) => setAddressSearch(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchAddress(); } }}

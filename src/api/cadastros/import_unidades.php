@@ -43,10 +43,6 @@ if (!preg_match('/^[A-Z0-9]{3}$/i', $domain)) {
 
 $dominio = strtoupper($domain);
 
-if (!isDatabaseConfigured()) {
-    msg('BANCO DE DADOS NÃO CONFIGURADO', 'error');
-}
-
 $confirma = ask("⚠️ Atenção! Os dados atuais serão reescritos. Confirma a operação?", "confirm", "confirm_import_unidades");
 
 if (!$confirma) {
@@ -54,9 +50,7 @@ if (!$confirma) {
 }
 
 global $g_sql;
-if (!isset($g_sql) || !$g_sql) {
-    $g_sql = getDBConnection();
-}
+$g_sql = getDBConnection();
 
 imp_ssw_uni();
 

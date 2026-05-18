@@ -75,7 +75,7 @@ function getDBConnection() {
         DB_PASS
     );
 
-    $conn = @pg_connect($connectionString);
+    $conn = @pg_connect($connectionString, PGSQL_CONNECT_FORCE_NEW);
 
     if (!$conn) {
         $error = error_get_last();
