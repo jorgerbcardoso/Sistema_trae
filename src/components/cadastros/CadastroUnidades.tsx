@@ -333,7 +333,7 @@ export function CadastroUnidades() {
   };
 
   return (
-    <AdminLayout title="Cadastro de Unidades" description="Gerenciar unidades do sistema e importação via SSW">
+    <AdminLayout title="Cadastro de Unidades" description="Gerenciar unidades do sistema e importação">
       <div className="max-w-6xl mx-auto space-y-6">
         <Card>
           <CardHeader>
@@ -560,4 +560,3 @@ export function CadastroUnidades() {
     </AdminLayout>
   );
 }
-

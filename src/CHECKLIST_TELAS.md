@@ -6,6 +6,14 @@ Use este checklist para validar TODAS as telas antes de fazer commit.
 
 ---
 
+## 🧭 MENU / ROTAS (QUANDO A TELA É ACESSADA PELO MENU)
+
+- [ ] Existe rota em `src/routes.tsx` para o path (ex: `cadastros/unidades`)
+- [ ] Existe registro no `ComponentRegistry` para o `component_path` do banco (ex: `cadastros/CadastroUnidades`)
+- [ ] Em `menu_items.route_path`, a rota começa com `/` (ex: `/cadastros/unidades`)
+- [ ] Em `menu_items.component_path`, o valor não tem `/` no início e bate com o registry
+- [ ] O item está liberado no domínio em `domain_menu_items` (senão não aparece no menu)
+
 ## 🎨 LAYOUT E ESTRUTURA
 
 ### **AdminLayout**

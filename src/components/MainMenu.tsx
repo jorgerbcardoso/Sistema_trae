@@ -315,8 +315,10 @@ export function MainMenu() {
         return;
       }
     }
-    
-    navigate(item.route_path);
+
+    const routePath = (item.route_path || '').trim();
+    const safePath = routePath.startsWith('/') ? routePath : `/${routePath}`;
+    navigate(safePath);
   };
 
   const getIconComponent = (iconName: string) => {

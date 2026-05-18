@@ -661,16 +661,24 @@ public function sendEmail($to_email, $to_name, $seq, $unidade, $domain, $usernam
 
 -- ✅ CORRETO - Sem prefixo (EXCEÇÕES GLOBAIS)
 users
-menu_itens
 menu_sections
 user_permissions
+menu_items
+domain_menu_items
 
 -- ❌ ERRADO - Sem prefixo para tabelas de domínio
 solicitacao_compra
 setores
 ```
 
-### **2. Implementação no PHP**
+### **2. Menu (nova tela)**
+
+Checklist mínimo para o item aparecer e abrir corretamente:
+- `menu_items.route_path` começa com `/` (rota absoluta)
+- `menu_items.component_path` bate com o `ComponentRegistry` (sem `/` no início)
+- existe registro em `domain_menu_items` para o(s) domínio(s) (senão não aparece no menu)
+
+### **3. Implementação no PHP**
 ```php
 // Definir prefixo baseado no domínio logado
 $prefix = strtolower($domain) . '_';
@@ -682,7 +690,7 @@ $query = "SELECT * FROM {$prefix}setores WHERE ativo = 'S'";
 $query = "SELECT * FROM users WHERE username = $1";
 ```
 
-### **2. Queries Otimizadas**
+### **4. Queries Otimizadas**
 
 ```sql
 -- ✅ CORRETO - Com índices e limitação
