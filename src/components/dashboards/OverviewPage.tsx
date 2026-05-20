@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { toast } from "sonner";
 import { PeriodRange } from './PeriodFilter';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { periodRangeToDashboardPeriod } from '../../utils/dashboardUtils';
+import { periodRangeToDashboardPeriod, formatCardValue } from '../../utils/dashboardUtils';
 import { OverviewData } from '../../services/dashboardService';
 import { ENVIRONMENT } from '../../config/environment';
 import { useTooltipStyle } from './CustomTooltip';
@@ -655,7 +655,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-              R$ {(totalReceita / 1000000).toFixed(2)}M
+              {formatCardValue(totalReceita)}
             </div>
             <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
@@ -685,7 +685,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-900 dark:text-red-100">
-              R$ {(totalDespesas / 1000000).toFixed(2)}M
+              {formatCardValue(totalDespesas)}
             </div>
             <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />
@@ -703,7 +703,7 @@ export function OverviewPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
-              R$ {(totalLucro / 1000000).toFixed(2)}M
+              {formatCardValue(totalLucro)}
             </div>
             <div className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 mt-1">
               <TrendingUp className="w-3 h-3" />

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { MapPin, Ticket, Luggage, Package, FileSpreadsheet, TrendingUp, FileEdit } from "lucide-react";
 import { PeriodRange } from './PeriodFilter';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { periodRangeToDashboardPeriod } from '../../utils/dashboardUtils';
+import { periodRangeToDashboardPeriod, formatCardValue } from '../../utils/dashboardUtils';
 import { RevenueData } from '../../services/dashboardService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTooltipStyle } from './CustomTooltip';
@@ -284,7 +284,7 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
               </CardHeader>
               <CardContent>
                 <div className={color.value}>
-                  R$ {(unitTotals[unitName] / 1000000).toFixed(2)}M
+                  {formatCardValue(unitTotals[unitName] ?? 0)}
                 </div>
                 <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 mt-1">
                   <TrendingUp className="w-3 h-3" />
@@ -317,7 +317,7 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
           </CardHeader>
           <CardContent>
             <div className="text-orange-900 dark:text-orange-100">
-              R$ {(unitTotals.Demais / 1000000).toFixed(2)}M
+              {formatCardValue(unitTotals.Demais ?? 0)}
             </div>
             <div className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 mt-1">
               <TrendingUp className="w-3 h-3" />

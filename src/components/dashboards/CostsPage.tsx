@@ -38,7 +38,7 @@ import {
 } from 'recharts';
 import { PeriodRange } from './PeriodFilter';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { periodRangeToDashboardPeriod } from '../../utils/dashboardUtils';
+import { periodRangeToDashboardPeriod, formatCardValue } from '../../utils/dashboardUtils';
 import { CostsData } from '../../services/dashboardService';
 import { Label } from '../ui/label';
 import React, { useState } from 'react';
@@ -514,7 +514,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-start">
             <div className={classes.value}>
-              R$ {(value / 1000000).toFixed(2)}M
+              {formatCardValue(value)}
             </div>
             <div className={`flex items-center gap-1 text-sm ${classes.subtitle} mt-1`}>
               <AlertCircle className="w-3 h-3 flex-shrink-0" />
@@ -753,7 +753,7 @@ export function CostsPage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', per
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col justify-start">
                   <div className={classes.value}>
-                    R$ {(value / 1000000).toFixed(2)}M
+                    {formatCardValue(value)}
                   </div>
                   <div className={`flex items-center gap-1 text-sm ${classes.subtitle} mt-1`}>
                     <AlertCircle className="w-3 h-3 flex-shrink-0" />

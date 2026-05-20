@@ -6,6 +6,14 @@ import { PeriodRange } from '../components/dashboards/PeriodFilter';
 import { DashboardPeriod } from '../services/dashboardService';
 
 /**
+ * Formata valor monetário para exibição em cards: valor inteiro em reais, sem centavos.
+ * Ex: 14340456.78 → "R$ 14.340.456"
+ */
+export function formatCardValue(value: number): string {
+  return `R$ ${Math.round(value).toLocaleString('pt-BR')}`;
+}
+
+/**
  * Converter PeriodRange (frontend) para DashboardPeriod (service)
  */
 export function periodRangeToDashboardPeriod(period: PeriodRange): DashboardPeriod {
