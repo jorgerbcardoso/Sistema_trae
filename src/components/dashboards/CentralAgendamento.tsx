@@ -7,6 +7,7 @@ import {
   CheckCircle, 
   Clock, 
   ClockCheck, 
+  Download,
   Filter, 
   Loader2, 
   Mail,
@@ -61,6 +62,7 @@ interface Cte {
   nome_dest: string;
   cnpj_dest: string;
   email_dest: string;
+  nfs: string;
   ult_ocor: string;
 }
 
@@ -755,6 +757,28 @@ export function CentralAgendamento() {
     </div>
   );
 
+  const exportarCSV = (lista: Cte[], nomeArquivo: string) => {
+    const header = ['CT-e', 'NFs', 'Pagador', 'Destinatário', 'CNPJ', 'Emissão', 'Prev. Entrega', 'Últ. Ocorrência'];
+    const rows = lista.map((c) => [
+      `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
+      c.nfs || '',
+      c.nome_pag || '',
+      c.nome_dest || '',
+      c.cnpj_dest || '',
+      c.data_emissao || '',
+      c.data_prev_ent || '',
+      c.ult_ocor || '',
+    ]);
+    const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <DashboardLayout
       title="Central de Agendamento"
@@ -955,14 +979,24 @@ export function CentralAgendamento() {
         </div>
 
         <Dialog open={cardDialogOpen} onOpenChange={(open) => { setCardDialogOpen(open); if (!open) { setSelectedCtes(new Set()); setSelectedCnpjDest(null); } }}>
-          <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-            <DialogHeader className="shrink-0">
-              <DialogTitle>{cardDialogNome}</DialogTitle>
-              <DialogDescription>
-                {cardDialogId === 1
-                  ? 'Selecione CT-es do mesmo destinatário para solicitar agendamento.'
-                  : 'Lista de CT-es neste grupo.'}
-              </DialogDescription>
+          <DialogContent className="max-w-7xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+            <DialogHeader className="shrink-0 pr-10">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <DialogTitle>{cardDialogNome}</DialogTitle>
+                  <DialogDescription>
+                    {cardDialogId === 1
+                      ? 'Selecione CT-es do mesmo destinatário para solicitar agendamento.'
+                      : 'Lista de CT-es neste grupo.'}
+                  </DialogDescription>
+                </div>
+                {ctes.length > 0 && (
+                  <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => exportarCSV(ctes, `${cardDialogNome.replace(/\s+/g, '_')}.csv`)}>
+                    <Download className="h-4 w-4" />
+                    Exportar CSV
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
 
             <div className={`grid h-full min-h-0 gap-3 overflow-hidden ${cardDialogId === 1 ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-rows-[minmax(0,1fr)]'}`}>
@@ -987,9 +1021,10 @@ export function CentralAgendamento() {
               )}
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
+                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
                   {cardDialogId === 1 && <span></span>}
                   <span>CT-e</span>
+                  <span>NF</span>
                   <span>Pagador</span>
                   <span>Destinatário</span>
                   <span>CNPJ</span>
@@ -1017,7 +1052,7 @@ export function CentralAgendamento() {
                         return (
                           <div
                             key={`${cte.ser_cte}-${cte.nro_cte}`}
-                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
+                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
                           >
                             {cardDialogId === 1 && (
                               <div className="flex items-center">
@@ -1029,6 +1064,7 @@ export function CentralAgendamento() {
                               </div>
                             )}
                             <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                            <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
                             <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                             <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
                             <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
@@ -1113,18 +1149,27 @@ export function CentralAgendamento() {
           </DialogContent>
         </Dialog>
         <Dialog open={calendarioDialogOpen} onOpenChange={setCalendarioDialogOpen}>
-          <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-            <DialogHeader className="shrink-0">
-              <DialogTitle>{calendarioDialogNome}</DialogTitle>
-              <DialogDescription>
-                Lista de CT-es neste grupo.
-              </DialogDescription>
+          <DialogContent className="max-w-7xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+            <DialogHeader className="shrink-0 pr-10">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <DialogTitle>{calendarioDialogNome}</DialogTitle>
+                  <DialogDescription>Lista de CT-es neste grupo.</DialogDescription>
+                </div>
+                {ctesCalendario.length > 0 && (
+                  <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => exportarCSV(ctesCalendario, `${calendarioDialogNome.replace(/\s+/g, '_')}.csv`)}>
+                    <Download className="h-4 w-4" />
+                    Exportar CSV
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
 
             <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden">
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                <div className="grid grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <div className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                   <span>CT-e</span>
+                  <span>NF</span>
                   <span>Pagador</span>
                   <span>Destinatário</span>
                   <span>CNPJ</span>
@@ -1149,9 +1194,10 @@ export function CentralAgendamento() {
                       ctesCalendario.map((cte) => (
                         <div
                           key={`cal-${cte.ser_cte}-${cte.nro_cte}`}
-                          className="grid grid-cols-[90px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                          className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
                         >
                           <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                          <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
                           <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                           <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
                           <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>

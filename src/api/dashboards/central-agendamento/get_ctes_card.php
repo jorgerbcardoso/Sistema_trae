@@ -95,6 +95,7 @@ $query = "
         cte.nome_dest,
         cte.cnpj_dest,
         COALESCE(c.email, '') AS email_dest,
+        COALESCE(cte.nfs, '') AS nfs,
         CASE
             WHEN cte.ult_ocor IS NOT NULL AND cte.ult_ocor <> 0
             THEN LPAD(cte.ult_ocor::text, 2, '0') || ' - ' || COALESCE(ocor.descricao, '')
@@ -122,10 +123,11 @@ while ($row = pg_fetch_assoc($result)) {
         'data_prev_ent'=> $row['data_prev_ent'],
         'nome_pag'     => $row['nome_pag'],
         'nome_dest'    => $row['nome_dest'],
-        'cnpj_dest'       => $row['cnpj_dest'],
-        'email_dest'      => $row['email_dest'],
+        'cnpj_dest'         => $row['cnpj_dest'],
+        'email_dest'        => $row['email_dest'],
         'data_prev_ent_iso' => $row['data_prev_ent_iso'],
-        'ult_ocor'     => $row['ult_ocor'],
+        'nfs'               => $row['nfs'],
+        'ult_ocor'          => $row['ult_ocor'],
     ];
 }
 
