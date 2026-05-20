@@ -147,17 +147,25 @@ $query = "
         cte.sigla_dest as sigla,
         COALESCE(u.nome, cte.sigla_dest) as nome,
         COUNT(*) as total,
-        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-              AND cte.data_entrega <= cte.data_prev_ent THEN 1 END) as entregues_no_prazo,
-        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-              AND cte.data_entrega > cte.data_prev_ent THEN 1 END) as entregues_em_atraso,
-        COUNT(CASE WHEN cte.data_entrega IS NULL
-              AND cte.data_prev_ent >= CURRENT_DATE THEN 1 END) as pendentes_no_prazo,
-        COUNT(CASE WHEN cte.data_entrega IS NULL
-              AND cte.data_prev_ent < CURRENT_DATE THEN 1 END) as pendentes_em_atraso,
+        COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
+                     OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)
+              THEN 1 END) as entregues_no_prazo,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NOT NULL
+                    AND cte.data_entrega > cte.data_prev_ent
+              THEN 1 END) as entregues_em_atraso,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NULL
+                    AND cte.data_prev_ent >= CURRENT_DATE
+              THEN 1 END) as pendentes_no_prazo,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NULL
+                    AND cte.data_prev_ent < CURRENT_DATE
+              THEN 1 END) as pendentes_em_atraso,
         ROUND(
-            CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                  AND cte.data_entrega <= cte.data_prev_ent THEN 1 END) AS DECIMAL) /
+            CAST(COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
+                              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)
+                  THEN 1 END) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1
         ) as percentage

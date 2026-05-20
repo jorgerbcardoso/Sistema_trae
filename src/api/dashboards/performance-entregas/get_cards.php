@@ -152,14 +152,21 @@ if (count($whereConditions) > 0) {
 $query = "
     SELECT
         COUNT(*) as total_ctes,
-        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-              AND cte.data_entrega <= cte.data_prev_ent THEN 1 END) as entregues_no_prazo,
-        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-              AND cte.data_entrega > cte.data_prev_ent THEN 1 END) as entregues_com_atraso,
-        COUNT(CASE WHEN cte.data_entrega IS NULL
-              AND CURRENT_DATE > cte.data_prev_ent THEN 1 END) as pendentes_atrasados,
-        COUNT(CASE WHEN cte.data_entrega IS NULL
-              AND CURRENT_DATE <= cte.data_prev_ent THEN 1 END) as pendentes_no_prazo
+        COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
+                     OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)
+              THEN 1 END) as entregues_no_prazo,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NOT NULL
+                    AND cte.data_entrega > cte.data_prev_ent
+              THEN 1 END) as entregues_com_atraso,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NULL
+                    AND CURRENT_DATE > cte.data_prev_ent
+              THEN 1 END) as pendentes_atrasados,
+        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
+                    AND cte.data_entrega IS NULL
+                    AND CURRENT_DATE <= cte.data_prev_ent
+              THEN 1 END) as pendentes_no_prazo
     FROM {$domain}_cte cte
     $whereClause
 ";
