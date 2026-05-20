@@ -52,6 +52,32 @@ try {
     $g_sql = connect();
 
     // ================================================================
+    // ATUALIZAR COLETAS SE O PERÍODO CONTEMPLAR HOJE OU FUTURO
+    // ================================================================
+    $hoje = date('Y-m-d');
+    $datasParaVerificar = [
+        $filters['periodoLancamentoInicio'] ?? null,
+        $filters['periodoLancamentoFim']    ?? null,
+        $filters['periodoPrevisaoInicio']   ?? null,
+        $filters['periodoPrevisaoFim']      ?? null,
+    ];
+    $contemplaHojeOuFuturo = false;
+    foreach ($datasParaVerificar as $data) {
+        if (!empty($data) && $data >= $hoje) {
+            $contemplaHojeOuFuturo = true;
+            break;
+        }
+    }
+    if ($contemplaHojeOuFuturo) {
+        $hasLancamento = !empty($filters['periodoLancamentoInicio']) || !empty($filters['periodoLancamentoFim']);
+        $tp_periodo = $hasLancamento ? 'I' : 'C';
+        $domEscapado = escapeshellarg(strtolower($domain));
+        $tpEscapado  = escapeshellarg($tp_periodo);
+        exec("php /var/www/html/imp_coleta.php \"\" \"\" $domEscapado $tpEscapado > /dev/null 2>&1");
+        error_log("✅ [get_dashboard_data.php] imp_coleta.php executado para domínio: $domain, tp_periodo: $tp_periodo");
+    }
+
+    // ================================================================
     // CRIAR DUAS TABELAS TEMPORÁRIAS
     // ================================================================
     // ✅ VIEW 1: Com filtros do usuário (para Cards + Comparativo)

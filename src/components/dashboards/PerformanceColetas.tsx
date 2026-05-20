@@ -740,53 +740,77 @@ export function PerformanceColetas() {
 
                 <div className="space-y-6 py-4">
                   {/* Período de Lançamento */}
-                  <div className="space-y-4">
-                    <Label className="text-slate-900 dark:text-slate-100">Período de Lançamento</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoLancamentoInicio}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoInicio: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoLancamentoFim}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoFim: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const hasPrevisao = !!(tempFilters.periodoPrevisaoInicio || tempFilters.periodoPrevisaoFim);
+                    const hasLancamento = !!(tempFilters.periodoLancamentoInicio || tempFilters.periodoLancamentoFim);
+                    return (
+                      <>
+                        <div className={`space-y-4 ${hasPrevisao ? 'opacity-40 pointer-events-none' : ''}`}>
+                          <div className="flex items-center justify-between">
+                            <Label className="text-slate-900 dark:text-slate-100">Período de Lançamento</Label>
+                            {hasLancamento && !hasPrevisao && (
+                              <button type="button" className="text-xs text-slate-400 hover:text-slate-600 underline" onClick={() => setTempFilters({...tempFilters, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}>Limpar</button>
+                            )}
+                          </div>
+                          {hasPrevisao && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Desative o Período de Previsão para usar este filtro.</p>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                              <Input
+                                type="date"
+                                value={tempFilters.periodoLancamentoInicio}
+                                onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoInicio: e.target.value, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}
+                                className="dark:bg-slate-800 dark:border-slate-700"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                              <Input
+                                type="date"
+                                value={tempFilters.periodoLancamentoFim}
+                                onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoFim: e.target.value, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}
+                                className="dark:bg-slate-800 dark:border-slate-700"
+                              />
+                            </div>
+                          </div>
+                        </div>
 
-                  <div className="space-y-4">
-                    <Label className="text-slate-900 dark:text-slate-100">Período de Previsão de Coleta</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoPrevisaoInicio}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoInicio: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoPrevisaoFim}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoFim: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                        <div className={`space-y-4 ${hasLancamento ? 'opacity-40 pointer-events-none' : ''}`}>
+                          <div className="flex items-center justify-between">
+                            <Label className="text-slate-900 dark:text-slate-100">Período de Previsão de Coleta</Label>
+                            {hasPrevisao && !hasLancamento && (
+                              <button type="button" className="text-xs text-slate-400 hover:text-slate-600 underline" onClick={() => setTempFilters({...tempFilters, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}>Limpar</button>
+                            )}
+                          </div>
+                          {hasLancamento && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Desative o Período de Lançamento para usar este filtro.</p>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                              <Input
+                                type="date"
+                                value={tempFilters.periodoPrevisaoInicio}
+                                onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoInicio: e.target.value, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}
+                                className="dark:bg-slate-800 dark:border-slate-700"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                              <Input
+                                type="date"
+                                value={tempFilters.periodoPrevisaoFim}
+                                onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoFim: e.target.value, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}
+                                className="dark:bg-slate-800 dark:border-slate-700"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* ✅ NOVO: Filtro de Unidade de Coleta */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
