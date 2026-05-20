@@ -61,6 +61,7 @@ $query = "
         COUNT(CASE
             WHEN c.agenda = true
              AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)
+             AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS agendaveis,
 

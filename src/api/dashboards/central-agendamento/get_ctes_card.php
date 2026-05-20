@@ -58,9 +58,11 @@ switch ($cardId) {
     case 1:
         $whereConditions[] = "c.agenda = true";
         $whereConditions[] = "(cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)";
+        $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 2:
         $whereConditions[] = "cte.ult_ocor_agend = $ocorAguardando";
+        $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 3:
         $whereConditions[] = "cte.ult_ocor_agend = 15";
