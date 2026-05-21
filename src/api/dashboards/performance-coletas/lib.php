@@ -604,7 +604,7 @@ function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt
             COUNT(
                 CASE 
                     WHEN situacao = '2' 
-                    AND (data_efetivacao + hora_efetivacao) <= (data_limite + hora_limite)
+                    AND (data_efetivacao::date + hora_efetivacao::time) <= (data_limite::date + hora_limite::time)
                     THEN 1 
                 END
             ) as no_prazo,
@@ -612,7 +612,7 @@ function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt
                 COUNT(
                     CASE 
                         WHEN situacao = '2' 
-                        AND (data_efetivacao + hora_efetivacao) <= (data_limite + hora_limite)
+                        AND (data_efetivacao::date + hora_efetivacao::time) <= (data_limite::date + hora_limite::time)
                         THEN 1 
                     END
                 )::numeric / 
@@ -660,13 +660,13 @@ function getColetasEvolucao($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
             COUNT(CASE WHEN situacao = '2' THEN 1 END) as coletadas,
             COUNT(CASE 
                 WHEN situacao = '2' 
-                AND (data_efetivacao + hora_efetivacao) <= (data_limite + hora_limite) 
+                AND (data_efetivacao::date + hora_efetivacao::time) <= (data_limite::date + hora_limite::time) 
                 THEN 1 
             END) as no_prazo,
             ROUND(
                 COUNT(CASE 
                     WHEN situacao = '2' 
-                    AND (data_efetivacao + hora_efetivacao) <= (data_limite + hora_limite) 
+                    AND (data_efetivacao::date + hora_efetivacao::time) <= (data_limite::date + hora_limite::time) 
                     THEN 1 
                 END)::numeric / 
                 NULLIF(COUNT(*)::numeric, 0) * 100, 
