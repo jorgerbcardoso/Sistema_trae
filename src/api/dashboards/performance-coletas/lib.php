@@ -704,6 +704,7 @@ function getColetasEvolucao($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
             ) as performance
         FROM $tableName
         WHERE situacao != '3'
+          AND data_limite::date <= CURRENT_DATE
         GROUP BY data_limite::date
         ORDER BY data_limite::date
     ";
