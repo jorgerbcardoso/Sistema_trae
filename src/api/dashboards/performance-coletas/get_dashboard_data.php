@@ -1,31 +1,4 @@
 <?php
-/**
- * ================================================================
- * API UNIFICADA: DASHBOARD PERFORMANCE DE COLETAS
- * ================================================================
- * Endpoint único que cria DUAS VIEWs temporárias e retorna TODOS
- * os dados necessários para o dashboard:
- * 
- * VIEW 1 (tmp_coleta_filtrada): COM filtros do usuário
- * - Cards com contadores por situação
- * - Comparativo por unidades coletadoras
- * 
- * VIEW 2 (tmp_coleta_30dias): Últimos 30 dias
- * - Análise diária (últimos 30 dias)
- * - Evolução de performance (últimos 30 dias)
- *
- * ✅ LEITURA DIRETA DA BASE DE DADOS
- * As VIEWs são criadas a partir da tabela [dominio]_coleta,
- * que é populada diariamente via crontab pelo script imp_coleta.php
- *
- * VANTAGENS:
- * ✅ Separação clara entre dados filtrados e dados históricos
- * ✅ Cards e Comparativo usam apenas Query 1 (filtros do usuário)
- * ✅ Evolução e Análise Diária usam apenas Query 2 (30 dias)
- * ✅ Apenas 1 requisição HTTP do frontend
- * ================================================================
- */
-
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/lib.php';
 
@@ -33,90 +6,63 @@ handleOptionsRequest();
 validateRequestMethod('POST');
 
 try {
-    // ================================================================
-    // AUTENTICAÇÃO
-    // ================================================================
-    $auth = authenticateAndGetUser();
-    $user = $auth['user'];
+    $auth   = authenticateAndGetUser();
     $domain = $auth['domain'];
 
-    // ================================================================
-    // RECEBER E PROCESSAR PARÂMETROS
-    // ================================================================
-    $input = getRequestInput();
+    $input   = getRequestInput();
     $filters = $input['filters'] ?? [];
-    
-    // ================================================================
-    // CONECTAR AO BANCO
-    // ================================================================
+
+    $hasLancamento = !empty($filters['periodoLancamentoInicio']) || !empty($filters['periodoLancamentoFim']);
+    $hasPrevisao   = !empty($filters['periodoPrevisaoInicio'])   || !empty($filters['periodoPrevisaoFim']);
+
+    if (!$hasLancamento && !$hasPrevisao) {
+        respondJson(['success' => false, 'error' => 'É obrigatório informar pelo menos um período (Lançamento ou Previsão de Coleta).'], 400);
+    }
+
+    $tp_periodo = $hasLancamento ? 'I' : 'C';
+    $dataIni    = $hasLancamento ? ($filters['periodoLancamentoInicio'] ?? '') : ($filters['periodoPrevisaoInicio'] ?? '');
+    $dataFim    = $hasLancamento ? ($filters['periodoLancamentoFim']    ?? '') : ($filters['periodoPrevisaoFim']    ?? '');
+
+    if (empty($dataIni) || empty($dataFim)) {
+        respondJson(['success' => false, 'error' => 'Informe as datas de início e fim do período.'], 400);
+    }
+
+    $ini = new DateTime($dataIni);
+    $fim = new DateTime($dataFim);
+    $diff = $ini->diff($fim)->days;
+
+    if ($diff > 31) {
+        respondJson(['success' => false, 'error' => 'O período não pode ser maior que 31 dias.'], 400);
+    }
+
+    $data_ini_dmy = $ini->format('dmy');
+    $data_fim_dmy = $fim->format('dmy');
+
     $g_sql = connect();
 
-    // ================================================================
-    // ATUALIZAR COLETAS SE O PERÍODO CONTEMPLAR HOJE OU FUTURO
-    // ================================================================
-    $hoje = date('Y-m-d');
-    $datasParaVerificar = [
-        $filters['periodoLancamentoInicio'] ?? null,
-        $filters['periodoLancamentoFim']    ?? null,
-        $filters['periodoPrevisaoInicio']   ?? null,
-        $filters['periodoPrevisaoFim']      ?? null,
-    ];
-    $contemplaHojeOuFuturo = false;
-    foreach ($datasParaVerificar as $data) {
-        if (!empty($data) && $data >= $hoje) {
-            $contemplaHojeOuFuturo = true;
-            break;
-        }
-    }
-    if ($contemplaHojeOuFuturo) {
-        $hasLancamento = !empty($filters['periodoLancamentoInicio']) || !empty($filters['periodoLancamentoFim']);
-        $tp_periodo = $hasLancamento ? 'I' : 'C';
-        $domEscapado = escapeshellarg(strtolower($domain));
-        $tpEscapado  = escapeshellarg($tp_periodo);
-        exec("php /var/www/html/imp_coleta.php \"\" \"\" $domEscapado $tpEscapado > /dev/null 2>&1");
-        error_log("✅ [get_dashboard_data.php] imp_coleta.php executado para domínio: $domain, tp_periodo: $tp_periodo");
-    }
+    $total = fetchColetasSSW($g_sql, $domain, $data_ini_dmy, $data_fim_dmy, $tp_periodo);
 
-    // ================================================================
-    // CRIAR DUAS TABELAS TEMPORÁRIAS
-    // ================================================================
-    // ✅ VIEW 1: Com filtros do usuário (para Cards + Comparativo)
-    // ✅ VIEW 2: Últimos 30 dias (para Evolução + Análise Diária)
-    createTempColetasTables($g_sql, $domain, $filters);
+    error_log("✅ [get_dashboard_data.php] fetchColetasSSW: $total coletas importadas para $domain ($data_ini_dmy a $data_fim_dmy, tp=$tp_periodo)");
 
-    // ================================================================
-    // BUSCAR TODOS OS DADOS NECESSÁRIOS
-    // ================================================================
-    
-    // 1️⃣ CARDS: Contadores por situação (usa VIEW 1 - filtrada)
-    $cards = getColetasCountBySituacao($g_sql, 'tmp_coleta_filtrada');
-    
-    // 2️⃣ ANÁLISE DIÁRIA: Últimos 30 dias (usa VIEW 2 - 30 dias)
-    $analiseDiaria = getColetasAnaliseDiaria($g_sql, 30, 'tmp_coleta_30dias');
-    
-    // 3️⃣ EVOLUÇÃO: Últimos 30 dias (usa VIEW 2 - 30 dias)
-    $evolucao = getColetasEvolucao($g_sql, 30, 'tmp_coleta_30dias');
-    
-    // 4️⃣ COMPARATIVO: Por unidades coletadoras (usa VIEW 1 - filtrada)
-    $comparativo = getColetasComparativo($g_sql, $domain);
+    $cards         = getColetasCountBySituacao($g_sql, 'tmp_coleta_rt', $filters);
+    $analiseDiaria = getColetasAnaliseDiaria($g_sql, $diff + 1, 'tmp_coleta_rt');
+    $evolucao      = getColetasEvolucao($g_sql, $diff + 1, 'tmp_coleta_rt');
+    $comparativo   = getColetasComparativo($g_sql, $domain, 'tmp_coleta_rt');
+    $coletas       = getColetasRaw($g_sql, 'tmp_coleta_rt');
 
-    // ================================================================
-    // RESPOSTA UNIFICADA
-    // ================================================================
     respondJson([
         'success' => true,
         'data' => [
-            'cards' => $cards,
-            'analiseDiaria' => $analiseDiaria,
-            'evolucao' => $evolucao,
-            'comparativo' => $comparativo
+            'cards'           => $cards,
+            'analiseDiaria'   => $analiseDiaria,
+            'evolucao'        => $evolucao,
+            'comparativo'     => $comparativo,
+            'coletas'         => $coletas,
+            'total_importado' => $total,
         ]
     ]);
 
 } catch (Exception $e) {
-    msg($e->getMessage(), 'e');
-    respondJson([
-        'success' => false,
-        'error' => $e->getMessage()
-    ], 500);
+    error_log('❌ [get_dashboard_data.php] ' . $e->getMessage());
+    respondJson(['success' => false, 'error' => $e->getMessage()], 500);
 }

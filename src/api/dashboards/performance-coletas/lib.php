@@ -419,13 +419,14 @@ function buildUnidadeColetaFilter($g_sql, $siglas = [], $columnName = 'unidade')
  * - 3 = Cancelada (SEMPRE DESCONSIDERADA)
  * ================================================================
  */
-function getColetasCountBySituacao($g_sql, $tableName = 'tmp_coleta_filtrada') {
+function getColetasCountBySituacao($g_sql, $tableName = 'tmp_coleta_rt', $filters = []) {
+    $where = buildWhereColetasUsuario($g_sql, $filters);
     $query = "
         SELECT 
             situacao,
             COUNT(*) as total
         FROM $tableName
-        WHERE situacao != '3'
+        WHERE $where
         GROUP BY situacao
         ORDER BY situacao
     ";
@@ -594,7 +595,7 @@ function getColetasByUnidade($g_sql) {
  * @return array - Array de dados diários
  * ================================================================
  */
-function getColetasAnaliseDiaria($g_sql, $days = 30) {
+function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
     $query = "
         SELECT 
             data_limite::date as data,
@@ -618,11 +619,8 @@ function getColetasAnaliseDiaria($g_sql, $days = 30) {
                 NULLIF(COUNT(*)::numeric, 0) * 100, 
                 2
             ) as performance
-        FROM tmp_coleta_30dias
-        WHERE 
-            situacao != '3'
-            AND data_limite >= CURRENT_DATE - INTERVAL '$days days'
-            AND data_limite <= CURRENT_DATE
+        FROM $tableName
+        WHERE situacao != '3'
         GROUP BY data_limite::date
         ORDER BY data_limite::date
     ";
@@ -654,7 +652,7 @@ function getColetasAnaliseDiaria($g_sql, $days = 30) {
  * @return array - Array de dados de evolução
  * ================================================================
  */
-function getColetasEvolucao($g_sql, $days = 30) {
+function getColetasEvolucao($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
     $query = "
         SELECT 
             data_limite::date as data,
@@ -674,11 +672,8 @@ function getColetasEvolucao($g_sql, $days = 30) {
                 NULLIF(COUNT(*)::numeric, 0) * 100, 
                 2
             ) as performance
-        FROM tmp_coleta_30dias
-        WHERE 
-            situacao != '3'
-            AND data_limite >= CURRENT_DATE - INTERVAL '$days days'
-            AND data_limite <= CURRENT_DATE
+        FROM $tableName
+        WHERE situacao != '3'
         GROUP BY data_limite::date
         ORDER BY data_limite::date
     ";
@@ -710,7 +705,59 @@ function getColetasEvolucao($g_sql, $days = 30) {
  * @return array - Array de dados comparativos por unidade
  * ================================================================
  */
-function getColetasComparativo($g_sql, $domain) {
+/**
+ * Retorna todas as linhas brutas da TEMP TABLE para exportação CSV no frontend
+ */
+function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt') {
+    $query = "
+        SELECT
+            unidade,
+            nro_coleta,
+            TO_CHAR(data_inclusao, 'DD/MM/YYYY') AS data_inclusao,
+            hora_inclusao,
+            TO_CHAR(data_limite, 'DD/MM/YYYY')   AS data_limite,
+            hora_limite,
+            cnpj_emit,
+            nome_emit,
+            endereco_emit,
+            bairro_emit,
+            cidade_emit,
+            uf_emit,
+            cep_emit,
+            setor,
+            cnpj_dest,
+            solicitante,
+            CASE situacao
+                WHEN '9' THEN 'PRE-CADASTRADA'
+                WHEN '0' THEN 'CADASTRADA'
+                WHEN '1' THEN 'COMANDADA'
+                WHEN '2' THEN 'COLETADA'
+                WHEN '3' THEN 'CANCELADA'
+                ELSE situacao
+            END AS situacao,
+            vlr_merc,
+            qtde_vol,
+            peso,
+            placa,
+            observacao,
+            TO_CHAR(data_efetivacao, 'DD/MM/YYYY') AS data_efetivacao,
+            hora_efetivacao
+        FROM $tableName
+        WHERE situacao != '3'
+        ORDER BY data_limite, unidade, nro_coleta
+    ";
+
+    $result = pg_query($g_sql, $query);
+    if (!$result) return [];
+
+    $rows = [];
+    while ($row = pg_fetch_assoc($result)) {
+        $rows[] = $row;
+    }
+    return $rows;
+}
+
+function getColetasComparativo($g_sql, $domain, $tableName = 'tmp_coleta_rt') {
     $tabela_unidade = strtolower($domain) . '_unidade';
     
     $query = "
@@ -739,7 +786,7 @@ function getColetasComparativo($g_sql, $domain) {
                 NULLIF(COUNT(*)::numeric, 0) * 100, 
                 2
             ) as performance
-        FROM tmp_coleta_filtrada c
+        FROM $tableName c
         LEFT JOIN $tabela_unidade u ON SUBSTRING(c.unidade, 1, 3) = u.sigla
         WHERE c.situacao != '3'
         GROUP BY SUBSTRING(c.unidade, 1, 3), u.nome

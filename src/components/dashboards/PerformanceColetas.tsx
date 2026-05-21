@@ -49,13 +49,7 @@ import { getLogoUrl } from '../../config/clientLogos';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { toast } from 'sonner';
 import { 
-  getDashboardData, // ✅ ENDPOINT UNIFICADO
-  exportColetasPorSituacao,
-  exportColetasProgramadasDia,
-  exportColetasDia,
-  exportColetasComandasDia,
-  exportColetasNoPrazoDia,
-  exportColetasComparativo,
+  getDashboardData,
   type ColetasFilters,
   type PerformanceCards as PerformanceCardsType,
   type DayDataColetas,
@@ -64,6 +58,33 @@ import {
 } from '../../services/performanceColetasService';
 
 interface Filters extends ColetasFilters {}
+
+interface ColetaRaw {
+  unidade: string;
+  nro_coleta: string;
+  data_inclusao: string;
+  hora_inclusao: string;
+  data_limite: string;
+  hora_limite: string;
+  cnpj_emit: string;
+  nome_emit: string;
+  endereco_emit: string;
+  bairro_emit: string;
+  cidade_emit: string;
+  uf_emit: string;
+  cep_emit: string;
+  setor: string;
+  cnpj_dest: string;
+  solicitante: string;
+  situacao: string;
+  vlr_merc: string;
+  qtde_vol: string;
+  peso: string;
+  placa: string;
+  observacao: string;
+  data_efetivacao: string;
+  hora_efetivacao: string;
+}
 
 interface ColetaGroup {
   label: string;
@@ -100,23 +121,13 @@ export function PerformanceColetas() {
       return `${year}-${month}-${day}`;
     };
     
-    // Se já passou dia 10 → mês atual do dia 1 até hoje
-    if (currentDay > 10) {
-      const firstDayCurrentMonth = new Date(currentYear, currentMonth, 1);
-      return {
-        inicio: formatDate(firstDayCurrentMonth),
-        fim: formatDate(today)
-      };
-    } 
-    // Se ainda não passou dia 10 → mês anterior completo
-    else {
-      const firstDayLastMonth = new Date(currentYear, currentMonth - 1, 1);
-      const lastDayLastMonth = new Date(currentYear, currentMonth, 0);
-      return {
-        inicio: formatDate(firstDayLastMonth),
-        fim: formatDate(lastDayLastMonth)
-      };
-    }
+    // Sempre: últimos 30 dias até hoje (máximo 31 dias)
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    return {
+      inicio: formatDate(thirtyDaysAgo),
+      fim: formatDate(today)
+    };
   };
   
   const defaultPeriod = getDefaultPeriod();
@@ -133,6 +144,7 @@ export function PerformanceColetas() {
   });
   
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
+  const [coletasRaw, setColetasRaw] = useState<ColetaRaw[]>([]);
   const [coletaGroups, setColetaGroups] = useState<ColetaGroup[]>([]);
   const [evolucaoData, setEvolucaoData] = useState<any[]>([]);
   const [unitPerformances, setUnitPerformances] = useState<UnidadePerformanceColetas[]>([]);
@@ -298,6 +310,9 @@ export function PerformanceColetas() {
       
       // Processar comparativo
       setUnitPerformances(comparativoArray);
+
+      // Armazenar coletas brutas para exportação CSV local
+      setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
       
       setLoading(false);
     } catch (error) {
@@ -323,6 +338,28 @@ export function PerformanceColetas() {
   };
 
   const applyFilters = () => {
+    const hasLancamento = !!(tempFilters.periodoLancamentoInicio || tempFilters.periodoLancamentoFim);
+    const hasPrevisao   = !!(tempFilters.periodoPrevisaoInicio   || tempFilters.periodoPrevisaoFim);
+
+    if (!hasLancamento && !hasPrevisao) {
+      toast.error('Informe pelo menos um período (Lançamento ou Previsão de Coleta) antes de aplicar os filtros.');
+      return;
+    }
+
+    const ini = hasLancamento ? tempFilters.periodoLancamentoInicio : tempFilters.periodoPrevisaoInicio;
+    const fim = hasLancamento ? tempFilters.periodoLancamentoFim    : tempFilters.periodoPrevisaoFim;
+
+    if (!ini || !fim) {
+      toast.error('Informe as datas de início e fim do período.');
+      return;
+    }
+
+    const diffDays = Math.round((new Date(fim).getTime() - new Date(ini).getTime()) / 86_400_000);
+    if (diffDays > 31) {
+      toast.error('O período não pode ser maior que 31 dias.');
+      return;
+    }
+
     setFilters(tempFilters);
     setShowFilters(false);
   };
@@ -398,180 +435,81 @@ export function PerformanceColetas() {
   };
 
   // Funções de exportação
-  const handleExportCard = async (situacao: string, label: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasPorSituacao(situacao, {
-        periodoLancamentoInicio: filters.periodoLancamentoInicio,
-        periodoLancamentoFim: filters.periodoLancamentoFim,
-        periodoPrevisaoInicio: filters.periodoPrevisaoInicio,
-        periodoPrevisaoFim: filters.periodoPrevisaoFim,
-        unidadeColeta: filters.unidadeColeta,
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao
-      });
-      toast.success(`Planilha de ${label} gerada com sucesso`, { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const CSV_HEADER = ['Unidade','Nº Coleta','Data Inclusão','Hora Inclusão','Data Limite','Hora Limite',
+    'CNPJ Remetente','Nome Remetente','Endereço','Bairro','Cidade','UF','CEP','Setor',
+    'CNPJ Destinatário','Solicitante','Situação','Vlr Mercadoria','Qtde Vol','Peso',
+    'Placa','Observação','Data Efetivação','Hora Efetivação'];
+
+  const coletaToRow = (c: ColetaRaw) => [
+    c.unidade, c.nro_coleta, c.data_inclusao, c.hora_inclusao, c.data_limite, c.hora_limite,
+    c.cnpj_emit, c.nome_emit, c.endereco_emit, c.bairro_emit, c.cidade_emit, c.uf_emit, c.cep_emit, c.setor,
+    c.cnpj_dest, c.solicitante, c.situacao, c.vlr_merc, c.qtde_vol, c.peso,
+    c.placa, c.observacao, c.data_efetivacao ?? '', c.hora_efetivacao ?? ''
+  ];
+
+  const downloadCSV = (rows: ColetaRaw[], filename: string) => {
+    if (rows.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
+    const lines = [CSV_HEADER, ...rows.map(coletaToRow)]
+      .map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + lines], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleExportColetasDia = async (data: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasDia(data, {
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao,
-        unidadeColeta: filters.unidadeColeta
-      });
-      toast.success('Planilha gerada com sucesso', { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const SITUACAO_MAP: Record<string, string> = {
+    '9': 'PRE-CADASTRADA', '0': 'CADASTRADA', '1': 'COMANDADA', '2': 'COLETADA', '3': 'CANCELADA'
   };
 
-  const handleExportProgramadasDia = async (data: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasProgramadasDia(data, {
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao,
-        unidadeColeta: filters.unidadeColeta
-      });
-      toast.success('Planilha gerada com sucesso', { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const handleExportCard = (situacao: string, label: string) => {
+    const filtered = coletasRaw.filter(c => c.situacao === SITUACAO_MAP[situacao] || c.situacao === situacao);
+    downloadCSV(filtered, `coletas_${label.toLowerCase().replace(/\s+/g, '_')}.csv`);
+    if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
   };
 
-  const handleExportComandasDia = async (data: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasComandasDia(data, {
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao,
-        unidadeColeta: filters.unidadeColeta
-      });
-      toast.success('Planilha gerada com sucesso', { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const normDate = (d: string) => {
+    if (!d) return '';
+    if (d.includes('/')) { const [dd, mm, yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; }
+    return d;
   };
 
-  const handleExportNoPrazoDia = async (data: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasNoPrazoDia(data, {
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao,
-        unidadeColeta: filters.unidadeColeta
-      });
-      toast.success('Planilha gerada com sucesso', { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const handleExportColetasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso);
+    downloadCSV(filtered, `coletas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
   };
 
-  const handleExportComparativo = async (sigla: string, tipo: 'total' | 'programadas' | 'comandadas' | 'coletadas' | 'no_prazo', label: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-    try {
-      await exportColetasComparativo(sigla, tipo, {
-        periodoLancamentoInicio: filters.periodoLancamentoInicio,
-        periodoLancamentoFim: filters.periodoLancamentoFim,
-        periodoPrevisaoInicio: filters.periodoPrevisaoInicio,
-        periodoPrevisaoFim: filters.periodoPrevisaoFim,
-        unidadeColeta: filters.unidadeColeta,
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao
-      });
-      toast.success(`Planilha de ${label} gerada com sucesso`, { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
-    }
+  const handleExportProgramadasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
+    downloadCSV(filtered, `programadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+  };
+
+  const handleExportComandasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COMANDADA');
+    downloadCSV(filtered, `comandadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+  };
+
+  const handleExportNoPrazoDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
+    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+  };
+
+  const handleExportComparativo = (sigla: string, tipo: 'total' | 'programadas' | 'comandadas' | 'coletadas' | 'no_prazo', label: string) => {
+    let filtered = coletasRaw.filter(c => c.unidade.startsWith(sigla));
+    if (tipo === 'programadas') filtered = filtered.filter(c => ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
+    else if (tipo === 'comandadas') filtered = filtered.filter(c => c.situacao === 'COMANDADA');
+    else if (tipo === 'coletadas') filtered = filtered.filter(c => c.situacao === 'COLETADA');
+    else if (tipo === 'no_prazo') filtered = filtered.filter(c => c.situacao === 'COLETADA' && c.data_efetivacao && c.data_efetivacao <= c.data_limite);
+    downloadCSV(filtered, `comparativo_${sigla}_${tipo}.csv`);
+    if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
   };
 
   // ✅ FUNÇÃO: Exportar CSV do Gráfico de Evolução (clique no dia)

@@ -1025,6 +1025,151 @@ function finishCSVExport($csv) {
  function fmtdec ($vlr, $cas) {return number_format ($vlr, $cas, ',', '.');}
 
 // ============================================
+// COLETAS SSW - TEMPO REAL
+// ============================================
+
+/**
+ * Busca coletas diretamente no SSW e popula uma TEMP TABLE PostgreSQL.
+ *
+ * A tabela criada se chama "tmp_coleta_rt" e existe apenas durante a sessão.
+ *
+ * @param resource $g_sql    Conexão PostgreSQL ativa
+ * @param string   $domain   Domínio (ex: ACV, JOI)
+ * @param string   $data_ini Data início no formato dmy (ex: 010125)
+ * @param string   $data_fin Data fim no formato dmy (ex: 310125)
+ * @param string   $tp_periodo 'I' = por data de inclusão/lançamento | 'C' = por data de coleta/previsão
+ *
+ * @return int Número de coletas importadas
+ * @throws Exception Em caso de erro no SSW ou no banco
+ */
+function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I') {
+    require_once '/var/www/html/lib/ssw.php';
+
+    $domain = strtoupper($domain);
+
+    ssw_login($domain);
+
+    $str = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
+
+    $param = "act=FIL_COL" .
+             "&f2=$domain" .
+             "&f14=$data_ini&f15=$data_fin" .
+             "&f16=$tp_periodo" .
+             "&f17=E" .
+             "&f19=";
+
+    $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param);
+
+    if (strpos($str, 'Sem movimento de coletas para') !== false) {
+        pg_query($g_sql, "DROP TABLE IF EXISTS tmp_coleta_rt");
+        pg_query($g_sql, "CREATE TEMP TABLE tmp_coleta_rt (
+            unidade varchar, nro_coleta varchar, data_limite date, hora_limite varchar,
+            cnpj_emit varchar, nome_emit varchar, endereco_emit varchar, bairro_emit varchar,
+            cep_emit varchar, cidade_emit varchar, uf_emit varchar, setor varchar,
+            cnpj_dest varchar, solicitante varchar, situacao varchar,
+            vlr_merc numeric, qtde_vol numeric, peso numeric, placa varchar,
+            observacao varchar, data_inclusao date, hora_inclusao varchar,
+            data_efetivacao date, hora_efetivacao varchar
+        )");
+        return 0;
+    }
+
+    if (strpos($str, '<input type=hidde') === false) {
+        throw new Exception('Erro na resposta do SSW ao buscar coletas: ' . substr($str, 0, 200));
+    }
+
+    $str = urldecode($str);
+    $act = ssw_get_act($str);
+    $arq = ssw_get_arq($str);
+
+    $file    = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    $fil_arr = explode("\r", $file);
+    $count   = count($fil_arr);
+
+    pg_query($g_sql, "DROP TABLE IF EXISTS tmp_coleta_rt");
+    pg_query($g_sql, "CREATE TEMP TABLE tmp_coleta_rt (
+        unidade varchar, nro_coleta varchar, data_limite date, hora_limite varchar,
+        cnpj_emit varchar, nome_emit varchar, endereco_emit varchar, bairro_emit varchar,
+        cep_emit varchar, cidade_emit varchar, uf_emit varchar, setor varchar,
+        cnpj_dest varchar, solicitante varchar, situacao varchar,
+        vlr_merc numeric, qtde_vol numeric, peso numeric, placa varchar,
+        observacao varchar, data_inclusao date, hora_inclusao varchar,
+        data_efetivacao date, hora_efetivacao varchar
+    )");
+
+    $inserted = 0;
+
+    for ($i = 0; $i < ($count - 1); $i++) {
+        $line = str_replace(chr(10), '', $fil_arr[$i]);
+        $arr  = explode(';', $line);
+
+        if ($arr[0] != '3') continue;
+
+        $unidade         = pg_escape_string($g_sql, $arr[1]);
+        $nro_coleta      = pg_escape_string($g_sql, $arr[2]);
+        $data_inclusao   = trim($arr[3]);
+        $hora_inclusao   = pg_escape_string($g_sql, $arr[4]);
+        $solicitante     = pg_escape_string($g_sql, str_replace("'", '', $arr[6]));
+        $nome_emit       = pg_escape_string($g_sql, str_replace("'", '', $arr[7]));
+        $cnpj_emit       = pg_escape_string($g_sql, substr($arr[8], 0, 14));
+        $endereco_emit   = pg_escape_string($g_sql, str_replace("'", '', $arr[9]));
+        $bairro_emit     = pg_escape_string($g_sql, str_replace("'", '', $arr[10]));
+        $cidade_emit     = pg_escape_string($g_sql, str_replace("'", '', $arr[11]));
+        $uf_emit         = pg_escape_string($g_sql, $arr[12]);
+        $setor           = pg_escape_string($g_sql, $arr[13]);
+        $cep_emit        = pg_escape_string($g_sql, $arr[14]);
+        $cnpj_dest_raw   = $arr[19];
+        $cnpj_dest       = pg_escape_string($g_sql, strlen($cnpj_dest_raw) < 5 ? '' : substr($cnpj_dest_raw, 0, 14));
+        $peso            = (float) str_replace(',', '.', str_replace('.', '', $arr[25]));
+        $qtde_vol        = (float) $arr[27];
+        $vlr_merc        = (float) str_replace(',', '.', str_replace('.', '', $arr[28]));
+        $data_limite_raw = trim($arr[30]);
+        $hora_limite     = pg_escape_string($g_sql, trim($arr[31]) !== '' ? $arr[31] : '17:00');
+        $data_efet_raw   = trim($arr[32]);
+        $hora_efet_raw   = trim($arr[33]);
+        $situacao_raw    = $arr[34];
+        $placa           = pg_escape_string($g_sql, $arr[36]);
+        $observacao      = pg_escape_string($g_sql, str_replace("'", '', trim($arr[44] . ' ' . $arr[45] . ' ' . $arr[46])));
+
+        if ($data_inclusao === '') { $data_inclusao = $data_limite_raw; $hora_inclusao = '12:00'; }
+        $data_inclusao = str_replace('/20', '/', $data_inclusao);
+        $data_inclusao_fmt = date('Y-m-d', strtodate(str_replace('/', '', $data_inclusao)));
+
+        $data_limite_raw = str_replace('/20', '/', $data_limite_raw);
+        $data_limite_fmt = date('Y-m-d', strtodate(str_replace('/', '', $data_limite_raw)));
+
+        if ($data_efet_raw === '') {
+            $data_efet_sql = 'NULL'; $hora_efet_sql = 'NULL';
+        } else {
+            $data_efet_raw = str_replace('/20', '/', $data_efet_raw);
+            $data_efet_fmt = date('Y-m-d', strtodate(str_replace('/', '', $data_efet_raw)));
+            $data_efet_sql = "'$data_efet_fmt'";
+            $hora_efet_sql = "'" . pg_escape_string($g_sql, $hora_efet_raw) . "'";
+        }
+
+        $situacao_map = [
+            'PRE-CADASTRADA' => '9', 'CADASTRADA' => '0',
+            'COMANDADA' => '1', 'COLETADA' => '2', 'CANCELADA' => '3',
+        ];
+        $situacao = pg_escape_string($g_sql, $situacao_map[$situacao_raw] ?? $situacao_raw);
+
+        pg_query($g_sql, "INSERT INTO tmp_coleta_rt VALUES (
+            '$unidade', '$nro_coleta', '$data_limite_fmt', '$hora_limite',
+            '$cnpj_emit', '$nome_emit', '$endereco_emit', '$bairro_emit',
+            '$cep_emit', '$cidade_emit', '$uf_emit', '$setor',
+            '$cnpj_dest', '$solicitante', '$situacao',
+            $vlr_merc, $qtde_vol, $peso, '$placa',
+            '$observacao', '$data_inclusao_fmt', '$hora_inclusao',
+            $data_efet_sql, $hora_efet_sql
+        )");
+
+        $inserted++;
+    }
+
+    return $inserted;
+}
+
+// ============================================
 // SISTEMA DE PERGUNTAS INTERATIVAS
 // ============================================
 
