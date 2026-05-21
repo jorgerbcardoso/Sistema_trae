@@ -201,6 +201,29 @@ export async function getDashboardData(filters: ColetasFilters): Promise<{
   return result.data;
 }
 
+export async function getAnaliseDiariaCalendario(filters: Pick<ColetasFilters, 'unidadeColeta' | 'cnpjRemetente' | 'placa' | 'situacao'>): Promise<DayDataColetas[]> {
+  if (ENVIRONMENT.isFigmaMake) {
+    const { mockGetAnaliseDiariaColetas } = await import('../mocks/mockData');
+    return mockGetAnaliseDiariaColetas(filters as ColetasFilters);
+  }
+
+  const token = localStorage.getItem('auth_token');
+  const result = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-coletas/get_analise_diaria.php`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ filters })
+  });
+
+  if (!result.success) {
+    throw new Error(result.message || 'Erro ao buscar análise diária');
+  }
+
+  return result.data.analiseDiaria ?? [];
+}
+
 /**
  * Busca os cards de performance de coletas
  * ⚠️ DEPRECIADO: Use getDashboardData() para melhor performance

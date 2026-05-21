@@ -50,6 +50,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { toast } from 'sonner';
 import { 
   getDashboardData,
+  getAnaliseDiariaCalendario,
   type ColetasFilters,
   type PerformanceCards as PerformanceCardsType,
   type DayDataColetas,
@@ -119,11 +120,13 @@ export function PerformanceColetas() {
   };
 
   const defaultPeriod = getDefaultPeriod();
+  const isMTZ = (user?.unidade_atual || user?.unidade || '') === 'MTZ';
+  const unidadeUsuario = user?.unidade_atual || user?.unidade || '';
 
   const [filters, setFilters] = useState<Filters>({
     periodoInicio: defaultPeriod.inicio,
     periodoFim: defaultPeriod.fim,
-    unidadeColeta: [],
+    unidadeColeta: isMTZ ? [] : [unidadeUsuario],
     cnpjRemetente: '',
     placa: '',
     situacao: []
@@ -143,6 +146,8 @@ export function PerformanceColetas() {
   const [analisePeriodo, setAnalisePeriodo] = useState<7 | 15 | 30>(7);
   const [diasData, setDiasData] = useState<DayDataColetas[]>([]);
   const [loadingAnalise, setLoadingAnalise] = useState(false);
+  const [loadingCalendario, setLoadingCalendario] = useState(false);
+  const [allDiasData, setAllDiasData] = useState<DayDataColetas[]>([]);
 
   // Estados para Evolução da Performance
   const [evolucaoPeriodo, setEvolucaoPeriodo] = useState<7 | 15 | 30>(30);
@@ -190,12 +195,17 @@ export function PerformanceColetas() {
     }
   }, [filters]);
 
-  // ✅ Recarregar dados quando mudar o período de análise ou evolução
+  // Recarregar evolução quando mudar o período (sem nova requisição ao SSW)
   useEffect(() => {
     if (coletaGroups.length > 0) {
       loadMockData();
     }
-  }, [analisePeriodo, evolucaoPeriodo]);
+  }, [evolucaoPeriodo]);
+
+  // Fatiar allDiasData quando mudar o período do calendário
+  useEffect(() => {
+    setDiasData(allDiasData.slice(-analisePeriodo));
+  }, [analisePeriodo, allDiasData]);
 
   const loadMockData = async () => {
     setLoading(true);
@@ -282,28 +292,38 @@ export function PerformanceColetas() {
       
       setColetaGroups(groups);
       
-      // ✅ VALIDAÇÃO: Garantir que são arrays antes de chamar slice
-      const analiseDiariaArray = Array.isArray(dashboardData.analiseDiaria) ? dashboardData.analiseDiaria : [];
       const evolucaoArray = Array.isArray(dashboardData.evolucao) ? dashboardData.evolucao : [];
       const comparativoArray = Array.isArray(dashboardData.comparativo) ? dashboardData.comparativo : [];
       
-      // Processar análise diária (últimos N dias)
-      setDiasData(analiseDiariaArray.slice(-analisePeriodo));
-      
-      // Processar evolução
-      const slicedEvolucao = evolucaoArray.slice(-evolucaoPeriodo);
-      setEvolucaoData(slicedEvolucao);
-      
-      // Processar comparativo
+      setEvolucaoData(evolucaoArray.slice(-evolucaoPeriodo));
       setUnitPerformances(comparativoArray);
-
-      // Armazenar coletas brutas para exportação CSV local
       setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
       
       setLoading(false);
+
+      loadAnaliseDiaria();
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
       setLoading(false);
+    }
+  };
+
+  const loadAnaliseDiaria = async () => {
+    setLoadingCalendario(true);
+    try {
+      const analiseFilters = {
+        unidadeColeta: filters.unidadeColeta,
+        cnpjRemetente: filters.cnpjRemetente,
+        placa: filters.placa,
+        situacao: filters.situacao,
+      };
+      const data = await getAnaliseDiariaCalendario(analiseFilters);
+      setAllDiasData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('❌ Erro ao carregar análise diária:', error);
+      setAllDiasData([]);
+    } finally {
+      setLoadingCalendario(false);
     }
   };
 
@@ -311,7 +331,7 @@ export function PerformanceColetas() {
     const emptyFilters: Filters = {
       periodoInicio: '',
       periodoFim: '',
-      unidadeColeta: [],
+      unidadeColeta: isMTZ ? [] : [unidadeUsuario],
       cnpjRemetente: '',
       placa: '',
       situacao: []
@@ -687,11 +707,19 @@ export function PerformanceColetas() {
                   {/* ✅ NOVO: Filtro de Unidade de Coleta */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
                     <Label className="text-slate-900 dark:text-slate-100">Unidade(s) de Coleta</Label>
-                    <FilterSelectUnidadeOrdered
-                      value={tempFilters.unidadeColeta}
-                      onChange={(value) => setTempFilters({...tempFilters, unidadeColeta: value})}
-                      apiEndpoint="/dashboards/performance-entregas/search_unidades.php"
-                    />
+                    {isMTZ ? (
+                      <FilterSelectUnidadeOrdered
+                        value={tempFilters.unidadeColeta}
+                        onChange={(value) => setTempFilters({...tempFilters, unidadeColeta: value})}
+                        apiEndpoint="/dashboards/performance-entregas/search_unidades.php"
+                      />
+                    ) : (
+                      <Input
+                        value={unidadeUsuario}
+                        disabled
+                        className="dark:bg-slate-800 dark:border-slate-700 opacity-60 cursor-not-allowed"
+                      />
+                    )}
                   </div>
 
                   {/* Filtros adicionais */}
@@ -1087,7 +1115,7 @@ export function PerformanceColetas() {
           analisePeriodo={analisePeriodo}
           setAnalisePeriodo={setAnalisePeriodo}
           diasData={diasData}
-          loadingAnalise={loadingAnalise}
+          loadingAnalise={loadingCalendario}
           handleExportColetasDia={handleExportColetasDia}
           handleExportProgramadasDia={handleExportProgramadasDia}
           handleExportComandasDia={handleExportComandasDia}
