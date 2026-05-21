@@ -152,7 +152,7 @@ export function PerformanceColetas() {
   const [coletasRawCalendario, setColetasRawCalendario] = useState<ColetaRaw[]>([]);
 
   // Estados para Evolução da Performance
-  const [evolucaoPeriodo, setEvolucaoPeriodo] = useState<7 | 15 | 30>(30);
+
   const [loadingEvolucao, setLoadingEvolucao] = useState(false);
 
   usePageTitle('Performance de Coletas');
@@ -197,12 +197,7 @@ export function PerformanceColetas() {
     }
   }, [filters]);
 
-  // Recarregar evolução quando mudar o período (sem nova requisição ao SSW)
-  useEffect(() => {
-    if (coletaGroups.length > 0) {
-      loadMockData();
-    }
-  }, [evolucaoPeriodo]);
+
 
   // Fatiar allDiasData quando mudar o período do calendário
   useEffect(() => {
@@ -301,7 +296,7 @@ export function PerformanceColetas() {
       const evolucaoArray = Array.isArray(dashboardData.evolucao) ? dashboardData.evolucao : [];
       const comparativoArray = Array.isArray(dashboardData.comparativo) ? dashboardData.comparativo : [];
       
-      setEvolucaoData(evolucaoArray.slice(-evolucaoPeriodo));
+      setEvolucaoData(evolucaoArray);
       setUnitPerformances(comparativoArray);
       setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
       
@@ -710,6 +705,7 @@ export function PerformanceColetas() {
                           <Input
                             type="date"
                             value={tempFilters.periodoInicio}
+                            max={new Date().toISOString().split('T')[0]}
                             onChange={(e) => setTempFilters({...tempFilters, periodoInicio: e.target.value})}
                             className="dark:bg-slate-800 dark:border-slate-700 pr-8"
                           />
@@ -730,6 +726,7 @@ export function PerformanceColetas() {
                           <Input
                             type="date"
                             value={tempFilters.periodoFim}
+                            max={new Date().toISOString().split('T')[0]}
                             onChange={(e) => setTempFilters({...tempFilters, periodoFim: e.target.value})}
                             className="dark:bg-slate-800 dark:border-slate-700 pr-8"
                           />
@@ -1253,33 +1250,7 @@ export function PerformanceColetas() {
                 </p>
               </div>
 
-              {/* Chave de Perodo */}
-              <div className="flex gap-2">
-                <Button
-                  variant={evolucaoPeriodo === 7 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEvolucaoPeriodo(7)}
-                  className={evolucaoPeriodo === 7 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
-                >
-                  7 dias
-                </Button>
-                <Button
-                  variant={evolucaoPeriodo === 15 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEvolucaoPeriodo(15)}
-                  className={evolucaoPeriodo === 15 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
-                >
-                  15 dias
-                </Button>
-                <Button
-                  variant={evolucaoPeriodo === 30 ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEvolucaoPeriodo(30)}
-                  className={evolucaoPeriodo === 30 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
-                >
-                  1 mês
-                </Button>
-              </div>
+
             </div>
           </CardHeader>
           <CardContent>
