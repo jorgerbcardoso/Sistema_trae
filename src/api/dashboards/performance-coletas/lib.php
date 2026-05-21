@@ -447,7 +447,12 @@ function buildUnidadeColetaFilter($g_sql, $siglas = [], $columnName = 'unidade')
  * ================================================================
  */
 function getColetasCountBySituacao($g_sql, $tableName = 'tmp_coleta_rt', $filters = []) {
-    $where = buildWhereColetasUsuario($g_sql, $filters);
+    $whereBase = buildWhereColetasUsuario($g_sql, $filters);
+    $where = preg_replace("/situacao != '3' AND /", '', $whereBase);
+    $where = preg_replace("/AND situacao != '3'/", '', $where);
+    $where = preg_replace("/^situacao != '3'$/", '1=1', trim($where));
+    if (empty(trim($where))) $where = '1=1';
+
     $query = "
         SELECT 
             situacao,
@@ -464,20 +469,23 @@ function getColetasCountBySituacao($g_sql, $tableName = 'tmp_coleta_rt', $filter
         '9' => 0,  // Pré-cadastrada
         '0' => 0,  // Cadastrada
         '1' => 0,  // Comandada
-        '2' => 0   // Coletada
+        '2' => 0,  // Coletada
+        '3' => 0   // Cancelada
     ];
     
     while ($row = pg_fetch_assoc($result)) {
-        $counts[$row['situacao']] = (int)$row['total'];
+        if (isset($counts[$row['situacao']])) {
+            $counts[$row['situacao']] = (int)$row['total'];
+        }
     }
     
-    // Retornar no formato esperado pelo frontend
     return [
         'preCadastradas' => $counts['9'],
-        'cadastradas' => $counts['0'],
-        'comandadas' => $counts['1'],
-        'coletadas' => $counts['2'],
-        'total' => $counts['9'] + $counts['0'] + $counts['1'] + $counts['2']
+        'cadastradas'    => $counts['0'],
+        'comandadas'     => $counts['1'],
+        'coletadas'      => $counts['2'],
+        'canceladas'     => $counts['3'],
+        'total'          => $counts['9'] + $counts['0'] + $counts['1'] + $counts['2']
     ];
 }
 
@@ -740,8 +748,7 @@ function getColetasEvolucao($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
  * Retorna todas as linhas brutas da TEMP TABLE para exportação CSV no frontend
  */
 function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt', $extraWhere = '') {
-    $where = "situacao != '3'";
-    if (!empty($extraWhere)) $where .= " AND $extraWhere";
+    $where = !empty($extraWhere) ? $extraWhere : '1=1';
 
     $query = "
         SELECT

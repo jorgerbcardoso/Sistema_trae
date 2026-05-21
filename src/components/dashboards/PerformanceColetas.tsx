@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../ThemeProvider';
 import { useNavigate } from 'react-router';
@@ -36,7 +36,9 @@ import {
   Truck,
   TrendingUp,
   Building2,
-  CircleHelp
+  CircleHelp,
+  RefreshCw,
+  Ban
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ENVIRONMENT } from '../../config/environment';
@@ -137,6 +139,7 @@ export function PerformanceColetas() {
   const [coletaGroups, setColetaGroups] = useState<ColetaGroup[]>([]);
   const [evolucaoData, setEvolucaoData] = useState<any[]>([]);
   const [unitPerformances, setUnitPerformances] = useState<UnidadePerformanceColetas[]>([]);
+  const [canceladas, setCanceladas] = useState(0);
   
   // Estados para ordenação da tabela de comparativo
   const [sortColumn, setSortColumn] = useState<keyof UnidadePerformanceColetas>('performance');
@@ -147,6 +150,8 @@ export function PerformanceColetas() {
   const [diasData, setDiasData] = useState<DayDataColetas[]>([]);
   const [loadingAnalise, setLoadingAnalise] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [countdown, setCountdown] = useState(300);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [loadingCalendario, setLoadingCalendario] = useState(false);
   const [allDiasData, setAllDiasData] = useState<DayDataColetas[]>([]);
   const [coletasRawCalendario, setColetasRawCalendario] = useState<ColetaRaw[]>([]);
@@ -204,6 +209,23 @@ export function PerformanceColetas() {
     setDiasData(allDiasData.slice(-analisePeriodo));
   }, [analisePeriodo, allDiasData]);
 
+  // Autoatualizador: countdown de 5 minutos
+  useEffect(() => {
+    if (coletaGroups.length === 0) return;
+    setCountdown(300);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          loadMockData();
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [filters, coletaGroups.length > 0]);
+
   const loadMockData = async () => {
     if (coletaGroups.length > 0) {
       setReprocessing(true);
@@ -223,14 +245,14 @@ export function PerformanceColetas() {
       }
       
       // Processar cards
-      const cardsData = dashboardData.cards || { preCadastradas: 0, cadastradas: 0, comandadas: 0, coletadas: 0, total: 0 };
+      const cardsData = dashboardData.cards || { preCadastradas: 0, cadastradas: 0, comandadas: 0, coletadas: 0, canceladas: 0, total: 0 };
       
-      // ✅ GARANTIR QUE TODOS OS VALORES SEJAM NÚMEROS
       const preCadastradas = Number(cardsData.preCadastradas) || 0;
-      const cadastradas = Number(cardsData.cadastradas) || 0;
-      const comandadas = Number(cardsData.comandadas) || 0;
-      const coletadas = Number(cardsData.coletadas) || 0;
-      const total = Number(cardsData.total) || 0;
+      const cadastradas    = Number(cardsData.cadastradas)    || 0;
+      const comandadas     = Number(cardsData.comandadas)     || 0;
+      const coletadas      = Number(cardsData.coletadas)      || 0;
+      const total          = Number(cardsData.total)          || 0;
+      setCanceladas(Number(cardsData.canceladas) || 0);
       
       // Criar grupos com cores específicas
       const groups: ColetaGroup[] = [
@@ -455,6 +477,12 @@ export function PerformanceColetas() {
     if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
   };
 
+  const handleExportCanceladas = () => {
+    const filtered = coletasRaw.filter(c => c.situacao === 'CANCELADA');
+    downloadCSV(filtered, 'coletas_canceladas.csv');
+    if (filtered.length > 0) toast.success('Planilha de canceladas gerada com sucesso');
+  };
+
   const normDate = (d: string) => {
     if (!d) return '';
     if (d.includes('/')) { const [dd, mm, yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; }
@@ -657,9 +685,18 @@ export function PerformanceColetas() {
     );
   }
 
-  // ✅ Construir headerActions com período e filtros
+  const countdownMin = Math.floor(countdown / 60);
+  const countdownSec = String(countdown % 60).padStart(2, '0');
+
   const headerActions = (
     <div className="flex items-center gap-2 md:gap-4">
+      {/* Countdown de atualização */}
+      {coletaGroups.length > 0 && (
+        <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <RefreshCw className="w-3 h-3" />
+          <span>{countdownMin}:{countdownSec}</span>
+        </div>
+      )}
       {/* Exibição do Período */}
       <div className="text-right print:block">
         <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden md:block">Período</p>
@@ -937,6 +974,33 @@ export function PerformanceColetas() {
             );
           })}
         </div>
+
+        {/* Card de Canceladas */}
+        {canceladas > 0 && (
+          <Card className="bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 border-zinc-200 dark:border-zinc-800">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Ban className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Canceladas</p>
+                    <p className="text-2xl font-bold text-zinc-700 dark:text-zinc-300">{canceladas}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 gap-1 px-2"
+                  onClick={handleExportCanceladas}
+                  title="Exportar canceladas"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="text-xs font-medium">CSV</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Comparativo por Unidades Coletadoras */}
         <Card className="dark:bg-slate-900 dark:border-slate-700">
