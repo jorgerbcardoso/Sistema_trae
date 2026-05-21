@@ -105,42 +105,28 @@ export function PerformanceColetas() {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   
-  // ✅ CALCULAR PERÍODO PADRÃO INTELIGENTE
-  // Se dia > 10: mês atual do dia 1 até hoje
-  // Se dia <= 10: mês anterior completo
   const getDefaultPeriod = () => {
     const today = new Date();
-    const currentDay = today.getDate();
-    const currentMonth = today.getMonth(); // 0-11
-    const currentYear = today.getFullYear();
-    
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
-    
-    // Sempre: últimos 7 dias até hoje
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
-    return {
-      inicio: formatDate(sevenDaysAgo),
-      fim: formatDate(today)
-    };
+    return { inicio: formatDate(sevenDaysAgo), fim: formatDate(today) };
   };
-  
+
   const defaultPeriod = getDefaultPeriod();
-  
+
   const [filters, setFilters] = useState<Filters>({
-    periodoLancamentoInicio: '',
-    periodoLancamentoFim: '',
-    periodoPrevisaoInicio: defaultPeriod.inicio,
-    periodoPrevisaoFim: defaultPeriod.fim,
-    unidadeColeta: [], // ✅ NOVO: Array vazio
+    periodoInicio: defaultPeriod.inicio,
+    periodoFim: defaultPeriod.fim,
+    unidadeColeta: [],
     cnpjRemetente: '',
     placa: '',
-    situacao: [] // ✅ ALTERADO: Array de strings para múltiplas situações
+    situacao: []
   });
   
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
@@ -323,14 +309,12 @@ export function PerformanceColetas() {
 
   const clearFilters = () => {
     const emptyFilters: Filters = {
-      periodoLancamentoInicio: '',
-      periodoLancamentoFim: '',
-      periodoPrevisaoInicio: '',
-      periodoPrevisaoFim: '',
-      unidadeColeta: [], // ✅ NOVO: Array vazio
+      periodoInicio: '',
+      periodoFim: '',
+      unidadeColeta: [],
       cnpjRemetente: '',
       placa: '',
-      situacao: [] // ✅ ALTERADO: Array de strings para múltiplas situações
+      situacao: []
     };
     setTempFilters(emptyFilters);
     setFilters(emptyFilters);
@@ -338,23 +322,12 @@ export function PerformanceColetas() {
   };
 
   const applyFilters = () => {
-    const hasLancamento = !!(tempFilters.periodoLancamentoInicio || tempFilters.periodoLancamentoFim);
-    const hasPrevisao   = !!(tempFilters.periodoPrevisaoInicio   || tempFilters.periodoPrevisaoFim);
-
-    if (!hasLancamento && !hasPrevisao) {
-      toast.error('Informe pelo menos um período (Lançamento ou Previsão de Coleta) antes de aplicar os filtros.');
+    if (!tempFilters.periodoInicio || !tempFilters.periodoFim) {
+      toast.error('Informe as datas de início e fim do período de lançamento.');
       return;
     }
 
-    const ini = hasLancamento ? tempFilters.periodoLancamentoInicio : tempFilters.periodoPrevisaoInicio;
-    const fim = hasLancamento ? tempFilters.periodoLancamentoFim    : tempFilters.periodoPrevisaoFim;
-
-    if (!ini || !fim) {
-      toast.error('Informe as datas de início e fim do período.');
-      return;
-    }
-
-    const diffDays = Math.round((new Date(fim).getTime() - new Date(ini).getTime()) / 86_400_000);
+    const diffDays = Math.round((new Date(tempFilters.periodoFim).getTime() - new Date(tempFilters.periodoInicio).getTime()) / 86_400_000);
     if (diffDays > 31) {
       toast.error('O período não pode ser maior que 31 dias.');
       return;
@@ -370,26 +343,13 @@ export function PerformanceColetas() {
       const [year, month, day] = dateStr.split('-');
       return `${day}/${month}/${year}`;
     };
-    
-    // Prioridade 1: Período de Lançamento (se preenchido)
-    if (filters.periodoLancamentoInicio && filters.periodoLancamentoFim) {
-      return `${formatDate(filters.periodoLancamentoInicio)} - ${formatDate(filters.periodoLancamentoFim)}`;
-    } else if (filters.periodoLancamentoInicio) {
-      return `A partir de ${formatDate(filters.periodoLancamentoInicio)}`;
-    } else if (filters.periodoLancamentoFim) {
-      return `Até ${formatDate(filters.periodoLancamentoFim)}`;
+    if (filters.periodoInicio && filters.periodoFim) {
+      return `${formatDate(filters.periodoInicio)} - ${formatDate(filters.periodoFim)}`;
+    } else if (filters.periodoInicio) {
+      return `A partir de ${formatDate(filters.periodoInicio)}`;
+    } else if (filters.periodoFim) {
+      return `Até ${formatDate(filters.periodoFim)}`;
     }
-    
-    // Prioridade 2: Período de Previsão (padrão)
-    if (filters.periodoPrevisaoInicio && filters.periodoPrevisaoFim) {
-      return `${formatDate(filters.periodoPrevisaoInicio)} - ${formatDate(filters.periodoPrevisaoFim)}`;
-    } else if (filters.periodoPrevisaoInicio) {
-      return `A partir de ${formatDate(filters.periodoPrevisaoInicio)}`;
-    } else if (filters.periodoPrevisaoFim) {
-      return `Até ${formatDate(filters.periodoPrevisaoFim)}`;
-    }
-    
-    // Fallback: Se nenhum período definido
     return 'Todos os períodos';
   };
 
@@ -678,77 +638,51 @@ export function PerformanceColetas() {
 
                 <div className="space-y-6 py-4">
                   {/* Período de Lançamento */}
-                  {(() => {
-                    const hasPrevisao = !!(tempFilters.periodoPrevisaoInicio || tempFilters.periodoPrevisaoFim);
-                    const hasLancamento = !!(tempFilters.periodoLancamentoInicio || tempFilters.periodoLancamentoFim);
-                    return (
-                      <>
-                        <div className={`space-y-4 ${hasPrevisao ? 'opacity-40 pointer-events-none' : ''}`}>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-slate-900 dark:text-slate-100">Período de Lançamento</Label>
-                            {hasLancamento && !hasPrevisao && (
-                              <button type="button" className="text-xs text-slate-400 hover:text-slate-600 underline" onClick={() => setTempFilters({...tempFilters, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}>Limpar</button>
-                            )}
-                          </div>
-                          {hasPrevisao && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400">Desative o Período de Previsão para usar este filtro.</p>
+                  <div className="space-y-4">
+                    <Label className="text-slate-900 dark:text-slate-100">Período de Lançamento</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoInicio}
+                            onChange={(e) => setTempFilters({...tempFilters, periodoInicio: e.target.value})}
+                            className="dark:bg-slate-800 dark:border-slate-700 pr-8"
+                          />
+                          {tempFilters.periodoInicio && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({...tempFilters, periodoInicio: ''})}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                              <Input
-                                type="date"
-                                value={tempFilters.periodoLancamentoInicio}
-                                onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoInicio: e.target.value, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}
-                                className="dark:bg-slate-800 dark:border-slate-700"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                              <Input
-                                type="date"
-                                value={tempFilters.periodoLancamentoFim}
-                                onChange={(e) => setTempFilters({...tempFilters, periodoLancamentoFim: e.target.value, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}
-                                className="dark:bg-slate-800 dark:border-slate-700"
-                              />
-                            </div>
-                          </div>
                         </div>
-
-                        <div className={`space-y-4 ${hasLancamento ? 'opacity-40 pointer-events-none' : ''}`}>
-                          <div className="flex items-center justify-between">
-                            <Label className="text-slate-900 dark:text-slate-100">Período de Previsão de Coleta</Label>
-                            {hasPrevisao && !hasLancamento && (
-                              <button type="button" className="text-xs text-slate-400 hover:text-slate-600 underline" onClick={() => setTempFilters({...tempFilters, periodoPrevisaoInicio: '', periodoPrevisaoFim: ''})}>Limpar</button>
-                            )}
-                          </div>
-                          {hasLancamento && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400">Desative o Período de Lançamento para usar este filtro.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoFim}
+                            onChange={(e) => setTempFilters({...tempFilters, periodoFim: e.target.value})}
+                            className="dark:bg-slate-800 dark:border-slate-700 pr-8"
+                          />
+                          {tempFilters.periodoFim && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({...tempFilters, periodoFim: ''})}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                              <Input
-                                type="date"
-                                value={tempFilters.periodoPrevisaoInicio}
-                                onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoInicio: e.target.value, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}
-                                className="dark:bg-slate-800 dark:border-slate-700"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                              <Input
-                                type="date"
-                                value={tempFilters.periodoPrevisaoFim}
-                                onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoFim: e.target.value, periodoLancamentoInicio: '', periodoLancamentoFim: ''})}
-                                className="dark:bg-slate-800 dark:border-slate-700"
-                              />
-                            </div>
-                          </div>
                         </div>
-                      </>
-                    );
-                  })()}
+                      </div>
+                    </div>
+                  </div>
 
                   {/* ✅ NOVO: Filtro de Unidade de Coleta */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">

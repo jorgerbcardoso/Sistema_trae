@@ -38,14 +38,12 @@ export interface Coleta {
 export type SituacaoColeta = 'PRE-CADASTRADA' | 'CADASTRADA' | 'COMANDADA' | 'COLETADA' | 'CANCELADA';
 
 export interface ColetasFilters {
-  periodoLancamentoInicio: string;
-  periodoLancamentoFim: string;
-  periodoPrevisaoInicio: string;
-  periodoPrevisaoFim: string;
-  unidadeColeta: string[]; // ✅ Array de siglas de unidades coletadoras
+  periodoInicio: string;
+  periodoFim: string;
+  unidadeColeta: string[];
   cnpjRemetente: string;
   placa: string;
-  situacao: string | string[]; // '' para todas, string única, ou array de situações
+  situacao: string | string[];
 }
 
 export interface PerformanceCards {

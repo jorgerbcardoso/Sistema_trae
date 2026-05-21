@@ -216,24 +216,13 @@ function buildWhereColetasUsuario($g_sql, $filters) {
     // ✅ SEMPRE EXCLUIR SITUAÇÃO 3 (CANCELADA)
     $conditions[] = "situacao != '3'";
     
-    // Filtro: Período de Lançamento (data_inclusao)
-    if (!empty($filters['periodoLancamentoInicio'])) {
-        $dataIni = pg_escape_string($g_sql, $filters['periodoLancamentoInicio']);
+    if (!empty($filters['periodoInicio'])) {
+        $dataIni = pg_escape_string($g_sql, $filters['periodoInicio']);
         $conditions[] = "data_inclusao >= '$dataIni'";
     }
-    if (!empty($filters['periodoLancamentoFim'])) {
-        $dataFim = pg_escape_string($g_sql, $filters['periodoLancamentoFim']);
+    if (!empty($filters['periodoFim'])) {
+        $dataFim = pg_escape_string($g_sql, $filters['periodoFim']);
         $conditions[] = "data_inclusao <= '$dataFim'";
-    }
-    
-    // Filtro: Período de Previsão (data_limite)
-    if (!empty($filters['periodoPrevisaoInicio'])) {
-        $dataIni = pg_escape_string($g_sql, $filters['periodoPrevisaoInicio']);
-        $conditions[] = "data_limite >= '$dataIni'";
-    }
-    if (!empty($filters['periodoPrevisaoFim'])) {
-        $dataFim = pg_escape_string($g_sql, $filters['periodoPrevisaoFim']);
-        $conditions[] = "data_limite <= '$dataFim'";
     }
     
     // Filtro: CNPJ Remetente

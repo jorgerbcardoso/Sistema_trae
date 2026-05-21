@@ -12,20 +12,14 @@ try {
     $input   = getRequestInput();
     $filters = $input['filters'] ?? [];
 
-    $hasLancamento = !empty($filters['periodoLancamentoInicio']) || !empty($filters['periodoLancamentoFim']);
-    $hasPrevisao   = !empty($filters['periodoPrevisaoInicio'])   || !empty($filters['periodoPrevisaoFim']);
-
-    if (!$hasLancamento && !$hasPrevisao) {
-        respondJson(['success' => false, 'error' => 'É obrigatório informar pelo menos um período (Lançamento ou Previsão de Coleta).'], 400);
-    }
-
-    $tp_periodo = $hasLancamento ? 'I' : 'C';
-    $dataIni    = $hasLancamento ? ($filters['periodoLancamentoInicio'] ?? '') : ($filters['periodoPrevisaoInicio'] ?? '');
-    $dataFim    = $hasLancamento ? ($filters['periodoLancamentoFim']    ?? '') : ($filters['periodoPrevisaoFim']    ?? '');
+    $dataIni = $filters['periodoInicio'] ?? '';
+    $dataFim = $filters['periodoFim']    ?? '';
 
     if (empty($dataIni) || empty($dataFim)) {
-        respondJson(['success' => false, 'error' => 'Informe as datas de início e fim do período.'], 400);
+        respondJson(['success' => false, 'error' => 'Informe as datas de início e fim do período de lançamento.'], 400);
     }
+
+    $tp_periodo = 'I';
 
     $ini = new DateTime($dataIni);
     $fim = new DateTime($dataFim);
