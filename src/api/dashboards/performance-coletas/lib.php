@@ -201,6 +201,45 @@ function createTempColetasTables($g_sql, $domain, $filters = []) {
 
 /**
  * ================================================================
+ * FUNÇÃO AUXILIAR: buildExtraWhereCalendario
+ * ================================================================
+ * Constrói cláusula WHERE sem filtro de período (para o calendário)
+ * ================================================================
+ */
+function buildExtraWhereCalendario($g_sql, $filters) {
+    $conditions = [];
+
+    if (!empty($filters['cnpjRemetente'])) {
+        $cnpj = pg_escape_string($g_sql, $filters['cnpjRemetente']);
+        $conditions[] = "cnpj_emit = '$cnpj'";
+    }
+
+    if (!empty($filters['placa'])) {
+        $placa = pg_escape_string($g_sql, strtoupper($filters['placa']));
+        $conditions[] = "UPPER(placa) = '$placa'";
+    }
+
+    if (!empty($filters['situacao'])) {
+        if (is_array($filters['situacao'])) {
+            $map = ['PRE-CADASTRADA' => '9', 'CADASTRADA' => '0', 'COMANDADA' => '1', 'COLETADA' => '2'];
+            $situacoes = array_map(fn($s) => "'" . pg_escape_string($g_sql, $map[$s] ?? $s) . "'", $filters['situacao']);
+            if (!empty($situacoes)) $conditions[] = "situacao IN (" . implode(', ', $situacoes) . ")";
+        } else {
+            $situacao = pg_escape_string($g_sql, $filters['situacao']);
+            $conditions[] = "situacao = '$situacao'";
+        }
+    }
+
+    $unidadeFilter = buildUnidadeColetaFilter($g_sql, $filters['unidadeColeta'] ?? []);
+    if (!empty($unidadeFilter)) {
+        $conditions[] = ltrim($unidadeFilter, ' AND');
+    }
+
+    return implode(' AND ', $conditions);
+}
+
+/**
+ * ================================================================
  * FUNÇÃO AUXILIAR: buildWhereColetasUsuario
  * ================================================================
  * Constrói cláusula WHERE para filtros do usuário
@@ -584,7 +623,10 @@ function getColetasByUnidade($g_sql) {
  * @return array - Array de dados diários
  * ================================================================
  */
-function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
+function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt', $extraWhere = '') {
+    $where = "situacao != '3'";
+    if (!empty($extraWhere)) $where .= " AND $extraWhere";
+
     $query = "
         SELECT 
             data_limite::date as data,
@@ -609,7 +651,7 @@ function getColetasAnaliseDiaria($g_sql, $days = 30, $tableName = 'tmp_coleta_rt
                 2
             ) as performance
         FROM $tableName
-        WHERE situacao != '3'
+        WHERE $where
         GROUP BY data_limite::date
         ORDER BY data_limite::date
     ";
@@ -697,7 +739,10 @@ function getColetasEvolucao($g_sql, $days = 30, $tableName = 'tmp_coleta_rt') {
 /**
  * Retorna todas as linhas brutas da TEMP TABLE para exportação CSV no frontend
  */
-function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt') {
+function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt', $extraWhere = '') {
+    $where = "situacao != '3'";
+    if (!empty($extraWhere)) $where .= " AND $extraWhere";
+
     $query = "
         SELECT
             unidade,
@@ -732,7 +777,7 @@ function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt') {
             TO_CHAR(data_efetivacao, 'DD/MM/YYYY') AS data_efetivacao,
             hora_efetivacao
         FROM $tableName
-        WHERE situacao != '3'
+        WHERE $where
         ORDER BY data_limite, unidade, nro_coleta
     ";
 

@@ -24,13 +24,16 @@ try {
 
     error_log("✅ [get_analise_diaria.php] fetchColetasSSW: $total coletas para $domain ($data_ini_dmy a $data_fim_dmy)");
 
+    $filtersCalendario = array_diff_key($filters, array_flip(['periodoInicio', 'periodoFim']));
+    $extraWhere = buildExtraWhereCalendario($g_sql, $filtersCalendario);
+
     $limiteStr     = $limite->format('Y-m-d');
     $analiseDiaria = array_filter(
-        getColetasAnaliseDiaria($g_sql, 34, 'tmp_coleta_rt'),
+        getColetasAnaliseDiaria($g_sql, 34, 'tmp_coleta_rt', $extraWhere),
         fn($d) => $d['data'] <= $limiteStr
     );
     $coletas = array_filter(
-        getColetasRaw($g_sql, 'tmp_coleta_rt'),
+        getColetasRaw($g_sql, 'tmp_coleta_rt', $extraWhere),
         function($c) use ($limiteStr) {
             $parts = explode('/', $c['data_limite']);
             if (count($parts) === 3) {

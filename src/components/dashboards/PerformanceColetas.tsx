@@ -146,6 +146,7 @@ export function PerformanceColetas() {
   const [analisePeriodo, setAnalisePeriodo] = useState<7 | 15 | 30>(7);
   const [diasData, setDiasData] = useState<DayDataColetas[]>([]);
   const [loadingAnalise, setLoadingAnalise] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const [loadingCalendario, setLoadingCalendario] = useState(false);
   const [allDiasData, setAllDiasData] = useState<DayDataColetas[]>([]);
   const [coletasRawCalendario, setColetasRawCalendario] = useState<ColetaRaw[]>([]);
@@ -209,7 +210,11 @@ export function PerformanceColetas() {
   }, [analisePeriodo, allDiasData]);
 
   const loadMockData = async () => {
-    setLoading(true);
+    if (coletaGroups.length > 0) {
+      setReprocessing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       console.log('🚀 [PerformanceColetas] Carregando TODOS os dados via endpoint unificado');
       
@@ -301,11 +306,13 @@ export function PerformanceColetas() {
       setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
       
       setLoading(false);
+      setReprocessing(false);
 
       loadAnaliseDiaria();
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
       setLoading(false);
+      setReprocessing(false);
     }
   };
 
@@ -446,7 +453,9 @@ export function PerformanceColetas() {
   };
 
   const handleExportCard = (situacao: string, label: string) => {
-    const filtered = coletasRaw.filter(c => c.situacao === SITUACAO_MAP[situacao] || c.situacao === situacao);
+    const filtered = situacao === 'TODAS'
+      ? coletasRaw
+      : coletasRaw.filter(c => c.situacao === SITUACAO_MAP[situacao] || c.situacao === situacao);
     downloadCSV(filtered, `coletas_${label.toLowerCase().replace(/\s+/g, '_')}.csv`);
     if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
   };
@@ -844,6 +853,15 @@ export function PerformanceColetas() {
       description={user?.client_name}
       headerActions={headerActions}
     >
+      {reprocessing && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl px-10 py-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-700 dark:text-slate-200 font-medium">Reprocessando...</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Essa operação pode levar alguns segundos.</p>
+          </div>
+        </div>
+      )}
       {/* Conteúdo */}
       <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
         {/* Título e Subtítulo */}
