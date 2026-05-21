@@ -771,7 +771,7 @@ function getColetasComparativo($g_sql, $domain, $tableName = 'tmp_coleta_rt') {
             COUNT(
                 CASE 
                     WHEN c.situacao = '2' 
-                    AND (c.data_efetivacao + c.hora_efetivacao) <= (c.data_limite + c.hora_limite)
+                    AND (c.data_efetivacao::date + c.hora_efetivacao::time) <= (c.data_limite::date + c.hora_limite::time)
                     THEN 1 
                 END
             ) as no_prazo,
@@ -779,7 +779,7 @@ function getColetasComparativo($g_sql, $domain, $tableName = 'tmp_coleta_rt') {
                 COUNT(
                     CASE 
                         WHEN c.situacao = '2' 
-                        AND (c.data_efetivacao + c.hora_efetivacao) <= (c.data_limite + c.hora_limite)
+                        AND (c.data_efetivacao::date + c.hora_efetivacao::time) <= (c.data_limite::date + c.hora_limite::time)
                         THEN 1 
                     END
                 )::numeric / 

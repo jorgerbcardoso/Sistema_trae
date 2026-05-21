@@ -121,11 +121,11 @@ export function PerformanceColetas() {
       return `${year}-${month}-${day}`;
     };
     
-    // Sempre: últimos 30 dias até hoje (máximo 31 dias)
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
+    // Sempre: últimos 7 dias até hoje
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
     return {
-      inicio: formatDate(thirtyDaysAgo),
+      inicio: formatDate(sevenDaysAgo),
       fim: formatDate(today)
     };
   };

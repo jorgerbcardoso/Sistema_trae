@@ -1097,7 +1097,16 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
         data_efetivacao date, hora_efetivacao varchar
     )");
 
-    $inserted = 0;
+    $inserted  = 0;
+    $batchSize = 200;
+    $values    = [];
+
+    $situacao_map = [
+        'PRE-CADASTRADA' => '9', 'CADASTRADA' => '0',
+        'COMANDADA' => '1', 'COLETADA' => '2', 'CANCELADA' => '3',
+    ];
+
+    pg_query($g_sql, 'BEGIN');
 
     for ($i = 0; $i < ($count - 1); $i++) {
         $line = str_replace(chr(10), '', $fil_arr[$i]);
@@ -1147,24 +1156,29 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
             $hora_efet_sql = "'" . pg_escape_string($g_sql, $hora_efet_raw) . "'";
         }
 
-        $situacao_map = [
-            'PRE-CADASTRADA' => '9', 'CADASTRADA' => '0',
-            'COMANDADA' => '1', 'COLETADA' => '2', 'CANCELADA' => '3',
-        ];
         $situacao = pg_escape_string($g_sql, $situacao_map[$situacao_raw] ?? $situacao_raw);
 
-        pg_query($g_sql, "INSERT INTO tmp_coleta_rt VALUES (
-            '$unidade', '$nro_coleta', '$data_limite_fmt', '$hora_limite',
-            '$cnpj_emit', '$nome_emit', '$endereco_emit', '$bairro_emit',
-            '$cep_emit', '$cidade_emit', '$uf_emit', '$setor',
-            '$cnpj_dest', '$solicitante', '$situacao',
-            $vlr_merc, $qtde_vol, $peso, '$placa',
-            '$observacao', '$data_inclusao_fmt', '$hora_inclusao',
-            $data_efet_sql, $hora_efet_sql
-        )");
+        $values[] = "('$unidade','$nro_coleta','$data_limite_fmt','$hora_limite'," .
+                    "'$cnpj_emit','$nome_emit','$endereco_emit','$bairro_emit'," .
+                    "'$cep_emit','$cidade_emit','$uf_emit','$setor'," .
+                    "'$cnpj_dest','$solicitante','$situacao'," .
+                    "$vlr_merc,$qtde_vol,$peso,'$placa'," .
+                    "'$observacao','$data_inclusao_fmt','$hora_inclusao'," .
+                    "$data_efet_sql,$hora_efet_sql)";
 
         $inserted++;
+
+        if (count($values) >= $batchSize) {
+            pg_query($g_sql, "INSERT INTO tmp_coleta_rt VALUES " . implode(',', $values));
+            $values = [];
+        }
     }
+
+    if (!empty($values)) {
+        pg_query($g_sql, "INSERT INTO tmp_coleta_rt VALUES " . implode(',', $values));
+    }
+
+    pg_query($g_sql, 'COMMIT');
 
     return $inserted;
 }
