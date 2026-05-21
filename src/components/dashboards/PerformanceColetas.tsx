@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ENVIRONMENT } from '../../config/environment';
-import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
+import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectCliente } from './FilterSelectCliente';
 import { FilterSelectVeiculo } from './FilterSelectVeiculo';
 import { AnaliseDiariaColetas } from './AnaliseDiariaColetas';
@@ -126,7 +126,7 @@ export function PerformanceColetas() {
   const [filters, setFilters] = useState<Filters>({
     periodoInicio: defaultPeriod.inicio,
     periodoFim: defaultPeriod.fim,
-    unidadeColeta: isMTZ ? [] : [unidadeUsuario],
+    unidadeColeta: isMTZ ? '' : unidadeUsuario,
     cnpjRemetente: '',
     placa: '',
     situacao: []
@@ -321,9 +321,9 @@ export function PerformanceColetas() {
     try {
       const analiseFilters = {
         unidadeColeta: filters.unidadeColeta,
-        cnpjRemetente: filters.cnpjRemetente,
-        placa: filters.placa,
-        situacao: filters.situacao,
+        cnpjRemetente:  filters.cnpjRemetente,
+        placa:          filters.placa,
+        situacao:       filters.situacao,
       };
       const { analiseDiaria, coletas } = await getAnaliseDiariaCalendario(analiseFilters);
       setAllDiasData(Array.isArray(analiseDiaria) ? analiseDiaria : []);
@@ -341,7 +341,7 @@ export function PerformanceColetas() {
     const emptyFilters: Filters = {
       periodoInicio: '',
       periodoFim: '',
-      unidadeColeta: isMTZ ? [] : [unidadeUsuario],
+      unidadeColeta: isMTZ ? '' : unidadeUsuario,
       cnpjRemetente: '',
       placa: '',
       situacao: []
@@ -496,32 +496,30 @@ export function PerformanceColetas() {
 
   const handleExportCalendarioColetasDia = (data: string) => {
     const iso = normDate(data);
-    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso);
-    downloadCSV(filtered, `coletas_dia_${iso}.csv`);
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
+    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
     if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
     else toast.warning('Nenhuma coleta encontrada para este dia');
   };
 
   const handleExportCalendarioProgramadasDia = (data: string) => {
     const iso = normDate(data);
-    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso);
     downloadCSV(filtered, `programadas_dia_${iso}.csv`);
     if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
     else toast.warning('Nenhuma coleta programada encontrada para este dia');
   };
 
-  const handleExportCalendarioComandasDia = (data: string) => {
-    const iso = normDate(data);
-    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COMANDADA');
-    downloadCSV(filtered, `comandadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
-    else toast.warning('Nenhuma coleta comandada encontrada para este dia');
-  };
-
   const handleExportCalendarioNoPrazoDia = (data: string) => {
     const iso = normDate(data);
-    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
-    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
+    const filtered = coletasRawCalendario.filter(c => {
+      if (normDate(c.data_limite) !== iso || c.situacao !== 'COLETADA') return false;
+      if (!c.data_efetivacao || !c.hora_efetivacao) return false;
+      const efet = normDate(c.data_efetivacao) + 'T' + c.hora_efetivacao;
+      const limite = iso + 'T' + (c.hora_limite || '17:00');
+      return efet <= limite;
+    });
+    downloadCSV(filtered, `no_prazo_dia_${iso}.csv`);
     if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
     else toast.warning('Nenhuma coleta no prazo encontrada para este dia');
   };
@@ -751,20 +749,13 @@ export function PerformanceColetas() {
 
                   {/* ✅ NOVO: Filtro de Unidade de Coleta */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
-                    <Label className="text-slate-900 dark:text-slate-100">Unidade(s) de Coleta</Label>
-                    {isMTZ ? (
-                      <FilterSelectUnidadeOrdered
-                        value={tempFilters.unidadeColeta}
-                        onChange={(value) => setTempFilters({...tempFilters, unidadeColeta: value})}
-                        apiEndpoint="/dashboards/performance-entregas/search_unidades.php"
-                      />
-                    ) : (
-                      <Input
-                        value={unidadeUsuario}
-                        disabled
-                        className="dark:bg-slate-800 dark:border-slate-700 opacity-60 cursor-not-allowed"
-                      />
-                    )}
+                    <Label className="text-slate-900 dark:text-slate-100">Unidade de Coleta</Label>
+                    <FilterSelectUnidadeSingle
+                      value={tempFilters.unidadeColeta}
+                      onChange={(value) => setTempFilters({...tempFilters, unidadeColeta: value})}
+                      disabled={!isMTZ}
+                      respectUserUnit={!isMTZ}
+                    />
                   </div>
 
                   {/* Filtros adicionais */}
@@ -1172,7 +1163,6 @@ export function PerformanceColetas() {
           loadingAnalise={loadingCalendario}
           handleExportColetasDia={handleExportCalendarioColetasDia}
           handleExportProgramadasDia={handleExportCalendarioProgramadasDia}
-          handleExportComandasDia={handleExportCalendarioComandasDia}
           handleExportNoPrazoDia={handleExportCalendarioNoPrazoDia}
         />
 

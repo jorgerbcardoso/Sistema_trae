@@ -1042,7 +1042,7 @@ function finishCSVExport($csv) {
  * @return int Número de coletas importadas
  * @throws Exception Em caso de erro no SSW ou no banco
  */
-function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I') {
+function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I', $unidade = '') {
     require_once '/var/www/html/lib/ssw.php';
 
     $domain = strtoupper($domain);
@@ -1051,12 +1051,14 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
 
     $str = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
 
+    $f19 = !empty($unidade) ? strtoupper(substr(trim($unidade), 0, 3)) : '';
+
     $param = "act=FIL_COL" .
              "&f2=$domain" .
              "&f14=$data_ini&f15=$data_fin" .
              "&f16=$tp_periodo" .
              "&f17=E" .
-             "&f19=";
+             "&f19=$f19";
 
     $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param);
 

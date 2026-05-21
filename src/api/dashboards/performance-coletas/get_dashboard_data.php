@@ -34,7 +34,8 @@ try {
 
     $g_sql = connect();
 
-    $total = fetchColetasSSW($g_sql, $domain, $data_ini_dmy, $data_fim_dmy, $tp_periodo);
+    $unidade = $filters['unidadeColeta'] ?? '';
+    $total = fetchColetasSSW($g_sql, $domain, $data_ini_dmy, $data_fim_dmy, $tp_periodo, $unidade);
 
     error_log("✅ [get_dashboard_data.php] fetchColetasSSW: $total coletas importadas para $domain ($data_ini_dmy a $data_fim_dmy, tp=$tp_periodo)");
 

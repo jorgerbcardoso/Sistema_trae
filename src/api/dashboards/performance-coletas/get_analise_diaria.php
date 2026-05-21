@@ -20,7 +20,8 @@ try {
 
     $g_sql = connect();
 
-    $total = fetchColetasSSW($g_sql, $domain, $data_ini_dmy, $data_fim_dmy, 'I');
+    $unidade = $filters['unidadeColeta'] ?? '';
+    $total = fetchColetasSSW($g_sql, $domain, $data_ini_dmy, $data_fim_dmy, 'I', $unidade);
 
     error_log("✅ [get_analise_diaria.php] fetchColetasSSW: $total coletas para $domain ($data_ini_dmy a $data_fim_dmy)");
 

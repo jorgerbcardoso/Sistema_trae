@@ -404,16 +404,15 @@ function buildWhereColetasBackup($g_sql, $filters) {
  * ================================================================
  */
 function buildUnidadeColetaFilter($g_sql, $siglas = [], $columnName = 'unidade') {
-    // Se não houver siglas, retornar string vazia
-    if (empty($siglas) || !is_array($siglas)) {
-        return '';
+    if (empty($siglas)) return '';
+
+    if (is_string($siglas)) {
+        $siglas = [$siglas];
     }
 
-    // Escapar cada sigla e construir array de condições
     $escapedSiglas = [];
     foreach ($siglas as $sigla) {
         if (!empty($sigla)) {
-            // Converter para maiúscula e pegar apenas 3 primeiros caracteres
             $siglaTrimmed = strtoupper(substr(trim($sigla), 0, 3));
             $escapedSiglas[] = "'" . pg_escape_string($g_sql, $siglaTrimmed) . "'";
         }

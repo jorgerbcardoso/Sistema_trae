@@ -40,7 +40,7 @@ export type SituacaoColeta = 'PRE-CADASTRADA' | 'CADASTRADA' | 'COMANDADA' | 'CO
 export interface ColetasFilters {
   periodoInicio: string;
   periodoFim: string;
-  unidadeColeta: string[];
+  unidadeColeta: string;
   cnpjRemetente: string;
   placa: string;
   situacao: string | string[];
@@ -201,7 +201,7 @@ export async function getDashboardData(filters: ColetasFilters): Promise<{
   return result.data;
 }
 
-export async function getAnaliseDiariaCalendario(filters: Pick<ColetasFilters, 'unidadeColeta' | 'cnpjRemetente' | 'placa' | 'situacao'>): Promise<{ analiseDiaria: DayDataColetas[]; coletas: any[] }> {
+export async function getAnaliseDiariaCalendario(filters: { unidadeColeta: string; cnpjRemetente: string; placa: string; situacao: string | string[] }): Promise<{ analiseDiaria: DayDataColetas[]; coletas: any[] }> {
   if (ENVIRONMENT.isFigmaMake) {
     const { mockGetAnaliseDiariaColetas } = await import('../mocks/mockData');
     return { analiseDiaria: await mockGetAnaliseDiariaColetas(filters as ColetasFilters), coletas: [] };
