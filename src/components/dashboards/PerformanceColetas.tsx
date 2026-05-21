@@ -148,6 +148,7 @@ export function PerformanceColetas() {
   const [loadingAnalise, setLoadingAnalise] = useState(false);
   const [loadingCalendario, setLoadingCalendario] = useState(false);
   const [allDiasData, setAllDiasData] = useState<DayDataColetas[]>([]);
+  const [coletasRawCalendario, setColetasRawCalendario] = useState<ColetaRaw[]>([]);
 
   // Estados para Evolução da Performance
   const [evolucaoPeriodo, setEvolucaoPeriodo] = useState<7 | 15 | 30>(30);
@@ -317,11 +318,13 @@ export function PerformanceColetas() {
         placa: filters.placa,
         situacao: filters.situacao,
       };
-      const data = await getAnaliseDiariaCalendario(analiseFilters);
-      setAllDiasData(Array.isArray(data) ? data : []);
+      const { analiseDiaria, coletas } = await getAnaliseDiariaCalendario(analiseFilters);
+      setAllDiasData(Array.isArray(analiseDiaria) ? analiseDiaria : []);
+      setColetasRawCalendario(Array.isArray(coletas) ? coletas : []);
     } catch (error) {
       console.error('❌ Erro ao carregar análise diária:', error);
       setAllDiasData([]);
+      setColetasRawCalendario([]);
     } finally {
       setLoadingCalendario(false);
     }
@@ -482,6 +485,38 @@ export function PerformanceColetas() {
     if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
   };
 
+  const handleExportCalendarioColetasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso);
+    downloadCSV(filtered, `coletas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    else toast.warning('Nenhuma coleta encontrada para este dia');
+  };
+
+  const handleExportCalendarioProgramadasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
+    downloadCSV(filtered, `programadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    else toast.warning('Nenhuma coleta programada encontrada para este dia');
+  };
+
+  const handleExportCalendarioComandasDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COMANDADA');
+    downloadCSV(filtered, `comandadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    else toast.warning('Nenhuma coleta comandada encontrada para este dia');
+  };
+
+  const handleExportCalendarioNoPrazoDia = (data: string) => {
+    const iso = normDate(data);
+    const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
+    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    else toast.warning('Nenhuma coleta no prazo encontrada para este dia');
+  };
+
   const handleExportComparativo = (sigla: string, tipo: 'total' | 'programadas' | 'comandadas' | 'coletadas' | 'no_prazo', label: string) => {
     let filtered = coletasRaw.filter(c => c.unidade.startsWith(sigla));
     if (tipo === 'programadas') filtered = filtered.filter(c => ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
@@ -614,6 +649,7 @@ export function PerformanceColetas() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-slate-600 dark:text-slate-400">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Essa operação pode levar alguns segundos.</p>
         </div>
       </div>
     );
@@ -1116,10 +1152,10 @@ export function PerformanceColetas() {
           setAnalisePeriodo={setAnalisePeriodo}
           diasData={diasData}
           loadingAnalise={loadingCalendario}
-          handleExportColetasDia={handleExportColetasDia}
-          handleExportProgramadasDia={handleExportProgramadasDia}
-          handleExportComandasDia={handleExportComandasDia}
-          handleExportNoPrazoDia={handleExportNoPrazoDia}
+          handleExportColetasDia={handleExportCalendarioColetasDia}
+          handleExportProgramadasDia={handleExportCalendarioProgramadasDia}
+          handleExportComandasDia={handleExportCalendarioComandasDia}
+          handleExportNoPrazoDia={handleExportCalendarioNoPrazoDia}
         />
 
         {/* Gráfico de Evolução da Performance */}

@@ -201,10 +201,10 @@ export async function getDashboardData(filters: ColetasFilters): Promise<{
   return result.data;
 }
 
-export async function getAnaliseDiariaCalendario(filters: Pick<ColetasFilters, 'unidadeColeta' | 'cnpjRemetente' | 'placa' | 'situacao'>): Promise<DayDataColetas[]> {
+export async function getAnaliseDiariaCalendario(filters: Pick<ColetasFilters, 'unidadeColeta' | 'cnpjRemetente' | 'placa' | 'situacao'>): Promise<{ analiseDiaria: DayDataColetas[]; coletas: any[] }> {
   if (ENVIRONMENT.isFigmaMake) {
     const { mockGetAnaliseDiariaColetas } = await import('../mocks/mockData');
-    return mockGetAnaliseDiariaColetas(filters as ColetasFilters);
+    return { analiseDiaria: await mockGetAnaliseDiariaColetas(filters as ColetasFilters), coletas: [] };
   }
 
   const token = localStorage.getItem('auth_token');
@@ -221,7 +221,10 @@ export async function getAnaliseDiariaCalendario(filters: Pick<ColetasFilters, '
     throw new Error(result.message || 'Erro ao buscar análise diária');
   }
 
-  return result.data.analiseDiaria ?? [];
+  return {
+    analiseDiaria: result.data.analiseDiaria ?? [],
+    coletas: result.data.coletas ?? [],
+  };
 }
 
 /**

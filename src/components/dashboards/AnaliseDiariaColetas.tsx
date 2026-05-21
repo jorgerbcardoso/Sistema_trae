@@ -165,7 +165,11 @@ export function AnaliseDiariaColetas({
       <CardContent>
         {loadingAnalise ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+              <p className="text-slate-600 dark:text-slate-400 text-sm">Carregando calendário...</p>
+              <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Essa operação pode levar alguns segundos.</p>
+            </div>
           </div>
         ) : (
           <div className={`grid gap-3 ${

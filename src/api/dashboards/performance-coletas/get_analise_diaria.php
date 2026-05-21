@@ -13,6 +13,7 @@ try {
     $filters = $input['filters'] ?? [];
 
     $hoje    = new DateTime();
+    $limite  = (new DateTime())->modify('+3 days');
     $ini     = (new DateTime())->modify('-30 days');
     $data_ini_dmy = $ini->format('dmy');
     $data_fim_dmy = $hoje->format('dmy');
@@ -23,12 +24,28 @@ try {
 
     error_log("✅ [get_analise_diaria.php] fetchColetasSSW: $total coletas para $domain ($data_ini_dmy a $data_fim_dmy)");
 
-    $analiseDiaria = getColetasAnaliseDiaria($g_sql, 30, 'tmp_coleta_rt');
+    $limiteStr     = $limite->format('Y-m-d');
+    $analiseDiaria = array_filter(
+        getColetasAnaliseDiaria($g_sql, 34, 'tmp_coleta_rt'),
+        fn($d) => $d['data'] <= $limiteStr
+    );
+    $coletas = array_filter(
+        getColetasRaw($g_sql, 'tmp_coleta_rt'),
+        function($c) use ($limiteStr) {
+            $parts = explode('/', $c['data_limite']);
+            if (count($parts) === 3) {
+                $iso = $parts[2] . '-' . $parts[1] . '-' . $parts[0];
+                return $iso <= $limiteStr;
+            }
+            return $c['data_limite'] <= $limiteStr;
+        }
+    );
 
     respondJson([
         'success' => true,
         'data'    => [
-            'analiseDiaria'   => $analiseDiaria,
+            'analiseDiaria'   => array_values($analiseDiaria),
+            'coletas'         => array_values($coletas),
             'total_importado' => $total,
         ]
     ]);
