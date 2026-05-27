@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, ReactNode } from 'react';
-import { apiFetch } from '../../utils/api';
+import { apiFetch } from '../../config/api';
 import {
   ChevronsLeft,
   ChevronsRight,
