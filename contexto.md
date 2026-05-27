@@ -28,3 +28,18 @@ COMO ADICIONAR UMA NOVA TELA/FUNCIONALIDADE (RESUMO PRÁTICO):
 3) BACKEND (PHP)
 - Cadastros costumam ficar em: src/api/cadastros/
 - Importações SSW seguem o padrão de: src/api/eventos/import_eventos.php (require_ssw + ask() + imp_ssw_*)
+
+
+PADRÕES DE CÓDIGO CRÍTICOS:
+
+1. INTERAÇÃO COM BANCO DE DADOS (PHP):
+   - NUNCA use as funções nativas `pg_query`, `pg_connect`, `pg_fetch_assoc`, etc.
+   - SEMPRE utilize a função wrapper `sql($query, $params=[])` disponível no `config.php`.
+   - Exemplo: `$resultado = sql("SELECT * FROM usuarios WHERE id = $1", [1]);`
+
+2. COMUNICAÇÃO COM SSW (PHP):
+   - NUNCA crie novas classes ou métodos para se comunicar com o SSW.
+   - SEMPRE use as funções existentes na biblioteca `ssw.php`.
+   - O fluxo padrão é:
+     a) `ssw_login()`: Para garantir que a sessão com o SSW está ativa.
+     b) `ssw_go($programa, $params)`: Para executar um programa no SSW e obter o resultado (seja HTML, XML, ou relatório de texto).

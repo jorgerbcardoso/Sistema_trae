@@ -1,0 +1,3 @@
+<?php
+// Lógica de parse do get_disponiveis_transferencia.php
+// ...

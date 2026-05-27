@@ -298,7 +298,7 @@ export function MainMenu() {
     }
   };
 
-  const handleMenuClick = (item: MenuItem) => {
+  const handleMenuClick = async (item: MenuItem) => {
     if (!item.is_available) {
       toast.warning(item.status_message || 'Funcionalidade em Desenvolvimento', {
         description: 'Esta funcionalidade estará disponível em breve.'
@@ -313,6 +313,19 @@ export function MainMenu() {
           description: 'Troque para uma unidade específica antes de acessar este painel.'
         });
         return;
+      }
+      try {
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/check_unidade_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ sigla: unidadeAtual }) },
+          true
+        );
+        if (res.success && res.efetua_carregamento === false) {
+          toast.error('Unidade não configurada para efetuar carregamentos no CADASTRO DE UNIDADES.');
+          return;
+        }
+      } catch (error) {
+        console.error('Erro ao verificar permissão de carregamento:', error);
       }
     }
 

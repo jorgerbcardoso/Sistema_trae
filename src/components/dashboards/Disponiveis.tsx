@@ -1,2227 +1,892 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../ThemeProvider';
-import { usePageTitle } from '../../hooks/usePageTitle';
-import { DashboardLayout } from '../layouts/DashboardLayout';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-
-import { ENVIRONMENT } from '../../config/environment';
-import { apiFetch } from '../../utils/apiUtils';
-import { toast } from 'sonner';
+import { useEffect, useState, useRef, useCallback, ReactNode } from 'react';
+import { apiFetch } from '../../utils/api';
 import {
-  Warehouse,
-  Truck,
-  PackageSearch,
+  ChevronsLeft,
+  ChevronsRight,
+  Filter as FilterIcon,
   RefreshCw,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
+  Truck,
   Package,
-  Weight,
-  Box,
-  MapPin,
-  Building2,
-  Layers,
-  Timer,
-  Loader2,
-  Home,
-  ListFilter,
-  Plus,
-  Trash2,
-  CheckSquare,
-  Square,
-  Car,
+  PlusCircle,
+  Archive,
+  Send,
+  Warehouse,
+  Search,
+  ArrowRight,
+  Bus,
   X,
+  DownloadCloud,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Filter } from '../../components/Filter';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
+import { DashboardLayout } from '../../components/layout/DashboardLayout';
 
-interface Cte {
-  ctrc: string;
-  serCte: string;
-  nroCte: number;
-  tipo: string;
-  emissao: string;
-  prevEnt: string;
-  nfiscal: string;
-  pedido: string;
-  remetente: string;
-  pagador: string;
-  destinatario: string;
-  cidade: string;
-  uf: string;
-  vlrNf: string;
-  frete: string;
-  peso: string;
-  cubagem: string;
-  qtdeVol: string;
-  manifesto: string;
-  prevChegada: string;
-  emTransito: boolean;
-  unidadeDest: string;
-  nomeDest: string;
-  indicadorSaida: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
-  atrasoTransf: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
-}
+// --- COMPONENTES DO HUB DE CARGAS E MODAIS ---
 
-interface Coleta {
-  serColeta: string;
-  nroColeta: string;
-  remetente: string;
-  cidadeRem: string;
-  cidadeDest: string;
-  unidadeDest: string;
-  paraEntrega: boolean;
-  dataHoreLim: string;
-  coletada: string;
-  valMerc: string;
-  qtdeVol: string;
-  peso: string;
-  statusColeta: 'pendente' | 'coletada' | 'coletada_atrasada' | 'atrasada';
-  atrasoMin: number | null;
-}
-
-interface DadosTransferencia {
-  ctes: Cte[];
-  coletas: Coleta[];
-  sigla: string;
-  geradoEm: string;
-}
-
-interface CteEntrega {
-  ctrc: string;
-  serCte: string;
-  nroCte: number;
-  setor: string;
-  nfiscal: string;
-  pagador: string;
-  destinatario: string;
-  cnpjDest: string;
-  endereco: string;
-  cidade: string;
-  bairro: string;
-  cep: string;
-  prevEnt: string;
-  agendamento: string;
-  vlrMerc: string;
-  peso: string;
-  cubagem: string;
-  qtdeVol: string;
-  frete: string;
-  codUltOcor: string;
-  descUltOcor: string;
-  dataUltOcor: string;
-  agendObrig: boolean;
-  prevChegada: string;
-  manifesto: string;
-  diasAtraso: number;
-  emTransito: boolean;
-  atrasoEntrega: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
-}
-
-interface DadosEntrega {
-  ctes: CteEntrega[];
-  sigla: string;
-  geradoEm: string;
-}
-
-interface GrupoSetor {
-  setor: string;
-  armazem: CteEntrega[];
-  transito: CteEntrega[];
-  totalCtes: number;
-  totalVol: number;
-  totalPeso: number;
-  totalCubagem: number;
-}
-
-interface GrupoDestino {
-  sigla: string;
-  nome: string;
-  armazem: Cte[];
-  transito: Cte[];
-  coletas: Coleta[];
-  totalCtes: number;
-  totalVol: number;
-  totalPeso: number;
-  totalCubagem: number;
-}
-
-interface CteCarregamento {
-  seq_cte: number;
-  login_inclusao: string;
-  data_inclusao: string;
-  hora_inclusao: string;
-}
-
-interface Carregamento {
-  placa_provisoria: string;
-  total_ctes: number;
-  data_criacao: string;
-  hora_criacao: string;
-  login_criacao: string;
-  capacidade_ton: number | null;
-  capacidade_m3: number | null;
-  ctes: CteCarregamento[];
-}
-
-const COR_INDICADOR: Record<string, string> = {
-  verde:    'bg-green-500',
-  amarelo:  'bg-yellow-400',
-  laranja:  'bg-orange-500',
-  vermelho: 'bg-red-600',
-};
-
-const TEXTO_INDICADOR: Record<string, string> = {
-  verde:    'text-green-700 dark:text-green-400',
-  amarelo:  'text-yellow-700 dark:text-yellow-400',
-  laranja:  'text-orange-700 dark:text-orange-400',
-  vermelho: 'text-red-700 dark:text-red-400',
-};
-
-const BG_INDICADOR: Record<string, string> = {
-  verde:    'bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800',
-  amarelo:  'bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-800',
-  laranja:  'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800',
-  vermelho: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800',
-};
-
-function IndicadorDot({ cor, title }: { cor: string | null; title?: string }) {
-  if (!cor) return <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600 inline-block" title={title ?? 'Sem dados'} />;
-  return <span className={`w-2.5 h-2.5 rounded-full inline-block ${COR_INDICADOR[cor]}`} title={title} />;
-}
-
-function formatarAtraso(min: number): string {
-  if (min < 60) return `${min}min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m > 0 ? `${h}h${m}min` : `${h}h`;
-}
-
-function StatusColetaBadge({ coleta }: { coleta: Coleta }) {
-  if (coleta.statusColeta === 'coletada') {
-    return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Coletada</Badge>;
-  }
-  if (coleta.statusColeta === 'coletada_atrasada') {
-    return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Coletada c/ atraso {coleta.atrasoMin ? formatarAtraso(coleta.atrasoMin) : ''}</Badge>;
-  }
-  if (coleta.statusColeta === 'atrasada') {
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"><XCircle className="w-3 h-3 mr-1" />Atrasada {coleta.atrasoMin ? formatarAtraso(coleta.atrasoMin) : ''}</Badge>;
-  }
-  return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"><Clock className="w-3 h-3 mr-1" />Pendente</Badge>;
-}
-
-function TabelaCtes({
-  ctes,
-  tipo,
-  modoApontamento,
-  ctesSelecionados,
-  ctesNoCarregamento,
-  ctesJaCarregados,
-  onToggleCte,
-  onToggleTodos,
+function ConfirmacaoModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  children,
 }: {
-  ctes: Cte[];
-  tipo: 'armazem' | 'transito';
-  modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
-  ctesNoCarregamento?: Set<number>;
-  ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  children: ReactNode;
 }) {
-  if (ctes.length === 0) return null;
-  const emApontamento = !!modoApontamento;
-
-  const selecionaveis = ctes.filter(c => {
-    if (ctesNoCarregamento?.has(c.nroCte)) return false;
-    if (ctesJaCarregados?.has(c.nroCte)) return false;
-    return true;
-  });
-  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(c.nroCte));
-  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(c.nroCte));
-
-  const handleToggleTodos = () => {
-    if (!onToggleTodos) return;
-    onToggleTodos(selecionaveis.map(c => c.nroCte), !todosSelecionados);
-  };
+  if (!isOpen) return null;
 
   return (
-    <div className="overflow-x-auto">
-      {emApontamento && (
-        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
-          <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <h3 className="text-lg font-semibold">{title}</h3>
         </div>
-      )}
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-            {emApontamento && (
-              <th className="px-3 py-2 w-8">
-                <button onClick={handleToggleTodos} className="flex items-center justify-center w-full" title={todosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}>
-                  {todosSelecionados ? (
-                    <CheckSquare className="w-4 h-4 text-amber-500" />
-                  ) : algunsSelecionados ? (
-                    <div className="w-4 h-4 border-2 border-amber-400 rounded-sm bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-                      <div className="w-2 h-0.5 bg-amber-500 rounded" />
-                    </div>
-                  ) : (
-                    <Square className="w-4 h-4 text-slate-400" />
-                  )}
-                </button>
-              </th>
-            )}
-            <th className="px-3 py-2 text-left font-semibold">CT-e</th>
-            <th className="px-3 py-2 text-left font-semibold">Emissão</th>
-            <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
-            <th className="px-3 py-2 text-left font-semibold">Remetente</th>
-            <th className="px-3 py-2 text-left font-semibold">Pagador</th>
-            <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
-            <th className="px-3 py-2 text-left font-semibold">Cidade/UF</th>
-            <th className="px-3 py-2 text-right font-semibold">Vlr. NF</th>
-            <th className="px-3 py-2 text-right font-semibold">Frete</th>
-            <th className="px-3 py-2 text-right font-semibold">Peso</th>
-            <th className="px-3 py-2 text-right font-semibold">M³</th>
-            <th className="px-3 py-2 text-right font-semibold">Vol.</th>
-            <th className="px-3 py-2 text-left font-semibold">Manifesto</th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
-            <th className="px-3 py-2 text-center font-semibold">Saída</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ctes.map((cte, i) => {
-            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
-            const placaOutro = ctesJaCarregados?.get(cte.nroCte);
-            const jaEmOutro = !!placaOutro && !jaNoCarregamento;
-            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
-            const bloqueado = jaNoCarregamento || jaEmOutro;
-            const rowBg = jaNoCarregamento
-              ? 'bg-emerald-50 dark:bg-emerald-950/20'
-              : jaEmOutro
-              ? 'bg-slate-100 dark:bg-slate-800/60 opacity-60'
-              : selecionado
-              ? 'bg-amber-50 dark:bg-amber-950/20'
-              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50';
-            return (
-              <tr
-                key={i}
-                className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
-              >
-                {emApontamento && (
-                  <td className="px-3 py-2 text-center">
-                    {jaNoCarregamento ? (
-                      <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
-                    ) : jaEmOutro ? (
-                      <Truck className="w-4 h-4 text-slate-400 mx-auto" />
-                    ) : selecionado ? (
-                      <CheckSquare className="w-4 h-4 text-amber-500 mx-auto" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
-                    )}
-                  </td>
-                )}
-                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                  {cte.ctrc}
-                  {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
-                  {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
-                </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.pagador}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
-                <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{cte.manifesto || '-'}</td>
-                {tipo === 'transito' && (
-                  <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{cte.prevChegada}</td>
-                )}
-                <td className="px-3 py-2 text-center">
-                  <IndicadorDot cor={cte.indicadorSaida} title={cte.indicadorSaida ? `Atraso saída: ${cte.indicadorSaida}` : 'Sem manifesto'} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function GrupoDestinoCard({
-  grupo,
-  maxPeso,
-  maxCubagem,
-  modoApontamento,
-  ctesSelecionados,
-  ctesNoCarregamento,
-  ctesJaCarregados,
-  onToggleCte,
-  onToggleTodos,
-}: {
-  grupo: GrupoDestino;
-  maxPeso: number;
-  maxCubagem: number;
-  modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
-  ctesNoCarregamento?: Set<number>;
-  ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
-
-  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
-  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
-
-  const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
-  const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
-    ctes.reduce<string | null>((p, c) => {
-      const v = c[campo]; if (!v) return p; if (!p) return v;
-      return (ORDEM_IND[v] ?? 0) > (ORDEM_IND[p] ?? 0) ? v : p;
-    }, null);
-
-  const piorTransito = getPior(grupo.transito, 'atrasoTransf');
-
-  const pctEntregueNoPrazo = (() => {
-    const comEntrega = [...grupo.armazem, ...grupo.transito].filter(c => c.indicadorSaida !== null);
-    if (comEntrega.length === 0) return null;
-    const noPrazo = comEntrega.filter(c => c.indicadorSaida === 'verde').length;
-    return Math.round((noPrazo / comEntrega.length) * 100);
-  })();
-
-  return (
-    <div className="overflow-hidden">
-      <button
-        className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
-        onClick={() => setAberto(!aberto)}
-      >
-        <span className="flex items-center">
-          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-        </span>
-        <span className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
-          <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-          {grupo.sigla}
-        </span>
-        <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nome}</span>
-        <span className="flex items-center justify-center">
-          {pctEntregueNoPrazo !== null
-            ? <span className={`text-xs font-bold ${pctEntregueNoPrazo >= 80 ? 'text-green-600 dark:text-green-400' : pctEntregueNoPrazo >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{pctEntregueNoPrazo}%</span>
-            : <span className="text-xs text-slate-400">-</span>}
-        </span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.coletas.length > 0 ? grupo.coletas.length : '-'}</span>
-        <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            const label = grupo.totalPeso >= 1000
-              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
-              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
-                />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
-              </div>
-            );
-          })()}
-        </span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
-                />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
-              </div>
-            );
-          })()}
-        </span>
-      </button>
-
-      {aberto && (
-        <div className="border-t border-slate-200 dark:border-slate-700">
-          <div className="flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <button
-              onClick={() => setAbaAtiva('armazem')}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'armazem' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Warehouse className="w-4 h-4" />
-              No Armazém
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.armazem.length}</Badge>
-            </button>
-            <button
-              onClick={() => setAbaAtiva('transito')}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'transito' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Truck className="w-4 h-4" />
-              Em Transferência
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.transito.length}</Badge>
-            </button>
-            {grupo.coletas.length > 0 && (
-              <button
-                onClick={() => setAbaAtiva('coletas')}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'coletas' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-              >
-                <Package className="w-4 h-4" />
-                Em Coleta
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">{grupo.coletas.length}</Badge>
-              </button>
-            )}
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-2">
-            {abaAtiva === 'armazem' && (
-              grupo.armazem.length > 0
-                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
-                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este destino.</p>
-            )}
-            {abaAtiva === 'transito' && (
-              grupo.transito.length > 0
-                ? <TabelaCtes ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
-                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e em trânsito para este destino.</p>
-            )}
-            {abaAtiva === 'coletas' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                      <th className="px-3 py-2 text-left font-semibold">Coleta</th>
-                      <th className="px-3 py-2 text-left font-semibold">Remetente</th>
-                      <th className="px-3 py-2 text-left font-semibold">Cidade Dest.</th>
-                      <th className="px-3 py-2 text-left font-semibold">Limite</th>
-                      <th className="px-3 py-2 text-left font-semibold">Coletada</th>
-                      <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
-                      <th className="px-3 py-2 text-right font-semibold">Vol.</th>
-                      <th className="px-3 py-2 text-right font-semibold">Peso (kg)</th>
-                      <th className="px-3 py-2 text-left font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grupo.coletas.map((c, i) => (
-                      <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                        <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">{c.serColeta} {c.nroColeta}</td>
-                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[120px] truncate">{c.remetente}</td>
-                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.cidadeDest || '-'}</td>
-                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.dataHoreLim}</td>
-                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.coletada || '-'}</td>
-                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.valMerc}</td>
-                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.qtdeVol}</td>
-                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.peso}</td>
-                        <td className="px-3 py-2"><StatusColetaBadge coleta={c} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+        <div className="p-6 text-sm text-slate-600 dark:text-slate-400">{children}</div>
+        <div className="flex justify-end p-4 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg space-x-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={onConfirm}>Confirmar</Button>
         </div>
-      )}
-    </div>
-  );
-}
-
-function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
-  const porCidade = coletas.reduce<Record<string, Coleta[]>>((acc, c) => {
-    const key = c.cidadeRem || 'SEM CIDADE';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(c);
-    return acc;
-  }, {});
-
-  const cidades = Object.keys(porCidade).sort();
-
-  return (
-    <div className="space-y-4">
-      {cidades.map(cidade => {
-        const cols = porCidade[cidade];
-        const totalVol  = cols.reduce((s, c) => s + (parseInt(c.qtdeVol) || 0), 0);
-        const totalPeso = cols.reduce((s, c) => s + (parseFloat(c.peso.replace('.', '').replace(',', '.')) || 0), 0);
-        const temAtrasada = cols.some(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada');
-
-        return (
-          <div key={cidade} className={`border rounded-xl overflow-hidden ${temAtrasada ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : 'border-slate-200 dark:border-slate-700'}`}>
-            <div className="flex items-center justify-between px-5 py-3 bg-white/60 dark:bg-slate-900/60">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-500" />
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{cidade}</span>
-                {temAtrasada && <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Atenção</Badge>}
-              </div>
-              <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-                <span><strong className="text-slate-900 dark:text-slate-100">{cols.length}</strong> coletas</span>
-                <span><strong className="text-slate-900 dark:text-slate-100">{totalVol}</strong> vol</span>
-                <span><strong className="text-slate-900 dark:text-slate-100">{totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</strong> kg</span>
-              </div>
-            </div>
-            <div className="overflow-x-auto bg-white dark:bg-slate-900">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    <th className="px-3 py-2 text-left font-semibold">Coleta</th>
-                    <th className="px-3 py-2 text-left font-semibold">Remetente</th>
-                    <th className="px-3 py-2 text-left font-semibold">Limite</th>
-                    <th className="px-3 py-2 text-left font-semibold">Coletada</th>
-                    <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
-                    <th className="px-3 py-2 text-right font-semibold">Vol.</th>
-                    <th className="px-3 py-2 text-right font-semibold">Peso (kg)</th>
-                    <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cols.map((c, i) => (
-                    <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                      <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">{c.serColeta} {c.nroColeta}</td>
-                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[120px] truncate">{c.remetente}</td>
-                      <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.dataHoreLim}</td>
-                      <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.coletada || '-'}</td>
-                      <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.valMerc}</td>
-                      <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.qtdeVol}</td>
-                      <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.peso}</td>
-                      <td className="px-3 py-2"><StatusColetaBadge coleta={c} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TabelaEntrega({
-  ctes,
-  tipo,
-  modoApontamento,
-  ctesSelecionados,
-  ctesNoCarregamento,
-  ctesJaCarregados,
-  onToggleCte,
-  onToggleTodos,
-}: {
-  ctes: CteEntrega[];
-  tipo: 'armazem' | 'transito';
-  modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
-  ctesNoCarregamento?: Set<number>;
-  ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
-}) {
-  if (ctes.length === 0) return null;
-  const emApontamento = !!modoApontamento;
-
-  const selecionaveis = ctes.filter(c => {
-    if (ctesNoCarregamento?.has(c.nroCte)) return false;
-    if (ctesJaCarregados?.has(c.nroCte)) return false;
-    return true;
-  });
-  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(c.nroCte));
-  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(c.nroCte));
-
-  const handleToggleTodos = () => {
-    if (!onToggleTodos) return;
-    onToggleTodos(selecionaveis.map(c => c.nroCte), !todosSelecionados);
-  };
-
-  return (
-    <div className="overflow-x-auto">
-      {emApontamento && (
-        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
-          <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
-        </div>
-      )}
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-            {emApontamento && (
-              <th className="px-3 py-2 w-8">
-                <button onClick={handleToggleTodos} className="flex items-center justify-center w-full" title={todosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}>
-                  {todosSelecionados ? (
-                    <CheckSquare className="w-4 h-4 text-amber-500" />
-                  ) : algunsSelecionados ? (
-                    <div className="w-4 h-4 border-2 border-amber-400 rounded-sm bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-                      <div className="w-2 h-0.5 bg-amber-500 rounded" />
-                    </div>
-                  ) : (
-                    <Square className="w-4 h-4 text-slate-400" />
-                  )}
-                </button>
-              </th>
-            )}
-            <th className="px-3 py-2 text-left font-semibold">CT-e</th>
-            <th className="px-3 py-2 text-left font-semibold">NF</th>
-            <th className="px-3 py-2 text-left font-semibold">Pagador</th>
-            <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
-            <th className="px-3 py-2 text-left font-semibold">Cidade</th>
-            <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
-            <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
-            <th className="px-3 py-2 text-right font-semibold">Peso</th>
-            <th className="px-3 py-2 text-right font-semibold">M³</th>
-            <th className="px-3 py-2 text-right font-semibold">Frete</th>
-            <th className="px-3 py-2 text-left font-semibold">Últ. Ocorrência</th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
-            <th className="px-3 py-2 text-center font-semibold">Atraso</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ctes.map((cte, i) => {
-            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
-            const placaOutro = ctesJaCarregados?.get(cte.nroCte);
-            const jaEmOutro = !!placaOutro && !jaNoCarregamento;
-            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
-            const bloqueado = jaNoCarregamento || jaEmOutro;
-            const rowBg = jaNoCarregamento
-              ? 'bg-emerald-50 dark:bg-emerald-950/20'
-              : jaEmOutro
-              ? 'bg-slate-100 dark:bg-slate-800/60 opacity-60'
-              : selecionado
-              ? 'bg-amber-50 dark:bg-amber-950/20'
-              : 'hover:bg-slate-50 dark:hover:bg-slate-900/50';
-            return (
-              <tr
-                key={i}
-                className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
-              >
-                {emApontamento && (
-                  <td className="px-3 py-2 text-center">
-                    {jaNoCarregamento ? (
-                      <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
-                    ) : jaEmOutro ? (
-                      <Truck className="w-4 h-4 text-slate-400 mx-auto" />
-                    ) : selecionado ? (
-                      <CheckSquare className="w-4 h-4 text-amber-500 mx-auto" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-300 dark:text-slate-600 mx-auto" />
-                    )}
-                  </td>
-                )}
-                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                  {cte.ctrc}
-                  {cte.agendObrig && <span className="ml-1 text-orange-500 font-bold" title="Agendamento obrigatório">S</span>}
-                  {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
-                  {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
-                </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
-                {tipo === 'transito' && (
-                  <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
-                )}
-                <td className="px-3 py-2 text-center">
-                  <IndicadorDot
-                    cor={cte.atrasoEntrega}
-                    title={cte.diasAtraso > 0 ? `${cte.diasAtraso} dia(s) em atraso` : 'No prazo'}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function GrupoSetorCard({
-  grupo,
-  maxPeso,
-  maxCubagem,
-  modoApontamento,
-  ctesSelecionados,
-  ctesNoCarregamento,
-  ctesJaCarregados,
-  onToggleCte,
-  onToggleTodos,
-}: {
-  grupo: GrupoSetor;
-  maxPeso: number;
-  maxCubagem: number;
-  modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
-  ctesNoCarregamento?: Set<number>;
-  ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
-
-  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
-  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
-
-  const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
-
-  const piorAtraso = [...grupo.armazem, ...grupo.transito].reduce<string | null>((p, c) => {
-    const v = c.atrasoEntrega;
-    if (!v) return p;
-    if (!p) return v;
-    return (ORDEM_IND[v] ?? 0) > (ORDEM_IND[p] ?? 0) ? v : p;
-  }, null);
-
-  const temAgendObrig = [...grupo.armazem, ...grupo.transito].some(c => c.agendObrig);
-
-  return (
-    <div className="overflow-hidden">
-      <button
-        className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
-        onClick={() => setAberto(!aberto)}
-      >
-        <span className="flex items-center">
-          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-        </span>
-        <span className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
-          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          {grupo.setor}
-        </span>
-        <span />
-        <span className="flex items-center justify-center">
-          {piorAtraso
-            ? <IndicadorDot cor={piorAtraso} title={`Pior atraso: ${piorAtraso}`} />
-            : <span className="text-xs text-slate-400">-</span>}
-        </span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.armazem.length}</span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
-        <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            const label = grupo.totalPeso >= 1000
-              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
-              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #065f46, #059669, #10b981)' }} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
-              </div>
-            );
-          })()}
-        </span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #064e3b, #047857, #059669)' }} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
-              </div>
-            );
-          })()}
-        </span>
-      </button>
-
-      {aberto && (
-        <div className="border-t border-slate-200 dark:border-slate-700">
-          <div className="flex border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <button
-              onClick={() => setAbaAtiva('armazem')}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'armazem' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Home className="w-4 h-4" />
-              No Armazém
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.armazem.length}</Badge>
-            </button>
-            <button
-              onClick={() => setAbaAtiva('transito')}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${abaAtiva === 'transito' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Truck className="w-4 h-4" />
-              A Caminho
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{grupo.transito.length}</Badge>
-            </button>
-            {temAgendObrig && (
-              <span className="ml-auto flex items-center gap-1 px-4 text-xs text-orange-600 dark:text-orange-400 font-medium">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Há CT-es com agendamento obrigatório
-              </span>
-            )}
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-2">
-            {abaAtiva === 'armazem' && (
-              grupo.armazem.length > 0
-                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
-                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
-            )}
-            {abaAtiva === 'transito' && (
-              grupo.transito.length > 0
-                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
-                : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface CarregamentoAreaProps {
-  sigla: string;
-  carregamentos: Carregamento[];
-  loadingCarregamentos: boolean;
-  modoApontamento: string | null;
-  onIniciarApontamento: (placa: string) => void;
-  onCancelarApontamento: () => void;
-  onCriarCarregamento: (placa: string) => void;
-  onExcluirCarregamento: (placa: string) => void;
-  onRemoverCte: (placa: string, seqCte: number) => void;
-  onCarregarSSW: (placa: string) => void;
-  todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
-}
-
-function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
-  const pct = capacidade > 0 ? Math.min((valor / capacidade) * 100, 100) : 0;
-  const cor = pct >= 100 ? 'bg-red-500' : pct >= 85 ? 'bg-orange-500' : pct >= 60 ? 'bg-yellow-500' : undefined;
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
-        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
-          {valor.toFixed(valor >= 10 ? 1 : 2)} / {capacidade.toFixed(capacidade >= 10 ? 1 : 2)}
-          {' '}({pct.toFixed(0)}%)
-        </span>
-      </div>
-      <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-        <div
-          className={`h-3 rounded-full transition-all duration-700 ease-out ${cor ?? ''}`}
-          style={{ width: `${pct}%`, background: cor ? undefined : corGradient }}
-        />
       </div>
     </div>
   );
 }
 
-function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string) => void; onFechar: () => void }) {
-  const [placa, setPlaca] = useState('');
-  const [buscaVeiculo, setBuscaVeiculo] = useState('');
-  const [veiculos, setVeiculos] = useState<{ placa: string; tipo: string; marca: string; modelo: string }[]>([]);
-  const [buscando, setBuscando] = useState(false);
-  const [modoVeiculo, setModoVeiculo] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const buscarVeiculos = useCallback(async (termo: string) => {
-    if (termo.length < 3) { setVeiculos([]); return; }
-    setBuscando(true);
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/search_veiculos.php`,
-        { method: 'POST', body: JSON.stringify({ search: termo }) },
-        true
-      );
-      if (res.success) setVeiculos(res.data ?? []);
-    } catch {}
-    finally { setBuscando(false); }
-  }, []);
-
-  useEffect(() => {
-    if (!modoVeiculo) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => buscarVeiculos(buscaVeiculo), 400);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [buscaVeiculo, modoVeiculo, buscarVeiculos]);
-
-  const placaFinal = modoVeiculo ? buscaVeiculo : placa;
+function HubModal({
+  isOpen,
+  onRequestClose,
+  title,
+  children,
+}: {
+  isOpen: boolean;
+  onRequestClose: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in-0">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-6xl mx-4 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
-            <Truck className="w-5 h-5 text-emerald-500" />
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Novo Carregamento</h3>
+            <Package className="w-5 h-5 text-indigo-500" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
           </div>
-          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+          <button onClick={onRequestClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setModoVeiculo(false); setBuscaVeiculo(''); setVeiculos([]); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${!modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
-            >
-              Placa livre
-            </button>
-            <button
-              onClick={() => { setModoVeiculo(true); setPlaca(''); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
-            >
-              <Car className="w-4 h-4 inline mr-1.5" />Veículo cadastrado
-            </button>
-          </div>
-
-          {!modoVeiculo ? (
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placa / Identificação</label>
-              <input
-                type="text"
-                value={placa}
-                onChange={e => setPlaca(e.target.value.toUpperCase())}
-                placeholder="Ex: ABC1234 ou ROTA-01"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <div className="relative">
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar veículo</label>
-              <input
-                type="text"
-                value={buscaVeiculo}
-                onChange={e => setBuscaVeiculo(e.target.value.toUpperCase())}
-                placeholder="Digite a placa, tipo ou modelo..."
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                autoFocus
-              />
-              {buscando && <Loader2 className="absolute right-3 top-8 w-4 h-4 animate-spin text-slate-400" />}
-              {veiculos.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {veiculos.map((v, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setBuscaVeiculo(v.placa); setVeiculos([]); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">{v.placa}</span>
-                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{v.tipo} · {v.marca} {v.modelo}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-3 px-6 pb-5">
-          <Button variant="outline" className="flex-1" onClick={onFechar}>Cancelar</Button>
-          <Button
-            className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-            disabled={!placaFinal.trim()}
-            onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim()); }}
-          >
-            <Plus className="w-4 h-4 mr-1.5" />Criar carregamento
-          </Button>
-        </div>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
   );
 }
 
-function parsePeso(s: string): number {
-  if (!s) return 0;
-  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
-}
-function parseCubagem(s: string): number {
-  if (!s) return 0;
-  return parseFloat(s.replace(',', '.')) || 0;
-}
-function formatData(d: string): string {
-  if (!d) return '';
-  const p = d.split('-');
-  if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
-  return d;
-}
 
-function CardCarregamento({
-  carregamento,
-  todosCtes,
-  modoApontamento,
-  onIniciarApontamento,
-  onCancelarApontamento,
-  onExcluirCarregamento,
-  onRemoverCte,
-  onCarregarSSW,
+function UnidadeCompartilhadaCard({
+  unidade,
+  onCteSelect,
+  ctesSelecionados,
 }: {
-  carregamento: Carregamento;
-  todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
-  modoApontamento: string | null;
-  onIniciarApontamento: (placa: string) => void;
-  onCancelarApontamento: () => void;
-  onExcluirCarregamento: (placa: string) => void;
-  onRemoverCte: (placa: string, seqCte: number) => void;
-  onCarregarSSW: (placa: string) => void;
+  unidade: string;
+  onCteSelect: (cte: any, unidade: string) => void;
+  ctesSelecionados: any[];
 }) {
-  const [expandido, setExpandido] = useState(false);
-  const ativo = modoApontamento === carregamento.placa_provisoria;
+  const [dados, setDados] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const ctesDetalhados = carregamento.ctes.map(c => {
-    const det = todosCtes.find(e => e.nroCte === c.seq_cte);
-    return { ...c, det };
-  });
+  useEffect(() => {
+    async function carregarDadosUnidade() {
+      setLoading(true);
+      try {
+        const resultado = await apiFetch(
+          `dashboards/disponiveis/get_disponiveis_unidade_compartilhada.php`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ unidade }),
+          }
+        );
+        if (resultado.status === 'error') {
+          throw new Error(resultado.message);
+        }
+        setDados(resultado.data);
+      } catch (error: any) {
+        console.error(`Erro ao buscar dados da unidade ${unidade}:`, error);
+        toast.error(`Erro ao buscar dados de ${unidade}: ${error.message}`);
+        setDados(null);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const totalPeso = ctesDetalhados.reduce((s, c) => s + parsePeso(c.det?.peso ?? ''), 0);
-  const totalCubagem = ctesDetalhados.reduce((s, c) => s + parseCubagem(c.det?.cubagem ?? ''), 0);
-  const temCapacidade = carregamento.capacidade_ton !== null && carregamento.capacidade_m3 !== null;
+    carregarDadosUnidade();
+  }, [unidade]);
 
-  const primeiroCte = carregamento.ctes.length > 0 ? carregamento.ctes[0] : null;
-  const infoCriacao = primeiroCte
-    ? `${formatData(primeiroCte.data_inclusao)} ${primeiroCte.hora_inclusao?.slice(0, 5)} · ${primeiroCte.login_inclusao}`
-    : null;
+  const isCteSelecionado = (cte: any) => {
+    return ctesSelecionados.some(c => c.chave_cte === cte.chave_cte);
+  };
+
+  if (loading) {
+    return (
+      <Card className="w-full animate-pulse">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Warehouse className="mr-2" size={24} />
+            <div className="h-6 bg-gray-300 dark:bg-slate-700 rounded w-24"></div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-4 bg-gray-300 dark:bg-slate-700 rounded w-1/2 mx-auto mt-4"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!dados || (dados.coletas.length === 0 && dados.transferencias.length === 0 && dados.entregas.length === 0)) {
+    return null; // Não renderiza nada se não houver cargas
+  }
 
   return (
-    <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
-              <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
+    <Card className="w-full bg-slate-50 dark:bg-slate-800/50">
+      <CardHeader>
+        <CardTitle className="flex items-center text-lg">
+          <Warehouse className="mr-2" size={24} />
+          {unidade}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {dados.coletas.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-md mb-2">Coletas ({dados.coletas.length})</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+              {dados.coletas.map((cte: any) => (
+                <div
+                  key={cte.chave_cte}
+                  onClick={() => onCteSelect({ ...cte, tipo: 'COLETA' }, unidade)}
+                  className={`p-2 border rounded-md cursor-pointer transition-colors ${
+                    isCteSelecionado(cte)
+                      ? 'bg-blue-100 dark:bg-blue-900 border-blue-400'
+                      : 'bg-white dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <p className="font-bold text-sm">{cte.destinatario}</p>
+                  <p className="text-xs text-gray-600 dark:text-slate-400">
+                    {cte.volumes} vol, {cte.peso} kg
+                  </p>
+                </div>
+              ))}
             </div>
-            <div className="min-w-0">
-              <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
-              {infoCriacao ? (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500">{infoCriacao}</p>
-              ) : (
-                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
-            </Badge>
-            {temCapacidade && (
-              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs">
-                <Car className="w-3 h-3 mr-1" />Veículo
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {temCapacidade ? (
-          <div className="flex flex-col gap-2 mb-3">
-            <BarraCapacidade
-              valor={totalPeso / 1000}
-              capacidade={carregamento.capacidade_ton!}
-              corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
-              label="Peso (ton)"
-            />
-            <BarraCapacidade
-              valor={totalCubagem}
-              capacidade={carregamento.capacidade_m3!}
-              corGradient="linear-gradient(90deg, #0369a1, #0ea5e9)"
-              label="Cubagem (m³)"
-            />
-          </div>
-        ) : (
-          <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
-            <span><Weight className="w-3 h-3 inline mr-1" />{(totalPeso / 1000).toFixed(3)}t</span>
-            <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
           </div>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
-          {!ativo ? (
-            <Button size="sm" className="flex-1 min-w-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
-              <CheckSquare className="w-3.5 h-3.5 mr-1" />Apontar
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" className="flex-1 min-w-0 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
-              <X className="w-3.5 h-3.5 mr-1" />Cancelar
-            </Button>
-          )}
-          <Button size="sm" className="flex-1 min-w-0 bg-sky-500 hover:bg-sky-600 text-white text-xs h-8" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
-            <Truck className="w-3.5 h-3.5 mr-1" />SSW
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
-            {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700" onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)} title="Excluir carregamento">
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {expandido && carregamento.ctes.length > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800">
-          <div className="max-h-52 overflow-y-auto">
-            <table className="w-full text-xs table-fixed">
-              <colgroup>
-                <col className="w-[90px]" />
-                <col />
-                <col className="w-[42px]" />
-                <col className="w-[46px]" />
-                <col className="w-[22px]" />
-              </colgroup>
-              <tbody>
-                {ctesDetalhados.map((c, i) => {
-                  const d = c.det;
-                  const pesoTon = d ? (parsePeso(d.peso) / 1000) : 0;
-                  const cub = d ? parseCubagem(d.cubagem) : 0;
-                  return (
-                    <tr key={i} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-2 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {d ? d.ctrc : `#${c.seq_cte}`}
-                      </td>
-                      <td className="px-1 py-1.5 text-slate-500 dark:text-slate-400 truncate">
-                        {d ? d.destinatario : <span className="italic text-slate-300 dark:text-slate-600">—</span>}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-                        {d ? `${pesoTon.toFixed(3)}t` : '—'}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-slate-500 dark:text-slate-500 whitespace-nowrap">
-                        {d ? `${cub.toFixed(3)}` : '—'}
-                      </td>
-                      <td className="pr-2 py-1.5 text-center">
-                        <button onClick={() => onRemoverCte(carregamento.placa_provisoria, c.seq_cte)} className="text-red-400 hover:text-red-600" title="Remover">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {dados.transferencias.length > 0 && (
+           <div>
+            <h4 className="font-semibold text-md mb-2">Transferências ({dados.transferencias.length})</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+              {dados.transferencias.map((cte: any) => (
+                <div
+                  key={cte.chave_cte}
+                  onClick={() => onCteSelect({ ...cte, tipo: 'TRANSFERENCIA' }, unidade)}
+                   className={`p-2 border rounded-md cursor-pointer transition-colors ${
+                    isCteSelecionado(cte)
+                      ? 'bg-blue-100 dark:bg-blue-900 border-blue-400'
+                      : 'bg-white dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <p className="font-bold text-sm">
+                    {cte.remetente} &rarr; {cte.destinatario}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-slate-400">
+                    {cte.volumes} vol, {cte.peso} kg
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {dados.entregas.length > 0 && (
+           <div>
+            <h4 className="font-semibold text-md mb-2">Entregas ({dados.entregas.length})</h4>
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+              {dados.entregas.map((cte: any) => (
+                <div
+                  key={cte.chave_cte}
+                  onClick={() => onCteSelect({ ...cte, tipo: 'ENTREGA' }, unidade)}
+                   className={`p-2 border rounded-md cursor-pointer transition-colors ${
+                    isCteSelecionado(cte)
+                      ? 'bg-blue-100 dark:bg-blue-900 border-blue-400'
+                      : 'bg-white dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <p className="font-bold text-sm">{cte.destinatario}</p>
+                   <p className="text-xs text-gray-600 dark:text-slate-400">
+                    {cte.volumes} vol, {cte.peso} kg
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function CarregamentoArea({
-  sigla,
-  carregamentos,
-  loadingCarregamentos,
-  modoApontamento,
-  onIniciarApontamento,
-  onCancelarApontamento,
-  onCriarCarregamento,
-  onExcluirCarregamento,
-  onRemoverCte,
-  onCarregarSSW,
-  todosCtes,
-}: CarregamentoAreaProps) {
-  const [modalAberto, setModalAberto] = useState(false);
-
-  const handleCriar = (placa: string) => {
-    setModalAberto(false);
-    onCriarCarregamento(placa);
-  };
-
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="flex items-center gap-2">
-          <Truck className="w-4 h-4 text-emerald-500" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
-          {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-          {carregamentos.length > 0 && (
-            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-              {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
-            </Badge>
-          )}
-          {modoApontamento && (
-            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
-              <CheckSquare className="w-3 h-3" />
-              Apontando para: <strong>{modoApontamento}</strong>
-            </Badge>
-          )}
-        </div>
-        <Button
-          size="sm"
-          className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8"
-          onClick={() => setModalAberto(true)}
-        >
-          <Plus className="w-3.5 h-3.5 mr-1.5" />Criar carregamento
-        </Button>
-      </div>
-
-      {carregamentos.length === 0 && !loadingCarregamentos ? (
-        <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
-          <Truck className="w-10 h-10 mb-2 opacity-20" />
-          <p className="text-sm">Nenhum carregamento em andamento</p>
-          <p className="text-xs mt-0.5">Clique em "Criar carregamento" para começar</p>
-        </div>
-      ) : (
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {carregamentos.map((c, i) => (
-            <CardCarregamento
-              key={i}
-              carregamento={c}
-              todosCtes={todosCtes}
-              modoApontamento={modoApontamento}
-              onIniciarApontamento={onIniciarApontamento}
-              onCancelarApontamento={onCancelarApontamento}
-              onExcluirCarregamento={onExcluirCarregamento}
-              onRemoverCte={onRemoverCte}
-              onCarregarSSW={onCarregarSSW}
-            />
-          ))}
-        </div>
-      )}
-
-      {modalAberto && (
-        <ModalCriarCarregamento
-          onConfirmar={handleCriar}
-          onFechar={() => setModalAberto(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-export function Disponiveis() {
-  usePageTitle('Disponíveis no Armazém');
-  const { user } = useAuth();
-  const { theme } = useTheme();
-
-  const unidadeLogada = user?.unidade_atual || user?.unidade || '';
-  const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
-
-  const [sigla] = useState<string>(unidadeLogada);
-
-  const [dados, setDados] = useState<DadosTransferencia | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
-  const [countdown, setCountdown] = useState(300);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const [dadosEntrega, setDadosEntrega] = useState<DadosEntrega | null>(null);
-  const [loadingEntrega, setLoadingEntrega] = useState(false);
-  const [erroEntrega, setErroEntrega] = useState<string | null>(null);
-  const [progressoEntrega, setProgressoEntrega] = useState(0);
-  const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const [carregamentos, setCarregamentos] = useState<Carregamento[]>([]);
-  const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
-  const [modoApontamento, setModoApontamento] = useState<string | null>(null);
-  const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
-
-  const [unidadePermiteCarregamento, setUnidadePermiteCarregamento] = useState<boolean | null>(null);
+function HubCargasCompartilhadas({
+  carregamento,
+  onClose,
+  onAddCtes,
+}: {
+  carregamento: any;
+  onClose: () => void;
+  onAddCtes: (novosCtes: any[]) => void;
+}) {
+  const [unidades, setUnidades] = useState<string[]>([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(true);
+  const [ctesSelecionados, setCtesSelecionados] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!sigla || isMTZ) return;
-    apiFetch(
-      `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/check_unidade_carregamento.php`,
-      { method: 'POST', body: JSON.stringify({ sigla }) },
-      true
-    ).then((res) => {
-      if (res.success && res.efetua_carregamento === false) {
-        setUnidadePermiteCarregamento(false);
-        toast.error('Unidade não configurada para efetuar carregamentos no CADASTRO DE UNIDADES.');
-      } else {
-        setUnidadePermiteCarregamento(true);
+    async function carregarUnidadesCompartilhadas() {
+      setLoadingUnidades(true);
+      try {
+        const resultado = await apiFetch(
+          'dashboards/disponiveis/get_unidades_compartilhadas.php',
+          { method: 'POST' }
+        );
+        if (resultado.status === 'success') {
+          setUnidades(resultado.data);
+        } else {
+          throw new Error(resultado.message);
+        }
+      } catch (error: any) {
+        toast.error(`Erro ao buscar unidades: ${error.message}`);
+      } finally {
+        setLoadingUnidades(false);
       }
-    }).catch(() => {
-      setUnidadePermiteCarregamento(true);
+    }
+    carregarUnidadesCompartilhadas();
+  }, []);
+
+  const handleCteSelect = (cte: any, unidade: string) => {
+    const cteComUnidade = { ...cte, unidade_origem_hub: unidade };
+
+    setCtesSelecionados(prev => {
+      const isJaSelecionado = prev.some(c => c.chave_cte === cte.chave_cte);
+      if (isJaSelecionado) {
+        return prev.filter(c => c.chave_cte !== cte.chave_cte);
+      } else {
+        const pesoTotalSelecionado = prev.reduce((acc, cur) => acc + parseFloat(cur.peso || 0), 0);
+        const volumeTotalSelecionado = prev.reduce((acc, cur) => acc + parseInt(cur.volumes || 0), 0);
+        const capacidadePesoRestante = parseFloat(carregamento.capacidade_kg) - parseFloat(carregamento.peso_total_carregado);
+        const capacidadeVolumeRestante = parseInt(carregamento.capacidade_vol) - parseInt(carregamento.volumes_total_carregado);
+
+        if (pesoTotalSelecionado + parseFloat(cte.peso || 0) > capacidadePesoRestante) {
+          toast.warning('Peso excederia a capacidade restante do veículo.');
+          return prev;
+        }
+        if (volumeTotalSelecionado + parseInt(cte.volumes || 0) > capacidadeVolumeRestante) {
+          toast.warning('Volume excederia a capacidade restante do veículo.');
+          return prev;
+        }
+
+        return [...prev, cteComUnidade];
+      }
     });
-  }, [sigla]);
+  };
 
-  const ctesJaCarregados = React.useMemo<Map<number, string>>(() => {
-    const m = new Map<number, string>();
-    for (const car of carregamentos) {
-      for (const c of car.ctes) {
-        if (!m.has(c.seq_cte)) m.set(c.seq_cte, car.placa_provisoria);
-      }
+  const totalPesoSelecionado = ctesSelecionados.reduce((acc, cur) => acc + parseFloat(cur.peso || 0), 0);
+  const totalVolumeSelecionado = ctesSelecionados.reduce((acc, cur) => acc + parseInt(cur.volumes || 0), 0);
+  const capacidadePesoRestante = parseFloat(carregamento.capacidade_kg) - parseFloat(carregamento.peso_total_carregado);
+  const capacidadeVolumeRestante = parseInt(carregamento.capacidade_vol) - parseInt(carregamento.volumes_total_carregado);
+
+  return (
+    <HubModal isOpen={true} onRequestClose={onClose} title={`Hub de Cargas Compartilhadas para ${carregamento.placa}`}>
+      <div className="p-6">
+        <div className="sticky top-0 bg-white dark:bg-slate-900 z-10 py-4 -my-4 grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700">
+                <h3 className="font-bold text-lg mb-2">Status do Carregamento ({carregamento.placa})</h3>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div>
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Ocupação Atual (Peso):</span>
+                        <p className="font-semibold text-base">{Number(carregamento.peso_total_carregado).toFixed(2)} kg / {carregamento.capacidade_kg} kg</p>
+                    </div>
+                    <div>
+                        <span className="text-sm text-gray-600 dark:text-slate-400">Ocupação Atual (Volume):</span>
+                        <p className="font-semibold text-base">{carregamento.volumes_total_carregado} / {carregamento.capacidade_vol} vol</p>
+                    </div>
+                    <div className="col-span-2 mt-2">
+                        <p className="text-sm font-bold text-green-700 dark:text-green-400">
+                            Capacidade Restante: {Math.max(0, capacidadePesoRestante - totalPesoSelecionado).toFixed(2)} kg e {Math.max(0, capacidadeVolumeRestante - totalVolumeSelecionado)} vol
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h3 className="font-bold text-lg mb-2">Cargas Selecionadas no Hub</h3>
+                 {ctesSelecionados.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div>
+                            <span className="text-sm text-gray-600 dark:text-slate-400">CT-es selecionados:</span>
+                            <p className="font-semibold text-base">{ctesSelecionados.length}</p>
+                        </div>
+                         <div>
+                            <span className="text-sm text-gray-600 dark:text-slate-400">Peso a adicionar:</span>
+                            <p className="font-semibold text-base">{totalPesoSelecionado.toFixed(2)} kg</p>
+                        </div>
+                         <div>
+                            <span className="text-sm text-gray-600 dark:text-slate-400">Volumes a adicionar:</span>
+                            <p className="font-semibold text-base">{totalVolumeSelecionado} vol</p>
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-500 italic mt-6">Nenhum CT-e selecionado nas unidades compartilhadas.</p>
+                )}
+            </div>
+        </div>
+
+        {loadingUnidades ? (
+          <p className='text-center py-8'>Buscando unidades compartilhadas...</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1">
+            {unidades.map(unidade => (
+              <UnidadeCompartilhadaCard 
+                key={unidade} 
+                unidade={unidade}
+                onCteSelect={handleCteSelect}
+                ctesSelecionados={ctesSelecionados}
+              />
+            ))}
+             {unidades.length === 0 && !loadingUnidades && (
+              <p className="col-span-full text-center text-gray-500 py-8">Nenhuma unidade configurada para compartilhamento.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+       <div className="flex justify-end p-4 mt-auto border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 sticky bottom-0">
+          <Button variant="outline" onClick={onClose} className="mr-2">
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => onAddCtes(ctesSelecionados)}
+            disabled={ctesSelecionados.length === 0}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            Adicionar {ctesSelecionados.length > 0 ? ctesSelecionados.length : ''} CT-e(s) ao Carregamento
+          </Button>
+        </div>
+    </HubModal>
+  );
+}
+
+// --- COMPONENTE PRINCIPAL AJUSTADO ---
+export function Disponiveis() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
+
+  const [manifestoFilter, setManifestoFilter] = useState('');
+  const [placaFilter, setPlacaFilter] = useState('');
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState(300);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [modalCarregamentoAberto, setModalCarregamentoAberto] = useState(false);
+  const [placaParaCarregamento, setPlacaParaCarregamento] = useState('');
+  const [veiculoParaCarregamento, setVeiculoParaCarregamento] = useState<any>(null);
+  const [unidadePodeCarregar, setUnidadePodeCarregar] = useState<boolean | null>(null);
+
+  const [hubAberto, setHubAberto] = useState(false);
+  const [carregamentoParaHub, setCarregamentoParaHub] = useState<any>(null);
+  const [ctesDoHub, setCtesDoHub] = useState<Record<string, any[]>>({});
+  const [modalConfirmacaoAberto, setModalConfirmacaoAberto] = useState(false);
+  const [importando, setImportando] = useState(false);
+
+  const fetchData = useCallback(async (unidade: string) => {
+    if (!unidade) {
+      setData(null);
+      setLoading(false);
+      return;
     }
-    return m;
-  }, [carregamentos]);
 
-  const todosCtes = React.useMemo(() => {
-    const lista: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[] = [];
-    const vistos = new Set<number>();
-    const add = (nroCte: number, ctrc: string, destinatario: string, cidade: string, peso: string, cubagem: string) => {
-      if (vistos.has(nroCte)) return;
-      vistos.add(nroCte);
-      lista.push({ nroCte, ctrc, destinatario, cidade, peso, cubagem });
-    };
-    if (dados?.ctes) {
-      for (const c of dados.ctes) {
-        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
-      }
-    }
-    if (dadosEntrega?.ctes) {
-      for (const c of dadosEntrega.ctes) {
-        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
-      }
-    }
-    return lista;
-  }, [dados, dadosEntrega]);
-
-  const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
-
-  type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'coletas' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
-  const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes' as any);
-  const [ordemDir, setOrdemDir]   = useState<'asc' | 'desc'>('desc');
-
-  const carregar = useCallback(async (siglaParam?: string) => {
-    const s = siglaParam ?? sigla;
-    if (!s) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_transferencia.php`,
-        { method: 'POST', body: JSON.stringify({ sigla: s }) },
-        true
+        const res = await apiFetch(`dashboards/disponiveis/check_unidade_carregamento.php`, {
+            method: 'POST', body: JSON.stringify({ unidade })
+        });
+
+        if (res.status === 'error' || (res.status === 'success' && !res.data.pode_carregar)) {
+            setUnidadePodeCarregar(false);
+            toast.error(res.message || "Unidade não configurada para efetuar carregamentos.");
+            setData(null);
+            setLoading(false);
+            return;
+        }
+        
+        setUnidadePodeCarregar(true);
+
+      const response = await apiFetch(
+        'dashboards/disponiveis/get_disponiveis.php',
+        {
+          method: 'POST',
+          body: JSON.stringify({ unidade: unidade }),
+        }
       );
-      if (res.success) {
-        setDados(res.data);
-        setUltimaAtualizacao(res.data.geradoEm);
-        setCountdown(300);
-      } else {
-        toast.error(res.message || 'Erro ao carregar dados');
+
+      if (response.status === 'error') {
+        throw new Error(response.message);
       }
+      
+      setData(response.data);
+      setLastUpdate(new Date());
+      setSecondsLeft(300);
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao carregar dados');
+      setError(e.message);
+      setData(null);
+      toast.error(`Erro ao buscar dados: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [sigla]);
-
-  const carregarEntrega = useCallback(async (siglaParam?: string) => {
-    const s = siglaParam ?? sigla;
-    if (!s) return;
-    setLoadingEntrega(true);
-    setErroEntrega(null);
-    setProgressoEntrega(0);
-
-    if (progressoRef.current) clearInterval(progressoRef.current);
-    progressoRef.current = setInterval(() => {
-      setProgressoEntrega(prev => {
-        if (prev >= 95) { clearInterval(progressoRef.current!); return 95; }
-        return prev + (prev < 60 ? 2 : 1);
-      });
-    }, 600);
-
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ sigla: s }) },
-        true
-      );
-      if (progressoRef.current) clearInterval(progressoRef.current);
-      setProgressoEntrega(100);
-      if (res.success) {
-        setDadosEntrega(res.data);
-      } else {
-        setErroEntrega(res.message || 'Erro ao carregar disponíveis para entrega');
-      }
-    } catch (e: any) {
-      if (progressoRef.current) clearInterval(progressoRef.current);
-      setProgressoEntrega(0);
-      setErroEntrega(e.message || 'Erro ao carregar disponíveis para entrega');
-    } finally {
-      setLoadingEntrega(false);
-    }
-  }, [sigla]);
-
-  const carregarCarregamentos = useCallback(async () => {
-    setLoadingCarregamentos(true);
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_carregamentos.php`,
-        { method: 'POST', body: JSON.stringify({}) },
-        true
-      );
-      if (res.success) {
-        setCarregamentos(res.carregamentos ?? []);
-      }
-    } catch {}
-    finally { setLoadingCarregamentos(false); }
   }, []);
 
-  const handleCriarCarregamento = useCallback(async (placa: string) => {
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa, seq_cte: 0 }) },
-        true
-      );
-      if (res.success) {
-        toast.success(`Carregamento ${placa} criado!`);
-        await carregarCarregamentos();
-      } else {
-        toast.error(res.message || 'Erro ao criar carregamento');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao criar carregamento');
+  const iniciarTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
-  }, [carregarCarregamentos]);
-
-  const handleExcluirCarregamento = useCallback(async (placa: string) => {
-    if (!confirm(`Excluir o carregamento "${placa}"? Todos os CT-es serão removidos.`)) return;
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'excluir_carregamento', placa }) },
-        true
-      );
-      if (res.success) {
-        toast.success(`Carregamento ${placa} excluído.`);
-        if (modoApontamento === placa) setModoApontamento(null);
-        await carregarCarregamentos();
-      } else {
-        toast.error(res.message || 'Erro ao excluir carregamento');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao excluir');
-    }
-  }, [carregarCarregamentos, modoApontamento]);
-
-  const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'remover_cte', placa, seq_cte: seqCte }) },
-        true
-      );
-      if (res.success) {
-        await carregarCarregamentos();
-      } else {
-        toast.error(res.message || 'Erro ao remover CT-e');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao remover CT-e');
-    }
-  }, [carregarCarregamentos]);
-
-  const handleConfirmarApontamento = useCallback(async () => {
-    if (!modoApontamento || ctesSelecionados.size === 0) return;
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: modoApontamento, seq_ctes: Array.from(ctesSelecionados) }) },
-        true
-      );
-      if (res.success) {
-        toast.success(`${res.adicionados ?? ctesSelecionados.size} CT-e(s) adicionado(s) ao carregamento ${modoApontamento}.`);
-        setCtesSelecionados(new Set());
-        setModoApontamento(null);
-        await carregarCarregamentos();
-      } else {
-        toast.error(res.message || 'Erro ao adicionar CT-es');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao adicionar CT-es');
-    }
-  }, [modoApontamento, ctesSelecionados, carregarCarregamentos]);
-
-  const toggleCte = useCallback((seqCte: number) => {
-    setCtesSelecionados(prev => {
-      const next = new Set(prev);
-      if (next.has(seqCte)) next.delete(seqCte);
-      else next.add(seqCte);
-      return next;
-    });
-  }, []);
-
-  const handleCarregarSSW = useCallback((_placa: string) => {
-    toast.info('Em breve: integração com SSW para carregar o manifesto.');
-  }, []);
-
-  const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
-    setCtesSelecionados(prev => {
-      const next = new Set(prev);
-      seqCtes.forEach(s => selecionar ? next.add(s) : next.delete(s));
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (isMTZ) {
-      toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
-      return;
-    }
-    if (sigla) {
-      carregar();
-      carregarEntrega();
-      carregarCarregamentos();
-    }
-  }, [sigla]);
-
-  useEffect(() => {
-    if (!sigla) return;
-    timerRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          carregar();
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft(prevSeconds => {
+        if (prevSeconds <= 1) {
+          if (autoRefresh && unidadeSelecionada) {
+            fetchData(unidadeSelecionada);
+          }
           return 300;
         }
-        return prev - 1;
+        return prevSeconds - 1;
       });
     }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [sigla, carregar]);
+  }, [autoRefresh, unidadeSelecionada, fetchData]);
 
-
-
-  const ORDEM_INDICADOR: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
-
-  const getPiorIndicador = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf'): string | null =>
-    ctes.reduce<string | null>((pior, cte) => {
-      const v = cte[campo];
-      if (!v) return pior;
-      if (!pior) return v;
-      return (ORDEM_INDICADOR[v] ?? 0) > (ORDEM_INDICADOR[pior] ?? 0) ? v : pior;
-    }, null);
-
-  const grupos: GrupoDestino[] = React.useMemo(() => {
-    if (!dados) return [];
-    const map: Record<string, GrupoDestino> = {};
-    for (const cte of dados.ctes) {
-      const key = cte.unidadeDest;
-      if (!map[key]) {
-        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+  useEffect(() => {
+    async function getUnidades() {
+      try {
+        const response = await apiFetch('get_unidades.php', { method: 'POST' });
+        if (response.status === 'success') {
+          const unidadesFiltradas = response.data.filter((u: any) => u.cgc_franquia === null);
+          setUnidades(unidadesFiltradas);
+           if (unidadesFiltradas.length > 0) {
+              const primeiraUnidade = unidadesFiltradas.find((u:any) => u.sigla !== 'MTZ') || unidadesFiltradas[0];
+              setUnidadeSelecionada(primeiraUnidade.sigla);
+           }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar unidades:', error);
       }
-      if (cte.emTransito) {
-        map[key].transito.push(cte);
-      } else {
-        map[key].armazem.push(cte);
-      }
-      map[key].totalCtes++;
-      map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
-      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
-      map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
-    for (const coleta of dados.coletas.filter(c => !c.paraEntrega)) {
-      const key = coleta.unidadeDest || 'SEM DESTINO';
-      if (!map[key]) {
-        map[key] = { sigla: key, nome: coleta.cidadeDest || key, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
-      }
-      map[key].coletas.push(coleta);
-      const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;
-      map[key].totalPeso    += pesoColeta;
-      map[key].totalCubagem += pesoColeta * 0.0033333333333333;
+    getUnidades();
+  }, []);
+
+  useEffect(() => {
+    if (unidadeSelecionada) {
+      fetchData(unidadeSelecionada);
+      iniciarTimer();
     }
-    const lista = Object.values(map);
-    const mult = ordemDir === 'desc' ? -1 : 1;
-    return lista.sort((a, b) => {
-      switch (ordemCol as string) {
-        case 'sigla':        return mult * a.sigla.localeCompare(b.sigla);
-        case 'armazem':      return mult * (a.armazem.length - b.armazem.length);
-        case 'transito':     return mult * (a.transito.length - b.transito.length);
-        case 'coletas':      return mult * (a.coletas.length - b.coletas.length);
-        case 'totalVol':     return mult * (a.totalVol - b.totalVol);
-        case 'totalPeso':    return mult * (a.totalPeso - b.totalPeso);
-        case 'totalCubagem': return mult * (a.totalCubagem - b.totalCubagem);
-        case 'piorSaida':    return mult * ((ORDEM_INDICADOR[getPiorIndicador([...a.armazem, ...a.transito], 'indicadorSaida') ?? ''] ?? 0) - (ORDEM_INDICADOR[getPiorIndicador([...b.armazem, ...b.transito], 'indicadorSaida') ?? ''] ?? 0));
-        case 'piorTransito': return mult * ((ORDEM_INDICADOR[getPiorIndicador(a.transito, 'atrasoTransf') ?? ''] ?? 0) - (ORDEM_INDICADOR[getPiorIndicador(b.transito, 'atrasoTransf') ?? ''] ?? 0));
-        default:             return mult * (b.totalCtes - a.totalCtes);
-      }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [unidadeSelecionada, fetchData, iniciarTimer]);
+
+  const handleRefresh = () => {
+    if (unidadeSelecionada) {
+      fetchData(unidadeSelecionada);
+    }
+  };
+
+  const handleAdicionarCtesDoHub = (novosCtes: any[]) => {
+    if (!carregamentoParaHub) return;
+    const placa = carregamentoParaHub.placa;
+
+    setCtesDoHub(prev => {
+        const ctesAtuais = prev[placa] || [];
+        const ctesUnicos = novosCtes.filter(
+            novoCte => !ctesAtuais.some(cteExistente => cteExistente.chave_cte === novoCte.chave_cte)
+        );
+        return { ...prev, [placa]: [...ctesAtuais, ...ctesUnicos] };
     });
-  }, [dados, ordemCol, ordemDir]);
+    
+    toast.success(`${novosCtes.length} CT-e(s) adicionados ao planejamento do carregamento ${placa}.`);
+    setHubAberto(false);
+  };
 
-  const totalArmazem  = dados?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalTransito = dados?.ctes.filter(c => c.emTransito).length ?? 0;
-  const totalColetas  = dados?.coletas.length ?? 0;
-  const totalVol      = grupos.reduce((s, g) => s + g.totalVol, 0);
-  const totalPeso     = grupos.reduce((s, g) => s + g.totalPeso, 0);
-  const totalCubagem  = grupos.reduce((s, g) => s + g.totalCubagem, 0);
-  const coletasAtrasadas = dados?.coletas.filter(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada').length ?? 0;
-  const ctesTransitoAlerta = dados?.ctes.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
-
-  const gruposSetor: GrupoSetor[] = React.useMemo(() => {
-    if (!dadosEntrega) return [];
-    const map: Record<string, GrupoSetor> = {};
-    for (const cte of dadosEntrega.ctes) {
-      const key = cte.setor || 'SEM SETOR';
-      if (!map[key]) {
-        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
-      }
-      if (cte.emTransito) {
-        map[key].transito.push(cte);
-      } else {
-        map[key].armazem.push(cte);
-      }
-      map[key].totalCtes++;
-      map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
-      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
-      map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+  const iniciarImportacao = () => {
+    if (data && data.carregamentos.length > 0) {
+        setModalConfirmacaoAberto(true);
+    } else {
+        handleImportarCarregamentos(false); // Se não há carregamentos, não precisa perguntar
     }
-    return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
-  }, [dadosEntrega]);
+  };
 
-  const totalEntregaArmazem  = dadosEntrega?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalEntregaTransito = dadosEntrega?.ctes.filter(c => c.emTransito).length ?? 0;
-  const totalEntregaVol      = gruposSetor.reduce((s, g) => s + g.totalVol, 0);
-  const totalEntregaPeso     = gruposSetor.reduce((s, g) => s + g.totalPeso, 0);
-  const totalEntregaCubagem  = gruposSetor.reduce((s, g) => s + g.totalCubagem, 0);
-  const entregaAtrasados     = dadosEntrega?.ctes.filter(c => c.diasAtraso > 0).length ?? 0;
+  const handleImportarCarregamentos = async (sobrescrever: boolean) => {
+    setModalConfirmacaoAberto(false);
+    toast.info(`Iniciando importação de carregamentos do SSW... (Sobrescrever: ${sobrescrever ? 'Sim' : 'Não'})`);
+    // A lógica completa será implementada em uma tarefa futura
+  };
 
-  const totalGeralArmazem  = totalArmazem + totalEntregaArmazem;
-  const totalGeralTransito = totalTransito + totalEntregaTransito;
-  const totalGeralVol      = totalVol + totalEntregaVol;
-  const totalGeralPeso     = totalPeso + totalEntregaPeso;
-  const totalGeralCubagem  = totalCubagem + totalEntregaCubagem;
+  const handleAbrirHub = (carregamento: any) => {
+    setCarregamentoParaHub(carregamento);
+    setHubAberto(true);
+  };
 
-  const minutos = Math.floor(countdown / 60);
-  const segundos = countdown % 60;
+  const handleSalvarCarregamento = async (placa: string) => {
+    const carregamento = data.carregamentos.find((c: any) => c.placa === placa);
+    if (!carregamento) {
+      toast.error('Carregamento não encontrado.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const ctesOriginais = carregamento.ctes;
+      const ctesExtras = ctesDoHub[placa] || [];
+
+      const response = await apiFetch(
+        'dashboards/disponiveis/salvar_carregamento.php',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            placa: carregamento.placa,
+            ctes: ctesOriginais, // CT-es que já estavam no carregamento
+            ctes_hub: ctesExtras, // CT-es novos, vindos do hub
+            unidade: unidadeSelecionada,
+          }),
+        }
+      );
+
+      if (response.status === 'success') {
+        toast.success(response.message);
+        setCtesDoHub(prev => { // Limpa os ctes do hub para este carregamento
+            const nextState = { ...prev };
+            delete nextState[placa];
+            return nextState;
+        });
+        fetchData(unidadeSelecionada); // Atualiza a tela
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (e: any) {
+      toast.error(`Falha ao salvar carregamento: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenCarregamentoModal = (placa: string) => {
+    const veiculo = data.disponiveis.find((v: any) => v.placa === placa);
+    if (veiculo) {
+      setVeiculoParaCarregamento(veiculo);
+      setPlacaParaCarregamento(placa);
+      setModalCarregamentoAberto(true);
+    }
+  };
+
+  const handleGerarCarregamentoAutomatico = async (placa: string) => {
+    setLoading(true);
+    toast.info(`Gerando carregamento automático para a placa ${placa}...`);
+
+    try {
+      const response = await apiFetch(
+        'dashboards/disponiveis/gerar_carregamento_automatico.php',
+        {
+          method: 'POST',
+          body: JSON.stringify({ placa: placa, unidade: unidadeSelecionada }),
+        }
+      );
+
+      if (response.status === 'success') {
+        toast.success(response.message);
+        setModalCarregamentoAberto(false);
+        fetchData(unidadeSelecionada);
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (e: any) {
+      toast.error(`Falha ao gerar carregamento automático: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredData = data
+    ? {
+        ...data,
+        em_transito: data.em_transito.filter(
+          (item: any) =>
+            item.manifesto.includes(manifestoFilter.toUpperCase()) &&
+            item.placa.includes(placaFilter.toUpperCase())
+        ),
+      }
+    : null;
+
+  const ProgressIndicator = ({ value, max }: { value: number; max: number }) => {
+    const percentage = max > 0 ? (value / max) * 100 : 0;
+    let bgColor = 'bg-green-500';
+    if (percentage > 70) bgColor = 'bg-yellow-500';
+    if (percentage > 90) bgColor = 'bg-red-500';
+
+    return (
+      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">
+        <div
+          className={`${bgColor} h-2.5 rounded-full`}
+          style={{ width: `${percentage}%` }}
+        ></div>
+      </div>
+    );
+  };
+  
+    // Componente de Paginação foi removido para simplificar e focar na funcionalidade principal
+    // O código original pode ser reinserido aqui se necessário.
+
+  if (loading && !data) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-full">
+           <p className="text-lg animate-pulse" dangerouslySetInnerHTML={{ __html: 'Carregando...<br>Essa operação pode levar alguns segundos.' }}></p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (unidadePodeCarregar === false) {
+    return (
+       <DashboardLayout>
+        <div className="p-4">
+          <h1 className="text-2xl font-bold mb-4">Disponíveis e em Trânsito</h1>
+          <div className="flex items-center space-x-4 mb-4">
+            <label htmlFor="unidade">Unidade:</label>
+            <select
+                id="unidade"
+                value={unidadeSelecionada}
+                onChange={e => setUnidadeSelecionada(e.target.value)}
+                className="border rounded px-2 py-1 bg-white dark:bg-slate-800"
+            >
+                {unidades.map(u => (<option key={u.sigla} value={u.sigla}>{u.sigla}</option>))}
+            </select>
+          </div>
+           <Card className="mt-6 bg-yellow-50 dark:bg-yellow-950 border-yellow-300 dark:border-yellow-700">
+                <CardHeader>
+                    <CardTitle className="text-yellow-800 dark:text-yellow-200">Acesso Bloqueado</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-yellow-700 dark:text-yellow-300">A unidade <strong>{unidadeSelecionada}</strong> não está configurada para efetuar carregamentos. Verifique o cadastro de unidades.</p>
+                </CardContent>
+            </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+   if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-4 text-red-500">Erro: {error}</div>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <DashboardLayout
-      title="Disponíveis no Armazém"
-      description={user?.client_name}
-      headerActions={
-        <div className="flex items-center gap-3">
-          {sigla && !isMTZ && (
-            <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-sm px-3 py-1">
-              <Building2 className="w-3.5 h-3.5 mr-1.5" />
-              {sigla}
-            </Badge>
-          )}
-          {ultimaAtualizacao && !isMTZ && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Timer className="w-3.5 h-3.5" />
-              <span>Atualiza em {minutos}:{String(segundos).padStart(2, '0')}</span>
-            </div>
-          )}
-          {!isMTZ && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => carregar()}
-              disabled={loading || !sigla}
-              className="dark:border-slate-600"
+    <DashboardLayout>
+      <div className="relative p-4">
+        {loading && (
+          <div className="absolute inset-0 bg-white/50 dark:bg-black/50 z-10 flex justify-center items-center">
+            <RefreshCw className="animate-spin h-8 w-8 text-blue-500" />
+          </div>
+        )}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">Disponíveis e em Trânsito</h1>
+          <div className="flex items-center space-x-2 text-sm text-gray-500">
+            <input type="checkbox" id="autoRefresh" checked={autoRefresh} onChange={() => setAutoRefresh(!autoRefresh)} />
+            <label htmlFor="autoRefresh">Atualização automática</label>
+            <span>(próxima em {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')})</span>
+            <RefreshCw className="cursor-pointer" onClick={handleRefresh} />
+          </div>
+        </div>
+        <div className="flex items-center space-x-4 mb-4">
+          <FilterIcon className="cursor-pointer" onClick={() => setShowFilter(!showFilter)} />
+          <div className="flex items-center space-x-2">
+            <label htmlFor="unidade">Unidade:</label>
+            <select
+              id="unidade"
+              value={unidadeSelecionada}
+              onChange={e => setUnidadeSelecionada(e.target.value)}
+              className="border rounded px-2 py-1 bg-white dark:bg-slate-800"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              <span className="ml-1.5">Atualizar</span>
-            </Button>
-          )}
+              {unidades.map(u => (<option key={u.sigla} value={u.sigla}>{u.sigla}</option>))}
+            </select>
+          </div>
+          <Button
+            variant="outline"
+            onClick={iniciarImportacao}
+            disabled={importando}
+          >
+            {importando ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />} 
+            {importando ? 'Importando...' : 'Importar do SSW'}
+          </Button>
+          <span>Última atualização: {lastUpdate.toLocaleTimeString()}</span>
         </div>
-      }
-    >
-      {isMTZ ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
-          <Building2 className="w-16 h-16 mb-4 opacity-30" />
-          <p className="text-lg font-medium">Acesso não disponível para a unidade MTZ</p>
-          <p className="text-sm mt-1">Faça login em uma unidade específica para visualizar este painel.</p>
-        </div>
-      ) : loading && !dados ? (
-        <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
-          <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
-          <p className="text-base">Aguarde...</p>
-          <p className="text-sm mt-1">Isso pode levar alguns segundos</p>
-        </div>
-      ) : dados ? (
-        <div className="space-y-6">
-          {(() => {
-            const baseArmazem  = totalGeralArmazem;
-            const baseTransito = totalGeralTransito;
-            const totalBase    = baseArmazem + baseTransito + totalColetas;
-            const pctArmazem   = totalBase > 0 ? Math.round((baseArmazem  / totalBase) * 100) : 0;
-            const pctTransito  = totalBase > 0 ? Math.round((baseTransito / totalBase) * 100) : 0;
-            const pctColetas   = totalBase > 0 ? Math.round((totalColetas  / totalBase) * 100) : 0;
+        <Filter isOpen={showFilter} onClose={() => setShowFilter(false)}>
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-2">Filtros (Em Trânsito)</h2>
+            <Input placeholder="Filtrar por manifesto..." value={manifestoFilter} onChange={e => setManifestoFilter(e.target.value)} className="mb-2" />
+            <Input placeholder="Filtrar por placa..." value={placaFilter} onChange={e => setPlacaFilter(e.target.value)} />
+          </div>
+        </Filter>
 
-            const subArmazem = (() => {
-              const parts = [];
-              if (totalArmazem > 0) parts.push(`${totalArmazem} transf.`);
-              if (totalEntregaArmazem > 0) parts.push(`${totalEntregaArmazem} entrega`);
-              return parts.length > 1 ? parts.join(' + ') : null;
-            })();
-
-            const subTransito = (() => {
-              const parts = [];
-              if (ctesTransitoAlerta > 0) parts.push(`${ctesTransitoAlerta} c/ atraso transf.`);
-              if (entregaAtrasados > 0) parts.push(`${entregaAtrasados} c/ atraso entrega`);
-              return parts.length > 0 ? parts.join(' · ') : null;
-            })();
-
-            const cardsDonut = [
-              {
-                bgColor: 'bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800',
-                textColor: 'text-indigo-700 dark:text-indigo-300',
-                emptyColor: '#e0e7ff', emptyColorDark: '#1e1b4b',
-                cor: '#6366f1',
-                icon: Warehouse,
-                valor: baseArmazem,
-                pct: pctArmazem,
-                label: 'No Armazém',
-                unidade: 'CT-e',
-                sub: subArmazem,
-                loadingExtra: loadingEntrega,
-              },
-              {
-                bgColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0)
-                  ? 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800'
-                  : 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',
-                textColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
-                emptyColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#ffedd5' : '#dbeafe',
-                emptyColorDark: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#431407' : '#1e3a8a',
-                cor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#f97316' : '#3b82f6',
-                icon: Truck,
-                valor: baseTransito,
-                pct: pctTransito,
-                label: 'Em Trânsito',
-                unidade: 'CT-e',
-                sub: subTransito,
-                loadingExtra: loadingEntrega,
-              },
-              {
-                bgColor: coletasAtrasadas > 0
-                  ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800'
-                  : 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800',
-                textColor: coletasAtrasadas > 0 ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300',
-                emptyColor: coletasAtrasadas > 0 ? '#fee2e2' : '#d1fae5',
-                emptyColorDark: coletasAtrasadas > 0 ? '#7f1d1d' : '#064e3b',
-                cor: coletasAtrasadas > 0 ? '#ef4444' : '#10b981',
-                icon: PackageSearch,
-                valor: totalColetas,
-                pct: pctColetas,
-                label: 'Coletas',
-                unidade: 'Coleta',
-                sub: coletasAtrasadas > 0 ? `${coletasAtrasadas} atrasada${coletasAtrasadas > 1 ? 's' : ''}` : null,
-                loadingExtra: false,
-              },
-            ];
-
-            const cardsSimples = [
-              { valor: totalGeralVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
-              { valor: `${(totalGeralPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
-              { valor: `${totalGeralCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
-            ];
-
-            return (
-              <div className="grid grid-cols-3 gap-4">
-                {cardsDonut.map((c, i) => {
-                  const Icon = c.icon;
-                  const donutData = [{ value: c.pct }, { value: Math.max(0, 100 - c.pct) }];
-                  return (
-                    <Card key={i} className={`${c.bgColor}`}>
-                      <CardContent className="pt-4 pb-3 px-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${c.textColor}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                              {c.label}
-                              {c.loadingExtra && <Loader2 className="w-3 h-3 animate-spin opacity-60 ml-1" />}
-                            </div>
-                            <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
-                            <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} {c.unidade}{c.valor !== 1 ? 's' : ''}</p>
-                            {c.sub && <p className={`text-xs mt-0.5 font-semibold ${c.textColor} opacity-80`}>{c.sub}</p>}
-                          </div>
-                          <div style={{ width: 80, height: 80 }}>
-                            <PieChart width={80} height={80}>
-                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" animationBegin={0} animationDuration={800}>
-                                <Cell fill={c.cor} />
-                                <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
-                              </Pie>
-                            </PieChart>
-                          </div>
-                        </div>
-                      </CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Coluna Em Trânsito */}
+          <div className="md:col-span-1">
+            <h2 className="text-xl font-semibold mb-2">Em Trânsito</h2>
+            <div className="space-y-4">
+              {filteredData && filteredData.em_transito.length > 0 ? (
+                filteredData.em_transito.map((item: any, index: number) => (
+                    <Card key={index} className="w-full">
+                        <CardHeader>
+                        <CardTitle className="flex justify-between items-center">
+                            <div className='flex flex-row items-center'> <Truck className="mr-2" /> {item.placa} - <span className='ml-1 font-light'>{item.motorista}</span> </div>
+                            <Badge>{item.manifesto}</Badge>
+                        </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                        <div className="flex justify-between text-sm"><span>Saída:</span><span>{item.data_saida}</span></div>
+                        <div className="flex justify-between text-sm"><span>Unidade Destino:</span><span>{item.unidade_destino}</span></div>
+                        <div className="flex justify-between text-sm"><span>Previsão de Chegada:</span><span>{item.previsao_chegada}</span></div>
+                        <div className="flex justify-between text-sm font-bold mt-2"><div className='flex flex-row gap-1 items-center'><Package size={16} /> Volumes:</div><span>{item.volumes}</span></div>
+                        <div className="flex justify-between text-sm font-bold"><div className='flex flex-row gap-1 items-center'><Archive size={16} /> Peso:</div><span>{parseFloat(item.peso).toFixed(2)} kg</span></div>
+                        </CardContent>
+                        <CardFooter>
+                            <a href={item.link_ssw} target="_blank" rel="noopener noreferrer" className="w-full">
+                                <Button variant='outline' className='w-full'><Send className="mr-2 h-4 w-4" /> Acompanhar no SSW</Button>
+                            </a>
+                        </CardFooter>
                     </Card>
-                  );
-                })}
-                {cardsSimples.map((c, i) => {
-                  const Icon = c.icon;
-                  return (
-                    <Card key={i} className="dark:bg-slate-900 dark:border-slate-700">
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${c.corBg}`}>
-                            <Icon className={`w-4 h-4 ${c.corTexto}`} />
-                          </div>
-                          <div>
-                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{c.valor}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{c.label}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          <CarregamentoArea
-            sigla={sigla}
-            carregamentos={carregamentos}
-            loadingCarregamentos={loadingCarregamentos}
-            modoApontamento={modoApontamento}
-            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
-            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}
-            onCriarCarregamento={handleCriarCarregamento}
-            onExcluirCarregamento={handleExcluirCarregamento}
-            onRemoverCte={handleRemoverCte}
-            onCarregarSSW={handleCarregarSSW}
-            todosCtes={todosCtes}
-          />
-
-          {modoApontamento && ctesSelecionados.size > 0 && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-              <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="text-sm text-amber-800 dark:text-amber-300 flex-1">
-                <strong>{ctesSelecionados.size}</strong> CT-e{ctesSelecionados.size !== 1 ? 's' : ''} selecionado{ctesSelecionados.size !== 1 ? 's' : ''} para <strong>{modoApontamento}</strong>
-              </span>
-              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
-                <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
-              </Button>
-              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}>
-                Cancelar
-              </Button>
+                ))
+              ) : (<p>Nenhum veículo em trânsito.</p>)}
             </div>
-          )}
-
-          <div className="flex border-b border-slate-200 dark:border-slate-700">
-            <button
-              onClick={() => setAbaAtiva('transferencia')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'transferencia' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Layers className="w-4 h-4" />
-              Disponíveis para Transferência
-              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs">{totalArmazem + totalTransito}</Badge>
-            </button>
-            <button
-              onClick={() => setAbaAtiva('entrega')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'entrega' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <Home className="w-4 h-4" />
-              Disponíveis para Entrega
-              {loadingEntrega
-                ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Carregando...</Badge>
-                : dadosEntrega
-                  ? <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">{totalEntregaArmazem + totalEntregaTransito}</Badge>
-                  : <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
-              }
-            </button>
-            <button
-              onClick={() => setAbaAtiva('todos')}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'todos' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              <ListFilter className="w-4 h-4" />
-              Todos os Disponíveis
-              {loadingEntrega
-                ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Carregando...</Badge>
-                : <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-xs">{totalGeralArmazem + totalGeralTransito}</Badge>
-              }
-            </button>
           </div>
 
-          {abaAtiva === 'transferencia' && (
+          {/* Coluna Disponíveis */}
+          <div className="md:col-span-1">
+            <h2 className="text-xl font-semibold mb-2">Disponíveis</h2>
             <div className="space-y-4">
-              {grupos.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-indigo-500" />
-                        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Destino</h2>
-                        <span className="text-sm text-slate-500 dark:text-slate-400">({grupos.length} destinos)</span>
-                        <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                          <ChevronRight className="w-3 h-3" />clique em um destino para expandir
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3">
-                        <span className="font-medium text-slate-600 dark:text-slate-300">Indicador Saída:</span>
-                        {(['verde','amarelo','laranja','vermelho'] as const).map(cor => (
-                          <span key={cor} className="flex items-center gap-1">
-                            <IndicadorDot cor={cor} />
-                            <span className={TEXTO_INDICADOR[cor]}>
-                              {cor === 'verde' ? '≤1 dia' : cor === 'amarelo' ? '2 dias' : cor === 'laranja' ? '3 dias' : '4+ dias'}
-                            </span>
-                          </span>
-                        ))}
-                        <span className="flex items-center gap-1">
-                          <IndicadorDot cor={null} />
-                          <span>sem manifesto</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              {data && data.disponiveis.length > 0 ? (
+                 data.disponiveis.map((item: any, index: number) => (
+                   <Card key={index} className="w-full">
+                     <CardHeader><CardTitle className="flex justify-between items-center"><div className='flex flex-row items-center'><Bus className="mr-2" /> {item.placa}</div></CardTitle></CardHeader>
+                     <CardContent>
+                       <p className="text-sm">Modelo: {item.modelo}</p>
+                       <div className="flex justify-between text-sm font-bold mt-2"><span>Capacidade (V):</span><span>{item.capacidade_vol}</span></div>
+                       <div className="flex justify-between text-sm font-bold"><span>Capacidade (P):</span><span>{parseFloat(item.capacidade_kg).toFixed(2)} kg</span></div>
+                     </CardContent>
+                     <CardFooter><Button className='w-full' onClick={() => handleOpenCarregamentoModal(item.placa)}><PlusCircle className="mr-2 h-4 w-4" /> Criar Carregamento</Button></CardFooter>
+                   </Card>
+                 ))
+              ) : (<p>Nenhum veículo disponível.</p>)}
+            </div>
+          </div>
 
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    {(() => {
-                      const toggleOrdem = (col: string) => {
-                        if (ordemCol === col) setOrdemDir(d => d === 'desc' ? 'asc' : 'desc');
-                        else { setOrdemCol(col as any); setOrdemDir('desc'); }
-                      };
-                      const ThBtn = ({ col, children, center }: { col: string; children: React.ReactNode; center?: boolean }) => (
-                        <button
-                          onClick={() => toggleOrdem(col)}
-                          className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${center ? 'justify-center w-full' : ''}`}
-                        >
-                          {children}
-                          {ordemCol === col
-                            ? (ordemDir === 'desc' ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />)
-                            : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
-                        </button>
-                      );
-                      return (
-                        <>
-                          <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
-                            <span />
-                            <ThBtn col="sigla">Destino</ThBtn>
-                            <span />
-                            <ThBtn col="piorSaida" center>Perf. saída</ThBtn>
-                            <ThBtn col="armazem" center>Piso</ThBtn>
-                            <ThBtn col="transito" center>Trans.</ThBtn>
-                            <ThBtn col="coletas" center>Coletas</ThBtn>
-                            <ThBtn col="totalVol" center>Volumes</ThBtn>
-                            <ThBtn col="totalPeso" center>Peso</ThBtn>
-                            <ThBtn col="totalCubagem" center>Cubagem</ThBtn>
-                          </div>
-                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {(() => {
-                                const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
-                                const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
-                                const ctesNoCarregamentoAtual = modoApontamento
-                                  ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
-                                  : undefined;
-                                return grupos.map((g, i) => (
-                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
-                                ));
-                              })()}
+          {/* Coluna Carregamentos */}
+          <div className="md:col-span-1">
+            <h2 className="text-xl font-semibold mb-2">Carregamentos</h2>
+            <div className="space-y-4">
+              {data && data.carregamentos.length > 0 ? (
+                data.carregamentos.map((carregamento: any, index: number) => {
+                  const ctesExtras = ctesDoHub[carregamento.placa] || [];
+                  const pesoExtras = ctesExtras.reduce((acc: number, cte: any) => acc + parseFloat(cte.peso || 0), 0);
+                  const volumeExtras = ctesExtras.reduce((acc: number, cte: any) => acc + parseInt(cte.volumes || 0), 0);
+                  
+                  const pesoTotal = parseFloat(carregamento.peso_total_carregado) + pesoExtras;
+                  const volumeTotal = parseInt(carregamento.volumes_total_carregado) + volumeExtras;
+                  
+                  const ctesOriginaisFormatados = carregamento.ctes.map((c: any) => ({ ...c, destinatario: c.destinatario_cte, volumes: c.volumes_cte, peso: c.peso_cte }));
+                  const todosOsCtes = [...ctesOriginaisFormatados, ...ctesExtras];
+
+                  return(
+                  <Card key={index} className="w-full bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <CardHeader><CardTitle className="flex justify-between items-center"><div className='flex flex-row items-center'><Truck className="mr-2" /> {carregamento.placa}</div></CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="mb-2">
+                        <div className="flex justify-between text-sm font-bold"><span>Peso:</span><span>{pesoTotal.toFixed(2)} kg / {carregamento.capacidade_kg} kg</span></div>
+                        <ProgressIndicator value={pesoTotal} max={parseFloat(carregamento.capacidade_kg)} />
+                        </div>
+                        <div>
+                        <div className="flex justify-between text-sm font-bold"><span>Volumes:</span><span>{volumeTotal} / {carregamento.capacidade_vol}</span></div>
+                        <ProgressIndicator value={volumeTotal} max={parseInt(carregamento.capacidade_vol)} />
+                        </div>
+
+                      <div className="mt-4 pt-2 border-t">
+                        <p className="font-bold mb-1">{todosOsCtes.length} CT-es no planejamento:</p>
+                         <div className="max-h-24 overflow-y-auto text-xs space-y-1 pr-1">
+                           {todosOsCtes.map((cte: any, i:number) => (
+                            <div key={i} className={`p-1 rounded ${cte.unidade_origem_hub ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}>
+                              {cte.unidade_origem_hub && <strong className='font-mono'>[HUB: {cte.unidade_origem_hub}]</strong>} {cte.destinatario} ({cte.volumes}v, {cte.peso}kg)
                             </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {grupos.length === 0 && dados.coletas.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
-                  <CheckCircle2 className="w-12 h-12 mb-3 text-green-400" />
-                  <p className="text-base font-medium">Nenhum CT-e disponível para transferência</p>
-                  <p className="text-sm mt-1">Armazém limpo e sem coletas pendentes!</p>
-                </div>
-              )}
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex-col space-y-2">
+                       <Button className='w-full' variant='outline' onClick={() => handleAbrirHub(carregamento)}><Search className="mr-2 h-4 w-4" /> Buscar Cargas Compartilhadas</Button>
+                       <Button className='w-full' onClick={() => handleSalvarCarregamento(carregamento.placa)}><ArrowRight className="mr-2 h-4 w-4" /> Manifestar Carregamento</Button>
+                    </CardFooter>
+                  </Card>
+                 )})
+              ) : (<p>Nenhum carregamento em andamento.</p>)}
             </div>
-          )}
-
-          {abaAtiva === 'entrega' && (
-            <div className="space-y-4">
-              {loadingEntrega && (
-                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Gerando relatório no SSW...</p>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">O relatório está sendo processado. Isso pode levar até 1 minuto.</p>
-                    </div>
-                  </div>
-                  <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-2 rounded-full bg-amber-500 dark:bg-amber-400 transition-all duration-500 ease-out"
-                      style={{ width: `${progressoEntrega}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 text-right">{progressoEntrega}%</p>
-                </div>
-              )}
-
-              {erroEntrega && !loadingEntrega && (
-                <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-5 flex items-start gap-3">
-                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-red-800 dark:text-red-300">Erro ao carregar disponíveis para entrega</p>
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">{erroEntrega}</p>
-                    <Button variant="outline" size="sm" className="mt-3 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400" onClick={() => carregarEntrega()}>
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Tentar novamente
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {dadosEntrega && !loadingEntrega && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Home className="w-4 h-4 text-emerald-500" />
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">CT-es por Setor</h2>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">({gruposSetor.length} setores)</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                      <ChevronRight className="w-3 h-3" />clique em um setor para expandir
-                    </span>
-                    <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={() => carregarEntrega()}>
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Atualizar
-                    </Button>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">
-                      <span className="font-medium text-slate-600 dark:text-slate-300">Atraso:</span>
-                      {(['verde','amarelo','laranja','vermelho'] as const).map(cor => (
-                        <span key={cor} className="flex items-center gap-1">
-                          <IndicadorDot cor={cor} />
-                          <span className={TEXTO_INDICADOR[cor]}>
-                            {cor === 'verde' ? 'No prazo' : cor === 'amarelo' ? '1-2 dias' : cor === 'laranja' ? '3-5 dias' : '6+ dias'}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
-                      <span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span>
-                      <span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                    </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {(() => {
-                        const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
-                        const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
-                        const ctesNoCarregamentoAtual = modoApontamento
-                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
-                          : undefined;
-                        return gruposSetor.map((g, i) => (
-                          <GrupoSetorCard
-                            key={i}
-                            grupo={g}
-                            maxPeso={maxPeso}
-                            maxCubagem={maxCubagem}
-                            modoApontamento={modoApontamento}
-                            ctesSelecionados={ctesSelecionados}
-                            ctesNoCarregamento={ctesNoCarregamentoAtual}
-                            ctesJaCarregados={ctesJaCarregados}
-                            onToggleCte={toggleCte}
-                            onToggleTodos={toggleTodos}
-                          />
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!loadingEntrega && !dadosEntrega && !erroEntrega && (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
-                  <Home className="w-12 h-12 mb-3 opacity-30" />
-                  <p className="text-base font-medium">Nenhum dado disponível</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {abaAtiva === 'todos' && (
-            <div className="space-y-6">
-              {loadingEntrega && (
-                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Aguardando dados de entrega...</p>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Os dados de transferência já estão disponíveis. Os dados de entrega ainda estão sendo processados.</p>
-                    </div>
-                  </div>
-                  <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-2 overflow-hidden">
-                    <div className="h-2 rounded-full bg-amber-500 dark:bg-amber-400 transition-all duration-500 ease-out" style={{ width: `${progressoEntrega}%` }} />
-                  </div>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 text-right">{progressoEntrega}%</p>
-                </div>
-              )}
-
-              {grupos.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-indigo-500" />
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Transferência</h2>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">({grupos.length} destinos · {totalArmazem + totalTransito} CT-es)</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
-                      <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Trans.</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Coletas</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                    </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {(() => {
-                        const maxPeso    = Math.max(...grupos.map(g => g.totalPeso), 1);
-                        const maxCubagem = Math.max(...grupos.map(g => g.totalCubagem), 1);
-                        const ctesNoCarregamentoAtual = modoApontamento
-                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
-                          : undefined;
-                        return grupos.map((g, i) => (
-                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {dadosEntrega && gruposSetor.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Home className="w-4 h-4 text-emerald-500" />
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Entrega</h2>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">({gruposSetor.length} setores · {totalEntregaArmazem + totalEntregaTransito} CT-es)</span>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
-                      <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span><span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                    </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {(() => {
-                        const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
-                        const maxCubagem = Math.max(...gruposSetor.map(g => g.totalCubagem), 1);
-                        const ctesNoCarregamentoAtual = modoApontamento
-                          ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
-                          : undefined;
-                        return gruposSetor.map((g, i) => (
-                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!loadingEntrega && !dadosEntrega && erroEntrega && (
-                <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-5 flex items-start gap-3">
-                  <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-red-800 dark:text-red-300">Dados de entrega indisponíveis</p>
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">{erroEntrega}</p>
-                    <Button variant="outline" size="sm" className="mt-3 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400" onClick={() => carregarEntrega()}>
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Tentar novamente
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {ultimaAtualizacao && (
-            <p className="text-xs text-slate-400 dark:text-slate-600 text-right">
-              Dados gerados em: {ultimaAtualizacao}
-            </p>
-          )}
+          </div>
         </div>
-      ) : null}
+      </div>
+
+       {modalCarregamentoAberto && veiculoParaCarregamento && (
+         <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setModalCarregamentoAberto(false)}>
+            <div className="fixed inset-y-0 right-0 bg-white dark:bg-slate-900 w-full max-w-md shadow-lg p-6" onClick={e => e.stopPropagation()}>
+               <h2 className="text-xl font-bold mb-4">Criar Carregamento para {placaParaCarregamento}</h2>
+                <p className="mb-4">Você pode gerar um carregamento automaticamente com base nos CT-es disponíveis ou iniciar um carregamento vazio para adicionar itens manualmente.</p>
+                <div className="flex flex-col space-y-4">
+                <Button onClick={() => handleGerarCarregamentoAutomatico(placaParaCarregamento)}><RefreshCw className="mr-2 h-4 w-4" /> Gerar Carregamento Automático</Button>
+                <Button variant="outline" disabled > <PlusCircle className="mr-2 h-4 w-4" /> Iniciar Carregamento Vazio (em breve)</Button>
+                </div>
+            </div>
+         </div>
+      )}
+
+      {hubAberto && carregamentoParaHub && (
+        <HubCargasCompartilhadas 
+            carregamento={carregamentoParaHub}
+            onClose={() => setHubAberto(false)}
+            onAddCtes={handleAdicionarCtesDoHub}
+        />
+      )}
+
+      <ConfirmacaoModal
+        isOpen={modalConfirmacaoAberto}
+        onClose={() => setModalConfirmacaoAberto(false)}
+        onConfirm={() => handleImportarCarregamentos(true)}
+        title="Sobrescrever Carregamentos?"
+      >
+        <p>Já existem carregamentos em andamento. Deseja sobrescrevê-los com os dados importados do SSW para as placas correspondentes?</p>
+        <p className="mt-2 font-semibold">Se você escolher "Não", apenas os carregamentos para placas que não estão atualmente na tela serão importados.</p>
+      </ConfirmacaoModal>
+
     </DashboardLayout>
   );
 }
