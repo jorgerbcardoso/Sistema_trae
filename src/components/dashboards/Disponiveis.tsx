@@ -423,8 +423,9 @@ export function Disponiveis() {
 
     setLoading(true);
     setError(null);
+
     try {
-        const res = await apiFetch(`dashboards/disponiveis/check_unidade_carregamento.php`, {
+        const res = await apiFetch(`/dashboards/disponiveis/check_unidade_carregamento.php`, {
             method: 'POST', body: JSON.stringify({ unidade })
         });
 
@@ -432,7 +433,7 @@ export function Disponiveis() {
             setUnidadePodeCarregar(false);
             toast.error(res.message || "Unidade não configurada para efetuar carregamentos.");
             setData(null);
-            setLoading(false);
+            // Não definir setLoading(false) aqui para mater a tela em "loading" visual
             return;
         }
         
@@ -482,7 +483,10 @@ export function Disponiveis() {
   useEffect(() => {
     async function getUnidades() {
       try {
-        const response = await apiFetch('get_unidades.php', { method: 'POST' });
+        const response = await apiFetch(
+          '/dashboards/performance-entregas/search_unidades.php',
+          { method: 'POST', body: JSON.stringify({ search: '' }) }
+        );
         if (response.status === 'success') {
           const unidadesFiltradas = response.data.filter((u: any) => u.cgc_franquia === null);
           setUnidades(unidadesFiltradas);
@@ -656,7 +660,7 @@ export function Disponiveis() {
     // Componente de Paginação foi removido para simplificar e focar na funcionalidade principal
     // O código original pode ser reinserido aqui se necessário.
 
-  if (loading && !data) {
+  if (loading && !data && unidadePodeCarregar !== false) {
     return (
       <DashboardLayout>
         <div className="flex justify-center items-center h-full">
