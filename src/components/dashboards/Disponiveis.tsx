@@ -3,7 +3,7 @@ import { apiFetch } from '../../config/api';
 import {
   ChevronsLeft,
   ChevronsRight,
-  Filter as FilterIcon,
+  Filter as FilterIcon, // Renomeado para não conflitar
   RefreshCw,
   Truck,
   Package,
@@ -18,12 +18,11 @@ import {
   DownloadCloud,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Filter } from '../../components/Filter';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Badge } from '../../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
-import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
+import { DashboardLayout } from '../layouts/DashboardLayout';
 
 // --- COMPONENTES DO HUB DE CARGAS E MODAIS ---
 
