@@ -1,18 +1,14 @@
 <?php
 require_once '../../../config.php';
-require_once '../../lib/lib.php';
-require_once '../../lib/ssw.php';
-
-header('Content-Type: application/json');
-
-// Garante que o método de requisição seja POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['status' => 'error', 'message' => 'Método não permitido']);
-    exit;
+// ssw.php é carregado pelo config.php, se necessário, ou aqui, vamos garantir
+if (file_exists(__DIR__ . '/../../lib/ssw.php')) {
+    require_once __DIR__ . '/../../lib/ssw.php';
 }
 
-// Função para extrair XML de uma string HTML
+header('Content-Type: application/json');
+handleOptionsRequest(); // Do config.php
+validateRequestMethod('POST'); // Do config.php
+
 function extrair_xml_do_html($html) {
     $inicio_xml = strpos($html, '<?xml');
     if ($inicio_xml === false) return null;
@@ -21,25 +17,26 @@ function extrair_xml_do_html($html) {
     return substr($html, $inicio_xml, ($fim_xml + strlen('</data>')) - $inicio_xml);
 }
 
+$conn = null;
 try {
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = getRequestInput(); // Do config.php
     $sobrescrever = $input['sobrescrever'] ?? false;
     
-    $dominio = App\Util\dominio::get();
-    $unidade_atual = App\Util\unidade::get();
+    $currentUser = getCurrentUser(); // Do config.php
+    $dominio = $currentUser['domain'];
+    $unidade_atual = $currentUser['unidade_atual'];
 
-    if (empty($unidade_atual)) {
-        throw new Exception('Unidade do usuário não identificada.', 400);
+    if (empty($unidade_atual) || empty($dominio)) {
+        throw new Exception('Unidade ou Domínio do usuário não identificados.', 400);
     }
-
-    $tabela_carregamento = "{$dominio}_carregamento";
-    sql("CREATE TABLE IF NOT EXISTS {$tabela_carregamento} (id SERIAL PRIMARY KEY, unidade VARCHAR(10), placa_provisoria VARCHAR(20), seq_cte integer, login_inclusao VARCHAR(50), dat_inclusao DATE DEFAULT CURRENT_DATE, hor_inclusao TIME DEFAULT CURRENT_TIME)");
-
-    ssw_login();
     
-    // 1. Obter a lista de placas
-    $url_placas = "https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&unidade=" . urlencode($unidade_atual);
-    $html_placas = ssw_go($url_placas);
+    $conn = getDBConnection(); // Do config.php
+
+    $tabela_carregamento = strtolower($dominio) . "_carregamento";
+    
+    // 1. Obter a lista de placas do SSW
+    $url_placas = "https://sistema.ssw.inf.br/bin/ssw0194.php?act=PLACAS&unidade=" . urlencode($unidade_atual);
+    $html_placas = ssw_go($url_placas); // Do ssw.php
     $xml_string = extrair_xml_do_html($html_placas);
 
     if (empty($xml_string)) {
@@ -59,23 +56,21 @@ try {
     }
 
     if(empty($placas_ssw)){
-        echo json_encode(['status' => 'success', 'message' => 'Nenhum carregamento encontrado no SSW para importar.']);
-        exit;
+        respondJson(['status' => 'success', 'message' => 'Nenhum carregamento encontrado no SSW para importar.']);
     }
 
     $logs = [];
     // 2. Processar cada placa
     foreach($placas_ssw as $placa){
-        $res_check = sql("SELECT id FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2 LIMIT 1", [$placa, $unidade_atual]);
-        $carregamento_existe = count($res_check) > 0;
+        $res_check = sql($conn, "SELECT id FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2 LIMIT 1", false, [$placa, $unidade_atual]);
+        $carregamento_existe = pg_num_rows($res_check) > 0;
 
         if($carregamento_existe && !$sobrescrever){
             $logs[] = "Carregamento para a placa {$placa} já existe no Presto e não foi sobrescrito.";
             continue;
         }
 
-        // 2.1 Gerar o relatório e obter parâmetros para download
-        $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=SR_IMP|" . urlencode($placa));
+        $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194.php?act=SR_IMP|" . urlencode($placa));
         $str_decodificada = urldecode($str_retorno);
         $act_download = ssw_get_act($str_decodificada);
         $arq_download = ssw_get_arq($str_decodificada);
@@ -85,11 +80,9 @@ try {
             continue;
         }
 
-        // 2.2 Baixar o arquivo do relatório
-        $url_download = "https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0";
+        $url_download = "https://sistema.ssw.inf.br/bin/ssw0424.php?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0";
         $relatorio_ctes = ssw_go($url_download);
         
-        // 2.3 Parsear o relatório
         $ctes_par-inserir = [];
         $linhas = explode("\n", $relatorio_ctes);
 
@@ -112,22 +105,21 @@ try {
             continue;
         }
 
-        // 2.4 Salvar no banco de dados
-        sql("BEGIN");
+        sql($conn, "BEGIN");
         try {
             if($carregamento_existe){
-                sql("DELETE FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2", [$placa, $unidade_atual]);
+                sql($conn, "DELETE FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2", false, [$placa, $unidade_atual]);
             }
             
             $ctes_inseridos_count = 0;
-            $tabela_cte = "{$dominio}_cte";
+            $tabela_cte = strtolower($dominio) . "_cte";
             foreach($ctes_par-inserir as $cte_info){
-                $res_seq = sql("SELECT nro_seq_cte FROM {$tabela_cte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1", [$cte_info['serie'], $cte_info['numero']]);
+                $res_seq = sql($conn, "SELECT nro_seq_cte FROM {$tabela_cte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1", false, [$cte_info['serie'], $cte_info['numero']]);
 
-                if(count($res_seq) > 0){
-                    $seq_cte = (int)$res_seq[0]['nro_seq_cte'];
+                if($res_seq && pg_num_rows($res_seq) > 0){
+                    $seq_cte = (int)pg_fetch_assoc($res_seq)['nro_seq_cte'];
                     if($seq_cte > 0){
-                        sql("INSERT INTO {$tabela_carregamento} (unidade, placa_provisoria, seq_cte, login_inclusao) VALUES ($1, $2, $3, 'IMPORT_SSW')", [$unidade_atual, $placa, $seq_cte]);
+                        sql($conn, "INSERT INTO {$tabela_carregamento} (unidade, placa_provisoria, seq_cte, login_inclusao) VALUES ($1, $2, $3, 'IMPORT_SSW')", false, [$unidade_atual, $placa, $seq_cte]);
                         $ctes_inseridos_count++;
                     }
                 } else {
@@ -135,7 +127,7 @@ try {
                 }
             }
 
-            sql("COMMIT");
+            sql($conn, "COMMIT");
             if ($ctes_inseridos_count > 0) {
                  $logs[] = "Carregamento para a placa {$placa} importado/atualizado com {$ctes_inseridos_count} CT-es.";
             } else {
@@ -143,18 +135,19 @@ try {
             }
 
         } catch (Exception $db_exception) {
-            sql("ROLLBACK");
+            sql($conn, "ROLLBACK");
             $logs[] = "Erro ao salvar o carregamento para a placa {$placa} no banco de dados: " . $db_exception->getMessage();
         }
     }
     
-    echo json_encode(['status' => 'success', 'message' => 'Importação do SSW concluída.', 'logs' => $logs]);
+    respondJson(['status' => 'success', 'message' => 'Importação do SSW concluída.', 'logs' => $logs]);
 
 } catch(Exception $e) {
-    $statusCode = ($e->getCode() > 0) ? $e->getCode() : 500;
-    http_response_code($statusCode);
-    error_log("Erro em importar_carregamentos_ssw.php: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    returnError($e->getMessage(), $e->getCode() > 0 ? $e->getCode() : 500);
+} finally {
+    if($conn){
+        closeDBConnection($conn);
+    }
 }
 
 ?>
