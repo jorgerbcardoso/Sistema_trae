@@ -1490,7 +1490,7 @@ function CarregamentoArea({
               onExcluirCarregamento={onExcluirCarregamento}
               onRemoverCte={onRemoverCte}
               onCarregarSSW={onCarregarSSW}
-              onBuscarCargas={setHubCarregamentoPlaca}
+              onBuscarCargas={onBuscarCargas}
               onCarregarHub={onCarregarHub}
               loadingHub={loadingHub}
               hubCarregamentoPlaca={hubCarregamentoPlaca}
