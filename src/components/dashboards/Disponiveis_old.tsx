@@ -38,10 +38,6 @@ import {
   Square,
   Car,
   X,
-  Share2,
-  Download,
-  AlertCircle,
-  FileDown,
 } from 'lucide-react';
 
 interface Cte {
@@ -70,7 +66,6 @@ interface Cte {
   nomeDest: string;
   indicadorSaida: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
   atrasoTransf: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
-  unidadeOrigem?: string;
 }
 
 interface Coleta {
@@ -154,11 +149,6 @@ interface GrupoDestino {
   totalVol: number;
   totalPeso: number;
   totalCubagem: number;
-}
-
-interface DadosHub {
-  unidades: string[];
-  dados: Record<string, { ctes: Cte[]; erro: string | null }>;
 }
 
 interface CteCarregamento {
@@ -337,16 +327,9 @@ function TabelaCtes({
                   </td>
                 )}
                 <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {cte.ctrc}
-                    {cte.unidadeOrigem && (
-                      <span className="text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700" title={`CT-e da unidade compartilhada ${cte.unidadeOrigem}`}>
-                        <Share2 className="w-2.5 h-2.5 inline mr-0.5" />{cte.unidadeOrigem}
-                      </span>
-                    )}
-                    {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
-                    {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
-                  </div>
+                  {cte.ctrc}
+                  {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
+                  {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
@@ -432,19 +415,7 @@ function GrupoDestinoCard({
           <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
           {grupo.sigla}
         </span>
-        <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs truncate pr-2">
-          {grupo.nome}
-          {(() => {
-            const ctesHub = [...grupo.armazem, ...grupo.transito].filter(c => c.unidadeOrigem);
-            if (ctesHub.length === 0) return null;
-            const origens = [...new Set(ctesHub.map(c => c.unidadeOrigem))];
-            return (
-              <span className="shrink-0 text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700 flex items-center gap-0.5" title={`${ctesHub.length} CT-e(s) de unidade(s) compartilhada(s): ${origens.join(', ')}`}>
-                <Share2 className="w-2.5 h-2.5" />{ctesHub.length}
-              </span>
-            );
-          })()}
-        </span>
+        <span className="flex items-center text-slate-500 dark:text-slate-400 text-xs truncate pr-2">{grupo.nome}</span>
         <span className="flex items-center justify-center">
           {pctEntregueNoPrazo !== null
             ? <span className={`text-xs font-bold ${pctEntregueNoPrazo >= 80 ? 'text-green-600 dark:text-green-400' : pctEntregueNoPrazo >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{pctEntregueNoPrazo}%</span>
@@ -920,10 +891,6 @@ interface CarregamentoAreaProps {
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onCarregarHub: (placa: string) => void;
-  loadingHub: boolean;
-  hubCarregamentoPlaca: string | null;
-  onRecarregarCarregamentos: () => void;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1089,9 +1056,6 @@ function CardCarregamento({
   onRemoverCte,
   onCarregarSSW,
   onBuscarCargas,
-  onCarregarHub,
-  loadingHub,
-  hubCarregamentoPlaca,
 }: {
   carregamento: Carregamento;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
@@ -1102,9 +1066,6 @@ function CardCarregamento({
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onBuscarCargas: (placa: string) => void;
-  onCarregarHub: (placa: string) => void;
-  loadingHub: boolean;
-  hubCarregamentoPlaca: string | null;
 }) {
   const [expandido, setExpandido] = useState(false);
   const ativo = modoApontamento === carregamento.placa_provisoria;
@@ -1193,22 +1154,6 @@ function CardCarregamento({
               <ListTree className="w-3.5 h-3.5" />
             </Button>
           )}
-          {ativo && (
-            <Button
-              size="sm"
-              variant="outline"
-              className={`h-8 px-2.5 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
-              onClick={() => onCarregarHub(carregamento.placa_provisoria)}
-              disabled={loadingHub}
-              title="Buscar cargas das unidades compartilhadas"
-            >
-              {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Share2 className="w-3.5 h-3.5" />
-              }
-              <span className="ml-1">Hub</span>
-            </Button>
-          )}
 
           <Button size="sm" variant="outline" className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
             {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -1266,136 +1211,6 @@ function CardCarregamento({
   );
 }
 
-type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
-
-function ModalImportarSSW({ onFechar, onConcluir }: { onFechar: () => void; onConcluir: () => void }) {
-  const [etapa, setEtapa] = useState<'confirmar' | 'carregando' | 'resultado'>('confirmar');
-  const [sobrescrever, setSobrescrever] = useState(false);
-  const [logs, setLogs] = useState<LogImportacao[]>([]);
-  const [placasSSW, setPlacasSSW] = useState<string[]>([]);
-
-  const executar = async () => {
-    setEtapa('carregando');
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
-        { method: 'POST', body: JSON.stringify({ sobrescrever }) },
-        true
-      );
-      if (res.success) {
-        setLogs(res.logs ?? []);
-        setPlacasSSW(res.placas_ssw ?? []);
-        setEtapa('resultado');
-        onConcluir();
-      } else {
-        toast.error(res.message || 'Erro ao importar carregamentos do SSW');
-        onFechar();
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao importar carregamentos do SSW');
-      onFechar();
-    }
-  };
-
-  const corStatus: Record<string, string> = {
-    importado:   'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30',
-    sobrescrito: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30',
-    ignorado:    'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40',
-    aviso:       'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30',
-    erro:        'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30',
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-2">
-            <FileDown className="w-5 h-5 text-sky-500" />
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Importar Carregamentos do SSW</h3>
-          </div>
-          {etapa !== 'carregando' && (
-            <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-
-        <div className="px-6 py-5">
-          {etapa === 'confirmar' && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                O sistema irá buscar os carregamentos prontos no SSW para a sua unidade e vinculá-los automaticamente ao Presto.
-              </p>
-              <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Carregamentos já existentes</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                      Se uma placa do SSW já existir no Presto, o que deseja fazer?
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 pl-7">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="sobrescrever" checked={!sobrescrever} onChange={() => setSobrescrever(false)} className="accent-amber-500" />
-                    <span className="text-sm text-amber-800 dark:text-amber-300">Ignorar (manter o carregamento atual do Presto)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="sobrescrever" checked={sobrescrever} onChange={() => setSobrescrever(true)} className="accent-amber-500" />
-                    <span className="text-sm text-amber-800 dark:text-amber-300">Sobrescrever (substituir pelo carregamento do SSW)</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {etapa === 'carregando' && (
-            <div className="flex flex-col items-center justify-center py-8 gap-4">
-              <Loader2 className="w-10 h-10 animate-spin text-sky-500" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Importando carregamentos do SSW...</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 text-center">Isso pode levar alguns segundos. Não feche esta janela.</p>
-            </div>
-          )}
-
-          {etapa === 'resultado' && (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                {placasSSW.length} placa{placasSSW.length !== 1 ? 's' : ''} encontrada{placasSSW.length !== 1 ? 's' : ''} no SSW. Resultado:
-              </p>
-              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-                {logs.map((log, i) => (
-                  <div key={i} className={`flex items-start gap-2 px-3 py-2 rounded-lg text-xs ${corStatus[log.status] ?? ''}`}>
-                    <span className="font-mono font-bold shrink-0">{log.placa}</span>
-                    <span className="flex-1">{log.msg}</span>
-                  </div>
-                ))}
-                {logs.length === 0 && (
-                  <p className="text-sm text-slate-400 text-center py-4">Nenhum resultado para exibir.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
-          {etapa === 'confirmar' && (
-            <>
-              <Button variant="outline" size="sm" onClick={onFechar}>Cancelar</Button>
-              <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white" onClick={executar}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />Importar
-              </Button>
-            </>
-          )}
-          {etapa === 'resultado' && (
-            <Button size="sm" variant="outline" onClick={onFechar}>Fechar</Button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function CarregamentoArea({
   sigla,
   carregamentos,
@@ -1407,15 +1222,10 @@ function CarregamentoArea({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
-  onCarregarHub,
-  loadingHub,
-  hubCarregamentoPlaca,
-  onRecarregarCarregamentos,
   todosCtes,
 }: CarregamentoAreaProps) {
   const [modalAberto, setModalAberto] = useState(false);
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
-  const [modalImportarAberto, setModalImportarAberto] = useState(false);
 
   const handleCriar = (placa: string) => {
     setModalAberto(false);
@@ -1442,14 +1252,6 @@ function CarregamentoArea({
           )}
         </div>
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-            onClick={() => setModalImportarAberto(true)}
-          >
-            <FileDown className="w-3.5 h-3.5 mr-1.5" />Importar do SSW
-          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -1488,9 +1290,6 @@ function CarregamentoArea({
               onRemoverCte={onRemoverCte}
               onCarregarSSW={onCarregarSSW}
               onBuscarCargas={setHubCarregamentoPlaca}
-              onCarregarHub={onCarregarHub}
-              loadingHub={loadingHub}
-              hubCarregamentoPlaca={hubCarregamentoPlaca}
             />
           ))}
         </div>
@@ -1506,12 +1305,6 @@ function CarregamentoArea({
         <ModalCarregamentoAutomatico
           onConfirmar={handleCarregamentoAutomatico}
           onFechar={() => setModalAutomaticoAberto(false)}
-        />
-      )}
-      {modalImportarAberto && (
-        <ModalImportarSSW
-          onFechar={() => setModalImportarAberto(false)}
-          onConcluir={onRecarregarCarregamentos}
         />
       )}
     </div>
@@ -1546,8 +1339,6 @@ export function Disponiveis() {
   const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
-  const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
-  const [loadingHub, setLoadingHub] = useState(false);
 
   const [unidadePermiteCarregamento, setUnidadePermiteCarregamento] = useState<boolean | null>(null);
 
@@ -1790,35 +1581,6 @@ export function Disponiveis() {
     toast.info('Em breve: integração com SSW para carregar o manifesto.');
   }, []);
 
-  const carregarHub = useCallback(async (placa: string) => {
-    if (!sigla) return;
-    setHubCarregamentoPlaca(placa);
-    setLoadingHub(true);
-    setDadosHub(null);
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_hub_compartilhado.php`,
-        { method: 'POST', body: JSON.stringify({ sigla }) },
-        true
-      );
-      if (res.success) {
-        if (res.unidades.length === 0) {
-          toast.info('Nenhuma unidade compartilhada configurada para esta unidade.');
-        } else {
-          setDadosHub({ unidades: res.unidades, dados: res.dados });
-          const totalCtes = Object.values(res.dados as Record<string, { ctes: Cte[] }>).reduce((s, u) => s + u.ctes.length, 0);
-          toast.success(`Hub carregado: ${totalCtes} CT-e(s) disponíveis em ${res.unidades.length} unidade(s) compartilhada(s).`);
-        }
-      } else {
-        toast.error(res.message || 'Erro ao carregar hub de cargas compartilhadas');
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Erro ao carregar hub');
-    } finally {
-      setLoadingHub(false);
-    }
-  }, [sigla]);
-
   const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
     setCtesSelecionados(prev => {
       const next = new Set(prev);
@@ -1868,7 +1630,7 @@ export function Disponiveis() {
   const grupos: GrupoDestino[] = React.useMemo(() => {
     if (!dados) return [];
     const map: Record<string, GrupoDestino> = {};
-    const addCte = (cte: Cte) => {
+    for (const cte of dados.ctes) {
       const key = cte.unidadeDest;
       if (!map[key]) {
         map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
@@ -1882,12 +1644,6 @@ export function Disponiveis() {
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
-    };
-    for (const cte of dados.ctes) addCte(cte);
-    if (dadosHub) {
-      for (const unidadeData of Object.values(dadosHub.dados)) {
-        for (const cte of unidadeData.ctes) addCte(cte);
-      }
     }
     for (const coleta of dados.coletas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
@@ -1915,7 +1671,7 @@ export function Disponiveis() {
         default:             return mult * (b.totalCtes - a.totalCtes);
       }
     });
-  }, [dados, dadosHub, ordemCol, ordemDir]);
+  }, [dados, ordemCol, ordemDir]);
 
   const totalArmazem  = dados?.ctes.filter(c => !c.emTransito).length ?? 0;
   const totalTransito = dados?.ctes.filter(c => c.emTransito).length ?? 0;
@@ -2146,29 +1902,13 @@ export function Disponiveis() {
             loadingCarregamentos={loadingCarregamentos}
             modoApontamento={modoApontamento}
             onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
-            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
+            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}
             onCriarCarregamento={handleCriarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
-            onCarregarHub={carregarHub}
-            loadingHub={loadingHub}
-            hubCarregamentoPlaca={hubCarregamentoPlaca}
-            onRecarregarCarregamentos={carregarCarregamentos}
             todosCtes={todosCtes}
           />
-
-          {dadosHub && modoApontamento && (
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-700">
-              <Share2 className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
-              <span className="text-sm text-violet-800 dark:text-violet-300 flex-1">
-                Hub ativo: exibindo CT-es de <strong>{dadosHub.unidades.join(', ')}</strong> integrados aos grupos abaixo
-              </span>
-              <Button size="sm" variant="outline" className="text-xs h-7 border-violet-300 text-violet-700 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-950/50" onClick={() => { setDadosHub(null); setHubCarregamentoPlaca(null); }}>
-                <X className="w-3 h-3 mr-1" />Limpar hub
-              </Button>
-            </div>
-          )}
 
           {modoApontamento && ctesSelecionados.size > 0 && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
@@ -2179,7 +1919,7 @@ export function Disponiveis() {
               <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
                 <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
               </Button>
-              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); setDadosHub(null); setHubCarregamentoPlaca(null); }}>
+              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); }}>
                 Cancelar
               </Button>
             </div>

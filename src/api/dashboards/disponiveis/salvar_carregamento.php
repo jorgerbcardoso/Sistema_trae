@@ -1,81 +1,162 @@
 <?php
-require_once '../../../config.php';
-require_once '../../lib/lib.php';
+require_once __DIR__ . '/../../config.php';
 
-use App\Util\SSW;
-use App\Util\dominio;
-use App\Util\unidade;
+handleOptionsRequest();
+validateRequestMethod('POST');
 
-header('Content-Type: application/json');
+$auth   = authenticateAndGetUser();
+$domain = $auth['domain'];
+$input  = getRequestInput();
+$acao   = $input['acao'] ?? '';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['status' => 'error', 'message' => 'Método não permitido']);
-    exit;
+$currentUser = getCurrentUser();
+$unidade = strtoupper(trim(
+    $currentUser['unidade_atual']
+    ?? $currentUser['unidade']
+    ?? $input['unidade']
+    ?? ''
+));
+$login = $currentUser['username'] ?? $auth['user']['username'] ?? '';
+
+if (empty($unidade)) {
+    respondJson(['success' => false, 'message' => 'Unidade do usuário não identificada.']);
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
-
-$placa     = $input['placa'] ?? null;
-$ctes      = $input['ctes'] ?? []; // CT-es do carregamento original
-$ctes_hub  = $input['ctes_hub'] ?? []; // CT-es adicionados pelo Hub
-$unidade   = $input['unidade'] ?? unidade::get(); // Pega a unidade do input ou a da sessão
-
-if (empty($placa) || empty($unidade)) {
-    http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Placa e Unidade são obrigatórios.']);
-    exit;
+if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
+    respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
-if (empty($ctes) && empty($ctes_hub)) {
-    http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Nenhum CT-e fornecido para o carregamento.']);
-    exit;
+$tabela = "{$domain}_carregamento";
+
+$conn = connect();
+
+$sqlCria = "
+    CREATE TABLE IF NOT EXISTS {$tabela} (
+        id              SERIAL PRIMARY KEY,
+        unidade         VARCHAR(10) NOT NULL,
+        seq_cte         INT NOT NULL,
+        placa_provisoria VARCHAR(20) NOT NULL,
+        data_inclusao   DATE NOT NULL DEFAULT CURRENT_DATE,
+        hora_inclusao   TIME NOT NULL DEFAULT CURRENT_TIME,
+        login_inclusao  VARCHAR(50) NOT NULL
+    )
+";
+pg_query($conn, $sqlCria);
+
+$unidadeEsc = pg_escape_string($conn, $unidade);
+$loginEsc   = pg_escape_string($conn, $login);
+
+if ($acao === 'criar') {
+    $placa = strtoupper(trim($input['placa'] ?? ''));
+    if (empty($placa)) {
+        respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    }
+    $placaEsc = pg_escape_string($conn, $placa);
+
+    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' LIMIT 1");
+    if (pg_num_rows($check) > 0) {
+        respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
+    }
+
+    $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
+            VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')";
+    $res = pg_query($conn, $sql);
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento.']);
+    }
+    respondJson(['success' => true]);
 }
 
-try {
-    $chaves_cte = [];
+if ($acao === 'adicionar_cte') {
+    $placa  = strtoupper(trim($input['placa'] ?? ''));
+    $seqCte = (int)($input['seq_cte'] ?? 0);
+    if (empty($placa) || $seqCte <= 0) {
+        respondJson(['success' => false, 'message' => 'Placa ou CT-e inválido.']);
+    }
+    $placaEsc = pg_escape_string($conn, $placa);
 
-    // 1. Extrai as chaves dos CT-es originais
-    foreach ($ctes as $cte) {
-        if (isset($cte['chave'])) {
-            $chaves_cte[] = $cte['chave'];
+    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte} LIMIT 1");
+    if (pg_num_rows($check) > 0) {
+        respondJson(['success' => false, 'message' => 'Este CT-e já está neste carregamento.']);
+    }
+
+    $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
+            VALUES ('{$unidadeEsc}', {$seqCte}, '{$placaEsc}', '{$loginEsc}')";
+    $res = pg_query($conn, $sql);
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao adicionar CT-e ao carregamento.']);
+    }
+    respondJson(['success' => true]);
+}
+
+if ($acao === 'adicionar_ctes') {
+    $placa   = strtoupper(trim($input['placa'] ?? ''));
+    $seqCtes = $input['seq_ctes'] ?? [];
+    if (empty($placa) || empty($seqCtes) || !is_array($seqCtes)) {
+        respondJson(['success' => false, 'message' => 'Placa ou CT-es inválidos.']);
+    }
+    $placaEsc = pg_escape_string($conn, $placa);
+
+    pg_query($conn, 'BEGIN');
+    $adicionados = 0;
+    foreach ($seqCtes as $seqCte) {
+        $seqCte = (int)$seqCte;
+        if ($seqCte <= 0) continue;
+
+        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte} LIMIT 1");
+        if (pg_num_rows($check) > 0) continue;
+
+        $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
+                VALUES ('{$unidadeEsc}', {$seqCte}, '{$placaEsc}', '{$loginEsc}')";
+        $res = pg_query($conn, $sql);
+        if (!$res) {
+            pg_query($conn, 'ROLLBACK');
+            respondJson(['success' => false, 'message' => 'Erro ao adicionar CT-es.']);
         }
+        $adicionados++;
     }
-
-    // 2. Extrai e adiciona as chaves dos CT-es do Hub, evitando duplicatas
-    foreach ($ctes_hub as $cte_hub) {
-        if (isset($cte_hub['chave_cte']) && !in_array($cte_hub['chave_cte'], $chaves_cte)) {
-            $chaves_cte[] = $cte_hub['chave_cte'];
-        }
+    if ($adicionados > 0) {
+        pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = 0");
     }
-
-    if(empty($chaves_cte)){
-        throw new Exception("Não foi possível extrair nenhuma chave de CT-e para manifestar.");
-    }
-
-    // 3. Monta os parâmetros para a chamada SSW
-    $params = [
-        'unidade' => $unidade,
-        'placa' => $placa,
-        'chavecfe' => implode(',', $chaves_cte) // SSW espera uma string separada por vírgulas
-    ];
-
-    // 4. Chama o endpoint da SSW para criar o manifesto
-    $resultadoSSW = SSW::post('manifesto-carga-v2', $params);
-
-    // 5. Verifica a resposta da SSW
-    if (isset($resultadoSSW['status']) && $resultadoSSW['status'] === 'ERRO') {
-        throw new Exception($resultadoSSW['mensagem'] ?? 'Erro desconhecido ao gerar manifesto na SSW.');
-    }
-
-    // Se chegou aqui, o manifesto foi gerado com sucesso.
-    echo json_encode(['status' => 'success', 'message' => 'Manifesto gerado com sucesso!']);
-
-} catch (Exception $e) {
-    http_response_code(500);
-    error_log("Erro em salvar_carregamento.php: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    pg_query($conn, 'COMMIT');
+    respondJson(['success' => true, 'adicionados' => $adicionados]);
 }
 
-?>
+if ($acao === 'remover_cte') {
+    $placa  = strtoupper(trim($input['placa'] ?? ''));
+    $seqCte = (int)($input['seq_cte'] ?? 0);
+    if (empty($placa) || $seqCte <= 0) {
+        respondJson(['success' => false, 'message' => 'Placa ou CT-e inválido.']);
+    }
+    $placaEsc = pg_escape_string($conn, $placa);
+
+    $sql = "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte}";
+    $res = pg_query($conn, $sql);
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao remover CT-e.']);
+    }
+
+    $checkRestantes = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte > 0 LIMIT 1");
+    if (pg_num_rows($checkRestantes) === 0) {
+        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')");
+    }
+
+    respondJson(['success' => true]);
+}
+
+if ($acao === 'excluir_carregamento') {
+    $placa = strtoupper(trim($input['placa'] ?? ''));
+    if (empty($placa)) {
+        respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    }
+    $placaEsc = pg_escape_string($conn, $placa);
+
+    $sql = "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}'";
+    $res = pg_query($conn, $sql);
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento.']);
+    }
+    respondJson(['success' => true]);
+}
+
+respondJson(['success' => false, 'message' => 'Ação inválida.']);

@@ -1,153 +1,167 @@
 <?php
-require_once '../../../config.php';
-// ssw.php é carregado pelo config.php, se necessário, ou aqui, vamos garantir
-if (file_exists(__DIR__ . '/../../lib/ssw.php')) {
-    require_once __DIR__ . '/../../lib/ssw.php';
+require_once __DIR__ . '/../../config.php';
+require_once '/var/www/html/lib/ssw.php';
+
+handleOptionsRequest();
+validateRequestMethod('POST');
+
+$auth        = authenticateAndGetUser();
+$domain      = $auth['domain'];
+$currentUser = getCurrentUser();
+$unidade     = strtoupper(trim($currentUser['unidade_atual'] ?? $currentUser['unidade'] ?? ''));
+$login       = $currentUser['username'] ?? '';
+
+if (empty($unidade) || empty($domain)) {
+    respondJson(['success' => false, 'message' => 'Unidade ou domínio não identificados.']);
 }
 
-header('Content-Type: application/json');
-handleOptionsRequest(); // Do config.php
-validateRequestMethod('POST'); // Do config.php
+$input       = getRequestInput();
+$sobrescrever = !empty($input['sobrescrever']);
 
-function extrair_xml_do_html($html) {
-    $inicio_xml = strpos($html, '<?xml');
-    if ($inicio_xml === false) return null;
-    $fim_xml = strrpos($html, '</data>');
-    if ($fim_xml === false) return null;
-    return substr($html, $inicio_xml, ($fim_xml + strlen('</data>')) - $inicio_xml);
+$conn = connect();
+
+ssw_login($domain);
+set_time_limit(180);
+
+$tabela    = "{$domain}_carregamento";
+$tabelaCte = "{$domain}_cte";
+
+$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&unidade=" . urlencode($unidade));
+
+$inicio_xml = strpos($html_placas, '<?xml');
+if ($inicio_xml === false) {
+    $inicio_xml = strpos($html_placas, '<xml');
+}
+if ($inicio_xml === false) {
+    respondJson(['success' => false, 'message' => 'Não foi possível encontrar o XML com as placas no retorno do SSW.']);
+}
+$fim_xml = strrpos($html_placas, '</data>');
+if ($fim_xml === false) {
+    $fim_xml = strrpos($html_placas, '</xml>');
+    $tag_fim = '</xml>';
+} else {
+    $tag_fim = '</data>';
+}
+if ($fim_xml === false) {
+    respondJson(['success' => false, 'message' => 'XML de placas malformado no retorno do SSW.']);
+}
+$xml_string = substr($html_placas, $inicio_xml, ($fim_xml + strlen($tag_fim)) - $inicio_xml);
+
+$xml = @simplexml_load_string($xml_string);
+if ($xml === false) {
+    respondJson(['success' => false, 'message' => 'Falha ao parsear o XML das placas do SSW.']);
 }
 
-$conn = null;
-try {
-    $input = getRequestInput(); // Do config.php
-    $sobrescrever = $input['sobrescrever'] ?? false;
-    
-    $currentUser = getCurrentUser(); // Do config.php
-    $dominio = $currentUser['domain'];
-    $unidade_atual = $currentUser['unidade_atual'];
-
-    if (empty($unidade_atual) || empty($dominio)) {
-        throw new Exception('Unidade ou Domínio do usuário não identificados.', 400);
+$placas_ssw = [];
+foreach ($xml->xpath('//f8') as $f8) {
+    $placa = strtoupper(trim((string)$f8));
+    if (!empty($placa)) {
+        $placas_ssw[] = $placa;
     }
-    
-    $conn = getDBConnection(); // Do config.php
+}
 
-    $tabela_carregamento = strtolower($dominio) . "_carregamento";
-    
-    // 1. Obter a lista de placas do SSW
-    $url_placas = "https://sistema.ssw.inf.br/bin/ssw0194.php?act=PLACAS&unidade=" . urlencode($unidade_atual);
-    $html_placas = ssw_go($url_placas); // Do ssw.php
-    $xml_string = extrair_xml_do_html($html_placas);
+if (empty($placas_ssw)) {
+    respondJson(['success' => true, 'message' => 'Nenhum carregamento encontrado no SSW para esta unidade.', 'logs' => []]);
+}
 
-    if (empty($xml_string)) {
-        throw new Exception('Não foi possível encontrar o XML com as placas no retorno do SSW.');
+$logs = [];
+
+foreach ($placas_ssw as $placa) {
+    $placaEsc = pg_escape_string($conn, $placa);
+    $unidadeEsc = pg_escape_string($conn, $unidade);
+
+    $res_check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' LIMIT 1");
+    $ja_existe = $res_check && pg_num_rows($res_check) > 0;
+
+    if ($ja_existe && !$sobrescrever) {
+        $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Já existe no Presto (não sobrescrito).'];
+        continue;
     }
 
-    $xml = simplexml_load_string($xml_string);
-    if ($xml === false) {
-        throw new Exception('Falha ao parsear o XML das placas.');
+    $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=SR_IMP|" . urlencode($placa));
+    $str_decodificada = urldecode($str_retorno);
+    $act_download = ssw_get_act($str_decodificada);
+    $arq_download = ssw_get_arq($str_decodificada);
+
+    if (empty($act_download) || empty($arq_download)) {
+        $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Não foi possível obter os parâmetros de download do relatório.'];
+        continue;
     }
-    
-    $placas_ssw = [];
-    foreach ($xml->row as $row) {
-        if (isset($row->f8)) {
-            $placas_ssw[] = (string)$row->f8;
+
+    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0");
+
+    if (empty($relatorio) || strlen($relatorio) < 50) {
+        $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Relatório vazio ou inválido.'];
+        continue;
+    }
+
+    $relatorio = mb_convert_encoding($relatorio, 'UTF-8', 'ISO-8859-1');
+    $linhas    = explode("\n", str_replace("\r\n", "\n", str_replace("\r", "\n", $relatorio)));
+
+    $ctes_para_inserir = [];
+    foreach ($linhas as $linha) {
+        $ctrc = trim(substr($linha, 0, 13));
+        if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+
+        $serie  = substr($ctrc, 0, 3);
+        $numero = (int)substr($ctrc, 3, 6);
+
+        if (empty($serie) || $numero <= 0) continue;
+
+        $ctes_para_inserir[] = ['serie' => $serie, 'numero' => $numero];
+    }
+
+    if (empty($ctes_para_inserir)) {
+        $logs[] = ['placa' => $placa, 'status' => 'aviso', 'msg' => 'Nenhum CT-e válido encontrado no relatório.'];
+        continue;
+    }
+
+    pg_query($conn, 'BEGIN');
+    try {
+        if ($ja_existe) {
+            pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}'");
         }
-    }
 
-    if(empty($placas_ssw)){
-        respondJson(['status' => 'success', 'message' => 'Nenhum carregamento encontrado no SSW para importar.']);
-    }
+        $loginEsc = pg_escape_string($conn, $login);
+        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')");
 
-    $logs = [];
-    // 2. Processar cada placa
-    foreach($placas_ssw as $placa){
-        $res_check = sql($conn, "SELECT id FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2 LIMIT 1", false, [$placa, $unidade_atual]);
-        $carregamento_existe = pg_num_rows($res_check) > 0;
+        $inseridos = 0;
+        $nao_encontrados = 0;
 
-        if($carregamento_existe && !$sobrescrever){
-            $logs[] = "Carregamento para a placa {$placa} já existe no Presto e não foi sobrescrito.";
-            continue;
-        }
+        foreach ($ctes_para_inserir as $cte_info) {
+            $res_seq = sql(
+                "SELECT nro_seq_cte FROM {$tabelaCte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1",
+                [$cte_info['serie'], $cte_info['numero']],
+                $conn
+            );
 
-        $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194.php?act=SR_IMP|" . urlencode($placa));
-        $str_decodificada = urldecode($str_retorno);
-        $act_download = ssw_get_act($str_decodificada);
-        $arq_download = ssw_get_arq($str_decodificada);
-
-        if(empty($act_download) || empty($arq_download)){
-            $logs[] = "Não foi possível obter os parâmetros de download do relatório para a placa {$placa}.";
-            continue;
-        }
-
-        $url_download = "https://sistema.ssw.inf.br/bin/ssw0424.php?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0";
-        $relatorio_ctes = ssw_go($url_download);
-        
-        $ctes_par-inserir = [];
-        $linhas = explode("\n", $relatorio_ctes);
-
-        foreach($linhas as $linha){
-            $linha_trim = trim($linha);
-            if (strlen($linha_trim) > 10 && preg_match('/^[A-Z]{3}/ ', $linha_trim)) {
-                $chave = trim(substr($linha_trim, 0, 9));
-                if(strlen($chave) == 9){
-                    $serie = substr($chave, 0, 3);
-                    $numero = (int)substr($chave, 3, 6);
-                    if(!empty($serie) && $numero > 0){
-                        $ctes_par-inserir[] = ['serie' => $serie, 'numero' => $numero];
+            if ($res_seq && pg_num_rows($res_seq) > 0) {
+                $seq_cte = (int)pg_fetch_assoc($res_seq)['nro_seq_cte'];
+                if ($seq_cte > 0) {
+                    $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seq_cte} LIMIT 1");
+                    if (!$check_dup || pg_num_rows($check_dup) === 0) {
+                        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', {$seq_cte}, '{$placaEsc}', '{$loginEsc}')");
+                        $inseridos++;
                     }
                 }
-            }
-        }
-
-        if(empty($ctes_par-inserir)){
-            $logs[] = "Nenhum CT-e válido encontrado no relatório do SSW para a placa {$placa}.";
-            continue;
-        }
-
-        sql($conn, "BEGIN");
-        try {
-            if($carregamento_existe){
-                sql($conn, "DELETE FROM {$tabela_carregamento} WHERE placa_provisoria = $1 AND unidade = $2", false, [$placa, $unidade_atual]);
-            }
-            
-            $ctes_inseridos_count = 0;
-            $tabela_cte = strtolower($dominio) . "_cte";
-            foreach($ctes_par-inserir as $cte_info){
-                $res_seq = sql($conn, "SELECT nro_seq_cte FROM {$tabela_cte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1", false, [$cte_info['serie'], $cte_info['numero']]);
-
-                if($res_seq && pg_num_rows($res_seq) > 0){
-                    $seq_cte = (int)pg_fetch_assoc($res_seq)['nro_seq_cte'];
-                    if($seq_cte > 0){
-                        sql($conn, "INSERT INTO {$tabela_carregamento} (unidade, placa_provisoria, seq_cte, login_inclusao) VALUES ($1, $2, $3, 'IMPORT_SSW')", false, [$unidade_atual, $placa, $seq_cte]);
-                        $ctes_inseridos_count++;
-                    }
-                } else {
-                    $logs[] = "CT-e {$cte_info['serie']}-{$cte_info['numero']} não encontrado no Presto para a placa {$placa}.";
-                }
-            }
-
-            sql($conn, "COMMIT");
-            if ($ctes_inseridos_count > 0) {
-                 $logs[] = "Carregamento para a placa {$placa} importado/atualizado com {$ctes_inseridos_count} CT-es.";
             } else {
-                 $logs[] = "Nenhum CT-e para a placa {$placa} foi encontrado no Presto. O carregamento pode ter sido criado vazio.";
+                $nao_encontrados++;
             }
-
-        } catch (Exception $db_exception) {
-            sql($conn, "ROLLBACK");
-            $logs[] = "Erro ao salvar o carregamento para a placa {$placa} no banco de dados: " . $db_exception->getMessage();
         }
-    }
-    
-    respondJson(['status' => 'success', 'message' => 'Importação do SSW concluída.', 'logs' => $logs]);
 
-} catch(Exception $e) {
-    returnError($e->getMessage(), $e->getCode() > 0 ? $e->getCode() : 500);
-} finally {
-    if($conn){
-        closeDBConnection($conn);
+        if ($inseridos > 0) {
+            pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = 0");
+        }
+
+        pg_query($conn, 'COMMIT');
+
+        $status = $ja_existe ? 'sobrescrito' : 'importado';
+        $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => "{$inseridos} CT-e(s) importado(s)." . ($nao_encontrados > 0 ? " {$nao_encontrados} não encontrado(s) na base." : '')];
+
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Erro ao salvar: ' . $e->getMessage()];
     }
 }
 
-?>
+respondJson(['success' => true, 'placas_ssw' => $placas_ssw, 'logs' => $logs]);
