@@ -42,6 +42,7 @@ import {
   Download,
   AlertCircle,
   FileDown,
+  ListTree,
 } from 'lucide-react';
 
 interface Cte {
@@ -1560,7 +1561,6 @@ export function Disponiveis() {
       ).then((res) => {
         if (res.success && res.efetua_carregamento === false) {
           setUnidadePermiteCarregamento(false);
-          toast.error('Unidade não configurada para efetuar carregamentos no CADASTRO DE UNIDADES.');
         } else {
           setUnidadePermiteCarregamento(true);
         }
