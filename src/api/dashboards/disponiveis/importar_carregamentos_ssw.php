@@ -26,7 +26,7 @@ set_time_limit(180);
 $tabela    = "{$domain}_carregamento";
 $tabelaCte = "{$domain}_cte";
 
-$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&unidade=" . urlencode($unidade));
+$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&unidade=$unidade&prioritario=N");
 
 $inicio_xml = strpos($html_placas, '<?xml');
 if ($inicio_xml === false) {
@@ -130,13 +130,13 @@ foreach ($placas_ssw as $placa) {
 
         foreach ($ctes_para_inserir as $cte_info) {
             $res_seq = sql(
-                "SELECT nro_seq_cte FROM {$tabelaCte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1",
+                "SELECT seq_cte FROM {$tabelaCte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1",
                 [$cte_info['serie'], $cte_info['numero']],
                 $conn
             );
 
             if ($res_seq && pg_num_rows($res_seq) > 0) {
-                $seq_cte = (int)pg_fetch_assoc($res_seq)['nro_seq_cte'];
+                $seq_cte = (int)pg_fetch_assoc($res_seq)['seq_cte'];
                 if ($seq_cte > 0) {
                     $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seq_cte} LIMIT 1");
                     if (!$check_dup || pg_num_rows($check_dup) === 0) {

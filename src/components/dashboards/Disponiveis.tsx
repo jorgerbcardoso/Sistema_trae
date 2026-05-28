@@ -921,6 +921,7 @@ interface CarregamentoAreaProps {
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
+  onBuscarCargas: (placa: string | null) => void;
   onCarregarHub: (placa: string) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
@@ -1408,6 +1409,7 @@ function CarregamentoArea({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
+  onBuscarCargas,
   onCarregarHub,
   loadingHub,
   hubCarregamentoPlaca,
@@ -2151,6 +2153,7 @@ export function Disponiveis() {
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
+            onBuscarCargas={setHubCarregamentoPlaca}
             onCarregarHub={carregarHub}
             loadingHub={loadingHub}
             hubCarregamentoPlaca={hubCarregamentoPlaca}
