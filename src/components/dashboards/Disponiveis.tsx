@@ -1279,6 +1279,70 @@ function CardCarregamento({
 
 type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
 
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[]) => void; onFechar: () => void }) {
+  const [placa, setPlaca] = useState('');
+  const [unidadeDestino, setUnidadeDestino] = useState('');
+  const [paradasStr, setParadasStr] = useState('');
+
+  const handleConfirmar = () => {
+    if (!placa.trim()) { toast.error('Informe a placa.'); return; }
+    if (!unidadeDestino.trim()) { toast.error('Informe a unidade de destino.'); return; }
+    const paradas = paradasStr.split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+    onConfirmar(placa.trim().toUpperCase(), unidadeDestino.trim().toUpperCase(), paradas);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <ListTree className="w-5 h-5 text-indigo-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Carregamento Automático</h3>
+          </div>
+          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Placa</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Ex: ABC1234"
+              value={placa}
+              onChange={e => setPlaca(e.target.value.toUpperCase())}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Unidade de Destino</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Ex: MTZ"
+              value={unidadeDestino}
+              onChange={e => setUnidadeDestino(e.target.value.toUpperCase())}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Paradas intermediárias <span className="font-normal text-slate-400">(separadas por vírgula, opcional)</span></label>
+            <input
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Ex: CWB, LDA"
+              value={paradasStr}
+              onChange={e => setParadasStr(e.target.value.toUpperCase())}
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onFechar}>Cancelar</Button>
+          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleConfirmar}>
+            <ListTree className="w-3.5 h-3.5 mr-1.5" />Iniciar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalImportarSSW({ onFechar, onConcluir }: { onFechar: () => void; onConcluir: () => void }) {
   const [etapa, setEtapa] = useState<'confirmar' | 'carregando' | 'resultado'>('confirmar');
   const [sobrescrever, setSobrescrever] = useState(false);
