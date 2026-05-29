@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { DashboardLayout } from './DashboardLayout';
+import { useTheme } from '../ThemeProvider';
+import { DashboardLayout } from '../layouts/DashboardLayout';
 import { FilterSelectVeiculo } from './FilterSelectVeiculo';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
