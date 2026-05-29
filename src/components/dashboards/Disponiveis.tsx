@@ -43,6 +43,8 @@ import {
   AlertCircle,
   FileDown,
   ListTree,
+  Gauge,
+  Pencil,
 } from 'lucide-react';
 
 interface Cte {
@@ -1116,9 +1118,45 @@ function CardCarregamento({
   onCarregarHub: (placa: string) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
+  onRecarregarCarregamentos: () => void;
 }) {
   const [expandido, setExpandido] = useState(false);
+  const [editandoPlaca, setEditandoPlaca] = useState(false);
+  const [novaPlaca, setNovaPlaca] = useState('');
+  const [editandoCapacidade, setEditandoCapacidade] = useState(false);
+  const [novaCapTon, setNovaCapTon] = useState('');
+  const [novaCapM3, setNovaCapM3] = useState('');
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const ativo = modoApontamento === carregamento.placa_provisoria;
+
+  const handleSalvarPlaca = async () => {
+    if (!novaPlaca.trim()) return;
+    setSalvandoEdicao(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_placa', placa_antiga: carregamento.placa_provisoria, placa_nova: novaPlaca.trim().toUpperCase() }) },
+        true
+      );
+      if (res.success) { toast.success('Placa atualizada.'); setEditandoPlaca(false); onRecarregarCarregamentos(); }
+      else toast.error(res.message || 'Erro ao atualizar placa.');
+    } catch (e: any) { toast.error(e.message || 'Erro ao atualizar placa.'); }
+    finally { setSalvandoEdicao(false); }
+  };
+
+  const handleSalvarCapacidade = async () => {
+    setSalvandoEdicao(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: novaCapTon !== '' ? parseFloat(novaCapTon) : null, cap_m3: novaCapM3 !== '' ? parseFloat(novaCapM3) : null }) },
+        true
+      );
+      if (res.success) { toast.success('Capacidade atualizada.'); setEditandoCapacidade(false); onRecarregarCarregamentos(); }
+      else toast.error(res.message || 'Erro ao atualizar capacidade.');
+    } catch (e: any) { toast.error(e.message || 'Erro ao atualizar capacidade.'); }
+    finally { setSalvandoEdicao(false); }
+  };
 
   const ctesDetalhados = carregamento.ctes.map(c => {
     const detSSW = todosCtes.find(e => e.nroCte === c.nroCte);
@@ -1144,7 +1182,26 @@ function CardCarregamento({
               <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
+              {editandoPlaca ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    className="font-bold font-mono text-sm w-28 rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    value={novaPlaca}
+                    onChange={e => setNovaPlaca(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSalvarPlaca(); if (e.key === 'Escape') setEditandoPlaca(false); }}
+                  />
+                  <button onClick={handleSalvarPlaca} disabled={salvandoEdicao} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-50"><CheckSquare className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditandoPlaca(false)} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 group">
+                  <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
+                  <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" title="Editar placa">
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               {infoCriacao ? (
                 <p className="text-[10px] text-slate-400 dark:text-slate-500">{infoCriacao}</p>
               ) : (
@@ -1163,6 +1220,28 @@ function CardCarregamento({
             )}
           </div>
         </div>
+
+        {editandoCapacidade && (
+          <div className="mb-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 space-y-2">
+            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Capacidade do veículo</p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Ton</label>
+                <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapTon} onChange={e => setNovaCapTon(e.target.value)} placeholder="Ex: 15" />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">m³</label>
+                <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapM3} onChange={e => setNovaCapM3(e.target.value)} placeholder="Ex: 40" />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditandoCapacidade(false)}>Cancelar</Button>
+              <Button size="sm" className="h-7 text-xs bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleSalvarCapacidade} disabled={salvandoEdicao}>
+                {salvandoEdicao ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}Salvar
+              </Button>
+            </div>
+          </div>
+        )}
 
         {temCapacidade ? (
           <div className="flex flex-col gap-2 mb-3">
@@ -1216,6 +1295,9 @@ function CardCarregamento({
             </Button>
           </div>
           <div className="flex gap-1.5 justify-end">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setEditandoCapacidade(v => !v); }} title="Editar capacidade do veículo">
+              <Gauge className="w-3.5 h-3.5" />
+            </Button>
             {temCapacidade && (
               <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => onBuscarCargas(carregamento.placa_provisoria)} title="Buscar Cargas Compartilhadas">
                 <ListTree className="w-3.5 h-3.5" />
@@ -1281,15 +1363,20 @@ function CardCarregamento({
 type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
 
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[]) => void; onFechar: () => void }) {
+  const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
   const [paradasStr, setParadasStr] = useState('');
 
-  const handleConfirmar = () => {
-    if (!placa.trim()) { toast.error('Informe a placa.'); return; }
+  const handleConfirmarManual = () => {
     if (!unidadeDestino.trim()) { toast.error('Informe a unidade de destino.'); return; }
     const paradas = paradasStr.split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
-    onConfirmar(placa.trim().toUpperCase(), unidadeDestino.trim().toUpperCase(), paradas);
+    const placaFinal = placa.trim().toUpperCase() || '';
+    onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
+  };
+
+  const handleConfirmarAutomatico = () => {
+    onConfirmar('', '', []);
   };
 
   return (
@@ -1304,38 +1391,68 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Placa</label>
-            <input
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              placeholder="Ex: ABC1234"
-              value={placa}
-              onChange={e => setPlaca(e.target.value.toUpperCase())}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Unidade de Destino</label>
-            <input
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              placeholder="Ex: MTZ"
-              value={unidadeDestino}
-              onChange={e => setUnidadeDestino(e.target.value.toUpperCase())}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Paradas intermediárias <span className="font-normal text-slate-400">(separadas por vírgula, opcional)</span></label>
-            <input
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              placeholder="Ex: CWB, LDA"
-              value={paradasStr}
-              onChange={e => setParadasStr(e.target.value.toUpperCase())}
-            />
-          </div>
+
+        <div className="px-6 pt-4 flex gap-2">
+          <button
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${modo === 'automatico' ? 'bg-indigo-500 text-white border-indigo-500' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            onClick={() => setModo('automatico')}
+          >
+            Por Linhas (automático)
+          </button>
+          <button
+            className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${modo === 'manual' ? 'bg-indigo-500 text-white border-indigo-500' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            onClick={() => setModo('manual')}
+          >
+            Manual
+          </button>
         </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {modo === 'automatico' ? (
+            <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 space-y-2">
+              <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
+                <ListTree className="w-4 h-4" />Montagem automática por linhas
+              </p>
+              <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                O sistema irá ler todas as linhas cadastradas com origem nesta unidade e montar um carregamento para cada destino final, incluindo as paradas intermediárias. A placa será gerada automaticamente no formato <strong>ORIGEM-DESTINO</strong>.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Placa <span className="font-normal text-slate-400">(opcional — gerada automaticamente se vazia)</span></label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="Ex: ABC1234"
+                  value={placa}
+                  onChange={e => setPlaca(e.target.value.toUpperCase())}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Unidade de Destino</label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="Ex: MTZ"
+                  value={unidadeDestino}
+                  onChange={e => setUnidadeDestino(e.target.value.toUpperCase())}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Paradas intermediárias <span className="font-normal text-slate-400">(separadas por vírgula, opcional)</span></label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  placeholder="Ex: CWB, LDA"
+                  value={paradasStr}
+                  onChange={e => setParadasStr(e.target.value.toUpperCase())}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onFechar}>Cancelar</Button>
-          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleConfirmar}>
+          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual}>
             <ListTree className="w-3.5 h-3.5 mr-1.5" />Iniciar
           </Button>
         </div>
@@ -1599,6 +1716,7 @@ function CarregamentoArea({
               onCarregarHub={onCarregarHub}
               loadingHub={loadingHub}
               hubCarregamentoPlaca={hubCarregamentoPlaca}
+              onRecarregarCarregamentos={onRecarregarCarregamentos}
             />
           ))}
         </div>

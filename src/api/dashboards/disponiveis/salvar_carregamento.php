@@ -159,6 +159,49 @@ if ($acao === 'excluir_carregamento') {
     respondJson(['success' => true]);
 }
 
+if ($acao === 'atualizar_placa') {
+    $placaAntiga = strtoupper(trim($input['placa_antiga'] ?? ''));
+    $placaNova   = strtoupper(trim($input['placa_nova'] ?? ''));
+    if (empty($placaAntiga) || empty($placaNova)) {
+        respondJson(['success' => false, 'message' => 'Placas não informadas.']);
+    }
+    $placaAntigaEsc = pg_escape_string($conn, $placaAntiga);
+    $placaNovaEsc   = pg_escape_string($conn, $placaNova);
+    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaNovaEsc}' LIMIT 1");
+    if ($check && pg_num_rows($check) > 0) {
+        respondJson(['success' => false, 'message' => "Já existe um carregamento com a placa {$placaNova}."]);
+    }
+    $res = pg_query($conn, "UPDATE {$tabela} SET placa_provisoria = '{$placaNovaEsc}' WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaAntigaEsc}'");
+    if (!$res) respondJson(['success' => false, 'message' => 'Erro ao atualizar placa.']);
+    respondJson(['success' => true]);
+}
+
+if ($acao === 'atualizar_capacidade') {
+    $placa  = strtoupper(trim($input['placa'] ?? ''));
+    $capTon = $input['cap_ton'] !== '' && $input['cap_ton'] !== null ? (float)$input['cap_ton'] : null;
+    $capM3  = $input['cap_m3']  !== '' && $input['cap_m3']  !== null ? (float)$input['cap_m3']  : null;
+    if (empty($placa)) respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    $placaEsc  = pg_escape_string($conn, $placa);
+    $capTonSql = $capTon !== null ? $capTon : 'NULL';
+    $capM3Sql  = $capM3  !== null ? $capM3  : 'NULL';
+
+    pg_query($conn, "
+        CREATE TABLE IF NOT EXISTS {$tabela}_capacidade (
+            unidade          VARCHAR(10) NOT NULL,
+            placa_provisoria VARCHAR(20) NOT NULL,
+            cap_ton          NUMERIC,
+            cap_m3           NUMERIC,
+            PRIMARY KEY (unidade, placa_provisoria)
+        )
+    ");
+    pg_query($conn, "
+        INSERT INTO {$tabela}_capacidade (unidade, placa_provisoria, cap_ton, cap_m3)
+        VALUES ('{$unidadeEsc}', '{$placaEsc}', {$capTonSql}, {$capM3Sql})
+        ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3
+    ");
+    respondJson(['success' => true]);
+}
+
 if ($acao === 'excluir_todos') {
     $res = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}'");
     if (!$res) {

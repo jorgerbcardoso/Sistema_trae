@@ -44,6 +44,13 @@ pg_query($conn, $sqlCria);
 
 $unidadeEsc = pg_escape_string($conn, $unidade);
 
+pg_query($conn, "
+        CREATE TABLE IF NOT EXISTS {$tabelaCarregamento}_capacidade (
+            unidade VARCHAR(10) NOT NULL, placa_provisoria VARCHAR(20) NOT NULL,
+            cap_ton NUMERIC, cap_m3 NUMERIC, PRIMARY KEY (unidade, placa_provisoria)
+        )
+    ");
+
 $sqlCarregamentos = "
     SELECT
         c.placa_provisoria,
@@ -52,11 +59,15 @@ $sqlCarregamentos = "
         MIN(c.hora_inclusao) AS hora_criacao,
         MIN(c.login_inclusao) AS login_criacao,
         v.capacidade_ton,
-        v.capacidade_m3
+        v.capacidade_m3,
+        cap.cap_ton,
+        cap.cap_m3
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v ON UPPER(v.placa) = UPPER(c.placa_provisoria)
+    LEFT JOIN {$tabelaCarregamento}_capacidade cap
+           ON UPPER(cap.unidade) = '{$unidadeEsc}' AND cap.placa_provisoria = c.placa_provisoria
     WHERE UPPER(c.unidade) = '{$unidadeEsc}'
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -120,8 +131,8 @@ while ($row = pg_fetch_assoc($resCarregamentos)) {
         'data_criacao'     => $row['data_criacao'],
         'hora_criacao'     => $row['hora_criacao'],
         'login_criacao'    => $row['login_criacao'],
-        'capacidade_ton'   => $row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null,
-        'capacidade_m3'    => $row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null,
+        'capacidade_ton'   => $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null),
+        'capacidade_m3'    => $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null),
         'ctes'             => $ctes,
     ];
 }

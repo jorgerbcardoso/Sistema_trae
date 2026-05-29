@@ -16,6 +16,7 @@ import { FluxoCaixa } from './components/dashboards/FluxoCaixa';
 import { CentralAgendamento } from './components/dashboards/CentralAgendamento';
 import { Disponiveis } from './components/dashboards/Disponiveis';
 import { FaturamentoClientes } from './components/dashboards/FaturamentoClientes';
+import { ColetaEntrega } from './components/dashboards/ColetaEntrega';
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
@@ -191,6 +192,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <FaturamentoClientes />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'dashboards/coleta-entrega',
+        element: (
+          <ProtectedRoute>
+            <ColetaEntrega />
           </ProtectedRoute>
         )
       },
