@@ -432,7 +432,5 @@ respondJson([
         'coletas'        => $coletas,
         'sigla'          => $sigla,
         'geradoEm'       => date('d/m/Y H:i:s'),
-        '_debug0083count' => count($linhas0083),
-        '_debug0083sample' => array_slice($linhas0083, 0, 3),
     ],
 ]);
