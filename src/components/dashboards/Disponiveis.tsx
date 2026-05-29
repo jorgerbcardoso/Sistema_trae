@@ -167,6 +167,14 @@ interface CteCarregamento {
   login_inclusao: string;
   data_inclusao: string;
   hora_inclusao: string;
+  ctrc?: string;
+  nroCte?: number;
+  destinatario?: string;
+  remetente?: string;
+  cidade?: string;
+  peso?: string;
+  cubagem?: string;
+  qtdeVol?: string;
 }
 
 interface Carregamento {
@@ -1599,8 +1607,15 @@ export function Disponiveis() {
         add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
       }
     }
+    for (const car of carregamentos) {
+      for (const c of car.ctes) {
+        if (c.nroCte && c.ctrc) {
+          add(c.nroCte, c.ctrc, c.destinatario ?? '', c.cidade ?? '', c.peso ?? '', c.cubagem ?? '');
+        }
+      }
+    }
     return lista;
-  }, [dados, dadosEntrega]);
+  }, [dados, dadosEntrega, carregamentos]);
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 

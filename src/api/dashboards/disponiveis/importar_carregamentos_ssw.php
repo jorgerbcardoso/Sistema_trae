@@ -122,7 +122,7 @@ foreach ($placas_ssw as $placa) {
         }
 
         $loginEsc = pg_escape_string($conn, $login);
-        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')");
+        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME)");
 
         $inseridos = 0;
         $nao_encontrados = 0;
@@ -133,7 +133,7 @@ foreach ($placas_ssw as $placa) {
             if ($seq_cte > 0) {
                 $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seq_cte} LIMIT 1");
                 if (!$check_dup || pg_num_rows($check_dup) === 0) {
-                    pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', {$seq_cte}, '{$placaEsc}', '{$loginEsc}')");
+                    pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES ('{$unidadeEsc}', {$seq_cte}, '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME)");
                     $inseridos++;
                 }
             } else {

@@ -69,23 +69,48 @@ $carregamentos = [];
 while ($row = pg_fetch_assoc($resCarregamentos)) {
     $placa = $row['placa_provisoria'];
 
-    $placaEsc = pg_escape_string($conn, $placa);
+    $placaEsc   = pg_escape_string($conn, $placa);
+    $tabelaCte  = "{$domain}_cte";
     $sqlCtes = "
-        SELECT seq_cte, login_inclusao, data_inclusao, hora_inclusao
-        FROM {$tabelaCarregamento}
-        WHERE UPPER(unidade) = '{$unidadeEsc}'
-          AND placa_provisoria = '{$placaEsc}'
-          AND seq_cte > 0
-        ORDER BY data_inclusao, hora_inclusao
+        SELECT
+            c.seq_cte,
+            c.login_inclusao,
+            c.data_inclusao,
+            c.hora_inclusao,
+            ct.ser_cte,
+            ct.nro_cte,
+            ct.nome_dest   AS destinatario,
+            ct.nome_emit   AS remetente,
+            ct.sigla_dest  AS cidade,
+            ct.peso_real   AS peso,
+            ct.cubagem,
+            ct.qtde_vol
+        FROM {$tabelaCarregamento} c
+        LEFT JOIN {$tabelaCte} ct ON ct.nro_seq_cte = c.seq_cte
+        WHERE UPPER(c.unidade) = '{$unidadeEsc}'
+          AND c.placa_provisoria = '{$placaEsc}'
+          AND c.seq_cte > 0
+        ORDER BY c.data_inclusao, c.hora_inclusao
     ";
     $resCtes = pg_query($conn, $sqlCtes);
     $ctes = [];
     while ($cteRow = pg_fetch_assoc($resCtes)) {
+        $serCte = $cteRow['ser_cte'] ?? '';
+        $nroCte = (int)($cteRow['nro_cte'] ?? 0);
+        $ctrc   = $nroCte > 0 ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
         $ctes[] = [
             'seq_cte'        => (int)$cteRow['seq_cte'],
             'login_inclusao' => $cteRow['login_inclusao'],
             'data_inclusao'  => $cteRow['data_inclusao'],
             'hora_inclusao'  => $cteRow['hora_inclusao'],
+            'ctrc'           => $ctrc,
+            'nroCte'         => $nroCte,
+            'destinatario'   => $cteRow['destinatario'] ?? '',
+            'remetente'      => $cteRow['remetente'] ?? '',
+            'cidade'         => $cteRow['cidade'] ?? '',
+            'peso'           => $cteRow['peso'] !== null ? number_format((float)$cteRow['peso'], 0, ',', '.') : '',
+            'cubagem'        => $cteRow['cubagem'] !== null ? number_format((float)$cteRow['cubagem'], 3, ',', '.') : '',
+            'qtdeVol'        => $cteRow['qtde_vol'] ?? '',
         ];
     }
 
