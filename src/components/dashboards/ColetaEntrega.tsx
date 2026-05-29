@@ -506,7 +506,7 @@ export function ColetaEntrega() {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={top5Placas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
                   <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
@@ -526,7 +526,7 @@ export function ColetaEntrega() {
                 <BarChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="frete" fill="#3b82f6" radius={[4, 4, 0, 0]} />
