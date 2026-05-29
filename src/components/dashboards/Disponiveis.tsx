@@ -934,6 +934,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[]) => void;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1487,6 +1488,7 @@ function CarregamentoArea({
   loadingHub,
   hubCarregamentoPlaca,
   onRecarregarCarregamentos,
+  onCarregamentoAutomatico,
   todosCtes,
 }: CarregamentoAreaProps) {
   const [modalAberto, setModalAberto] = useState(false);
@@ -1610,7 +1612,7 @@ function CarregamentoArea({
       )}
       {modalAutomaticoAberto && (
         <ModalCarregamentoAutomatico
-          onConfirmar={handleCarregamentoAutomatico}
+          onConfirmar={onCarregamentoAutomatico}
           onFechar={() => setModalAutomaticoAberto(false)}
         />
       )}
@@ -2268,6 +2270,7 @@ export function Disponiveis() {
             loadingHub={loadingHub}
             hubCarregamentoPlaca={hubCarregamentoPlaca}
             onRecarregarCarregamentos={carregarCarregamentos}
+            onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
 
