@@ -129,9 +129,35 @@ export function ColetaEntrega() {
     return sortDir === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
   });
 
+  const parseDateBR = (s: string): Date | null => {
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (!m) return null;
+    return new Date(2000 + parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+  };
+
   const handleGerar = async () => {
     if (!dataIni || !dataFin) {
       toast.error('Informe o período.');
+      return;
+    }
+
+    const dtIni = parseDateBR(dataIni);
+    const dtFin = parseDateBR(dataFin);
+
+    if (!dtIni || !dtFin) {
+      toast.error('Data inválida. Use o formato DD/MM/AA.');
+      return;
+    }
+
+    if (dtFin < dtIni) {
+      toast.error('A data final não pode ser anterior à data inicial.');
+      return;
+    }
+
+    const diffMs   = dtFin.getTime() - dtIni.getTime();
+    const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDias > 31) {
+      toast.error('O período não pode ser maior que 31 dias.');
       return;
     }
 

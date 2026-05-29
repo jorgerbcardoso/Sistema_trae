@@ -33,6 +33,22 @@ if (!preg_match('/^\d{2}\/\d{2}\/\d{2}$/', $dataIni) || !preg_match('/^\d{2}\/\d
     respondJson(['success' => false, 'message' => 'Formato de data inválido. Use DD/MM/AA.']);
 }
 
+$dtIni = DateTime::createFromFormat('d/m/y', $dataIni);
+$dtFin = DateTime::createFromFormat('d/m/y', $dataFin);
+
+if (!$dtIni || !$dtFin) {
+    respondJson(['success' => false, 'message' => 'Data inválida.']);
+}
+
+if ($dtFin < $dtIni) {
+    respondJson(['success' => false, 'message' => 'A data final não pode ser anterior à data inicial.']);
+}
+
+$diffDias = $dtIni->diff($dtFin)->days;
+if ($diffDias > 31) {
+    respondJson(['success' => false, 'message' => 'O período não pode ser maior que 31 dias.']);
+}
+
 $dataIniSsw = str_replace('/', '', $dataIni);
 $dataFinSsw = str_replace('/', '', $dataFin);
 
@@ -65,60 +81,49 @@ if (substr($str0216, 0, 5) === '<foc ') {
     respondJson(['success' => false, 'message' => 'Erro SSW (0216): ' . $str0216]);
 }
 
-$encontrado  = false;
-$nomeArq216  = null;
-$pathArq216  = null;
+$seqRelatorio  = null;
+$encontrado    = false;
 $maxTentativas = 40;
 $intervalo     = 3;
+
+function lerXml1440() {
+    $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+    $pos = strpos($str, '<xml');
+    if ($pos === false) return null;
+    $str = substr($str, $pos);
+    $end = strpos($str, '</xml>');
+    if ($end === false) return null;
+    $str = substr($str, 0, $end) . '</xml>';
+    return simplexml_load_string($str) ?: null;
+}
 
 for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
     sleep($intervalo);
 
-    $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
-
-    $posXml = strpos($str1440, '<xml');
-    if ($posXml === false) continue;
-
-    $str1440 = substr($str1440, $posXml);
-    $posEnd  = strpos($str1440, '</xml>');
-    if ($posEnd === false) continue;
-
-    $str1440 = substr($str1440, 0, $posEnd) . '</xml>';
-    $xml1440 = simplexml_load_string($str1440);
+    $xml1440 = lerXml1440();
     if (!$xml1440) continue;
 
     for ($i = 0; $i <= 100; $i++) {
         $seq = $xml1440->xpath('rs/r/f0')[$i];
         $opc = $xml1440->xpath('rs/r/f1')[$i];
         $usr = $xml1440->xpath('rs/r/f3')[$i];
-        $f4  = $xml1440->xpath('rs/r/f4')[$i];
         $sit = $xml1440->xpath('rs/r/f6')[$i];
-        $f8  = $xml1440->xpath('rs/r/f8')[$i];
 
         if ($seq === null) break;
 
         $usr    = trim((string)$usr);
-        $unidF4 = strtoupper(trim((string)$f4));
         $sitStr = (string)$sit;
+        $seqNum = (int)(string)$seq;
 
-        if ((substr($opc, 0, 3) == '216')
+        if ((substr((string)$opc, 0, 3) == '076')
             && (($usr == 'presto') || ($usr == 'damasce1'))
-            && ($unidF4 === strtoupper($unidade))
         ) {
-            if ($sitStr === 'Conclu&iacute;do') {
-                $encontrado = true;
-                $f8dec = html_entity_decode((string)$f8);
+            if ($seqRelatorio === null) {
+                $seqRelatorio = $seqNum;
+            }
 
-                if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
-                        $decoded = urldecode($mVal[1]);
-                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
-                            $nomeArq216 = $mArq[1];
-                            $pathArq216 = $mArq[2];
-                        }
-                    }
-                }
+            if ($seqNum === $seqRelatorio && $sitStr === 'Conclu&iacute;do') {
+                $encontrado = true;
             }
             break;
         }
@@ -127,14 +132,18 @@ for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
     if ($encontrado) break;
 }
 
-if (!$encontrado || !$nomeArq216 || !$pathArq216) {
-    respondJson(['success' => false, 'message' => 'Relatório 216 não ficou pronto no tempo esperado. Tente novamente.']);
+if (!$encontrado || $seqRelatorio === null) {
+    respondJson(['success' => false, 'message' => 'Relatório 076 não ficou pronto no tempo esperado. Tente novamente.']);
 }
 
-$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq216}&filename={$nomeArq216}&path={$pathArq216}&down=1&nw=1");
+$dominioUpper = strtoupper($domain);
+$arqCsv       = 'CSV' . $dominioUpper . sprintf('%08d', $seqRelatorio) . '.sswweb';
+$pathCsv      = '/usr/aws/jobs/' . $dominioUpper . '/';
+
+$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$arqCsv}&filename={$arqCsv}&path={$pathCsv}&down=1&nw=1");
 
 if (empty($file) || strlen($file) < 100) {
-    respondJson(['success' => false, 'message' => 'Arquivo do relatório 216 vazio ou inválido.']);
+    respondJson(['success' => false, 'message' => 'Arquivo do relatório 076 vazio ou inválido.']);
 }
 
 $file   = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');
