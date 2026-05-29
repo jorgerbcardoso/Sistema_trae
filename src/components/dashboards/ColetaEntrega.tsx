@@ -13,20 +13,15 @@ import { apiFetch } from '../../utils/apiUtils';
 import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
 import {
-  Loader2,
-  FileSpreadsheet,
-  Truck,
-  Package,
-  PackageCheck,
-  Weight,
-  DollarSign,
-  Percent,
-  BarChart3,
-  RefreshCw,
-  ChevronUp,
-  ChevronDown,
-  ChevronsUpDown,
-  Building2,
+  PieChart, Pie, Cell, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
+  Legend, ResponsiveContainer, BarChart, Bar,
+} from 'recharts';
+import {
+  Loader2, FileSpreadsheet, Truck, Package, PackageCheck,
+  Weight, DollarSign, BarChart3, RefreshCw,
+  ChevronUp, ChevronDown, ChevronsUpDown, Building2,
+  ChevronRight, Hash,
 } from 'lucide-react';
 
 interface Operacao {
@@ -47,31 +42,53 @@ interface Operacao {
   qtVol: number;
   valMerc: number;
   vlrFrete: number;
-  ctrbOs: number;
-  percCtrb: number;
+  nroCtrb: string;
 }
 
-interface Totais {
+interface GrupoPlaca {
+  placa: string;
   coletas: number;
   entregas: number;
   total: number;
   peso: number;
   frete: number;
   valMerc: number;
-  ctrbOs: number;
   vol: number;
-  percCtrb: number;
+  ctrcs: Operacao[];
 }
 
-type SortField = keyof Operacao;
+interface SerieDia {
+  data: string;
+  coletas: number;
+  entregas: number;
+  frete: number;
+  peso: number;
+}
+
+interface Totais {
+  coletas: number;
+  entregas: number;
+  total: number;
+  placas: number;
+  peso: number;
+  frete: number;
+  valMerc: number;
+  vol: number;
+}
+
+type SortField = 'placa' | 'total' | 'coletas' | 'entregas' | 'peso' | 'frete' | 'valMerc';
 type SortDir = 'asc' | 'desc';
+
+const COLORS_DONUT = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444'];
 
 function formatMoeda(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-
 function formatNum(v: number, dec = 3) {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function formatTon(kg: number) {
+  return (kg / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' t';
 }
 
 function getDataPadrao() {
@@ -85,6 +102,12 @@ function getDataPadrao() {
   };
   return { ini: fmt(primeiroDia), fin: fmt(hoje) };
 }
+
+const parseDateBR = (s: string): Date | null => {
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+  if (!m) return null;
+  return new Date(2000 + parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+};
 
 export function ColetaEntrega() {
   const { user, logout, clientConfig } = useAuth();
@@ -101,96 +124,76 @@ export function ColetaEntrega() {
 
   const [loading, setLoading] = useState(false);
   const [loadingExcel, setLoadingExcel] = useState(false);
+  const [loadingExcelPlaca, setLoadingExcelPlaca] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [operacoes, setOperacoes] = useState<Operacao[]>([]);
+
+  const [grupos, setGrupos] = useState<GrupoPlaca[]>([]);
+  const [serie, setSerie] = useState<SerieDia[]>([]);
   const [totais, setTotais] = useState<Totais | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const [sortField, setSortField] = useState<SortField>('dataBaixa');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [sortField, setSortField] = useState<SortField>('total');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [expandedPlacas, setExpandedPlacas] = useState<Set<string>>(new Set());
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDir('asc');
-    }
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('desc'); }
   };
 
-  const operacoesOrdenadas = [...operacoes].sort((a, b) => {
-    const va = a[sortField];
-    const vb = b[sortField];
-    if (typeof va === 'number' && typeof vb === 'number') {
+  const toggleExpand = (placa: string) => {
+    setExpandedPlacas(prev => {
+      const next = new Set(prev);
+      next.has(placa) ? next.delete(placa) : next.add(placa);
+      return next;
+    });
+  };
+
+  const gruposOrdenados = [...grupos].sort((a, b) => {
+    const va = a[sortField] as number | string;
+    const vb = b[sortField] as number | string;
+    if (typeof va === 'number' && typeof vb === 'number')
       return sortDir === 'asc' ? va - vb : vb - va;
-    }
-    const sa = String(va ?? '').toLowerCase();
-    const sb = String(vb ?? '').toLowerCase();
-    return sortDir === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+    return sortDir === 'asc'
+      ? String(va).localeCompare(String(vb))
+      : String(vb).localeCompare(String(va));
   });
 
-  const parseDateBR = (s: string): Date | null => {
-    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-    if (!m) return null;
-    return new Date(2000 + parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
-  };
-
   const handleGerar = async () => {
-    if (!dataIni || !dataFin) {
-      toast.error('Informe o período.');
-      return;
-    }
+    if (!dataIni || !dataFin) { toast.error('Informe o período.'); return; }
 
     const dtIni = parseDateBR(dataIni);
     const dtFin = parseDateBR(dataFin);
-
-    if (!dtIni || !dtFin) {
-      toast.error('Data inválida. Use o formato DD/MM/AA.');
-      return;
-    }
-
-    if (dtFin < dtIni) {
-      toast.error('A data final não pode ser anterior à data inicial.');
-      return;
-    }
-
-    const diffMs   = dtFin.getTime() - dtIni.getTime();
-    const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDias > 31) {
-      toast.error('O período não pode ser maior que 31 dias.');
-      return;
-    }
+    if (!dtIni || !dtFin) { toast.error('Data inválida. Use o formato DD/MM/AA.'); return; }
+    if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
+    const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
+    if (diffDias > 31) { toast.error('O período não pode ser maior que 31 dias.'); return; }
 
     setLoading(true);
     setElapsed(0);
     setHasSearched(false);
-    setOperacoes([]);
+    setGrupos([]);
+    setSerie([]);
     setTotais(null);
+    setExpandedPlacas(new Set());
 
-    const timer = setInterval(() => {
-      setElapsed(e => e + 1);
-    }, 1000);
+    const timer = setInterval(() => setElapsed(e => e + 1), 1000);
 
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ data_ini: dataIni, data_fin: dataFin, placa }),
-        },
+        { method: 'POST', body: JSON.stringify({ data_ini: dataIni, data_fin: dataFin, placa }) },
         true
       );
-
       clearInterval(timer);
       setElapsed(0);
 
       if (res.success) {
-        setOperacoes(res.operacoes ?? []);
+        setGrupos(res.grupos ?? []);
+        setSerie(res.serieCronologica ?? []);
         setTotais(res.totais ?? null);
         setHasSearched(true);
-        if ((res.operacoes ?? []).length === 0) {
-          toast.info('Nenhuma operação encontrada para o período.');
-        }
+        if ((res.grupos ?? []).length === 0) toast.info('Nenhuma operação encontrada para o período.');
       } else {
         toast.error(res.message || 'Erro ao gerar relatório.');
       }
@@ -203,56 +206,55 @@ export function ColetaEntrega() {
     }
   };
 
-  const handleExportarExcel = async () => {
-    if (operacoes.length === 0) {
-      toast.error('Não há dados para exportar.');
-      return;
-    }
+  const exportarExcel = async (ctrcs: Operacao[], placaLabel: string) => {
+    const isGeral = placaLabel === 'GERAL';
+    if (isGeral) setLoadingExcel(true);
+    else setLoadingExcelPlaca(placaLabel);
 
-    setLoadingExcel(true);
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/exportar_excel.php`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
-            operacoes,
-            totais,
-            filters: { data_ini: dataIni, data_fin: dataFin, unidade: user?.unidade ?? '' },
+            operacoes: ctrcs,
+            totais: isGeral ? totais : {
+              total: ctrcs.length,
+              coletas: ctrcs.filter(c => c.tipoCodigo === 'C').length,
+              entregas: ctrcs.filter(c => c.tipoCodigo === 'E').length,
+              peso: ctrcs.reduce((s, c) => s + c.pesoCalculo, 0),
+              frete: ctrcs.reduce((s, c) => s + c.vlrFrete, 0),
+              valMerc: ctrcs.reduce((s, c) => s + c.valMerc, 0),
+              vol: ctrcs.reduce((s, c) => s + c.qtVol, 0),
+            },
+            filters: { data_ini: dataIni, data_fin: dataFin, unidade: unidadeAtual, placa: isGeral ? '' : placaLabel },
           }),
         }
       );
 
       if (!response.ok) {
         const txt = await response.text();
-        try {
-          const j = JSON.parse(txt);
-          throw new Error(j.message || 'Erro ao exportar');
-        } catch {
-          throw new Error('Erro ao exportar planilha');
-        }
+        try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
+        catch { throw new Error('Erro ao exportar planilha'); }
       }
 
       const blob = await response.blob();
-      const url  = window.URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `coleta_entrega_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `coleta_entrega_${isGeral ? 'geral' : placaLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-
       toast.success('Planilha Excel exportada com sucesso!');
     } catch (e: any) {
       toast.error(e.message || 'Erro ao exportar planilha.');
     } finally {
       setLoadingExcel(false);
+      setLoadingExcelPlaca(null);
     }
   };
 
@@ -263,26 +265,31 @@ export function ColetaEntrega() {
       : <ChevronDown className="h-3 w-3 ml-1 text-blue-400" />;
   };
 
-  const ThHeader = ({ field, label, className = '' }: { field: SortField; label: string; className?: string }) => (
+  const ThH = ({ field, label, right = false }: { field: SortField; label: string; right?: boolean }) => (
     <th
-      className={`px-3 py-2 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-white ${className}`}
+      className={`px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-white ${right ? 'text-right' : 'text-left'}`}
       onClick={() => handleSort(field)}
     >
-      <span className="flex items-center">
-        {label}
-        <SortIcon field={field} />
+      <span className={`flex items-center ${right ? 'justify-end' : ''}`}>
+        {label}<SortIcon field={field} />
       </span>
     </th>
   );
 
+  const donutColetas = totais ? [
+    { name: 'Coletas', value: totais.coletas },
+    { name: 'Entregas', value: totais.entregas },
+  ] : [];
+
+  const top5Placas = [...grupos]
+    .sort((a, b) => b.frete - a.frete)
+    .slice(0, 5)
+    .map(g => ({ placa: g.placa, frete: g.frete, peso: g.peso / 1000 }));
+
   return (
     <DashboardLayout
-      user={user}
-      logout={logout}
-      theme={theme}
-      toggleTheme={toggleTheme}
-      navigate={navigate}
-      clientConfig={clientConfig}
+      user={user} logout={logout} theme={theme} toggleTheme={toggleTheme}
+      navigate={navigate} clientConfig={clientConfig}
       title="COLETA E ENTREGA"
       subtitle="LEVANTAMENTO DE COLETAS E ENTREGAS DA UNIDADE"
     >
@@ -294,9 +301,9 @@ export function ColetaEntrega() {
             <p className="text-lg font-medium">Acesso não disponível para a unidade MTZ</p>
             <p className="text-sm mt-1">Faça login em uma unidade específica para visualizar este painel.</p>
           </div>
-        ) : (
-        <>
+        ) : (<>
 
+        {/* FILTROS */}
         <Card className="dark:bg-slate-900/90 dark:border-slate-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
@@ -308,64 +315,31 @@ export function ColetaEntrega() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div className="space-y-1">
                 <Label className="text-xs text-slate-600 dark:text-slate-400">Data Início</Label>
-                <Input
-                  type="text"
-                  value={dataIni}
-                  onChange={e => setDataIni(e.target.value)}
-                  placeholder="DD/MM/AA"
-                  maxLength={8}
-                  className="dark:bg-slate-800 dark:border-slate-700 font-mono"
-                />
+                <Input type="text" value={dataIni} onChange={e => setDataIni(e.target.value)}
+                  placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-slate-600 dark:text-slate-400">Data Fim</Label>
-                <Input
-                  type="text"
-                  value={dataFin}
-                  onChange={e => setDataFin(e.target.value)}
-                  placeholder="DD/MM/AA"
-                  maxLength={8}
-                  className="dark:bg-slate-800 dark:border-slate-700 font-mono"
-                />
+                <Input type="text" value={dataFin} onChange={e => setDataFin(e.target.value)}
+                  placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-slate-600 dark:text-slate-400">Placa (opcional)</Label>
-                <FilterSelectVeiculo
-                  value={placa}
-                  onChange={setPlaca}
-                  placeholder="Todas as placas"
-                />
+                <FilterSelectVeiculo value={placa} onChange={setPlaca} placeholder="Todas as placas" />
               </div>
               <div className="flex gap-2">
-                <Button
-                  onClick={handleGerar}
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                >
+                <Button onClick={handleGerar} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
                   {loading ? (
-                    <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}
-                  </>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}</>
                   ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Gerar Relatório
-                    </>
+                    <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
                   )}
                 </Button>
                 {hasSearched && (
-                  <Button
-                    onClick={handleExportarExcel}
-                    disabled={loadingExcel || operacoes.length === 0}
-                    variant="outline"
-                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                  >
-                    {loadingExcel ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileSpreadsheet className="h-4 w-4" />
-                    )}
+                  <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
+                    disabled={loadingExcel || grupos.length === 0} variant="outline"
+                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                    {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                   </Button>
                 )}
               </div>
@@ -383,277 +357,352 @@ export function ColetaEntrega() {
                       <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
                     </div>
                   </div>
-                  <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300 min-w-[3rem] text-right">
-                    {elapsed}s
-                  </span>
+                  <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300 min-w-[3rem] text-right">{elapsed}s</span>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {hasSearched && totais && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                    <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Coletas</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {hasSearched && totais && (<>
 
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Entregas</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <Truck className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.total}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    <Weight className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Peso Total</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatNum(totais.peso)} kg</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Vlr Frete</p>
-                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                    <Percent className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">% CTRB/Frete</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.percCtrb.toFixed(1)}%</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {hasSearched && (
+        {/* CARDS — 3 por linha, 2 linhas */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center justify-between text-base">
-                <span className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Operações
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                    {operacoes.length} {operacoes.length === 1 ? 'registro' : 'registros'}
-                  </span>
-                  <Button
-                    onClick={handleExportarExcel}
-                    disabled={loadingExcel || operacoes.length === 0}
-                    size="sm"
-                    variant="outline"
-                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                  >
-                    {loadingExcel ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Exportando...
-                      </>
-                    ) : (
-                      <>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Exportar Excel
-                      </>
-                    )}
-                  </Button>
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                  <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {operacoes.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-                  Nenhuma operação encontrada para o período informado.
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Coletas</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</p>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-800 dark:bg-slate-950">
-                        <ThHeader field="dataBaixa" label="Data" />
-                        <ThHeader field="tipoCodigo" label="Tipo" />
-                        <ThHeader field="placa" label="Placa" />
-                        <ThHeader field="ctrc" label="CTRC" />
-                        <ThHeader field="nf" label="NF" />
-                        <ThHeader field="nomeRemetente" label="Remetente" />
-                        <ThHeader field="nomeDestinatario" label="Destinatário" />
-                        <ThHeader field="cidadeEntrega" label="Cidade" />
-                        <ThHeader field="nomePagador" label="Pagador" />
-                        <ThHeader field="romaneio" label="Romaneio" />
-                        <ThHeader field="pesoCalculo" label="Peso" className="text-right" />
-                        <ThHeader field="qtVol" label="Vol" className="text-right" />
-                        <ThHeader field="valMerc" label="Vlr Merc" className="text-right" />
-                        <ThHeader field="vlrFrete" label="Vlr Frete" className="text-right" />
-                        <ThHeader field="ctrbOs" label="CTRB/OS" className="text-right" />
-                        <ThHeader field="percCtrb" label="% CTRB" className="text-right" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {operacoesOrdenadas.map((op, idx) => (
-                        <tr
-                          key={idx}
-                          className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${
-                            op.tipoCodigo === 'C'
-                              ? 'bg-orange-50/60 dark:bg-orange-900/10'
-                              : idx % 2 === 0
-                              ? 'bg-white dark:bg-slate-900'
-                              : 'bg-blue-50/40 dark:bg-blue-900/10'
-                          }`}
-                        >
-                          <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {op.dataBaixa}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            <Badge
-                              className={`text-[10px] font-semibold ${
-                                op.tipoCodigo === 'C'
-                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                              }`}
-                              variant="outline"
-                            >
-                              {op.tipo}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2 font-mono font-bold text-xs text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                            {op.placa}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {op.ctrc}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {op.nf}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={op.nomeRemetente}>
-                            {op.nomeRemetente}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={op.nomeDestinatario}>
-                            {op.nomeDestinatario}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {op.cidadeEntrega}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={op.nomePagador}>
-                            {op.nomePagador}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {op.romaneio}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {formatNum(op.pesoCalculo)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {op.qtVol}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {formatMoeda(op.valMerc)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                            {formatMoeda(op.vlrFrete)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                            {op.ctrbOs > 0 ? formatMoeda(op.ctrbOs) : '-'}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right whitespace-nowrap">
-                            {op.percCtrb > 0 ? (
-                              <span className={`font-semibold ${op.percCtrb > 100 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                {op.percCtrb.toFixed(1)}%
-                              </span>
-                            ) : '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {totais && (
-                      <tfoot>
-                        <tr className="bg-slate-800 dark:bg-slate-950 font-semibold">
-                          <td colSpan={10} className="px-3 py-2 text-xs text-slate-200 whitespace-nowrap">
-                            TOTAL — {totais.total} operações ({totais.coletas} coletas / {totais.entregas} entregas)
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-200 whitespace-nowrap">
-                            {formatNum(totais.peso)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-200 whitespace-nowrap">
-                            {totais.vol}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-200 whitespace-nowrap">
-                            {formatMoeda(totais.valMerc)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-emerald-300 whitespace-nowrap">
-                            {formatMoeda(totais.frete)}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-200 whitespace-nowrap">
-                            {totais.ctrbOs > 0 ? formatMoeda(totais.ctrbOs) : '-'}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-right text-slate-200 whitespace-nowrap">
-                            {totais.percCtrb > 0 ? `${totais.percCtrb.toFixed(1)}%` : '-'}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
-        )}
 
-        </>
-        )}
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                  <PackageCheck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Entregas</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                  <Truck className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Placas</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.placas}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{totais.total} operações</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
+                  <Weight className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Peso Total</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatTon(totais.peso)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                  <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vlr Frete</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                  <Hash className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vlr Mercadoria</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* DASHBOARD — gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Donut coletas x entregas */}
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Coletas vs Entregas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={donutColetas} cx="50%" cy="50%" innerRadius={55} outerRadius={80}
+                    dataKey="value" paddingAngle={3}>
+                    <Cell fill="#f97316" />
+                    <Cell fill="#3b82f6" />
+                  </Pie>
+                  <RechartTooltip formatter={(v: number, n: string) => [v, n]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Linha cronológica de operações */}
+          <Card className="lg:col-span-2 dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Operações por Dia</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <RechartTooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="coletas" stroke="#f97316" strokeWidth={2} dot={false} name="Coletas" />
+                  <Line type="monotone" dataKey="entregas" stroke="#3b82f6" strokeWidth={2} dot={false} name="Entregas" />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Top 5 placas por frete */}
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 5 Placas — Frete</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={top5Placas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                  <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="frete" fill="#10b981" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Frete por dia */}
+          <Card className="lg:col-span-2 dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Frete por Dia (R$)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="frete" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* TABELA AGRUPADA POR PLACA */}
+        <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Operações por Placa
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                  {grupos.length} {grupos.length === 1 ? 'placa' : 'placas'}
+                </span>
+                <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
+                  disabled={loadingExcel} size="sm" variant="outline"
+                  className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                  {loadingExcel
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
+                    : <><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar Tudo</>}
+                </Button>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-800 dark:bg-slate-950">
+                    <th className="px-3 py-2 w-8" />
+                    <ThH field="placa" label="Placa" />
+                    <ThH field="coletas" label="Coletas" right />
+                    <ThH field="entregas" label="Entregas" right />
+                    <ThH field="total" label="Total" right />
+                    <ThH field="peso" label="Peso (t)" right />
+                    <ThH field="frete" label="Vlr Frete" right />
+                    <ThH field="valMerc" label="Vlr Merc" right />
+                    <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Excel</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gruposOrdenados.map((g, idx) => {
+                    const expanded = expandedPlacas.has(g.placa);
+                    return (
+                      <React.Fragment key={g.placa}>
+                        <tr
+                          className={`border-b border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
+                          onClick={() => toggleExpand(g.placa)}
+                        >
+                          <td className="px-3 py-2 text-slate-400">
+                            {expanded
+                              ? <ChevronDown className="h-4 w-4" />
+                              : <ChevronRight className="h-4 w-4" />}
+                          </td>
+                          <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{g.placa}</td>
+                          <td className="px-3 py-2 text-right">
+                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800 text-xs">{g.coletas}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 text-xs">{g.entregas}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-700 dark:text-slate-300">{g.total}</td>
+                          <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatTon(g.peso)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(g.frete)}</td>
+                          <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatMoeda(g.valMerc)}</td>
+                          <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                            <Button size="sm" variant="ghost"
+                              disabled={loadingExcelPlaca === g.placa}
+                              onClick={() => exportarExcel(g.ctrcs, g.placa)}
+                              className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                              {loadingExcelPlaca === g.placa
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                            </Button>
+                          </td>
+                        </tr>
+
+                        {expanded && (
+                          <tr className="bg-slate-50 dark:bg-slate-950/60">
+                            <td colSpan={9} className="p-0">
+                              <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="bg-slate-700 dark:bg-slate-900">
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Data</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Tipo</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">CTRC</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">NF</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Remetente</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Destinatário</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Cidade</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Pagador</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Romaneio</th>
+                                      <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Peso (kg)</th>
+                                      <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Vol</th>
+                                      <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Vlr Merc</th>
+                                      <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Vlr Frete</th>
+                                      <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">CTRB/OS</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {g.ctrcs.map((op, i) => (
+                                      <tr key={i} className={`border-b border-slate-200 dark:border-slate-800 ${op.tipoCodigo === 'C' ? 'bg-orange-50/40 dark:bg-orange-900/5' : i % 2 === 0 ? 'bg-white dark:bg-slate-900/40' : 'bg-blue-50/20 dark:bg-blue-900/5'}`}>
+                                        <td className="px-3 py-1.5 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{op.dataBaixa}</td>
+                                        <td className="px-3 py-1.5 whitespace-nowrap">
+                                          <Badge variant="outline" className={`text-[10px] ${op.tipoCodigo === 'C' ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300'}`}>
+                                            {op.tipo}
+                                          </Badge>
+                                        </td>
+                                        <td className="px-3 py-1.5 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{op.ctrc}</td>
+                                        <td className="px-3 py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{op.nf}</td>
+                                        <td className="px-3 py-1.5 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={op.nomeRemetente}>{op.nomeRemetente}</td>
+                                        <td className="px-3 py-1.5 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={op.nomeDestinatario}>{op.nomeDestinatario}</td>
+                                        <td className="px-3 py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{op.cidadeEntrega}</td>
+                                        <td className="px-3 py-1.5 text-slate-600 dark:text-slate-400 max-w-[120px] truncate" title={op.nomePagador}>{op.nomePagador}</td>
+                                        <td className="px-3 py-1.5 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{op.romaneio}</td>
+                                        <td className="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatNum(op.pesoCalculo)}</td>
+                                        <td className="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300">{op.qtVol}</td>
+                                        <td className="px-3 py-1.5 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatMoeda(op.valMerc)}</td>
+                                        <td className="px-3 py-1.5 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(op.vlrFrete)}</td>
+                                        <td className="px-3 py-1.5 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{op.nroCtrb || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot>
+                                    <tr className="bg-slate-700 dark:bg-slate-900 font-semibold">
+                                      <td colSpan={9} className="px-3 py-1.5 text-xs text-slate-200">
+                                        {g.total} operações ({g.coletas} coletas / {g.entregas} entregas)
+                                      </td>
+                                      <td className="px-3 py-1.5 text-right text-xs text-slate-200 whitespace-nowrap">{formatNum(g.peso)}</td>
+                                      <td className="px-3 py-1.5 text-right text-xs text-slate-200">{g.vol}</td>
+                                      <td className="px-3 py-1.5 text-right text-xs text-slate-200 whitespace-nowrap">{formatMoeda(g.valMerc)}</td>
+                                      <td className="px-3 py-1.5 text-right text-xs text-emerald-300 whitespace-nowrap">{formatMoeda(g.frete)}</td>
+                                      <td />
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+                {totais && (
+                  <tfoot>
+                    <tr className="bg-slate-800 dark:bg-slate-950 font-semibold">
+                      <td colSpan={2} className="px-3 py-2 text-xs text-slate-200">
+                        TOTAL — {totais.placas} placas / {totais.total} operações
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs text-orange-300">{totais.coletas}</td>
+                      <td className="px-3 py-2 text-right text-xs text-blue-300">{totais.entregas}</td>
+                      <td className="px-3 py-2 text-right text-xs text-slate-200">{totais.total}</td>
+                      <td className="px-3 py-2 text-right text-xs text-slate-200 whitespace-nowrap">{formatTon(totais.peso)}</td>
+                      <td className="px-3 py-2 text-right text-xs text-emerald-300 whitespace-nowrap">{formatMoeda(totais.frete)}</td>
+                      <td className="px-3 py-2 text-right text-xs text-slate-200 whitespace-nowrap">{formatMoeda(totais.valMerc)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        </>)}
+
+        </>)}
       </div>
     </DashboardLayout>
   );

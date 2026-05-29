@@ -202,11 +202,6 @@ foreach ($linhas as $linha) {
     $valMercNum     = (float) str_replace(['.', ','], ['', '.'], $valMerc);
     $qtVolNum       = (int)   str_replace(['.', ','], ['', ''], $qtVol);
 
-    $percCtrb = 0;
-    if ($vlrFreteNum > 0 && $ctrbOsNum > 0) {
-        $percCtrb = round(($ctrbOsNum / $vlrFreteNum) * 100, 2);
-    }
-
     $operacoes[] = [
         'placa'            => $placa_csv,
         'tipo'             => $tipoBaixa === 'E' ? 'ENTREGA' : 'COLETA',
@@ -214,7 +209,6 @@ foreach ($linhas as $linha) {
         'dataBaixa'        => $dataBaixa,
         'ctrc'             => $ctrc,
         'nf'               => $nf,
-        'cnpjRemetente'    => $cnpjRemetente,
         'nomeRemetente'    => $nomeRemetente,
         'cidadeRemetente'  => $cidadeRemetente,
         'nomeExpedidor'    => $nomeExpedidor,
@@ -224,55 +218,94 @@ foreach ($linhas as $linha) {
         'nomePagador'      => $nomePagador,
         'ocorrencia'       => $ocorrencia,
         'dataOcorrencia'   => $dataOcorrencia,
-        'vlrCtrcOrigem'    => $vlrCtrcNum,
         'set'              => $set,
         'pesoCalculo'      => $pesoNum,
         'qtVol'            => $qtVolNum,
         'valMerc'          => $valMercNum,
-        'icms'             => (float) str_replace(['.', ','], ['', '.'], $icms),
         'vlrFrete'         => $vlrFreteNum,
-        'baseCalc'         => (float) str_replace(['.', ','], ['', '.'], $baseCalc),
         'romaneio'         => $romaneio,
-        'ctrbOs'           => $ctrbOsNum,
-        'percCtrb'         => $percCtrb,
+        'nroCtrb'          => trim($ctrbOs),
     ];
 }
 
-$totalColetas   = 0;
-$totalEntregas  = 0;
-$totalPeso      = 0.0;
-$totalFrete     = 0.0;
-$totalValMerc   = 0.0;
-$totalCtrbOs    = 0.0;
-$totalVol       = 0;
+$totalColetas  = 0;
+$totalEntregas = 0;
+$totalPeso     = 0.0;
+$totalFrete    = 0.0;
+$totalValMerc  = 0.0;
+$totalVol      = 0;
+
+$porPlaca    = [];
+$porData     = [];
 
 foreach ($operacoes as $op) {
+    $pl = $op['placa'];
+    $dt = $op['dataBaixa'];
+
     if ($op['tipoCodigo'] === 'C') $totalColetas++;
     if ($op['tipoCodigo'] === 'E') $totalEntregas++;
     $totalPeso    += $op['pesoCalculo'];
     $totalFrete   += $op['vlrFrete'];
     $totalValMerc += $op['valMerc'];
-    $totalCtrbOs  += $op['ctrbOs'];
     $totalVol     += $op['qtVol'];
+
+    if (!isset($porPlaca[$pl])) {
+        $porPlaca[$pl] = [
+            'placa'    => $pl,
+            'coletas'  => 0,
+            'entregas' => 0,
+            'total'    => 0,
+            'peso'     => 0.0,
+            'frete'    => 0.0,
+            'valMerc'  => 0.0,
+            'vol'      => 0,
+            'ctrcs'    => [],
+        ];
+    }
+    if ($op['tipoCodigo'] === 'C') $porPlaca[$pl]['coletas']++;
+    if ($op['tipoCodigo'] === 'E') $porPlaca[$pl]['entregas']++;
+    $porPlaca[$pl]['total']++;
+    $porPlaca[$pl]['peso']    += $op['pesoCalculo'];
+    $porPlaca[$pl]['frete']   += $op['vlrFrete'];
+    $porPlaca[$pl]['valMerc'] += $op['valMerc'];
+    $porPlaca[$pl]['vol']     += $op['qtVol'];
+    $porPlaca[$pl]['ctrcs'][]  = $op;
+
+    if (!isset($porData[$dt])) {
+        $porData[$dt] = ['data' => $dt, 'coletas' => 0, 'entregas' => 0, 'frete' => 0.0, 'peso' => 0.0];
+    }
+    if ($op['tipoCodigo'] === 'C') $porData[$dt]['coletas']++;
+    if ($op['tipoCodigo'] === 'E') $porData[$dt]['entregas']++;
+    $porData[$dt]['frete'] += $op['vlrFrete'];
+    $porData[$dt]['peso']  += $op['pesoCalculo'];
 }
 
-$percCtrbGeral = 0;
-if ($totalFrete > 0 && $totalCtrbOs > 0) {
-    $percCtrbGeral = round(($totalCtrbOs / $totalFrete) * 100, 2);
+foreach ($porPlaca as &$g) {
+    $g['peso']    = round($g['peso'], 3);
+    $g['frete']   = round($g['frete'], 2);
+    $g['valMerc'] = round($g['valMerc'], 2);
 }
+unset($g);
+
+ksort($porData);
+$serieCronologica = array_values($porData);
+
+$placasOrdenadas = array_values($porPlaca);
+usort($placasOrdenadas, fn($a, $b) => $b['total'] - $a['total']);
 
 respondJson([
-    'success'       => true,
-    'operacoes'     => $operacoes,
-    'totais'        => [
-        'coletas'      => $totalColetas,
-        'entregas'     => $totalEntregas,
-        'total'        => count($operacoes),
-        'peso'         => round($totalPeso, 3),
-        'frete'        => round($totalFrete, 2),
-        'valMerc'      => round($totalValMerc, 2),
-        'ctrbOs'       => round($totalCtrbOs, 2),
-        'vol'          => $totalVol,
-        'percCtrb'     => $percCtrbGeral,
+    'success'          => true,
+    'operacoes'        => $operacoes,
+    'grupos'           => $placasOrdenadas,
+    'serieCronologica' => $serieCronologica,
+    'totais'           => [
+        'coletas'  => $totalColetas,
+        'entregas' => $totalEntregas,
+        'total'    => count($operacoes),
+        'placas'   => count($porPlaca),
+        'peso'     => round($totalPeso, 3),
+        'frete'    => round($totalFrete, 2),
+        'valMerc'  => round($totalValMerc, 2),
+        'vol'      => $totalVol,
     ],
 ]);
