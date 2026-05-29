@@ -1120,7 +1120,8 @@ function CardCarregamento({
   const ativo = modoApontamento === carregamento.placa_provisoria;
 
   const ctesDetalhados = carregamento.ctes.map(c => {
-    const det = todosCtes.find(e => e.nroCte === c.seq_cte);
+    const detSSW = todosCtes.find(e => e.nroCte === c.nroCte);
+    const det = detSSW ?? (c.ctrc ? { ctrc: c.ctrc, nroCte: c.nroCte ?? 0, destinatario: c.destinatario ?? '', cidade: c.cidade ?? '', peso: c.peso ?? '', cubagem: c.cubagem ?? '' } : undefined);
     return { ...c, det };
   });
 
