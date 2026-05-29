@@ -52,7 +52,7 @@ $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
     . '&f4=' . urlencode($dataFinSsw)
-    . '&f7=R'
+    . '&f7=E'
     . '&t_email=N,';
 
 if (!empty($placa)) {
