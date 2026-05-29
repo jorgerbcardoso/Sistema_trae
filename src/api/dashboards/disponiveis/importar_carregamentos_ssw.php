@@ -23,8 +23,7 @@ $conn = connect();
 ssw_login($domain);
 set_time_limit(180);
 
-$tabela    = "{$domain}_carregamento";
-$tabelaCte = "{$domain}_cte";
+$tabela = "{$domain}_carregamento";
 
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&unidade=$unidade&prioritario=N");
 
@@ -129,20 +128,13 @@ foreach ($placas_ssw as $placa) {
         $nao_encontrados = 0;
 
         foreach ($ctes_para_inserir as $cte_info) {
-            $res_seq = sql(
-                "SELECT seq_cte FROM {$tabelaCte} WHERE ser_cte = $1 AND nro_cte = $2 LIMIT 1",
-                [$cte_info['serie'], $cte_info['numero']],
-                $conn
-            );
+            $seq_cte = imp_cte($cte_info['serie'], $cte_info['numero']);
 
-            if ($res_seq && pg_num_rows($res_seq) > 0) {
-                $seq_cte = (int)pg_fetch_assoc($res_seq)['seq_cte'];
-                if ($seq_cte > 0) {
-                    $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seq_cte} LIMIT 1");
-                    if (!$check_dup || pg_num_rows($check_dup) === 0) {
-                        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', {$seq_cte}, '{$placaEsc}', '{$loginEsc}')");
-                        $inseridos++;
-                    }
+            if ($seq_cte > 0) {
+                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seq_cte} LIMIT 1");
+                if (!$check_dup || pg_num_rows($check_dup) === 0) {
+                    pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', {$seq_cte}, '{$placaEsc}', '{$loginEsc}')");
+                    $inseridos++;
                 }
             } else {
                 $nao_encontrados++;
