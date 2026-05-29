@@ -33,6 +33,9 @@ if (!preg_match('/^\d{2}\/\d{2}\/\d{2}$/', $dataIni) || !preg_match('/^\d{2}\/\d
     respondJson(['success' => false, 'message' => 'Formato de data inválido. Use DD/MM/AA.']);
 }
 
+$dataIniSsw = str_replace('/', '', $dataIni);
+$dataFinSsw = str_replace('/', '', $dataFin);
+
 ssw_login($domain);
 set_time_limit(180);
 ini_set('memory_limit', '256M');
@@ -47,8 +50,8 @@ register_shutdown_function(function() {
 
 $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
-    . '&f3=' . urlencode($dataIni)
-    . '&f4=' . urlencode($dataFin)
+    . '&f3=' . urlencode($dataIniSsw)
+    . '&f4=' . urlencode($dataFinSsw)
     . '&f7=R'
     . '&t_email=N,';
 
@@ -62,18 +65,28 @@ if (substr($str0216, 0, 5) === '<foc ') {
     respondJson(['success' => false, 'message' => 'Erro SSW (0216): ' . $str0216]);
 }
 
-sleep(30);
-
-$str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
-$str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
-$str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
-$xml1440 = simplexml_load_string($str1440);
-
 $encontrado  = false;
 $nomeArq216  = null;
 $pathArq216  = null;
+$maxTentativas = 40;
+$intervalo     = 3;
 
-if ($xml1440) {
+for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
+    sleep($intervalo);
+
+    $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+
+    $posXml = strpos($str1440, '<xml');
+    if ($posXml === false) continue;
+
+    $str1440 = substr($str1440, $posXml);
+    $posEnd  = strpos($str1440, '</xml>');
+    if ($posEnd === false) continue;
+
+    $str1440 = substr($str1440, 0, $posEnd) . '</xml>';
+    $xml1440 = simplexml_load_string($str1440);
+    if (!$xml1440) continue;
+
     for ($i = 0; $i <= 100; $i++) {
         $seq = $xml1440->xpath('rs/r/f0')[$i];
         $opc = $xml1440->xpath('rs/r/f1')[$i];
@@ -86,32 +99,36 @@ if ($xml1440) {
 
         $usr    = trim((string)$usr);
         $unidF4 = strtoupper(trim((string)$f4));
+        $sitStr = (string)$sit;
 
         if ((substr($opc, 0, 3) == '216')
             && (($usr == 'presto') || ($usr == 'damasce1'))
-            && ((string)$sit == 'Conclu&iacute;do')
             && ($unidF4 === strtoupper($unidade))
         ) {
-            $encontrado = true;
-            $f8dec = html_entity_decode((string)$f8);
+            if ($sitStr === 'Conclu&iacute;do') {
+                $encontrado = true;
+                $f8dec = html_entity_decode((string)$f8);
 
-            if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-                if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
-                    $decoded = urldecode($mVal[1]);
-                    if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
-                        $nomeArq216 = $mArq[1];
-                        $pathArq216 = $mArq[2];
+                if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
+                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
+                        $decoded = urldecode($mVal[1]);
+                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
+                            $nomeArq216 = $mArq[1];
+                            $pathArq216 = $mArq[2];
+                        }
                     }
                 }
             }
             break;
         }
     }
+
+    if ($encontrado) break;
 }
 
 if (!$encontrado || !$nomeArq216 || !$pathArq216) {
-    respondJson(['success' => false, 'message' => 'Relatório 216 não encontrado na fila do ssw1440. Tente novamente em alguns instantes.']);
+    respondJson(['success' => false, 'message' => 'Relatório 216 não ficou pronto no tempo esperado. Tente novamente.']);
 }
 
 $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq216}&filename={$nomeArq216}&path={$pathArq216}&down=1&nw=1");
