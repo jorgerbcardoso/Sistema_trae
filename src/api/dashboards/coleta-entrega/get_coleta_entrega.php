@@ -7,6 +7,7 @@ validateRequestMethod('POST');
 
 $auth   = authenticateAndGetUser();
 $domain = $auth['domain'];
+$g_sql  = connect();
 
 $currentUser = getCurrentUser();
 $unidade     = strtoupper(trim($currentUser['unidade_atual'] ?? $currentUser['unidade'] ?? ''));
