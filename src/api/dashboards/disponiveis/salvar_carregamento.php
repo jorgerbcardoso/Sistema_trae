@@ -159,4 +159,12 @@ if ($acao === 'excluir_carregamento') {
     respondJson(['success' => true]);
 }
 
+if ($acao === 'excluir_todos') {
+    $res = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}'");
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos.']);
+    }
+    respondJson(['success' => true]);
+}
+
 respondJson(['success' => false, 'message' => 'Ação inválida.']);

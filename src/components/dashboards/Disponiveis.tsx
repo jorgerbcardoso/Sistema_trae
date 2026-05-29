@@ -1185,48 +1185,48 @@ function CardCarregamento({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
-          {!ativo ? (
-            <Button size="sm" className="flex-1 min-w-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
-              <CheckSquare className="w-3.5 h-3.5 mr-1" />Apontar
+        <div className="flex flex-col gap-1.5">
+          <div className="flex gap-1.5">
+            {!ativo ? (
+              <Button size="sm" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
+                <CheckSquare className="w-3.5 h-3.5 mr-1" />Apontar
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="flex-1 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
+                <X className="w-3.5 h-3.5 mr-1" />Cancelar
+              </Button>
+            )}
+            <Button size="sm" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white text-xs h-8" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
+              <Truck className="w-3.5 h-3.5 mr-1" />SSW
             </Button>
-          ) : (
-            <Button size="sm" variant="outline" className="flex-1 min-w-0 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
-              <X className="w-3.5 h-3.5 mr-1" />Cancelar
-            </Button>
-          )}
-          <Button size="sm" className="flex-1 min-w-0 bg-sky-500 hover:bg-sky-600 text-white text-xs h-8" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
-            <Truck className="w-3.5 h-3.5 mr-1" />SSW
-          </Button>
-
-          {temCapacidade && (
-            <Button size="sm" variant="outline" className="h-8 px-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => onBuscarCargas(carregamento.placa_provisoria)} title="Buscar Cargas Compartilhadas">
-              <ListTree className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {ativo && (
             <Button
               size="sm"
               variant="outline"
-              className={`h-8 px-2.5 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
+              className={`flex-1 h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
               onClick={() => onCarregarHub(carregamento.placa_provisoria)}
               disabled={loadingHub}
               title="Buscar cargas das unidades compartilhadas"
             >
               {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Share2 className="w-3.5 h-3.5" />
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                : <Share2 className="w-3.5 h-3.5 mr-1" />
               }
-              <span className="ml-1">Hub</span>
+              Hub
             </Button>
-          )}
-
-          <Button size="sm" variant="outline" className="h-8 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
-            {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </Button>
-          <Button size="sm" variant="outline" className="h-8 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700" onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)} title="Excluir carregamento">
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
+          </div>
+          <div className="flex gap-1.5 justify-end">
+            {temCapacidade && (
+              <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => onBuscarCargas(carregamento.placa_provisoria)} title="Buscar Cargas Compartilhadas">
+                <ListTree className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
+              {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700" onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)} title="Excluir carregamento">
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1434,6 +1434,25 @@ function CarregamentoArea({
     onCriarCarregamento(placa);
   };
 
+  const handleExcluirTodos = async () => {
+    if (!window.confirm(`Excluir TODOS os ${carregamentos.length} carregamento(s) da unidade ${sigla}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'excluir_todos' }) },
+        true
+      );
+      if (res.success) {
+        toast.success('Todos os carregamentos foram excluídos.');
+        onRecarregarCarregamentos();
+      } else {
+        toast.error(res.message || 'Erro ao excluir carregamentos.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao excluir carregamentos.');
+    }
+  };
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
@@ -1454,6 +1473,17 @@ function CarregamentoArea({
           )}
         </div>
         <div className="flex gap-2">
+          {carregamentos.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+              onClick={handleExcluirTodos}
+              title="Excluir todos os carregamentos"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
