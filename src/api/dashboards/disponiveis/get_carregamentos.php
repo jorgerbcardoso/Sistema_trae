@@ -86,7 +86,7 @@ while ($row = pg_fetch_assoc($resCarregamentos)) {
             ct.cubagem,
             ct.qtde_vol
         FROM {$tabelaCarregamento} c
-        LEFT JOIN {$tabelaCte} ct ON ct.nro_seq_cte = c.seq_cte
+        LEFT JOIN {$tabelaCte} ct ON ct.seq_cte = c.seq_cte
         WHERE UPPER(c.unidade) = '{$unidadeEsc}'
           AND c.placa_provisoria = '{$placaEsc}'
           AND c.seq_cte > 0
