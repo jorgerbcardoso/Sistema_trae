@@ -13,15 +13,15 @@ import { apiFetch } from '../../utils/apiUtils';
 import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
 import {
-  PieChart, Pie, Cell, LineChart, Line,
+  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
   Legend, ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
 import {
   Loader2, FileSpreadsheet, Truck, Package, PackageCheck,
-  Weight, DollarSign, BarChart3, RefreshCw,
+  Weight, DollarSign, Filter, RefreshCw,
   ChevronUp, ChevronDown, ChevronsUpDown, Building2,
-  ChevronRight, Hash,
+  ChevronRight, FileText,
 } from 'lucide-react';
 
 interface Operacao {
@@ -93,14 +93,15 @@ function formatTon(kg: number) {
 
 function getDataPadrao() {
   const hoje = new Date();
-  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const ontem = new Date(hoje);
+  ontem.setDate(hoje.getDate() - 1);
   const fmt = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const yy = String(d.getFullYear()).slice(-2);
     return `${dd}/${mm}/${yy}`;
   };
-  return { ini: fmt(primeiroDia), fin: fmt(hoje) };
+  return { ini: fmt(ontem), fin: fmt(hoje) };
 }
 
 const parseDateBR = (s: string): Date | null => {
@@ -307,7 +308,7 @@ export function ColetaEntrega() {
         <Card className="dark:bg-slate-900/90 dark:border-slate-700">
           <CardHeader className="pb-3">
             <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
-              <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Filtros
             </CardTitle>
           </CardHeader>
@@ -351,7 +352,7 @@ export function ColetaEntrega() {
                   <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                      Relatório enviado ao SSW. Aguardando processamento...
+                      Processando informações...
                     </p>
                     <div className="mt-2 bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
                       <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
@@ -375,7 +376,7 @@ export function ColetaEntrega() {
                   <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Coletas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Coletas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</p>
                 </div>
               </div>
@@ -389,7 +390,7 @@ export function ColetaEntrega() {
                   <PackageCheck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Entregas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Entregas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</p>
                 </div>
               </div>
@@ -403,7 +404,7 @@ export function ColetaEntrega() {
                   <Truck className="h-6 w-6 text-slate-600 dark:text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Placas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Placas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.placas}</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">{totais.total} operações</p>
                 </div>
@@ -418,7 +419,7 @@ export function ColetaEntrega() {
                   <Weight className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Peso Total</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Peso Total</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatTon(totais.peso)}</p>
                 </div>
               </div>
@@ -432,7 +433,7 @@ export function ColetaEntrega() {
                   <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vlr Frete</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Vlr Frete</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</p>
                 </div>
               </div>
@@ -443,10 +444,10 @@ export function ColetaEntrega() {
             <CardContent className="pt-5 pb-5">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                  <Hash className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Vlr Mercadoria</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Vlr Mercadoria</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</p>
                 </div>
               </div>
@@ -466,7 +467,7 @@ export function ColetaEntrega() {
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={donutColetas} cx="50%" cy="50%" innerRadius={55} outerRadius={80}
-                    dataKey="value" paddingAngle={3}>
+                    dataKey="value" paddingAngle={3} stroke="none">
                     <Cell fill="#f97316" />
                     <Cell fill="#3b82f6" />
                   </Pie>
@@ -505,12 +506,18 @@ export function ColetaEntrega() {
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={top5Placas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradTop5" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.7} />
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
                   <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="frete" fill="#10b981" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="frete" fill="url(#gradTop5)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -523,14 +530,21 @@ export function ColetaEntrega() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <AreaChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="gradFreteDia" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
                     contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="frete" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Area type="monotone" dataKey="frete" stroke="#3b82f6" strokeWidth={2.5}
+                    fill="url(#gradFreteDia)" dot={false} name="Frete" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
