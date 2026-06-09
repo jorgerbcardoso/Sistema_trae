@@ -49,3 +49,7 @@ PADRÕES DE CÓDIGO CRÍTICOS:
      Exemplo: `<Pie dataKey="value" stroke="none" ...>`
    - Gráfico de Área (AreaChart): usar gradiente vertical com `<defs><linearGradient>` do recharts, opacidade de 0.35 no topo e 0 na base.
    - Gráfico de Barras horizontais (Top N): usar gradiente horizontal (`x1="0" x2="1" y1="0" y2="0"`) com duas cores complementares.
+
+4. CORES PADRÃO DO SISTEMA:
+   - Botão de ação principal (Aplicar, Salvar, etc.): usar `bg-indigo-600 hover:bg-indigo-700`
+   - Ícone de loading (Loader2): usar `text-slate-400` sem cor específica forte

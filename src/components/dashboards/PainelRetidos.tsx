@@ -313,7 +313,7 @@ export function PainelRetidos() {
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-10 w-10 animate-spin text-red-500" />
+            <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
           </div>
         ) : (
           <>
@@ -612,7 +612,7 @@ export function PainelRetidos() {
               <Button variant="outline" onClick={cancelFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
                 Cancelar
               </Button>
-              <Button onClick={applyFilters} className="bg-red-600 hover:bg-red-700 text-white">
+              <Button onClick={applyFilters} className="bg-indigo-600 hover:bg-indigo-700 text-white">
                 <Check className="w-4 h-4 mr-2" />
                 Aplicar
               </Button>
