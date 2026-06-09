@@ -147,12 +147,13 @@ export function FaturamentoClientes() {
   usePageTitle('Faturamento de Clientes');
 
   const defaultPeriod = getLastMonthPeriod();
+  const userUnit = user?.unidade_atual || user?.unidade;
 
   const [filters, setFilters] = useState<Filters>({
     periodoEmissaoInicio: defaultPeriod.inicio,
     periodoEmissaoFim: defaultPeriod.fim,
     tpFrete: '',
-    siglaEmit: [],
+    siglaEmit: userUnit && userUnit !== 'MTZ' ? [userUnit] : [],
     siglaDest: [],
     cnpjsPagadores: [],
   });
