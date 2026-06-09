@@ -991,6 +991,7 @@ export function FaturamentoClientes() {
               <FilterSelectUnidadeOrdered
                 value={tempFilters.siglaEmit}
                 onChange={v => setTempFilters({ ...tempFilters, siglaEmit: v })}
+                disabled={userUnit && userUnit !== 'MTZ'} // Desabilita se a unidade do usuário for diferente de MTZ
               />
             </div>
 
