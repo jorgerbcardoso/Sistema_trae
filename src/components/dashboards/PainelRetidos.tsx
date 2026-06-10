@@ -402,6 +402,18 @@ export function PainelRetidos() {
           </div>
         ) : (
           <>
+            {/* Hint card */}
+            <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800/50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Dica: clique nos cards <strong>Retidos Ativos</strong>, <strong>Resolvidos</strong> ou <strong>Total Retidos</strong> para ver os detalhes dos CT-es!
+              </p>
+            </div>
+            
             {totais && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {([
@@ -727,7 +739,7 @@ export function PainelRetidos() {
       <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
         <DialogContent className="sm:max-w-[1200px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center gap-4">
               <div>
                 <DialogTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   {cardDialogName}
@@ -741,7 +753,7 @@ export function PainelRetidos() {
                 variant="outline"
                 onClick={() => exportarCSV(ctesDialog, `ctes_${cardDialogId}_${new Date().toISOString().split('T')[0]}.csv`)}
                 disabled={ctesDialog.length === 0}
-                className="dark:border-slate-700 dark:hover:bg-slate-800"
+                className="dark:border-slate-700 dark:hover:bg-slate-800 flex-shrink-0"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Exportar CSV

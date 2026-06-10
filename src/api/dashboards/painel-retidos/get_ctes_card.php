@@ -56,6 +56,8 @@ if ($cardId === 'ativos') {
     $whereConditions[] = 'cte.ult_ocor != 82';
 }
 
+$conn = connect();
+
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
 // Query to fetch CT-es
