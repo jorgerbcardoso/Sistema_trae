@@ -403,15 +403,11 @@ export function PainelRetidos() {
         ) : (
           <>
             {/* Hint card */}
-            <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-center gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800/50 flex items-center justify-center">
-                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                Dica: clique nos cards <strong>Retidos Ativos</strong>, <strong>Resolvidos</strong> ou <strong>Total Retidos</strong> para ver os detalhes dos CT-es!
-              </p>
+            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Clique nos cards para visualizar os CT-es do grupo.
             </div>
             
             {totais && (
@@ -737,104 +733,95 @@ export function PainelRetidos() {
       </Dialog>
 
       <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
-        <DialogContent className="sm:max-w-[1200px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <div className="flex justify-between items-center gap-4">
+        <DialogContent className="max-w-7xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+          <DialogHeader className="shrink-0 pr-10">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <DialogTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  {cardDialogName}
-                  <Badge variant="outline" className="text-xs">{ctesDialog.length} CT-es</Badge>
-                </DialogTitle>
-                <DialogDescription className="text-slate-500 dark:text-slate-400">
-                  Lista de CT-es do card
+                <DialogTitle>{cardDialogName}</DialogTitle>
+                <DialogDescription>
+                  Lista de CT-es deste grupo.
                 </DialogDescription>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => exportarCSV(ctesDialog, `ctes_${cardDialogId}_${new Date().toISOString().split('T')[0]}.csv`)}
-                disabled={ctesDialog.length === 0}
-                className="dark:border-slate-700 dark:hover:bg-slate-800 flex-shrink-0"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar CSV
-              </Button>
+              {ctesDialog.length > 0 && (
+                <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => exportarCSV(ctesDialog, `${cardDialogName.replace(/\s+/g, '_')}.csv`)}>
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+              )}
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-auto -mx-6">
-            {loadingCtesDialog ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+          <div className="grid h-full min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)]">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+              <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}>
+                <span>CT-e</span>
+                <span>Emissão</span>
+                <span>Ocorrência</span>
+                <span>Status</span>
+                <span>Un. Emit</span>
+                <span>Cidade Origem</span>
+                <span>Cidade Destino</span>
+                <span>Remetente</span>
+                <span>Destinatário</span>
+                <span>Pagador</span>
+                <span>Peso (kg)</span>
+                <span>Vol</span>
+                <span>Vlr Merc</span>
+                <span>Vlr Frete</span>
+                <span>Últ. Ocorrência</span>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">CT-e</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">Emissão</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">Ocorrência 82</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Status</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Un. Emit</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Cidade Origem</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Cidade Destino</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Remetente</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Destinatário</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Pagador</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Peso (kg)</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vol</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vlr Merc</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vlr Frete</th>
-                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Últ. Ocorrência</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ctesDialog.length === 0 ? (
-                      <tr>
-                        <td colSpan={15} className="px-4 py-16 text-center text-slate-500 dark:text-slate-400">
-                          Nenhum CT-e encontrado
-                        </td>
-                      </tr>
-                    ) : (
-                      ctesDialog.map((cte, idx) => (
-                        <tr
-                          key={idx}
-                          className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
-                        >
-                          <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                            {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_ocorrencia_82}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <Badge variant="outline" className={cte.is_ativo
-                              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
-                              {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.sigla_emit}</td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
-                            {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
-                            {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_remetente}>{cte.nome_remetente}</td>
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_destinatario}>{cte.nome_destinatario}</td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={cte.nome_pagador}>{cte.nome_pagador}</td>
-                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatNum(cte.peso_real)}</td>
-                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</td>
-                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatMoeda(cte.vlr_merc)}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(cte.vlr_frete)}</td>
-                          <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ult_ocor}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {loadingCtesDialog ? (
+                  <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando CT-es...
+                  </div>
+                ) : ctesDialog.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    Nenhum CT-e encontrado.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {ctesDialog.map((cte, idx) => (
+                      <div
+                        key={idx}
+                        className={`px-4 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
+                        style={{ display: 'grid', gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px', alignItems: 'center', gap: '8px' }}
+                      >
+                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                          {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                        </div>
+                        <div className="text-slate-600 dark:text-slate-400">{cte.data_emissao}</div>
+                        <div className="text-slate-600 dark:text-slate-400">{cte.data_ocorrencia_82}</div>
+                        <div>
+                          <Badge variant="outline" className={cte.is_ativo
+                            ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
+                            {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
+                          </Badge>
+                        </div>
+                        <div className="font-mono text-slate-700 dark:text-slate-300">{cte.sigla_emit}</div>
+                        <div className="truncate text-slate-700 dark:text-slate-300" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
+                          {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
+                        </div>
+                        <div className="truncate text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
+                          {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
+                        </div>
+                        <div className="truncate text-slate-700 dark:text-slate-300" title={cte.nome_remetente}>{cte.nome_remetente}</div>
+                        <div className="truncate text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario}</div>
+                        <div className="truncate text-slate-600 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador}</div>
+                        <div className="text-right text-slate-700 dark:text-slate-300">{formatNum(cte.peso_real)}</div>
+                        <div className="text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</div>
+                        <div className="text-right text-slate-700 dark:text-slate-300">{formatMoeda(cte.vlr_merc)}</div>
+                        <div className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoeda(cte.vlr_frete)}</div>
+                        <div className="text-right font-mono text-slate-700 dark:text-slate-300">{cte.ult_ocor}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -80,8 +80,7 @@ $query = "
         cte.vlr_merc,
         cte.vlr_frete,
         cte.qtde_vol AS qt_vol,
-        cte.ult_ocor,
-        (cte.ult_ocor = 82) AS is_ativo
+        cte.ult_ocor
     FROM {$domain}_cte cte
     INNER JOIN {$domain}_cte_ocorrencia oc ON cte.seq_cte = oc.seq_cte
     LEFT JOIN cidade cte_emit ON cte.seq_cidade_emit = cte_emit.seq_cidade
@@ -97,6 +96,7 @@ if (!$result) {
 
 $ctes = [];
 while ($row = pg_fetch_assoc($result)) {
+    $isAtivo = (int)$row['ult_ocor'] === 82;
     $ctes[] = [
         'nro_cte' => $row['nro_cte'],
         'ser_cte' => $row['ser_cte'],
@@ -104,9 +104,9 @@ while ($row = pg_fetch_assoc($result)) {
         'data_ocorrencia_82' => $row['data_ocorrencia_82'],
         'sigla_emit' => $row['sigla_emit'],
         'sigla_dest' => $row['sigla_dest'],
-        'nome_remetente' => $row['nome_remetente'],
-        'nome_destinatario' => $row['nome_destinatario'],
-        'nome_pagador' => $row['nome_pagador'],
+        'nome_remetente' => $row['nome_emit'],
+        'nome_destinatario' => $row['nome_dest'],
+        'nome_pagador' => $row['nome_pag'],
         'cidade_emit' => $row['cidade_emit'],
         'uf_emit' => $row['uf_emit'],
         'cidade_dest' => $row['cidade_dest'],
@@ -116,7 +116,7 @@ while ($row = pg_fetch_assoc($result)) {
         'vlr_frete' => (float)$row['vlr_frete'],
         'qt_vol' => (int)$row['qt_vol'],
         'ult_ocor' => (int)$row['ult_ocor'],
-        'is_ativo' => (bool)$row['is_ativo']
+        'is_ativo' => $isAtivo
     ];
 }
 
