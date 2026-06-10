@@ -152,6 +152,49 @@ export function PainelRetidos() {
   const [ctesDialog, setCtesDialog] = useState<CteRetido[]>([]);
   const [loadingCtesDialog, setLoadingCtesDialog] = useState(false);
 
+  // Sorting States
+  const [sortConfig, setSortConfig] = useState<{ key: keyof CteRetido; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfigDialog, setSortConfigDialog] = useState<{ key: keyof CteRetido; direction: 'asc' | 'desc' } | null>(null);
+
+  // Helper function to capitalize first letter
+  const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+
+  // Sorting function
+  const sortData = (data: CteRetido[], config: { key: keyof CteRetido; direction: 'asc' | 'desc' } | null) => {
+    if (!config) return data;
+
+    return [...data].sort((a, b) => {
+      let aVal = a[config.key];
+      let bVal = b[config.key];
+
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal as string).toLowerCase();
+      }
+
+      if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Handle sort click
+  const handleSort = (key: keyof CteRetido) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleSortDialog = (key: keyof CteRetido) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfigDialog && sortConfigDialog.key === key && sortConfigDialog.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfigDialog({ key, direction });
+  };
+
   const carregarDados = useCallback(async (currentFilters: Filters) => {
     setLoading(true);
     setElapsed(0);
@@ -268,6 +311,7 @@ export function PainelRetidos() {
     setCardDialogName(cardName);
     setCardDialogOpen(true);
     setCtesDialog([]);
+    setSortConfigDialog(null);
     setLoadingCtesDialog(true);
 
     try {
@@ -573,72 +617,64 @@ export function PainelRetidos() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-800 dark:bg-slate-950">
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left whitespace-nowrap">CT-e</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left whitespace-nowrap">Emissão</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left whitespace-nowrap">Ocorrência</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Status</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Un. Emit</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Cidade Origem</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Cidade Destino</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Remetente</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Destinatário</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Pagador</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Peso (kg)</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vol</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vlr Merc</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vlr Frete</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Últ. Ocorrência</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ctesRetidos.length === 0 ? (
-                        <tr>
-                          <td colSpan={15} className="px-3 py-16 text-center text-slate-500 dark:text-slate-400">
-                            Nenhum CT-e retido encontrado
-                          </td>
-                        </tr>
-                      ) : (
-                        ctesRetidos.map((cte, idx) => (
-                          <tr
+                <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+                  <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nro_cte')}>{capitalizeFirst('CT-e')} {sortConfig?.key === 'nro_cte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_emissao')}>{capitalizeFirst('Emissão')} {sortConfig?.key === 'data_emissao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>{capitalizeFirst('Ocorrência')} {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('is_ativo')}>{capitalizeFirst('Status')} {sortConfig?.key === 'is_ativo' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('sigla_emit')}>{capitalizeFirst('Un. Emit')} {sortConfig?.key === 'sigla_emit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_emit')}>{capitalizeFirst('Cidade Origem')} {sortConfig?.key === 'cidade_emit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_dest')}>{capitalizeFirst('Cidade Destino')} {sortConfig?.key === 'cidade_dest' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_remetente')}>{capitalizeFirst('Remetente')} {sortConfig?.key === 'nome_remetente' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_destinatario')}>{capitalizeFirst('Destinatário')} {sortConfig?.key === 'nome_destinatario' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_pagador')}>{capitalizeFirst('Pagador')} {sortConfig?.key === 'nome_pagador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('peso_real')}>{capitalizeFirst('Peso (kg)')} {sortConfig?.key === 'peso_real' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('qt_vol')}>{capitalizeFirst('Vol')} {sortConfig?.key === 'qt_vol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_merc')}>{capitalizeFirst('Vlr Merc')} {sortConfig?.key === 'vlr_merc' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_frete')}>{capitalizeFirst('Vlr Frete')} {sortConfig?.key === 'vlr_frete' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('ult_ocor')}>{capitalizeFirst('Últ. Ocorrência')} {sortConfig?.key === 'ult_ocor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                  </div>
+
+                  <div className="min-h-0 overflow-y-auto">
+                    {ctesRetidos.length === 0 ? (
+                      <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        Nenhum CT-e retido encontrado
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {sortData(ctesRetidos, sortConfig).map((cte, idx) => (
+                          <div
                             key={idx}
-                            className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
+                            className="grid gap-2 px-4 py-2 text-sm"
+                            style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}
                           >
-                            <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                              {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                            </td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_ocorrencia_82}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">
+                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
+                            <span className="self-center">
                               <Badge variant="outline" className={cte.is_ativo
                                 ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
                                 {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
                               </Badge>
-                            </td>
-                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.sigla_emit}</td>
-                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
-                              {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
-                            </td>
-                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
-                              {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
-                            </td>
-                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_remetente}>{cte.nome_remetente}</td>
-                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_destinatario}>{cte.nome_destinatario}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={cte.nome_pagador}>{cte.nome_pagador}</td>
-                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatNum(cte.peso_real)}</td>
-                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</td>
-                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatMoeda(cte.vlr_merc)}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(cte.vlr_frete)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ult_ocor}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                            </span>
+                            <span className="self-center font-mono text-slate-500 dark:text-slate-400">{cte.sigla_emit}</span>
+                            <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>{cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}</span>
+                            <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>{cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}</span>
+                            <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_remetente}>{cte.nome_remetente || '-'}</span>
+                            <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario || '-'}</span>
+                            <span className="truncate self-center text-slate-500 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador || '-'}</span>
+                            <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatNum(cte.peso_real)}</span>
+                            <span className="self-center text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</span>
+                            <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatMoeda(cte.vlr_merc)}</span>
+                            <span className="self-center text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoeda(cte.vlr_frete)}</span>
+                            <span className="truncate self-center text-right font-mono text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -753,22 +789,22 @@ export function PainelRetidos() {
 
           <div className="grid h-full min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)]">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}>
-                <span>CT-e</span>
-                <span>Emissão</span>
-                <span>Ocorrência</span>
-                <span>Status</span>
-                <span>Un. Emit</span>
-                <span>Cidade Origem</span>
-                <span>Cidade Destino</span>
-                <span>Remetente</span>
-                <span>Destinatário</span>
-                <span>Pagador</span>
-                <span>Peso (kg)</span>
-                <span>Vol</span>
-                <span>Vlr Merc</span>
-                <span>Vlr Frete</span>
-                <span>Últ. Ocorrência</span>
+              <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nro_cte')}>{capitalizeFirst('CT-e')} {sortConfigDialog?.key === 'nro_cte' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_emissao')}>{capitalizeFirst('Emissão')} {sortConfigDialog?.key === 'data_emissao' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_ocorrencia_82')}>{capitalizeFirst('Ocorrência')} {sortConfigDialog?.key === 'data_ocorrencia_82' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('is_ativo')}>{capitalizeFirst('Status')} {sortConfigDialog?.key === 'is_ativo' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('sigla_emit')}>{capitalizeFirst('Un. Emit')} {sortConfigDialog?.key === 'sigla_emit' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('cidade_emit')}>{capitalizeFirst('Cidade Origem')} {sortConfigDialog?.key === 'cidade_emit' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('cidade_dest')}>{capitalizeFirst('Cidade Destino')} {sortConfigDialog?.key === 'cidade_dest' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_remetente')}>{capitalizeFirst('Remetente')} {sortConfigDialog?.key === 'nome_remetente' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_destinatario')}>{capitalizeFirst('Destinatário')} {sortConfigDialog?.key === 'nome_destinatario' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_pagador')}>{capitalizeFirst('Pagador')} {sortConfigDialog?.key === 'nome_pagador' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('peso_real')}>{capitalizeFirst('Peso (kg)')} {sortConfigDialog?.key === 'peso_real' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('qt_vol')}>{capitalizeFirst('Vol')} {sortConfigDialog?.key === 'qt_vol' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_merc')}>{capitalizeFirst('Vlr Merc')} {sortConfigDialog?.key === 'vlr_merc' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_frete')}>{capitalizeFirst('Vlr Frete')} {sortConfigDialog?.key === 'vlr_frete' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('ult_ocor')}>{capitalizeFirst('Últ. Ocorrência')} {sortConfigDialog?.key === 'ult_ocor' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
               </div>
 
               <div className="min-h-0 overflow-y-auto">
@@ -783,7 +819,7 @@ export function PainelRetidos() {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {ctesDialog.map((cte, idx) => (
+                    {sortData(ctesDialog, sortConfigDialog).map((cte, idx) => (
                       <div
                         key={idx}
                         className="grid gap-2 px-4 py-2 text-sm"
