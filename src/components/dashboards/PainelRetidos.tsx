@@ -739,7 +739,7 @@ export function PainelRetidos() {
               <div>
                 <DialogTitle>{cardDialogName}</DialogTitle>
                 <DialogDescription>
-                  Lista de CT-es deste grupo.
+                  Lista de CT-es neste grupo.
                 </DialogDescription>
               </div>
               {ctesDialog.length > 0 && (
@@ -771,14 +771,14 @@ export function PainelRetidos() {
                 <span>Últ. Ocorrência</span>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="min-h-0 overflow-y-auto">
                 {loadingCtesDialog ? (
-                  <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando CT-es...
                   </div>
                 ) : ctesDialog.length === 0 ? (
-                  <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
                     Nenhum CT-e encontrado.
                   </div>
                 ) : (
@@ -786,36 +786,30 @@ export function PainelRetidos() {
                     {ctesDialog.map((cte, idx) => (
                       <div
                         key={idx}
-                        className={`px-4 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
-                        style={{ display: 'grid', gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px', alignItems: 'center', gap: '8px' }}
+                        className="grid gap-2 px-4 py-2 text-sm"
+                        style={{ gridTemplateColumns: '100px 100px 100px 80px 80px 140px 140px 160px 160px 140px 100px 60px 110px 110px 100px' }}
                       >
-                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                          {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                        </div>
-                        <div className="text-slate-600 dark:text-slate-400">{cte.data_emissao}</div>
-                        <div className="text-slate-600 dark:text-slate-400">{cte.data_ocorrencia_82}</div>
-                        <div>
+                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
+                        <span className="self-center">
                           <Badge variant="outline" className={cte.is_ativo
                             ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
                             : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
                             {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
                           </Badge>
-                        </div>
-                        <div className="font-mono text-slate-700 dark:text-slate-300">{cte.sigla_emit}</div>
-                        <div className="truncate text-slate-700 dark:text-slate-300" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
-                          {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
-                        </div>
-                        <div className="truncate text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
-                          {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
-                        </div>
-                        <div className="truncate text-slate-700 dark:text-slate-300" title={cte.nome_remetente}>{cte.nome_remetente}</div>
-                        <div className="truncate text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario}</div>
-                        <div className="truncate text-slate-600 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador}</div>
-                        <div className="text-right text-slate-700 dark:text-slate-300">{formatNum(cte.peso_real)}</div>
-                        <div className="text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</div>
-                        <div className="text-right text-slate-700 dark:text-slate-300">{formatMoeda(cte.vlr_merc)}</div>
-                        <div className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoeda(cte.vlr_frete)}</div>
-                        <div className="text-right font-mono text-slate-700 dark:text-slate-300">{cte.ult_ocor}</div>
+                        </span>
+                        <span className="self-center font-mono text-slate-500 dark:text-slate-400">{cte.sigla_emit}</span>
+                        <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>{cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}</span>
+                        <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>{cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}</span>
+                        <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_remetente}>{cte.nome_remetente || '-'}</span>
+                        <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario || '-'}</span>
+                        <span className="truncate self-center text-slate-500 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador || '-'}</span>
+                        <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatNum(cte.peso_real)}</span>
+                        <span className="self-center text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</span>
+                        <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatMoeda(cte.vlr_merc)}</span>
+                        <span className="self-center text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoeda(cte.vlr_frete)}</span>
+                        <span className="truncate self-center text-right font-mono text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
                       </div>
                     ))}
                   </div>
