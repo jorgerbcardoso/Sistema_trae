@@ -4,6 +4,7 @@ while (ob_get_level()) {
 }
 ob_start();
 
+require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../config/phpspreadsheet_loader.php';
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -14,8 +15,6 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
-require_once __DIR__ . '/../../config.php';
-
 try {
     $currentUser = getCurrentUser();
     $dominioHeader = $_SERVER['HTTP_X_DOMAIN'] ?? null;
@@ -25,12 +24,10 @@ try {
         throw new Exception('Domínio não identificado');
     }
 
-    $conn = connect();
-
-    $input     = json_decode(file_get_contents('php://input'), true);
-    $ctes      = $input['ctes'] ?? [];
-    $totais    = $input['totais'] ?? [];
-    $filters   = $input['filters'] ?? [];
+    $input   = json_decode(file_get_contents('php://input'), true);
+    $ctes    = $input['ctes'] ?? [];
+    $totais  = $input['totais'] ?? [];
+    $filters = $input['filters'] ?? [];
 
     if (empty($ctes)) {
         throw new Exception('Nenhum CT-e para exportar');
@@ -45,7 +42,7 @@ try {
 
     try {
         $sqlLogo = "SELECT logo_light, name FROM domains WHERE domain = $1 LIMIT 1";
-        $resultLogo = sql($conn, $sqlLogo, false, [$dominioUpper]);
+        $resultLogo = sql($sqlLogo, [$dominioUpper]);
         if ($resultLogo && pg_num_rows($resultLogo) > 0) {
             $rowLogo    = pg_fetch_assoc($resultLogo);
             $logoUrl    = trim($rowLogo['logo_light'] ?? '');
@@ -81,7 +78,7 @@ try {
         }
     }
 
-    $ultimaColuna = 'L';
+    $ultimaColuna = 'N';
 
     if ($logoAdicionada) {
         $sheet->mergeCells('C1:' . $ultimaColuna . '1');
@@ -114,7 +111,7 @@ try {
         ]);
 
         $sheet->mergeCells('C4:' . $ultimaColuna . '4');
-        $sheet->setCellValue('C4', 'Gerado em: ' . date('d/m/Y \à\s H:i:s'));
+        $sheet->setCellValue('C4', 'Gerado em: ' . date('d/m/Y à\s H:i:s'));
         $sheet->getStyle('C4')->applyFromArray([
             'font'      => ['size' => 9, 'italic' => true, 'color' => ['rgb' => '94A3B8']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -156,7 +153,7 @@ try {
         ]);
 
         $sheet->mergeCells('A4:' . $ultimaColuna . '4');
-        $sheet->setCellValue('A4', 'Gerado em: ' . date('d/m/Y \à\s H:i:s'));
+        $sheet->setCellValue('A4', 'Gerado em: ' . date('d/m/Y à\s H:i:s'));
         $sheet->getStyle('A4')->applyFromArray([
             'font'      => ['size' => 9, 'italic' => true, 'color' => ['rgb' => '94A3B8']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -182,13 +179,15 @@ try {
         'C' => 'OCORRÊNCIA 82',
         'D' => 'STATUS',
         'E' => 'UNIDADE',
-        'F' => 'REMETENTE',
-        'G' => 'DESTINATÁRIO',
-        'H' => 'PAGADOR',
-        'I' => 'PESO (KG)',
-        'J' => 'VOLUME',
-        'K' => 'VLR MERCADORIA',
-        'L' => 'VLR FRETE',
+        'F' => 'CIDADE ORIGEM',
+        'G' => 'CIDADE DESTINO',
+        'H' => 'REMETENTE',
+        'I' => 'DESTINATÁRIO',
+        'J' => 'PAGADOR',
+        'K' => 'PESO (KG)',
+        'L' => 'VOLUME',
+        'M' => 'VLR MERCADORIA',
+        'N' => 'VLR FRETE',
     ];
 
     $linhaHeader = $linhaInicio;
@@ -216,17 +215,27 @@ try {
         $sheet->setCellValue('C' . $linhaAtual, $cte['data_ocorrencia_82'] ?? '');
         $sheet->setCellValue('D' . $linhaAtual, ($cte['is_ativo'] ?? false) ? 'RETIDO' : 'RESOLVIDO');
         $sheet->setCellValue('E' . $linhaAtual, $cte['sigla_emit'] ?? '');
-        $sheet->setCellValue('F' . $linhaAtual, $cte['nome_remetente'] ?? '');
-        $sheet->setCellValue('G' . $linhaAtual, $cte['nome_destinatario'] ?? '');
-        $sheet->setCellValue('H' . $linhaAtual, $cte['nome_pagador'] ?? '');
-        $sheet->setCellValue('I' . $linhaAtual, floatval($cte['peso_real'] ?? 0));
-        $sheet->setCellValue('J' . $linhaAtual, intval($cte['qt_vol'] ?? 0));
-        $sheet->setCellValue('K' . $linhaAtual, floatval($cte['vlr_merc'] ?? 0));
-        $sheet->setCellValue('L' . $linhaAtual, floatval($cte['vlr_frete'] ?? 0));
+        $cidadeOrigem = '';
+        if (isset($cte['cidade_emit']) && $cte['cidade_emit']) {
+            $cidadeOrigem = $cte['cidade_emit'] . (isset($cte['uf_emit']) && $cte['uf_emit'] ? '/' . $cte['uf_emit'] : '');
+        }
+        $sheet->setCellValue('F' . $linhaAtual, $cidadeOrigem);
+        $cidadeDestino = '';
+        if (isset($cte['cidade_dest']) && $cte['cidade_dest']) {
+            $cidadeDestino = $cte['cidade_dest'] . (isset($cte['uf_dest']) && $cte['uf_dest'] ? '/' . $cte['uf_dest'] : '');
+        }
+        $sheet->setCellValue('G' . $linhaAtual, $cidadeDestino);
+        $sheet->setCellValue('H' . $linhaAtual, $cte['nome_remetente'] ?? '');
+        $sheet->setCellValue('I' . $linhaAtual, $cte['nome_destinatario'] ?? '');
+        $sheet->setCellValue('J' . $linhaAtual, $cte['nome_pagador'] ?? '');
+        $sheet->setCellValue('K' . $linhaAtual, floatval($cte['peso_real'] ?? 0));
+        $sheet->setCellValue('L' . $linhaAtual, intval($cte['qt_vol'] ?? 0));
+        $sheet->setCellValue('M' . $linhaAtual, floatval($cte['vlr_merc'] ?? 0));
+        $sheet->setCellValue('N' . $linhaAtual, floatval($cte['vlr_frete'] ?? 0));
 
-        $sheet->getStyle('I' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.000');
-        $sheet->getStyle('K' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-        $sheet->getStyle('L' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+        $sheet->getStyle('K' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.000');
+        $sheet->getStyle('M' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+        $sheet->getStyle('N' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
 
         $rowStyle = ($cte['is_ativo'] ?? false) ? $styleAtivo : ($idx % 2 === 0 ? $styleZebra1 : $styleZebra2);
         $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($rowStyle);
@@ -245,7 +254,7 @@ try {
         'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '7F1D1D']]],
     ];
 
-    $sheet->mergeCells('A' . $linhaAtual . ':H' . $linhaAtual);
+    $sheet->mergeCells('A' . $linhaAtual . ':J' . $linhaAtual);
     $sheet->setCellValue('A' . $linhaAtual, sprintf(
         'TOTAL: %d CT-e (%d retidos / %d resolvidos)',
         $totais['total_retidos'] ?? count($ctes),
@@ -253,14 +262,14 @@ try {
         $totais['retidos_resolvidos'] ?? 0
     ));
     $sheet->getStyle('A' . $linhaAtual)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-    $sheet->setCellValue('I' . $linhaAtual, floatval($totais['peso_total'] ?? 0));
-    $sheet->setCellValue('J' . $linhaAtual, '');
-    $sheet->setCellValue('K' . $linhaAtual, floatval($totais['vlr_merc_total'] ?? 0));
-    $sheet->setCellValue('L' . $linhaAtual, floatval($totais['vlr_frete_total'] ?? 0));
+    $sheet->setCellValue('K' . $linhaAtual, floatval($totais['peso_total'] ?? 0));
+    $sheet->setCellValue('L' . $linhaAtual, '');
+    $sheet->setCellValue('M' . $linhaAtual, floatval($totais['vlr_merc_total'] ?? 0));
+    $sheet->setCellValue('N' . $linhaAtual, floatval($totais['vlr_frete_total'] ?? 0));
 
-    $sheet->getStyle('I' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.000');
-    $sheet->getStyle('K' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
-    $sheet->getStyle('L' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+    $sheet->getStyle('K' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.000');
+    $sheet->getStyle('M' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
+    $sheet->getStyle('N' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
     $sheet->getStyle('A' . $linhaAtual . ':' . $ultimaColuna . $linhaAtual)->applyFromArray($totalStyle);
     $sheet->getRowDimension($linhaAtual)->setRowHeight(22);
 
@@ -269,13 +278,15 @@ try {
     $sheet->getColumnDimension('C')->setWidth(14);
     $sheet->getColumnDimension('D')->setWidth(12);
     $sheet->getColumnDimension('E')->setWidth(10);
-    $sheet->getColumnDimension('F')->setWidth(22);
-    $sheet->getColumnDimension('G')->setWidth(22);
+    $sheet->getColumnDimension('F')->setWidth(20);
+    $sheet->getColumnDimension('G')->setWidth(20);
     $sheet->getColumnDimension('H')->setWidth(22);
-    $sheet->getColumnDimension('I')->setWidth(12);
-    $sheet->getColumnDimension('J')->setWidth(10);
-    $sheet->getColumnDimension('K')->setWidth(16);
-    $sheet->getColumnDimension('L')->setWidth(14);
+    $sheet->getColumnDimension('I')->setWidth(22);
+    $sheet->getColumnDimension('J')->setWidth(22);
+    $sheet->getColumnDimension('K')->setWidth(12);
+    $sheet->getColumnDimension('L')->setWidth(10);
+    $sheet->getColumnDimension('M')->setWidth(16);
+    $sheet->getColumnDimension('N')->setWidth(14);
 
     $sheet->freezePane('A' . ($linhaHeader + 1));
 

@@ -44,12 +44,14 @@ interface CteRetido {
   nome_destinatario: string;
   nome_pagador: string;
   cidade_emit: string;
+  uf_emit: string;
   cidade_dest: string;
+  uf_dest: string;
   peso_real: number;
   vlr_merc: number;
   vlr_frete: number;
   qt_vol: number;
-  ult_ocor: string;
+  ult_ocor: number;
   is_ativo: boolean;
 }
 
@@ -481,6 +483,8 @@ export function PainelRetidos() {
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left whitespace-nowrap">Ocorrência</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Status</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Un. Emit</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Cidade Origem</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Cidade Destino</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Remetente</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Destinatário</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-left">Pagador</th>
@@ -493,7 +497,7 @@ export function PainelRetidos() {
                     <tbody>
                       {ctesRetidos.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="px-3 py-16 text-center text-slate-500 dark:text-slate-400">
+                          <td colSpan={14} className="px-3 py-16 text-center text-slate-500 dark:text-slate-400">
                             Nenhum CT-e retido encontrado
                           </td>
                         </tr>
@@ -516,6 +520,12 @@ export function PainelRetidos() {
                               </Badge>
                             </td>
                             <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.sigla_emit}</td>
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
+                              {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
+                              {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
+                            </td>
                             <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_remetente}>{cte.nome_remetente}</td>
                             <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_destinatario}>{cte.nome_destinatario}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={cte.nome_pagador}>{cte.nome_pagador}</td>
