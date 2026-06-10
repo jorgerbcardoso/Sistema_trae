@@ -78,7 +78,7 @@ try {
         }
     }
 
-    $ultimaColuna = 'N';
+    $ultimaColuna = 'O';
 
     if ($logoAdicionada) {
         $sheet->mergeCells('C1:' . $ultimaColuna . '1');
@@ -188,6 +188,7 @@ try {
         'L' => 'VOLUME',
         'M' => 'VLR MERCADORIA',
         'N' => 'VLR FRETE',
+        'O' => 'ÚLTIMA OCORRÊNCIA',
     ];
 
     $linhaHeader = $linhaInicio;
@@ -232,6 +233,7 @@ try {
         $sheet->setCellValue('L' . $linhaAtual, intval($cte['qt_vol'] ?? 0));
         $sheet->setCellValue('M' . $linhaAtual, floatval($cte['vlr_merc'] ?? 0));
         $sheet->setCellValue('N' . $linhaAtual, floatval($cte['vlr_frete'] ?? 0));
+        $sheet->setCellValue('O' . $linhaAtual, $cte['ult_ocor'] ?? '');
 
         $sheet->getStyle('K' . $linhaAtual)->getNumberFormat()->setFormatCode('#,##0.000');
         $sheet->getStyle('M' . $linhaAtual)->getNumberFormat()->setFormatCode('R$ #,##0.00');
@@ -254,7 +256,7 @@ try {
         'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '7F1D1D']]],
     ];
 
-    $sheet->mergeCells('A' . $linhaAtual . ':J' . $linhaAtual);
+    $sheet->mergeCells('A' . $linhaAtual . ':K' . $linhaAtual);
     $sheet->setCellValue('A' . $linhaAtual, sprintf(
         'TOTAL: %d CT-e (%d retidos / %d resolvidos)',
         $totais['total_retidos'] ?? count($ctes),
@@ -287,6 +289,7 @@ try {
     $sheet->getColumnDimension('L')->setWidth(10);
     $sheet->getColumnDimension('M')->setWidth(16);
     $sheet->getColumnDimension('N')->setWidth(14);
+    $sheet->getColumnDimension('O')->setWidth(18);
 
     $sheet->freezePane('A' . ($linhaHeader + 1));
 

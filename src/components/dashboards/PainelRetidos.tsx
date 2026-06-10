@@ -22,7 +22,7 @@ import {
   Loader2, FileSpreadsheet, PackageX, PackageCheck,
   Weight, DollarSign, Filter, RefreshCw,
   Calendar, Building2, FileText, Users, Truck,
-  X, Check, ChevronDown
+  X, Check, ChevronDown, Download
 } from 'lucide-react';
 
 interface Filters {
@@ -145,6 +145,13 @@ export function PainelRetidos() {
   const [elapsed, setElapsed] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Card Dialog States
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
+  const [cardDialogId, setCardDialogId] = useState<string>('');
+  const [cardDialogName, setCardDialogName] = useState<string>('');
+  const [ctesDialog, setCtesDialog] = useState<CteRetido[]>([]);
+  const [loadingCtesDialog, setLoadingCtesDialog] = useState(false);
+
   const carregarDados = useCallback(async (currentFilters: Filters) => {
     setLoading(true);
     setElapsed(0);
@@ -256,6 +263,82 @@ export function PainelRetidos() {
     }
   };
 
+  const abrirCardDialog = async (cardId: string, cardName: string) => {
+    setCardDialogId(cardId);
+    setCardDialogName(cardName);
+    setCardDialogOpen(true);
+    setCtesDialog([]);
+    setLoadingCtesDialog(true);
+
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/painel-retidos/get_ctes_card.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            cardId,
+            filters,
+          })
+        },
+        true
+      );
+      if (res.success) {
+        setCtesDialog(res.ctes ?? []);
+      } else {
+        toast.error(res.message || 'Erro ao carregar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao carregar CT-es');
+    } finally {
+      setLoadingCtesDialog(false);
+    }
+  };
+
+  const exportarCSV = (ctes: CteRetido[], filename: string) => {
+    const header = [
+      'CT-e',
+      'Emissão',
+      'Ocorrência 82',
+      'Status',
+      'Unidade Emit',
+      'Cidade Origem',
+      'Cidade Destino',
+      'Remetente',
+      'Destinatário',
+      'Pagador',
+      'Peso (kg)',
+      'Volume',
+      'Vlr Mercadoria',
+      'Vlr Frete',
+      'Última Ocorrência'
+    ];
+    const rows = ctes.map((cte) => [
+      `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`,
+      cte.data_emissao,
+      cte.data_ocorrencia_82,
+      cte.is_ativo ? 'RETIDO' : 'RESOLVIDO',
+      cte.sigla_emit,
+      cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-',
+      cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-',
+      cte.nome_remetente,
+      cte.nome_destinatario,
+      cte.nome_pagador,
+      cte.peso_real,
+      cte.qt_vol,
+      cte.vlr_merc,
+      cte.vlr_frete,
+      cte.ult_ocor
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const isDark = theme === 'dark';
   const gridColor  = isDark ? '#334155' : '#e2e8f0';
   const textColor  = isDark ? '#94a3b8' : '#64748b';
@@ -322,21 +405,29 @@ export function PainelRetidos() {
             {totais && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {([
-                  { label: 'Retidos Ativos',   value: totais.retidos_ativos, icon: PackageX, bg: '#fef2f2', bgDark: '#7f1d1d33', border: '#fecaca', borderDark: '#991b1b', iconColor: '#dc2626', textLabel: '#991b1b', textValue: '#7f1d1d' },
-                  { label: 'Resolvidos',     value: totais.retidos_resolvidos, icon: PackageCheck, bg: '#f0fdf4', bgDark: '#14532d33', border: '#bbf7d0', borderDark: '#166534', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
-                  { label: 'Total Retidos',  value: totais.total_retidos, icon: FileText, bg: '#f1f5f9', bgDark: '#1e293b', border: '#cbd5e1', borderDark: '#475569', iconColor: '#475569', textLabel: '#475569', textValue: '#334155' },
-                  { label: 'Peso Total',     value: formatTon(totais.peso_total), icon: Weight, bg: '#faf5ff', bgDark: '#3b076433', border: '#e9d5ff', borderDark: '#6b21a8', iconColor: '#8b5cf6', textLabel: '#7c3aed', textValue: '#5b21b6' },
-                  { label: 'Vlr Mercadoria', value: formatMoeda(totais.vlr_merc_total), icon: DollarSign, bg: '#fffbeb', bgDark: '#451a0333', border: '#fde68a', borderDark: '#92400e', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
-                  { label: 'Clientes',       value: totais.total_clientes, icon: Users, bg: '#f0fdfa', bgDark: '#042f2e33', border: '#99f6e4', borderDark: '#0f766e', iconColor: '#14b8a6', textLabel: '#0d9488', textValue: '#0f766e' },
-                ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
+                  { label: 'Retidos Ativos',   value: totais.retidos_ativos, icon: PackageX, bg: '#fef2f2', bgDark: '#7f1d1d33', border: '#fecaca', borderDark: '#991b1b', iconColor: '#dc2626', textLabel: '#991b1b', textValue: '#7f1d1d', cardId: 'ativos' },
+                  { label: 'Resolvidos',     value: totais.retidos_resolvidos, icon: PackageCheck, bg: '#f0fdf4', bgDark: '#14532d33', border: '#bbf7d0', borderDark: '#166534', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d', cardId: 'resolvidos' },
+                  { label: 'Total Retidos',  value: totais.total_retidos, icon: FileText, bg: '#f1f5f9', bgDark: '#1e293b', border: '#cbd5e1', borderDark: '#475569', iconColor: '#475569', textLabel: '#475569', textValue: '#334155', cardId: 'total' },
+                  { label: 'Peso Total',     value: formatTon(totais.peso_total), icon: Weight, bg: '#faf5ff', bgDark: '#3b076433', border: '#e9d5ff', borderDark: '#6b21a8', iconColor: '#8b5cf6', textLabel: '#7c3aed', textValue: '#5b21b6', cardId: null },
+                  { label: 'Vlr Mercadoria', value: formatMoeda(totais.vlr_merc_total), icon: DollarSign, bg: '#fffbeb', bgDark: '#451a0333', border: '#fde68a', borderDark: '#92400e', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e', cardId: null },
+                  { label: 'Clientes',       value: totais.total_clientes, icon: Users, bg: '#f0fdfa', bgDark: '#042f2e33', border: '#99f6e4', borderDark: '#0f766e', iconColor: '#14b8a6', textLabel: '#0d9488', textValue: '#0f766e', cardId: null },
+                ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue, cardId }) => (
                   <div
                     key={label}
-                    className="rounded-xl border p-4"
+                    className={`rounded-xl border p-4 transition-all ${cardId ? 'cursor-pointer hover:shadow-md hover:border-opacity-80' : ''}`}
                     style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
+                    onClick={() => cardId ? abrirCardDialog(cardId, label) : undefined}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Icon className="w-4 h-4" style={{ color: iconColor }} />
-                      <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+                        {cardId && (
+                          <span className="text-xs text-slate-400" title="Clique para ver detalhes">
+                            •
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
                   </div>
@@ -492,12 +583,13 @@ export function PainelRetidos() {
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vol</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vlr Merc</th>
                         <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Vlr Frete</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Últ. Ocorrência</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ctesRetidos.length === 0 ? (
                         <tr>
-                          <td colSpan={14} className="px-3 py-16 text-center text-slate-500 dark:text-slate-400">
+                          <td colSpan={15} className="px-3 py-16 text-center text-slate-500 dark:text-slate-400">
                             Nenhum CT-e retido encontrado
                           </td>
                         </tr>
@@ -533,6 +625,7 @@ export function PainelRetidos() {
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatMoeda(cte.vlr_merc)}</td>
                             <td className="px-3 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(cte.vlr_frete)}</td>
+                          <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ult_ocor}</td>
                           </tr>
                         ))
                       )}
@@ -627,6 +720,109 @@ export function PainelRetidos() {
                 Aplicar
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
+        <DialogContent className="sm:max-w-[1200px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <DialogTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  {cardDialogName}
+                  <Badge variant="outline" className="text-xs">{ctesDialog.length} CT-es</Badge>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 dark:text-slate-400">
+                  Lista de CT-es do card
+                </DialogDescription>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => exportarCSV(ctesDialog, `ctes_${cardDialogId}_${new Date().toISOString().split('T')[0]}.csv`)}
+                disabled={ctesDialog.length === 0}
+                className="dark:border-slate-700 dark:hover:bg-slate-800"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto -mx-6">
+            {loadingCtesDialog ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-10 w-10 animate-spin text-slate-400" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">CT-e</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">Emissão</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left whitespace-nowrap">Ocorrência 82</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Un. Emit</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Cidade Origem</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Cidade Destino</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Remetente</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Destinatário</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-left">Pagador</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Peso (kg)</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vol</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vlr Merc</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Vlr Frete</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase text-right whitespace-nowrap">Últ. Ocorrência</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ctesDialog.length === 0 ? (
+                      <tr>
+                        <td colSpan={15} className="px-4 py-16 text-center text-slate-500 dark:text-slate-400">
+                          Nenhum CT-e encontrado
+                        </td>
+                      </tr>
+                    ) : (
+                      ctesDialog.map((cte, idx) => (
+                        <tr
+                          key={idx}
+                          className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
+                        >
+                          <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                            {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.data_ocorrencia_82}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <Badge variant="outline" className={cte.is_ativo
+                              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
+                              {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.sigla_emit}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_emit || '-'}/${cte.uf_emit || ''}`}>
+                            {cte.cidade_emit ? `${cte.cidade_emit}/${cte.uf_emit}` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>
+                            {cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_remetente}>{cte.nome_remetente}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 max-w-[160px] truncate" title={cte.nome_destinatario}>{cte.nome_destinatario}</td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 max-w-[140px] truncate" title={cte.nome_pagador}>{cte.nome_pagador}</td>
+                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatNum(cte.peso_real)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</td>
+                          <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatMoeda(cte.vlr_merc)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(cte.vlr_frete)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ult_ocor}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
