@@ -936,7 +936,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[]) => void;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[]) => Promise<boolean>;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1362,21 +1362,36 @@ function CardCarregamento({
 
 type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[]) => void; onFechar: () => void }) {
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[]) => Promise<boolean>; onFechar: () => void }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
   const [paradasStr, setParadasStr] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleConfirmarManual = () => {
+  const handleConfirmarManual = async () => {
+    if (loading) return;
     if (!unidadeDestino.trim()) { toast.error('Informe a unidade de destino.'); return; }
     const paradas = paradasStr.split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
     const placaFinal = placa.trim().toUpperCase() || '';
-    onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
+    try {
+      setLoading(true);
+      const ok = await onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
+      if (ok) onFechar();
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleConfirmarAutomatico = () => {
-    onConfirmar('', '', []);
+  const handleConfirmarAutomatico = async () => {
+    if (loading) return;
+    try {
+      setLoading(true);
+      const ok = await onConfirmar('', '', []);
+      if (ok) onFechar();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -1387,7 +1402,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
             <ListTree className="w-5 h-5 text-indigo-500" />
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Carregamento Automático</h3>
           </div>
-          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+          <button onClick={!loading ? onFechar : undefined} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" disabled={loading}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1396,12 +1411,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
           <button
             className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${modo === 'automatico' ? 'bg-indigo-500 text-white border-indigo-500' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
             onClick={() => setModo('automatico')}
+            disabled={loading}
           >
             Por Linhas (automático)
           </button>
           <button
             className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${modo === 'manual' ? 'bg-indigo-500 text-white border-indigo-500' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
             onClick={() => setModo('manual')}
+            disabled={loading}
           >
             Manual
           </button>
@@ -1422,28 +1439,31 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Placa <span className="font-normal text-slate-400">(opcional — gerada automaticamente se vazia)</span></label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                   placeholder="Ex: ABC1234"
                   value={placa}
                   onChange={e => setPlaca(e.target.value.toUpperCase())}
+                  disabled={loading}
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Unidade de Destino</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                   placeholder="Ex: MTZ"
                   value={unidadeDestino}
                   onChange={e => setUnidadeDestino(e.target.value.toUpperCase())}
+                  disabled={loading}
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Paradas intermediárias <span className="font-normal text-slate-400">(separadas por vírgula, opcional)</span></label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                   placeholder="Ex: CWB, LDA"
                   value={paradasStr}
                   onChange={e => setParadasStr(e.target.value.toUpperCase())}
+                  disabled={loading}
                 />
               </div>
             </>
@@ -1451,9 +1471,10 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
         </div>
 
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onFechar}>Cancelar</Button>
-          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual}>
-            <ListTree className="w-3.5 h-3.5 mr-1.5" />Iniciar
+          <Button variant="outline" size="sm" onClick={onFechar} disabled={loading}>Cancelar</Button>
+          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual} disabled={loading}>
+            {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
+            {loading ? 'Processando...' : 'Iniciar'}
           </Button>
         </div>
       </div>
@@ -1952,7 +1973,7 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[]) => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[]): Promise<boolean> => {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
@@ -1961,13 +1982,15 @@ export function Disponiveis() {
       );
       if (res.success) {
         toast.success(res.message || 'Carregamento automático iniciado!');
-        setModalAutomaticoAberto(false);
         await carregarCarregamentos();
+        return true;
       } else {
         toast.error(res.message || 'Erro ao iniciar carregamento automático');
+        return false;
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao iniciar carregamento automático');
+      return false;
     }
   }, [carregarCarregamentos]);
 
