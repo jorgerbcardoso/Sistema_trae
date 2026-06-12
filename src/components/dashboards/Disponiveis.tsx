@@ -1171,8 +1171,23 @@ function CardCarregamento({
   const infoCriacao = primeiroCte
     ? `${formatData(primeiroCte.data_inclusao)} ${primeiroCte.hora_inclusao?.slice(0, 5)} · ${primeiroCte.login_inclusao}`
     : null;
-  const destino = carregamento.destino ?? null;
-  const paradas = carregamento.paradas ? carregamento.paradas.split(',').map(p => p.trim()).filter(Boolean) : [];
+  const destino = (() => {
+    if (carregamento.destino) return carregamento.destino;
+    const m = carregamento.placa_provisoria.match(/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/);
+    if (m?.[1]) return m[1];
+    const freq = new Map<string, number>();
+    for (const c of carregamento.ctes) {
+      const cidade = (c.cidade ?? '').trim().toUpperCase();
+      if (!cidade || !/^[A-Z0-9]{2,5}$/.test(cidade)) continue;
+      freq.set(cidade, (freq.get(cidade) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    let bestN = 0;
+    for (const [k, n] of freq.entries()) {
+      if (n > bestN) { best = k; bestN = n; }
+    }
+    return best;
+  })();
 
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
@@ -1211,11 +1226,6 @@ function CardCarregamento({
               <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 <span className="font-semibold text-slate-600 dark:text-slate-300">Destino:</span>
                 <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{destino ?? '-'}</span>
-                {paradas.length > 0 && (
-                  <span className="text-slate-400 dark:text-slate-500 truncate">
-                    · via {paradas.join(', ')}
-                  </span>
-                )}
               </div>
             </div>
           </div>
@@ -1294,7 +1304,7 @@ function CardCarregamento({
               variant="outline"
               className={`flex-1 h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
               onClick={() => onCarregarHub(carregamento)}
-              disabled={loadingHub || !carregamento.destino || !carregamento.paradas || carregamento.paradas.trim() === '' || carregamento.capacidade_ton === null || carregamento.capacidade_m3 === null}
+              disabled={loadingHub || carregamento.capacidade_ton === null || carregamento.capacidade_m3 === null}
               title="Completar carregamento com CT-es via Hub"
             >
               {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
@@ -1480,6 +1490,89 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
           <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual} disabled={loading}>
             {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
             {loading ? 'Processando...' : 'Iniciar'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalHub({
+  placa,
+  origem,
+  destino,
+  unidadesStr,
+  onChangeUnidades,
+  onConfirmar,
+  onFechar,
+  loadingSugestao,
+  loadingConfirmar,
+}: {
+  placa: string;
+  origem: string;
+  destino: string;
+  unidadesStr: string;
+  onChangeUnidades: (value: string) => void;
+  onConfirmar: () => void;
+  onFechar: () => void;
+  loadingSugestao: boolean;
+  loadingConfirmar: boolean;
+}) {
+  const loading = loadingSugestao || loadingConfirmar;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Hub · Completar Carregamento</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {placa} · linha <span className="font-mono font-bold">{origem}</span> → <span className="font-mono font-bold">{destino}</span>
+              </p>
+            </div>
+          </div>
+          <button onClick={!loading ? onFechar : undefined} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" disabled={loading}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <div className="rounded-xl border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 p-4 space-y-2">
+            <p className="text-sm font-semibold text-violet-800 dark:text-violet-300 flex items-center gap-2">
+              <Share2 className="w-4 h-4" />
+              Unidades intermediárias
+              {loadingSugestao && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+            </p>
+            <p className="text-xs text-violet-700 dark:text-violet-400">
+              O sistema sugere estas unidades a partir da linha cadastrada ({origem} → {destino}). Você pode editar antes de buscar.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+              Unidades <span className="font-normal text-slate-400">(separadas por vírgula)</span>
+            </label>
+            <input
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 disabled:opacity-50"
+              placeholder="Ex: CWB, LDA"
+              value={unidadesStr}
+              onChange={e => onChangeUnidades(e.target.value.toUpperCase())}
+              disabled={loading}
+            />
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onFechar} disabled={loading}>Cancelar</Button>
+          <Button
+            size="sm"
+            className="bg-violet-600 hover:bg-violet-700 text-white"
+            onClick={onConfirmar}
+            disabled={loading || !unidadesStr.trim()}
+          >
+            {loadingConfirmar ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5 mr-1.5" />}
+            {loadingConfirmar ? 'Processando...' : 'Completar'}
           </Button>
         </div>
       </div>
@@ -1799,6 +1892,11 @@ export function Disponiveis() {
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
   const [loadingHub, setLoadingHub] = useState(false);
+  const [hubEtapa, setHubEtapa] = useState<'sugestao' | 'confirmar' | null>(null);
+  const [hubModalAberto, setHubModalAberto] = useState(false);
+  const [hubModalCarregamento, setHubModalCarregamento] = useState<Carregamento | null>(null);
+  const [hubModalDestino, setHubModalDestino] = useState('');
+  const [hubModalUnidadesStr, setHubModalUnidadesStr] = useState('');
 
   const [unidadePermiteCarregamento, setUnidadePermiteCarregamento] = useState<boolean | null>(null);
 
@@ -2050,26 +2148,87 @@ export function Disponiveis() {
     toast.info('Em breve: integração com SSW para carregar o manifesto.');
   }, []);
 
-  const carregarHub = useCallback(async (car: Carregamento) => {
+  const getDestinoCarregamento = useCallback((car: Carregamento): string | null => {
+    if (car.destino) return car.destino;
+    const m = car.placa_provisoria.match(/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/);
+    if (m?.[1]) return m[1];
+    const freq = new Map<string, number>();
+    for (const c of car.ctes) {
+      const cidade = (c.cidade ?? '').trim().toUpperCase();
+      if (!cidade || !/^[A-Z0-9]{2,5}$/.test(cidade)) continue;
+      freq.set(cidade, (freq.get(cidade) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    let bestN = 0;
+    for (const [k, n] of freq.entries()) {
+      if (n > bestN) { best = k; bestN = n; }
+    }
+    return best;
+  }, []);
+
+  const abrirHub = useCallback(async (car: Carregamento) => {
     if (!sigla) return;
     if (loadingHub) return;
-
-    const destino = car.destino ?? null;
-    const paradas = (car.paradas ?? '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
-    const destinosPermitidos = new Set<string>([...(destino ? [destino] : []), ...paradas]);
-
-    if (!destino) {
-      toast.error('Destino do carregamento não definido.');
-      return;
-    }
-    if (paradas.length === 0) {
-      toast.info('Este carregamento não possui unidades intermediárias para consultar no Hub.');
-      return;
-    }
     if (car.capacidade_ton === null || car.capacidade_m3 === null) {
       toast.error('Defina a capacidade do veículo para completar via Hub.');
       return;
     }
+
+    const destino = getDestinoCarregamento(car);
+    if (!destino) {
+      toast.error('Não foi possível identificar o destino do carregamento.');
+      return;
+    }
+
+    setHubModalCarregamento(car);
+    setHubModalDestino(destino);
+    setHubModalUnidadesStr('');
+    setHubModalAberto(true);
+
+    setHubCarregamentoPlaca(car.placa_provisoria);
+    setHubEtapa('sugestao');
+    setLoadingHub(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_hub_compartilhado.php`,
+        { method: 'POST', body: JSON.stringify({ sigla, destino, modo: 'sugestao' }) },
+        true
+      );
+      if (res.success) {
+        const sugeridas = Array.isArray(res.unidades_sugeridas) ? res.unidades_sugeridas : [];
+        setHubModalUnidadesStr(sugeridas.join(', '));
+      } else {
+        toast.error(res.message || 'Erro ao buscar sugestão de unidades.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao buscar sugestão de unidades.');
+    } finally {
+      setLoadingHub(false);
+      setHubEtapa(null);
+    }
+  }, [sigla, loadingHub, getDestinoCarregamento]);
+
+  const confirmarHub = useCallback(async () => {
+    if (!sigla) return;
+    const car = hubModalCarregamento;
+    const destino = hubModalDestino.trim().toUpperCase();
+    if (!car) return;
+    if (!destino) { toast.error('Destino do carregamento não definido.'); return; }
+    if (car.capacidade_ton === null || car.capacidade_m3 === null) { toast.error('Defina a capacidade do veículo.'); return; }
+    if (loadingHub) return;
+
+    const unidades = hubModalUnidadesStr
+      .split(',')
+      .map(u => u.trim().toUpperCase())
+      .filter(Boolean)
+      .filter(u => /^[A-Z0-9]{2,5}$/.test(u));
+
+    if (unidades.length === 0) {
+      toast.error('Informe ao menos uma unidade intermediária.');
+      return;
+    }
+
+    const destinosPermitidos = new Set<string>([destino, ...unidades]);
 
     const parsePrevEntTs = (s: string): number => {
       const m = s?.match(/^(\d{2})\/(\d{2})$/);
@@ -2111,12 +2270,13 @@ export function Disponiveis() {
     }
 
     setHubCarregamentoPlaca(car.placa_provisoria);
+    setHubEtapa('confirmar');
     setLoadingHub(true);
     setDadosHub(null);
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_hub_compartilhado.php`,
-        { method: 'POST', body: JSON.stringify({ sigla, unidades: paradas }) },
+        { method: 'POST', body: JSON.stringify({ sigla, destino, unidades }) },
         true
       );
 
@@ -2174,13 +2334,18 @@ export function Disponiveis() {
       }
 
       toast.success(`Hub: ${resAdd.adicionados ?? selecionar.length} CT-e(s) adicionados ao carregamento ${car.placa_provisoria}.`);
+      setHubModalAberto(false);
+      setHubModalCarregamento(null);
+      setHubModalDestino('');
+      setHubModalUnidadesStr('');
       await carregarCarregamentos();
     } catch (e: any) {
       toast.error(e.message || 'Erro ao completar carregamento via Hub');
     } finally {
       setLoadingHub(false);
+      setHubEtapa(null);
     }
-  }, [sigla, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos]);
+  }, [sigla, hubModalCarregamento, hubModalDestino, hubModalUnidadesStr, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos]);
 
   const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
     setCtesSelecionados(prev => {
@@ -2514,13 +2679,27 @@ export function Disponiveis() {
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
-            onCarregarHub={carregarHub}
+            onCarregarHub={abrirHub}
             loadingHub={loadingHub}
             hubCarregamentoPlaca={hubCarregamentoPlaca}
             onRecarregarCarregamentos={carregarCarregamentos}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
+
+          {hubModalAberto && hubModalCarregamento && (
+            <ModalHub
+              placa={hubModalCarregamento.placa_provisoria}
+              origem={sigla}
+              destino={hubModalDestino}
+              unidadesStr={hubModalUnidadesStr}
+              onChangeUnidades={setHubModalUnidadesStr}
+              onConfirmar={confirmarHub}
+              onFechar={() => { if (!loadingHub) { setHubModalAberto(false); setHubModalCarregamento(null); setHubModalDestino(''); setHubModalUnidadesStr(''); } }}
+              loadingSugestao={loadingHub && hubEtapa === 'sugestao'}
+              loadingConfirmar={loadingHub && hubEtapa === 'confirmar'}
+            />
+          )}
 
           {dadosHub && modoApontamento && (
             <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-700">
