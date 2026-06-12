@@ -86,6 +86,9 @@ try {
             PRIMARY KEY (unidade, placa_provisoria)
         )
     ", [], $conn);
+
+    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS destino VARCHAR(10)", [], $conn);
+    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS paradas TEXT", [], $conn);
 } catch (Exception $e) {
     respondJson(['success' => false, 'message' => 'Erro ao preparar tabelas de carregamento.']);
 }
@@ -104,13 +107,15 @@ $sqlCarregamentos = "
         v.capacidade_ton,
         v.capacidade_m3,
         cap.cap_ton,
-        cap.cap_m3
+        cap.cap_m3,
+        cap.destino,
+        cap.paradas
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = $1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = $1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.destino, cap.paradas
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -125,6 +130,13 @@ $idxPorPlaca = [];
 while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $placa = $row['placa_provisoria'] ?? '';
     if ($placa === '') continue;
+
+    $destino = strtoupper(trim($row['destino'] ?? ''));
+    if ($destino === '' && preg_match('/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/', $placa, $m)) {
+        $destino = strtoupper($m[1]);
+    }
+    $paradas = $row['paradas'] ?? '';
+
     $idx = count($carregamentos);
     $idxPorPlaca[$placa] = $idx;
     $carregamentos[] = [
@@ -135,6 +147,8 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'login_criacao'    => $row['login_criacao'] ?? '',
         'capacidade_ton'   => $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null),
         'capacidade_m3'    => $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null),
+        'destino'          => $destino !== '' ? $destino : null,
+        'paradas'          => $paradas !== '' ? $paradas : null,
         'ctes'             => [],
     ];
 }

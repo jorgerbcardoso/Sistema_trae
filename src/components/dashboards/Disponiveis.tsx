@@ -187,6 +187,8 @@ interface Carregamento {
   login_criacao: string;
   capacidade_ton: number | null;
   capacidade_m3: number | null;
+  destino?: string | null;
+  paradas?: string | null;
   ctes: CteCarregamento[];
 }
 
@@ -931,8 +933,7 @@ interface CarregamentoAreaProps {
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onBuscarCargas: (placa: string | null) => void;
-  onCarregarHub: (placa: string) => void;
+  onCarregarHub: (carregamento: Carregamento) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
@@ -1101,7 +1102,6 @@ function CardCarregamento({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
-  onBuscarCargas,
   onCarregarHub,
   loadingHub,
   hubCarregamentoPlaca,
@@ -1114,8 +1114,7 @@ function CardCarregamento({
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onBuscarCargas: (placa: string) => void;
-  onCarregarHub: (placa: string) => void;
+  onCarregarHub: (carregamento: Carregamento) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
@@ -1172,6 +1171,8 @@ function CardCarregamento({
   const infoCriacao = primeiroCte
     ? `${formatData(primeiroCte.data_inclusao)} ${primeiroCte.hora_inclusao?.slice(0, 5)} · ${primeiroCte.login_inclusao}`
     : null;
+  const destino = carregamento.destino ?? null;
+  const paradas = carregamento.paradas ? carregamento.paradas.split(',').map(p => p.trim()).filter(Boolean) : [];
 
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
@@ -1203,10 +1204,19 @@ function CardCarregamento({
                 </div>
               )}
               {infoCriacao ? (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500">{infoCriacao}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap truncate w-full">{infoCriacao}</p>
               ) : (
                 <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
               )}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino:</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{destino ?? '-'}</span>
+                {paradas.length > 0 && (
+                  <span className="text-slate-400 dark:text-slate-500 truncate">
+                    · via {paradas.join(', ')}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -1283,9 +1293,9 @@ function CardCarregamento({
               size="sm"
               variant="outline"
               className={`flex-1 h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
-              onClick={() => onCarregarHub(carregamento.placa_provisoria)}
-              disabled={loadingHub}
-              title="Buscar cargas das unidades compartilhadas"
+              onClick={() => onCarregarHub(carregamento)}
+              disabled={loadingHub || !carregamento.destino || !carregamento.paradas || carregamento.paradas.trim() === '' || carregamento.capacidade_ton === null || carregamento.capacidade_m3 === null}
+              title="Completar carregamento com CT-es via Hub"
             >
               {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
@@ -1298,11 +1308,6 @@ function CardCarregamento({
             <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setEditandoCapacidade(v => !v); }} title="Editar capacidade do veículo">
               <Gauge className="w-3.5 h-3.5" />
             </Button>
-            {temCapacidade && (
-              <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => onBuscarCargas(carregamento.placa_provisoria)} title="Buscar Cargas Compartilhadas">
-                <ListTree className="w-3.5 h-3.5" />
-              </Button>
-            )}
             <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
               {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             </Button>
@@ -1621,7 +1626,6 @@ function CarregamentoArea({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
-  onBuscarCargas,
   onCarregarHub,
   loadingHub,
   hubCarregamentoPlaca,
@@ -1699,17 +1703,18 @@ function CarregamentoArea({
           <Button
             size="sm"
             variant="outline"
-            className="text-xs h-8"
-            onClick={() => setModalAutomaticoAberto(true)}
-          >
-            <ListTree className="w-3.5 h-3.5 mr-1.5" />Carregamento Automático
-          </Button>
-          <Button
-            size="sm"
-            className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8"
+            className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
             onClick={() => setModalAberto(true)}
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />Criar carregamento
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+            onClick={() => setModalAutomaticoAberto(true)}
+          >
+            <ListTree className="w-3.5 h-3.5 mr-1.5" />Carregamento Automático
           </Button>
         </div>
       </div>
@@ -1733,7 +1738,6 @@ function CarregamentoArea({
               onExcluirCarregamento={onExcluirCarregamento}
               onRemoverCte={onRemoverCte}
               onCarregarSSW={onCarregarSSW}
-              onBuscarCargas={onBuscarCargas}
               onCarregarHub={onCarregarHub}
               loadingHub={loadingHub}
               hubCarregamentoPlaca={hubCarregamentoPlaca}
@@ -1819,7 +1823,8 @@ export function Disponiveis() {
     const m = new Map<number, string>();
     for (const car of carregamentos) {
       for (const c of car.ctes) {
-        if (!m.has(c.seq_cte)) m.set(c.seq_cte, car.placa_provisoria);
+        const key = (c.nroCte ?? 0) > 0 ? (c.nroCte as number) : c.seq_cte;
+        if (!m.has(key)) m.set(key, car.placa_provisoria);
       }
     }
     return m;
@@ -2045,34 +2050,137 @@ export function Disponiveis() {
     toast.info('Em breve: integração com SSW para carregar o manifesto.');
   }, []);
 
-  const carregarHub = useCallback(async (placa: string) => {
+  const carregarHub = useCallback(async (car: Carregamento) => {
     if (!sigla) return;
-    setHubCarregamentoPlaca(placa);
+    if (loadingHub) return;
+
+    const destino = car.destino ?? null;
+    const paradas = (car.paradas ?? '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+    const destinosPermitidos = new Set<string>([...(destino ? [destino] : []), ...paradas]);
+
+    if (!destino) {
+      toast.error('Destino do carregamento não definido.');
+      return;
+    }
+    if (paradas.length === 0) {
+      toast.info('Este carregamento não possui unidades intermediárias para consultar no Hub.');
+      return;
+    }
+    if (car.capacidade_ton === null || car.capacidade_m3 === null) {
+      toast.error('Defina a capacidade do veículo para completar via Hub.');
+      return;
+    }
+
+    const parsePrevEntTs = (s: string): number => {
+      const m = s?.match(/^(\d{2})\/(\d{2})$/);
+      if (!m) return Number.POSITIVE_INFINITY;
+      const dia = parseInt(m[1], 10);
+      const mes = parseInt(m[2], 10);
+      if (dia <= 0 || mes <= 0 || mes > 12) return Number.POSITIVE_INFINITY;
+      const hoje = new Date();
+      const anoBase = hoje.getFullYear();
+      const cand = new Date(anoBase, mes - 1, dia);
+      const diff = cand.getTime() - new Date(anoBase, hoje.getMonth(), hoje.getDate()).getTime();
+      if (diff < -180 * 86400 * 1000) {
+        return new Date(anoBase + 1, mes - 1, dia).getTime();
+      }
+      return cand.getTime();
+    };
+
+    const ctesNoCarregamento = new Set<number>(
+      car.ctes.map(c => (c.nroCte && c.nroCte > 0 ? c.nroCte : c.seq_cte)).filter(n => n > 0)
+    );
+
+    const ctesDetalhados = car.ctes.map(c => {
+      const key = c.nroCte && c.nroCte > 0 ? c.nroCte : c.seq_cte;
+      const detSSW = todosCtes.find(e => e.nroCte === key);
+      const det = detSSW ?? (c.ctrc ? { ctrc: c.ctrc, nroCte: c.nroCte ?? 0, destinatario: c.destinatario ?? '', cidade: c.cidade ?? '', peso: c.peso ?? '', cubagem: c.cubagem ?? '' } : undefined);
+      return { ...c, det, key };
+    });
+
+    const pesoAtualKg = ctesDetalhados.reduce((s, c) => s + parsePeso(c.det?.peso ?? ''), 0);
+    const cubAtualM3 = ctesDetalhados.reduce((s, c) => s + parseCubagem(c.det?.cubagem ?? ''), 0);
+
+    const capKg = car.capacidade_ton * 1000;
+    const capM3 = car.capacidade_m3;
+    let restoKg = capKg - pesoAtualKg;
+    let restoM3 = capM3 - cubAtualM3;
+    if (restoKg <= 0 || restoM3 <= 0) {
+      toast.info('Este carregamento já está no limite de capacidade.');
+      return;
+    }
+
+    setHubCarregamentoPlaca(car.placa_provisoria);
     setLoadingHub(true);
     setDadosHub(null);
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_hub_compartilhado.php`,
-        { method: 'POST', body: JSON.stringify({ sigla }) },
+        { method: 'POST', body: JSON.stringify({ sigla, unidades: paradas }) },
         true
       );
-      if (res.success) {
-        if (res.unidades.length === 0) {
-          toast.info('Nenhuma unidade compartilhada configurada para esta unidade.');
-        } else {
-          setDadosHub({ unidades: res.unidades, dados: res.dados });
-          const totalCtes = Object.values(res.dados as Record<string, { ctes: Cte[] }>).reduce((s, u) => s + u.ctes.length, 0);
-          toast.success(`Hub carregado: ${totalCtes} CT-e(s) disponíveis em ${res.unidades.length} unidade(s) compartilhada(s).`);
-        }
-      } else {
-        toast.error(res.message || 'Erro ao carregar hub de cargas compartilhadas');
+
+      if (!res.success) {
+        toast.error(res.message || 'Erro ao carregar hub');
+        return;
       }
+
+      if (!res.unidades || res.unidades.length === 0) {
+        toast.info('Nenhuma unidade retornada pelo Hub.');
+        return;
+      }
+
+      setDadosHub({ unidades: res.unidades, dados: res.dados });
+
+      const hubs = Object.values(res.dados as Record<string, { ctes: Cte[]; erro: string | null }>).flatMap(u => u.ctes ?? []);
+      const candidatos = hubs
+        .filter(c => destinosPermitidos.has(c.unidadeDest))
+        .filter(c => !ctesNoCarregamento.has(c.nroCte))
+        .filter(c => !ctesJaCarregados.has(c.nroCte));
+
+      if (candidatos.length === 0) {
+        toast.info('Nenhum CT-e elegível no Hub para completar este carregamento.');
+        return;
+      }
+
+      candidatos.sort((a, b) => parsePrevEntTs(a.prevEnt) - parsePrevEntTs(b.prevEnt));
+
+      const selecionar: number[] = [];
+      for (const c of candidatos) {
+        const p = parsePeso(c.peso);
+        const v = parseCubagem(c.cubagem);
+        if (p <= 0 && v <= 0) continue;
+        if (p > restoKg || v > restoM3) continue;
+        selecionar.push(c.nroCte);
+        restoKg -= p;
+        restoM3 -= v;
+        if (restoKg <= 0 || restoM3 <= 0) break;
+      }
+
+      if (selecionar.length === 0) {
+        toast.info('Nenhum CT-e do Hub cabe na capacidade restante do veículo.');
+        return;
+      }
+
+      const resAdd = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: car.placa_provisoria, seq_ctes: selecionar }) },
+        true
+      );
+
+      if (!resAdd.success) {
+        toast.error(resAdd.message || 'Erro ao adicionar CT-es do Hub');
+        return;
+      }
+
+      toast.success(`Hub: ${resAdd.adicionados ?? selecionar.length} CT-e(s) adicionados ao carregamento ${car.placa_provisoria}.`);
+      await carregarCarregamentos();
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao carregar hub');
+      toast.error(e.message || 'Erro ao completar carregamento via Hub');
     } finally {
       setLoadingHub(false);
     }
-  }, [sigla]);
+  }, [sigla, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos]);
 
   const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
     setCtesSelecionados(prev => {
@@ -2406,7 +2514,6 @@ export function Disponiveis() {
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
-            onBuscarCargas={setHubCarregamentoPlaca}
             onCarregarHub={carregarHub}
             loadingHub={loadingHub}
             hubCarregamentoPlaca={hubCarregamentoPlaca}

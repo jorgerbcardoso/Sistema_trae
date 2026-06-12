@@ -154,6 +154,9 @@ try {
             PRIMARY KEY (unidade, placa_provisoria)
         )
     ", [], $conn);
+
+    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS destino VARCHAR(10)", [], $conn);
+    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS paradas TEXT", [], $conn);
 } catch (Exception $e) {
     respondJson(['success' => false, 'message' => 'Erro ao preparar tabelas de carregamento.']);
 }
@@ -210,11 +213,12 @@ if ($modoAutomatico) {
 
             $capTon = $limitePeso / 1000.0;
             $capM3  = $limiteVol;
+            $paradasCsv = implode(',', $paradasLinha);
             sql(
-                "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3)
-                 VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3",
-                [$unidade, $placaAuto, $capTon, $capM3],
+                "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
+                [$unidade, $placaAuto, $capTon, $capM3, $dest, $paradasCsv],
                 $conn
             );
 
@@ -282,11 +286,12 @@ try {
 
     $capTon = $limitePeso / 1000.0;
     $capM3  = $limiteVol;
+    $paradasCsv = implode(',', $paradas);
     sql(
-        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3",
-        [$unidade, $placaFinal, $capTon, $capM3],
+        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
+        [$unidade, $placaFinal, $capTon, $capM3, $unidadeDestino, $paradasCsv],
         $conn
     );
 

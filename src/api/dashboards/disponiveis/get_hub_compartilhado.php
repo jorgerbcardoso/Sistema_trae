@@ -11,21 +11,32 @@ $g_sql  = connect();
 
 $input = getRequestInput();
 $sigla = strtoupper(trim($input['sigla'] ?? ''));
+$unidadesParam = $input['unidades'] ?? null;
 
 if (empty($sigla) || !preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Parâmetros inválidos.']);
 }
 
-$tblUnidade = $domain . '_unidade';
-$resUnidade = sql("SELECT unidades_compart FROM {$tblUnidade} WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$sigla], $g_sql);
+$unidadesCompart = [];
 
-if (!$resUnidade || pg_num_rows($resUnidade) === 0) {
-    respondJson(['success' => true, 'unidades' => [], 'dados' => []]);
+if (is_array($unidadesParam)) {
+    $unidadesCompart = array_values(array_unique(array_filter(array_map(function($u) {
+        $u = strtoupper(trim((string)$u));
+        return preg_match('/^[A-Z0-9]{2,5}$/', $u) ? $u : null;
+    }, $unidadesParam))));
+} else {
+    $tblUnidade = $domain . '_unidade';
+    $resUnidade = sql("SELECT unidades_compart FROM {$tblUnidade} WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$sigla], $g_sql);
+
+    if ($resUnidade && pg_num_rows($resUnidade) > 0) {
+        $row = pg_fetch_assoc($resUnidade);
+        $unidadesCompart = array_filter(array_map('trim', explode(',', $row['unidades_compart'] ?? '')));
+        $unidadesCompart = array_values(array_unique(array_filter(array_map(function($u) {
+            $u = strtoupper(trim((string)$u));
+            return preg_match('/^[A-Z0-9]{2,5}$/', $u) ? $u : null;
+        }, $unidadesCompart))));
+    }
 }
-
-$row = pg_fetch_assoc($resUnidade);
-$unidadesCompart = array_filter(array_map('trim', explode(',', $row['unidades_compart'] ?? '')));
-$unidadesCompart = array_values(array_map('strtoupper', $unidadesCompart));
 
 if (empty($unidadesCompart)) {
     respondJson(['success' => true, 'unidades' => [], 'dados' => []]);
