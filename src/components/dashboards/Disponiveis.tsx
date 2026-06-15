@@ -6,6 +6,7 @@ import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Switch } from '../ui/switch';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 import { ENVIRONMENT } from '../../config/environment';
@@ -450,7 +451,7 @@ function GrupoDestinoCard({
         </span>
         <span className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
           <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-          {grupo.sigla}
+          {grupo.sigla === 'SEM DESTINO' ? '-' : grupo.sigla}
         </span>
         <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs truncate pr-2">
           {grupo.nome}
@@ -973,7 +974,11 @@ interface CarregamentoAreaProps {
   onCarregarHub: (carregamento: Carregamento) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
-  onRecarregarCarregamentos: () => void;
+  onRecarregarCarregamentos: () => Promise<void>;
+  onImportarCarregamentos: () => Promise<any>;
+  importandoCarregamentos: boolean;
+  importacaoAutomatica: boolean;
+  onToggleImportacaoAutomatica: (ativo: boolean) => void;
   onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
@@ -1168,6 +1173,8 @@ function CardCarregamento({
   onCarregarHub,
   loadingHub,
   hubCarregamentoPlaca,
+  onRecarregarCarregamentos,
+  importandoCarregamentos,
 }: {
   carregamento: Carregamento;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
@@ -1180,7 +1187,8 @@ function CardCarregamento({
   onCarregarHub: (carregamento: Carregamento) => void;
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
-  onRecarregarCarregamentos: () => void;
+  onRecarregarCarregamentos: () => Promise<void>;
+  importandoCarregamentos: boolean;
 }) {
   const [expandido, setExpandido] = useState(false);
   const [editandoPlaca, setEditandoPlaca] = useState(false);
@@ -1358,7 +1366,13 @@ function CardCarregamento({
           </div>
           <div className="flex items-center gap-1.5 shrink-0 justify-end">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
+              {importandoCarregamentos ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <>
+                  {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
+                </>
+              )}
             </Badge>
           </div>
           <div className="col-span-2 flex gap-2 min-w-0">
@@ -2073,25 +2087,20 @@ function ModalHub({
   );
 }
 
-function ModalImportarSSW({ onFechar, onConcluir }: { onFechar: () => void; onConcluir: () => void }) {
+function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () => void; onConcluir: () => Promise<void>; onExecutar: () => Promise<any> }) {
   const [etapa, setEtapa] = useState<'confirmar' | 'carregando' | 'resultado'>('confirmar');
-  const [sobrescrever, setSobrescrever] = useState(false);
   const [logs, setLogs] = useState<LogImportacao[]>([]);
   const [placasSSW, setPlacasSSW] = useState<string[]>([]);
 
   const executar = async () => {
     setEtapa('carregando');
     try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
-        { method: 'POST', body: JSON.stringify({ sobrescrever }) },
-        true
-      );
+      const res = await onExecutar();
       if (res.success) {
         setLogs(res.logs ?? []);
         setPlacasSSW(res.placas_ssw ?? []);
         setEtapa('resultado');
-        onConcluir();
+        await onConcluir();
       } else {
         toast.error(res.message || 'Erro ao importar carregamentos do SSW');
         onFechar();
@@ -2129,27 +2138,17 @@ function ModalImportarSSW({ onFechar, onConcluir }: { onFechar: () => void; onCo
           {etapa === 'confirmar' && (
             <div className="space-y-4">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                O sistema irá buscar os carregamentos prontos no SSW para a sua unidade e vinculá-los automaticamente ao Presto.
+                O sistema irá reimportar os carregamentos do SSW para a sua unidade, atualizando o Presto.
               </p>
               <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Carregamentos já existentes</p>
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Reimportação automática</p>
                     <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                      Se uma placa do SSW já existir no Presto, o que deseja fazer?
+                      Antes de importar, o sistema remove os registros anteriores vindos do SSW e traz novamente os dados. Apontamentos manuais permanecem.
                     </p>
                   </div>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 pl-7">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="sobrescrever" checked={!sobrescrever} onChange={() => setSobrescrever(false)} className="accent-amber-500" />
-                    <span className="text-sm text-amber-800 dark:text-amber-300">Ignorar (manter o carregamento atual do Presto)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="sobrescrever" checked={sobrescrever} onChange={() => setSobrescrever(true)} className="accent-amber-500" />
-                    <span className="text-sm text-amber-800 dark:text-amber-300">Sobrescrever (substituir pelo carregamento do SSW)</span>
-                  </label>
                 </div>
               </div>
             </div>
@@ -2216,6 +2215,10 @@ function CarregamentoArea({
   loadingHub,
   hubCarregamentoPlaca,
   onRecarregarCarregamentos,
+  onImportarCarregamentos,
+  importandoCarregamentos,
+  importacaoAutomatica,
+  onToggleImportacaoAutomatica,
   onCarregamentoAutomatico,
   todosCtes,
 }: CarregamentoAreaProps) {
@@ -2283,9 +2286,14 @@ function CarregamentoArea({
             variant="outline"
             className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
             onClick={() => setModalImportarAberto(true)}
+            disabled={importandoCarregamentos}
           >
             <FileDown className="w-3.5 h-3.5 mr-1.5" />Importar carregamentos
           </Button>
+          <div className="flex items-center gap-2 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Importação automática</span>
+            <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
+          </div>
           <Button
             size="sm"
             variant="outline"
@@ -2328,6 +2336,7 @@ function CarregamentoArea({
               loadingHub={loadingHub}
               hubCarregamentoPlaca={hubCarregamentoPlaca}
               onRecarregarCarregamentos={onRecarregarCarregamentos}
+              importandoCarregamentos={importandoCarregamentos}
             />
           ))}
         </div>
@@ -2349,6 +2358,7 @@ function CarregamentoArea({
         <ModalImportarSSW
           onFechar={() => setModalImportarAberto(false)}
           onConcluir={onRecarregarCarregamentos}
+          onExecutar={onImportarCarregamentos}
         />
       )}
     </div>
@@ -2381,6 +2391,8 @@ export function Disponiveis() {
   const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
+  const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
+  const [importacaoAutomatica, setImportacaoAutomatica] = useState(false);
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
@@ -2533,6 +2545,38 @@ export function Disponiveis() {
     } catch {}
     finally { setLoadingCarregamentos(false); }
   }, []);
+
+  const handleImportarCarregamentos = useCallback(async () => {
+    if (importandoCarregamentos) return { success: false, message: 'Importação já em andamento.' };
+    setImportandoCarregamentos(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
+        { method: 'POST', body: JSON.stringify({}) },
+        true
+      );
+      if (res?.success) {
+        await carregarCarregamentos();
+      }
+      return res;
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
+    } finally {
+      setImportandoCarregamentos(false);
+    }
+  }, [carregarCarregamentos, importandoCarregamentos]);
+
+  useEffect(() => {
+    if (!importacaoAutomatica) return;
+    let cancelado = false;
+    const tick = async () => {
+      if (cancelado) return;
+      await handleImportarCarregamentos();
+    };
+    tick();
+    const id = setInterval(tick, 120000);
+    return () => { cancelado = true; clearInterval(id); };
+  }, [importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {
@@ -3256,6 +3300,10 @@ export function Disponiveis() {
             loadingHub={loadingHub}
             hubCarregamentoPlaca={hubCarregamentoPlaca}
             onRecarregarCarregamentos={carregarCarregamentos}
+            onImportarCarregamentos={handleImportarCarregamentos}
+            importandoCarregamentos={importandoCarregamentos}
+            importacaoAutomatica={importacaoAutomatica}
+            onToggleImportacaoAutomatica={setImportacaoAutomatica}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
