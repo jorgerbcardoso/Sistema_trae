@@ -1509,7 +1509,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                 <ListTree className="w-4 h-4" />Montagem automática por linhas
               </p>
               <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                Selecione uma linha para montar um carregamento para o destino final dessa linha, incluindo as paradas intermediárias. A placa será gerada automaticamente no formato <strong>ORIGEM-DESTINO</strong>.
+                Selecione uma linha para montar um carregamento para o destino final dessa linha, incluindo as paradas intermediárias.
               </p>
               <div className="pt-2 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1558,7 +1558,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                       )}
                     </button>
                   </div>
-                  <div className="max-h-52 overflow-y-auto">
+                  <div className="max-h-28 overflow-y-auto">
                     {loadingLinhas ? (
                       <div className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
