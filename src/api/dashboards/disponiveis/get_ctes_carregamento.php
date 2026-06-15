@@ -50,6 +50,7 @@ $colSiglaDest  = in_array('sigla_dest', $cols, true) ? 'sigla_dest' : null;
 $colSerCte     = in_array('ser_cte', $cols, true) ? 'ser_cte' : null;
 $colNroCte     = in_array('nro_cte', $cols, true) ? 'nro_cte' : null;
 $colQtdeVol    = in_array('qtde_vol', $cols, true) ? 'qtde_vol' : null;
+$colNomePag    = in_array('nome_pag', $cols, true) ? 'nome_pag' : null;
 
 $selects = [];
 if ($colSerCte)     $selects[] = "ct.{$colSerCte}     AS ser_cte";
@@ -61,6 +62,7 @@ if ($colVlrFrete)   $selects[] = "COALESCE(ct.{$colVlrFrete}, 0) AS vlr_frete";
 if ($colPeso)       $selects[] = "ct.{$colPeso}::text AS peso";
 if ($colCubagem)    $selects[] = "ct.{$colCubagem}::text AS cubagem";
 if ($colQtdeVol)    $selects[] = "ct.{$colQtdeVol}   AS qtde_vol";
+if ($colNomePag)    $selects[] = "ct.{$colNomePag}   AS nome_pag";
 
 if (empty($selects)) {
     respondJson(['success' => false, 'message' => 'Tabela de CT-es não possui colunas reconhecidas.']);
@@ -122,6 +124,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
         'sigla_dest'    => strtoupper(trim($row['sigla_dest'] ?? '')),
+        'nome_pag'      => $row['nome_pag'] ?? '',
         'vlr_frete'     => round($vlrFrete, 2),
         'peso'          => round($pesoNum, 2),
         'cubagem'       => round($cubNum, 3),

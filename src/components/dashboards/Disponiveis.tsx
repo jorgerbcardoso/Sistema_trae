@@ -939,7 +939,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<boolean>;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }>;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1167,12 +1167,13 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CT-e', 'Emissão', 'Prev. Entr.', 'Unidade Destino', 'Valor Frete', 'Peso(kg)', 'Cubagem(m³)'];
+    const header = ['CT-e', 'Emissão', 'Prev. Entr.', 'Unidade Destino', 'Pagador', 'Valor Frete', 'Peso(kg)', 'Cubagem(m³)'];
     const rows = lista.map((c: any) => [
       c.ctrc,
       c.data_emissao,
       c.data_prev_ent,
       `"${c.sigla_dest || ''}"`,
+      `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
       c.vlr_frete.toFixed(2).replace('.', ','),
       c.peso.toFixed(2).replace('.', ','),
       c.cubagem.toFixed(3).replace('.', ','),
@@ -1458,10 +1459,10 @@ function CardCarregamento({
               <div className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>CT-e</span>
                 <span>Emissão</span>
-                <span>Prev. Entr.</span>
-                <span>Un. Dest.</span>
-                <span />
-                <span className="text-right">Valor Frete</span>
+                <span>Prev. entr.</span>
+                <span>Un. dest.</span>
+                <span>Pagador</span>
+                <span className="text-right">Valor frete</span>
                 <span className="text-right">Peso(kg)</span>
                 <span className="text-right">Cub.(m³)</span>
               </div>
@@ -1487,7 +1488,7 @@ function CardCarregamento({
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
-                        <span className="self-center" />
+                        <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
@@ -1521,7 +1522,7 @@ type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ign
 
 type LinhaCarregamento = { nro_linha: number; nome: string; sigla_emit: string; sigla_dest: string; unidades: string; km_ida: number | null; km_volta: number | null };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<boolean>; onFechar: () => void }) {
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }>; onFechar: () => void }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
@@ -1564,20 +1565,31 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
     const placaFinal = placa.trim().toUpperCase() || '';
     try {
       setLoading(true);
-      const ok = await onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
-      if (ok) onFechar();
+      const result = await onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
+      if (result.ok) onFechar();
     } finally {
       setLoading(false);
     }
   };
+
+  const [resumoDialogOpen, setResumoDialogOpen] = useState(false);
+  const [resumoPlaca, setResumoPlaca] = useState('');
+  const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number }[]>([]);
 
   const handleConfirmarAutomatico = async () => {
     if (loading) return;
     if (!nroLinha) { toast.error('Selecione uma linha.'); return; }
     try {
       setLoading(true);
-      const ok = await onConfirmar('', '', [], Number(nroLinha));
-      if (ok) onFechar();
+      const result = await onConfirmar('', '', [], Number(nroLinha));
+      if (result.ok) {
+        onFechar();
+        if (result.placa && result.resumo && result.resumo.length > 0) {
+          setResumoPlaca(result.placa);
+          setResumoUnidades(result.resumo);
+          setResumoDialogOpen(true);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -1791,6 +1803,35 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
           </Button>
         </div>
       </div>
+      <Dialog open={resumoDialogOpen} onOpenChange={setResumoDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Resumo · Carregamento {resumoPlaca}</DialogTitle>
+            <DialogDescription>CT-es adicionados por unidade de destino</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <span>Unidade</span>
+              <span className="text-right">CT-es</span>
+            </div>
+            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {resumoUnidades.map((r, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-2.5 text-sm">
+                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{r.unidade}</span>
+                  <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-sm font-semibold">
+              <span className="text-slate-700 dark:text-slate-300">Total</span>
+              <span className="text-right font-bold text-indigo-700 dark:text-indigo-300 tabular-nums">{resumoUnidades.reduce((s, r) => s + r.qtd, 0)}</span>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setResumoDialogOpen(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -2374,7 +2415,7 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<boolean> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }> => {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
@@ -2384,14 +2425,14 @@ export function Disponiveis() {
       if (res.success) {
         toast.success(res.message || 'Carregamento automático iniciado!');
         await carregarCarregamentos();
-        return true;
+        return { ok: true, placa: res.placa, resumo: res.resumo_unidades };
       } else {
         toast.error(res.message || 'Erro ao iniciar carregamento automático');
-        return false;
+        return { ok: false };
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao iniciar carregamento automático');
-      return false;
+      return { ok: false };
     }
   }, [carregarCarregamentos]);
 

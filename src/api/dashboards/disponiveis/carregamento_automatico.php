@@ -288,8 +288,34 @@ if ($modoAutomatico) {
 
     $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($seqCtes) . ' CT-e(s) adicionados.'];
 
+    // Resumo por unidade de destino (sigla_dest)
+    $resumoUnidades = [];
+    if (!empty($seqCtes)) {
+        $inSeq = [];
+        $paramsSeq = [];
+        $idxSeq = 1;
+        foreach ($seqCtes as $seq) {
+            $inSeq[] = '$' . $idxSeq;
+            $paramsSeq[] = (int)$seq;
+            $idxSeq++;
+        }
+        try {
+            $resResumo = sql(
+                "SELECT sigla_dest AS dest, COUNT(*) AS qtd FROM {$tabelaCte} WHERE seq_cte IN (" . implode(',', $inSeq) . ") GROUP BY sigla_dest ORDER BY qtd DESC",
+                $paramsSeq,
+                $conn
+            );
+            while ($resResumo && ($r = pg_fetch_assoc($resResumo))) {
+                $resumoUnidades[] = [
+                    'unidade' => strtoupper(trim($r['dest'] ?? '')),
+                    'qtd'     => (int)$r['qtd'],
+                ];
+            }
+        } catch (Exception $e) {}
+    }
+
     $criados = 1;
-    respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
+    respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados, 'placa' => $placaAuto, 'resumo_unidades' => $resumoUnidades]);
 }
 
 if (empty($unidadeDestino)) {
