@@ -1070,7 +1070,7 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
             disabled={!placaFinal.trim()}
             onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim()); }}
           >
-            <Plus className="w-4 h-4 mr-1.5" />Criar carregamento
+            <Plus className="w-4 h-4 mr-1.5" />Carregamento Manual
           </Button>
         </div>
       </div>
@@ -1192,7 +1192,7 @@ function CardCarregamento({
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
-        <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
               <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
@@ -1218,18 +1218,9 @@ function CardCarregamento({
                   </button>
                 </div>
               )}
-              {infoCriacao ? (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap truncate w-full">{infoCriacao}</p>
-              ) : (
-                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
-              )}
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino:</span>
-                <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{destino ?? '-'}</span>
-              </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 justify-end">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
@@ -1238,6 +1229,20 @@ function CardCarregamento({
                 <Car className="w-3 h-3 mr-1" />Veículo
               </Badge>
             )}
+          </div>
+          <div className="col-span-2 flex gap-2 min-w-0">
+            <div className="w-8 shrink-0" />
+            <div className="min-w-0 flex-1">
+              {infoCriacao ? (
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{infoCriacao}</p>
+              ) : (
+                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
+              )}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino:</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{destino ?? '-'}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1435,7 +1440,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
             onClick={() => setModo('manual')}
             disabled={loading}
           >
-            Manual
+            Informado
           </button>
         </div>
 
@@ -1791,7 +1796,7 @@ function CarregamentoArea({
             className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
             onClick={() => setModalImportarAberto(true)}
           >
-            <FileDown className="w-3.5 h-3.5 mr-1.5" />Importar do SSW
+            <FileDown className="w-3.5 h-3.5 mr-1.5" />Importar carregamentos
           </Button>
           <Button
             size="sm"
@@ -1799,7 +1804,7 @@ function CarregamentoArea({
             className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
             onClick={() => setModalAberto(true)}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />Criar carregamento
+            <Plus className="w-3.5 h-3.5 mr-1.5" />Carregamento Manual
           </Button>
           <Button
             size="sm"
@@ -1816,7 +1821,7 @@ function CarregamentoArea({
         <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
           <Truck className="w-10 h-10 mb-2 opacity-20" />
           <p className="text-sm">Nenhum carregamento em andamento</p>
-          <p className="text-xs mt-0.5">Clique em "Criar carregamento" para começar</p>
+          <p className="text-xs mt-0.5">Clique em "Carregamento Manual" para começar</p>
         </div>
       ) : (
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
