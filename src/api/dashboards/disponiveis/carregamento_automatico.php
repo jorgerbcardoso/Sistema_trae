@@ -16,9 +16,11 @@ if (empty($unidade) || !preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 }
 
 $input           = getRequestInput();
+$acao            = strtolower(trim($input['acao'] ?? ''));
 $placa           = strtoupper(trim($input['placa'] ?? ''));
 $unidadeDestino  = strtoupper(trim($input['unidadeDestino'] ?? ''));
 $paradas         = array_filter(array_map('strtoupper', array_map('trim', (array)($input['paradas'] ?? []))));
+$nroLinha        = (int)($input['nroLinha'] ?? 0);
 
 $conn        = connect();
 $tabela      = "{$domain}_carregamento";
@@ -28,6 +30,34 @@ $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap   = "{$domain}_carregamento_capacidade";
 
 $modoAutomatico = empty($placa) && empty($unidadeDestino);
+
+if ($acao === 'listar_linhas') {
+    try {
+        $res = sql(
+            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta
+             FROM {$tabelaLinha}
+             WHERE sigla_emit = $1
+             ORDER BY sigla_dest, nome, nro_linha",
+            [$unidade],
+            $conn
+        );
+        $linhas = [];
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $linhas[] = [
+                'nro_linha' => (int)($r['nro_linha'] ?? 0),
+                'nome' => (string)($r['nome'] ?? ''),
+                'sigla_emit' => strtoupper(trim((string)($r['sigla_emit'] ?? ''))),
+                'sigla_dest' => strtoupper(trim((string)($r['sigla_dest'] ?? ''))),
+                'unidades' => (string)($r['unidades'] ?? ''),
+                'km_ida' => $r['km_ida'] !== null ? (int)$r['km_ida'] : null,
+                'km_volta' => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
+            ];
+        }
+        respondJson(['success' => true, 'linhas' => $linhas]);
+    } catch (Exception $e) {
+        respondJson(['success' => false, 'message' => 'Erro ao listar linhas.']);
+    }
+}
 
 function parseNumero($value) {
     if ($value === null) return 0.0;
@@ -167,89 +197,98 @@ $cubExpr  = $colCubagem ? "c.{$colCubagem}::text" : "'0'";
 $orderByCtes = "ORDER BY c.data_prev_ent ASC NULLS LAST, c.data_emissao ASC, c.seq_cte ASC";
 
 if ($modoAutomatico) {
-    $resLinhas = null;
+    $resLinha = null;
     try {
-        $resLinhas = sql("SELECT sigla_dest, unidades FROM {$tabelaLinha} WHERE sigla_emit = $1 ORDER BY sigla_dest", [$unidade], $conn);
+        if ($nroLinha <= 0) {
+            respondJson(['success' => false, 'message' => 'Linha não informada.']);
+        }
+        $resLinha = sql(
+            "SELECT sigla_dest, unidades FROM {$tabelaLinha} WHERE sigla_emit = $1 AND nro_linha = $2 LIMIT 1",
+            [$unidade, $nroLinha],
+            $conn
+        );
     } catch (Exception $e) {}
 
-    if (!$resLinhas || pg_num_rows($resLinhas) === 0) {
-        respondJson(['success' => false, 'message' => 'Nenhuma linha cadastrada com origem nesta unidade.']);
+    if (!$resLinha || pg_num_rows($resLinha) === 0) {
+        respondJson(['success' => false, 'message' => 'Linha não encontrada para a unidade atual.']);
     }
 
+    $linha = pg_fetch_assoc($resLinha);
     $resultados = [];
 
-    while ($linha = pg_fetch_assoc($resLinhas)) {
-        $dest = strtoupper(trim($linha['sigla_dest'] ?? ''));
-        if ($dest === '') continue;
-
-        $paradasLinha = array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? ''))));
-        $destinosCarregamento = array_values(array_unique(array_filter(array_merge($paradasLinha, [$dest]))));
-
-        $placaAuto = $unidade . '-' . $dest;
-
-        $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = $1 AND placa_provisoria = $2 LIMIT 1", [$unidade, $placaAuto], $conn);
-        if ($check && pg_num_rows($check) > 0) {
-            $resultados[] = ['placa' => $placaAuto, 'status' => 'ignorado', 'msg' => 'Carregamento já existe.'];
-            continue;
-        }
-
-        list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
-        $seqCtes = buscarSeqCtesDentroCapacidade($conn, $tabela, $tabelaCte, $unidade, $destinosCarregamento, $pesoExpr, $cubExpr, $limitePeso, $limiteVol, $orderByCtes);
-
-        if (empty($seqCtes)) {
-            $resultados[] = ['placa' => $placaAuto, 'status' => 'vazio', 'msg' => 'Nenhum CT-e disponível ou dentro da capacidade para este destino.'];
-            continue;
-        }
-
-        try {
-            sql('BEGIN', [], $conn);
-
-            sql("DELETE FROM {$tabela} WHERE unidade = $1 AND placa_provisoria = $2 AND seq_cte = 0", [$unidade, $placaAuto], $conn);
-            sql(
-                "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES ($1, 0, $2, $3, CURRENT_DATE, CURRENT_TIME)",
-                [$unidade, $placaAuto, $login],
-                $conn
-            );
-
-            $capTon = $limitePeso / 1000.0;
-            $capM3  = $limiteVol;
-            $paradasCsv = implode(',', $paradasLinha);
-            sql(
-                "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
-                 VALUES ($1, $2, $3, $4, $5, $6)
-                 ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
-                [$unidade, $placaAuto, $capTon, $capM3, $dest, $paradasCsv],
-                $conn
-            );
-
-            $chunks = array_chunk($seqCtes, 500);
-            foreach ($chunks as $chunk) {
-                $params = [$unidade, $placaAuto, $login];
-                $values = [];
-                $idx = 4;
-                foreach ($chunk as $seq) {
-                    $values[] = "($1, $" . $idx . ", $2, $3, CURRENT_DATE, CURRENT_TIME)";
-                    $params[] = (int)$seq;
-                    $idx++;
-                }
-                sql(
-                    "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES " . implode(', ', $values),
-                    $params,
-                    $conn
-                );
-            }
-
-            sql('COMMIT', [], $conn);
-        } catch (Exception $e) {
-            try { sql('ROLLBACK', [], $conn); } catch (Exception $e2) {}
-            $resultados[] = ['placa' => $placaAuto, 'status' => 'erro', 'msg' => 'Erro ao criar carregamento.'];
-            continue;
-        }
-
-        $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($seqCtes) . ' CT-e(s) adicionados.'];
+    $dest = strtoupper(trim($linha['sigla_dest'] ?? ''));
+    if ($dest === '') {
+        respondJson(['success' => false, 'message' => 'Linha inválida: destino não informado.']);
     }
 
-    $criados = count(array_filter($resultados, fn($r) => $r['status'] === 'criado'));
+    $paradasLinha = array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? ''))));
+    $destinosCarregamento = array_values(array_unique(array_filter(array_merge($paradasLinha, [$dest]))));
+
+    $placaAuto = $unidade . '-' . $dest;
+
+    $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = $1 AND placa_provisoria = $2 LIMIT 1", [$unidade, $placaAuto], $conn);
+    if ($check && pg_num_rows($check) > 0) {
+        $resultados[] = ['placa' => $placaAuto, 'status' => 'ignorado', 'msg' => 'Carregamento já existe.'];
+        $criados = 0;
+        respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
+    }
+
+    list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
+    $seqCtes = buscarSeqCtesDentroCapacidade($conn, $tabela, $tabelaCte, $unidade, $destinosCarregamento, $pesoExpr, $cubExpr, $limitePeso, $limiteVol, $orderByCtes);
+
+    if (empty($seqCtes)) {
+        $resultados[] = ['placa' => $placaAuto, 'status' => 'vazio', 'msg' => 'Nenhum CT-e disponível ou dentro da capacidade para este destino.'];
+        $criados = 0;
+        respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
+    }
+
+    try {
+        sql('BEGIN', [], $conn);
+
+        sql("DELETE FROM {$tabela} WHERE unidade = $1 AND placa_provisoria = $2 AND seq_cte = 0", [$unidade, $placaAuto], $conn);
+        sql(
+            "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES ($1, 0, $2, $3, CURRENT_DATE, CURRENT_TIME)",
+            [$unidade, $placaAuto, $login],
+            $conn
+        );
+
+        $capTon = $limitePeso / 1000.0;
+        $capM3  = $limiteVol;
+        $paradasCsv = implode(',', $paradasLinha);
+        sql(
+            "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
+            [$unidade, $placaAuto, $capTon, $capM3, $dest, $paradasCsv],
+            $conn
+        );
+
+        $chunks = array_chunk($seqCtes, 500);
+        foreach ($chunks as $chunk) {
+            $params = [$unidade, $placaAuto, $login];
+            $values = [];
+            $idx = 4;
+            foreach ($chunk as $seq) {
+                $values[] = "($1, $" . $idx . ", $2, $3, CURRENT_DATE, CURRENT_TIME)";
+                $params[] = (int)$seq;
+                $idx++;
+            }
+            sql(
+                "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES " . implode(', ', $values),
+                $params,
+                $conn
+            );
+        }
+
+        sql('COMMIT', [], $conn);
+    } catch (Exception $e) {
+        try { sql('ROLLBACK', [], $conn); } catch (Exception $e2) {}
+        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento.']);
+    }
+
+    $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($seqCtes) . ' CT-e(s) adicionados.'];
+
+    $criados = 1;
     respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
 }
 

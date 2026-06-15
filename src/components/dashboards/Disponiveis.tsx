@@ -937,7 +937,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[]) => Promise<boolean>;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<boolean>;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1382,12 +1382,40 @@ function CardCarregamento({
 
 type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[]) => Promise<boolean>; onFechar: () => void }) {
+type LinhaCarregamento = { nro_linha: number; nome: string; sigla_emit: string; sigla_dest: string; unidades: string; km_ida: number | null; km_volta: number | null };
+
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<boolean>; onFechar: () => void }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
   const [paradasStr, setParadasStr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [linhas, setLinhas] = useState<LinhaCarregamento[]>([]);
+  const [nroLinha, setNroLinha] = useState('');
+  const [loadingLinhas, setLoadingLinhas] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        setLoadingLinhas(true);
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'listar_linhas' }) },
+          true
+        );
+        if (!ativo) return;
+        if (res.success) setLinhas(res.linhas ?? []);
+        else toast.error(res.message || 'Erro ao carregar linhas.');
+      } catch (e: any) {
+        if (!ativo) return;
+        toast.error(e.message || 'Erro ao carregar linhas.');
+      } finally {
+        if (ativo) setLoadingLinhas(false);
+      }
+    })();
+    return () => { ativo = false; };
+  }, []);
 
   const handleConfirmarManual = async () => {
     if (loading) return;
@@ -1405,14 +1433,27 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
 
   const handleConfirmarAutomatico = async () => {
     if (loading) return;
+    if (!nroLinha) { toast.error('Selecione uma linha.'); return; }
     try {
       setLoading(true);
-      const ok = await onConfirmar('', '', []);
+      const ok = await onConfirmar('', '', [], Number(nroLinha));
       if (ok) onFechar();
     } finally {
       setLoading(false);
     }
   };
+
+  const formatarLinha = (l: LinhaCarregamento): string => {
+    const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+    const nome = (l.nome ?? '').trim();
+    const paradas = (l.unidades ?? '').trim();
+    const base = [`${l.nro_linha}`, dest ? `→ ${dest}` : '', nome ? `· ${nome}` : ''].filter(Boolean).join(' ');
+    return paradas ? `${base} (${paradas})` : base;
+  };
+
+  const podeIniciar = modo === 'automatico'
+    ? !!nroLinha && !loadingLinhas
+    : !!unidadeDestino.trim();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1451,8 +1492,24 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                 <ListTree className="w-4 h-4" />Montagem automática por linhas
               </p>
               <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                O sistema irá ler todas as linhas cadastradas com origem nesta unidade e montar um carregamento para cada destino final, incluindo as paradas intermediárias. A placa será gerada automaticamente no formato <strong>ORIGEM-DESTINO</strong>.
+                Selecione uma linha para montar um carregamento para o destino final dessa linha, incluindo as paradas intermediárias. A placa será gerada automaticamente no formato <strong>ORIGEM-DESTINO</strong>.
               </p>
+              <div className="pt-2 space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Linha <span className="text-red-500">*</span>
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
+                  value={nroLinha}
+                  onChange={e => setNroLinha(e.target.value)}
+                  disabled={loading || loadingLinhas}
+                >
+                  <option value="">{loadingLinhas ? 'Carregando linhas...' : 'Selecione uma linha'}</option>
+                  {linhas.map(l => (
+                    <option key={l.nro_linha} value={String(l.nro_linha)}>{formatarLinha(l)}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           ) : (
             <>
@@ -1492,7 +1549,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
 
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onFechar} disabled={loading}>Cancelar</Button>
-          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual} disabled={loading}>
+          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual} disabled={loading || !podeIniciar}>
             {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
             {loading ? 'Processando...' : 'Iniciar'}
           </Button>
@@ -2081,11 +2138,11 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[]): Promise<boolean> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<boolean> => {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas }) },
+        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha }) },
         true
       );
       if (res.success) {
