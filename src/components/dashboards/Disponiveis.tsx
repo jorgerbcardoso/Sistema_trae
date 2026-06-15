@@ -1515,27 +1515,29 @@ function CardCarregamento({
       )}
       <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
         <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-          <DialogHeader className="shrink-0 pr-20">
-            <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
-            <DialogDescription>Lista detalhada de CT-es</DialogDescription>
-          </DialogHeader>
+          <div className="shrink-0 pr-20 flex flex-col gap-1.5">
+            <DialogHeader>
+              <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
+              <DialogDescription>Lista detalhada de CT-es</DialogDescription>
+            </DialogHeader>
 
-          {/* Destinos do carregamento */}
-          {(() => {
-            const paradasArr = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
-            const destFinal = carregamento.destino?.toUpperCase() || null;
-            const todas = [...paradasArr, destFinal].filter(Boolean) as string[];
-            if (todas.length === 0) return null;
-            return (
-              <div className="flex flex-wrap gap-1.5 px-1 -mt-1">
-                {todas.map((u, i) => (
-                  <span key={i} className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-mono ${i === todas.length - 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                    {u}
-                  </span>
-                ))}
-              </div>
-            );
-          })()}
+            {/* Destinos do carregamento */}
+            {(() => {
+              const paradasArr = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+              const destFinal = carregamento.destino?.toUpperCase() || null;
+              const todas = [...paradasArr, destFinal].filter(Boolean) as string[];
+              if (todas.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-1.5">
+                  {todas.map((u, i) => (
+                    <span key={i} className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-mono ${i === todas.length - 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                      {u}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
 
           {cteDetalheLista.length > 0 && (
             <Button
