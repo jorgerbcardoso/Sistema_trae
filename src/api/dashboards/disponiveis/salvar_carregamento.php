@@ -54,8 +54,8 @@ if ($acao === 'criar') {
     $unidadesSql = $paradas !== '' ? "'" . pg_escape_string($conn, $paradas) . "'" : 'NULL';
 
     $res = pg_query($conn,
-        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, origem_ssw)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, false)"
+        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, origem_ssw, unidade_carregamento)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, false, '" . pg_escape_string($conn, $unidade) . "')"
     );
 
     if (!$res) {
@@ -106,10 +106,13 @@ if ($acao === 'adicionar_ctes') {
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
-        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? '')));
-        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? '')));
-        $emissao  = pg_escape_string($conn, $cteData['emissao'] ?? '');
-        $prevEnt  = pg_escape_string($conn, $cteData['prevEnt'] ?? '');
+        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
+        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
+        $emissaoRaw = trim($cteData['emissao'] ?? '');
+        $prevEntRaw = trim($cteData['prevEnt'] ?? '');
+        $emissao  = pg_escape_string($conn, $emissaoRaw);
+        $prevEnt  = pg_escape_string($conn, $prevEntRaw);
         $remetente  = pg_escape_string($conn, $cteData['remetente'] ?? '');
         $destinatar = pg_escape_string($conn, $cteData['destinatario'] ?? '');
         $pagador    = pg_escape_string($conn, $cteData['pagador'] ?? '');
@@ -126,8 +129,26 @@ if ($acao === 'adicionar_ctes') {
         $peso     = is_numeric($peso)     ? (float)$peso     : 0;
         $cubagem  = is_numeric($cubagem)  ? (float)$cubagem  : 0;
 
-        $emissaoSql = $emissao ? "TO_DATE('" . $emissao . "', 'DD/MM/YYYY')" : 'NULL';
-        $prevEntSql = $prevEnt ? "TO_DATE('" . $prevEnt . "', 'DD/MM/YYYY')" : 'NULL';
+        $emissaoSql = 'NULL';
+        $prevEntSql = 'NULL';
+        $nowYear  = (int)date('Y');
+        $nowMonth = (int)date('n');
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $emissaoRaw)) {
+            $emissaoSql = "TO_DATE('" . $emissao . "', 'DD/MM/YYYY')";
+        } elseif (preg_match('/^(\d{2})\/(\d{2})$/', $emissaoRaw, $m)) {
+            $y = $nowYear;
+            $mm = (int)$m[2];
+            if ($nowMonth >= 11 && $mm <= 2) $y = $nowYear + 1;
+            $emissaoSql = "TO_DATE('" . $m[1] . '/' . $m[2] . '/' . $y . "', 'DD/MM/YYYY')";
+        }
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $prevEntRaw)) {
+            $prevEntSql = "TO_DATE('" . $prevEnt . "', 'DD/MM/YYYY')";
+        } elseif (preg_match('/^(\d{2})\/(\d{2})$/', $prevEntRaw, $m)) {
+            $y = $nowYear;
+            $mm = (int)$m[2];
+            if ($nowMonth >= 11 && $mm <= 2) $y = $nowYear + 1;
+            $prevEntSql = "TO_DATE('" . $m[1] . '/' . $m[2] . '/' . $y . "', 'DD/MM/YYYY')";
+        }
 
         $destEsc  = pg_escape_string($conn, $destinoCarreg);
         $unidEsc  = pg_escape_string($conn, $unidadesCarreg);
@@ -138,13 +159,13 @@ if ($acao === 'adicionar_ctes') {
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-              destino, unidades, origem_ssw)
+              destino, unidades, origem_ssw, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', false)"
+              '{$destEsc}', '{$unidEsc}', false, '{$unidCar}')"
         );
 
         if (!$res) {
@@ -198,8 +219,8 @@ if ($acao === 'remover_cte') {
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
         pg_query($conn,
-            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, false)"
+            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, unidade_carregamento)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, false, '" . pg_escape_string($conn, $unidade) . "')"
         );
     }
 

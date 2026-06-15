@@ -1236,9 +1236,10 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CT-e', 'Emissão', 'Prev. Entr.', 'Unidade Destino', 'Pagador', 'Valor Frete', 'Peso(kg)', 'Cubagem(m³)'];
+    const header = ['CT-e', 'Carr.', 'Emissão', 'Prev. Entr.', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
     const rows = lista.map((c: any) => [
       c.ctrc,
+      `"${c.unidade_carregamento || ''}"`,
       c.data_emissao,
       c.data_prev_ent,
       `"${c.sigla_dest || ''}"`,
@@ -1567,15 +1568,16 @@ function CardCarregamento({
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>CT-e</span>
+                <span>Carr.</span>
                 <span>Emissão</span>
-                <span>Prev. entr.</span>
-                <span>Un. dest.</span>
+                <span>Prev. entr..</span>
+                <span>Dest.</span>
                 <span>Pagador</span>
-                <span className="text-right">Valor frete</span>
-                <span className="text-right">Peso(kg)</span>
-                <span className="text-right">Cub.(m³)</span>
+                <span className="text-right">Frete (R$)</span>
+                <span className="text-right">Peso (Kg)</span>
+                <span className="text-right">Cub. (m³)</span>
               </div>
               <div className="min-h-0 overflow-y-auto">
                 {loadingCteDetalhe ? (
@@ -1593,9 +1595,10 @@ function CardCarregamento({
                     {cteDetalheLista.map((cte, idx) => (
                       <div
                         key={idx}
-                        className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
                       >
                         <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
+                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
@@ -1611,8 +1614,9 @@ function CardCarregamento({
             </div>
 
             {cteDetalheTotais && (
-              <div className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
+                <span />
                 <span />
                 <span />
                 <span />
@@ -1944,14 +1948,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
-                <span className="text-right">CTs</span>
-                <span className="text-right">Peso</span>
-                <span className="text-right">Cub.</span>
+                <span className="text-right">CT-es</span>
+                <span className="text-right">Kg</span>
+                <span className="text-right">M³</span>
               </div>
               <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 {resumoUnidades.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoUnidades.map((r, idx) => (
                   <div key={idx} className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 px-2 py-1.5 text-xs">
-                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade}</span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
                     <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
@@ -1973,14 +1977,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
-                <span className="text-right">CTs</span>
-                <span className="text-right">Peso</span>
-                <span className="text-right">Cub.</span>
+                <span className="text-right">CT-es</span>
+                <span className="text-right">Kg</span>
+                <span className="text-right">M³</span>
               </div>
               <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 {resumoDestinos.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoDestinos.map((r, idx) => (
                   <div key={idx} className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 px-2 py-1.5 text-xs">
-                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade}</span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
                     <span className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.qtd}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
@@ -2288,11 +2292,11 @@ function CarregamentoArea({
             onClick={() => setModalImportarAberto(true)}
             disabled={importandoCarregamentos}
           >
-            <FileDown className="w-3.5 h-3.5 mr-1.5" />Importar carregamentos
+            <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
           </Button>
-          <div className="flex items-center gap-2 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Importação automática</span>
-            <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
+          <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
+            <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
           </div>
           <Button
             size="sm"
@@ -2300,7 +2304,7 @@ function CarregamentoArea({
             className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
             onClick={() => setModalAberto(true)}
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />Carregamento Manual
+            <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
           </Button>
           <Button
             size="sm"
@@ -2308,7 +2312,7 @@ function CarregamentoArea({
             className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
             onClick={() => setModalAutomaticoAberto(true)}
           >
-            <ListTree className="w-3.5 h-3.5 mr-1.5" />Carregamento Automático
+            <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
           </Button>
         </div>
       </div>
@@ -2393,6 +2397,7 @@ export function Disponiveis() {
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(false);
+  const importandoCarregamentosRef = useRef(false);
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
@@ -2547,7 +2552,8 @@ export function Disponiveis() {
   }, []);
 
   const handleImportarCarregamentos = useCallback(async () => {
-    if (importandoCarregamentos) return { success: false, message: 'Importação já em andamento.' };
+    if (importandoCarregamentosRef.current) return { success: false, message: 'Importação já em andamento.' };
+    importandoCarregamentosRef.current = true;
     setImportandoCarregamentos(true);
     try {
       const res = await apiFetch(
@@ -2562,20 +2568,15 @@ export function Disponiveis() {
     } catch (e: any) {
       return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
     } finally {
+      importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos, importandoCarregamentos]);
+  }, [carregarCarregamentos]);
 
   useEffect(() => {
     if (!importacaoAutomatica) return;
-    let cancelado = false;
-    const tick = async () => {
-      if (cancelado) return;
-      await handleImportarCarregamentos();
-    };
-    tick();
-    const id = setInterval(tick, 120000);
-    return () => { cancelado = true; clearInterval(id); };
+    const id = setInterval(() => { void handleImportarCarregamentos(); }, 120000);
+    return () => clearInterval(id);
   }, [importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
@@ -2619,23 +2620,31 @@ export function Disponiveis() {
   const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
     try {
       // Envia os CT-es disponíveis (do relatório 019) para o backend filtrar e inserir
-      const ctesDisponiveis = (dados?.ctes ?? []).map(c => ({
-        nroCte: c.nroCte,
-        serCte: c.serCte,
-        emissao: c.emissao,
-        prevEnt: c.prevEnt,
-        remetente: c.remetente,
-        destinatario: c.destinatario,
-        pagador: c.pagador,
-        cidade: `${c.cidade}/${c.uf}`,
-        vlrNf: c.vlrNf,
-        frete: c.frete,
-        peso: c.peso,
-        cubagem: c.cubagem,
-        qtdeVol: c.qtdeVol,
-        unidadeDest: c.unidadeDest,
-        unidadeOrigem: c.unidadeOrigem ?? '',
-      }));
+      const ctesDisponiveis = (dados?.ctes ?? []).map(c => {
+        const anyC: any = c as any;
+        const unidadeDest = (anyC.unidadeDest ?? anyC.destinoCte ?? anyC.destino_cte ?? anyC.unidDest ?? anyC.destino ?? '') as string;
+        const serCte = (anyC.serCte ?? anyC.ser_cte ?? '') as string;
+        const uf = (anyC.uf ?? '') as string;
+        const cidadeBase = (anyC.cidade ?? anyC.cidadeDest ?? '') as string;
+        const cidade = uf && cidadeBase ? `${cidadeBase}/${uf}` : (anyC.cidade ?? '');
+        return {
+          nroCte: anyC.nroCte ?? 0,
+          serCte,
+          emissao: anyC.emissao ?? '',
+          prevEnt: anyC.prevEnt ?? '',
+          remetente: anyC.remetente ?? '',
+          destinatario: anyC.destinatario ?? '',
+          pagador: anyC.pagador ?? '',
+          cidade,
+          vlrNf: anyC.vlrNf ?? anyC.vlr_merc ?? '',
+          frete: anyC.frete ?? anyC.vlr_frete ?? '',
+          peso: anyC.peso ?? '',
+          cubagem: anyC.cubagem ?? '',
+          qtdeVol: anyC.qtdeVol ?? anyC.qtde_vol ?? '',
+          unidadeDest,
+          unidadeOrigem: anyC.unidadeOrigem ?? anyC.sigla_emit ?? anyC.siglaEmit ?? anyC.unidOrig ?? anyC.origem ?? '',
+        };
+      });
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
         { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis }) },
@@ -2691,6 +2700,7 @@ export function Disponiveis() {
         cubagem: c.cubagem,
         qtdeVol: c.qtdeVol,
         unidadeDest: c.unidadeDest,
+        unidadeOrigem: c.unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
       }));
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -2933,6 +2943,7 @@ export function Disponiveis() {
         cubagem: c.cubagem,
         qtdeVol: c.qtdeVol,
         unidadeDest: c.unidadeDest,
+        unidadeOrigem: c.unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
       }));
 
       const resAdd = await apiFetch(

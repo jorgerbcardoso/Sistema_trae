@@ -99,16 +99,36 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
     $resumoUnidades = [];
     $resumoDestinos = [];
     try {
-        $res = sql(
-            "SELECT destino_cte AS unid, COUNT(*) AS qtd,
+        $resU = sql(
+            "SELECT COALESCE(NULLIF(unidade_carregamento, ''), unidade) AS unid, COUNT(*) AS qtd,
                     COALESCE(SUM(peso_cte), 0) AS peso_total,
                     COALESCE(SUM(cubagem_cte), 0) AS cub_total
              FROM {$tabela}
              WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
-             GROUP BY destino_cte ORDER BY qtd DESC",
+             GROUP BY COALESCE(NULLIF(unidade_carregamento, ''), unidade)
+             ORDER BY qtd DESC",
             [$unidade, $placa], $conn
         );
-        while ($res && ($r = pg_fetch_assoc($res))) {
+        while ($resU && ($r = pg_fetch_assoc($resU))) {
+            $resumoUnidades[] = [
+                'unidade' => strtoupper(trim($r['unid'] ?? '')),
+                'qtd'     => (int)$r['qtd'],
+                'peso_kg' => round((float)$r['peso_total'], 2),
+                'cubagem' => round((float)$r['cub_total'], 3),
+            ];
+        }
+
+        $resD = sql(
+            "SELECT COALESCE(NULLIF(destino_cte, ''), '-') AS unid, COUNT(*) AS qtd,
+                    COALESCE(SUM(peso_cte), 0) AS peso_total,
+                    COALESCE(SUM(cubagem_cte), 0) AS cub_total
+             FROM {$tabela}
+             WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
+             GROUP BY COALESCE(NULLIF(destino_cte, ''), '-')
+             ORDER BY qtd DESC",
+            [$unidade, $placa], $conn
+        );
+        while ($resD && ($r = pg_fetch_assoc($resD))) {
             $resumoDestinos[] = [
                 'unidade' => strtoupper(trim($r['unid'] ?? '')),
                 'qtd'     => (int)$r['qtd'],
@@ -117,18 +137,6 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
             ];
         }
     } catch (Exception $e) {}
-
-    $totalQtd  = array_sum(array_column($resumoDestinos, 'qtd'));
-    $totalPeso = array_sum(array_column($resumoDestinos, 'peso_kg'));
-    $totalCub  = array_sum(array_column($resumoDestinos, 'cubagem'));
-    if ($totalQtd > 0) {
-        $resumoUnidades[] = [
-            'unidade' => strtoupper($unidade),
-            'qtd'     => $totalQtd,
-            'peso_kg' => round($totalPeso, 2),
-            'cubagem' => round($totalCub, 3),
-        ];
-    }
     return [$resumoUnidades, $resumoDestinos];
 }
 
@@ -154,7 +162,7 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $destinos, $unidade, $limite
         $nroCte      = (int)($cte['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
 
-        $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? ''));
+        $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? ''));
         $unidOrigem  = strtoupper(trim($cte['unidadeOrigem'] ?? ''));
 
         // Inclui se destino está na lista OU se é da própria unidade de origem
@@ -193,8 +201,9 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
-        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? '')));
-        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? '')));
+        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? $cteData['ser_cte'] ?? '')));
+        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
         $emissao  = trim($cteData['emissao'] ?? '');
         $prevEnt  = trim($cteData['prevEnt'] ?? '');
         $remet    = pg_escape_string($conn, $cteData['remetente']    ?? '');
@@ -210,20 +219,25 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         $cubagem  = parseNumero($cteData['cubagem']  ?? 0);
         $qtdeVol  = (int)($cteData['qtdeVol'] ?? 0);
 
-        // Converte datas DD/MM/YYYY → formato PostgreSQL
-        $emissaoSql = '';
-        $prevEntSql = '';
-        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $emissao)) {
-            $parts = explode('/', $emissao);
-            $emissaoSql = "'" . $parts[2] . '-' . $parts[1] . '-' . $parts[0] . "'";
-        } else {
-            $emissaoSql = 'NULL';
+        $emissaoSql = 'NULL';
+        $prevEntSql = 'NULL';
+        $nowYear  = (int)date('Y');
+        $nowMonth = (int)date('n');
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $emissao, $m)) {
+            $emissaoSql = "'" . $m[3] . '-' . $m[2] . '-' . $m[1] . "'";
+        } elseif (preg_match('/^(\d{2})\/(\d{2})$/', $emissao, $m)) {
+            $y = $nowYear;
+            $mm = (int)$m[2];
+            if ($nowMonth >= 11 && $mm <= 2) $y = $nowYear + 1;
+            $emissaoSql = "'" . $y . '-' . $m[2] . '-' . $m[1] . "'";
         }
-        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $prevEnt)) {
-            $parts = explode('/', $prevEnt);
-            $prevEntSql = "'" . $parts[2] . '-' . $parts[1] . '-' . $parts[0] . "'";
-        } else {
-            $prevEntSql = 'NULL';
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $prevEnt, $m)) {
+            $prevEntSql = "'" . $m[3] . '-' . $m[2] . '-' . $m[1] . "'";
+        } elseif (preg_match('/^(\d{2})\/(\d{2})$/', $prevEnt, $m)) {
+            $y = $nowYear;
+            $mm = (int)$m[2];
+            if ($nowMonth >= 11 && $mm <= 2) $y = $nowYear + 1;
+            $prevEntSql = "'" . $y . '-' . $m[2] . '-' . $m[1] . "'";
         }
 
         $res = pg_query($conn,
@@ -232,13 +246,13 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-              destino, unidades, origem_ssw)
+              destino, unidades, origem_ssw, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', false)"
+              '{$destEsc}', '{$unidEsc}', false, '{$unidCar}')"
         );
 
         if (!$res) {

@@ -31,9 +31,42 @@ $sql = "
     SELECT
         nro_cte,
         ser_cte,
+        unidade_carregamento,
         destino_cte,
-        TO_CHAR(data_emissao_cte, 'DD/MM/YYYY')  AS data_emissao,
-        TO_CHAR(data_prev_ent_cte, 'DD/MM/YYYY') AS data_prev_ent,
+        TO_CHAR(
+            CASE
+                WHEN data_emissao_cte IS NULL THEN NULL
+                WHEN EXTRACT(YEAR FROM data_emissao_cte) = 1 THEN
+                    data_emissao_cte + make_interval(
+                        years => (
+                            (CASE
+                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM data_emissao_cte) <= 2
+                                    THEN EXTRACT(YEAR FROM CURRENT_DATE)::int + 1
+                                ELSE EXTRACT(YEAR FROM CURRENT_DATE)::int
+                             END) - 1
+                        )
+                    )
+                ELSE data_emissao_cte
+            END,
+            'DD/MM/YYYY'
+        ) AS data_emissao,
+        TO_CHAR(
+            CASE
+                WHEN data_prev_ent_cte IS NULL THEN NULL
+                WHEN EXTRACT(YEAR FROM data_prev_ent_cte) = 1 THEN
+                    data_prev_ent_cte + make_interval(
+                        years => (
+                            (CASE
+                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM data_prev_ent_cte) <= 2
+                                    THEN EXTRACT(YEAR FROM CURRENT_DATE)::int + 1
+                                ELSE EXTRACT(YEAR FROM CURRENT_DATE)::int
+                             END) - 1
+                        )
+                    )
+                ELSE data_prev_ent_cte
+            END,
+            'DD/MM/YYYY'
+        ) AS data_prev_ent,
         remetente_cte,
         destinatario_cte,
         pagador_cte,
@@ -76,6 +109,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $ctes[] = [
         'seq_cte'       => $nroCte,   // compatibilidade com frontend
         'ctrc'          => $ctrc,
+        'unidade_carregamento' => strtoupper(trim($row['unidade_carregamento'] ?? '')),
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
         'sigla_dest'    => strtoupper(trim($row['destino_cte'] ?? '')),

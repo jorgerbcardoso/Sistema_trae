@@ -282,14 +282,14 @@ foreach ($placas_ssw as $placa) {
                   ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                   remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                   vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                  origem_ssw)
+                  origem_ssw, unidade_carregamento)
                  VALUES
                  ('{$unidadeEsc}', '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
                   {$destinoCarEsc}, NULL,
                   '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                   '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                   {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
-                  true)"
+                  true, '{$unidadeEsc}')"
             );
             if (!$resIns) throw new Exception(pg_last_error($conn));
             $inseridos++;
