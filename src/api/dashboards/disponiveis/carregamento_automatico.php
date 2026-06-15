@@ -117,57 +117,40 @@ function getColunasCte($conn, $tabelaCte) {
     return [$peso, $cub];
 }
 
-function gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem) {
+function gerarResumos($conn, $tabela, $placa, $unidade) {
     $resumoUnidades = [];
     $resumoDestinos = [];
-    if (empty($seqCtes)) return [$resumoUnidades, $resumoDestinos];
-
-    $inSeq = [];
-    $paramsSeq = [];
-    $idxSeq = 1;
-    foreach ($seqCtes as $seq) {
-        $inSeq[] = '$' . $idxSeq;
-        $paramsSeq[] = (int)$seq;
-        $idxSeq++;
-    }
-    $pesoResumo = $colPeso ? "COALESCE(SUM(c.{$colPeso}::numeric), 0)" : '0';
-    $cubResumo  = $colCubagem ? "COALESCE(SUM(c.{$colCubagem}::numeric), 0)" : '0';
-    $inStr = implode(',', $inSeq);
-
-    // Resumo por unidade emissora (carregadora)
     try {
         $res = sql(
-            "SELECT c.sigla_emit AS unid, COUNT(*) AS qtd, {$pesoResumo} AS peso_total, {$cubResumo} AS cub_total
-             FROM {$tabelaCte} c WHERE c.seq_cte IN ({$inStr}) GROUP BY c.sigla_emit ORDER BY qtd DESC",
-            $paramsSeq, $conn
-        );
-        while ($res && ($r = pg_fetch_assoc($res))) {
-            $resumoUnidades[] = [
-                'unidade' => strtoupper(trim($r['unid'] ?? '')),
-                'qtd'     => (int)$r['qtd'],
-                'peso_kg' => round(parseNumero($r['peso_total'] ?? 0), 2),
-                'cubagem' => round(parseNumero($r['cub_total'] ?? 0), 3),
-            ];
-        }
-    } catch (Exception $e) {}
-
-    // Resumo por unidade destino
-    try {
-        $res = sql(
-            "SELECT c.sigla_dest AS unid, COUNT(*) AS qtd, {$pesoResumo} AS peso_total, {$cubResumo} AS cub_total
-             FROM {$tabelaCte} c WHERE c.seq_cte IN ({$inStr}) GROUP BY c.sigla_dest ORDER BY qtd DESC",
-            $paramsSeq, $conn
+            "SELECT destino_cte AS unid, COUNT(*) AS qtd,
+                    COALESCE(SUM(peso_cte), 0) AS peso_total,
+                    COALESCE(SUM(cubagem_cte), 0) AS cub_total
+             FROM {$tabela}
+             WHERE unidade = \$1 AND placa_provisoria = \$2 AND seq_cte > 0
+             GROUP BY destino_cte ORDER BY qtd DESC",
+            [$unidade, $placa], $conn
         );
         while ($res && ($r = pg_fetch_assoc($res))) {
             $resumoDestinos[] = [
                 'unidade' => strtoupper(trim($r['unid'] ?? '')),
                 'qtd'     => (int)$r['qtd'],
-                'peso_kg' => round(parseNumero($r['peso_total'] ?? 0), 2),
-                'cubagem' => round(parseNumero($r['cub_total'] ?? 0), 3),
+                'peso_kg' => round((float)$r['peso_total'], 2),
+                'cubagem' => round((float)$r['cub_total'], 3),
             ];
         }
     } catch (Exception $e) {}
-
+    // Resumo por unidade emissora: usa a unidade do carregamento como origem
+    $totalQtd  = array_sum(array_column($resumoDestinos, 'qtd'));
+    $totalPeso = array_sum(array_column($resumoDestinos, 'peso_kg'));
+    $totalCub  = array_sum(array_column($resumoDestinos, 'cubagem'));
+    if ($totalQtd > 0) {
+        $resumoUnidades[] = [
+            'unidade' => strtoupper($unidade),
+            'qtd'     => $totalQtd,
+            'peso_kg' => round($totalPeso, 2),
+            'cubagem' => round($totalCub, 3),
+        ];
+    }
     return [$resumoUnidades, $resumoDestinos];
 }
 
@@ -322,19 +305,60 @@ if ($modoAutomatico) {
 
         $chunks = array_chunk($seqCtes, 500);
         foreach ($chunks as $chunk) {
-            $params = [$unidade, $placaAuto, $login];
-            $values = [];
-            $idx = 4;
             foreach ($chunk as $seq) {
-                $values[] = "($1, $" . $idx . ", $2, $3, CURRENT_DATE, CURRENT_TIME)";
-                $params[] = (int)$seq;
-                $idx++;
+                $seqInt = (int)$seq;
+                // Busca dados do CT-e na _cte para popular as novas colunas
+                $cteData = null;
+                try {
+                    $resCte = sql(
+                        "SELECT ser_cte, nro_cte, sigla_dest, data_emissao, data_prev_ent,
+                                nome_emit AS remetente, nome_dest AS destinatario,
+                                nome_pag AS pagador, sigla_dest AS cidade_dest,
+                                vlr_nf, vlr_frete, {$pesoExpr} AS peso_val, {$cubExpr} AS cub_val, qtde_vol
+                         FROM {$tabelaCte} WHERE seq_cte = \$1 LIMIT 1",
+                        [$seqInt], $conn
+                    );
+                    if ($resCte && pg_num_rows($resCte) > 0) {
+                        $cteData = pg_fetch_assoc($resCte);
+                    }
+                } catch (Exception $e) {}
+
+                if ($cteData) {
+                    $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['ser_cte'] ?? '')));
+                    $nroCte   = (int)($cteData['nro_cte'] ?? 0);
+                    $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['sigla_dest'] ?? '')));
+                    $emissao  = $cteData['data_emissao'] ? "'{$cteData['data_emissao']}'" : 'NULL';
+                    $prevEnt  = $cteData['data_prev_ent'] ? "'{$cteData['data_prev_ent']}'" : 'NULL';
+                    $remet    = pg_escape_string($conn, $cteData['remetente'] ?? '');
+                    $destin   = pg_escape_string($conn, $cteData['destinatario'] ?? '');
+                    $pagad    = pg_escape_string($conn, $cteData['pagador'] ?? '');
+                    $cidade   = pg_escape_string($conn, $cteData['cidade_dest'] ?? '');
+                    $vlrMerc  = is_numeric($cteData['vlr_nf'] ?? '') ? (float)$cteData['vlr_nf'] : 0;
+                    $vlrFrete = is_numeric($cteData['vlr_frete'] ?? '') ? (float)$cteData['vlr_frete'] : 0;
+                    $pesoVal  = parseNumero($cteData['peso_val'] ?? 0);
+                    $cubVal   = parseNumero($cteData['cub_val'] ?? 0);
+                    $qtdeVol  = (int)($cteData['qtde_vol'] ?? 0);
+
+                    sql(
+                        "INSERT INTO {$tabela}
+                         (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                          ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                          remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                          vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
+                         VALUES (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME,
+                                 '{$serCte}', {$nroCte}, '{$destCte}', {$emissao}, {$prevEnt},
+                                 '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
+                                 {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol})",
+                        [$unidade, $seqInt, $placaAuto, $login], $conn
+                    );
+                } else {
+                    sql(
+                        "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao)
+                         VALUES (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME)",
+                        [$unidade, $seqInt, $placaAuto, $login], $conn
+                    );
+                }
             }
-            sql(
-                "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES " . implode(', ', $values),
-                $params,
-                $conn
-            );
         }
 
         sql('COMMIT', [], $conn);
@@ -345,7 +369,7 @@ if ($modoAutomatico) {
 
     $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($seqCtes) . ' CT-e(s) adicionados.'];
 
-    [$resumoUnidades, $resumoDestinos] = gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem);
+    [$resumoUnidades, $resumoDestinos] = gerarResumos($conn, $tabela, $placaAuto, $unidade);
 
     $criados = 1;
     respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados, 'placa' => $placaAuto, 'resumo_unidades' => $resumoUnidades, 'resumo_destinos' => $resumoDestinos]);
@@ -395,19 +419,59 @@ try {
 
     $chunks = array_chunk($seqCtes, 500);
     foreach ($chunks as $chunk) {
-        $params = [$unidade, $placaFinal, $login];
-        $values = [];
-        $idx = 4;
         foreach ($chunk as $seq) {
-            $values[] = "($1, $" . $idx . ", $2, $3, CURRENT_DATE, CURRENT_TIME)";
-            $params[] = (int)$seq;
-            $idx++;
+            $seqInt = (int)$seq;
+            $cteData = null;
+            try {
+                $resCte = sql(
+                    "SELECT ser_cte, nro_cte, sigla_dest, data_emissao, data_prev_ent,
+                            nome_emit AS remetente, nome_dest AS destinatario,
+                            nome_pag AS pagador, sigla_dest AS cidade_dest,
+                            vlr_nf, vlr_frete, {$pesoExpr} AS peso_val, {$cubExpr} AS cub_val, qtde_vol
+                     FROM {$tabelaCte} WHERE seq_cte = \$1 LIMIT 1",
+                    [$seqInt], $conn
+                );
+                if ($resCte && pg_num_rows($resCte) > 0) {
+                    $cteData = pg_fetch_assoc($resCte);
+                }
+            } catch (Exception $e) {}
+
+            if ($cteData) {
+                $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['ser_cte'] ?? '')));
+                $nroCte   = (int)($cteData['nro_cte'] ?? 0);
+                $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['sigla_dest'] ?? '')));
+                $emissao  = $cteData['data_emissao'] ? "'{$cteData['data_emissao']}'" : 'NULL';
+                $prevEnt  = $cteData['data_prev_ent'] ? "'{$cteData['data_prev_ent']}'" : 'NULL';
+                $remet    = pg_escape_string($conn, $cteData['remetente'] ?? '');
+                $destin   = pg_escape_string($conn, $cteData['destinatario'] ?? '');
+                $pagad    = pg_escape_string($conn, $cteData['pagador'] ?? '');
+                $cidade   = pg_escape_string($conn, $cteData['cidade_dest'] ?? '');
+                $vlrMerc  = is_numeric($cteData['vlr_nf'] ?? '') ? (float)$cteData['vlr_nf'] : 0;
+                $vlrFrete = is_numeric($cteData['vlr_frete'] ?? '') ? (float)$cteData['vlr_frete'] : 0;
+                $pesoVal  = parseNumero($cteData['peso_val'] ?? 0);
+                $cubVal   = parseNumero($cteData['cub_val'] ?? 0);
+                $qtdeVol  = (int)($cteData['qtde_vol'] ?? 0);
+
+                sql(
+                    "INSERT INTO {$tabela}
+                     (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                      ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                      remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                      vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
+                     VALUES (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME,
+                             '{$serCte}', {$nroCte}, '{$destCte}', {$emissao}, {$prevEnt},
+                             '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
+                             {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol})",
+                    [$unidade, $seqInt, $placaFinal, $login], $conn
+                );
+            } else {
+                sql(
+                    "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao)
+                     VALUES (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME)",
+                    [$unidade, $seqInt, $placaFinal, $login], $conn
+                );
+            }
         }
-        sql(
-            "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao) VALUES " . implode(', ', $values),
-            $params,
-            $conn
-        );
     }
 
     sql('COMMIT', [], $conn);
@@ -416,6 +480,6 @@ try {
     respondJson(['success' => false, 'message' => 'Erro ao criar carregamento automático.']);
 }
 
-[$resumoUnidadesManual, $resumoDestinosManual] = gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem);
+[$resumoUnidadesManual, $resumoDestinosManual] = gerarResumos($conn, $tabela, $placaFinal, $unidade);
 
 respondJson(['success' => true, 'message' => count($seqCtes) . " CT-e(s) adicionados ao carregamento {$placaFinal}.", 'placa' => $placaFinal, 'resumo_unidades' => $resumoUnidadesManual, 'resumo_destinos' => $resumoDestinosManual]);

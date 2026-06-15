@@ -53,6 +53,7 @@ interface Cte {
   ctrc: string;
   serCte: string;
   nroCte: number;
+  seqCte?: number;
   tipo: string;
   emissao: string;
   prevEnt: string;
@@ -194,6 +195,10 @@ interface Carregamento {
   ctes: CteCarregamento[];
 }
 
+/** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
+ *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
+const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
+
 const COR_INDICADOR: Record<string, string> = {
   verde:    'bg-green-500',
   amarelo:  'bg-yellow-400',
@@ -253,26 +258,26 @@ function TabelaCtes({
   ctes: Cte[];
   tipo: 'armazem' | 'transito';
   modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
+  ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
+  onToggleCte?: (cte: Cte) => void;
+  onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
 
   const selecionaveis = ctes.filter(c => {
-    if (ctesNoCarregamento?.has(c.nroCte)) return false;
-    if (ctesJaCarregados?.has(c.nroCte)) return false;
+    if (ctesNoCarregamento?.has(cteId(c))) return false;
+    if (ctesJaCarregados?.has(cteId(c))) return false;
     return true;
   });
-  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(c.nroCte));
-  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(c.nroCte));
+  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(cteId(c)));
+  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(cteId(c)));
 
   const handleToggleTodos = () => {
     if (!onToggleTodos) return;
-    onToggleTodos(selecionaveis.map(c => c.nroCte), !todosSelecionados);
+    onToggleTodos(selecionaveis, !todosSelecionados);
   };
 
   return (
@@ -320,10 +325,10 @@ function TabelaCtes({
         </thead>
         <tbody>
           {ctes.map((cte, i) => {
-            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
-            const placaOutro = ctesJaCarregados?.get(cte.nroCte);
+            const jaNoCarregamento = ctesNoCarregamento?.has(cteId(cte)) ?? false;
+            const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
-            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
+            const selecionado = ctesSelecionados?.has(cteId(cte)) ?? false;
             const bloqueado = jaNoCarregamento || jaEmOutro;
             const rowBg = jaNoCarregamento
               ? 'bg-emerald-50 dark:bg-emerald-950/20'
@@ -336,7 +341,7 @@ function TabelaCtes({
               <tr
                 key={i}
                 className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
+                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte) : undefined}
               >
                 {emApontamento && (
                   <td className="px-3 py-2 text-center">
@@ -405,11 +410,11 @@ function GrupoDestinoCard({
   maxPeso: number;
   maxCubagem: number;
   modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
+  ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
+  onToggleCte?: (cte: Cte) => void;
+  onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
@@ -664,26 +669,56 @@ function TabelaEntrega({
   ctes: CteEntrega[];
   tipo: 'armazem' | 'transito';
   modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
+  ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
+  onToggleCte?: (cte: Cte) => void;
+  onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
 
+  // Converte CteEntrega para Cte (campos disponíveis) para envio ao backend
+  const toCteFull = (c: CteEntrega): Cte => ({
+    ctrc: c.ctrc,
+    serCte: c.serCte,
+    nroCte: c.nroCte,
+    seqCte: undefined,
+    tipo: '',
+    emissao: '',
+    prevEnt: c.prevEnt,
+    nfiscal: c.nfiscal,
+    pedido: '',
+    remetente: '',
+    pagador: c.pagador,
+    destinatario: c.destinatario,
+    cidade: c.cidade,
+    uf: '',
+    vlrNf: c.vlrMerc,
+    frete: c.frete,
+    peso: c.peso,
+    cubagem: c.cubagem,
+    qtdeVol: c.qtdeVol,
+    manifesto: c.manifesto,
+    prevChegada: c.prevChegada,
+    emTransito: c.emTransito,
+    unidadeDest: '',
+    nomeDest: '',
+    indicadorSaida: null,
+    atrasoTransf: null,
+  });
+
   const selecionaveis = ctes.filter(c => {
-    if (ctesNoCarregamento?.has(c.nroCte)) return false;
-    if (ctesJaCarregados?.has(c.nroCte)) return false;
+    if (ctesNoCarregamento?.has(cteId(c))) return false;
+    if (ctesJaCarregados?.has(cteId(c))) return false;
     return true;
   });
-  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(c.nroCte));
-  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(c.nroCte));
+  const todosSelecionados = selecionaveis.length > 0 && selecionaveis.every(c => ctesSelecionados?.has(cteId(c)));
+  const algunsSelecionados = !todosSelecionados && selecionaveis.some(c => ctesSelecionados?.has(cteId(c)));
 
   const handleToggleTodos = () => {
     if (!onToggleTodos) return;
-    onToggleTodos(selecionaveis.map(c => c.nroCte), !todosSelecionados);
+    onToggleTodos(selecionaveis.map(toCteFull), !todosSelecionados);
   };
 
   return (
@@ -729,10 +764,10 @@ function TabelaEntrega({
         </thead>
         <tbody>
           {ctes.map((cte, i) => {
-            const jaNoCarregamento = ctesNoCarregamento?.has(cte.nroCte) ?? false;
-            const placaOutro = ctesJaCarregados?.get(cte.nroCte);
+            const jaNoCarregamento = ctesNoCarregamento?.has(cteId(cte)) ?? false;
+            const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
-            const selecionado = ctesSelecionados?.has(cte.nroCte) ?? false;
+            const selecionado = ctesSelecionados?.has(cteId(cte)) ?? false;
             const bloqueado = jaNoCarregamento || jaEmOutro;
             const rowBg = jaNoCarregamento
               ? 'bg-emerald-50 dark:bg-emerald-950/20'
@@ -745,7 +780,7 @@ function TabelaEntrega({
               <tr
                 key={i}
                 className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte.nroCte) : undefined}
+                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(toCteFull(cte)) : undefined}
               >
                 {emApontamento && (
                   <td className="px-3 py-2 text-center">
@@ -809,11 +844,11 @@ function GrupoSetorCard({
   maxPeso: number;
   maxCubagem: number;
   modoApontamento?: string | null;
-  ctesSelecionados?: Set<number>;
+  ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
-  onToggleCte?: (seqCte: number) => void;
-  onToggleTodos?: (seqCtes: number[], selecionar: boolean) => void;
+  onToggleCte?: (cte: Cte) => void;
+  onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
@@ -940,7 +975,7 @@ interface CarregamentoAreaProps {
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
   onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>;
-  todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
+  todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
 function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
@@ -1135,7 +1170,7 @@ function CardCarregamento({
   hubCarregamentoPlaca,
 }: {
   carregamento: Carregamento;
-  todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
+  todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   modoApontamento: string | null;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
@@ -1484,6 +1519,24 @@ function CardCarregamento({
             <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
             <DialogDescription>Lista detalhada de CT-es</DialogDescription>
           </DialogHeader>
+
+          {/* Destinos do carregamento */}
+          {(() => {
+            const paradasArr = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+            const destFinal = carregamento.destino?.toUpperCase() || null;
+            const todas = [...paradasArr, destFinal].filter(Boolean) as string[];
+            if (todas.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5 px-1 -mt-1">
+                {todas.map((u, i) => (
+                  <span key={i} className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-mono ${i === todas.length - 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    {u}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
+
           {cteDetalheLista.length > 0 && (
             <Button
               variant="outline"
@@ -2325,7 +2378,7 @@ export function Disponiveis() {
   const [carregamentos, setCarregamentos] = useState<Carregamento[]>([]);
   const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
-  const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
+  const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
@@ -2359,35 +2412,38 @@ export function Disponiveis() {
     const m = new Map<number, string>();
     for (const car of carregamentos) {
       for (const c of car.ctes) {
-        const key = (c.nroCte ?? 0) > 0 ? (c.nroCte as number) : c.seq_cte;
-        if (!m.has(key)) m.set(key, car.placa_provisoria);
+        // Usa seq_cte como chave primária (é o que o backend salva)
+        if (c.seq_cte > 0) m.set(c.seq_cte, car.placa_provisoria);
+        // Também indexa por nroCte para compatibilidade com dados SSW sem seqCte
+        if ((c.nroCte ?? 0) > 0) m.set(c.nroCte as number, car.placa_provisoria);
       }
     }
     return m;
   }, [carregamentos]);
 
   const todosCtes = React.useMemo(() => {
-    const lista: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[] = [];
-    const vistos = new Set<number>();
-    const add = (nroCte: number, ctrc: string, destinatario: string, cidade: string, peso: string, cubagem: string) => {
-      if (vistos.has(nroCte)) return;
-      vistos.add(nroCte);
-      lista.push({ nroCte, ctrc, destinatario, cidade, peso, cubagem });
+    const lista: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[] = [];
+    const vistos = new Set<string>();
+    const add = (nroCte: number, ctrc: string, destinatario: string, cidade: string, peso: string, cubagem: string, seqCte?: number) => {
+      const key = seqCte ? `seq:${seqCte}` : `nro:${nroCte}`;
+      if (vistos.has(key)) return;
+      vistos.add(key);
+      lista.push({ nroCte, seqCte, ctrc, destinatario, cidade, peso, cubagem });
     };
     if (dados?.ctes) {
       for (const c of dados.ctes) {
-        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
+        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem, c.seqCte);
       }
     }
     if (dadosEntrega?.ctes) {
       for (const c of dadosEntrega.ctes) {
-        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
+        add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem, c.seqCte);
       }
     }
     for (const car of carregamentos) {
       for (const c of car.ctes) {
-        if (c.nroCte && c.ctrc) {
-          add(c.nroCte, c.ctrc, c.destinatario ?? '', c.cidade ?? '', c.peso ?? '', c.cubagem ?? '');
+        if (c.ctrc) {
+          add(c.nroCte ?? 0, c.ctrc, c.destinatario ?? '', c.cidade ?? '', c.peso ?? '', c.cubagem ?? '');
         }
       }
     }
@@ -2555,14 +2611,31 @@ export function Disponiveis() {
   const handleConfirmarApontamento = useCallback(async () => {
     if (!modoApontamento || ctesSelecionados.size === 0) return;
     try {
+      const ctesPayload = Array.from(ctesSelecionados.values()).map(c => ({
+        seqCte: c.seqCte ?? 0,
+        nroCte: c.nroCte,
+        serCte: c.serCte,
+        emissao: c.emissao,
+        prevEnt: c.prevEnt,
+        remetente: c.remetente,
+        destinatario: c.destinatario,
+        pagador: c.pagador,
+        cidade: `${c.cidade}/${c.uf}`,
+        vlrNf: c.vlrNf,
+        frete: c.frete,
+        peso: c.peso,
+        cubagem: c.cubagem,
+        qtdeVol: c.qtdeVol,
+        unidadeDest: c.unidadeDest,
+      }));
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: modoApontamento, seq_ctes: Array.from(ctesSelecionados) }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: modoApontamento, ctes: ctesPayload }) },
         true
       );
       if (res.success) {
         toast.success(`${res.adicionados ?? ctesSelecionados.size} CT-e(s) adicionado(s) ao carregamento ${modoApontamento}.`);
-        setCtesSelecionados(new Set());
+        setCtesSelecionados(new Map());
         setModoApontamento(null);
         await carregarCarregamentos();
       } else {
@@ -2573,11 +2646,12 @@ export function Disponiveis() {
     }
   }, [modoApontamento, ctesSelecionados, carregarCarregamentos]);
 
-  const toggleCte = useCallback((seqCte: number) => {
+  const toggleCte = useCallback((cte: Cte) => {
+    const id = cteId(cte);
     setCtesSelecionados(prev => {
-      const next = new Set(prev);
-      if (next.has(seqCte)) next.delete(seqCte);
-      else next.add(seqCte);
+      const next = new Map(prev);
+      if (next.has(id)) next.delete(id);
+      else next.set(id, cte);
       return next;
     });
   }, []);
@@ -2687,14 +2761,31 @@ export function Disponiveis() {
     };
 
     const ctesNoCarregamento = new Set<number>(
-      car.ctes.map(c => (c.nroCte && c.nroCte > 0 ? c.nroCte : c.seq_cte)).filter(n => n > 0)
+      car.ctes.flatMap(c => {
+        const ids: number[] = [];
+        if (c.seq_cte > 0) ids.push(c.seq_cte);
+        if ((c.nroCte ?? 0) > 0) ids.push(c.nroCte as number);
+        return ids;
+      })
     );
 
     const ctesDetalhados = car.ctes.map(c => {
-      const key = c.nroCte && c.nroCte > 0 ? c.nroCte : c.seq_cte;
-      const detSSW = todosCtes.find(e => e.nroCte === key);
-      const det = detSSW ?? (c.ctrc ? { ctrc: c.ctrc, nroCte: c.nroCte ?? 0, destinatario: c.destinatario ?? '', cidade: c.cidade ?? '', peso: c.peso ?? '', cubagem: c.cubagem ?? '' } : undefined);
-      return { ...c, det, key };
+      // Busca no todosCtes: primeiro por seqCte (PK do banco), depois por nroCte
+      const detSSW = todosCtes.find(e =>
+        (c.seq_cte > 0 && e.seqCte === c.seq_cte) ||
+        (c.seq_cte > 0 && e.nroCte === c.seq_cte) ||
+        ((c.nroCte ?? 0) > 0 && e.nroCte === c.nroCte)
+      );
+      // Fallback: usa dados que já vieram do banco via get_carregamentos.php
+      const det = detSSW ?? {
+        ctrc: c.ctrc || `#${c.seq_cte}`,
+        nroCte: c.nroCte ?? 0,
+        destinatario: c.destinatario ?? '',
+        cidade: c.cidade ?? '',
+        peso: c.peso ?? '',
+        cubagem: c.cubagem ?? '',
+      };
+      return { ...c, det, key: c.seq_cte };
     });
 
     const pesoAtualKg = ctesDetalhados.reduce((s, c) => s + parsePeso(c.det?.peso ?? ''), 0);
@@ -2745,26 +2836,44 @@ export function Disponiveis() {
 
       candidatos.sort((a, b) => parsePrevEntTs(a.prevEnt) - parsePrevEntTs(b.prevEnt));
 
-      const selecionar: number[] = [];
+      const selecionarCtes: Cte[] = [];
       for (const c of candidatos) {
         const p = parsePeso(c.peso);
         const v = parseCubagem(c.cubagem);
         if (p <= 0 && v <= 0) continue;
         if (p > restoKg || v > restoM3) continue;
-        selecionar.push(c.nroCte);
+        selecionarCtes.push(c);
         restoKg -= p;
         restoM3 -= v;
         if (restoKg <= 0 || restoM3 <= 0) break;
       }
 
-      if (selecionar.length === 0) {
+      if (selecionarCtes.length === 0) {
         toast.info('Nenhum CT-e do Hub cabe na capacidade restante do veículo.');
         return;
       }
 
+      const ctesPayloadHub = selecionarCtes.map(c => ({
+        seqCte: c.seqCte ?? 0,
+        nroCte: c.nroCte,
+        serCte: c.serCte,
+        emissao: c.emissao,
+        prevEnt: c.prevEnt,
+        remetente: c.remetente,
+        destinatario: c.destinatario,
+        pagador: c.pagador,
+        cidade: `${c.cidade}/${c.uf}`,
+        vlrNf: c.vlrNf,
+        frete: c.frete,
+        peso: c.peso,
+        cubagem: c.cubagem,
+        qtdeVol: c.qtdeVol,
+        unidadeDest: c.unidadeDest,
+      }));
+
       const resAdd = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: car.placa_provisoria, seq_ctes: selecionar }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: car.placa_provisoria, ctes: ctesPayloadHub }) },
         true
       );
 
@@ -2773,7 +2882,7 @@ export function Disponiveis() {
         return;
       }
 
-      toast.success(`Hub: ${resAdd.adicionados ?? selecionar.length} CT-e(s) adicionados ao carregamento ${car.placa_provisoria}.`);
+      toast.success(`Hub: ${resAdd.adicionados ?? selecionarCtes.length} CT-e(s) adicionados ao carregamento ${car.placa_provisoria}.`);
       setHubModalAberto(false);
       setHubModalCarregamento(null);
       setHubModalDestino('');
@@ -2787,10 +2896,14 @@ export function Disponiveis() {
     }
   }, [sigla, hubModalCarregamento, hubModalDestino, hubModalUnidadesStr, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos]);
 
-  const toggleTodos = useCallback((seqCtes: number[], selecionar: boolean) => {
+  const toggleTodos = useCallback((ctes: Cte[], selecionar: boolean) => {
     setCtesSelecionados(prev => {
-      const next = new Set(prev);
-      seqCtes.forEach(s => selecionar ? next.add(s) : next.delete(s));
+      const next = new Map(prev);
+      ctes.forEach(c => {
+        const id = cteId(c);
+        if (selecionar) next.set(id, c);
+        else next.delete(id);
+      });
       return next;
     });
   }, []);
@@ -3113,8 +3226,8 @@ export function Disponiveis() {
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
             modoApontamento={modoApontamento}
-            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Set()); }}
-            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Set()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
+            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
+            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
             onCriarCarregamento={handleCriarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
@@ -3162,7 +3275,7 @@ export function Disponiveis() {
               <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
                 <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
               </Button>
-              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Set()); setDadosHub(null); setHubCarregamentoPlaca(null); }}>
+              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}>
                 Cancelar
               </Button>
             </div>

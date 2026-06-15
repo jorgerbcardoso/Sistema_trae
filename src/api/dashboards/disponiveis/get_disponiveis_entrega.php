@@ -31,6 +31,9 @@ register_shutdown_function(function() {
     }
 });
 
+// Navega para a unidade correta antes de gerar o relatório
+ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
+
 $agora12h    = time() + (12 * 3600);
 $dataPrevMan = date('dmy', $agora12h);
 $horaPrevMan = date('Hi', $agora12h);
@@ -57,10 +60,15 @@ $url0052 = 'https://sistema.ssw.inf.br/bin/ssw0052?act=ENV'
 
 $str0052 = ssw_go($url0052);
 
+if (substr($str0052, 0, 5) === '<foc ') {
+    respondJson(['success' => false, 'message' => 'Erro SSW ao gerar relatório 081: ' . $str0052]);
+}
+
 $file = null;
 
-$actImediato = ssw_get_act(urldecode($str0052));
-$arqImediato = ssw_get_arq(urldecode($str0052));
+$str0052dec  = urldecode($str0052);
+$actImediato = ssw_get_act($str0052dec);
+$arqImediato = ssw_get_arq($str0052dec);
 
 if (!empty($actImediato) && !empty($arqImediato)) {
     $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$actImediato}&filename={$arqImediato}&path=&down=1&nw=1");

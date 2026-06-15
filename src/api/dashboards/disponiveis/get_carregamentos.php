@@ -157,24 +157,30 @@ if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
 }
 
+// Lê dados dos CT-es diretamente de _carregamento (novas colunas, sem join com _cte)
 $sqlCtes = "
     SELECT
         c.placa_provisoria,
         c.seq_cte,
+        c.ser_cte,
+        c.nro_cte,
+        c.destino_cte,
+        c.data_emissao_cte,
+        c.data_prev_ent_cte,
+        c.remetente_cte,
+        c.destinatario_cte,
+        c.pagador_cte,
+        c.cidade_destino_cte,
+        c.vlr_merc_cte,
+        c.vlr_frete_cte,
+        c.peso_cte,
+        c.cubagem_cte,
+        c.qtde_vol_cte,
         c.login_inclusao,
         c.data_inclusao,
-        c.hora_inclusao,
-        ct.ser_cte,
-        ct.nro_cte,
-        ct.nome_dest  AS destinatario,
-        ct.nome_emit  AS remetente,
-        ct.sigla_dest AS cidade,
-        {$pesoSelect} AS peso,
-        {$cubSelect}  AS cubagem,
-        ct.qtde_vol
+        c.hora_inclusao
     FROM {$tabelaCarregamento} c
-    LEFT JOIN {$tabelaCte} ct ON ct.seq_cte = c.seq_cte
-    WHERE c.unidade = $1
+    WHERE c.unidade = \$1
       AND c.seq_cte > 0
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
 ";
@@ -184,26 +190,31 @@ try {
     while ($resCtes && ($cteRow = pg_fetch_assoc($resCtes))) {
         $placa = $cteRow['placa_provisoria'] ?? '';
         if ($placa === '' || !isset($idxPorPlaca[$placa])) continue;
+
         $serCte = $cteRow['ser_cte'] ?? '';
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
         $ctrc   = ($nroCte > 0) ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
 
-        $pesoNum = $cteRow['peso'] !== null ? parseNumero($cteRow['peso']) : null;
-        $cubNum  = $cteRow['cubagem'] !== null ? parseNumero($cteRow['cubagem']) : null;
-
         $carregamentos[$idxPorPlaca[$placa]]['ctes'][] = [
-            'seq_cte'        => (int)($cteRow['seq_cte'] ?? 0),
-            'login_inclusao' => $cteRow['login_inclusao'] ?? '',
-            'data_inclusao'  => $cteRow['data_inclusao'] ?? null,
-            'hora_inclusao'  => $cteRow['hora_inclusao'] ?? null,
-            'ctrc'           => $ctrc,
-            'nroCte'         => $nroCte,
-            'destinatario'   => $cteRow['destinatario'] ?? '',
-            'remetente'      => $cteRow['remetente'] ?? '',
-            'cidade'         => $cteRow['cidade'] ?? '',
-            'peso'           => $pesoNum !== null ? number_format((float)$pesoNum, 0, ',', '.') : '',
-            'cubagem'        => $cubNum !== null ? number_format((float)$cubNum, 3, ',', '.') : '',
-            'qtdeVol'        => $cteRow['qtde_vol'] ?? '',
+            'seq_cte'          => (int)($cteRow['seq_cte'] ?? 0),
+            'ser_cte'          => $serCte,
+            'nroCte'           => $nroCte,
+            'ctrc'             => $ctrc,
+            'destino_cte'      => strtoupper(trim($cteRow['destino_cte'] ?? '')),
+            'data_emissao'     => $cteRow['data_emissao_cte'] ?? '',
+            'data_prev_ent'    => $cteRow['data_prev_ent_cte'] ?? '',
+            'remetente'        => $cteRow['remetente_cte'] ?? '',
+            'destinatario'     => $cteRow['destinatario_cte'] ?? '',
+            'pagador'          => $cteRow['pagador_cte'] ?? '',
+            'cidade'           => $cteRow['cidade_destino_cte'] ?? '',
+            'vlr_merc'         => $cteRow['vlr_merc_cte'] ?? '',
+            'vlr_frete'        => $cteRow['vlr_frete_cte'] ?? '',
+            'peso'             => $cteRow['peso_cte'] ?? '',
+            'cubagem'          => $cteRow['cubagem_cte'] ?? '',
+            'qtde_vol'         => $cteRow['qtde_vol_cte'] ?? '',
+            'login_inclusao'   => $cteRow['login_inclusao'] ?? '',
+            'data_inclusao'    => $cteRow['data_inclusao'] ?? null,
+            'hora_inclusao'    => $cteRow['hora_inclusao'] ?? null,
         ];
     }
 } catch (Exception $e) {}

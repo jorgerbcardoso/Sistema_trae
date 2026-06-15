@@ -116,32 +116,68 @@ if ($acao === 'adicionar_cte') {
 
 if ($acao === 'adicionar_ctes') {
     $placa   = strtoupper(trim($input['placa'] ?? ''));
-    $seqCtes = $input['seq_ctes'] ?? [];
-    if (empty($placa) || empty($seqCtes) || !is_array($seqCtes)) {
+    $cteList = $input['ctes'] ?? [];
+    if (empty($placa) || empty($cteList) || !is_array($cteList)) {
         respondJson(['success' => false, 'message' => 'Placa ou CT-es inválidos.']);
     }
     $placaEsc = pg_escape_string($conn, $placa);
-    $tabelaCte = "{$domain}_cte";
+
+    // Garante colunas novas existem
+    $novasCols = [
+        'ser_cte VARCHAR(5)', 'nro_cte INT', 'destino_cte VARCHAR(10)',
+        'data_emissao_cte DATE', 'data_prev_ent_cte DATE',
+        'remetente_cte TEXT', 'destinatario_cte TEXT', 'pagador_cte TEXT',
+        'cidade_destino_cte TEXT', 'vlr_merc_cte NUMERIC', 'vlr_frete_cte NUMERIC',
+        'peso_cte NUMERIC', 'cubagem_cte NUMERIC', 'qtde_vol_cte INT',
+    ];
+    foreach ($novasCols as $colDef) {
+        $colName = explode(' ', $colDef)[0];
+        pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS {$colName} " . implode(' ', array_slice(explode(' ', $colDef), 1)));
+    }
 
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
-    foreach ($seqCtes as $seqCteInput) {
-        $seqCteInput = (int)$seqCteInput;
-        if ($seqCteInput <= 0) continue;
+    foreach ($cteList as $cteData) {
+        $seqCte = (int)($cteData['seqCte'] ?? $cteData['seq_cte'] ?? 0);
+        $nroCte = (int)($cteData['nroCte'] ?? 0);
+        if ($seqCte <= 0 && $nroCte <= 0) continue;
+        // Usa seqCte como PK se disponível, senão nroCte como fallback temporário
+        $idCte = $seqCte > 0 ? $seqCte : $nroCte;
 
-        // Tenta encontrar o seq_cte real na tabela _cte pelo nro_cte
-        $seqCteReal = $seqCteInput;
-        $resBusca = pg_query($conn, "SELECT seq_cte FROM {$tabelaCte} WHERE nro_cte = {$seqCteInput} LIMIT 1");
-        if ($resBusca && pg_num_rows($resBusca) > 0) {
-            $rowBusca = pg_fetch_assoc($resBusca);
-            $seqCteReal = (int)$rowBusca['seq_cte'];
-        }
-
-        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCteReal} LIMIT 1");
+        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$idCte} LIMIT 1");
         if (pg_num_rows($check) > 0) continue;
 
-        $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
-                VALUES ('{$unidadeEsc}', {$seqCteReal}, '{$placaEsc}', '{$loginEsc}')";
+        $serCte      = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? '')));
+        $destCte     = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['cidade'] ?? '')));
+        $emissao     = pg_escape_string($conn, $cteData['emissao'] ?? '');
+        $prevEnt     = pg_escape_string($conn, $cteData['prevEnt'] ?? '');
+        $remetente   = pg_escape_string($conn, $cteData['remetente'] ?? '');
+        $destinatar  = pg_escape_string($conn, $cteData['destinatario'] ?? '');
+        $pagador     = pg_escape_string($conn, $cteData['pagador'] ?? '');
+        $cidade      = pg_escape_string($conn, $cteData['cidade'] ?? '');
+        $vlrMerc     = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['vlrNf'] ?? '0'));
+        $vlrFrete    = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['frete'] ?? '0'));
+        $peso        = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['peso'] ?? '0'));
+        $cubagem     = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['cubagem'] ?? '0'));
+        $qtdeVol     = (int)($cteData['qtdeVol'] ?? 0);
+
+        $emissaoSql  = $emissao  ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')"  : 'NULL';
+        $prevEntSql  = $prevEnt  ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')"  : 'NULL';
+
+        $sql = "INSERT INTO {$tabela}
+            (unidade, seq_cte, placa_provisoria, login_inclusao,
+             ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+             remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+             vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
+            VALUES
+            ('{$unidadeEsc}', {$idCte}, '{$placaEsc}', '{$loginEsc}',
+             '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
+             '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
+             " . (is_numeric(str_replace(',', '.', $vlrMerc)) ? str_replace(',', '.', $vlrMerc) : '0') . ",
+             " . (is_numeric(str_replace(',', '.', $vlrFrete)) ? str_replace(',', '.', $vlrFrete) : '0') . ",
+             " . (is_numeric(str_replace(',', '.', $peso)) ? str_replace(',', '.', $peso) : '0') . ",
+             " . (is_numeric(str_replace(',', '.', $cubagem)) ? str_replace(',', '.', $cubagem) : '0') . ",
+             {$qtdeVol})";
         $res = pg_query($conn, $sql);
         if (!$res) {
             pg_query($conn, 'ROLLBACK');
