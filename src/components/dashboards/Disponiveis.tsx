@@ -1066,7 +1066,6 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               )}
             </div>
           )}
-          </div>
           {!modoVeiculo && (
             <>
               <div>
