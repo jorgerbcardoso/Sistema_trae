@@ -19,12 +19,12 @@ $input          = getRequestInput();
 $acao           = strtolower(trim($input['acao'] ?? ''));
 $placa          = strtoupper(trim($input['placa'] ?? ''));
 $unidadeDestino = strtoupper(trim($input['unidadeDestino'] ?? ''));
-$paradas        = array_filter(array_map('strtoupper', array_map('trim', (array)($input['paradas'] ?? []))));
+$paradas        = array_values(array_filter(array_map('strtoupper', array_map('trim', (array)($input['paradas'] ?? [])))));
 $nroLinha       = (int)($input['nroLinha'] ?? 0);
+$ctesDisponiveis = $input['ctesDisponiveis'] ?? [];   // array de objetos enviados pelo frontend
 
 $conn        = connect();
 $tabela      = "{$domain}_carregamento";
-$tabelaCte   = "{$domain}_cte";
 $tabelaLinha = "{$domain}_linha";
 $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap   = "{$domain}_carregamento_capacidade";
@@ -49,8 +49,8 @@ if ($acao === 'listar_linhas') {
                 'sigla_emit' => strtoupper(trim((string)($r['sigla_emit'] ?? ''))),
                 'sigla_dest' => strtoupper(trim((string)($r['sigla_dest'] ?? ''))),
                 'unidades'   => (string)($r['unidades'] ?? ''),
-                'km_ida'     => $r['km_ida']    !== null ? (int)$r['km_ida']    : null,
-                'km_volta'   => $r['km_volta']  !== null ? (int)$r['km_volta']  : null,
+                'km_ida'     => $r['km_ida']   !== null ? (int)$r['km_ida']   : null,
+                'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
             ];
         }
         respondJson(['success' => true, 'linhas' => $linhas]);
@@ -75,14 +75,10 @@ function parseNumero($value) {
     return (float)$s;
 }
 
-function placaFicticia($placa) {
-    return empty($placa) || strpos($placa, '-') !== false;
-}
-
 function getCapacidadeVeiculo($conn, $tabelaVeiculo, $placa) {
     $capPesoKg = 27000.0;
     $capVolM3  = 67.0;
-    if (placaFicticia($placa)) return [$capPesoKg, $capVolM3];
+    if (empty($placa) || strpos($placa, '-') !== false) return [$capPesoKg, $capVolM3];
     try {
         $res = sql(
             "SELECT capacidade_ton, capacidade_m3 FROM {$tabelaVeiculo} WHERE UPPER(placa) = UPPER(\$1) LIMIT 1",
@@ -97,22 +93,6 @@ function getCapacidadeVeiculo($conn, $tabelaVeiculo, $placa) {
         }
     } catch (Exception $e) {}
     return [$capPesoKg, $capVolM3];
-}
-
-function getColunasCte($conn, $tabelaCte) {
-    $cols = [];
-    try {
-        $resCols = sql(
-            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = \$1",
-            [strtolower($tabelaCte)], $conn
-        );
-        while ($resCols && ($r = pg_fetch_assoc($resCols))) {
-            $cols[] = strtolower($r['column_name']);
-        }
-    } catch (Exception $e) {}
-    $peso = in_array('peso_real', $cols, true) ? 'peso_real' : (in_array('peso', $cols, true) ? 'peso' : null);
-    $cub  = in_array('cubagem', $cols, true) ? 'cubagem' : (in_array('vlr_cubagem', $cols, true) ? 'vlr_cubagem' : null);
-    return [$peso, $cub];
 }
 
 function gerarResumos($conn, $tabela, $placa, $unidade) {
@@ -153,125 +133,121 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
 }
 
 /**
- * Busca CT-es da _cte dentro da capacidade disponível.
- * Retorna array de nro_cte (inteiros).
+ * Filtra CT-es disponíveis (vindos do frontend) para os destinos informados,
+ * respeitando a capacidade do veículo.
+ * Retorna array de objetos CT-e prontos para inserção.
  */
-function buscarNroCtesDentroCapacidade($conn, $tabelaCarregamento, $tabelaCte, $unidade, $destinos, $pesoExpr, $cubExpr, $limitePesoKg, $limiteVolM3, $orderBySql) {
-    if (count($destinos) === 0) return [];
+function filtrarCtesPorCapacidade($ctesDisponiveis, $destinos, $unidade, $limitePesoKg, $limiteVolM3) {
+    // Ordena por prevEnt ASC, depois nroCte ASC
+    usort($ctesDisponiveis, function($a, $b) {
+        $pa = $a['prevEnt'] ?? '';
+        $pb = $b['prevEnt'] ?? '';
+        if ($pa !== $pb) return strcmp($pa, $pb);
+        return (int)($a['nroCte'] ?? 0) - (int)($b['nroCte'] ?? 0);
+    });
 
-    $params   = [];
-    $inParts  = [];
-    $i = 1;
-    foreach ($destinos as $d) {
-        $inParts[] = '$' . $i;
-        $params[]  = $d;
-        $i++;
-    }
-    $unidadeIdx = $i;
-    $params[]   = $unidade;
+    $selecionados = [];
+    $somaPeso     = 0.0;
+    $somaVol      = 0.0;
 
-    $sqlCtes = "
-        SELECT c.nro_cte, {$pesoExpr} AS peso_val, {$cubExpr} AS cubagem_val
-        FROM {$tabelaCte} c
-        WHERE (
-            c.sigla_dest IN (" . implode(',', $inParts) . ")
-            OR c.sigla_emit = \${$unidadeIdx}
-        )
-          AND c.status NOT IN ('C','X')
-          AND NOT EXISTS (
-              SELECT 1 FROM {$tabelaCarregamento} t
-              WHERE t.unidade = \${$unidadeIdx} AND t.nro_cte = c.nro_cte AND t.nro_cte > 0
-          )
-        {$orderBySql}
-    ";
+    foreach ($ctesDisponiveis as $cte) {
+        $nroCte      = (int)($cte['nroCte'] ?? 0);
+        if ($nroCte <= 0) continue;
 
-    $resCtes  = sql($sqlCtes, $params, $conn);
-    $nroCtes  = [];
-    $somaPeso = 0.0;
-    $somaVol  = 0.0;
+        $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? ''));
+        $unidOrigem  = strtoupper(trim($cte['unidadeOrigem'] ?? ''));
 
-    while ($resCtes && ($r = pg_fetch_assoc($resCtes))) {
-        $p = parseNumero($r['peso_val']    ?? null);
-        $v = parseNumero($r['cubagem_val'] ?? null);
-        if ($somaPeso + $p > $limitePesoKg || $somaVol + $v > $limiteVolM3) break;
-        $somaPeso += $p;
-        $somaVol  += $v;
-        $nroCtes[] = (int)$r['nro_cte'];
+        // Inclui se destino está na lista OU se é da própria unidade de origem
+        $pertence = in_array($unidDest, $destinos, true) || $unidOrigem === $unidade;
+        if (!$pertence) continue;
+
+        $peso = parseNumero($cte['peso']    ?? 0);
+        $cub  = parseNumero($cte['cubagem'] ?? 0);
+
+        if ($somaPeso + $peso > $limitePesoKg || $somaVol + $cub > $limiteVolM3) break;
+
+        $somaPeso += $peso;
+        $somaVol  += $cub;
+        $selecionados[] = $cte;
     }
 
-    return $nroCtes;
+    return $selecionados;
 }
 
 /**
- * Insere CT-es na tabela de carregamento buscando dados da _cte.
+ * Insere CT-es na tabela de carregamento com destino e unidades em cada linha.
  */
-function inserirCtes($conn, $tabela, $tabelaCte, $unidade, $placa, $login, $nroCtes, $pesoExpr, $cubExpr) {
+function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidades, $ctesSelecionados) {
     $inseridos = 0;
-    foreach ($nroCtes as $nroCte) {
-        $nroCteInt = (int)$nroCte;
-        if ($nroCteInt <= 0) continue;
+    foreach ($ctesSelecionados as $cteData) {
+        $nroCte = (int)($cteData['nroCte'] ?? 0);
+        if ($nroCte <= 0) continue;
 
-        $cteData = null;
-        try {
-            $resCte = sql(
-                "SELECT ser_cte, nro_cte, sigla_dest, data_emissao, data_prev_ent,
-                        nome_emit AS remetente, nome_dest AS destinatario,
-                        nome_pag AS pagador, sigla_dest AS cidade_dest,
-                        vlr_nf, vlr_frete, {$pesoExpr} AS peso_val, {$cubExpr} AS cub_val, qtde_vol
-                 FROM {$tabelaCte} WHERE nro_cte = \$1 LIMIT 1",
-                [$nroCteInt], $conn
-            );
-            if ($resCte && pg_num_rows($resCte) > 0) {
-                $cteData = pg_fetch_assoc($resCte);
-            }
-        } catch (Exception $e) {}
+        // Evita duplicata
+        $check = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND nro_cte = {$nroCte}
+             LIMIT 1"
+        );
+        if ($check && pg_num_rows($check) > 0) continue;
 
-        if ($cteData) {
-            $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['ser_cte'] ?? '')));
-            $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['sigla_dest'] ?? '')));
-            $emissao  = $cteData['data_emissao']  ? "'{$cteData['data_emissao']}'"  : 'NULL';
-            $prevEnt  = $cteData['data_prev_ent'] ? "'{$cteData['data_prev_ent']}'" : 'NULL';
-            $remet    = pg_escape_string($conn, $cteData['remetente']    ?? '');
-            $destin   = pg_escape_string($conn, $cteData['destinatario'] ?? '');
-            $pagad    = pg_escape_string($conn, $cteData['pagador']      ?? '');
-            $cidade   = pg_escape_string($conn, $cteData['cidade_dest']  ?? '');
-            $vlrMerc  = is_numeric($cteData['vlr_nf']    ?? '') ? (float)$cteData['vlr_nf']    : 0;
-            $vlrFrete = is_numeric($cteData['vlr_frete'] ?? '') ? (float)$cteData['vlr_frete'] : 0;
-            $pesoVal  = parseNumero($cteData['peso_val'] ?? 0);
-            $cubVal   = parseNumero($cteData['cub_val']  ?? 0);
-            $qtdeVol  = (int)($cteData['qtde_vol'] ?? 0);
+        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? '')));
+        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? '')));
+        $emissao  = trim($cteData['emissao'] ?? '');
+        $prevEnt  = trim($cteData['prevEnt'] ?? '');
+        $remet    = pg_escape_string($conn, $cteData['remetente']    ?? '');
+        $destin   = pg_escape_string($conn, $cteData['destinatario'] ?? '');
+        $pagad    = pg_escape_string($conn, $cteData['pagador']      ?? '');
+        $cidade   = pg_escape_string($conn, $cteData['cidade']       ?? '');
+        $destEsc  = pg_escape_string($conn, $destino);
+        $unidEsc  = pg_escape_string($conn, $unidades);
 
-            sql(
-                "INSERT INTO {$tabela}
-                 (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                  ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
-                  remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-                  vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
-                 VALUES (\$1, \$2, \$3, CURRENT_DATE, CURRENT_TIME,
-                         '{$serCte}', {$nroCteInt}, '{$destCte}', {$emissao}, {$prevEnt},
-                         '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
-                         {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol})",
-                [$unidade, $placa, $login], $conn
-            );
+        $vlrMerc  = parseNumero($cteData['vlrNf']    ?? 0);
+        $vlrFrete = parseNumero($cteData['frete']    ?? 0);
+        $peso     = parseNumero($cteData['peso']     ?? 0);
+        $cubagem  = parseNumero($cteData['cubagem']  ?? 0);
+        $qtdeVol  = (int)($cteData['qtdeVol'] ?? 0);
+
+        // Converte datas DD/MM/YYYY → formato PostgreSQL
+        $emissaoSql = '';
+        $prevEntSql = '';
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $emissao)) {
+            $parts = explode('/', $emissao);
+            $emissaoSql = "'" . $parts[2] . '-' . $parts[1] . '-' . $parts[0] . "'";
         } else {
-            // Insere só com nro_cte, sem dados extras
-            sql(
-                "INSERT INTO {$tabela}
-                 (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte)
-                 VALUES (\$1, \$2, \$3, CURRENT_DATE, CURRENT_TIME, \$4)",
-                [$unidade, $placa, $login, $nroCteInt], $conn
-            );
+            $emissaoSql = 'NULL';
+        }
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $prevEnt)) {
+            $parts = explode('/', $prevEnt);
+            $prevEntSql = "'" . $parts[2] . '-' . $parts[1] . '-' . $parts[0] . "'";
+        } else {
+            $prevEntSql = 'NULL';
+        }
+
+        $res = pg_query($conn,
+            "INSERT INTO {$tabela}
+             (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+              ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+              remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+              vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+              destino, unidades)
+             VALUES
+             ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
+              '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
+              '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
+              {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
+              '{$destEsc}', '{$unidEsc}')"
+        );
+
+        if (!$res) {
+            return -1; // sinaliza erro
         }
         $inseridos++;
     }
     return $inseridos;
 }
-
-// ─── Prepara expressões de peso/cubagem da _cte ───────────────────────────────
-list($colPeso, $colCubagem) = getColunasCte($conn, $tabelaCte);
-$pesoExpr    = $colPeso    ? "c.{$colPeso}::text"    : "'0'";
-$cubExpr     = $colCubagem ? "c.{$colCubagem}::text" : "'0'";
-$orderByCtes = "ORDER BY c.data_prev_ent ASC NULLS LAST, c.data_emissao ASC, c.nro_cte ASC";
 
 // ─── Modo automático por linha ────────────────────────────────────────────────
 if ($modoAutomatico) {
@@ -297,73 +273,46 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Linha inválida: destino não informado.']);
     }
 
-    $paradasLinha           = array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? ''))));
-    $destinosCarregamento   = array_values(array_unique(array_filter(array_merge($paradasLinha, [$dest]))));
-    $placaAuto              = $unidade . '-' . $dest;
-    $resultados             = [];
+    $paradasLinha         = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
+    $destinosCarregamento = array_values(array_unique(array_filter(array_merge($paradasLinha, [$dest]))));
+    $placaAuto            = $unidade . '-' . $dest;
+    $paradasCsv           = implode(',', $paradasLinha);
 
     $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaAuto], $conn);
     if ($check && pg_num_rows($check) > 0) {
-        $resultados[] = ['placa' => $placaAuto, 'status' => 'ignorado', 'msg' => 'Carregamento já existe.'];
-        respondJson(['success' => true, 'message' => "0 carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
+        respondJson(['success' => true, 'message' => "Carregamento {$placaAuto} já existe.", 'resultados' => [['placa' => $placaAuto, 'status' => 'ignorado', 'msg' => 'Carregamento já existe.']]]);
+    }
+
+    if (empty($ctesDisponiveis)) {
+        respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
     }
 
     list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
-    $nroCtes = buscarNroCtesDentroCapacidade($conn, $tabela, $tabelaCte, $unidade, $destinosCarregamento, $pesoExpr, $cubExpr, $limitePeso, $limiteVol, $orderByCtes);
+    $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $destinosCarregamento, $unidade, $limitePeso, $limiteVol);
 
-    if (empty($nroCtes)) {
-        $resultados[] = ['placa' => $placaAuto, 'status' => 'vazio', 'msg' => 'Nenhum CT-e disponível ou dentro da capacidade para este destino.'];
-        respondJson(['success' => true, 'message' => "0 carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados]);
+    if (empty($ctesSelecionados)) {
+        respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos desta linha.']);
     }
 
-    try {
-        sql('BEGIN', [], $conn);
+    pg_query($conn, 'BEGIN');
 
-        $paradasCsv = implode(',', $paradasLinha);
-        $capTon     = $limitePeso / 1000.0;
-        $capM3      = $limiteVol;
-
-        // Linha sentinela com destino e unidades
-        sql(
-            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades)
-             VALUES (\$1, \$2, \$3, CURRENT_DATE, CURRENT_TIME, 0, \$4, \$5)",
-            [$unidade, $placaAuto, $login, $dest, $paradasCsv], $conn
-        );
-
-        // Salva capacidade
-        sql(
-            "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
-             VALUES (\$1, \$2, \$3, \$4, \$5, \$6)
-             ON CONFLICT (unidade, placa_provisoria) DO UPDATE
-             SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3,
-                 destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
-            [$unidade, $placaAuto, $capTon, $capM3, $dest, $paradasCsv], $conn
-        );
-
-        inserirCtes($conn, $tabela, $tabelaCte, $unidade, $placaAuto, $login, $nroCtes, $pesoExpr, $cubExpr);
-
-        // Remove sentinela após inserir CT-es reais
-        sql(
-            "DELETE FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte = 0",
-            [$unidade, $placaAuto], $conn
-        );
-
-        sql('COMMIT', [], $conn);
-    } catch (Exception $e) {
-        try { sql('ROLLBACK', [], $conn); } catch (Exception $e2) {}
-        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento: ' . $e->getMessage()]);
+    $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados);
+    if ($inseridos < 0) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);
     }
 
-    $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($nroCtes) . ' CT-e(s) adicionados.'];
+    pg_query($conn, 'COMMIT');
+
     [$resumoUnidades, $resumoDestinos] = gerarResumos($conn, $tabela, $placaAuto, $unidade);
 
     respondJson([
-        'success'          => true,
-        'message'          => "1 carregamento(s) criado(s) automaticamente.",
-        'resultados'       => $resultados,
-        'placa'            => $placaAuto,
-        'resumo_unidades'  => $resumoUnidades,
-        'resumo_destinos'  => $resumoDestinos,
+        'success'         => true,
+        'message'         => "{$inseridos} CT-e(s) adicionados ao carregamento {$placaAuto}.",
+        'resultados'      => [['placa' => $placaAuto, 'status' => 'criado', 'msg' => "{$inseridos} CT-e(s) adicionados."]],
+        'placa'           => $placaAuto,
+        'resumo_unidades' => $resumoUnidades,
+        'resumo_destinos' => $resumoDestinos,
     ]);
 }
 
@@ -373,64 +322,41 @@ if (empty($unidadeDestino)) {
 }
 
 $placaFinal = !empty($placa) ? $placa : ($unidade . '-' . $unidadeDestino);
+$paradasCsv = implode(',', $paradas);
 
 $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaFinal], $conn);
 if ($check && pg_num_rows($check) > 0) {
     respondJson(['success' => false, 'message' => "Já existe um carregamento com a placa {$placaFinal}."]);
 }
 
+if (empty($ctesDisponiveis)) {
+    respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
+}
+
 list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaFinal);
-$destinosManual = array_values(array_unique(array_filter(array_merge($paradas, [$unidadeDestino]))));
-$nroCtes = buscarNroCtesDentroCapacidade($conn, $tabela, $tabelaCte, $unidade, $destinosManual, $pesoExpr, $cubExpr, $limitePeso, $limiteVol, $orderByCtes);
+$destinosManual   = array_values(array_unique(array_filter(array_merge($paradas, [$unidadeDestino]))));
+$ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $destinosManual, $unidade, $limitePeso, $limiteVol);
 
-if (empty($nroCtes)) {
-    respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível ou dentro da capacidade para os destinos informados.']);
+if (empty($ctesSelecionados)) {
+    respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos informados.']);
 }
 
-try {
-    sql('BEGIN', [], $conn);
+pg_query($conn, 'BEGIN');
 
-    $paradasCsv = implode(',', $paradas);
-    $capTon     = $limitePeso / 1000.0;
-    $capM3      = $limiteVol;
-
-    // Linha sentinela com destino e unidades
-    sql(
-        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades)
-         VALUES (\$1, \$2, \$3, CURRENT_DATE, CURRENT_TIME, 0, \$4, \$5)",
-        [$unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv], $conn
-    );
-
-    // Salva capacidade
-    sql(
-        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, destino, paradas)
-         VALUES (\$1, \$2, \$3, \$4, \$5, \$6)
-         ON CONFLICT (unidade, placa_provisoria) DO UPDATE
-         SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3,
-             destino = EXCLUDED.destino, paradas = EXCLUDED.paradas",
-        [$unidade, $placaFinal, $capTon, $capM3, $unidadeDestino, $paradasCsv], $conn
-    );
-
-    inserirCtes($conn, $tabela, $tabelaCte, $unidade, $placaFinal, $login, $nroCtes, $pesoExpr, $cubExpr);
-
-    // Remove sentinela após inserir CT-es reais
-    sql(
-        "DELETE FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte = 0",
-        [$unidade, $placaFinal], $conn
-    );
-
-    sql('COMMIT', [], $conn);
-} catch (Exception $e) {
-    try { sql('ROLLBACK', [], $conn); } catch (Exception $e2) {}
-    respondJson(['success' => false, 'message' => 'Erro ao criar carregamento automático: ' . $e->getMessage()]);
+$inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados);
+if ($inseridos < 0) {
+    pg_query($conn, 'ROLLBACK');
+    respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);
 }
 
-[$resumoUnidadesManual, $resumoDestinosManual] = gerarResumos($conn, $tabela, $placaFinal, $unidade);
+pg_query($conn, 'COMMIT');
+
+[$resumoUnidades, $resumoDestinos] = gerarResumos($conn, $tabela, $placaFinal, $unidade);
 
 respondJson([
     'success'         => true,
-    'message'         => count($nroCtes) . " CT-e(s) adicionados ao carregamento {$placaFinal}.",
+    'message'         => "{$inseridos} CT-e(s) adicionados ao carregamento {$placaFinal}.",
     'placa'           => $placaFinal,
-    'resumo_unidades' => $resumoUnidadesManual,
-    'resumo_destinos' => $resumoDestinosManual,
+    'resumo_unidades' => $resumoUnidades,
+    'resumo_destinos' => $resumoDestinos,
 ]);

@@ -74,6 +74,21 @@ if ($acao === 'adicionar_ctes') {
         respondJson(['success' => false, 'message' => 'Placa ou CT-es inválidos.']);
     }
 
+    // Busca destino/unidades do carregamento existente (para replicar em cada linha)
+    $destinoCarreg  = '';
+    $unidadesCarreg = '';
+    $resCarreg = pg_query($conn,
+        "SELECT destino, unidades FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+         LIMIT 1"
+    );
+    if ($resCarreg && pg_num_rows($resCarreg) > 0) {
+        $rowCarreg      = pg_fetch_assoc($resCarreg);
+        $destinoCarreg  = $rowCarreg['destino']  ?? '';
+        $unidadesCarreg = $rowCarreg['unidades'] ?? '';
+    }
+
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
 
@@ -114,17 +129,22 @@ if ($acao === 'adicionar_ctes') {
         $emissaoSql = $emissao ? "TO_DATE('" . $emissao . "', 'DD/MM/YYYY')" : 'NULL';
         $prevEntSql = $prevEnt ? "TO_DATE('" . $prevEnt . "', 'DD/MM/YYYY')" : 'NULL';
 
+        $destEsc  = pg_escape_string($conn, $destinoCarreg);
+        $unidEsc  = pg_escape_string($conn, $unidadesCarreg);
+
         $res = pg_query($conn,
             "INSERT INTO {$tabela}
              (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-              vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
+              vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+              destino, unidades)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
-              {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol})"
+              {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
+              '{$destEsc}', '{$unidEsc}')"
         );
 
         if (!$res) {

@@ -2572,9 +2572,27 @@ export function Disponiveis() {
 
   const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
     try {
+      // Envia os CT-es disponíveis (do relatório 019) para o backend filtrar e inserir
+      const ctesDisponiveis = (dados?.ctes ?? []).map(c => ({
+        nroCte: c.nroCte,
+        serCte: c.serCte,
+        emissao: c.emissao,
+        prevEnt: c.prevEnt,
+        remetente: c.remetente,
+        destinatario: c.destinatario,
+        pagador: c.pagador,
+        cidade: `${c.cidade}/${c.uf}`,
+        vlrNf: c.vlrNf,
+        frete: c.frete,
+        peso: c.peso,
+        cubagem: c.cubagem,
+        qtdeVol: c.qtdeVol,
+        unidadeDest: c.unidadeDest,
+        unidadeOrigem: c.unidadeOrigem ?? '',
+      }));
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha }) },
+        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis }) },
         true
       );
       if (res.success) {
@@ -2589,7 +2607,7 @@ export function Disponiveis() {
       toast.error(e.message || 'Erro ao iniciar carregamento automático');
       return { ok: false };
     }
-  }, [carregarCarregamentos]);
+  }, [carregarCarregamentos, dados]);
 
   const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
     try {
