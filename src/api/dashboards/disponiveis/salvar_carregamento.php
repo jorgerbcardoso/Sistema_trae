@@ -111,6 +111,14 @@ if ($acao === 'adicionar_ctes') {
         $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
         $emissaoRaw = trim($cteData['emissao'] ?? '');
         $prevEntRaw = trim($cteData['prevEnt'] ?? '');
+        if ($emissaoRaw !== '') {
+            $emissaoRaw = preg_replace('/[^\d]/', '/', $emissaoRaw);
+            $emissaoRaw = preg_replace('/\/+/', '/', trim($emissaoRaw, '/'));
+        }
+        if ($prevEntRaw !== '') {
+            $prevEntRaw = preg_replace('/[^\d]/', '/', $prevEntRaw);
+            $prevEntRaw = preg_replace('/\/+/', '/', trim($prevEntRaw, '/'));
+        }
         $emissao  = pg_escape_string($conn, $emissaoRaw);
         $prevEnt  = pg_escape_string($conn, $prevEntRaw);
         $remetente  = pg_escape_string($conn, $cteData['remetente'] ?? '');

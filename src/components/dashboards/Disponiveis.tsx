@@ -1236,7 +1236,7 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CT-e', 'Carr.', 'Emissão', 'Prev. Entr.', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
+    const header = ['CT-e', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
     const rows = lista.map((c: any) => [
       c.ctrc,
       `"${c.unidade_carregamento || ''}"`,
@@ -1568,11 +1568,11 @@ function CardCarregamento({
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>CT-e</span>
                 <span>Carr.</span>
                 <span>Emissão</span>
-                <span>Prev. entr..</span>
+                <span>Prev. Entr..</span>
                 <span>Dest.</span>
                 <span>Pagador</span>
                 <span className="text-right">Frete (R$)</span>

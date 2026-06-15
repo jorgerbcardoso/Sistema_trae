@@ -31,7 +31,7 @@ $sql = "
     SELECT
         nro_cte,
         ser_cte,
-        unidade_carregamento,
+        COALESCE(NULLIF(unidade_carregamento, ''), unidade) AS unidade_carregamento,
         destino_cte,
         TO_CHAR(
             CASE

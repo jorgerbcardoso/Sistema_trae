@@ -206,6 +206,14 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
         $emissao  = trim($cteData['emissao'] ?? '');
         $prevEnt  = trim($cteData['prevEnt'] ?? '');
+        if ($emissao !== '') {
+            $emissao = preg_replace('/[^\d]/', '/', $emissao);
+            $emissao = preg_replace('/\/+/', '/', trim($emissao, '/'));
+        }
+        if ($prevEnt !== '') {
+            $prevEnt = preg_replace('/[^\d]/', '/', $prevEnt);
+            $prevEnt = preg_replace('/\/+/', '/', trim($prevEnt, '/'));
+        }
         $remet    = pg_escape_string($conn, $cteData['remetente']    ?? '');
         $destin   = pg_escape_string($conn, $cteData['destinatario'] ?? '');
         $pagad    = pg_escape_string($conn, $cteData['pagador']      ?? '');
