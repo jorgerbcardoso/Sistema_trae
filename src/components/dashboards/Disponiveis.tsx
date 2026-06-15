@@ -1522,7 +1522,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                 </div>
 
                 <input
-                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
                   placeholder="Buscar sigla (destino ou intermediárias)..."
                   value={buscaLinha}
                   onChange={e => setBuscaLinha(e.target.value.toUpperCase())}
@@ -1530,7 +1530,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                 />
 
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
-                  <div className="grid grid-cols-[96px_1fr] items-center gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <div className="grid grid-cols-[84px_1fr] items-center gap-2 px-2.5 py-1.5 border-b border-slate-200 dark:border-slate-700 text-[9px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <button
                       type="button"
                       className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
@@ -1579,24 +1579,24 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
                             key={l.nro_linha}
                             type="button"
                             onClick={() => setNroLinha(String(l.nro_linha))}
-                            className={`w-full text-left px-3 py-2 border-b border-slate-100 dark:border-slate-800 transition-colors ${selecionada ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
+                            className={`w-full text-left px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-800 transition-colors ${selecionada ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
                             disabled={loading}
                           >
-                            <div className="grid grid-cols-[96px_1fr] items-start gap-2">
+                            <div className="grid grid-cols-[84px_1fr] items-start gap-2">
                               <div className="leading-tight">
-                                <div className={`font-mono font-bold text-sm ${selecionada ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
+                                <div className={`font-mono font-bold text-xs ${selecionada ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
                                   {destino}
                                 </div>
-                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">
                                   #{l.nro_linha}
                                 </div>
                               </div>
-                              <div className="min-w-0">
-                                <div className="font-mono text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap truncate">
+                              <div className="min-w-0 leading-tight">
+                                <div className="font-mono text-[11px] text-slate-700 dark:text-slate-200 whitespace-nowrap truncate">
                                   {inter}
                                 </div>
                                 {nome && (
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap truncate">
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap truncate">
                                     {nome}
                                   </div>
                                 )}
