@@ -45,7 +45,9 @@ import {
   ListTree,
   Gauge,
   Pencil,
+  Search,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
 interface Cte {
   ctrc: string;
@@ -1126,6 +1128,65 @@ function CardCarregamento({
   const [novaCapTon, setNovaCapTon] = useState('');
   const [novaCapM3, setNovaCapM3] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
+  const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
+  const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
+  const [loadingCteDetalhe, setLoadingCteDetalhe] = useState(false);
+  const cteDetalheListaRef = useRef<any[]>([]);
+  const cteDetalheTituloRef = useRef<string>('');
+
+  const abrirCteDetalhe = async () => {
+    setCteDetalheDialogOpen(true);
+    setCteDetalheLista([]);
+    cteDetalheListaRef.current = [];
+    setCteDetalheTotais(null);
+    setLoadingCteDetalhe(true);
+    const titulo = `Carregamento ${carregamento.placa_provisoria}`;
+    cteDetalheTituloRef.current = titulo;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria }) },
+        true
+      );
+      if (res.success) {
+        setCteDetalheLista(res.ctes ?? []);
+        cteDetalheListaRef.current = res.ctes ?? [];
+        setCteDetalheTotais(res.totais ?? null);
+      } else {
+        toast.error(res.message || 'Erro ao carregar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao carregar CT-es');
+    } finally {
+      setLoadingCteDetalhe(false);
+    }
+  };
+
+  const exportarCteDetalheCSV = () => {
+    const lista = cteDetalheListaRef.current;
+    const titulo = cteDetalheTituloRef.current;
+    if (!lista.length) return;
+    const header = ['CT-e', 'Emissão', 'Prev. Entr.', 'Unidade Destino', 'Valor Frete', 'Peso(kg)', 'Cubagem(m³)'];
+    const rows = lista.map((c: any) => [
+      c.ctrc,
+      c.data_emissao,
+      c.data_prev_ent,
+      `"${c.sigla_dest || ''}"`,
+      c.vlr_frete.toFixed(2).replace('.', ','),
+      c.peso.toFixed(2).replace('.', ','),
+      c.cubagem.toFixed(3).replace('.', ','),
+    ]);
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ctes_${titulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const ativo = modoApontamento === carregamento.placa_provisoria;
 
   const handleSalvarPlaca = async () => {
@@ -1224,11 +1285,6 @@ function CardCarregamento({
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
-            {temCapacidade && (
-              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs">
-                <Car className="w-3 h-3 mr-1" />Veículo
-              </Badge>
-            )}
           </div>
           <div className="col-span-2 flex gap-2 min-w-0">
             <div className="w-8 shrink-0" />
@@ -1326,6 +1382,9 @@ function CardCarregamento({
             <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
               {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={abrirCteDetalhe} title="Detalhar CT-es">
+              <Search className="w-3.5 h-3.5" />
+            </Button>
             <Button size="sm" variant="outline" className="h-7 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700" onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)} title="Excluir carregamento">
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
@@ -1376,6 +1435,84 @@ function CardCarregamento({
           </div>
         </div>
       )}
+      <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
+        <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+          <DialogHeader className="shrink-0 pr-20">
+            <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
+            <DialogDescription>Lista detalhada de CT-es</DialogDescription>
+          </DialogHeader>
+          {cteDetalheLista.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarCteDetalheCSV}
+              className="absolute top-4 right-10 gap-1.5 z-10"
+            >
+              <FileDown className="w-4 h-4" />
+              Exportar CSV
+            </Button>
+          )}
+
+          <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
+              <div className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <span>CT-e</span>
+                <span>Emissão</span>
+                <span>Prev. Entr.</span>
+                <span>Un. Dest.</span>
+                <span />
+                <span className="text-right">Valor Frete</span>
+                <span className="text-right">Peso(kg)</span>
+                <span className="text-right">Cub.(m³)</span>
+              </div>
+              <div className="min-h-0 overflow-y-auto">
+                {loadingCteDetalhe ? (
+                  <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando CT-es...
+                  </div>
+                ) : cteDetalheLista.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
+                    <Package className="h-6 w-6" />
+                    Nenhum CT-e encontrado.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {cteDetalheLista.map((cte, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                      >
+                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
+                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
+                        <span className="self-center" />
+                        <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {cteDetalheTotais && (
+              <div className="grid grid-cols-[105px_75px_75px_75px_minmax(0,1fr)_80px_65px_70px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
+                <span />
+                <span />
+                <span />
+                <span />
+                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{cteDetalheTotais.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-right font-mono">{cteDetalheTotais.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-right font-mono">{cteDetalheTotais.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
