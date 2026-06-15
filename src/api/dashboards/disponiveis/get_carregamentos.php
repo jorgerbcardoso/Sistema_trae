@@ -28,94 +28,30 @@ $conn = connect();
 
 $tabelaCarregamento = "{$domain}_carregamento";
 $tabelaVeiculo      = "{$domain}_veiculo";
-$tabelaCte          = "{$domain}_cte";
 $tabelaCap          = "{$domain}_carregamento_capacidade";
 
-function parseNumero($value) {
-    if ($value === null) return 0.0;
-    if (is_int($value) || is_float($value)) return (float)$value;
-    $s = trim((string)$value);
-    if ($s === '') return 0.0;
-    $s = str_replace(' ', '', $s);
-    if (strpos($s, ',') !== false) {
-        $s = str_replace('.', '', $s);
-        $s = str_replace(',', '.', $s);
-        return (float)$s;
-    }
-    $s = str_replace(',', '', $s);
-    return (float)$s;
-}
-
-function getColunasCte($conn, $tabelaCte) {
-    $cols = [];
-    try {
-        $resCols = sql(
-            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1",
-            [strtolower($tabelaCte)],
-            $conn
-        );
-        while ($resCols && ($r = pg_fetch_assoc($resCols))) {
-            $cols[] = strtolower($r['column_name']);
-        }
-    } catch (Exception $e) {}
-
-    $peso = in_array('peso_real', $cols, true) ? 'peso_real' : (in_array('peso', $cols, true) ? 'peso' : null);
-    $cub  = in_array('cubagem', $cols, true) ? 'cubagem' : (in_array('vlr_cubagem', $cols, true) ? 'vlr_cubagem' : null);
-    return [$peso, $cub];
-}
-
-try {
-    sql("
-        CREATE TABLE IF NOT EXISTS {$tabelaCarregamento} (
-            id               SERIAL PRIMARY KEY,
-            unidade          VARCHAR(10) NOT NULL,
-            seq_cte          INT NOT NULL,
-            placa_provisoria VARCHAR(20) NOT NULL,
-            data_inclusao    DATE NOT NULL DEFAULT CURRENT_DATE,
-            hora_inclusao    TIME NOT NULL DEFAULT CURRENT_TIME,
-            login_inclusao   VARCHAR(50) NOT NULL
-        )
-    ", [], $conn);
-
-    sql("
-        CREATE TABLE IF NOT EXISTS {$tabelaCap} (
-            unidade VARCHAR(10) NOT NULL,
-            placa_provisoria VARCHAR(20) NOT NULL,
-            cap_ton NUMERIC,
-            cap_m3 NUMERIC,
-            PRIMARY KEY (unidade, placa_provisoria)
-        )
-    ", [], $conn);
-
-    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS destino VARCHAR(10)", [], $conn);
-    sql("ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS paradas TEXT", [], $conn);
-} catch (Exception $e) {
-    respondJson(['success' => false, 'message' => 'Erro ao preparar tabelas de carregamento.']);
-}
-
-list($colPeso, $colCubagem) = getColunasCte($conn, $tabelaCte);
-$pesoSelect = $colPeso ? "ct.{$colPeso}" : "NULL";
-$cubSelect  = $colCubagem ? "ct.{$colCubagem}" : "NULL";
-
+// ─── Busca carregamentos agrupados por placa ──────────────────────────────────
+// destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
     SELECT
         c.placa_provisoria,
-        COUNT(*) FILTER (WHERE c.seq_cte > 0) AS total_ctes,
-        MIN(c.data_inclusao) AS data_criacao,
-        MIN(c.hora_inclusao) AS hora_criacao,
-        MIN(c.login_inclusao) AS login_criacao,
+        COUNT(*) FILTER (WHERE c.nro_cte > 0)  AS total_ctes,
+        MIN(c.data_inclusao)                    AS data_criacao,
+        MIN(c.hora_inclusao)                    AS hora_criacao,
+        MIN(c.login_inclusao)                   AS login_criacao,
+        MAX(c.destino)                          AS destino,
+        MAX(c.unidades)                         AS paradas,
         v.capacidade_ton,
         v.capacidade_m3,
         cap.cap_ton,
-        cap.cap_m3,
-        cap.destino,
-        cap.paradas
+        cap.cap_m3
     FROM {$tabelaCarregamento} c
-    LEFT JOIN {$tabelaVeiculo} v ON UPPER(v.placa) = UPPER(c.placa_provisoria)
+    LEFT JOIN {$tabelaVeiculo} v
+           ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
-           ON cap.unidade = $1 AND cap.placa_provisoria = c.placa_provisoria
-    WHERE c.unidade = $1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.destino, cap.paradas
+           ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
+    WHERE c.unidade = \$1
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -126,12 +62,14 @@ try {
 }
 
 $carregamentos = [];
-$idxPorPlaca = [];
+$idxPorPlaca   = [];
+
 while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $placa = $row['placa_provisoria'] ?? '';
     if ($placa === '') continue;
 
     $destino = strtoupper(trim($row['destino'] ?? ''));
+    // Fallback: extrai destino da placa fictícia (ex: SAO-CTB → CTB)
     if ($destino === '' && preg_match('/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/', $placa, $m)) {
         $destino = strtoupper($m[1]);
     }
@@ -157,13 +95,12 @@ if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
 }
 
-// Lê dados dos CT-es diretamente de _carregamento (novas colunas, sem join com _cte)
+// ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
 $sqlCtes = "
     SELECT
         c.placa_provisoria,
-        c.seq_cte,
-        c.ser_cte,
         c.nro_cte,
+        c.ser_cte,
         c.destino_cte,
         c.data_emissao_cte,
         c.data_prev_ent_cte,
@@ -181,7 +118,7 @@ $sqlCtes = "
         c.hora_inclusao
     FROM {$tabelaCarregamento} c
     WHERE c.unidade = \$1
-      AND c.seq_cte > 0
+      AND c.nro_cte > 0
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
 ";
 
@@ -193,28 +130,28 @@ try {
 
         $serCte = $cteRow['ser_cte'] ?? '';
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
-        $ctrc   = ($nroCte > 0) ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
+        $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
 
         $carregamentos[$idxPorPlaca[$placa]]['ctes'][] = [
-            'seq_cte'          => (int)($cteRow['seq_cte'] ?? 0),
-            'ser_cte'          => $serCte,
-            'nroCte'           => $nroCte,
-            'ctrc'             => $ctrc,
-            'destino_cte'      => strtoupper(trim($cteRow['destino_cte'] ?? '')),
-            'data_emissao'     => $cteRow['data_emissao_cte'] ?? '',
-            'data_prev_ent'    => $cteRow['data_prev_ent_cte'] ?? '',
-            'remetente'        => $cteRow['remetente_cte'] ?? '',
-            'destinatario'     => $cteRow['destinatario_cte'] ?? '',
-            'pagador'          => $cteRow['pagador_cte'] ?? '',
-            'cidade'           => $cteRow['cidade_destino_cte'] ?? '',
-            'vlr_merc'         => $cteRow['vlr_merc_cte'] ?? '',
-            'vlr_frete'        => $cteRow['vlr_frete_cte'] ?? '',
-            'peso'             => $cteRow['peso_cte'] ?? '',
-            'cubagem'          => $cteRow['cubagem_cte'] ?? '',
-            'qtde_vol'         => $cteRow['qtde_vol_cte'] ?? '',
-            'login_inclusao'   => $cteRow['login_inclusao'] ?? '',
-            'data_inclusao'    => $cteRow['data_inclusao'] ?? null,
-            'hora_inclusao'    => $cteRow['hora_inclusao'] ?? null,
+            'seq_cte'        => $nroCte,   // compatibilidade com frontend (usa seq_cte como ID)
+            'nroCte'         => $nroCte,
+            'ser_cte'        => $serCte,
+            'ctrc'           => $ctrc,
+            'destino_cte'    => strtoupper(trim($cteRow['destino_cte'] ?? '')),
+            'data_emissao'   => $cteRow['data_emissao_cte'] ?? '',
+            'data_prev_ent'  => $cteRow['data_prev_ent_cte'] ?? '',
+            'remetente'      => $cteRow['remetente_cte'] ?? '',
+            'destinatario'   => $cteRow['destinatario_cte'] ?? '',
+            'pagador'        => $cteRow['pagador_cte'] ?? '',
+            'cidade'         => $cteRow['cidade_destino_cte'] ?? '',
+            'vlr_merc'       => $cteRow['vlr_merc_cte'] ?? '',
+            'vlr_frete'      => $cteRow['vlr_frete_cte'] ?? '',
+            'peso'           => $cteRow['peso_cte'] ?? '',
+            'cubagem'        => $cteRow['cubagem_cte'] ?? '',
+            'qtde_vol'       => $cteRow['qtde_vol_cte'] ?? '',
+            'login_inclusao' => $cteRow['login_inclusao'] ?? '',
+            'data_inclusao'  => $cteRow['data_inclusao'] ?? null,
+            'hora_inclusao'  => $cteRow['hora_inclusao'] ?? null,
         ];
     }
 } catch (Exception $e) {}

@@ -26,237 +26,244 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
-$tabela = "{$domain}_carregamento";
+$tabela    = "{$domain}_carregamento";
+$tabelaCap = "{$domain}_carregamento_capacidade";
 
 $conn = connect();
 
-$sqlCria = "
-    CREATE TABLE IF NOT EXISTS {$tabela} (
-        id              SERIAL PRIMARY KEY,
-        unidade         VARCHAR(10) NOT NULL,
-        seq_cte         INT NOT NULL,
-        placa_provisoria VARCHAR(20) NOT NULL,
-        data_inclusao   DATE NOT NULL DEFAULT CURRENT_DATE,
-        hora_inclusao   TIME NOT NULL DEFAULT CURRENT_TIME,
-        login_inclusao  VARCHAR(50) NOT NULL
-    )
-";
-pg_query($conn, $sqlCria);
-
-$unidadeEsc = pg_escape_string($conn, $unidade);
-$loginEsc   = pg_escape_string($conn, $login);
-
+// ─── Ação: criar carregamento manual (linha sentinela com nro_cte = 0) ────────
 if ($acao === 'criar') {
-    $placa = strtoupper(trim($input['placa'] ?? ''));
+    $placa   = strtoupper(trim($input['placa'] ?? ''));
+    $destino = strtoupper(trim($input['destino'] ?? ''));
+    $paradas = strtoupper(trim($input['paradas'] ?? ''));
+
     if (empty($placa)) {
         respondJson(['success' => false, 'message' => 'Placa não informada.']);
     }
-    $placaEsc = pg_escape_string($conn, $placa);
 
-    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' LIMIT 1");
-    if (pg_num_rows($check) > 0) {
+    $check = sql(
+        "SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1",
+        [$unidade, $placa], $conn
+    );
+    if ($check && pg_num_rows($check) > 0) {
         respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
     }
 
-    $destino  = strtoupper(trim($input['destino'] ?? ''));
-    $paradas  = strtoupper(trim($input['paradas'] ?? ''));
-    $destinoEsc = $destino !== '' ? pg_escape_string($conn, $destino) : '';
-    $paradasEsc = $paradas !== '' ? pg_escape_string($conn, $paradas) : '';
+    // Linha sentinela: nro_cte = 0 indica carregamento sem CT-es ainda
+    $destinoSql = $destino !== '' ? "'" . pg_escape_string($conn, $destino) . "'" : 'NULL';
+    $unidadesSql = $paradas !== '' ? "'" . pg_escape_string($conn, $paradas) . "'" : 'NULL';
 
-    $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
-            VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')";
-    $res = pg_query($conn, $sql);
+    $res = pg_query($conn,
+        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql})"
+    );
+
     if (!$res) {
-        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento.']);
-    }
-
-    if ($destinoEsc !== '' || $paradasEsc !== '') {
-        pg_query($conn, "
-            CREATE TABLE IF NOT EXISTS {$tabela}_capacidade (
-                unidade          VARCHAR(10) NOT NULL,
-                placa_provisoria VARCHAR(20) NOT NULL,
-                cap_ton          NUMERIC,
-                cap_m3           NUMERIC,
-                destino          VARCHAR(10),
-                paradas          TEXT,
-                PRIMARY KEY (unidade, placa_provisoria)
-            )
-        ");
-        pg_query($conn, "
-            INSERT INTO {$tabela}_capacidade (unidade, placa_provisoria, destino, paradas)
-            VALUES ('{$unidadeEsc}', '{$placaEsc}', " . ($destinoEsc !== '' ? "'{$destinoEsc}'" : 'NULL') . ", " . ($paradasEsc !== '' ? "'{$paradasEsc}'" : 'NULL') . ")
-            ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET destino = EXCLUDED.destino, paradas = EXCLUDED.paradas
-        ");
+        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento: ' . pg_last_error($conn)]);
     }
 
     respondJson(['success' => true]);
 }
 
-if ($acao === 'adicionar_cte') {
-    $placa  = strtoupper(trim($input['placa'] ?? ''));
-    $seqCte = (int)($input['seq_cte'] ?? 0);
-    if (empty($placa) || $seqCte <= 0) {
-        respondJson(['success' => false, 'message' => 'Placa ou CT-e inválido.']);
-    }
-    $placaEsc = pg_escape_string($conn, $placa);
-
-    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte} LIMIT 1");
-    if (pg_num_rows($check) > 0) {
-        respondJson(['success' => false, 'message' => 'Este CT-e já está neste carregamento.']);
-    }
-
-    $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
-            VALUES ('{$unidadeEsc}', {$seqCte}, '{$placaEsc}', '{$loginEsc}')";
-    $res = pg_query($conn, $sql);
-    if (!$res) {
-        respondJson(['success' => false, 'message' => 'Erro ao adicionar CT-e ao carregamento.']);
-    }
-    respondJson(['success' => true]);
-}
-
+// ─── Ação: adicionar CT-es (apontamento manual e Hub) ─────────────────────────
 if ($acao === 'adicionar_ctes') {
     $placa   = strtoupper(trim($input['placa'] ?? ''));
     $cteList = $input['ctes'] ?? [];
+
     if (empty($placa) || empty($cteList) || !is_array($cteList)) {
         respondJson(['success' => false, 'message' => 'Placa ou CT-es inválidos.']);
-    }
-    $placaEsc = pg_escape_string($conn, $placa);
-
-    // Garante colunas novas existem
-    $novasCols = [
-        'ser_cte VARCHAR(5)', 'nro_cte INT', 'destino_cte VARCHAR(10)',
-        'data_emissao_cte DATE', 'data_prev_ent_cte DATE',
-        'remetente_cte TEXT', 'destinatario_cte TEXT', 'pagador_cte TEXT',
-        'cidade_destino_cte TEXT', 'vlr_merc_cte NUMERIC', 'vlr_frete_cte NUMERIC',
-        'peso_cte NUMERIC', 'cubagem_cte NUMERIC', 'qtde_vol_cte INT',
-    ];
-    foreach ($novasCols as $colDef) {
-        $colName = explode(' ', $colDef)[0];
-        pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS {$colName} " . implode(' ', array_slice(explode(' ', $colDef), 1)));
     }
 
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
+
     foreach ($cteList as $cteData) {
-        $seqCte = (int)($cteData['seqCte'] ?? $cteData['seq_cte'] ?? 0);
         $nroCte = (int)($cteData['nroCte'] ?? 0);
-        if ($seqCte <= 0 && $nroCte <= 0) continue;
-        // Usa seqCte como PK se disponível, senão nroCte como fallback temporário
-        $idCte = $seqCte > 0 ? $seqCte : $nroCte;
+        if ($nroCte <= 0) continue;
 
-        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$idCte} LIMIT 1");
-        if (pg_num_rows($check) > 0) continue;
+        // Evita duplicata
+        $check = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND nro_cte = {$nroCte}
+             LIMIT 1"
+        );
+        if ($check && pg_num_rows($check) > 0) continue;
 
-        $serCte      = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? '')));
-        $destCte     = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['cidade'] ?? '')));
-        $emissao     = pg_escape_string($conn, $cteData['emissao'] ?? '');
-        $prevEnt     = pg_escape_string($conn, $cteData['prevEnt'] ?? '');
-        $remetente   = pg_escape_string($conn, $cteData['remetente'] ?? '');
-        $destinatar  = pg_escape_string($conn, $cteData['destinatario'] ?? '');
-        $pagador     = pg_escape_string($conn, $cteData['pagador'] ?? '');
-        $cidade      = pg_escape_string($conn, $cteData['cidade'] ?? '');
-        $vlrMerc     = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['vlrNf'] ?? '0'));
-        $vlrFrete    = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['frete'] ?? '0'));
-        $peso        = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['peso'] ?? '0'));
-        $cubagem     = pg_escape_string($conn, preg_replace('/[^\d.,]/', '', $cteData['cubagem'] ?? '0'));
-        $qtdeVol     = (int)($cteData['qtdeVol'] ?? 0);
+        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? '')));
+        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? '')));
+        $emissao  = pg_escape_string($conn, $cteData['emissao'] ?? '');
+        $prevEnt  = pg_escape_string($conn, $cteData['prevEnt'] ?? '');
+        $remetente  = pg_escape_string($conn, $cteData['remetente'] ?? '');
+        $destinatar = pg_escape_string($conn, $cteData['destinatario'] ?? '');
+        $pagador    = pg_escape_string($conn, $cteData['pagador'] ?? '');
+        $cidade     = pg_escape_string($conn, $cteData['cidade'] ?? '');
 
-        $emissaoSql  = $emissao  ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')"  : 'NULL';
-        $prevEntSql  = $prevEnt  ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')"  : 'NULL';
+        $vlrMerc  = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['vlrNf']  ?? '0'));
+        $vlrFrete = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['frete']  ?? '0'));
+        $peso     = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['peso']   ?? '0'));
+        $cubagem  = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['cubagem'] ?? '0'));
+        $qtdeVol  = (int)($cteData['qtdeVol'] ?? 0);
 
-        $sql = "INSERT INTO {$tabela}
-            (unidade, seq_cte, placa_provisoria, login_inclusao,
-             ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
-             remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-             vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
-            VALUES
-            ('{$unidadeEsc}', {$idCte}, '{$placaEsc}', '{$loginEsc}',
-             '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
-             '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
-             " . (is_numeric(str_replace(',', '.', $vlrMerc)) ? str_replace(',', '.', $vlrMerc) : '0') . ",
-             " . (is_numeric(str_replace(',', '.', $vlrFrete)) ? str_replace(',', '.', $vlrFrete) : '0') . ",
-             " . (is_numeric(str_replace(',', '.', $peso)) ? str_replace(',', '.', $peso) : '0') . ",
-             " . (is_numeric(str_replace(',', '.', $cubagem)) ? str_replace(',', '.', $cubagem) : '0') . ",
-             {$qtdeVol})";
-        $res = pg_query($conn, $sql);
+        $vlrMerc  = is_numeric($vlrMerc)  ? (float)$vlrMerc  : 0;
+        $vlrFrete = is_numeric($vlrFrete) ? (float)$vlrFrete : 0;
+        $peso     = is_numeric($peso)     ? (float)$peso     : 0;
+        $cubagem  = is_numeric($cubagem)  ? (float)$cubagem  : 0;
+
+        $emissaoSql = $emissao ? "TO_DATE('" . $emissao . "', 'DD/MM/YYYY')" : 'NULL';
+        $prevEntSql = $prevEnt ? "TO_DATE('" . $prevEnt . "', 'DD/MM/YYYY')" : 'NULL';
+
+        $res = pg_query($conn,
+            "INSERT INTO {$tabela}
+             (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+              ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+              remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+              vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte)
+             VALUES
+             ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
+              '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
+              '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
+              {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol})"
+        );
+
         if (!$res) {
             pg_query($conn, 'ROLLBACK');
-            respondJson(['success' => false, 'message' => 'Erro ao adicionar CT-es.']);
+            respondJson(['success' => false, 'message' => 'Erro ao adicionar CT-es: ' . pg_last_error($conn)]);
         }
         $adicionados++;
     }
+
+    // Remove sentinela (nro_cte = 0) se adicionou CT-es reais
     if ($adicionados > 0) {
-        pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = 0");
+        pg_query($conn,
+            "DELETE FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND nro_cte = 0"
+        );
     }
+
     pg_query($conn, 'COMMIT');
     respondJson(['success' => true, 'adicionados' => $adicionados]);
 }
 
+// ─── Ação: remover CT-e ───────────────────────────────────────────────────────
 if ($acao === 'remover_cte') {
     $placa  = strtoupper(trim($input['placa'] ?? ''));
-    $seqCte = (int)($input['seq_cte'] ?? 0);
-    if (empty($placa) || $seqCte <= 0) {
+    $nroCte = (int)($input['seq_cte'] ?? $input['nro_cte'] ?? 0);
+
+    if (empty($placa) || $nroCte <= 0) {
         respondJson(['success' => false, 'message' => 'Placa ou CT-e inválido.']);
     }
-    $placaEsc = pg_escape_string($conn, $placa);
 
-    $sql = "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte}";
-    $res = pg_query($conn, $sql);
+    $res = pg_query($conn,
+        "DELETE FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND nro_cte = {$nroCte}"
+    );
+
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao remover CT-e.']);
     }
 
-    $checkRestantes = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte > 0 LIMIT 1");
-    if (pg_num_rows($checkRestantes) === 0) {
-        pg_query($conn, "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao) VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')");
+    // Se ficou sem CT-es, reinsere sentinela para manter o carregamento visível
+    $checkRestantes = pg_query($conn,
+        "SELECT 1 FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND nro_cte > 0
+         LIMIT 1"
+    );
+    if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
+        pg_query($conn,
+            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0)"
+        );
     }
 
     respondJson(['success' => true]);
 }
 
+// ─── Ação: excluir carregamento ───────────────────────────────────────────────
 if ($acao === 'excluir_carregamento') {
     $placa = strtoupper(trim($input['placa'] ?? ''));
     if (empty($placa)) {
         respondJson(['success' => false, 'message' => 'Placa não informada.']);
     }
-    $placaEsc = pg_escape_string($conn, $placa);
 
-    $sql = "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}'";
-    $res = pg_query($conn, $sql);
+    $res = pg_query($conn,
+        "DELETE FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
+    );
+
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento.']);
     }
+
+    // Limpa capacidade também
+    pg_query($conn,
+        "DELETE FROM {$tabelaCap}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
+    );
+
     respondJson(['success' => true]);
 }
 
+// ─── Ação: atualizar placa ────────────────────────────────────────────────────
 if ($acao === 'atualizar_placa') {
     $placaAntiga = strtoupper(trim($input['placa_antiga'] ?? ''));
     $placaNova   = strtoupper(trim($input['placa_nova'] ?? ''));
+
     if (empty($placaAntiga) || empty($placaNova)) {
         respondJson(['success' => false, 'message' => 'Placas não informadas.']);
     }
-    $placaAntigaEsc = pg_escape_string($conn, $placaAntiga);
-    $placaNovaEsc   = pg_escape_string($conn, $placaNova);
-    $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaNovaEsc}' LIMIT 1");
+
+    $check = pg_query($conn,
+        "SELECT 1 FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placaNova) . "'
+         LIMIT 1"
+    );
     if ($check && pg_num_rows($check) > 0) {
         respondJson(['success' => false, 'message' => "Já existe um carregamento com a placa {$placaNova}."]);
     }
-    $res = pg_query($conn, "UPDATE {$tabela} SET placa_provisoria = '{$placaNovaEsc}' WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaAntigaEsc}'");
+
+    $res = pg_query($conn,
+        "UPDATE {$tabela}
+         SET placa_provisoria = '" . pg_escape_string($conn, $placaNova) . "'
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placaAntiga) . "'"
+    );
     if (!$res) respondJson(['success' => false, 'message' => 'Erro ao atualizar placa.']);
+
+    // Atualiza na capacidade também
+    pg_query($conn,
+        "UPDATE {$tabelaCap}
+         SET placa_provisoria = '" . pg_escape_string($conn, $placaNova) . "'
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placaAntiga) . "'"
+    );
+
     respondJson(['success' => true]);
 }
 
+// ─── Ação: atualizar capacidade ───────────────────────────────────────────────
 if ($acao === 'atualizar_capacidade') {
     $placa  = strtoupper(trim($input['placa'] ?? ''));
-    $capTon = $input['cap_ton'] !== '' && $input['cap_ton'] !== null ? (float)$input['cap_ton'] : null;
-    $capM3  = $input['cap_m3']  !== '' && $input['cap_m3']  !== null ? (float)$input['cap_m3']  : null;
+    $capTon = ($input['cap_ton'] !== '' && $input['cap_ton'] !== null) ? (float)$input['cap_ton'] : null;
+    $capM3  = ($input['cap_m3']  !== '' && $input['cap_m3']  !== null) ? (float)$input['cap_m3']  : null;
+
     if (empty($placa)) respondJson(['success' => false, 'message' => 'Placa não informada.']);
-    $placaEsc  = pg_escape_string($conn, $placa);
+
     $capTonSql = $capTon !== null ? $capTon : 'NULL';
     $capM3Sql  = $capM3  !== null ? $capM3  : 'NULL';
 
     pg_query($conn, "
-        CREATE TABLE IF NOT EXISTS {$tabela}_capacidade (
+        CREATE TABLE IF NOT EXISTS {$tabelaCap} (
             unidade          VARCHAR(10) NOT NULL,
             placa_provisoria VARCHAR(20) NOT NULL,
             cap_ton          NUMERIC,
@@ -264,16 +271,21 @@ if ($acao === 'atualizar_capacidade') {
             PRIMARY KEY (unidade, placa_provisoria)
         )
     ");
-    pg_query($conn, "
-        INSERT INTO {$tabela}_capacidade (unidade, placa_provisoria, cap_ton, cap_m3)
-        VALUES ('{$unidadeEsc}', '{$placaEsc}', {$capTonSql}, {$capM3Sql})
-        ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3
-    ");
+
+    pg_query($conn,
+        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql})
+         ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3"
+    );
+
     respondJson(['success' => true]);
 }
 
+// ─── Ação: excluir todos ──────────────────────────────────────────────────────
 if ($acao === 'excluir_todos') {
-    $res = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}'");
+    $res = pg_query($conn,
+        "DELETE FROM {$tabela} WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'"
+    );
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos.']);
     }

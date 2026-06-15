@@ -29,9 +29,8 @@ $tabela = "{$domain}_carregamento";
 
 $sql = "
     SELECT
-        seq_cte,
-        ser_cte,
         nro_cte,
+        ser_cte,
         destino_cte,
         TO_CHAR(data_emissao_cte, 'DD/MM/YYYY')  AS data_emissao,
         TO_CHAR(data_prev_ent_cte, 'DD/MM/YYYY') AS data_prev_ent,
@@ -47,7 +46,7 @@ $sql = "
     FROM {$tabela}
     WHERE unidade = \$1
       AND UPPER(placa_provisoria) = \$2
-      AND seq_cte > 0
+      AND nro_cte > 0
     ORDER BY data_inclusao ASC, hora_inclusao ASC
 ";
 
@@ -62,7 +61,7 @@ $totVol   = 0;
 while ($res && ($row = pg_fetch_assoc($res))) {
     $serCte = $row['ser_cte'] ?? '';
     $nroCte = (int)($row['nro_cte'] ?? 0);
-    $ctrc   = $nroCte > 0 ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : ('#' . $row['seq_cte']);
+    $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : ('#' . $nroCte);
 
     $vlrFrete = (float)($row['vlr_frete'] ?? 0);
     $pesoNum  = (float)($row['peso'] ?? 0);
@@ -75,7 +74,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $totVol   += $qtdeVol;
 
     $ctes[] = [
-        'seq_cte'       => (int)$row['seq_cte'],
+        'seq_cte'       => $nroCte,   // compatibilidade com frontend
         'ctrc'          => $ctrc,
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
