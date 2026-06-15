@@ -1392,6 +1392,9 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
   const [loading, setLoading] = useState(false);
   const [linhas, setLinhas] = useState<LinhaCarregamento[]>([]);
   const [nroLinha, setNroLinha] = useState('');
+  const [buscaLinha, setBuscaLinha] = useState('');
+  const [ordemLinhas, setOrdemLinhas] = useState<'destino' | 'intermediarias'>('destino');
+  const [ordemDirLinhas, setOrdemDirLinhas] = useState<'asc' | 'desc'>('asc');
   const [loadingLinhas, setLoadingLinhas] = useState(false);
 
   useEffect(() => {
@@ -1443,13 +1446,27 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
     }
   };
 
-  const formatarLinha = (l: LinhaCarregamento): string => {
-    const dest = (l.sigla_dest ?? '').trim().toUpperCase();
-    const nome = (l.nome ?? '').trim();
-    const paradas = (l.unidades ?? '').trim();
-    const base = [`${l.nro_linha}`, dest ? `→ ${dest}` : '', nome ? `· ${nome}` : ''].filter(Boolean).join(' ');
-    return paradas ? `${base} (${paradas})` : base;
+  const toggleOrdemLinhas = (col: 'destino' | 'intermediarias') => {
+    if (ordemLinhas === col) setOrdemDirLinhas(d => d === 'asc' ? 'desc' : 'asc');
+    else { setOrdemLinhas(col); setOrdemDirLinhas('asc'); }
   };
+
+  const linhasVisiveis = React.useMemo(() => {
+    const q = buscaLinha.trim().toUpperCase();
+    const filtradas = q
+      ? linhas.filter(l => (l.sigla_dest ?? '').toUpperCase().includes(q) || (l.unidades ?? '').toUpperCase().includes(q))
+      : linhas.slice();
+
+    const dir = ordemDirLinhas === 'asc' ? 1 : -1;
+    filtradas.sort((a, b) => {
+      const va = (ordemLinhas === 'destino' ? (a.sigla_dest ?? '') : (a.unidades ?? '')).toUpperCase();
+      const vb = (ordemLinhas === 'destino' ? (b.sigla_dest ?? '') : (b.unidades ?? '')).toUpperCase();
+      const cmp = va.localeCompare(vb);
+      if (cmp !== 0) return cmp * dir;
+      return ((a.nro_linha ?? 0) - (b.nro_linha ?? 0)) * dir;
+    });
+    return filtradas;
+  }, [linhas, buscaLinha, ordemLinhas, ordemDirLinhas]);
 
   const podeIniciar = modo === 'automatico'
     ? !!nroLinha && !loadingLinhas
@@ -1494,21 +1511,103 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <p className="text-xs text-indigo-700 dark:text-indigo-400">
                 Selecione uma linha para montar um carregamento para o destino final dessa linha, incluindo as paradas intermediárias. A placa será gerada automaticamente no formato <strong>ORIGEM-DESTINO</strong>.
               </p>
-              <div className="pt-2 space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  Linha <span className="text-red-500">*</span>
-                </label>
-                <select
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Linha <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {loadingLinhas ? 'Carregando...' : `${linhasVisiveis.length} linha(s)`}
+                  </span>
+                </div>
+
+                <input
                   className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
-                  value={nroLinha}
-                  onChange={e => setNroLinha(e.target.value)}
+                  placeholder="Buscar sigla (destino ou intermediárias)..."
+                  value={buscaLinha}
+                  onChange={e => setBuscaLinha(e.target.value.toUpperCase())}
                   disabled={loading || loadingLinhas}
-                >
-                  <option value="">{loadingLinhas ? 'Carregando linhas...' : 'Selecione uma linha'}</option>
-                  {linhas.map(l => (
-                    <option key={l.nro_linha} value={String(l.nro_linha)}>{formatarLinha(l)}</option>
-                  ))}
-                </select>
+                />
+
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                  <div className="grid grid-cols-[96px_1fr] items-center gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                      onClick={() => toggleOrdemLinhas('destino')}
+                      disabled={loading || loadingLinhas}
+                    >
+                      Destino
+                      {ordemLinhas === 'destino' && (
+                        ordemDirLinhas === 'desc'
+                          ? <ChevronDown className="w-3 h-3 shrink-0" />
+                          : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 text-left"
+                      onClick={() => toggleOrdemLinhas('intermediarias')}
+                      disabled={loading || loadingLinhas}
+                    >
+                      Unidades intermediárias
+                      {ordemLinhas === 'intermediarias' && (
+                        ordemDirLinhas === 'desc'
+                          ? <ChevronDown className="w-3 h-3 shrink-0" />
+                          : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {loadingLinhas ? (
+                      <div className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Carregando linhas...
+                      </div>
+                    ) : linhasVisiveis.length === 0 ? (
+                      <div className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400">
+                        Nenhuma linha encontrada.
+                      </div>
+                    ) : (
+                      linhasVisiveis.map(l => {
+                        const selecionada = String(l.nro_linha) === nroLinha;
+                        const destino = (l.sigla_dest ?? '').trim().toUpperCase() || '-';
+                        const inter = (l.unidades ?? '').trim().toUpperCase() || '-';
+                        const nome = (l.nome ?? '').trim();
+                        return (
+                          <button
+                            key={l.nro_linha}
+                            type="button"
+                            onClick={() => setNroLinha(String(l.nro_linha))}
+                            className={`w-full text-left px-3 py-2 border-b border-slate-100 dark:border-slate-800 transition-colors ${selecionada ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
+                            disabled={loading}
+                          >
+                            <div className="grid grid-cols-[96px_1fr] items-start gap-2">
+                              <div className="leading-tight">
+                                <div className={`font-mono font-bold text-sm ${selecionada ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
+                                  {destino}
+                                </div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                                  #{l.nro_linha}
+                                </div>
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-mono text-xs text-slate-700 dark:text-slate-200 whitespace-nowrap truncate">
+                                  {inter}
+                                </div>
+                                {nome && (
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap truncate">
+                                    {nome}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
