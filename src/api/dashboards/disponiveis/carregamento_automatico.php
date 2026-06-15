@@ -117,6 +117,60 @@ function getColunasCte($conn, $tabelaCte) {
     return [$peso, $cub];
 }
 
+function gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem) {
+    $resumoUnidades = [];
+    $resumoDestinos = [];
+    if (empty($seqCtes)) return [$resumoUnidades, $resumoDestinos];
+
+    $inSeq = [];
+    $paramsSeq = [];
+    $idxSeq = 1;
+    foreach ($seqCtes as $seq) {
+        $inSeq[] = '$' . $idxSeq;
+        $paramsSeq[] = (int)$seq;
+        $idxSeq++;
+    }
+    $pesoResumo = $colPeso ? "COALESCE(SUM(c.{$colPeso}::numeric), 0)" : '0';
+    $cubResumo  = $colCubagem ? "COALESCE(SUM(c.{$colCubagem}::numeric), 0)" : '0';
+    $inStr = implode(',', $inSeq);
+
+    // Resumo por unidade emissora (carregadora)
+    try {
+        $res = sql(
+            "SELECT c.sigla_emit AS unid, COUNT(*) AS qtd, {$pesoResumo} AS peso_total, {$cubResumo} AS cub_total
+             FROM {$tabelaCte} c WHERE c.seq_cte IN ({$inStr}) GROUP BY c.sigla_emit ORDER BY qtd DESC",
+            $paramsSeq, $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $resumoUnidades[] = [
+                'unidade' => strtoupper(trim($r['unid'] ?? '')),
+                'qtd'     => (int)$r['qtd'],
+                'peso_kg' => round(parseNumero($r['peso_total'] ?? 0), 2),
+                'cubagem' => round(parseNumero($r['cub_total'] ?? 0), 3),
+            ];
+        }
+    } catch (Exception $e) {}
+
+    // Resumo por unidade destino
+    try {
+        $res = sql(
+            "SELECT c.sigla_dest AS unid, COUNT(*) AS qtd, {$pesoResumo} AS peso_total, {$cubResumo} AS cub_total
+             FROM {$tabelaCte} c WHERE c.seq_cte IN ({$inStr}) GROUP BY c.sigla_dest ORDER BY qtd DESC",
+            $paramsSeq, $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $resumoDestinos[] = [
+                'unidade' => strtoupper(trim($r['unid'] ?? '')),
+                'qtd'     => (int)$r['qtd'],
+                'peso_kg' => round(parseNumero($r['peso_total'] ?? 0), 2),
+                'cubagem' => round(parseNumero($r['cub_total'] ?? 0), 3),
+            ];
+        }
+    } catch (Exception $e) {}
+
+    return [$resumoUnidades, $resumoDestinos];
+}
+
 function buscarSeqCtesDentroCapacidade($conn, $tabelaCarregamento, $tabelaCte, $unidade, $destinos, $pesoExpr, $cubExpr, $limitePesoKg, $limiteVolM3, $orderBySql) {
     if (count($destinos) === 0) return [];
 
@@ -134,7 +188,10 @@ function buscarSeqCtesDentroCapacidade($conn, $tabelaCarregamento, $tabelaCte, $
     $sqlCtes = "
         SELECT c.seq_cte, {$pesoExpr} AS peso_val, {$cubExpr} AS cubagem_val
         FROM {$tabelaCte} c
-        WHERE c.sigla_dest IN (" . implode(',', $inParts) . ")
+        WHERE (
+            c.sigla_dest IN (" . implode(',', $inParts) . ")
+            OR c.sigla_emit = $" . $unidadeIdx . "
+        )
           AND c.status NOT IN ('C','X')
           AND NOT EXISTS (
               SELECT 1 FROM {$tabelaCarregamento} t
@@ -288,45 +345,10 @@ if ($modoAutomatico) {
 
     $resultados[] = ['placa' => $placaAuto, 'status' => 'criado', 'msg' => count($seqCtes) . ' CT-e(s) adicionados.'];
 
-    // Resumo por unidade de origem (lida do 019) e por destino dos CT-es
-    $resumoUnidades = [];
-    if (!empty($seqCtes)) {
-        $inSeq = [];
-        $paramsSeq = [];
-        $idxSeq = 1;
-        foreach ($seqCtes as $seq) {
-            $inSeq[] = '$' . $idxSeq;
-            $paramsSeq[] = (int)$seq;
-            $idxSeq++;
-        }
-        $pesoResumo = $colPeso ? "COALESCE(SUM(c.{$colPeso}::numeric), 0)" : '0';
-        $cubResumo  = $colCubagem ? "COALESCE(SUM(c.{$colCubagem}::numeric), 0)" : '0';
-        try {
-            $resResumo = sql(
-                "SELECT c.sigla_dest AS dest,
-                        COUNT(*) AS qtd,
-                        {$pesoResumo} AS peso_total,
-                        {$cubResumo} AS cub_total
-                 FROM {$tabelaCte} c
-                 WHERE c.seq_cte IN (" . implode(',', $inSeq) . ")
-                 GROUP BY c.sigla_dest
-                 ORDER BY qtd DESC",
-                $paramsSeq,
-                $conn
-            );
-            while ($resResumo && ($r = pg_fetch_assoc($resResumo))) {
-                $resumoUnidades[] = [
-                    'unidade'   => strtoupper(trim($r['dest'] ?? '')),
-                    'qtd'       => (int)$r['qtd'],
-                    'peso_kg'   => round(parseNumero($r['peso_total'] ?? 0), 2),
-                    'cubagem'   => round(parseNumero($r['cub_total'] ?? 0), 3),
-                ];
-            }
-        } catch (Exception $e) {}
-    }
+    [$resumoUnidades, $resumoDestinos] = gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem);
 
     $criados = 1;
-    respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados, 'placa' => $placaAuto, 'resumo_unidades' => $resumoUnidades]);
+    respondJson(['success' => true, 'message' => "{$criados} carregamento(s) criado(s) automaticamente.", 'resultados' => $resultados, 'placa' => $placaAuto, 'resumo_unidades' => $resumoUnidades, 'resumo_destinos' => $resumoDestinos]);
 }
 
 if (empty($unidadeDestino)) {
@@ -394,41 +416,6 @@ try {
     respondJson(['success' => false, 'message' => 'Erro ao criar carregamento automático.']);
 }
 
-// Resumo por unidade de destino (sigla_dest)
-$resumoUnidadesManual = [];
-if (!empty($seqCtes)) {
-    $inSeq = [];
-    $paramsSeq = [];
-    $idxSeq = 1;
-    foreach ($seqCtes as $seq) {
-        $inSeq[] = '$' . $idxSeq;
-        $paramsSeq[] = (int)$seq;
-        $idxSeq++;
-    }
-    $pesoResumo = $colPeso ? "COALESCE(SUM(c.{$colPeso}::numeric), 0)" : '0';
-    $cubResumo  = $colCubagem ? "COALESCE(SUM(c.{$colCubagem}::numeric), 0)" : '0';
-    try {
-        $resResumo = sql(
-            "SELECT c.sigla_dest AS dest,
-                    COUNT(*) AS qtd,
-                    {$pesoResumo} AS peso_total,
-                    {$cubResumo} AS cub_total
-             FROM {$tabelaCte} c
-             WHERE c.seq_cte IN (" . implode(',', $inSeq) . ")
-             GROUP BY c.sigla_dest
-             ORDER BY qtd DESC",
-            $paramsSeq,
-            $conn
-        );
-        while ($resResumo && ($r = pg_fetch_assoc($resResumo))) {
-            $resumoUnidadesManual[] = [
-                'unidade'   => strtoupper(trim($r['dest'] ?? '')),
-                'qtd'       => (int)$r['qtd'],
-                'peso_kg'   => round(parseNumero($r['peso_total'] ?? 0), 2),
-                'cubagem'   => round(parseNumero($r['cub_total'] ?? 0), 3),
-            ];
-        }
-    } catch (Exception $e) {}
-}
+[$resumoUnidadesManual, $resumoDestinosManual] = gerarResumos($conn, $tabelaCte, $seqCtes, $colPeso, $colCubagem);
 
-respondJson(['success' => true, 'message' => count($seqCtes) . " CT-e(s) adicionados ao carregamento {$placaFinal}.", 'placa' => $placaFinal, 'resumo_unidades' => $resumoUnidadesManual]);
+respondJson(['success' => true, 'message' => count($seqCtes) . " CT-e(s) adicionados ao carregamento {$placaFinal}.", 'placa' => $placaFinal, 'resumo_unidades' => $resumoUnidadesManual, 'resumo_destinos' => $resumoDestinosManual]);

@@ -185,8 +185,8 @@ try {
         $placa = $cteRow['placa_provisoria'] ?? '';
         if ($placa === '' || !isset($idxPorPlaca[$placa])) continue;
         $serCte = $cteRow['ser_cte'] ?? '';
-        $nroCte = (int)($cteRow['nro_cte'] ?? 0);
-        $ctrc   = $nroCte > 0 ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
+        $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
+        $ctrc   = ($nroCte > 0) ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
 
         $pesoNum = $cteRow['peso'] !== null ? parseNumero($cteRow['peso']) : null;
         $cubNum  = $cteRow['cubagem'] !== null ? parseNumero($cteRow['cubagem']) : null;

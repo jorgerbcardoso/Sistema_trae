@@ -121,18 +121,27 @@ if ($acao === 'adicionar_ctes') {
         respondJson(['success' => false, 'message' => 'Placa ou CT-es inválidos.']);
     }
     $placaEsc = pg_escape_string($conn, $placa);
+    $tabelaCte = "{$domain}_cte";
 
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
-    foreach ($seqCtes as $seqCte) {
-        $seqCte = (int)$seqCte;
-        if ($seqCte <= 0) continue;
+    foreach ($seqCtes as $seqCteInput) {
+        $seqCteInput = (int)$seqCteInput;
+        if ($seqCteInput <= 0) continue;
 
-        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCte} LIMIT 1");
+        // Tenta encontrar o seq_cte real na tabela _cte pelo nro_cte
+        $seqCteReal = $seqCteInput;
+        $resBusca = pg_query($conn, "SELECT seq_cte FROM {$tabelaCte} WHERE nro_cte = {$seqCteInput} LIMIT 1");
+        if ($resBusca && pg_num_rows($resBusca) > 0) {
+            $rowBusca = pg_fetch_assoc($resBusca);
+            $seqCteReal = (int)$rowBusca['seq_cte'];
+        }
+
+        $check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND seq_cte = {$seqCteReal} LIMIT 1");
         if (pg_num_rows($check) > 0) continue;
 
         $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
-                VALUES ('{$unidadeEsc}', {$seqCte}, '{$placaEsc}', '{$loginEsc}')";
+                VALUES ('{$unidadeEsc}', {$seqCteReal}, '{$placaEsc}', '{$loginEsc}')";
         $res = pg_query($conn, $sql);
         if (!$res) {
             pg_query($conn, 'ROLLBACK');
