@@ -58,12 +58,37 @@ if ($acao === 'criar') {
         respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
     }
 
+    $destino  = strtoupper(trim($input['destino'] ?? ''));
+    $paradas  = strtoupper(trim($input['paradas'] ?? ''));
+    $destinoEsc = $destino !== '' ? pg_escape_string($conn, $destino) : '';
+    $paradasEsc = $paradas !== '' ? pg_escape_string($conn, $paradas) : '';
+
     $sql = "INSERT INTO {$tabela} (unidade, seq_cte, placa_provisoria, login_inclusao)
             VALUES ('{$unidadeEsc}', 0, '{$placaEsc}', '{$loginEsc}')";
     $res = pg_query($conn, $sql);
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao criar carregamento.']);
     }
+
+    if ($destinoEsc !== '' || $paradasEsc !== '') {
+        pg_query($conn, "
+            CREATE TABLE IF NOT EXISTS {$tabela}_capacidade (
+                unidade          VARCHAR(10) NOT NULL,
+                placa_provisoria VARCHAR(20) NOT NULL,
+                cap_ton          NUMERIC,
+                cap_m3           NUMERIC,
+                destino          VARCHAR(10),
+                paradas          TEXT,
+                PRIMARY KEY (unidade, placa_provisoria)
+            )
+        ");
+        pg_query($conn, "
+            INSERT INTO {$tabela}_capacidade (unidade, placa_provisoria, destino, paradas)
+            VALUES ('{$unidadeEsc}', '{$placaEsc}', " . ($destinoEsc !== '' ? "'{$destinoEsc}'" : 'NULL') . ", " . ($paradasEsc !== '' ? "'{$paradasEsc}'" : 'NULL') . ")
+            ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET destino = EXCLUDED.destino, paradas = EXCLUDED.paradas
+        ");
+    }
+
     respondJson(['success' => true]);
 }
 

@@ -931,7 +931,7 @@ interface CarregamentoAreaProps {
   modoApontamento: string | null;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
-  onCriarCarregamento: (placa: string) => void;
+  onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
   onExcluirCarregamento: (placa: string) => void;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
@@ -939,7 +939,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }>;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>;
   todosCtes: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -965,8 +965,10 @@ function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: num
   );
 }
 
-function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string) => void; onFechar: () => void }) {
+function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string, destino: string, paradas: string) => void; onFechar: () => void }) {
   const [placa, setPlaca] = useState('');
+  const [destino, setDestino] = useState('');
+  const [paradas, setParadas] = useState('');
   const [buscaVeiculo, setBuscaVeiculo] = useState('');
   const [veiculos, setVeiculos] = useState<{ placa: string; tipo: string; marca: string; modelo: string }[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -1008,7 +1010,7 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-3">
           <div className="flex gap-2">
             <button
               onClick={() => { setModoVeiculo(false); setBuscaVeiculo(''); setVeiculos([]); }}
@@ -1017,7 +1019,7 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               Placa livre
             </button>
             <button
-              onClick={() => { setModoVeiculo(true); setPlaca(''); }}
+              onClick={() => { setModoVeiculo(true); setPlaca(''); setDestino(''); setParadas(''); }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
             >
               <Car className="w-4 h-4 inline mr-1.5" />Veículo cadastrado
@@ -1064,13 +1066,38 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               )}
             </div>
           )}
+          </div>
+          {!modoVeiculo && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Unid. destino <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={destino}
+                  onChange={e => setDestino(e.target.value.toUpperCase())}
+                  placeholder="Ex: SPO"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Paradas intermediárias <span className="font-normal text-slate-400">(opcional)</span></label>
+                <input
+                  type="text"
+                  value={paradas}
+                  onChange={e => setParadas(e.target.value.toUpperCase())}
+                  placeholder="Ex: CWB, LDA"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+            </>
+          )}
         </div>
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" className="flex-1" onClick={onFechar}>Cancelar</Button>
           <Button
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-            disabled={!placaFinal.trim()}
-            onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim()); }}
+            disabled={!placaFinal.trim() || (!modoVeiculo && !destino.trim())}
+            onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim(), destino.trim(), paradas.trim()); }}
           >
             <Plus className="w-4 h-4 mr-1.5" />Carregamento Manual
           </Button>
@@ -1221,7 +1248,14 @@ function CardCarregamento({
 
   const ctesDetalhados = carregamento.ctes.map(c => {
     const detSSW = todosCtes.find(e => e.nroCte === c.nroCte);
-    const det = detSSW ?? (c.ctrc ? { ctrc: c.ctrc, nroCte: c.nroCte ?? 0, destinatario: c.destinatario ?? '', cidade: c.cidade ?? '', peso: c.peso ?? '', cubagem: c.cubagem ?? '' } : undefined);
+    const det = detSSW ?? {
+      ctrc: c.ctrc || `#${c.seq_cte}`,
+      nroCte: c.nroCte ?? 0,
+      destinatario: c.destinatario || '',
+      cidade: c.cidade || '',
+      peso: c.peso || '',
+      cubagem: c.cubagem || '',
+    };
     return { ...c, det };
   });
 
@@ -1250,6 +1284,12 @@ function CardCarregamento({
     }
     return best;
   })();
+
+  const paradasArray = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+  const todasUnidades = [...paradasArray, destino].filter(Boolean) as string[];
+  const unidadesDestinoTexto = todasUnidades.length > 0
+    ? todasUnidades.map((u, i) => i === todasUnidades.length - 1 ? <span key={i} className="font-bold">{u}</span> : <span key={i}>{u}{i < todasUnidades.length - 1 ? ', ' : ''}</span>)
+    : null;
 
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
@@ -1296,8 +1336,11 @@ function CardCarregamento({
                 <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
               )}
               <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino:</span>
-                <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{destino ?? '-'}</span>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
+                {unidadesDestinoTexto
+                  ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
+                  : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
+                }
               </div>
             </div>
           </div>
@@ -1366,7 +1409,7 @@ function CardCarregamento({
               variant="outline"
               className={`flex-1 h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
               onClick={() => onCarregarHub(carregamento)}
-              disabled={loadingHub || carregamento.capacidade_ton === null || carregamento.capacidade_m3 === null}
+              disabled={loadingHub}
               title="Completar carregamento com CT-es via Hub"
             >
               {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
@@ -1522,7 +1565,7 @@ type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ign
 
 type LinhaCarregamento = { nro_linha: number; nome: string; sigla_emit: string; sigla_dest: string; unidades: string; km_ida: number | null; km_volta: number | null };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }>; onFechar: () => void }) {
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>; onFechar: () => void }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
@@ -1566,7 +1609,15 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
     try {
       setLoading(true);
       const result = await onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
-      if (result.ok) onFechar();
+      if (result.ok) {
+        if (result.placa && result.resumo && result.resumo.length > 0) {
+          setResumoPlaca(result.placa);
+          setResumoUnidades(result.resumo);
+          setResumoDialogOpen(true);
+        } else {
+          onFechar();
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -1574,7 +1625,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
 
   const [resumoDialogOpen, setResumoDialogOpen] = useState(false);
   const [resumoPlaca, setResumoPlaca] = useState('');
-  const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number }[]>([]);
+  const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]>([]);
 
   const handleConfirmarAutomatico = async () => {
     if (loading) return;
@@ -1583,16 +1634,22 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
       setLoading(true);
       const result = await onConfirmar('', '', [], Number(nroLinha));
       if (result.ok) {
-        onFechar();
         if (result.placa && result.resumo && result.resumo.length > 0) {
           setResumoPlaca(result.placa);
           setResumoUnidades(result.resumo);
           setResumoDialogOpen(true);
+        } else {
+          onFechar();
         }
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFecharResumo = () => {
+    setResumoDialogOpen(false);
+    onFechar();
   };
 
   const toggleOrdemLinhas = (col: 'destino' | 'intermediarias') => {
@@ -1804,31 +1861,37 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
         </div>
       </div>
       <Dialog open={resumoDialogOpen} onOpenChange={setResumoDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-[580px]">
           <DialogHeader>
             <DialogTitle>Resumo · Carregamento {resumoPlaca}</DialogTitle>
             <DialogDescription>CT-es adicionados por unidade de destino</DialogDescription>
           </DialogHeader>
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+            <div className="grid grid-cols-[minmax(0,1fr)_60px_80px_75px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
               <span>Unidade</span>
               <span className="text-right">CT-es</span>
+              <span className="text-right">Peso (kg)</span>
+              <span className="text-right">Cub. (m³)</span>
             </div>
             <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
               {resumoUnidades.map((r, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-2.5 text-sm">
+                <div key={idx} className="grid grid-cols-[minmax(0,1fr)_60px_80px_75px] gap-3 px-4 py-2.5 text-sm">
                   <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{r.unidade}</span>
                   <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-sm font-semibold">
+            <div className="grid grid-cols-[minmax(0,1fr)_60px_80px_75px] gap-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-sm font-semibold">
               <span className="text-slate-700 dark:text-slate-300">Total</span>
               <span className="text-right font-bold text-indigo-700 dark:text-indigo-300 tabular-nums">{resumoUnidades.reduce((s, r) => s + r.qtd, 0)}</span>
+              <span className="text-right font-mono text-xs tabular-nums text-slate-700 dark:text-slate-300">{resumoUnidades.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+              <span className="text-right font-mono text-xs tabular-nums text-slate-700 dark:text-slate-300">{resumoUnidades.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
             </div>
           </div>
           <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => setResumoDialogOpen(false)}>Fechar</Button>
+            <Button variant="outline" size="sm" onClick={handleFecharResumo}>Fechar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2069,9 +2132,9 @@ function CarregamentoArea({
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
 
-  const handleCriar = (placa: string) => {
+  const handleCriar = (placa: string, destino: string, paradas: string) => {
     setModalAberto(false);
-    onCriarCarregamento(placa);
+    onCriarCarregamento(placa, destino, paradas);
   };
 
   const handleExcluirTodos = async () => {
@@ -2377,11 +2440,11 @@ export function Disponiveis() {
     finally { setLoadingCarregamentos(false); }
   }, []);
 
-  const handleCriarCarregamento = useCallback(async (placa: string) => {
+  const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa, seq_cte: 0 }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa, destino, paradas }) },
         true
       );
       if (res.success) {
@@ -2415,7 +2478,7 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number }[] }> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
@@ -2521,7 +2584,9 @@ export function Disponiveis() {
 
     setHubModalCarregamento(car);
     setHubModalDestino(destino);
-    setHubModalUnidadesStr('');
+
+    const paradasDoCarregamento = (car.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
+    setHubModalUnidadesStr(paradasDoCarregamento.join(', '));
     setHubModalAberto(true);
 
     setHubCarregamentoPlaca(car.placa_provisoria);
@@ -2535,9 +2600,9 @@ export function Disponiveis() {
       );
       if (res.success) {
         const sugeridas = Array.isArray(res.unidades_sugeridas) ? res.unidades_sugeridas : [];
-        setHubModalUnidadesStr(sugeridas.join(', '));
-      } else {
-        toast.error(res.message || 'Erro ao buscar sugestão de unidades.');
+        if (sugeridas.length > 0 && paradasDoCarregamento.length === 0) {
+          setHubModalUnidadesStr(sugeridas.join(', '));
+        }
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao buscar sugestão de unidades.');
