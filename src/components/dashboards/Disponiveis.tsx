@@ -978,7 +978,12 @@ interface CarregamentoAreaProps {
   importandoCarregamentos: boolean;
   importacaoAutomatica: boolean;
   onToggleImportacaoAutomatica: (ativo: boolean) => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>;
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{
+    ok: boolean;
+    placa?: string;
+    resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+  }>;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
 }
 
@@ -1636,7 +1641,15 @@ type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ign
 
 type LinhaCarregamento = { nro_linha: number; nome: string; sigla_emit: string; sigla_dest: string; unidades: string; km_ida: number | null; km_volta: number | null };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }>; onFechar: () => void }) {
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
+  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{
+    ok: boolean;
+    placa?: string;
+    resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+  }>;
+  onFechar: () => void;
+}) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
@@ -1697,8 +1710,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
 
   const [resumoDialogOpen, setResumoDialogOpen] = useState(false);
   const [resumoPlaca, setResumoPlaca] = useState('');
-  const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]>([]);
-  const [resumoDestinos, setResumoDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]>([]);
+  const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
+  const [resumoDestinos, setResumoDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
 
   const handleConfirmarAutomatico = async () => {
     if (loading) return;
@@ -1935,7 +1948,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
         </div>
       </div>
       <Dialog open={resumoDialogOpen} onOpenChange={setResumoDialogOpen}>
-        <DialogContent className="sm:max-w-[580px]">
+        <DialogContent className="sm:max-w-[690px]">
           <DialogHeader>
             <DialogTitle>Resumo · Carregamento {resumoPlaca}</DialogTitle>
             <DialogDescription>CT-es adicionados por unidade de destino</DialogDescription>
@@ -1946,27 +1959,30 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade carregadora</p>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
                 <span className="text-right">CT-es</span>
                 <span className="text-right">Kg</span>
                 <span className="text-right">M³</span>
+                <span className="text-right">Frete</span>
               </div>
               <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 {resumoUnidades.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoUnidades.map((r, idx) => (
-                  <div key={idx} className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 px-2 py-1.5 text-xs">
+                  <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
                     <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
                     <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
+              <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
                 <span className="text-slate-600 dark:text-slate-300">Total</span>
                 <span className="text-right font-bold text-indigo-700 dark:text-indigo-300 tabular-nums">{resumoUnidades.reduce((s, r) => s + r.qtd, 0)}</span>
                 <span className="text-right font-mono text-[10px] tabular-nums">{resumoUnidades.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                 <span className="text-right font-mono text-[10px] tabular-nums">{resumoUnidades.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                <span className="text-right font-mono text-[10px] tabular-nums">{resumoUnidades.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
             </div>
 
@@ -1975,27 +1991,30 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade destino</p>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
                 <span className="text-right">CT-es</span>
                 <span className="text-right">Kg</span>
                 <span className="text-right">M³</span>
+                <span className="text-right">Frete</span>
               </div>
               <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                 {resumoDestinos.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoDestinos.map((r, idx) => (
-                  <div key={idx} className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 px-2 py-1.5 text-xs">
+                  <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
                     <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
                     <span className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.qtd}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                     <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
+              <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
                 <span className="text-slate-600 dark:text-slate-300">Total</span>
                 <span className="text-right font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{resumoDestinos.reduce((s, r) => s + r.qtd, 0)}</span>
                 <span className="text-right font-mono text-[10px] tabular-nums">{resumoDestinos.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                 <span className="text-right font-mono text-[10px] tabular-nums">{resumoDestinos.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                <span className="text-right font-mono text-[10px] tabular-nums">{resumoDestinos.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
             </div>
           </div>

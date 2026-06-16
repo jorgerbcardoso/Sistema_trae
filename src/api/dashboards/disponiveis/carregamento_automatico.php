@@ -295,7 +295,8 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
         $resU = sql(
             "SELECT COALESCE(NULLIF(unidade_carregamento, ''), unidade) AS unid, COUNT(*) AS qtd,
                     COALESCE(SUM(peso_cte), 0) AS peso_total,
-                    COALESCE(SUM(cubagem_cte), 0) AS cub_total
+                    COALESCE(SUM(cubagem_cte), 0) AS cub_total,
+                    COALESCE(SUM(vlr_frete_cte), 0) AS frete_total
              FROM {$tabela}
              WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
              GROUP BY COALESCE(NULLIF(unidade_carregamento, ''), unidade)
@@ -308,13 +309,15 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
                 'qtd'     => (int)$r['qtd'],
                 'peso_kg' => round((float)$r['peso_total'], 2),
                 'cubagem' => round((float)$r['cub_total'], 3),
+                'frete'   => round((float)$r['frete_total'], 2),
             ];
         }
 
         $resD = sql(
             "SELECT COALESCE(NULLIF(destino_cte, ''), '-') AS unid, COUNT(*) AS qtd,
                     COALESCE(SUM(peso_cte), 0) AS peso_total,
-                    COALESCE(SUM(cubagem_cte), 0) AS cub_total
+                    COALESCE(SUM(cubagem_cte), 0) AS cub_total,
+                    COALESCE(SUM(vlr_frete_cte), 0) AS frete_total
              FROM {$tabela}
              WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
              GROUP BY COALESCE(NULLIF(destino_cte, ''), '-')
@@ -327,6 +330,7 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
                 'qtd'     => (int)$r['qtd'],
                 'peso_kg' => round((float)$r['peso_total'], 2),
                 'cubagem' => round((float)$r['cub_total'], 3),
+                'frete'   => round((float)$r['frete_total'], 2),
             ];
         }
     } catch (Exception $e) {}
