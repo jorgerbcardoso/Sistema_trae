@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+require_once '/var/www/html/lib/ssw.php';
 
 handleOptionsRequest();
 validateRequestMethod('POST');
@@ -73,6 +74,145 @@ function parseNumero($value) {
     }
     $s = str_replace(',', '', $s);
     return (float)$s;
+}
+
+function fetchCtes019Csv($domain, $g_sql, $siglaUnidade, $agora) {
+    $siglaUnidade = strtoupper(trim((string)$siglaUnidade));
+    if ($siglaUnidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $siglaUnidade)) return [];
+
+    ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($siglaUnidade) . '&f3=101');
+
+    $agora12h = $agora + (12 * 3600);
+    $dataPrevMan = date('dmy', $agora12h);
+    $horaPrevMan = date('Hi', $agora12h);
+    $dataEmitCte = date('dmy', $agora);
+    $horaEmitCte = date('Hi', $agora);
+
+    $url0036 = 'https://sistema.ssw.inf.br/bin/ssw0036?act=ENV'
+        . '&l_siglas_familia=' . urlencode($siglaUnidade)
+        . '&data_prev_man='    . $dataPrevMan
+        . '&hora_prev_man='    . $horaPrevMan
+        . '&data_emit_ctrc='   . $dataEmitCte
+        . '&hora_emit_ctrc='   . $horaEmitCte
+        . '&status_ctrc=C&ctrc_pendente=T&lista_pendencias=N&apenas_descarregados=T'
+        . '&lista_reversa=T&apenas_prioritarios=T&id_tp_produto=T&fg_enderecados=T'
+        . '&relacionar_produtos=N&relatorio_excel=S'
+        . '&button_env_enable=ENV&button_env_disable=btn_envia';
+
+    $str = ssw_go($url0036);
+    if (substr($str, 0, 5) === '<foc ') return [];
+
+    $str  = urldecode($str);
+    $act  = ssw_get_act($str);
+    $arq  = ssw_get_arq($str);
+    if ($act === '' || $arq === '') return [];
+
+    $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    if ($file === '' || strlen($file) < 50) return [];
+
+    $file = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');
+    $file = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $file);
+    $file = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
+    $linhas = explode("\n", $file);
+
+    $normKey = static function(string $s): string {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($s)));
+    };
+    $getCell = static function(array $row, array $idx, array $candidates) use ($normKey): string {
+        foreach ($candidates as $c) {
+            $k = $normKey($c);
+            if (isset($idx[$k])) return trim((string)($row[$idx[$k]] ?? ''));
+        }
+        return '';
+    };
+
+    $headerLine = null;
+    foreach ($linhas as $l) {
+        $t = trim((string)$l);
+        if ($t === '') continue;
+        if (strpos($t, ';') !== false && stripos($t, 'CTRC/GAI/PAL') !== false) {
+            $headerLine = $t;
+            break;
+        }
+    }
+    if ($headerLine === null) return [];
+
+    $header = str_getcsv($headerLine, ';');
+    if (!empty($header)) $header[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$header[0]);
+    $idx = [];
+    foreach ($header as $i => $h) {
+        $key = $normKey((string)$h);
+        if ($key !== '') $idx[$key] = $i;
+    }
+    if (empty($idx)) return [];
+
+    $nomeUnidadeCache = [];
+    $getNomeUnidade = static function(string $siglaDest) use (&$nomeUnidadeCache, $domain, $g_sql): string {
+        $k = strtoupper(trim($siglaDest));
+        if ($k === '') return '';
+        if (array_key_exists($k, $nomeUnidadeCache)) return (string)$nomeUnidadeCache[$k];
+        $res = sql("SELECT nome FROM {$domain}_unidade WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$k], $g_sql);
+        $nome = '';
+        if ($res && pg_num_rows($res) > 0) {
+            $row = pg_fetch_assoc($res);
+            $nome = (string)($row['nome'] ?? '');
+        }
+        $nomeUnidadeCache[$k] = $nome;
+        return $nome;
+    };
+
+    $ctes = [];
+    $headerFound = false;
+    foreach ($linhas as $linha) {
+        $linha = trim((string)$linha);
+        if ($linha === '') continue;
+        if (!$headerFound) {
+            if ($linha === $headerLine) $headerFound = true;
+            continue;
+        }
+
+        $arr = str_getcsv($linha, ';');
+        if (count($arr) < 5) continue;
+
+        $ctrc = $getCell($arr, $idx, ['CTRC/GAI/PAL']);
+        if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+
+        $serCte = substr($ctrc, 0, 3);
+        $nroCte = (int)substr($ctrc, 3, 6);
+        if ($nroCte <= 0) continue;
+
+        $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
+        if ($unidadeDest === '' || $unidadeDest === '0') continue;
+
+        $ctes[] = [
+            'ctrc' => $ctrc,
+            'serCte' => $serCte,
+            'nroCte' => $nroCte,
+            'unidadeCarregamento' => $siglaUnidade,
+            'unidadeOrigem' => $siglaUnidade,
+            'unidadeDest' => $unidadeDest,
+            'nomeDest' => $getNomeUnidade($unidadeDest),
+            'tipo' => $getCell($arr, $idx, ['T']),
+            'emissao' => $getCell($arr, $idx, ['AUTORIZACAO']),
+            'prevEnt' => $getCell($arr, $idx, ['PREV DE ENTREGA']),
+            'nfiscal' => $getCell($arr, $idx, ['NFISCAL']),
+            'pedido' => $getCell($arr, $idx, ['PEDIDO']),
+            'remetente' => $getCell($arr, $idx, ['REMETENTE']),
+            'pagador' => $getCell($arr, $idx, ['PAGADOR']),
+            'destinatario' => $getCell($arr, $idx, ['DESTINATARIO']),
+            'cidade' => $getCell($arr, $idx, ['CIDADE']),
+            'uf' => $getCell($arr, $idx, ['UF']),
+            'vlrNf' => $getCell($arr, $idx, ['MERCADORIA']),
+            'frete' => $getCell($arr, $idx, ['FRETE']),
+            'peso' => $getCell($arr, $idx, ['KGREA', 'KG REA', 'KG']),
+            'cubagem' => $getCell($arr, $idx, ['M3']),
+            'qtdeVol' => $getCell($arr, $idx, ['QVOL']),
+            'manifesto' => $getCell($arr, $idx, ['MANIFESTO/END']),
+            'prevChegada' => $getCell($arr, $idx, ['PREVCHEGADA']),
+        ];
+    }
+
+    return $ctes;
 }
 
 function getCapacidadeVeiculo($conn, $tabelaVeiculo, $placa) {
@@ -343,6 +483,30 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
     }
 
+    set_time_limit(180);
+    ssw_login($domain);
+    $ctesUnicos = [];
+    foreach ($ctesDisponiveis as $cte) {
+        $ser = strtoupper(trim((string)($cte['serCte'] ?? $cte['ser_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 0, 3))));
+        $nro = (int)($cte['nroCte'] ?? $cte['nro_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 3, 6));
+        if ($ser === '' || $nro <= 0) continue;
+        $k = $ser . $nro;
+        if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
+    }
+    foreach ($paradasLinha as $u) {
+        $u = strtoupper(trim((string)$u));
+        if ($u === '' || $u === $unidade) continue;
+        $ctesExtra = fetchCtes019Csv($domain, $conn, $u, time());
+        foreach ($ctesExtra as $cte) {
+            $ser = strtoupper(trim((string)($cte['serCte'] ?? '')));
+            $nro = (int)($cte['nroCte'] ?? 0);
+            if ($ser === '' || $nro <= 0) continue;
+            $k = $ser . $nro;
+            if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
+        }
+    }
+    $ctesDisponiveis = array_values($ctesUnicos);
+
     list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
     $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $dest, $paradasLinha, $limitePeso, $limiteVol);
 
@@ -388,6 +552,30 @@ if ($check && pg_num_rows($check) > 0) {
 if (empty($ctesDisponiveis)) {
     respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
 }
+
+set_time_limit(180);
+ssw_login($domain);
+$ctesUnicos = [];
+foreach ($ctesDisponiveis as $cte) {
+    $ser = strtoupper(trim((string)($cte['serCte'] ?? $cte['ser_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 0, 3))));
+    $nro = (int)($cte['nroCte'] ?? $cte['nro_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 3, 6));
+    if ($ser === '' || $nro <= 0) continue;
+    $k = $ser . $nro;
+    if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
+}
+foreach ($paradas as $u) {
+    $u = strtoupper(trim((string)$u));
+    if ($u === '' || $u === $unidade) continue;
+    $ctesExtra = fetchCtes019Csv($domain, $conn, $u, time());
+    foreach ($ctesExtra as $cte) {
+        $ser = strtoupper(trim((string)($cte['serCte'] ?? '')));
+        $nro = (int)($cte['nroCte'] ?? 0);
+        if ($ser === '' || $nro <= 0) continue;
+        $k = $ser . $nro;
+        if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
+    }
+}
+$ctesDisponiveis = array_values($ctesUnicos);
 
 list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaFinal);
 $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $unidadeDestino, $paradas, $limitePeso, $limiteVol);
