@@ -163,10 +163,10 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $destinos, $unidade, $limite
         if ($nroCte <= 0) continue;
 
         $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? ''));
-        $unidOrigem  = strtoupper(trim($cte['unidadeOrigem'] ?? ''));
+        $unidRel019  = strtoupper(trim($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? ''));
 
         // Inclui se destino está na lista OU se é da própria unidade de origem
-        $pertence = in_array($unidDest, $destinos, true) || $unidOrigem === $unidade;
+        $pertence = in_array($unidDest, $destinos, true) || $unidRel019 === $unidade;
         if (!$pertence) continue;
 
         $peso = parseNumero($cte['peso']    ?? 0);
@@ -203,7 +203,14 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
 
         $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
-        $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
+        $unidCarRaw = strtoupper(trim(
+            $cteData['unidadeCarregamento']
+            ?? $cteData['unidade_carregamento']
+            ?? $cteData['unidadeRelatorio']
+            ?? ''
+        ));
+        if ($unidCarRaw === '') return -1;
+        $unidCar  = pg_escape_string($conn, $unidCarRaw);
         $emissao  = trim($cteData['emissao'] ?? '');
         $prevEnt  = trim($cteData['prevEnt'] ?? '');
         if ($emissao !== '') {

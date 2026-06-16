@@ -114,7 +114,7 @@ foreach ($unidadesCompart as $siglaHub) {
             . '&hora_emit_ctrc='   . $horaEmitCte
             . '&status_ctrc=C&ctrc_pendente=T&lista_pendencias=N&apenas_descarregados=T'
             . '&lista_reversa=T&apenas_prioritarios=T&id_tp_produto=T&fg_enderecados=T'
-            . '&relacionar_produtos=N&relatorio_excel=N'
+            . '&relacionar_produtos=N&relatorio_excel=S'
             . '&button_env_enable=ENV&button_env_disable=btn_envia';
 
         $str = ssw_go($url0036);
@@ -128,132 +128,308 @@ foreach ($unidadesCompart as $siglaHub) {
         $act  = ssw_get_act($str);
         $arq  = ssw_get_arq($str);
         $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
-        $linhas = explode("\r", $file);
+        $file = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');
+        $file = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $file);
+        $file = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
+        $linhas = explode("\n", $file);
 
         $ctes = [];
-        $unidadeDestAtual = '';
-        $nomeDestAtual    = '';
-        $isResumo         = false;
-
-        foreach ($linhas as $linha) {
-            if (strpos($linha, 'CTRCS DISPONIVEIS PARA TRANSFERENCIA') !== false) continue;
-            if (strpos($linha, 'CHEGADA PREVISTA') !== false) continue;
-            if (strpos($linha, 'CTRC/GAI/PAL') !== false) continue;
-            if (strpos($linha, '------------+') !== false) continue;
-            if (strpos($linha, 'ssw0036') !== false) continue;
-            if (strpos($linha, 'PAG:') !== false) continue;
-
-            if (strpos($linha, 'TOTAL GERAL') !== false) {
-                $isResumo = true;
+        $normKey = static function(string $s): string {
+            return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($s)));
+        };
+        $getCell = static function(array $row, array $idx, array $candidates) use ($normKey): string {
+            foreach ($candidates as $c) {
+                $k = $normKey($c);
+                if (isset($idx[$k])) return trim((string)($row[$idx[$k]] ?? ''));
             }
-            if ($isResumo) continue;
+            return '';
+        };
 
-            if (preg_match('/DESTINO FINAL:\s*([A-Z0-9]{2,5})\s+(.+)/', $linha, $m)) {
-                $unidadeDestAtual = trim($m[1]);
-                $nomeDestAtual    = trim($m[2]);
-                continue;
+        $headerLine = null;
+        foreach ($linhas as $l) {
+            $t = trim((string)$l);
+            if ($t === '') continue;
+            if (strpos($t, ';') !== false && stripos($t, 'CTRC/GAI/PAL') !== false) {
+                $headerLine = $t;
+                break;
             }
+        }
 
-            if (preg_match('/^\s*TOTAL CTRCS\s+-\s+(NO ARMAZEM|EM TRANSITO)/', $linha)) {
-                continue;
+        if ($headerLine !== null) {
+            $header = str_getcsv($headerLine, ';');
+            if (!empty($header)) {
+                $header[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$header[0]);
             }
-
-            $ctrc = trim(substr($linha, 0, 13));
-            if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
-
-            $tipo        = trim(substr($linha, 14, 1));
-            $autor       = trim(substr($linha, 16, 5));
-            $previ       = trim(substr($linha, 22, 5));
-            $nfiscal     = trim(substr($linha, 28, 10));
-            $pedido      = trim(substr($linha, 39, 12));
-            $remetente   = trim(substr($linha, 52, 10));
-            $pagador     = trim(substr($linha, 63, 14));
-            $destinatar  = trim(substr($linha, 78, 10));
-            $cidade      = trim(substr($linha, 89, 9));
-            $uf          = trim(substr($linha, 99, 2));
-            $mercadoria  = trim(substr($linha, 106, 14));
-            $frete       = trim(substr($linha, 121, 11));
-            $peso        = trim(substr($linha, 133, 7));
-            $m3          = trim(substr($linha, 141, 6));
-            $qvol        = trim(substr($linha, 148, 7));
-            $manifesto   = trim(substr($linha, 162, 9));
-            $prevChegada = trim(substr($linha, 174, 12));
-
-            $emTransito = !empty($prevChegada);
-
-            $serCte = substr($ctrc, 0, 3);
-            $nroCte = (int)substr($ctrc, 3, 6);
-
-            $dataAutorTs = null;
-            if (!empty($autor) && preg_match('/^(\d{2})\/(\d{2})$/', $autor, $ma)) {
-                $anoAtual    = date('Y');
-                $dataAutorTs = mktime(0, 0, 0, (int)$ma[2], (int)$ma[1], (int)$anoAtual);
+            $idx = [];
+            foreach ($header as $i => $h) {
+                $key = $normKey((string)$h);
+                if ($key !== '') $idx[$key] = $i;
             }
 
-            $atrasoTransf = null;
-            if ($emTransito && preg_match('/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/', $prevChegada, $mp)) {
-                $anoAtual      = date('Y');
-                $prevChegadaTs = mktime((int)$mp[3], (int)$mp[4], 0, (int)$mp[2], (int)$mp[1], (int)$anoAtual);
-                $diffSecs      = $agora - $prevChegadaTs;
-                if ($diffSecs <= 0)          $atrasoTransf = 'verde';
-                elseif ($diffSecs <= 7200)   $atrasoTransf = 'amarelo';
-                elseif ($diffSecs <= 14400)  $atrasoTransf = 'laranja';
-                else                         $atrasoTransf = 'vermelho';
-            }
-
-            $indicadorSaida = null;
-            if (!empty($manifesto) && preg_match('/^([A-Z]{3})(\d{6})/', $manifesto, $mm)) {
-                $serMan = $mm[1];
-                $nroMan = (int)$mm[2];
-                $qryMan = "SELECT data_emissao FROM {$domain}_manifesto WHERE ser_man = $1 AND nro_man = $2 LIMIT 1";
-                $resMan = pg_query_params($g_sql, $qryMan, [$serMan, $nroMan]);
-                $dataManEmissaoTs = null;
-                if ($resMan && pg_num_rows($resMan) > 0) {
-                    $rowMan = pg_fetch_assoc($resMan);
-                    $dataManEmissaoTs = strtotime($rowMan['data_emissao']);
+            $nomeUnidadeCache = [];
+            $getNomeUnidade = static function(string $siglaUnid) use (&$nomeUnidadeCache, $domain, $g_sql): string {
+                $k = strtoupper(trim($siglaUnid));
+                if ($k === '') return '';
+                if (array_key_exists($k, $nomeUnidadeCache)) return (string)$nomeUnidadeCache[$k];
+                $res = sql("SELECT nome FROM {$domain}_unidade WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$k], $g_sql);
+                $nome = '';
+                if ($res && pg_num_rows($res) > 0) {
+                    $row = pg_fetch_assoc($res);
+                    $nome = (string)($row['nome'] ?? '');
                 }
-                $refTs = $dataManEmissaoTs ?? $agora;
-                $diffDias = $dataAutorTs !== null ? (int)(($dataAutorTs - $refTs) / 86400) : (int)(($agora - $refTs) / 86400);
-                if ($diffDias <= 1)      $indicadorSaida = 'verde';
-                elseif ($diffDias == 2)  $indicadorSaida = 'amarelo';
-                elseif ($diffDias == 3)  $indicadorSaida = 'laranja';
-                else                     $indicadorSaida = 'vermelho';
-            } elseif ($dataAutorTs !== null) {
-                $diffDias = (int)(($agora - $dataAutorTs) / 86400);
-                if ($diffDias <= 1)      $indicadorSaida = 'verde';
-                elseif ($diffDias == 2)  $indicadorSaida = 'amarelo';
-                elseif ($diffDias == 3)  $indicadorSaida = 'laranja';
-                else                     $indicadorSaida = 'vermelho';
-            }
+                $nomeUnidadeCache[$k] = $nome;
+                return $nome;
+            };
 
-            $ctes[] = [
-                'ctrc'           => $ctrc,
-                'serCte'         => $serCte,
-                'nroCte'         => $nroCte,
-                'tipo'           => $tipo,
-                'emissao'        => $autor,
-                'prevEnt'        => $previ,
-                'nfiscal'        => $nfiscal,
-                'pedido'         => $pedido,
-                'remetente'      => $remetente,
-                'pagador'        => $pagador,
-                'destinatario'   => $destinatar,
-                'cidade'         => $cidade,
-                'uf'             => $uf,
-                'vlrNf'          => $mercadoria,
-                'frete'          => $frete,
-                'peso'           => $peso,
-                'cubagem'        => $m3,
-                'qtdeVol'        => trim($qvol),
-                'manifesto'      => $manifesto,
-                'prevChegada'    => $prevChegada,
-                'emTransito'     => $emTransito,
-                'unidadeDest'    => $unidadeDestAtual,
-                'nomeDest'       => $nomeDestAtual,
-                'indicadorSaida' => $indicadorSaida,
-                'atrasoTransf'   => $atrasoTransf,
-                'unidadeOrigem'  => $siglaHub,
-            ];
+            $headerFound = false;
+            foreach ($linhas as $linha) {
+                $linha = trim((string)$linha);
+                if ($linha === '') continue;
+                if (!$headerFound) {
+                    if ($linha === $headerLine) $headerFound = true;
+                    continue;
+                }
+
+                $arr = str_getcsv($linha, ';');
+                if (count($arr) < 5) continue;
+
+                $ctrc = $getCell($arr, $idx, ['CTRC/GAI/PAL']);
+                if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+
+                $tipo        = $getCell($arr, $idx, ['T']);
+                $autor       = $getCell($arr, $idx, ['AUTORIZACAO']);
+                $previ       = $getCell($arr, $idx, ['PREV DE ENTREGA']);
+                $nfiscal     = $getCell($arr, $idx, ['NFISCAL']);
+                $pedido      = $getCell($arr, $idx, ['PEDIDO']);
+                $remetente   = $getCell($arr, $idx, ['REMETENTE']);
+                $pagador     = $getCell($arr, $idx, ['PAGADOR']);
+                $destinatar  = $getCell($arr, $idx, ['DESTINATARIO']);
+                $cidade      = $getCell($arr, $idx, ['CIDADE']);
+                $uf          = $getCell($arr, $idx, ['UF']);
+                $mercadoria  = $getCell($arr, $idx, ['MERCADORIA']);
+                $frete       = $getCell($arr, $idx, ['FRETE']);
+                $peso        = $getCell($arr, $idx, ['KGREA', 'KG REA', 'KG']);
+                $m3          = $getCell($arr, $idx, ['M3']);
+                $qvol        = $getCell($arr, $idx, ['QVOL']);
+                $manifesto   = $getCell($arr, $idx, ['MANIFESTO/END']);
+                $prevChegada = $getCell($arr, $idx, ['PREVCHEGADA']);
+
+                $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
+                $nomeDest    = $getNomeUnidade($unidadeDest);
+
+                $emTransito = $prevChegada !== '';
+
+                $serCte = substr($ctrc, 0, 3);
+                $nroCte = (int)substr($ctrc, 3, 6);
+
+                $dataAutorTs = null;
+                if ($autor !== '') {
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $autor, $ma)) {
+                        $dataAutorTs = mktime(0, 0, 0, (int)$ma[2], (int)$ma[1], (int)$ma[3]);
+                    } elseif (preg_match('/^(\d{2})\/(\d{2})\/(\d{2})$/', $autor, $ma)) {
+                        $dataAutorTs = mktime(0, 0, 0, (int)$ma[2], (int)$ma[1], (int)('20' . $ma[3]));
+                    }
+                }
+
+                $atrasoTransf = null;
+                if ($emTransito && $prevChegada !== '') {
+                    $ts = null;
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2,4})(?:\s+(\d{2}):(\d{2}))?$/', $prevChegada, $mp)) {
+                        $yy = strlen($mp[3]) === 2 ? (int)('20' . $mp[3]) : (int)$mp[3];
+                        $hh = isset($mp[4]) ? (int)$mp[4] : 0;
+                        $mi = isset($mp[5]) ? (int)$mp[5] : 0;
+                        $ts = mktime($hh, $mi, 0, (int)$mp[2], (int)$mp[1], $yy);
+                    }
+                    if ($ts !== null) {
+                        $diffSecs = $agora - $ts;
+                        if ($diffSecs <= 0) $atrasoTransf = 'verde';
+                        elseif ($diffSecs <= 7200) $atrasoTransf = 'amarelo';
+                        elseif ($diffSecs <= 14400) $atrasoTransf = 'laranja';
+                        else $atrasoTransf = 'vermelho';
+                    }
+                }
+
+                $indicadorSaida = null;
+                if ($manifesto !== '' && preg_match('/^([A-Z]{3})(\d{6})/', $manifesto, $mm)) {
+                    $serMan = $mm[1];
+                    $nroMan = (int)$mm[2];
+                    $qryMan = "SELECT data_emissao FROM {$domain}_manifesto WHERE ser_man = $1 AND nro_man = $2 LIMIT 1";
+                    $resMan = pg_query_params($g_sql, $qryMan, [$serMan, $nroMan]);
+                    $dataManEmissaoTs = null;
+                    if ($resMan && pg_num_rows($resMan) > 0) {
+                        $rowMan = pg_fetch_assoc($resMan);
+                        $dataManEmissaoTs = strtotime($rowMan['data_emissao']);
+                    }
+                    $refTs = $dataManEmissaoTs ?? $agora;
+                    $diffDias = $dataAutorTs !== null ? (int)(($dataAutorTs - $refTs) / 86400) : (int)(($agora - $refTs) / 86400);
+                    if ($diffDias <= 1) $indicadorSaida = 'verde';
+                    elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
+                    elseif ($diffDias == 3) $indicadorSaida = 'laranja';
+                    else $indicadorSaida = 'vermelho';
+                } elseif ($dataAutorTs !== null) {
+                    $diffDias = (int)(($agora - $dataAutorTs) / 86400);
+                    if ($diffDias <= 1) $indicadorSaida = 'verde';
+                    elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
+                    elseif ($diffDias == 3) $indicadorSaida = 'laranja';
+                    else $indicadorSaida = 'vermelho';
+                }
+
+                $ctes[] = [
+                    'ctrc'           => $ctrc,
+                    'serCte'         => $serCte,
+                    'nroCte'         => $nroCte,
+                    'tipo'           => $tipo,
+                    'emissao'        => $autor,
+                    'prevEnt'        => $previ,
+                    'nfiscal'        => $nfiscal,
+                    'pedido'         => $pedido,
+                    'remetente'      => $remetente,
+                    'pagador'        => $pagador,
+                    'destinatario'   => $destinatar,
+                    'cidade'         => $cidade,
+                    'uf'             => $uf,
+                    'vlrNf'          => $mercadoria,
+                    'frete'          => $frete,
+                    'peso'           => $peso,
+                    'cubagem'        => $m3,
+                    'qtdeVol'        => trim((string)$qvol),
+                    'manifesto'      => $manifesto,
+                    'prevChegada'    => $prevChegada,
+                    'emTransito'     => $emTransito,
+                    'unidadeDest'    => $unidadeDest,
+                    'nomeDest'       => $nomeDest,
+                    'indicadorSaida' => $indicadorSaida,
+                    'atrasoTransf'   => $atrasoTransf,
+                    'unidadeCarregamento' => $siglaHub,
+                    'unidadeOrigem'  => $siglaHub,
+                ];
+            }
+        } else {
+            $unidadeDestAtual = '';
+            $nomeDestAtual    = '';
+            $isResumo         = false;
+
+            foreach ($linhas as $linha) {
+                if (strpos($linha, 'CTRCS DISPONIVEIS PARA TRANSFERENCIA') !== false) continue;
+                if (strpos($linha, 'CHEGADA PREVISTA') !== false) continue;
+                if (strpos($linha, 'CTRC/GAI/PAL') !== false) continue;
+                if (strpos($linha, '------------+') !== false) continue;
+                if (strpos($linha, 'ssw0036') !== false) continue;
+                if (strpos($linha, 'PAG:') !== false) continue;
+
+                if (strpos($linha, 'TOTAL GERAL') !== false) {
+                    $isResumo = true;
+                }
+                if ($isResumo) continue;
+
+                if (preg_match('/DESTINO FINAL:\s*([A-Z0-9]{2,5})\s+(.+)/', $linha, $m)) {
+                    $unidadeDestAtual = trim($m[1]);
+                    $nomeDestAtual    = trim($m[2]);
+                    continue;
+                }
+
+                if (preg_match('/^\s*TOTAL CTRCS\s+-\s+(NO ARMAZEM|EM TRANSITO)/', $linha)) {
+                    continue;
+                }
+
+                $ctrc = trim(substr($linha, 0, 13));
+                if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+
+                $tipo        = trim(substr($linha, 14, 1));
+                $autor       = trim(substr($linha, 16, 5));
+                $previ       = trim(substr($linha, 22, 5));
+                $nfiscal     = trim(substr($linha, 28, 10));
+                $pedido      = trim(substr($linha, 39, 12));
+                $remetente   = trim(substr($linha, 52, 10));
+                $pagador     = trim(substr($linha, 63, 14));
+                $destinatar  = trim(substr($linha, 78, 10));
+                $cidade      = trim(substr($linha, 89, 9));
+                $uf          = trim(substr($linha, 99, 2));
+                $mercadoria  = trim(substr($linha, 106, 14));
+                $frete       = trim(substr($linha, 121, 11));
+                $peso        = trim(substr($linha, 133, 7));
+                $m3          = trim(substr($linha, 141, 6));
+                $qvol        = trim(substr($linha, 148, 7));
+                $manifesto   = trim(substr($linha, 162, 9));
+                $prevChegada = trim(substr($linha, 174, 12));
+
+                $emTransito = !empty($prevChegada);
+
+                $serCte = substr($ctrc, 0, 3);
+                $nroCte = (int)substr($ctrc, 3, 6);
+
+                $dataAutorTs = null;
+                if (!empty($autor) && preg_match('/^(\d{2})\/(\d{2})$/', $autor, $ma)) {
+                    $anoAtual    = date('Y');
+                    $dataAutorTs = mktime(0, 0, 0, (int)$ma[2], (int)$ma[1], (int)$anoAtual);
+                }
+
+                $atrasoTransf = null;
+                if ($emTransito && preg_match('/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/', $prevChegada, $mp)) {
+                    $anoAtual      = date('Y');
+                    $prevChegadaTs = mktime((int)$mp[3], (int)$mp[4], 0, (int)$mp[2], (int)$mp[1], (int)$anoAtual);
+                    $diffSecs      = $agora - $prevChegadaTs;
+                    if ($diffSecs <= 0)          $atrasoTransf = 'verde';
+                    elseif ($diffSecs <= 7200)   $atrasoTransf = 'amarelo';
+                    elseif ($diffSecs <= 14400)  $atrasoTransf = 'laranja';
+                    else                         $atrasoTransf = 'vermelho';
+                }
+
+                $indicadorSaida = null;
+                if (!empty($manifesto) && preg_match('/^([A-Z]{3})(\d{6})/', $manifesto, $mm)) {
+                    $serMan = $mm[1];
+                    $nroMan = (int)$mm[2];
+                    $qryMan = "SELECT data_emissao FROM {$domain}_manifesto WHERE ser_man = $1 AND nro_man = $2 LIMIT 1";
+                    $resMan = pg_query_params($g_sql, $qryMan, [$serMan, $nroMan]);
+                    $dataManEmissaoTs = null;
+                    if ($resMan && pg_num_rows($resMan) > 0) {
+                        $rowMan = pg_fetch_assoc($resMan);
+                        $dataManEmissaoTs = strtotime($rowMan['data_emissao']);
+                    }
+                    $refTs = $dataManEmissaoTs ?? $agora;
+                    $diffDias = $dataAutorTs !== null ? (int)(($dataAutorTs - $refTs) / 86400) : (int)(($agora - $refTs) / 86400);
+                    if ($diffDias <= 1)      $indicadorSaida = 'verde';
+                    elseif ($diffDias == 2)  $indicadorSaida = 'amarelo';
+                    elseif ($diffDias == 3)  $indicadorSaida = 'laranja';
+                    else                     $indicadorSaida = 'vermelho';
+                } elseif ($dataAutorTs !== null) {
+                    $diffDias = (int)(($agora - $dataAutorTs) / 86400);
+                    if ($diffDias <= 1)      $indicadorSaida = 'verde';
+                    elseif ($diffDias == 2)  $indicadorSaida = 'amarelo';
+                    elseif ($diffDias == 3)  $indicadorSaida = 'laranja';
+                    else                     $indicadorSaida = 'vermelho';
+                }
+
+                $ctes[] = [
+                    'ctrc'           => $ctrc,
+                    'serCte'         => $serCte,
+                    'nroCte'         => $nroCte,
+                    'tipo'           => $tipo,
+                    'emissao'        => $autor,
+                    'prevEnt'        => $previ,
+                    'nfiscal'        => $nfiscal,
+                    'pedido'         => $pedido,
+                    'remetente'      => $remetente,
+                    'pagador'        => $pagador,
+                    'destinatario'   => $destinatar,
+                    'cidade'         => $cidade,
+                    'uf'             => $uf,
+                    'vlrNf'          => $mercadoria,
+                    'frete'          => $frete,
+                    'peso'           => $peso,
+                    'cubagem'        => $m3,
+                    'qtdeVol'        => trim($qvol),
+                    'manifesto'      => $manifesto,
+                    'prevChegada'    => $prevChegada,
+                    'emTransito'     => $emTransito,
+                    'unidadeDest'    => $unidadeDestAtual,
+                    'nomeDest'       => $nomeDestAtual,
+                    'indicadorSaida' => $indicadorSaida,
+                    'atrasoTransf'   => $atrasoTransf,
+                    'unidadeCarregamento' => $siglaHub,
+                    'unidadeOrigem'  => $siglaHub,
+                ];
+            }
         }
 
         $resultadosPorUnidade[$siglaHub] = ['ctes' => $ctes, 'erro' => null];

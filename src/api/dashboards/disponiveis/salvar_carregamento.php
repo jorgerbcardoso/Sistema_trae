@@ -108,7 +108,17 @@ if ($acao === 'adicionar_ctes') {
 
         $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
-        $unidCar  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeOrigem'] ?? $unidade)));
+        $unidCarRaw = strtoupper(trim(
+            $cteData['unidadeCarregamento']
+            ?? $cteData['unidade_carregamento']
+            ?? $cteData['unidadeRelatorio']
+            ?? ''
+        ));
+        if ($unidCarRaw === '') {
+            pg_query($conn, 'ROLLBACK');
+            respondJson(['success' => false, 'message' => 'Unidade de carregamento não informada para o CT-e ' . $serCte . $nroCte . '.']);
+        }
+        $unidCar  = pg_escape_string($conn, $unidCarRaw);
         $emissaoRaw = trim($cteData['emissao'] ?? '');
         $prevEntRaw = trim($cteData['prevEnt'] ?? '');
         if ($emissaoRaw !== '') {

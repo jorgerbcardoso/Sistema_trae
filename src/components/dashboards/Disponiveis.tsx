@@ -77,6 +77,7 @@ interface Cte {
   nomeDest: string;
   indicadorSaida: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
   atrasoTransf: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
+  unidadeCarregamento?: string;
   unidadeOrigem?: string;
 }
 
@@ -360,9 +361,9 @@ function TabelaCtes({
                 <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {cte.ctrc}
-                    {cte.unidadeOrigem && (
-                      <span className="text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700" title={`CT-e da unidade compartilhada ${cte.unidadeOrigem}`}>
-                        <Share2 className="w-2.5 h-2.5 inline mr-0.5" />{cte.unidadeOrigem}
+                    {cte.unidadeCarregamento && (
+                      <span className="text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700" title={`CT-e no 019 da unidade ${cte.unidadeCarregamento}`}>
+                        <Share2 className="w-2.5 h-2.5 inline mr-0.5" />{cte.unidadeCarregamento}
                       </span>
                     )}
                     {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
@@ -456,9 +457,9 @@ function GrupoDestinoCard({
         <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs truncate pr-2">
           {grupo.nome}
           {(() => {
-            const ctesHub = [...grupo.armazem, ...grupo.transito].filter(c => c.unidadeOrigem);
+            const ctesHub = [...grupo.armazem, ...grupo.transito].filter(c => c.unidadeCarregamento);
             if (ctesHub.length === 0) return null;
-            const origens = [...new Set(ctesHub.map(c => c.unidadeOrigem))];
+            const origens = [...new Set(ctesHub.map(c => c.unidadeCarregamento))];
             return (
               <span className="shrink-0 text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700 flex items-center gap-0.5" title={`${ctesHub.length} CT-e(s) de unidade(s) compartilhada(s): ${origens.join(', ')}`}>
                 <Share2 className="w-2.5 h-2.5" />{ctesHub.length}
@@ -1682,9 +1683,10 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
       setLoading(true);
       const result = await onConfirmar(placaFinal, unidadeDestino.trim().toUpperCase(), paradas);
       if (result.ok) {
-        if (result.placa && result.resumo && result.resumo.length > 0) {
+        if (result.placa && (result.resumo?.length || result.resumoDestinos?.length)) {
           setResumoPlaca(result.placa);
-          setResumoUnidades(result.resumo);
+          setResumoUnidades(result.resumo ?? []);
+          setResumoDestinos(result.resumoDestinos ?? []);
           setResumoDialogOpen(true);
         } else {
           onFechar();
@@ -1946,7 +1948,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade carregadora</p>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
                 <span className="text-right">CT-es</span>
                 <span className="text-right">Kg</span>
@@ -1975,7 +1977,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: { onConfirmar: (
               <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade destino</p>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[minmax(0,1fr)_40px_60px_55px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>Unid.</span>
                 <span className="text-right">CT-es</span>
                 <span className="text-right">Kg</span>
@@ -2642,7 +2644,7 @@ export function Disponiveis() {
           cubagem: anyC.cubagem ?? '',
           qtdeVol: anyC.qtdeVol ?? anyC.qtde_vol ?? '',
           unidadeDest,
-          unidadeOrigem: anyC.unidadeOrigem ?? anyC.sigla_emit ?? anyC.siglaEmit ?? anyC.unidOrig ?? anyC.origem ?? '',
+          unidadeCarregamento: anyC.unidadeCarregamento ?? anyC.unidade_carregamento ?? anyC.unidadeRelatorio ?? anyC.unidadeOrigem ?? anyC.sigla_emit ?? anyC.siglaEmit ?? anyC.unidOrig ?? anyC.origem ?? '',
         };
       });
       const res = await apiFetch(
@@ -2700,7 +2702,7 @@ export function Disponiveis() {
         cubagem: c.cubagem,
         qtdeVol: c.qtdeVol,
         unidadeDest: c.unidadeDest,
-        unidadeOrigem: c.unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
+        unidadeCarregamento: c.unidadeCarregamento ?? (c as any).unidadeCarregamento ?? (c as any).unidade_carregamento ?? (c as any).unidadeRelatorio ?? (c as any).unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
       }));
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -2943,7 +2945,7 @@ export function Disponiveis() {
         cubagem: c.cubagem,
         qtdeVol: c.qtdeVol,
         unidadeDest: c.unidadeDest,
-        unidadeOrigem: c.unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
+        unidadeCarregamento: c.unidadeCarregamento ?? (c as any).unidadeCarregamento ?? (c as any).unidade_carregamento ?? (c as any).unidadeRelatorio ?? (c as any).unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
       }));
 
       const resAdd = await apiFetch(

@@ -7,6 +7,7 @@ validateRequestMethod('POST');
 
 $auth   = authenticateAndGetUser();
 $domain = $auth['domain'];
+$g_sql  = connect();
 
 $input = getRequestInput();
 $sigla = strtoupper(trim($input['sigla'] ?? ''));
@@ -212,6 +213,7 @@ foreach ($linhas as $linha) {
         'ctrc'         => $ctrc,
         'serCte'       => $serCte,
         'nroCte'       => $nroCte,
+        'emissao'      => '',
         'setor'        => $setor,
         'nfiscal'      => $nfiscal,
         'pagador'      => $pagador,
@@ -238,6 +240,67 @@ foreach ($linhas as $linha) {
         'emTransito'   => $isEmTransito,
         'atrasoEntrega'=> $atrasoEntrega,
     ];
+}
+
+$tblCte = "{$domain}_cte";
+$emissaoPorCte = [];
+$tblExists = false;
+$chk = pg_query($g_sql, "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{$tblCte}') AS ok");
+if ($chk) {
+    $tblExists = (pg_fetch_result($chk, 0, 0) === 't');
+}
+
+if ($tblExists && !empty($ctes)) {
+    $pares = [];
+    $seen = [];
+    foreach ($ctes as $c) {
+        $ser = (string)($c['serCte'] ?? '');
+        $nro = (int)($c['nroCte'] ?? 0);
+        if ($ser === '' || $nro <= 0) continue;
+        $k = $ser . '|' . $nro;
+        if (isset($seen[$k])) continue;
+        $seen[$k] = true;
+        $pares[] = [$ser, $nro];
+    }
+
+    foreach (array_chunk($pares, 500) as $chunk) {
+        $params = [];
+        $values = [];
+        $p = 1;
+        foreach ($chunk as $par) {
+            $values[] = "($" . $p . ", $" . ($p + 1) . ")";
+            $params[] = $par[0];
+            $params[] = $par[1];
+            $p += 2;
+        }
+        if (empty($values)) continue;
+
+        $q = "
+            WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $values) . ")
+            SELECT DISTINCT ON (c.ser_cte, c.nro_cte)
+                c.ser_cte,
+                c.nro_cte,
+                TO_CHAR(c.data_emissao, 'DD/MM/YYYY') AS emissao
+            FROM {$tblCte} c
+            JOIN req r ON r.ser_cte = c.ser_cte AND r.nro_cte = c.nro_cte
+            ORDER BY c.ser_cte, c.nro_cte, c.seq_cte DESC
+        ";
+        $resEmi = pg_query_params($g_sql, $q, $params);
+        if ($resEmi) {
+            while ($row = pg_fetch_assoc($resEmi)) {
+                $k = ((string)($row['ser_cte'] ?? '')) . '|' . (int)($row['nro_cte'] ?? 0);
+                $emissaoPorCte[$k] = (string)($row['emissao'] ?? '');
+            }
+        }
+    }
+
+    foreach ($ctes as &$c) {
+        $k = ((string)($c['serCte'] ?? '')) . '|' . (int)($c['nroCte'] ?? 0);
+        if (isset($emissaoPorCte[$k]) && $emissaoPorCte[$k] !== '') {
+            $c['emissao'] = $emissaoPorCte[$k];
+        }
+    }
+    unset($c);
 }
 
 respondJson([
