@@ -3056,7 +3056,8 @@ export function Disponiveis() {
     for (const coleta of dados.coletas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
-        map[key] = { sigla: key, nome: coleta.cidadeDest || key, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        const nomeGrupo = key === 'SEM DESTINO' ? (coleta.cidadeDest || key) : key;
+        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
       }
       map[key].coletas.push(coleta);
       const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;

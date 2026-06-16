@@ -429,7 +429,42 @@ $coletas    = [];
 $blocoAtual = [];
 $isResumo   = false;
 
-$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap, $linhas0083) {
+$seqCidadeCache = [];
+$unidadeCidParamCache = [];
+
+$getSeqCidade = static function(string $nome, string $uf) use (&$seqCidadeCache, $g_sql): ?int {
+    $nome = trim($nome);
+    $uf   = strtoupper(trim($uf));
+    if ($nome === '' || $uf === '') return null;
+    $key = strtoupper($nome) . '|' . $uf;
+    if (array_key_exists($key, $seqCidadeCache)) return $seqCidadeCache[$key];
+
+    $res = sql('SELECT seq_cidade FROM cidade WHERE UPPER(nome) = UPPER($1) AND UPPER(uf) = UPPER($2) LIMIT 1', [$nome, $uf], $g_sql);
+    $seq = null;
+    if ($res && pg_num_rows($res) > 0) {
+        $row = pg_fetch_assoc($res);
+        $seq = isset($row['seq_cidade']) ? (int)$row['seq_cidade'] : null;
+    }
+    $seqCidadeCache[$key] = $seq;
+    return $seq;
+};
+
+$getUnidadePorSeqCidade = static function(int $seqCidade) use (&$unidadeCidParamCache, $domain, $g_sql): ?string {
+    if ($seqCidade <= 0) return null;
+    if (array_key_exists($seqCidade, $unidadeCidParamCache)) return $unidadeCidParamCache[$seqCidade];
+
+    $res = sql("SELECT unidade FROM {$domain}_cid_param WHERE seq_cidade = $1 LIMIT 1", [$seqCidade], $g_sql);
+    $unidade = null;
+    if ($res && pg_num_rows($res) > 0) {
+        $row = pg_fetch_assoc($res);
+        $u = strtoupper(trim((string)($row['unidade'] ?? '')));
+        $unidade = $u !== '' ? $u : null;
+    }
+    $unidadeCidParamCache[$seqCidade] = $unidade;
+    return $unidade;
+};
+
+$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $sigla, $getSeqCidade, $getUnidadePorSeqCidade) {
     if (empty($blocoAtual)) return;
 
     $linhaBloco = implode("\n", $blocoAtual);
@@ -468,7 +503,7 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap, $linhas
             if (!empty($cidadeRaw)) {
                 $ufDest     = substr($cidadeRaw, strlen($cidadeRaw) - 2);
                 $nomeDest   = trim(substr($cidadeRaw, 0, strlen($cidadeRaw) - 3));
-                $cidadeDest = $cidadeRaw;
+                $cidadeDest = $nomeDest !== '' ? $nomeDest : $cidadeRaw;
             }
         }
         if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
@@ -488,13 +523,12 @@ $flush157 = function() use (&$blocoAtual, &$coletas, $agora, $cidadeMap, $linhas
         }
     }
 
-    foreach ($linhas0083 as $linha)
-    {
-      if (strpos($linha, "$ufDest $nomeDest") !== false)
-      {
-        $unidadeDest = substr ($linha, 37, 3);
-        break;
-      }
+    if ($nomeDest !== '' && $ufDest !== '') {
+        $seqCidade = $getSeqCidade($nomeDest, $ufDest);
+        if ($seqCidade !== null) {
+            $unidade = $getUnidadePorSeqCidade($seqCidade);
+            if ($unidade !== null) $unidadeDest = $unidade;
+        }
     }
 
     $atrasoColeta = null;
