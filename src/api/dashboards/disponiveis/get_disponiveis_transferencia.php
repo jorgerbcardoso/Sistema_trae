@@ -177,6 +177,7 @@ if ($headerLine !== null) {
         $prevChegada = $getCell($arr, $idx, ['PREVCHEGADA']);
 
         $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
+        if ($unidadeDest === '0') continue;
         $nomeDest    = $getNomeUnidade($unidadeDest);
 
         $emTransito = $prevChegada !== '';
@@ -238,6 +239,8 @@ if ($headerLine !== null) {
             elseif ($diffDias == 3) $indicadorSaida = 'laranja';
             else $indicadorSaida = 'vermelho';
         }
+
+        if (trim((string)$unidadeDestAtual) === '0') continue;
 
         $ctes[] = [
             'ctrc'           => $ctrc,

@@ -10,7 +10,7 @@ import { Switch } from '../ui/switch';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 import { ENVIRONMENT } from '../../config/environment';
-import { apiFetch } from '../../utils/apiUtils';
+import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
 import { toast } from 'sonner';
 import {
   Warehouse,
@@ -222,6 +222,16 @@ const BG_INDICADOR: Record<string, string> = {
   vermelho: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800',
 };
 
+const formatBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 100 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(mb < 100 ? 1 : 0)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(gb < 100 ? 1 : 0)} GB`;
+};
+
 function IndicadorDot({ cor, title }: { cor: string | null; title?: string }) {
   if (!cor) return <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600 inline-block" title={title ?? 'Sem dados'} />;
   return <span className={`w-2.5 h-2.5 rounded-full inline-block ${COR_INDICADOR[cor]}`} title={title} />;
@@ -361,11 +371,6 @@ function TabelaCtes({
                 <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {cte.ctrc}
-                    {cte.unidadeCarregamento && (
-                      <span className="text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700" title={`CT-e no 019 da unidade ${cte.unidadeCarregamento}`}>
-                        <Share2 className="w-2.5 h-2.5 inline mr-0.5" />{cte.unidadeCarregamento}
-                      </span>
-                    )}
                     {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
@@ -456,16 +461,6 @@ function GrupoDestinoCard({
         </span>
         <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs truncate pr-2">
           {grupo.nome}
-          {(() => {
-            const ctesHub = [...grupo.armazem, ...grupo.transito].filter(c => c.unidadeCarregamento);
-            if (ctesHub.length === 0) return null;
-            const origens = [...new Set(ctesHub.map(c => c.unidadeCarregamento))];
-            return (
-              <span className="shrink-0 text-[10px] font-bold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-700 flex items-center gap-0.5" title={`${ctesHub.length} CT-e(s) de unidade(s) compartilhada(s): ${origens.join(', ')}`}>
-                <Share2 className="w-2.5 h-2.5" />{ctesHub.length}
-              </span>
-            );
-          })()}
         </span>
         <span className="flex items-center justify-center">
           {pctEntregueNoPrazo !== null
@@ -2482,9 +2477,12 @@ export function Disponiveis() {
     if (!s) return;
     try {
       setLoading(true);
-      const res = await apiFetch(
+      setTransferLoaded(0);
+      setTransferTotal(null);
+      const res = await apiFetchWithProgress(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_transferencia.php`,
         { method: 'POST', body: JSON.stringify({ sigla: s }) },
+        (p) => { setTransferLoaded(p.loaded); setTransferTotal(p.total); },
         true
       );
       if (res.success) {
@@ -2507,23 +2505,26 @@ export function Disponiveis() {
     setLoadingEntrega(true);
     setErroEntrega(null);
     setProgressoEntrega(0);
+    setEntregaLoaded(0);
+    setEntregaTotal(null);
 
     if (progressoRef.current) clearInterval(progressoRef.current);
-    progressoRef.current = setInterval(() => {
-      setProgressoEntrega(prev => {
-        if (prev >= 95) { clearInterval(progressoRef.current!); return 95; }
-        return prev + (prev < 60 ? 2 : 1);
-      });
-    }, 600);
 
     try {
-      const res = await apiFetch(
+      let lastTotal: number | null = null;
+      const res = await apiFetchWithProgress(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_entrega.php`,
         { method: 'POST', body: JSON.stringify({ sigla: s }) },
+        (p) => {
+          setEntregaLoaded(p.loaded);
+          setEntregaTotal(p.total);
+          lastTotal = p.total;
+          if (p.total && p.total > 0) setProgressoEntrega(Math.min(100, Math.floor((p.loaded / p.total) * 100)));
+        },
         true
       );
       if (progressoRef.current) clearInterval(progressoRef.current);
-      setProgressoEntrega(100);
+      if (res?.success) setProgressoEntrega(100);
       if (res.success) {
         setDadosEntrega(res.data);
       } else {
@@ -2537,6 +2538,11 @@ export function Disponiveis() {
       setLoadingEntrega(false);
     }
   }, [sigla]);
+
+  const [transferLoaded, setTransferLoaded] = useState(0);
+  const [transferTotal, setTransferTotal] = useState<number | null>(null);
+  const [entregaLoaded, setEntregaLoaded] = useState(0);
+  const [entregaTotal, setEntregaTotal] = useState<number | null>(null);
 
   const carregarCarregamentos = useCallback(async () => {
     setLoadingCarregamentos(true);
@@ -3139,6 +3145,14 @@ export function Disponiveis() {
               <span>Atualiza em {minutos}:{String(segundos).padStart(2, '0')}</span>
             </div>
           )}
+          {(loading || loadingEntrega) && !isMTZ && (
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>Transf.</span>
+              <span className="font-mono">{formatBytes(transferLoaded)}{transferTotal ? `/${formatBytes(transferTotal)}` : ''}</span>
+              <span>Ent.</span>
+              <span className="font-mono">{formatBytes(entregaLoaded)}{entregaTotal ? `/${formatBytes(entregaTotal)}` : ''}</span>
+            </div>
+          )}
           {!isMTZ && (
             <Button
               variant="outline"
@@ -3165,6 +3179,20 @@ export function Disponiveis() {
           <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
           <p className="text-base">Aguarde...</p>
           <p className="text-sm mt-1">Isso pode levar alguns segundos</p>
+          <div className="mt-4 w-full max-w-md space-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between">
+              <span>Transferência</span>
+              <span className="font-mono">
+                {formatBytes(transferLoaded)}{transferTotal ? ` / ${formatBytes(transferTotal)}` : ''}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Entrega</span>
+              <span className="font-mono">
+                {formatBytes(entregaLoaded)}{entregaTotal ? ` / ${formatBytes(entregaTotal)}` : ''}
+              </span>
+            </div>
+          </div>
         </div>
       ) : dados ? (
         <div className="space-y-6">
@@ -3607,6 +3635,9 @@ export function Disponiveis() {
                     <div>
                       <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Aguardando dados de entrega...</p>
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Os dados de transferência já estão disponíveis. Os dados de entrega ainda estão sendo processados.</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 font-mono">
+                        {formatBytes(entregaLoaded)}{entregaTotal ? ` / ${formatBytes(entregaTotal)}` : ''}
+                      </p>
                     </div>
                   </div>
                   <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-2 overflow-hidden">

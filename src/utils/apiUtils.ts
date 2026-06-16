@@ -360,6 +360,79 @@ export async function apiFetch(url: string, options?: RequestInit, suppressToast
   }
 }
 
+export type FetchProgress = {
+  loaded: number;
+  total: number | null;
+};
+
+export async function apiFetchWithProgress(
+  url: string,
+  options: RequestInit | undefined,
+  onProgress: (p: FetchProgress) => void,
+  suppressToast = false
+): Promise<any> {
+  try {
+    console.log('🌐 [apiFetchWithProgress] Chamando:', url);
+    console.log('🌐 [apiFetchWithProgress] ENVIRONMENT.isFigmaMake:', ENVIRONMENT.isFigmaMake);
+
+    if (ENVIRONMENT.isFigmaMake) {
+      const data = await handleMockRequest(url, options);
+      try {
+        const encoded = new TextEncoder().encode(JSON.stringify(data));
+        onProgress({ loaded: encoded.byteLength, total: encoded.byteLength });
+      } catch {}
+      return data;
+    }
+
+    const defaultHeaders = getDefaultHeaders();
+    const customHeaders = options?.headers || {};
+    const mergedOptions: RequestInit = {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...customHeaders,
+      },
+    };
+
+    const response = await fetch(url, mergedOptions);
+    const totalHeader = response.headers.get('content-length');
+    const total = totalHeader ? (parseInt(totalHeader, 10) || null) : null;
+
+    if (!response.body) {
+      onProgress({ loaded: 0, total });
+      return await handleAPIResponse(response, suppressToast);
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let loaded = 0;
+    onProgress({ loaded, total });
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        loaded += value.byteLength;
+        onProgress({ loaded, total });
+      }
+    }
+
+    const blob = new Blob(chunks);
+    const cloned = new Response(blob, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: new Headers(response.headers),
+    });
+
+    return await handleAPIResponse(cloned, suppressToast);
+  } catch (error) {
+    console.error('❌ [apiFetchWithProgress] Erro na requisição:', error);
+    toast.error('Erro de comunicação com o servidor', { closeButton: true });
+    throw error;
+  }
+}
+
 /**
  * ================================================================
  * HANDLER DE REQUISIÇÕES MOCKADAS (FIGMA MAKE)
