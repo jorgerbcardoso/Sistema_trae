@@ -33,60 +33,103 @@ register_shutdown_function(function() {
     }
 });
 
-$str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
-$str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
-$str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
-$xml1440 = simplexml_load_string($str1440);
+function downloadRelatorio019($sigla, $agora) {
+    $sigla = strtoupper(trim((string)$sigla));
+    if ($sigla === '') return null;
 
-$encontrado  = false;
-$nomeArq019  = null;
-$pathArq019  = null;
+    ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
 
-if ($xml1440) {
-    for ($i = 0; $i <= 100; $i++) {
-        $seq = $xml1440->xpath('rs/r/f0')[$i];
-        $opc = $xml1440->xpath('rs/r/f1')[$i];
-        $usr = $xml1440->xpath('rs/r/f3')[$i];
-        $f4  = $xml1440->xpath('rs/r/f4')[$i];
-        $sit = $xml1440->xpath('rs/r/f6')[$i];
-        $f8  = $xml1440->xpath('rs/r/f8')[$i];
+    $agora12h = $agora + (12 * 3600);
+    $dataPrevMan = date('dmy', $agora12h);
+    $horaPrevMan = date('Hi', $agora12h);
+    $dataEmitCte = date('dmy', $agora);
+    $horaEmitCte = date('Hi', $agora);
 
-        if ($seq === null) break;
+    $url0036 = 'https://sistema.ssw.inf.br/bin/ssw0036?act=ENV'
+        . '&l_siglas_familia=' . urlencode($sigla)
+        . '&data_prev_man='    . $dataPrevMan
+        . '&hora_prev_man='    . $horaPrevMan
+        . '&data_emit_ctrc='   . $dataEmitCte
+        . '&hora_emit_ctrc='   . $horaEmitCte
+        . '&status_ctrc=C&ctrc_pendente=T&lista_pendencias=N&apenas_descarregados=T'
+        . '&lista_reversa=T&apenas_prioritarios=T&id_tp_produto=T&fg_enderecados=T'
+        . '&relacionar_produtos=N&relatorio_excel=S'
+        . '&button_env_enable=ENV&button_env_disable=btn_envia';
 
-        $usr    = trim((string)$usr);
-        $unidF4 = strtoupper(trim((string)$f4));
+    $str = ssw_go($url0036);
+    if (substr($str, 0, 5) === '<foc ') return null;
 
-        if ((substr($opc, 0, 3) == '019')
-            && (($usr == 'presto') || ($usr == 'damasce1'))
-            && ((string)$sit == 'Conclu&iacute;do')
-            && ($unidF4 === strtoupper($sigla))
-        ) {
-            $encontrado = true;
-            $f8dec = html_entity_decode((string)$f8);
+    $strDec = urldecode($str);
+    $queued = (strpos($strDec, 'Solicita &ccedil;&atilde;o enviada para processamento.') !== false);
 
-            if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-                if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
-                    $decoded = urldecode($mVal[1]);
-                    if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
-                        $nomeArq019 = $mArq[1];
-                        $pathArq019 = $mArq[2];
+    $act = $queued ? '' : ssw_get_act($strDec);
+    $arq = $queued ? '' : ssw_get_arq($strDec);
+
+    if ($act !== '' && $arq !== '') {
+        $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
+        if (!empty($file) && strlen($file) >= 100) return $file;
+    }
+
+    for ($try = 0; $try < 10; $try++) {
+        $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+        $posXml = strpos($str1440, '<xml');
+        if ($posXml !== false) {
+            $str1440 = substr($str1440, $posXml);
+            $endXml = strpos($str1440, '</xml>');
+            if ($endXml !== false) $str1440 = substr($str1440, 0, $endXml) . '</xml>';
+        }
+
+        $xml1440 = simplexml_load_string($str1440);
+        $nomeArq019 = null;
+        $pathArq019 = null;
+
+        if ($xml1440) {
+            for ($i = 0; $i <= 120; $i++) {
+                $seq = $xml1440->xpath('rs/r/f0')[$i];
+                $opc = $xml1440->xpath('rs/r/f1')[$i];
+                $usr = $xml1440->xpath('rs/r/f3')[$i];
+                $f4  = $xml1440->xpath('rs/r/f4')[$i];
+                $sit = $xml1440->xpath('rs/r/f6')[$i];
+                $f8  = $xml1440->xpath('rs/r/f8')[$i];
+
+                if ($seq === null) break;
+
+                $unidF4 = strtoupper(trim((string)$f4));
+                if ($unidF4 !== $sigla) continue;
+                $usr = trim((string)$usr);
+                if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+                if ((string)$sit !== 'Conclu&iacute;do') continue;
+                if (substr((string)$opc, 0, 3) !== '019') continue;
+
+                $f8dec = html_entity_decode((string)$f8);
+                if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
+                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
+                        $decoded = urldecode($mVal[1]);
+                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
+                            $nomeArq019 = $mArq[1];
+                            $pathArq019 = $mArq[2];
+                            break;
+                        }
                     }
                 }
             }
-            break;
         }
+
+        if ($nomeArq019 && $pathArq019) {
+            $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
+            if (!empty($file) && strlen($file) >= 100) return $file;
+        }
+
+        usleep(400000);
     }
+
+    return null;
 }
 
-if (!$encontrado || !$nomeArq019 || !$pathArq019) {
-    respondJson(['success' => false, 'message' => 'Relatório 019 não encontrado na fila do ssw1440. Execute o script de geração do relatório.']);
-}
-
-$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
-
+$file = downloadRelatorio019($sigla, $agora);
 if (empty($file) || strlen($file) < 100) {
-    respondJson(['success' => false, 'message' => 'Arquivo do relatório 019 vazio ou inválido.']);
+    respondJson(['success' => false, 'message' => 'Relatório 019 não encontrado (nem gerado imediatamente nem na fila do ssw1440).']);
 }
 
 $file   = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');

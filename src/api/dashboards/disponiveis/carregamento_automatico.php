@@ -102,12 +102,65 @@ function fetchCtes019Csv($domain, $g_sql, $siglaUnidade, $agora) {
     $str = ssw_go($url0036);
     if (substr($str, 0, 5) === '<foc ') return [];
 
-    $str  = urldecode($str);
-    $act  = ssw_get_act($str);
-    $arq  = ssw_get_arq($str);
-    if ($act === '' || $arq === '') return [];
+    $strDec = urldecode($str);
+    $queued = (strpos($strDec, 'Solicita &ccedil;&atilde;o enviada para processamento.') !== false);
+    $act  = $queued ? '' : ssw_get_act($strDec);
+    $arq  = $queued ? '' : ssw_get_arq($strDec);
 
-    $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    $file = '';
+    if ($act !== '' && $arq !== '') {
+        $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    }
+
+    if ($file === '' || strlen($file) < 50) {
+        for ($try = 0; $try < 10; $try++) {
+            $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+            $posXml = strpos($str1440, '<xml');
+            if ($posXml !== false) {
+                $str1440 = substr($str1440, $posXml);
+                $endXml = strpos($str1440, '</xml>');
+                if ($endXml !== false) $str1440 = substr($str1440, 0, $endXml) . '</xml>';
+            }
+            $xml1440 = simplexml_load_string($str1440);
+            $nomeArq019 = null;
+            $pathArq019 = null;
+            if ($xml1440) {
+                for ($i = 0; $i <= 120; $i++) {
+                    $seq = $xml1440->xpath('rs/r/f0')[$i];
+                    $opc = $xml1440->xpath('rs/r/f1')[$i];
+                    $usr = $xml1440->xpath('rs/r/f3')[$i];
+                    $f4  = $xml1440->xpath('rs/r/f4')[$i];
+                    $sit = $xml1440->xpath('rs/r/f6')[$i];
+                    $f8  = $xml1440->xpath('rs/r/f8')[$i];
+                    if ($seq === null) break;
+                    $unidF4 = strtoupper(trim((string)$f4));
+                    if ($unidF4 !== strtoupper($siglaUnidade)) continue;
+                    $usr = trim((string)$usr);
+                    if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+                    if ((string)$sit !== 'Conclu&iacute;do') continue;
+                    if (substr((string)$opc, 0, 3) !== '019') continue;
+                    $f8dec = html_entity_decode((string)$f8);
+                    if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
+                        $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                        if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
+                            $decoded = urldecode($mVal[1]);
+                            if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
+                                $nomeArq019 = $mArq[1];
+                                $pathArq019 = $mArq[2];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if ($nomeArq019 && $pathArq019) {
+                $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
+                if ($file !== '' && strlen($file) >= 50) break;
+            }
+            usleep(400000);
+        }
+    }
+
     if ($file === '' || strlen($file) < 50) return [];
 
     $file = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');

@@ -68,10 +68,11 @@ if (substr($str0052, 0, 5) === '<foc ') {
 $file = null;
 
 $str0052dec  = urldecode($str0052);
+$queued081 = (strpos($str0052dec, 'Solicita &ccedil;&atilde;o enviada para processamento.') !== false);
 $actImediato = ssw_get_act($str0052dec);
 $arqImediato = ssw_get_arq($str0052dec);
 
-if (!empty($actImediato) && !empty($arqImediato)) {
+if (!$queued081 && !empty($actImediato) && !empty($arqImediato)) {
     $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$actImediato}&filename={$arqImediato}&path=&down=1&nw=1");
 }
 
