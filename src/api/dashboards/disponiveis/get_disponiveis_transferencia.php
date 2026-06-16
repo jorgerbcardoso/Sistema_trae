@@ -213,34 +213,13 @@ if ($headerLine !== null) {
         }
 
         $indicadorSaida = null;
-        if ($manifesto !== '' && preg_match('/^([A-Z]{3})(\d{6})/', $manifesto, $mm)) {
-            $serMan = $mm[1];
-            $nroMan = (int)$mm[2];
-
-            $qryMan = "SELECT data_emissao FROM {$domain}_manifesto WHERE ser_man = $1 AND nro_man = $2 LIMIT 1";
-            $resMan = pg_query_params($g_sql, $qryMan, [$serMan, $nroMan]);
-            $dataManEmissaoTs = null;
-
-            if ($resMan && pg_num_rows($resMan) > 0) {
-                $rowMan = pg_fetch_assoc($resMan);
-                $dataManEmissaoTs = strtotime($rowMan['data_emissao']);
-            }
-
-            $refTs = $dataManEmissaoTs ?? $agora;
-            $diffDias = $dataAutorTs !== null ? (int)(($dataAutorTs - $refTs) / 86400) : (int)(($agora - $refTs) / 86400);
-            if ($diffDias <= 1) $indicadorSaida = 'verde';
-            elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
-            elseif ($diffDias == 3) $indicadorSaida = 'laranja';
-            else $indicadorSaida = 'vermelho';
-        } elseif ($dataAutorTs !== null) {
+        if ($dataAutorTs !== null) {
             $diffDias = (int)(($agora - $dataAutorTs) / 86400);
             if ($diffDias <= 1) $indicadorSaida = 'verde';
             elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
             elseif ($diffDias == 3) $indicadorSaida = 'laranja';
             else $indicadorSaida = 'vermelho';
         }
-
-        if (trim((string)$unidadeDestAtual) === '0') continue;
 
         $ctes[] = [
             'ctrc'           => $ctrc,
@@ -344,26 +323,7 @@ if ($headerLine !== null) {
         }
 
         $indicadorSaida = null;
-        if (!empty($manifesto) && preg_match('/^([A-Z]{3})(\d{6})/', $manifesto, $mm)) {
-            $serMan = $mm[1];
-            $nroMan = (int)$mm[2];
-
-            $qryMan = "SELECT data_emissao FROM {$domain}_manifesto WHERE ser_man = $1 AND nro_man = $2 LIMIT 1";
-            $resMan = pg_query_params($g_sql, $qryMan, [$serMan, $nroMan]);
-            $dataManEmissaoTs = null;
-
-            if ($resMan && pg_num_rows($resMan) > 0) {
-                $rowMan = pg_fetch_assoc($resMan);
-                $dataManEmissaoTs = strtotime($rowMan['data_emissao']);
-            }
-
-            $refTs = $dataManEmissaoTs ?? $agora;
-            $diffDias = $dataAutorTs !== null ? (int)(($dataAutorTs - $refTs) / 86400) : (int)(($agora - $refTs) / 86400);
-            if ($diffDias <= 1) $indicadorSaida = 'verde';
-            elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
-            elseif ($diffDias == 3) $indicadorSaida = 'laranja';
-            else $indicadorSaida = 'vermelho';
-        } elseif ($dataAutorTs !== null) {
+        if ($dataAutorTs !== null) {
             $diffDias = (int)(($agora - $dataAutorTs) / 86400);
             if ($diffDias <= 1) $indicadorSaida = 'verde';
             elseif ($diffDias == 2) $indicadorSaida = 'amarelo';
@@ -537,33 +497,38 @@ if (strpos($str166, 'Sem movimento de coletas') !== false) {
     }
 
     if (!empty($paresCidadeUf)) {
-        $cidades = [];
-        $ufs = [];
-        foreach ($paresCidadeUf as $p) {
-            $cidades[] = $p['cidade'];
-            $ufs[]     = $p['uf'];
-        }
-
         $cidadeSeqMap = [];
 
-        $resCid = sql(
-            'SELECT v.nome, v.uf, c.seq_cidade
-               FROM (SELECT unnest($1::text[]) AS nome, unnest($2::text[]) AS uf) v
-               LEFT JOIN cidade c
-                 ON regexp_replace(unaccent(UPPER(c.nome)), \'\\s+\', \' \', \'g\') = regexp_replace(unaccent(UPPER(v.nome)), \'\\s+\', \' \', \'g\')
-                AND UPPER(c.uf) = UPPER(v.uf)',
-            [$cidades, $ufs],
-            $g_sql
-        );
+        $pairs = [];
+        $params = [];
+        $pi = 1;
+        foreach ($paresCidadeUf as $p) {
+            $pairs[] = '($' . $pi . ', $' . ($pi + 1) . ')';
+            $params[] = $p['cidade'];
+            $params[] = $p['uf'];
+            $pi += 2;
+        }
 
-        if ($resCid === false) {
+        try {
             $resCid = sql(
-                'SELECT v.nome, v.uf, c.seq_cidade
-                   FROM (SELECT unnest($1::text[]) AS nome, unnest($2::text[]) AS uf) v
+                'WITH v(nome, uf) AS (VALUES ' . implode(', ', $pairs) . ')
+                 SELECT v.nome, v.uf, c.seq_cidade
+                   FROM v
+                   LEFT JOIN cidade c
+                     ON regexp_replace(unaccent(UPPER(c.nome)), \'\\s+\', \' \', \'g\') = regexp_replace(unaccent(UPPER(v.nome)), \'\\s+\', \' \', \'g\')
+                    AND UPPER(c.uf) = UPPER(v.uf)',
+                $params,
+                $g_sql
+            );
+        } catch (Throwable $e) {
+            $resCid = sql(
+                'WITH v(nome, uf) AS (VALUES ' . implode(', ', $pairs) . ')
+                 SELECT v.nome, v.uf, c.seq_cidade
+                   FROM v
                    LEFT JOIN cidade c
                      ON regexp_replace(UPPER(c.nome), \'\\s+\', \' \', \'g\') = regexp_replace(UPPER(v.nome), \'\\s+\', \' \', \'g\')
                     AND UPPER(c.uf) = UPPER(v.uf)',
-                [$cidades, $ufs],
+                $params,
                 $g_sql
             );
         }
@@ -582,7 +547,19 @@ if (strpos($str166, 'Sem movimento de coletas') !== false) {
         $seqs = array_values(array_unique(array_values($cidadeSeqMap)));
         $seqUnidadeMap = [];
         if (!empty($seqs)) {
-            $resParam = sql("SELECT seq_cidade, unidade FROM {$domain}_cid_param WHERE seq_cidade = ANY($1::int[])", [$seqs], $g_sql);
+            $ph = [];
+            $paramsSeq = [];
+            $pi = 1;
+            foreach ($seqs as $seqCidade) {
+                $seqCidade = (int)$seqCidade;
+                if ($seqCidade <= 0) continue;
+                $ph[] = '$' . $pi;
+                $paramsSeq[] = $seqCidade;
+                $pi++;
+            }
+            $resParam = !empty($ph)
+                ? sql("SELECT seq_cidade, unidade FROM {$domain}_cid_param WHERE seq_cidade IN (" . implode(',', $ph) . ")", $paramsSeq, $g_sql)
+                : false;
             if ($resParam && pg_num_rows($resParam) > 0) {
                 while ($r = pg_fetch_assoc($resParam)) {
                     $seq = isset($r['seq_cidade']) ? (int)$r['seq_cidade'] : 0;
