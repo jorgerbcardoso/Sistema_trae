@@ -406,209 +406,207 @@ if ($headerLine !== null) {
 $ontem = date('dmy', strtotime('yesterday'));
 $hoje  = date('dmy');
 
-$url0157 = 'https://sistema.ssw.inf.br/bin/ssw0157?act=ENV'
-    . '&f2=' . urlencode($sigla)
-    . '&f3=A'
-    . '&f6=' . $ontem
-    . '&f7=' . $hoje
-    . '&f16=0&f17=1&f18=2';
+$param0166 = 'act=FIL_COL'
+    . '&f2=' . urlencode(strtoupper($domain))
+    . '&f14=' . $ontem
+    . '&f15=' . $hoje
+    . '&f16=I'
+    . '&f17=E'
+    . '&f19=' . urlencode($sigla);
 
-$str157 = ssw_go($url0157);
-if (substr($str157, 0, 5) === '<foc ') {
-    respondJson(['success' => false, 'message' => 'Erro SSW (0157): ' . $str157]);
-}
+$str166 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param0166);
 
-$str157   = urldecode($str157);
-$act157   = ssw_get_act($str157);
-$arq157   = ssw_get_arq($str157);
-$file157   = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act157 . '&filename=' . $arq157 . '&path=&down=1&nw=0');
-$file157   = str_replace("\r\n", "\n", str_replace("\r", "\n", $file157));
-$linhas157 = explode("\n", $file157);
-
-$coletas    = [];
-$blocoAtual = [];
-$isResumo   = false;
-
-$seqCidadeCache = [];
-$unidadeCidParamCache = [];
-
-$getSeqCidade = static function(string $nome, string $uf) use (&$seqCidadeCache, $g_sql): ?int {
-    $nome = trim($nome);
-    $uf   = strtoupper(trim($uf));
-    if ($nome === '' || $uf === '') return null;
-    $key = strtoupper($nome) . '|' . $uf;
-    if (array_key_exists($key, $seqCidadeCache)) return $seqCidadeCache[$key];
-
-    $res = sql('SELECT seq_cidade FROM cidade WHERE UPPER(nome) = UPPER($1) AND UPPER(uf) = UPPER($2) LIMIT 1', [$nome, $uf], $g_sql);
-    $seq = null;
-    if ($res && pg_num_rows($res) > 0) {
-        $row = pg_fetch_assoc($res);
-        $seq = isset($row['seq_cidade']) ? (int)$row['seq_cidade'] : null;
-    }
-    $seqCidadeCache[$key] = $seq;
-    return $seq;
-};
-
-$getUnidadePorSeqCidade = static function(int $seqCidade) use (&$unidadeCidParamCache, $domain, $g_sql): ?string {
-    if ($seqCidade <= 0) return null;
-    if (array_key_exists($seqCidade, $unidadeCidParamCache)) return $unidadeCidParamCache[$seqCidade];
-
-    $res = sql("SELECT unidade FROM {$domain}_cid_param WHERE seq_cidade = $1 LIMIT 1", [$seqCidade], $g_sql);
-    $unidade = null;
-    if ($res && pg_num_rows($res) > 0) {
-        $row = pg_fetch_assoc($res);
-        $u = strtoupper(trim((string)($row['unidade'] ?? '')));
-        $unidade = $u !== '' ? $u : null;
-    }
-    $unidadeCidParamCache[$seqCidade] = $unidade;
-    return $unidade;
-};
-
-$flush157 = function() use (&$blocoAtual, &$coletas, $agora, $sigla, $getSeqCidade, $getUnidadePorSeqCidade) {
-    if (empty($blocoAtual)) return;
-
-    $linhaBloco = implode("\n", $blocoAtual);
-
-    if (strpos($linhaBloco, 'CTRC GERADO') !== false) {
-        $blocoAtual = [];
-        return;
+if (strpos($str166, 'Sem movimento de coletas') !== false) {
+    $coletas = [];
+} else {
+    if (substr($str166, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (0166): ' . $str166]);
     }
 
-    $cabecalho = $blocoAtual[0] ?? '';
-    if (!preg_match('/^([A-Z]{3})\s+(\d+)\s+-/', $cabecalho, $mc)) {
-        $blocoAtual = [];
-        return;
-    }
-    $serColeta = $mc[1];
-    $nroColeta = $mc[2];
+    $str166 = urldecode($str166);
+    $act166 = ssw_get_act($str166);
+    $arq166 = ssw_get_arq($str166);
 
-    $remetente   = '';
-    $cidadeRem   = '';
-    $cidadeDest  = '';
-    $ufDest      = '';
-    $nomeDest    = '';
-    $unidadeDest = '';
-    $dataHoreLim = '';
-    $coletada    = '';
-    $valMerc     = '';
-    $qtdeVol     = '';
-    $peso        = '';
-
-    foreach ($blocoAtual as $idx => $bl) {
-        if (preg_match('/REME:\s*\S+\s+(.+?)\s{2,}/', $bl, $mr)) {
-            $remetente = trim($mr[1]);
-        }
-        if (strpos($bl, 'DEST:') !== false) {
-            $cidadeRaw = trim(substr($bl, 120, 25));
-            if (!empty($cidadeRaw)) {
-                $ufDest     = substr($cidadeRaw, strlen($cidadeRaw) - 2);
-                $nomeDest   = trim(substr($cidadeRaw, 0, strlen($cidadeRaw) - 3));
-                $cidadeDest = $nomeDest !== '' ? $nomeDest : $cidadeRaw;
-            }
-        }
-        if (preg_match('/DATA\/HORA LIMITE:\s*(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mdh)) {
-            $dataHoreLim = trim($mdh[1]);
-        }
-        if (preg_match('/VAL MERC:\s*([\d.,]+)/', $bl, $mvm)) {
-            $valMerc = trim($mvm[1]);
-        }
-        if (preg_match('/QTDE VOL:\s*(\d+)/', $bl, $mqv)) {
-            $qtdeVol = trim($mqv[1]);
-        }
-        if (preg_match('/PESO\(KG\):\s*([\d.,]+)/', $bl, $mpe)) {
-            $peso = trim($mpe[1]);
-        }
-        if (preg_match('/COLETADA:\s+(\d{2}\/\d{2}\s+\d{2}:\d{2})/', $bl, $mco)) {
-            $coletada = trim($mco[1]);
-        }
+    if (empty($act166) || empty($arq166)) {
+        respondJson(['success' => false, 'message' => 'Erro SSW (0166): parâmetros de download não encontrados.']);
     }
 
-    if ($nomeDest !== '' && $ufDest !== '') {
-        $seqCidade = $getSeqCidade($nomeDest, $ufDest);
-        if ($seqCidade !== null) {
-            $unidade = $getUnidadePorSeqCidade($seqCidade);
-            if ($unidade !== null) $unidadeDest = $unidade;
+    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=0");
+
+    if (empty($file166) || strlen($file166) < 100) {
+        respondJson(['success' => false, 'message' => 'Arquivo do relatório 0166 vazio ou inválido.']);
+    }
+
+    $file166 = mb_convert_encoding($file166, 'UTF-8', 'ISO-8859-1');
+    $file166 = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $file166);
+    $file166 = str_replace("\r\n", "\n", str_replace("\r", "\n", $file166));
+    $linhas166 = explode("\n", $file166);
+
+    $coletas = [];
+    $paresCidadeUf = [];
+
+    $parseDataHora = static function(string $data, string $hora): ?int {
+        $data = trim($data);
+        $hora = trim($hora);
+        if ($data === '') return null;
+        if (!preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $data, $md)) return null;
+        $h = 0;
+        $m = 0;
+        if ($hora !== '' && preg_match('/^(\d{2}):(\d{2})$/', $hora, $mh)) {
+            $h = (int)$mh[1];
+            $m = (int)$mh[2];
         }
-    }
+        return mktime($h, $m, 0, (int)$md[2], (int)$md[1], (int)$md[3]);
+    };
 
-    $atrasoColeta = null;
-    $limiteTs     = null;
+    foreach ($linhas166 as $linha) {
+        $linha = trim((string)$linha);
+        if ($linha === '') continue;
 
-    if (!empty($dataHoreLim) && preg_match('/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/', $dataHoreLim, $ml)) {
-        $anoAtual = date('Y');
-        $limiteTs = mktime((int)$ml[3], (int)$ml[4], 0, (int)$ml[2], (int)$ml[1], (int)$anoAtual);
-    }
+        $arr = str_getcsv($linha, ';');
+        if (count($arr) < 35) continue;
+        if (trim((string)$arr[0]) !== '3') continue;
 
-    if (!empty($coletada)) {
-        $statusColeta = 'coletada';
-        if ($limiteTs !== null && preg_match('/^(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/', $coletada, $mcc)) {
-            $anoAtual   = date('Y');
-            $coletadaTs = mktime((int)$mcc[3], (int)$mcc[4], 0, (int)$mcc[2], (int)$mcc[1], (int)$anoAtual);
-            if ($coletadaTs > $limiteTs) {
+        $serColeta  = strtoupper(trim((string)($arr[1] ?? '')));
+        $nroColeta  = trim((string)($arr[2] ?? ''));
+        $remetente  = trim((string)($arr[7] ?? ''));
+        $ctrcGerado = trim((string)($arr[17] ?? ''));
+
+        if ($ctrcGerado !== '') continue;
+
+        $cidadeDest = trim((string)($arr[20] ?? ''));
+        $ufDest     = strtoupper(trim((string)($arr[21] ?? '')));
+
+        $pesoReal = trim((string)($arr[25] ?? ''));
+        $pesoCalc = trim((string)($arr[24] ?? ''));
+        $peso     = $pesoReal !== '' ? $pesoReal : $pesoCalc;
+
+        $qtdeVol  = trim((string)($arr[27] ?? ''));
+        $valMerc  = trim((string)($arr[28] ?? ''));
+
+        $limiteData = trim((string)($arr[30] ?? ''));
+        $limiteHora = trim((string)($arr[31] ?? ''));
+        $coletData  = trim((string)($arr[32] ?? ''));
+        $coletHora  = trim((string)($arr[33] ?? ''));
+
+        $dataHoreLim = $limiteData !== '' ? trim($limiteData . ' ' . $limiteHora) : '';
+        $coletada    = $coletData !== '' ? trim($coletData . ' ' . $coletHora) : '';
+
+        $limiteTs   = $parseDataHora($limiteData, $limiteHora);
+        $coletadaTs = $parseDataHora($coletData, $coletHora);
+
+        $statusColeta = 'pendente';
+        $atrasoMin    = null;
+
+        if ($coletData !== '') {
+            $statusColeta = 'coletada';
+            if ($limiteTs !== null && $coletadaTs !== null && $coletadaTs > $limiteTs) {
                 $statusColeta = 'coletada_atrasada';
-                $diffMin      = (int)(($coletadaTs - $limiteTs) / 60);
-                $atrasoColeta = $diffMin;
+                $atrasoMin = (int)(($coletadaTs - $limiteTs) / 60);
+            }
+        } else {
+            if ($limiteTs !== null && $agora > $limiteTs) {
+                $statusColeta = 'atrasada';
+                $atrasoMin = (int)(($agora - $limiteTs) / 60);
             }
         }
-    } else {
-        if ($limiteTs !== null && $agora > $limiteTs) {
-            $statusColeta = 'atrasada';
-            $diffMin      = (int)(($agora - $limiteTs) / 60);
-            $atrasoColeta = $diffMin;
+
+        $unidadeDest = '';
+        if ($cidadeDest !== '' && $ufDest !== '') {
+            $k = strtoupper($cidadeDest) . '|' . $ufDest;
+            $paresCidadeUf[$k] = ['cidade' => $cidadeDest, 'uf' => $ufDest];
         }
+
+        $coletas[] = [
+            'serColeta'    => $serColeta,
+            'nroColeta'    => $nroColeta,
+            'remetente'    => $remetente,
+            'cidadeRem'    => '',
+            'cidadeDest'   => $cidadeDest,
+            'ufDest'       => $ufDest,
+            'unidadeDest'  => $unidadeDest,
+            'paraEntrega'  => false,
+            'dataHoreLim'  => $dataHoreLim,
+            'coletada'     => $coletada,
+            'valMerc'      => $valMerc,
+            'qtdeVol'      => $qtdeVol,
+            'peso'         => $peso,
+            'statusColeta' => $statusColeta,
+            'atrasoMin'    => $atrasoMin,
+        ];
     }
 
-    $paraEntrega = (!empty($unidadeDest) && strtoupper($unidadeDest) === strtoupper($sigla));
-
-    $coletas[] = [
-        'serColeta'    => $serColeta,
-        'nroColeta'    => $nroColeta,
-        'remetente'    => $remetente,
-        'cidadeRem'    => $cidadeRem,
-        'cidadeDest'   => $cidadeDest,
-        'unidadeDest'  => $unidadeDest,
-        'paraEntrega'  => $paraEntrega,
-        'dataHoreLim'  => $dataHoreLim,
-        'coletada'     => $coletada,
-        'valMerc'      => $valMerc,
-        'qtdeVol'      => $qtdeVol,
-        'peso'         => $peso,
-        'statusColeta' => $statusColeta,
-        'atrasoMin'    => $atrasoColeta,
-    ];
-
-    $blocoAtual = [];
-};
-
-foreach ($linhas157 as $linha) {
-    if (strpos($linha, 'R E S U M O') !== false) {
-        $flush157();
-        $isResumo = true;
-        continue;
-    }
-    if ($isResumo) continue;
-
-    if (strpos($linha, 'RELACAO DAS COLETAS') !== false) continue;
-    if (strpos($linha, 'PERIODO DE COLETA') !== false) continue;
-    if (strpos($linha, 'ssw0157') !== false) continue;
-    if (strpos($linha, 'PAG:') !== false) continue;
-    if (preg_match('/^={5,}/', trim($linha))) continue;
-
-    if (preg_match('/^([A-Z]{3})\s+(\d+)\s+-/', $linha)) {
-        $flush157();
-        $blocoAtual[] = $linha;
-        continue;
-    }
-
-    if (!empty($blocoAtual)) {
-        if (preg_match('/^-{10,}/', trim($linha))) {
-            $flush157();
-            continue;
+    if (!empty($paresCidadeUf)) {
+        $cidades = [];
+        $ufs = [];
+        foreach ($paresCidadeUf as $p) {
+            $cidades[] = $p['cidade'];
+            $ufs[]     = $p['uf'];
         }
-        $blocoAtual[] = $linha;
+
+        $cidadeSeqMap = [];
+
+        $resCid = sql(
+            'SELECT v.nome, v.uf, c.seq_cidade
+               FROM (SELECT unnest($1::text[]) AS nome, unnest($2::text[]) AS uf) v
+               LEFT JOIN cidade c
+                 ON regexp_replace(unaccent(UPPER(c.nome)), \'\\s+\', \' \', \'g\') = regexp_replace(unaccent(UPPER(v.nome)), \'\\s+\', \' \', \'g\')
+                AND UPPER(c.uf) = UPPER(v.uf)',
+            [$cidades, $ufs],
+            $g_sql
+        );
+
+        if ($resCid === false) {
+            $resCid = sql(
+                'SELECT v.nome, v.uf, c.seq_cidade
+                   FROM (SELECT unnest($1::text[]) AS nome, unnest($2::text[]) AS uf) v
+                   LEFT JOIN cidade c
+                     ON regexp_replace(UPPER(c.nome), \'\\s+\', \' \', \'g\') = regexp_replace(UPPER(v.nome), \'\\s+\', \' \', \'g\')
+                    AND UPPER(c.uf) = UPPER(v.uf)',
+                [$cidades, $ufs],
+                $g_sql
+            );
+        }
+
+        if ($resCid && pg_num_rows($resCid) > 0) {
+            while ($r = pg_fetch_assoc($resCid)) {
+                $nome = strtoupper(trim((string)($r['nome'] ?? '')));
+                $uf   = strtoupper(trim((string)($r['uf'] ?? '')));
+                $seq  = isset($r['seq_cidade']) ? (int)$r['seq_cidade'] : 0;
+                if ($nome !== '' && $uf !== '' && $seq > 0) {
+                    $cidadeSeqMap[$nome . '|' . $uf] = $seq;
+                }
+            }
+        }
+
+        $seqs = array_values(array_unique(array_values($cidadeSeqMap)));
+        $seqUnidadeMap = [];
+        if (!empty($seqs)) {
+            $resParam = sql("SELECT seq_cidade, unidade FROM {$domain}_cid_param WHERE seq_cidade = ANY($1::int[])", [$seqs], $g_sql);
+            if ($resParam && pg_num_rows($resParam) > 0) {
+                while ($r = pg_fetch_assoc($resParam)) {
+                    $seq = isset($r['seq_cidade']) ? (int)$r['seq_cidade'] : 0;
+                    $un  = strtoupper(trim((string)($r['unidade'] ?? '')));
+                    if ($seq > 0 && $un !== '') $seqUnidadeMap[$seq] = $un;
+                }
+            }
+        }
+
+        foreach ($coletas as $i => $c) {
+            $nome = strtoupper(trim((string)($c['cidadeDest'] ?? '')));
+            $uf   = strtoupper(trim((string)($c['ufDest'] ?? '')));
+            if ($nome === '' || $uf === '') continue;
+            $seq = $cidadeSeqMap[$nome . '|' . $uf] ?? 0;
+            if ($seq > 0) {
+                $u = $seqUnidadeMap[$seq] ?? '';
+                if ($u !== '') {
+                    $coletas[$i]['unidadeDest'] = $u;
+                    $coletas[$i]['paraEntrega'] = (strtoupper($u) === strtoupper($sigla));
+                }
+            }
+        }
     }
 }
-$flush157();
 
 respondJson([
     'success' => true,

@@ -87,6 +87,7 @@ interface Coleta {
   remetente: string;
   cidadeRem: string;
   cidadeDest: string;
+  ufDest?: string;
   unidadeDest: string;
   paraEntrega: boolean;
   dataHoreLim: string;
@@ -550,7 +551,7 @@ function GrupoDestinoCard({
                     <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                       <th className="px-3 py-2 text-left font-semibold">Coleta</th>
                       <th className="px-3 py-2 text-left font-semibold">Remetente</th>
-                      <th className="px-3 py-2 text-left font-semibold">Cidade Dest.</th>
+                      <th className="px-3 py-2 text-left font-semibold">Cidade/UF Dest.</th>
                       <th className="px-3 py-2 text-left font-semibold">Limite</th>
                       <th className="px-3 py-2 text-left font-semibold">Coletada</th>
                       <th className="px-3 py-2 text-right font-semibold">Vlr. Merc.</th>
@@ -564,7 +565,9 @@ function GrupoDestinoCard({
                       <tr key={i} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
                         <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">{c.serColeta} {c.nroColeta}</td>
                         <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[120px] truncate">{c.remetente}</td>
-                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.cidadeDest || '-'}</td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-normal">
+                          {(c.cidadeDest || '-')}{c.ufDest ? `/${c.ufDest}` : ''}
+                        </td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.dataHoreLim}</td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{c.coletada || '-'}</td>
                         <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{c.valMerc}</td>
