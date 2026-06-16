@@ -78,12 +78,8 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $capTon = $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null);
     $capM3  = $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null);
 
-    $placaUpper = strtoupper($placa);
-    $placaFicticia = preg_match('/^[A-Z0-9]{2,5}-[A-Z0-9]{2,5}$/', $placaUpper) === 1;
-    if ($placaFicticia) {
-        if ($capTon === null) $capTon = 27.0;
-        if ($capM3  === null) $capM3  = 67.0;
-    }
+    if ($capTon === null || $capTon <= 0) $capTon = 27.0;
+    if ($capM3  === null || $capM3  <= 0) $capM3  = 67.0;
 
     $idx = count($carregamentos);
     $idxPorPlaca[$placa] = $idx;
