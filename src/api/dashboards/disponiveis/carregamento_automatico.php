@@ -145,12 +145,35 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
  * respeitando a capacidade do veículo.
  * Retorna array de objetos CT-e prontos para inserção.
  */
-function filtrarCtesPorCapacidade($ctesDisponiveis, $destinos, $unidade, $limitePesoKg, $limiteVolM3) {
-    // Ordena por prevEnt ASC, depois nroCte ASC
-    usort($ctesDisponiveis, function($a, $b) {
-        $pa = $a['prevEnt'] ?? '';
-        $pb = $b['prevEnt'] ?? '';
-        if ($pa !== $pb) return strcmp($pa, $pb);
+function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFinal, $intermediarias, $limitePesoKg, $limiteVolM3) {
+    $unidadeOrigem = strtoupper(trim((string)$unidadeOrigem));
+    $destinoFinal  = strtoupper(trim((string)$destinoFinal));
+    $intermediarias = array_values(array_filter(array_map(function($u) {
+        return strtoupper(trim((string)$u));
+    }, (array)$intermediarias)));
+
+    $cadeia = array_values(array_unique(array_filter(array_merge([$unidadeOrigem], $intermediarias, [$destinoFinal]))));
+    $idxCadeia = array_flip($cadeia);
+
+    $parseDataKey = static function(string $s): int {
+        $s = trim($s);
+        if ($s === '') return 99991231;
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) return ((int)$m[3] * 10000) + ((int)$m[2] * 100) + (int)$m[1];
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2})$/', $s, $m)) return ((int)('20' . $m[3]) * 10000) + ((int)$m[2] * 100) + (int)$m[1];
+        return 99991231;
+    };
+
+    usort($ctesDisponiveis, function($a, $b) use ($idxCadeia, $parseDataKey) {
+        $ua = strtoupper(trim((string)($a['unidadeCarregamento'] ?? $a['unidade_carregamento'] ?? $a['unidadeRelatorio'] ?? '')));
+        $ub = strtoupper(trim((string)($b['unidadeCarregamento'] ?? $b['unidade_carregamento'] ?? $b['unidadeRelatorio'] ?? '')));
+
+        $pa = $idxCadeia[$ua] ?? 999;
+        $pb = $idxCadeia[$ub] ?? 999;
+        if ($pa !== $pb) return $pa - $pb;
+
+        $da = $parseDataKey((string)($a['prevEnt'] ?? ''));
+        $db = $parseDataKey((string)($b['prevEnt'] ?? ''));
+        if ($da !== $db) return $da - $db;
         return (int)($a['nroCte'] ?? 0) - (int)($b['nroCte'] ?? 0);
     });
 
@@ -165,14 +188,18 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $destinos, $unidade, $limite
         $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? ''));
         $unidRel019  = strtoupper(trim($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? ''));
 
-        // Inclui se destino está na lista OU se é da própria unidade de origem
-        $pertence = in_array($unidDest, $destinos, true) || $unidRel019 === $unidade;
-        if (!$pertence) continue;
+        $idxOrigem = $idxCadeia[$unidRel019] ?? null;
+        if ($idxOrigem === null) continue;
+
+        $idxDest = $idxCadeia[$unidDest] ?? null;
+        if ($idxDest === null) continue;
+
+        if ($idxDest <= $idxOrigem) continue;
 
         $peso = parseNumero($cte['peso']    ?? 0);
         $cub  = parseNumero($cte['cubagem'] ?? 0);
 
-        if ($somaPeso + $peso > $limitePesoKg || $somaVol + $cub > $limiteVolM3) break;
+        if ($somaPeso + $peso > $limitePesoKg || $somaVol + $cub > $limiteVolM3) continue;
 
         $somaPeso += $peso;
         $somaVol  += $cub;
@@ -317,7 +344,7 @@ if ($modoAutomatico) {
     }
 
     list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
-    $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $destinosCarregamento, $unidade, $limitePeso, $limiteVol);
+    $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $dest, $paradasLinha, $limitePeso, $limiteVol);
 
     if (empty($ctesSelecionados)) {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos desta linha.']);
@@ -363,8 +390,7 @@ if (empty($ctesDisponiveis)) {
 }
 
 list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaFinal);
-$destinosManual   = array_values(array_unique(array_filter(array_merge($paradas, [$unidadeDestino]))));
-$ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $destinosManual, $unidade, $limitePeso, $limiteVol);
+$ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $unidadeDestino, $paradas, $limitePeso, $limiteVol);
 
 if (empty($ctesSelecionados)) {
     respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos informados.']);
