@@ -48,6 +48,18 @@ try {
     $carrega_sex = $parseBool($input['carrega_sex'] ?? null, true);
     $carrega_sab = $parseBool($input['carrega_sab'] ?? null, true);
     $carrega_dom = $parseBool($input['carrega_dom'] ?? null, true);
+
+    $toPgBool = function($v) {
+        return $v ? 't' : 'f';
+    };
+
+    $carrega_seg = $toPgBool($carrega_seg);
+    $carrega_ter = $toPgBool($carrega_ter);
+    $carrega_qua = $toPgBool($carrega_qua);
+    $carrega_qui = $toPgBool($carrega_qui);
+    $carrega_sex = $toPgBool($carrega_sex);
+    $carrega_sab = $toPgBool($carrega_sab);
+    $carrega_dom = $toPgBool($carrega_dom);
     
     // Validações
     if (!$domain) {

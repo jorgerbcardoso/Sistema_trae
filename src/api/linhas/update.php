@@ -44,13 +44,18 @@ try {
         return null;
     };
 
-    $carrega_seg = $parseBoolOrNull($input, 'carrega_seg');
-    $carrega_ter = $parseBoolOrNull($input, 'carrega_ter');
-    $carrega_qua = $parseBoolOrNull($input, 'carrega_qua');
-    $carrega_qui = $parseBoolOrNull($input, 'carrega_qui');
-    $carrega_sex = $parseBoolOrNull($input, 'carrega_sex');
-    $carrega_sab = $parseBoolOrNull($input, 'carrega_sab');
-    $carrega_dom = $parseBoolOrNull($input, 'carrega_dom');
+    $toPgBoolOrNull = function($v) {
+        if ($v === null) return null;
+        return $v ? 't' : 'f';
+    };
+
+    $carrega_seg = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_seg'));
+    $carrega_ter = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_ter'));
+    $carrega_qua = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_qua'));
+    $carrega_qui = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_qui'));
+    $carrega_sex = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_sex'));
+    $carrega_sab = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_sab'));
+    $carrega_dom = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_dom'));
     
     // Validações
     if (!$domain) {
@@ -138,13 +143,13 @@ try {
     // Atualizar linha
     $updateQuery = "UPDATE $tableName 
                     SET nome = $1, sigla_emit = $2, sigla_dest = $3, unidades = $4, km_ida = $5,
-                        carrega_seg = COALESCE(NULLIF($6::text, '')::boolean, carrega_seg),
-                        carrega_ter = COALESCE(NULLIF($7::text, '')::boolean, carrega_ter),
-                        carrega_qua = COALESCE(NULLIF($8::text, '')::boolean, carrega_qua),
-                        carrega_qui = COALESCE(NULLIF($9::text, '')::boolean, carrega_qui),
-                        carrega_sex = COALESCE(NULLIF($10::text, '')::boolean, carrega_sex),
-                        carrega_sab = COALESCE(NULLIF($11::text, '')::boolean, carrega_sab),
-                        carrega_dom = COALESCE(NULLIF($12::text, '')::boolean, carrega_dom)
+                        carrega_seg = COALESCE($6::boolean, carrega_seg),
+                        carrega_ter = COALESCE($7::boolean, carrega_ter),
+                        carrega_qua = COALESCE($8::boolean, carrega_qua),
+                        carrega_qui = COALESCE($9::boolean, carrega_qui),
+                        carrega_sex = COALESCE($10::boolean, carrega_sex),
+                        carrega_sab = COALESCE($11::boolean, carrega_sab),
+                        carrega_dom = COALESCE($12::boolean, carrega_dom)
                     WHERE nro_linha = $13
                     RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
                               carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom";
