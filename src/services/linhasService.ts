@@ -10,6 +10,13 @@ export interface Linha {
   unidades: string;
   km_ida: number;  // INTEGER
   km_volta: number; // INTEGER
+  carrega_seg: boolean;
+  carrega_ter: boolean;
+  carrega_qua: boolean;
+  carrega_qui: boolean;
+  carrega_sex: boolean;
+  carrega_sab: boolean;
+  carrega_dom: boolean;
 }
 
 interface LinhaInput {
@@ -18,6 +25,13 @@ interface LinhaInput {
   sigla_dest: string;
   unidades: string;
   km_ida: number; // INTEGER
+  carrega_seg: boolean;
+  carrega_ter: boolean;
+  carrega_qua: boolean;
+  carrega_qui: boolean;
+  carrega_sex: boolean;
+  carrega_sab: boolean;
+  carrega_dom: boolean;
 }
 
 // ============================================
@@ -31,7 +45,14 @@ const MOCK_LINHAS: Linha[] = [
     sigla_dest: 'RJO',
     unidades: 'TAU,GUA',
     km_ida: 450,
-    km_volta: 0
+    km_volta: 0,
+    carrega_seg: true,
+    carrega_ter: true,
+    carrega_qua: true,
+    carrega_qui: true,
+    carrega_sex: true,
+    carrega_sab: true,
+    carrega_dom: true,
   },
   {
     nro_linha: 2,
@@ -40,7 +61,14 @@ const MOCK_LINHAS: Linha[] = [
     sigla_dest: 'BHZ',
     unidades: 'ATI,POA,VGD',
     km_ida: 580,
-    km_volta: 0
+    km_volta: 0,
+    carrega_seg: true,
+    carrega_ter: true,
+    carrega_qua: true,
+    carrega_qui: true,
+    carrega_sex: true,
+    carrega_sab: true,
+    carrega_dom: true,
   },
   {
     nro_linha: 3,
@@ -49,7 +77,14 @@ const MOCK_LINHAS: Linha[] = [
     sigla_dest: 'BHZ',
     unidades: 'JFO,BBR',
     km_ida: 280,
-    km_volta: 0
+    km_volta: 0,
+    carrega_seg: true,
+    carrega_ter: true,
+    carrega_qua: true,
+    carrega_qui: true,
+    carrega_sex: true,
+    carrega_sab: true,
+    carrega_dom: true,
   }
 ];
 
@@ -121,7 +156,14 @@ export async function createLinha(domain: string, data: LinhaInput) {
       sigla_dest: data.sigla_dest,
       unidades: data.unidades,
       km_ida: data.km_ida,
-      km_volta: 0
+      km_volta: 0,
+      carrega_seg: data.carrega_seg,
+      carrega_ter: data.carrega_ter,
+      carrega_qua: data.carrega_qua,
+      carrega_qui: data.carrega_qui,
+      carrega_sex: data.carrega_sex,
+      carrega_sab: data.carrega_sab,
+      carrega_dom: data.carrega_dom,
     };
 
     mockLinhasState.push(novaLinha);
@@ -196,7 +238,14 @@ export async function updateLinha(domain: string, nroLinha: number, data: LinhaI
       sigla_emit: data.sigla_emit,
       sigla_dest: data.sigla_dest,
       unidades: data.unidades,
-      km_ida: data.km_ida
+      km_ida: data.km_ida,
+      carrega_seg: data.carrega_seg,
+      carrega_ter: data.carrega_ter,
+      carrega_qua: data.carrega_qua,
+      carrega_qui: data.carrega_qui,
+      carrega_sex: data.carrega_sex,
+      carrega_sab: data.carrega_sab,
+      carrega_dom: data.carrega_dom,
     };
 
     toast.success('Linha atualizada com sucesso');

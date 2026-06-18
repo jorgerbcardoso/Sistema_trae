@@ -30,6 +30,24 @@ try {
     $sigla_dest = $input['sigla_dest'] ?? null;
     $unidades = $input['unidades'] ?? null;
     $km_ida = $input['km_ida'] ?? null;
+
+    $parseBool = function($v, $default = true) {
+        if ($v === null) return $default;
+        if (is_bool($v)) return $v;
+        $vv = strtolower(trim((string)$v));
+        if ($vv === '') return $default;
+        if (in_array($vv, ['1', 't', 'true', 's', 'sim', 'y', 'yes'], true)) return true;
+        if (in_array($vv, ['0', 'f', 'false', 'n', 'nao', 'não', 'no'], true)) return false;
+        return $default;
+    };
+
+    $carrega_seg = $parseBool($input['carrega_seg'] ?? null, true);
+    $carrega_ter = $parseBool($input['carrega_ter'] ?? null, true);
+    $carrega_qua = $parseBool($input['carrega_qua'] ?? null, true);
+    $carrega_qui = $parseBool($input['carrega_qui'] ?? null, true);
+    $carrega_sex = $parseBool($input['carrega_sex'] ?? null, true);
+    $carrega_sab = $parseBool($input['carrega_sab'] ?? null, true);
+    $carrega_dom = $parseBool($input['carrega_dom'] ?? null, true);
     
     // Validações
     if (!$domain) {
@@ -107,9 +125,15 @@ try {
     $nextId = pg_fetch_result($maxIdResult, 0, 0);
     
     // Inserir linha
-    $insertQuery = "INSERT INTO $tableName (nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta) 
-                    VALUES ($1, $2, $3, $4, $5, $6, 0)
-                    RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta";
+    $insertQuery = "INSERT INTO $tableName (
+                        nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6, 0,
+                        $7, $8, $9, $10, $11, $12, $13
+                    )
+                    RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom";
     
     $insertResult = sql($g_sql, $insertQuery, false, [
         $nextId,
@@ -117,7 +141,14 @@ try {
         strtoupper($sigla_emit),
         strtoupper($sigla_dest),
         strtoupper($unidades),
-        (int)$km_ida
+        (int)$km_ida,
+        $carrega_seg,
+        $carrega_ter,
+        $carrega_qua,
+        $carrega_qui,
+        $carrega_sex,
+        $carrega_sab,
+        $carrega_dom,
     ]);
     
     $newLinha = pg_fetch_assoc($insertResult);
@@ -131,7 +162,14 @@ try {
             'sigla_dest' => trim($newLinha['sigla_dest']),
             'unidades' => trim($newLinha['unidades']),
             'km_ida' => (int)$newLinha['km_ida'],
-            'km_volta' => (int)$newLinha['km_volta']
+            'km_volta' => (int)$newLinha['km_volta'],
+            'carrega_seg' => ((string)($newLinha['carrega_seg'] ?? '') === 't'),
+            'carrega_ter' => ((string)($newLinha['carrega_ter'] ?? '') === 't'),
+            'carrega_qua' => ((string)($newLinha['carrega_qua'] ?? '') === 't'),
+            'carrega_qui' => ((string)($newLinha['carrega_qui'] ?? '') === 't'),
+            'carrega_sex' => ((string)($newLinha['carrega_sex'] ?? '') === 't'),
+            'carrega_sab' => ((string)($newLinha['carrega_sab'] ?? '') === 't'),
+            'carrega_dom' => ((string)($newLinha['carrega_dom'] ?? '') === 't'),
         ]
     ]);
     

@@ -58,7 +58,14 @@ export function CadastroLinhas() {
     sigla_emit: '',
     sigla_dest: '',
     unidades: [] as string[],
-    km_ida: ''
+    km_ida: '',
+    carrega_seg: true,
+    carrega_ter: true,
+    carrega_qua: true,
+    carrega_qui: true,
+    carrega_sex: true,
+    carrega_sab: true,
+    carrega_dom: true,
   });
 
   usePageTitle('Cadastro de Linhas');
@@ -90,7 +97,14 @@ export function CadastroLinhas() {
       sigla_emit: '',
       sigla_dest: '',
       unidades: [],
-      km_ida: ''
+      km_ida: '',
+      carrega_seg: true,
+      carrega_ter: true,
+      carrega_qua: true,
+      carrega_qui: true,
+      carrega_sex: true,
+      carrega_sab: true,
+      carrega_dom: true,
     });
     setSelectedLinha(null);
     setIsEditing(false);
@@ -103,7 +117,14 @@ export function CadastroLinhas() {
       sigla_emit: linha.sigla_emit,
       sigla_dest: linha.sigla_dest,
       unidades: linha.unidades.split(',').filter(u => u.trim()),
-      km_ida: String(linha.km_ida)
+      km_ida: String(linha.km_ida),
+      carrega_seg: linha.carrega_seg ?? true,
+      carrega_ter: linha.carrega_ter ?? true,
+      carrega_qua: linha.carrega_qua ?? true,
+      carrega_qui: linha.carrega_qui ?? true,
+      carrega_sex: linha.carrega_sex ?? true,
+      carrega_sab: linha.carrega_sab ?? true,
+      carrega_dom: linha.carrega_dom ?? true,
     });
     setSelectedLinha(linha);
     setIsEditing(true);
@@ -173,7 +194,14 @@ export function CadastroLinhas() {
         sigla_emit: formData.sigla_emit.toUpperCase(),
         sigla_dest: formData.sigla_dest.toUpperCase(),
         unidades: unidadesStr,
-        km_ida: parseFloat(formData.km_ida)
+        km_ida: parseFloat(formData.km_ida),
+        carrega_seg: !!formData.carrega_seg,
+        carrega_ter: !!formData.carrega_ter,
+        carrega_qua: !!formData.carrega_qua,
+        carrega_qui: !!formData.carrega_qui,
+        carrega_sex: !!formData.carrega_sex,
+        carrega_sab: !!formData.carrega_sab,
+        carrega_dom: !!formData.carrega_dom,
       };
 
       let result;
@@ -269,6 +297,20 @@ export function CadastroLinhas() {
   }, [sortedLinhas, currentPage]);
 
   const totalPages = Math.ceil(sortedLinhas.length / ITEMS_PER_PAGE);
+
+  const diasCarrCompacto = (linha: Linha) => {
+    const letras = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'] as const;
+    const flags = [
+      !!linha.carrega_seg,
+      !!linha.carrega_ter,
+      !!linha.carrega_qua,
+      !!linha.carrega_qui,
+      !!linha.carrega_sex,
+      !!linha.carrega_sab,
+      !!linha.carrega_dom,
+    ];
+    return flags.map((ok, i) => (ok ? letras[i] : '.')).join('');
+  };
 
   return (
     <AdminLayout 
@@ -370,6 +412,9 @@ export function CadastroLinhas() {
                             <TableHead className="w-[250px]">
                               Unidades
                             </TableHead>
+                            <TableHead className="w-[95px]">
+                              Dias Carr.
+                            </TableHead>
                             <TableHead 
                               className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" 
                               onClick={() => handleSort('sigla_dest')}
@@ -399,6 +444,9 @@ export function CadastroLinhas() {
                               <TableCell>{linha.sigla_emit}</TableCell>
                               <TableCell>
                                 <span className="text-xs font-mono">{linha.unidades}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs font-mono tracking-widest tabular-nums text-slate-700 dark:text-slate-300">{diasCarrCompacto(linha)}</span>
                               </TableCell>
                               <TableCell>{linha.sigla_dest}</TableCell>
                               <TableCell>{linha.km_ida.toLocaleString('pt-BR')}</TableCell>
@@ -529,6 +577,36 @@ export function CadastroLinhas() {
                 onChange={(e) => setFormData({ ...formData, km_ida: e.target.value })}
                 placeholder="Ex: 450"
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Dias de Carregamento</Label>
+              <div className="flex flex-wrap gap-1">
+                {([
+                  { key: 'carrega_seg', label: 'S', title: 'Seg' },
+                  { key: 'carrega_ter', label: 'T', title: 'Ter' },
+                  { key: 'carrega_qua', label: 'Q', title: 'Qua' },
+                  { key: 'carrega_qui', label: 'Q', title: 'Qui' },
+                  { key: 'carrega_sex', label: 'S', title: 'Sex' },
+                  { key: 'carrega_sab', label: 'S', title: 'Sáb' },
+                  { key: 'carrega_dom', label: 'D', title: 'Dom' },
+                ] as const).map((d) => {
+                  const ativo = (formData as any)[d.key] as boolean;
+                  return (
+                    <Button
+                      key={d.key}
+                      type="button"
+                      variant={ativo ? 'default' : 'outline'}
+                      size="sm"
+                      className={`h-8 w-8 px-0 font-mono ${ativo ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                      onClick={() => setFormData({ ...formData, [d.key]: !ativo } as any)}
+                      title={d.title}
+                    >
+                      {d.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

@@ -31,6 +31,26 @@ try {
     $sigla_dest = $input['sigla_dest'] ?? null;
     $unidades = $input['unidades'] ?? null;
     $km_ida = $input['km_ida'] ?? null;
+
+    $parseBoolOrNull = function($arr, $key) {
+        if (!is_array($arr) || !array_key_exists($key, $arr)) return null;
+        $v = $arr[$key];
+        if ($v === null) return null;
+        if (is_bool($v)) return $v;
+        $vv = strtolower(trim((string)$v));
+        if ($vv === '') return null;
+        if (in_array($vv, ['1', 't', 'true', 's', 'sim', 'y', 'yes'], true)) return true;
+        if (in_array($vv, ['0', 'f', 'false', 'n', 'nao', 'não', 'no'], true)) return false;
+        return null;
+    };
+
+    $carrega_seg = $parseBoolOrNull($input, 'carrega_seg');
+    $carrega_ter = $parseBoolOrNull($input, 'carrega_ter');
+    $carrega_qua = $parseBoolOrNull($input, 'carrega_qua');
+    $carrega_qui = $parseBoolOrNull($input, 'carrega_qui');
+    $carrega_sex = $parseBoolOrNull($input, 'carrega_sex');
+    $carrega_sab = $parseBoolOrNull($input, 'carrega_sab');
+    $carrega_dom = $parseBoolOrNull($input, 'carrega_dom');
     
     // Validações
     if (!$domain) {
@@ -117,9 +137,17 @@ try {
     
     // Atualizar linha
     $updateQuery = "UPDATE $tableName 
-                    SET nome = $1, sigla_emit = $2, sigla_dest = $3, unidades = $4, km_ida = $5
-                    WHERE nro_linha = $6
-                    RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta";
+                    SET nome = $1, sigla_emit = $2, sigla_dest = $3, unidades = $4, km_ida = $5,
+                        carrega_seg = COALESCE($6, carrega_seg),
+                        carrega_ter = COALESCE($7, carrega_ter),
+                        carrega_qua = COALESCE($8, carrega_qua),
+                        carrega_qui = COALESCE($9, carrega_qui),
+                        carrega_sex = COALESCE($10, carrega_sex),
+                        carrega_sab = COALESCE($11, carrega_sab),
+                        carrega_dom = COALESCE($12, carrega_dom)
+                    WHERE nro_linha = $13
+                    RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom";
     
     $updateResult = sql($g_sql, $updateQuery, false, [
         strtoupper($nome),
@@ -127,6 +155,13 @@ try {
         strtoupper($sigla_dest),
         strtoupper($unidades),
         (int)$km_ida,
+        $carrega_seg,
+        $carrega_ter,
+        $carrega_qua,
+        $carrega_qui,
+        $carrega_sex,
+        $carrega_sab,
+        $carrega_dom,
         (int)$nro_linha
     ]);
     
@@ -141,7 +176,14 @@ try {
             'sigla_dest' => trim($updatedLinha['sigla_dest']),
             'unidades' => trim($updatedLinha['unidades']),
             'km_ida' => (int)$updatedLinha['km_ida'],
-            'km_volta' => (int)$updatedLinha['km_volta']
+            'km_volta' => (int)$updatedLinha['km_volta'],
+            'carrega_seg' => ((string)($updatedLinha['carrega_seg'] ?? '') === 't'),
+            'carrega_ter' => ((string)($updatedLinha['carrega_ter'] ?? '') === 't'),
+            'carrega_qua' => ((string)($updatedLinha['carrega_qua'] ?? '') === 't'),
+            'carrega_qui' => ((string)($updatedLinha['carrega_qui'] ?? '') === 't'),
+            'carrega_sex' => ((string)($updatedLinha['carrega_sex'] ?? '') === 't'),
+            'carrega_sab' => ((string)($updatedLinha['carrega_sab'] ?? '') === 't'),
+            'carrega_dom' => ((string)($updatedLinha['carrega_dom'] ?? '') === 't'),
         ]
     ]);
     
