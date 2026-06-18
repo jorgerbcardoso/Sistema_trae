@@ -3514,11 +3514,11 @@ export function Disponiveis() {
                 <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
-                <div className="flex-1 min-w-0 text-center text-sm text-slate-800 dark:text-slate-200 leading-none truncate">
+                <div className="flex-1 min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
                   <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
                   {' '}linha{(!loadingLinhasOrigem && linhasCarregamHoje.length !== 1) ? 's' : ''} carregam HOJE. Clique aqui para visualizar.
                 </div>
-                <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap hidden lg:block">
                   {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
                 </div>
               </div>
