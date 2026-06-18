@@ -26,7 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { toUpperCase } from '../../utils/stringUtils';
 import { FilterSelectUnidadeSingle } from './FilterSelectUnidadeSingle';
-import { FilterSelectUnidadeOrdered } from './FilterSelectUnidadeOrdered';
+import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import {
   listLinhas,
   createLinha,
@@ -513,7 +513,7 @@ export function CadastroLinhas() {
 
       {/* Dialog de Cadastro/Edição */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[640px]">
+        <DialogContent className="sm:max-w-[640px] h-[70vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? 'Editar Linha' : 'Nova Linha'}
@@ -523,10 +523,10 @@ export function CadastroLinhas() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[70vh] overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto pr-1">
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label htmlFor="nome">Nome da Linha *</Label>
                   <Input
                     id="nome"
@@ -536,7 +536,7 @@ export function CadastroLinhas() {
                   />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label htmlFor="km_ida">Distância (km) *</Label>
                   <Input
                     id="km_ida"
@@ -551,7 +551,7 @@ export function CadastroLinhas() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label>Unidade de Origem *</Label>
                   <FilterSelectUnidadeSingle
                     value={formData.sigla_emit}
@@ -559,7 +559,7 @@ export function CadastroLinhas() {
                   />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 min-w-0">
                   <Label>Unidade de Destino *</Label>
                   <FilterSelectUnidadeSingle
                     value={formData.sigla_dest}
@@ -569,14 +569,12 @@ export function CadastroLinhas() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Unidades Intermediárias</Label>
-                <FilterSelectUnidadeOrdered
+                <UnidadesMultiSelect
                   value={formData.unidades}
                   onChange={(value) => setFormData({ ...formData, unidades: value })}
+                  domain={user?.domain}
+                  label="Unidades Intermediárias"
                 />
-                <p className="text-xs text-slate-500">
-                  Opcional. A ordem de seleção será mantida.
-                </p>
               </div>
 
               <div className="grid gap-2">

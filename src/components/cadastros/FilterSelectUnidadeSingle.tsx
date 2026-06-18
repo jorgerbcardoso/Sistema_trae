@@ -179,13 +179,13 @@ export function FilterSelectUnidadeSingle({ value, onChange, disabled, respectUs
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 w-full min-w-0">
       {label && <Label>{label}</Label>}
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button 
             variant="outline" 
-            className="w-full justify-between text-left overflow-hidden bg-input-background"
+            className="w-full min-w-0 justify-between text-left overflow-hidden bg-input-background"
             disabled={shouldBeDisabled}
           >
             <span className="truncate flex-1 block">

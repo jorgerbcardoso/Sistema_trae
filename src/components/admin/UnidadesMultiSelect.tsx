@@ -19,6 +19,7 @@ interface Unidade {
 
 export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: UnidadesMultiSelectProps) {
   const [search, setSearch] = useState('');
+  const [manualInput, setManualInput] = useState('');
   const [todasUnidades, setTodasUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -26,6 +27,10 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
   useEffect(() => {
     loadUnidades();
   }, [domain]);
+
+  useEffect(() => {
+    setManualInput(value.join(', '));
+  }, [value.join(',')]);
   
   const loadUnidades = async () => {
     setLoading(true);
@@ -82,6 +87,23 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
       onChange([...value, unidade]);
     }
   };
+
+  const handleManualInputChange = (input: string) => {
+    setManualInput(input);
+    const siglas = input
+      .split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(s => s.length > 0);
+
+    const seen = new Set<string>();
+    const orderedUnique: string[] = [];
+    for (const s of siglas) {
+      if (seen.has(s)) continue;
+      seen.add(s);
+      orderedUnique.push(s);
+    }
+    onChange(orderedUnique);
+  };
   
   // Selecionar todas
   const handleSelectAll = () => {
@@ -118,6 +140,19 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
       </div>
       
       <div className="border rounded-lg p-3 space-y-3 bg-slate-50 dark:bg-slate-900">
+        <div className="space-y-1">
+          <Label className="text-xs text-slate-600 dark:text-slate-400">
+            Digite manualmente (separado por vírgulas):
+          </Label>
+          <Input
+            type="text"
+            placeholder="Ex: SP, RJ, MG"
+            value={manualInput}
+            onChange={(e) => handleManualInputChange(e.target.value)}
+            className="bg-white dark:bg-slate-800"
+          />
+        </div>
+
         {/* Input de busca */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
