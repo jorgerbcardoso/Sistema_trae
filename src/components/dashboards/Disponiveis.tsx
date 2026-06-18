@@ -2417,6 +2417,8 @@ export function Disponiveis() {
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
   const [carregandoNroLinhaHoje, setCarregandoNroLinhaHoje] = useState<number | null>(null);
+  const [linhasHojeSortKey, setLinhasHojeSortKey] = useState<'nro' | 'nome' | 'dest' | 'inter' | 'km'>('nro');
+  const [linhasHojeSortDir, setLinhasHojeSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [resumoHojeDialogOpen, setResumoHojeDialogOpen] = useState(false);
   const [resumoHojePlaca, setResumoHojePlaca] = useState('');
@@ -2470,6 +2472,32 @@ export function Disponiveis() {
   const linhasCarregamHoje = React.useMemo(() => {
     return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
   }, [linhasOrigem, diaCarregaKey]);
+
+  const linhasCarregamHojeOrdenadas = React.useMemo(() => {
+    const dir = linhasHojeSortDir === 'asc' ? 1 : -1;
+    const copy = [...linhasCarregamHoje];
+    copy.sort((a, b) => {
+      const aN = a.nro_linha ?? 0;
+      const bN = b.nro_linha ?? 0;
+      const aNome = (a.nome ?? '').toUpperCase();
+      const bNome = (b.nome ?? '').toUpperCase();
+      const aDest = (a.sigla_dest ?? '').toUpperCase();
+      const bDest = (b.sigla_dest ?? '').toUpperCase();
+      const aInter = (a.unidades ?? '').toUpperCase();
+      const bInter = (b.unidades ?? '').toUpperCase();
+      const aKm = a.km_ida ?? 0;
+      const bKm = b.km_ida ?? 0;
+
+      const cmp = (va: string | number, vb: string | number) => (va < vb ? -1 : va > vb ? 1 : 0);
+
+      if (linhasHojeSortKey === 'nro') return cmp(aN, bN) * dir;
+      if (linhasHojeSortKey === 'nome') return cmp(aNome, bNome) * dir;
+      if (linhasHojeSortKey === 'dest') return cmp(aDest, bDest) * dir;
+      if (linhasHojeSortKey === 'inter') return cmp(aInter, bInter) * dir;
+      return cmp(aKm, bKm) * dir;
+    });
+    return copy;
+  }, [linhasCarregamHoje, linhasHojeSortDir, linhasHojeSortKey]);
   const [progressoEntrega, setProgressoEntrega] = useState(0);
   const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -3429,21 +3457,24 @@ export function Disponiveis() {
             );
           })()}
 
-          <Card className="dark:bg-slate-900 dark:border-slate-700">
-            <CardContent className="p-3">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => { if (!loadingLinhasOrigem) setLinhasHojeDialogOpen(true); }}
+            onKeyDown={(e) => { if (!loadingLinhasOrigem && (e.key === 'Enter' || e.key === ' ')) setLinhasHojeDialogOpen(true); }}
+            className={`dark:bg-slate-900 dark:border-slate-700 transition-colors ${
+              loadingLinhasOrigem ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
+            }`}
+          >
+            <CardContent className="px-3 py-2">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40">
+                <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
-                <button
-                  type="button"
-                  className="text-left text-sm text-slate-800 dark:text-slate-200 hover:underline disabled:opacity-60 disabled:hover:no-underline"
-                  onClick={() => setLinhasHojeDialogOpen(true)}
-                  disabled={loadingLinhasOrigem || linhasCarregamHoje.length === 0}
-                >
+                <div className="text-left text-sm text-slate-800 dark:text-slate-200">
                   <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
                   {' '}linha{(!loadingLinhasOrigem && linhasCarregamHoje.length !== 1) ? 's' : ''} carregam HOJE. Clique aqui para visualizar.
-                </button>
+                </div>
                 <div className="ml-auto text-xs text-slate-500 dark:text-slate-400">
                   {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
                 </div>
@@ -3460,11 +3491,76 @@ export function Disponiveis() {
               <div className="flex-1 overflow-y-auto pr-1">
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                    <span>#</span>
-                    <span>Nome</span>
-                    <span>Dest.</span>
-                    <span>Intermediárias</span>
-                    <span className="text-right">Km</span>
+                    <button
+                      type="button"
+                      className="text-left hover:text-slate-800 dark:hover:text-slate-100"
+                      onClick={() => {
+                        if (linhasHojeSortKey === 'nro') setLinhasHojeSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setLinhasHojeSortKey('nro'); setLinhasHojeSortDir('asc'); }
+                      }}
+                    >
+                      Nº {linhasHojeSortKey === 'nro' && (
+                        linhasHojeSortDir === 'asc'
+                          ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" />
+                          : <ChevronDown className="w-3 h-3 inline ml-1" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-left hover:text-slate-800 dark:hover:text-slate-100"
+                      onClick={() => {
+                        if (linhasHojeSortKey === 'nome') setLinhasHojeSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setLinhasHojeSortKey('nome'); setLinhasHojeSortDir('asc'); }
+                      }}
+                    >
+                      Nome {linhasHojeSortKey === 'nome' && (
+                        linhasHojeSortDir === 'asc'
+                          ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" />
+                          : <ChevronDown className="w-3 h-3 inline ml-1" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-left hover:text-slate-800 dark:hover:text-slate-100"
+                      onClick={() => {
+                        if (linhasHojeSortKey === 'dest') setLinhasHojeSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setLinhasHojeSortKey('dest'); setLinhasHojeSortDir('asc'); }
+                      }}
+                    >
+                      Dest. {linhasHojeSortKey === 'dest' && (
+                        linhasHojeSortDir === 'asc'
+                          ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" />
+                          : <ChevronDown className="w-3 h-3 inline ml-1" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-left hover:text-slate-800 dark:hover:text-slate-100"
+                      onClick={() => {
+                        if (linhasHojeSortKey === 'inter') setLinhasHojeSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setLinhasHojeSortKey('inter'); setLinhasHojeSortDir('asc'); }
+                      }}
+                    >
+                      Intermediárias {linhasHojeSortKey === 'inter' && (
+                        linhasHojeSortDir === 'asc'
+                          ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" />
+                          : <ChevronDown className="w-3 h-3 inline ml-1" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-right hover:text-slate-800 dark:hover:text-slate-100"
+                      onClick={() => {
+                        if (linhasHojeSortKey === 'km') setLinhasHojeSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                        else { setLinhasHojeSortKey('km'); setLinhasHojeSortDir('asc'); }
+                      }}
+                    >
+                      Km {linhasHojeSortKey === 'km' && (
+                        linhasHojeSortDir === 'asc'
+                          ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" />
+                          : <ChevronDown className="w-3 h-3 inline ml-1" />
+                      )}
+                    </button>
                     <span className="text-right">Ação</span>
                   </div>
                   {loadingLinhasOrigem ? (
@@ -3472,18 +3568,18 @@ export function Disponiveis() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Carregando linhas...
                     </div>
-                  ) : linhasCarregamHoje.length === 0 ? (
+                  ) : linhasCarregamHojeOrdenadas.length === 0 ? (
                     <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
                       Nenhuma linha está configurada para carregar hoje.
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {linhasCarregamHoje.map((l) => (
+                      {linhasCarregamHojeOrdenadas.map((l) => (
                         <div
                           key={l.nro_linha}
                           className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 text-sm items-center"
                         >
-                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400">#{l.nro_linha}</span>
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
                           <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
                           <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{(l.unidades ?? '').toUpperCase() || '-'}</span>
