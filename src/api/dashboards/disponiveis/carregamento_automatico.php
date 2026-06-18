@@ -36,7 +36,8 @@ $modoAutomatico = empty($placa) && empty($unidadeDestino);
 if ($acao === 'listar_linhas') {
     try {
         $res = sql(
-            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta
+            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                    carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
              FROM {$tabelaLinha}
              WHERE sigla_emit = \$1
              ORDER BY sigla_dest, nome, nro_linha",
@@ -52,6 +53,13 @@ if ($acao === 'listar_linhas') {
                 'unidades'   => (string)($r['unidades'] ?? ''),
                 'km_ida'     => $r['km_ida']   !== null ? (int)$r['km_ida']   : null,
                 'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
+                'carrega_seg' => ((string)($r['carrega_seg'] ?? '') === 't'),
+                'carrega_ter' => ((string)($r['carrega_ter'] ?? '') === 't'),
+                'carrega_qua' => ((string)($r['carrega_qua'] ?? '') === 't'),
+                'carrega_qui' => ((string)($r['carrega_qui'] ?? '') === 't'),
+                'carrega_sex' => ((string)($r['carrega_sex'] ?? '') === 't'),
+                'carrega_sab' => ((string)($r['carrega_sab'] ?? '') === 't'),
+                'carrega_dom' => ((string)($r['carrega_dom'] ?? '') === 't'),
             ];
         }
         respondJson(['success' => true, 'linhas' => $linhas]);

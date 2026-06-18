@@ -1639,7 +1639,22 @@ function CardCarregamento({
 
 type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
 
-type LinhaCarregamento = { nro_linha: number; nome: string; sigla_emit: string; sigla_dest: string; unidades: string; km_ida: number | null; km_volta: number | null };
+type LinhaCarregamento = {
+  nro_linha: number;
+  nome: string;
+  sigla_emit: string;
+  sigla_dest: string;
+  unidades: string;
+  km_ida: number | null;
+  km_volta: number | null;
+  carrega_seg?: boolean;
+  carrega_ter?: boolean;
+  carrega_qua?: boolean;
+  carrega_qui?: boolean;
+  carrega_sex?: boolean;
+  carrega_sab?: boolean;
+  carrega_dom?: boolean;
+};
 
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
   onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{
@@ -2398,6 +2413,16 @@ export function Disponiveis() {
 
   const [sigla] = useState<string>(unidadeLogada);
 
+  const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
+  const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
+  const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
+  const [carregandoNroLinhaHoje, setCarregandoNroLinhaHoje] = useState<number | null>(null);
+
+  const [resumoHojeDialogOpen, setResumoHojeDialogOpen] = useState(false);
+  const [resumoHojePlaca, setResumoHojePlaca] = useState('');
+  const [resumoHojeUnidades, setResumoHojeUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
+  const [resumoHojeDestinos, setResumoHojeDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
+
   const [dados, setDados] = useState<DadosTransferencia | null>(null);
   const [loading, setLoading] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
@@ -2407,6 +2432,44 @@ export function Disponiveis() {
   const [dadosEntrega, setDadosEntrega] = useState<DadosEntrega | null>(null);
   const [loadingEntrega, setLoadingEntrega] = useState(false);
   const [erroEntrega, setErroEntrega] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        setLoadingLinhasOrigem(true);
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'listar_linhas' }) },
+          true
+        );
+        if (!ativo) return;
+        if (res.success) setLinhasOrigem(res.linhas ?? []);
+        else setLinhasOrigem([]);
+      } catch {
+        if (!ativo) return;
+        setLinhasOrigem([]);
+      } finally {
+        if (ativo) setLoadingLinhasOrigem(false);
+      }
+    })();
+    return () => { ativo = false; };
+  }, []);
+
+  const diaCarregaKey = React.useMemo(() => {
+    const d = new Date().getDay();
+    if (d === 0) return 'carrega_dom' as const;
+    if (d === 1) return 'carrega_seg' as const;
+    if (d === 2) return 'carrega_ter' as const;
+    if (d === 3) return 'carrega_qua' as const;
+    if (d === 4) return 'carrega_qui' as const;
+    if (d === 5) return 'carrega_sex' as const;
+    return 'carrega_sab' as const;
+  }, []);
+
+  const linhasCarregamHoje = React.useMemo(() => {
+    return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
+  }, [linhasOrigem, diaCarregaKey]);
   const [progressoEntrega, setProgressoEntrega] = useState(0);
   const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -2693,6 +2756,23 @@ export function Disponiveis() {
       return { ok: false };
     }
   }, [carregarCarregamentos, dados]);
+
+  const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
+    if (carregandoNroLinhaHoje) return;
+    try {
+      setCarregandoNroLinhaHoje(nroLinha);
+      const result = await handleCarregamentoAutomatico('', '', [], nroLinha);
+      if (result.ok && result.placa && ((result.resumo?.length ?? 0) > 0 || (result.resumoDestinos?.length ?? 0) > 0)) {
+        setResumoHojePlaca(result.placa);
+        setResumoHojeUnidades((result.resumo as any) ?? []);
+        setResumoHojeDestinos((result.resumoDestinos as any) ?? []);
+        setResumoHojeDialogOpen(true);
+      }
+      setLinhasHojeDialogOpen(false);
+    } finally {
+      setCarregandoNroLinhaHoje(null);
+    }
+  }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico]);
 
   const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
     try {
@@ -3348,6 +3428,163 @@ export function Disponiveis() {
               </div>
             );
           })()}
+
+          <Card className="dark:bg-slate-900 dark:border-slate-700">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40">
+                  <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                </div>
+                <button
+                  type="button"
+                  className="text-left text-sm text-slate-800 dark:text-slate-200 hover:underline disabled:opacity-60 disabled:hover:no-underline"
+                  onClick={() => setLinhasHojeDialogOpen(true)}
+                  disabled={loadingLinhasOrigem || linhasCarregamHoje.length === 0}
+                >
+                  <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
+                  {' '}linha{(!loadingLinhasOrigem && linhasCarregamHoje.length !== 1) ? 's' : ''} carregam HOJE. Clique aqui para visualizar.
+                </button>
+                <div className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                  {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Dialog open={linhasHojeDialogOpen} onOpenChange={setLinhasHojeDialogOpen}>
+            <DialogContent className="sm:max-w-[900px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Linhas que carregam hoje</DialogTitle>
+                <DialogDescription>Linhas com origem na unidade atual e frequência ativa para o dia de hoje</DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-1">
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                    <span>#</span>
+                    <span>Nome</span>
+                    <span>Dest.</span>
+                    <span>Intermediárias</span>
+                    <span className="text-right">Km</span>
+                    <span className="text-right">Ação</span>
+                  </div>
+                  {loadingLinhasOrigem ? (
+                    <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando linhas...
+                    </div>
+                  ) : linhasCarregamHoje.length === 0 ? (
+                    <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
+                      Nenhuma linha está configurada para carregar hoje.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {linhasCarregamHoje.map((l) => (
+                        <div
+                          key={l.nro_linha}
+                          className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 text-sm items-center"
+                        >
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400">#{l.nro_linha}</span>
+                          <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{(l.unidades ?? '').toUpperCase() || '-'}</span>
+                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
+                          <div className="flex justify-end">
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white"
+                              onClick={() => handleCarregarLinhaHoje(l.nro_linha)}
+                              disabled={carregandoNroLinhaHoje !== null}
+                            >
+                              {carregandoNroLinhaHoje === l.nro_linha ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                              Carregar
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <Button variant="outline" size="sm" onClick={() => setLinhasHojeDialogOpen(false)}>Fechar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={resumoHojeDialogOpen} onOpenChange={setResumoHojeDialogOpen}>
+            <DialogContent className="sm:max-w-[690px]">
+              <DialogHeader>
+                <DialogTitle>Resumo · Carregamento {resumoHojePlaca}</DialogTitle>
+                <DialogDescription>CT-es adicionados por unidade de destino</DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade carregadora</p>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <span>Unid.</span>
+                    <span className="text-right">CT-es</span>
+                    <span className="text-right">Kg</span>
+                    <span className="text-right">M³</span>
+                    <span className="text-right">Frete</span>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {resumoHojeUnidades.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoHojeUnidades.map((r, idx) => (
+                      <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
+                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
+                        <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
+                    <span className="text-slate-600 dark:text-slate-300">Total</span>
+                    <span className="text-right font-bold text-indigo-700 dark:text-indigo-300 tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + r.qtd, 0)}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade destino</p>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <span>Unid.</span>
+                    <span className="text-right">CT-es</span>
+                    <span className="text-right">Kg</span>
+                    <span className="text-right">M³</span>
+                    <span className="text-right">Frete</span>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {resumoHojeDestinos.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoHojeDestinos.map((r, idx) => (
+                      <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
+                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
+                        <span className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.qtd}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
+                    <span className="text-slate-600 dark:text-slate-300">Total</span>
+                    <span className="text-right font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + r.qtd, 0)}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setResumoHojeDialogOpen(false)}>Fechar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <CarregamentoArea
             sigla={sigla}
