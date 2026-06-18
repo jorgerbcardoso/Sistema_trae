@@ -3264,7 +3264,7 @@ export function Disponiveis() {
   const totalEntregaVol      = gruposSetor.reduce((s, g) => s + g.totalVol, 0);
   const totalEntregaPeso     = gruposSetor.reduce((s, g) => s + g.totalPeso, 0);
   const totalEntregaCubagem  = gruposSetor.reduce((s, g) => s + g.totalCubagem, 0);
-  const entregaAtrasados     = dadosEntrega?.ctes.filter(c => c.diasAtraso > 0).length ?? 0;
+  const entregaAtrasadosTransito = dadosEntrega?.ctes.filter(c => c.emTransito && c.diasAtraso > 0).length ?? 0;
 
   const totalGeralArmazem  = totalArmazem + totalEntregaArmazem;
   const totalGeralTransito = totalTransito + totalEntregaTransito;
@@ -3382,7 +3382,7 @@ export function Disponiveis() {
             const subTransito = (() => {
               const parts = [];
               if (ctesTransitoAlerta > 0) parts.push(`${ctesTransitoAlerta} c/ atraso transf.`);
-              if (entregaAtrasados > 0) parts.push(`${entregaAtrasados} c/ atraso entrega`);
+              if (entregaAtrasadosTransito > 0) parts.push(`${entregaAtrasadosTransito} c/ atraso entrega`);
               return parts.length > 0 ? parts.join(' · ') : null;
             })();
 
@@ -3401,13 +3401,13 @@ export function Disponiveis() {
                 loadingExtra: loadingEntrega,
               },
               {
-                bgColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0)
+                bgColor: (ctesTransitoAlerta > 0 || entregaAtrasadosTransito > 0)
                   ? 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800'
                   : 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',
-                textColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
-                emptyColor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#ffedd5' : '#dbeafe',
-                emptyColorDark: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#431407' : '#1e3a8a',
-                cor: (ctesTransitoAlerta > 0 || entregaAtrasados > 0) ? '#f97316' : '#3b82f6',
+                textColor: (ctesTransitoAlerta > 0 || entregaAtrasadosTransito > 0) ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300',
+                emptyColor: (ctesTransitoAlerta > 0 || entregaAtrasadosTransito > 0) ? '#ffedd5' : '#dbeafe',
+                emptyColorDark: (ctesTransitoAlerta > 0 || entregaAtrasadosTransito > 0) ? '#431407' : '#1e3a8a',
+                cor: (ctesTransitoAlerta > 0 || entregaAtrasadosTransito > 0) ? '#f97316' : '#3b82f6',
                 icon: Truck,
                 valor: baseTransito,
                 pct: pctTransito,
@@ -3510,15 +3510,15 @@ export function Disponiveis() {
             }`}
           >
             <CardContent className="h-12 px-3 py-0">
-              <div className="h-full flex items-center gap-3">
+              <div className="h-full flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
-                <div className="text-left text-sm text-slate-800 dark:text-slate-200">
+                <div className="flex-1 min-w-0 text-center text-sm text-slate-800 dark:text-slate-200 leading-none truncate">
                   <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
                   {' '}linha{(!loadingLinhasOrigem && linhasCarregamHoje.length !== 1) ? 's' : ''} carregam HOJE. Clique aqui para visualizar.
                 </div>
-                <div className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+                <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                   {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
                 </div>
               </div>
