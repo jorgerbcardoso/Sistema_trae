@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Filter, X, Check, Calendar } from 'lucide-react';
+import { Filter, X, Check, Calendar, Search } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   Dialog,
@@ -53,6 +53,8 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
   const [open, setOpen] = useState(false);
   const [tempPeriod, setTempPeriod] = useState<PeriodRange>(currentPeriod);
   const [tempUnidades, setTempUnidades] = useState<string[]>(selectedUnidades);
+  const [manualUnidades, setManualUnidades] = useState('');
+  const [searchUnidades, setSearchUnidades] = useState('');
 
   const unidadeAtual = (user?.unidade_atual || user?.unidade || '').toUpperCase();
   const isMTZ = unidadeAtual === 'MTZ';
@@ -71,7 +73,7 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
   const naoMTZSemGrupo = !isMTZ && (user?.unidades || '').trim() === '';
   const unidadeBloqueada = (sigla: string) => !isMTZ && sigla === unidadeAtual;
 
-  const [unidadesMTZ, setUnidadesMTZ] = useState<string[]>([]);
+  const [unidadesMTZ, setUnidadesMTZ] = useState<Array<{ sigla: string; nome?: string }>>([]);
 
   useEffect(() => {
     if (!isMTZ) return;
@@ -81,27 +83,66 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
       body: JSON.stringify({ search: '' }),
     })
       .then((res) => {
-        const lista = (res?.unidades || []).map((u: any) => u.sigla as string);
-        setUnidadesMTZ(lista);
+        const lista = (res?.unidades || []).map((u: any) => ({ sigla: String(u.sigla || '').toUpperCase(), nome: u.nome ? String(u.nome) : '' }));
+        setUnidadesMTZ(lista.filter((u: any) => u.sigla));
       })
       .catch(() => {});
   }, [isMTZ]);
 
-  const unidadesParaExibir = isMTZ ? unidadesMTZ : unidadesDisponiveis;
+  const unidadesParaExibir = isMTZ
+    ? unidadesMTZ
+    : unidadesDisponiveis.map((sigla) => ({ sigla, nome: '' }));
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
       setTempPeriod(currentPeriod);
       setTempUnidades(selectedUnidades);
+      setManualUnidades(selectedUnidades.join(', '));
+      setSearchUnidades('');
     }
     setOpen(isOpen);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    setManualUnidades(tempUnidades.join(', '));
+  }, [open, tempUnidades.join(',')]);
+
+  const normalizeSiglas = (siglas: string[]) => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const s of siglas) {
+      const v = s.trim().toUpperCase();
+      if (!v) continue;
+      if (seen.has(v)) continue;
+      seen.add(v);
+      ordered.push(v);
+    }
+    if (!isMTZ && unidadeAtual) {
+      if (!ordered.includes(unidadeAtual)) ordered.unshift(unidadeAtual);
+    }
+    return ordered;
+  };
+
+  const allowedSet = useMemo(() => {
+    if (isMTZ) return null;
+    const set = new Set(unidadesDisponiveis.map((u) => u.toUpperCase()));
+    if (unidadeAtual) set.add(unidadeAtual);
+    return set;
+  }, [isMTZ, unidadesDisponiveis, unidadeAtual]);
+
+  const applyAllowed = (siglas: string[]) => {
+    if (!allowedSet) return siglas;
+    return siglas.filter((s) => allowedSet.has(s));
+  };
+
   const toggleUnidade = (sigla: string) => {
     if (unidadeBloqueada(sigla)) return;
-    setTempUnidades(prev =>
-      prev.includes(sigla) ? prev.filter(u => u !== sigla) : [...prev, sigla]
-    );
+    setTempUnidades((prev) => {
+      const next = prev.includes(sigla) ? prev.filter((u) => u !== sigla) : [...prev, sigla];
+      const normalized = normalizeSiglas(next);
+      return applyAllowed(normalized);
+    });
   };
 
   const handleApply = () => {
@@ -205,7 +246,7 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
           <Filter className="w-4 h-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-slate-900">
+      <DialogContent className="sm:max-w-[600px] h-[calc(100vh-80px)] overflow-hidden flex flex-col bg-white dark:bg-slate-900">
         <DialogHeader>
           <DialogTitle className="text-slate-900 dark:text-slate-100">Filtrar Período</DialogTitle>
           <DialogDescription className="text-slate-600 dark:text-slate-400">
@@ -213,7 +254,7 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-1">
           {/* Atalhos Rápidos */}
           <div>
             <Label className="text-slate-900 dark:text-slate-100 mb-2 block">Atalhos</Label>
@@ -344,36 +385,95 @@ export function PeriodFilter({ currentPeriod, onPeriodChange, selectedUnidades =
                     ? 'Nenhuma unidade selecionada — exibindo todas'
                     : `${tempUnidades.length} unidade${tempUnidades.length > 1 ? 's' : ''} selecionada${tempUnidades.length > 1 ? 's' : ''}`}
               </p>
-              <div className="flex flex-wrap gap-2">
-                {unidadesParaExibir.length === 0 ? (
-                  <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-                    {isMTZ ? 'Carregando unidades...' : 'Nenhuma unidade configurada no seu cadastro.'}
-                  </p>
-                ) : (
-                  unidadesParaExibir.map((sigla) => {
-                    const selected = tempUnidades.includes(sigla);
-                    const bloqueado = unidadeBloqueada(sigla);
-                    return (
-                      <button
-                        key={sigla}
-                        type="button"
-                        onClick={() => toggleUnidade(sigla)}
-                        disabled={bloqueado}
-                        title={bloqueado ? 'Sua unidade atual — não pode ser removida' : undefined}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                          bloqueado
-                            ? 'bg-blue-600 border-blue-600 text-white opacity-70 cursor-not-allowed'
-                            : selected
-                              ? 'bg-blue-600 border-blue-600 text-white'
-                              : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-blue-400 dark:hover:border-blue-500'
-                        }`}
-                      >
-                        {sigla}{bloqueado ? ' 🔒' : ''}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+              {naoMTZSemGrupo ? (
+                <div className="text-xs text-slate-700 dark:text-slate-300 font-mono">
+                  {unidadeAtual || '-'}
+                </div>
+              ) : (
+                <div className="border rounded-lg p-3 space-y-3 bg-slate-50 dark:bg-slate-900">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">
+                      Digite manualmente (separado por vírgulas):
+                    </Label>
+                    <input
+                      type="text"
+                      value={manualUnidades}
+                      onChange={(e) => {
+                        const input = e.target.value;
+                        setManualUnidades(input);
+                        const siglas = input.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+                        const normalized = normalizeSiglas(siglas);
+                        setTempUnidades(applyAllowed(normalized));
+                      }}
+                      className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ex: CWB, SPO, GYN"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchUnidades}
+                      onChange={(e) => setSearchUnidades(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Buscar unidade..."
+                    />
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto space-y-1 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 p-2">
+                    {unidadesParaExibir.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-slate-500">
+                        {isMTZ ? 'Carregando unidades...' : 'Nenhuma unidade configurada no seu cadastro.'}
+                      </div>
+                    ) : (
+                      unidadesParaExibir
+                        .filter((u) => {
+                          const term = searchUnidades.trim().toLowerCase();
+                          if (!term) return true;
+                          return (u.sigla || '').toLowerCase().includes(term) || (u.nome || '').toLowerCase().includes(term);
+                        })
+                        .map((u) => {
+                          const sigla = u.sigla;
+                          const selected = tempUnidades.includes(sigla);
+                          const bloqueado = unidadeBloqueada(sigla);
+                          return (
+                            <div
+                              key={sigla}
+                              className={`flex items-center gap-3 p-2 rounded transition-colors ${
+                                bloqueado ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700'
+                              }`}
+                              onClick={() => { if (!bloqueado) toggleUnidade(sigla); }}
+                              title={bloqueado ? 'Sua unidade atual — não pode ser removida' : undefined}
+                            >
+                              <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${
+                                selected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-600'
+                              }`}>
+                                {selected && (
+                                  <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                                )}
+                              </div>
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                                  {sigla}{bloqueado ? ' 🔒' : ''}
+                                </span>
+                                {u.nome ? (
+                                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                    {u.nome}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-600 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-2 bg-blue-50 dark:bg-blue-900/20 rounded p-2">
+                    <strong>Selecionadas ({tempUnidades.length}):</strong> {tempUnidades.join(', ') || '—'}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

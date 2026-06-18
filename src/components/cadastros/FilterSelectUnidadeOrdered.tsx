@@ -241,7 +241,7 @@ export function FilterSelectUnidadeOrdered({ value, onChange, disabled = false }
                 Digite manualmente (separado por vírgulas):
               </label>
               <Input
-                placeholder="Ex: SP, RJ, MG"
+                placeholder="Ex: CWB, SPO, GYN"
                 value={manualInput}
                 onChange={(e) => handleManualInputChange(e.target.value)}
                 className="h-8 text-sm dark:bg-slate-800 dark:border-slate-700"

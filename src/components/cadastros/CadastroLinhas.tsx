@@ -513,7 +513,7 @@ export function CadastroLinhas() {
 
       {/* Dialog de Cadastro/Edição */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[640px] h-[70vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[640px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? 'Editar Linha' : 'Nova Linha'}

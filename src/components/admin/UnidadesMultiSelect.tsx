@@ -146,7 +146,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
           </Label>
           <Input
             type="text"
-            placeholder="Ex: SP, RJ, MG"
+            placeholder="Ex: CWB, SPO, GYN"
             value={manualInput}
             onChange={(e) => handleManualInputChange(e.target.value)}
             className="bg-white dark:bg-slate-800"
