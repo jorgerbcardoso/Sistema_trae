@@ -513,7 +513,7 @@ export function CadastroLinhas() {
 
       {/* Dialog de Cadastro/Edição */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[640px]">
           <DialogHeader>
             <DialogTitle>
               {isEditing ? 'Editar Linha' : 'Nova Linha'}
@@ -523,89 +523,90 @@ export function CadastroLinhas() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            {/* Nome */}
-            <div className="grid gap-2">
-              <Label htmlFor="nome">Nome da Linha *</Label>
-              <Input
-                id="nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                placeholder="Ex: LINHA SP-RJ"
-              />
-            </div>
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="nome">Nome da Linha *</Label>
+                  <Input
+                    id="nome"
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    placeholder="Ex: LINHA SP-RJ"
+                  />
+                </div>
 
-            {/* Origem */}
-            <div className="grid gap-2">
-              <Label>Unidade de Origem *</Label>
-              <FilterSelectUnidadeSingle
-                value={formData.sigla_emit}
-                onChange={(value) => setFormData({ ...formData, sigla_emit: value })}
-              />
-            </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="km_ida">Distância (km) *</Label>
+                  <Input
+                    id="km_ida"
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.km_ida}
+                    onChange={(e) => setFormData({ ...formData, km_ida: e.target.value })}
+                    placeholder="Ex: 450"
+                  />
+                </div>
+              </div>
 
-            {/* Unidades Intermediárias */}
-            <div className="grid gap-2">
-              <Label>Unidades Intermediárias</Label>
-              <FilterSelectUnidadeOrdered
-                value={formData.unidades}
-                onChange={(value) => setFormData({ ...formData, unidades: value })}
-              />
-              <p className="text-xs text-slate-500">
-                Campo opcional. A ordem de seleção será mantida. Você também pode digitar as siglas separadas por vírgula.
-              </p>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Unidade de Origem *</Label>
+                  <FilterSelectUnidadeSingle
+                    value={formData.sigla_emit}
+                    onChange={(value) => setFormData({ ...formData, sigla_emit: value })}
+                  />
+                </div>
 
-            {/* Destino */}
-            <div className="grid gap-2">
-              <Label>Unidade de Destino *</Label>
-              <FilterSelectUnidadeSingle
-                value={formData.sigla_dest}
-                onChange={(value) => setFormData({ ...formData, sigla_dest: value })}
-              />
-            </div>
+                <div className="grid gap-2">
+                  <Label>Unidade de Destino *</Label>
+                  <FilterSelectUnidadeSingle
+                    value={formData.sigla_dest}
+                    onChange={(value) => setFormData({ ...formData, sigla_dest: value })}
+                  />
+                </div>
+              </div>
 
-            {/* Distância */}
-            <div className="grid gap-2">
-              <Label htmlFor="km_ida">Distância (km) *</Label>
-              <Input
-                id="km_ida"
-                type="number"
-                step="1"
-                min="0"
-                value={formData.km_ida}
-                onChange={(e) => setFormData({ ...formData, km_ida: e.target.value })}
-                placeholder="Ex: 450"
-              />
-            </div>
+              <div className="grid gap-2">
+                <Label>Unidades Intermediárias</Label>
+                <FilterSelectUnidadeOrdered
+                  value={formData.unidades}
+                  onChange={(value) => setFormData({ ...formData, unidades: value })}
+                />
+                <p className="text-xs text-slate-500">
+                  Opcional. A ordem de seleção será mantida.
+                </p>
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Dias de Carregamento</Label>
-              <div className="flex flex-wrap gap-1">
-                {([
-                  { key: 'carrega_seg', label: 'S', title: 'Seg' },
-                  { key: 'carrega_ter', label: 'T', title: 'Ter' },
-                  { key: 'carrega_qua', label: 'Q', title: 'Qua' },
-                  { key: 'carrega_qui', label: 'Q', title: 'Qui' },
-                  { key: 'carrega_sex', label: 'S', title: 'Sex' },
-                  { key: 'carrega_sab', label: 'S', title: 'Sáb' },
-                  { key: 'carrega_dom', label: 'D', title: 'Dom' },
-                ] as const).map((d) => {
-                  const ativo = (formData as any)[d.key] as boolean;
-                  return (
-                    <Button
-                      key={d.key}
-                      type="button"
-                      variant={ativo ? 'default' : 'outline'}
-                      size="sm"
-                      className={`h-8 w-8 px-0 font-mono ${ativo ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
-                      onClick={() => setFormData({ ...formData, [d.key]: !ativo } as any)}
-                      title={d.title}
-                    >
-                      {d.label}
-                    </Button>
-                  );
-                })}
+              <div className="grid gap-2">
+                <Label>Dias de Carregamento</Label>
+                <div className="flex flex-wrap gap-1">
+                  {([
+                    { key: 'carrega_seg', label: 'S', title: 'Seg' },
+                    { key: 'carrega_ter', label: 'T', title: 'Ter' },
+                    { key: 'carrega_qua', label: 'Q', title: 'Qua' },
+                    { key: 'carrega_qui', label: 'Q', title: 'Qui' },
+                    { key: 'carrega_sex', label: 'S', title: 'Sex' },
+                    { key: 'carrega_sab', label: 'S', title: 'Sáb' },
+                    { key: 'carrega_dom', label: 'D', title: 'Dom' },
+                  ] as const).map((d) => {
+                    const ativo = (formData as any)[d.key] as boolean;
+                    return (
+                      <Button
+                        key={d.key}
+                        type="button"
+                        variant={ativo ? 'default' : 'outline'}
+                        size="sm"
+                        className={`h-7 w-7 px-0 font-mono ${ativo ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                        onClick={() => setFormData({ ...formData, [d.key]: !ativo } as any)}
+                        title={d.title}
+                      >
+                        {d.label}
+                      </Button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
