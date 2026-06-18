@@ -47,6 +47,8 @@ import {
   Gauge,
   Pencil,
   Search,
+  DollarSign,
+  Wallet,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
@@ -1157,6 +1159,21 @@ function parsePeso(s: string): number {
 function parseCubagem(s: string): number {
   if (!s) return 0;
   return parseFloat(s.replace(',', '.')) || 0;
+}
+function parseMoeda(s: string): number {
+  if (!s) return 0;
+  const raw = String(s).trim();
+  if (!raw) return 0;
+  const cleaned = raw.replace(/[^\d,.\-]/g, '');
+  if (!cleaned) return 0;
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+  const normalized = hasComma && hasDot
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : hasComma
+      ? cleaned.replace(',', '.')
+      : cleaned;
+  return parseFloat(normalized) || 0;
 }
 function formatData(d: string): string {
   if (!d) return '';
@@ -3255,6 +3272,26 @@ export function Disponiveis() {
   const totalGeralPeso     = totalPeso + totalEntregaPeso;
   const totalGeralCubagem  = totalCubagem + totalEntregaCubagem;
 
+  const ctesTransferTodos = React.useMemo(() => {
+    const list: Cte[] = [];
+    if (dados?.ctes) list.push(...dados.ctes);
+    if (dadosHub) {
+      for (const unidadeData of Object.values(dadosHub.dados)) {
+        if (unidadeData?.ctes?.length) list.push(...unidadeData.ctes);
+      }
+    }
+    return list;
+  }, [dados, dadosHub]);
+
+  const totalGeralFrete =
+    ctesTransferTodos.reduce((s, c) => s + parseMoeda(c.frete), 0) +
+    (dadosEntrega?.ctes.reduce((s, c) => s + parseMoeda(c.frete), 0) ?? 0);
+
+  const totalGeralMercadoria =
+    ctesTransferTodos.reduce((s, c) => s + parseMoeda(c.vlrNf), 0) +
+    (dadosEntrega?.ctes.reduce((s, c) => s + parseMoeda(c.vlrMerc), 0) ?? 0) +
+    (dados?.coletas.reduce((s, c) => s + parseMoeda(c.valMerc), 0) ?? 0);
+
   const minutos = Math.floor(countdown / 60);
   const segundos = countdown % 60;
 
@@ -3398,61 +3435,67 @@ export function Disponiveis() {
             ];
 
             const cardsSimples = [
-              { valor: totalGeralVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
               { valor: `${(totalGeralPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
               { valor: `${totalGeralCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
+              { valor: totalGeralFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), label: 'Valor de Frete',      icon: Wallet,     corBg: 'bg-sky-100 dark:bg-sky-900/40',      corTexto: 'text-sky-600 dark:text-sky-400' },
+              { valor: totalGeralMercadoria.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), label: 'Valor de Mercadoria', icon: DollarSign, corBg: 'bg-emerald-100 dark:bg-emerald-900/40', corTexto: 'text-emerald-600 dark:text-emerald-400' },
+              { valor: totalGeralVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
             ];
 
             return (
-              <div className="grid grid-cols-3 gap-4">
-                {cardsDonut.map((c, i) => {
-                  const Icon = c.icon;
-                  const donutData = [{ value: c.pct }, { value: Math.max(0, 100 - c.pct) }];
-                  return (
-                    <Card key={i} className={`${c.bgColor}`}>
-                      <CardContent className="pt-4 pb-3 px-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${c.textColor}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                              {c.label}
-                              {c.loadingExtra && <Loader2 className="w-3 h-3 animate-spin opacity-60 ml-1" />}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {cardsDonut.map((c, i) => {
+                    const Icon = c.icon;
+                    const donutData = [{ value: c.pct }, { value: Math.max(0, 100 - c.pct) }];
+                    return (
+                      <Card key={i} className={`${c.bgColor}`}>
+                        <CardContent className="pt-4 pb-3 px-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${c.textColor}`}>
+                                <Icon className="w-3.5 h-3.5" />
+                                {c.label}
+                                {c.loadingExtra && <Loader2 className="w-3 h-3 animate-spin opacity-60 ml-1" />}
+                              </div>
+                              <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
+                              <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} {c.unidade}{c.valor !== 1 ? 's' : ''}</p>
+                              {c.sub && <p className={`text-xs mt-0.5 font-semibold ${c.textColor} opacity-80`}>{c.sub}</p>}
                             </div>
-                            <div className={`text-2xl font-bold tabular-nums ${c.textColor}`}>{c.pct}%</div>
-                            <p className={`text-sm mt-0.5 ${c.textColor}`}>{c.valor} {c.unidade}{c.valor !== 1 ? 's' : ''}</p>
-                            {c.sub && <p className={`text-xs mt-0.5 font-semibold ${c.textColor} opacity-80`}>{c.sub}</p>}
+                            <div style={{ width: 80, height: 80 }}>
+                              <PieChart width={80} height={80}>
+                                <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" animationBegin={0} animationDuration={800}>
+                                  <Cell fill={c.cor} />
+                                  <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
+                                </Pie>
+                              </PieChart>
+                            </div>
                           </div>
-                          <div style={{ width: 80, height: 80 }}>
-                            <PieChart width={80} height={80}>
-                              <Pie data={donutData} cx={40} cy={40} innerRadius={20} outerRadius={35} startAngle={90} endAngle={-270} dataKey="value" stroke="none" animationBegin={0} animationDuration={800}>
-                                <Cell fill={c.cor} />
-                                <Cell fill={theme === 'dark' ? c.emptyColorDark : c.emptyColor} />
-                              </Pie>
-                            </PieChart>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {cardsSimples.map((c, i) => {
+                    const Icon = c.icon;
+                    return (
+                      <Card key={i} className="dark:bg-slate-900 dark:border-slate-700">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${c.corBg}`}>
+                              <Icon className={`w-4 h-4 ${c.corTexto}`} />
+                            </div>
+                            <div>
+                              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{c.valor}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{c.label}</p>
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {cardsSimples.map((c, i) => {
-                  const Icon = c.icon;
-                  return (
-                    <Card key={i} className="dark:bg-slate-900 dark:border-slate-700">
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${c.corBg}`}>
-                            <Icon className={`w-4 h-4 ${c.corTexto}`} />
-                          </div>
-                          <div>
-                            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{c.valor}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{c.label}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               </div>
             );
           })()}
@@ -3466,8 +3509,8 @@ export function Disponiveis() {
               loadingLinhasOrigem ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
-            <CardContent className="px-3 py-2">
-              <div className="flex items-center gap-3">
+            <CardContent className="h-12 px-3 py-0">
+              <div className="h-full flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
