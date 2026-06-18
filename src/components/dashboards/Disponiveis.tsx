@@ -3509,7 +3509,7 @@ export function Disponiveis() {
               loadingLinhasOrigem ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
-            <CardContent className="h-12 px-3 py-0">
+            <CardContent className="min-h-16 px-3 py-2">
               <div className="h-full flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
