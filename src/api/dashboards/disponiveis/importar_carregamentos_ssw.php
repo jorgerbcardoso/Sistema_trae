@@ -59,13 +59,25 @@ foreach ($xml->xpath('//f8') as $f8) {
     }
 }
 
+$unidadeEsc = pg_escape_string($conn, $unidade);
+
 if (empty($placas_ssw)) {
-    respondJson(['success' => true, 'message' => 'Nenhum carregamento encontrado no SSW para esta unidade.', 'logs' => []]);
+    $resDelSsw = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = true");
+    if ($resDelSsw === false) {
+        respondJson(['success' => false, 'message' => 'Erro ao limpar importações anteriores (origem_ssw=true).']);
+    }
+    $removidos = pg_affected_rows($resDelSsw);
+    respondJson([
+        'success' => true,
+        'message' => "Nenhum carregamento encontrado no SSW para esta unidade. Removidos {$removidos} registro(s) importado(s).",
+        'logs' => [],
+        'placas_ssw' => [],
+        'removidos' => $removidos,
+    ]);
 }
 
 $logs = [];
 
-$unidadeEsc = pg_escape_string($conn, $unidade);
 $loginEsc   = pg_escape_string($conn, $login);
 
 // Reimportação: remove todas as linhas anteriormente importadas do SSW
