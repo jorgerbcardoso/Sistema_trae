@@ -176,9 +176,7 @@ $query = "
 
 // Executar query com parâmetros
 if (count($params) > 0) {
-    // Como usamos os mesmos parâmetros 3 vezes, precisamos triplicá-los
-    $allParams = array_merge($params, $params, $params);
-    $result = pg_query_params($g_sql, $query, $allParams);
+    $result = pg_query_params($g_sql, $query, $params);
 } else {
     $result = pg_query($g_sql, $query);
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Check, Search, Loader2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,6 +10,8 @@ interface UnidadesMultiSelectProps {
   onChange: (value: string[]) => void;
   domain?: string;
   label?: string;
+  disabled?: boolean;
+  emptyHint?: ReactNode;
 }
 
 interface Unidade {
@@ -17,7 +19,7 @@ interface Unidade {
   nome: string;
 }
 
-export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: UnidadesMultiSelectProps) {
+export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label, disabled = false, emptyHint }: UnidadesMultiSelectProps) {
   const [search, setSearch] = useState('');
   const [manualInput, setManualInput] = useState('');
   const [todasUnidades, setTodasUnidades] = useState<Unidade[]>([]);
@@ -81,6 +83,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
   
   // Toggle unidade
   const handleToggle = (unidade: string) => {
+    if (disabled) return;
     if (value.includes(unidade)) {
       onChange(value.filter(u => u !== unidade));
     } else {
@@ -89,6 +92,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
   };
 
   const handleManualInputChange = (input: string) => {
+    if (disabled) return;
     setManualInput(input);
     const siglas = input
       .split(',')
@@ -107,11 +111,13 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
   
   // Selecionar todas
   const handleSelectAll = () => {
+    if (disabled) return;
     onChange([...todasUnidades.map(u => u.sigla)]);
   };
   
   // Limpar todas
   const handleClearAll = () => {
+    if (disabled) return;
     onChange([]);
   };
   
@@ -125,14 +131,14 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
           <button
             type="button"
             onClick={handleSelectAll}
-            className="text-xs text-blue-600 hover:underline"
+            className={`text-xs text-blue-600 hover:underline ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
             Selecionar todas
           </button>
           <button
             type="button"
             onClick={handleClearAll}
-            className="text-xs text-slate-500 hover:underline"
+            className={`text-xs text-slate-500 hover:underline ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
             Limpar
           </button>
@@ -149,6 +155,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
             placeholder="Ex: CWB, SPO, GYN"
             value={manualInput}
             onChange={(e) => handleManualInputChange(e.target.value)}
+            disabled={disabled}
             className="bg-white dark:bg-slate-800"
           />
         </div>
@@ -161,6 +168,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
             placeholder="Buscar unidade..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            disabled={disabled}
             className="pl-9 bg-white dark:bg-slate-800"
           />
         </div>
@@ -212,7 +220,7 @@ export function UnidadesMultiSelect({ value, onChange, domain = 'MTZ', label }: 
           </div>
         ) : (
           <div className="text-xs text-amber-600 dark:text-amber-400 border-t pt-2 bg-amber-50 dark:bg-amber-900/20 rounded p-2">
-            ⚠️ <strong>Nenhuma unidade selecionada</strong> = Usuário poderá trocar para QUALQUER unidade
+            {emptyHint ?? <>⚠️ <strong>Nenhuma unidade selecionada</strong> = Usuário poderá trocar para QUALQUER unidade</>}
           </div>
         )}
       </div>

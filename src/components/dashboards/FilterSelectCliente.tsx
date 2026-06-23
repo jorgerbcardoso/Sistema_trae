@@ -32,8 +32,18 @@ export function FilterSelectCliente({ type, value, onChange }: FilterSelectClien
   const [loading, setLoading] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
 
-  const label = type === 'pagador' ? 'Todos os remetentes' : 'Todos os destinatários';
+  const label = type === 'pagador' ? 'Todos os pagadores' : 'Todos os destinatários';
   const minChars = 3;
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedCliente(null);
+      return;
+    }
+    if (selectedCliente && selectedCliente.cnpj !== value) {
+      setSelectedCliente(null);
+    }
+  }, [value, selectedCliente]);
 
   // Buscar quando digitar 3+ caracteres
   useEffect(() => {
@@ -86,9 +96,32 @@ export function FilterSelectCliente({ type, value, onChange }: FilterSelectClien
           variant="outline" 
           className="w-full justify-start text-left dark:bg-slate-800 dark:border-slate-700 relative"
         >
-          <span className={`truncate ${selectedCliente ? 'pr-16' : 'pr-10'}`}>
-            {selectedCliente ? selectedCliente.nome : label}
+          <span className={`truncate ${(value || selectedCliente) ? 'pr-20' : 'pr-10'}`}>
+            {selectedCliente?.nome || value || label}
           </span>
+          {value && (
+            <span
+              role="button"
+              tabIndex={0}
+              className="absolute right-8 top-1/2 -translate-y-1/2 z-10 hover:bg-slate-100 dark:hover:bg-slate-700 rounded p-0.5"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange('');
+                setSelectedCliente(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onChange('');
+                  setSelectedCliente(null);
+                }
+              }}
+            >
+              <X className="h-4 w-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
+            </span>
+          )}
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -149,20 +182,6 @@ export function FilterSelectCliente({ type, value, onChange }: FilterSelectClien
           </div>
         </div>
       </PopoverContent>
-      {selectedCliente && (
-        <button
-          type="button"
-          className="absolute right-8 top-1/2 -translate-y-1/2 z-10 hover:bg-slate-100 dark:hover:bg-slate-700 rounded p-0.5"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onChange('');
-            setSelectedCliente(null);
-          }}
-        >
-          <X className="h-4 w-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
-        </button>
-      )}
     </Popover>
   );
 }

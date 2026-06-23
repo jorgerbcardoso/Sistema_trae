@@ -55,9 +55,9 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ENVIRONMENT } from '../../config/environment';
-import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
 import { FilterSelectCliente } from './FilterSelectCliente';
 import { AnaliseDiaria } from './AnaliseDiaria';
+import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 
 interface Filters {
   periodoEmissaoInicio: string;
@@ -153,6 +153,9 @@ export function PerformanceEntregas() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+
+  const unidadeAtual = (user?.unidade_atual || user?.unidade || '').toUpperCase();
+  const isMTZ = unidadeAtual === 'MTZ';
   
   const defaultPeriod = getLastMonthPeriod();
   const [filters, setFilters] = useState<Filters>({
@@ -160,7 +163,7 @@ export function PerformanceEntregas() {
     periodoEmissaoFim: defaultPeriod.fim,
     periodoPrevisaoInicio: '',
     periodoPrevisaoFim: '',
-    unidadeDestino: [],
+    unidadeDestino: (!isMTZ && unidadeAtual) ? [unidadeAtual] : [],
     cnpjPagador: '',
     cnpjDestinatario: '',
   });
@@ -761,13 +764,16 @@ export function PerformanceEntregas() {
       toast.error('É obrigatório preencher pelo menos um período (Emissão ou Previsão de Entrega)');
       return;
     }
-    
-    setFilters(tempFilters);
+
+    const next = (!isMTZ && unidadeAtual) ? { ...tempFilters, unidadeDestino: [unidadeAtual] } : tempFilters;
+    setFilters(next);
+    setTempFilters(next);
     setShowFilters(false);
   };
 
   const cancelFilters = () => {
-    setTempFilters({ ...filters });
+    if (!isMTZ && unidadeAtual) setTempFilters({ ...filters, unidadeDestino: [unidadeAtual] });
+    else setTempFilters({ ...filters });
     setShowFilters(false);
   };
 
@@ -778,12 +784,24 @@ export function PerformanceEntregas() {
       periodoEmissaoFim: lastMonth.fim,
       periodoPrevisaoInicio: '',
       periodoPrevisaoFim: '',
-      unidadeDestino: [],
+      unidadeDestino: (!isMTZ && unidadeAtual) ? [unidadeAtual] : [],
       cnpjPagador: '',
       cnpjDestinatario: '',
     };
     setTempFilters(emptyFilters);
   };
+
+  useEffect(() => {
+    if (!unidadeAtual || isMTZ) return;
+    setFilters(prev => {
+      if (prev.unidadeDestino.length === 1 && prev.unidadeDestino[0] === unidadeAtual) return prev;
+      return { ...prev, unidadeDestino: [unidadeAtual] };
+    });
+    setTempFilters(prev => {
+      if (prev.unidadeDestino.length === 1 && prev.unidadeDestino[0] === unidadeAtual) return prev;
+      return { ...prev, unidadeDestino: [unidadeAtual] };
+    });
+  }, [unidadeAtual, isMTZ]);
 
   // Determinar qual período exibir
   const getPeriodDisplay = () => {
@@ -833,7 +851,7 @@ export function PerformanceEntregas() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-              <DialogContent className="sm:max-w-[700px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto overscroll-contain">
+              <DialogContent className="sm:max-w-[700px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
                 <DialogHeader>
                   <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros de Pesquisa</DialogTitle>
                   <DialogDescription className="text-slate-600 dark:text-slate-400">
@@ -841,7 +859,8 @@ export function PerformanceEntregas() {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
+                <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+                  <div className="space-y-6 py-4">
                   {/* Períodos */}
                   <div className="space-y-4">
                     <Label className="text-slate-900 dark:text-slate-100">Período de Emissão</Label>
@@ -893,16 +912,17 @@ export function PerformanceEntregas() {
 
                   {/* Unidade, Pagador e Destinatário */}
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-100">Unidade(s) Destino</Label>
-                      <FilterSelectUnidadeOrdered
-                        value={tempFilters.unidadeDestino}
-                        onChange={(value) => setTempFilters({...tempFilters, unidadeDestino: value})}
-                      />
-                    </div>
+                    <UnidadesMultiSelect
+                      value={tempFilters.unidadeDestino}
+                      onChange={(value) => { if (isMTZ) setTempFilters({ ...tempFilters, unidadeDestino: value }); }}
+                      domain={user?.domain}
+                      label="Unidade(s) Destino"
+                      disabled={!isMTZ}
+                      emptyHint={<><strong>Nenhuma unidade selecionada</strong> = sem filtro (todas as unidades)</>}
+                    />
 
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-100">CNPJ Pagador</Label>
+                      <Label className="text-slate-900 dark:text-slate-100">Pagador</Label>
                       <FilterSelectCliente
                         type="pagador"
                         value={tempFilters.cnpjPagador}
@@ -911,7 +931,7 @@ export function PerformanceEntregas() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-900 dark:text-slate-100">CNPJ Destinatário</Label>
+                      <Label className="text-slate-900 dark:text-slate-100">Destinatário</Label>
                       <FilterSelectCliente
                         type="destinatario"
                         value={tempFilters.cnpjDestinatario}
@@ -919,33 +939,33 @@ export function PerformanceEntregas() {
                       />
                     </div>
                   </div>
+                  </div>
+                </div>
 
-                  {/* Botes de Ação */}
-                  <div className="flex justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="flex justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <Button
+                    variant="outline"
+                    onClick={clearFilters}
+                    className="dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Limpar Tudo
+                  </Button>
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      onClick={clearFilters}
+                      onClick={cancelFilters}
                       className="dark:border-slate-700 dark:hover:bg-slate-800"
                     >
-                      <X className="w-4 h-4 mr-2" />
-                      Limpar Tudo
+                      Cancelar
                     </Button>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={cancelFilters}
-                        className="dark:border-slate-700 dark:hover:bg-slate-800"
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        onClick={applyFilters}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Check className="w-4 h-4 mr-2" />
-                        Aplicar Filtros
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={applyFilters}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Aplicar Filtros
+                    </Button>
                   </div>
                 </div>
               </DialogContent>
