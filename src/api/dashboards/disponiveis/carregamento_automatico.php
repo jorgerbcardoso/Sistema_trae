@@ -297,30 +297,8 @@ function getCapacidadeVeiculo($conn, $tabelaVeiculo, $placa) {
 }
 
 function gerarResumos($conn, $tabela, $placa, $unidade) {
-    $resumoUnidades = [];
     $resumoDestinos = [];
     try {
-        $resU = sql(
-            "SELECT COALESCE(NULLIF(unidade_carregamento, ''), unidade) AS unid, COUNT(*) AS qtd,
-                    COALESCE(SUM(peso_cte), 0) AS peso_total,
-                    COALESCE(SUM(cubagem_cte), 0) AS cub_total,
-                    COALESCE(SUM(vlr_frete_cte), 0) AS frete_total
-             FROM {$tabela}
-             WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
-             GROUP BY COALESCE(NULLIF(unidade_carregamento, ''), unidade)
-             ORDER BY qtd DESC",
-            [$unidade, $placa], $conn
-        );
-        while ($resU && ($r = pg_fetch_assoc($resU))) {
-            $resumoUnidades[] = [
-                'unidade' => strtoupper(trim($r['unid'] ?? '')),
-                'qtd'     => (int)$r['qtd'],
-                'peso_kg' => round((float)$r['peso_total'], 2),
-                'cubagem' => round((float)$r['cub_total'], 3),
-                'frete'   => round((float)$r['frete_total'], 2),
-            ];
-        }
-
         $resD = sql(
             "SELECT COALESCE(NULLIF(destino_cte, ''), '-') AS unid, COUNT(*) AS qtd,
                     COALESCE(SUM(peso_cte), 0) AS peso_total,
@@ -342,7 +320,7 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
             ];
         }
     } catch (Exception $e) {}
-    return [$resumoUnidades, $resumoDestinos];
+    return [[], $resumoDestinos];
 }
 
 /**
@@ -357,8 +335,17 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
         return strtoupper(trim((string)$u));
     }, (array)$intermediarias)));
 
-    $cadeia = array_values(array_unique(array_filter(array_merge([$unidadeOrigem], $intermediarias, [$destinoFinal]))));
-    $idxCadeia = array_flip($cadeia);
+    $prioridade = [];
+    $addUnique = static function(array &$arr, string $v): void {
+        $v = strtoupper(trim($v));
+        if ($v === '') return;
+        if (!in_array($v, $arr, true)) $arr[] = $v;
+    };
+
+    $addUnique($prioridade, $destinoFinal);
+    foreach ($intermediarias as $u) $addUnique($prioridade, $u);
+
+    $idxDestino = array_flip($prioridade);
 
     $parseDataKey = static function(string $s): int {
         $s = trim($s);
@@ -368,12 +355,24 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
         return 99991231;
     };
 
-    usort($ctesDisponiveis, function($a, $b) use ($idxCadeia, $parseDataKey) {
-        $ua = strtoupper(trim((string)($a['unidadeCarregamento'] ?? $a['unidade_carregamento'] ?? $a['unidadeRelatorio'] ?? '')));
-        $ub = strtoupper(trim((string)($b['unidadeCarregamento'] ?? $b['unidade_carregamento'] ?? $b['unidadeRelatorio'] ?? '')));
+    $filtrados = [];
+    foreach ($ctesDisponiveis as $cte) {
+        $nroCte = (int)($cte['nroCte'] ?? 0);
+        if ($nroCte <= 0) continue;
 
-        $pa = $idxCadeia[$ua] ?? 999;
-        $pb = $idxCadeia[$ub] ?? 999;
+        $unidRel019 = strtoupper(trim((string)($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? '')));
+        if ($unidRel019 === '' || $unidRel019 !== $unidadeOrigem) continue;
+
+        $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
+        if ($unidDest === '' || !isset($idxDestino[$unidDest])) continue;
+
+        $cte['_prio'] = $idxDestino[$unidDest];
+        $filtrados[] = $cte;
+    }
+
+    usort($filtrados, function($a, $b) use ($parseDataKey) {
+        $pa = (int)($a['_prio'] ?? 999);
+        $pb = (int)($b['_prio'] ?? 999);
         if ($pa !== $pb) return $pa - $pb;
 
         $da = $parseDataKey((string)($a['prevEnt'] ?? ''));
@@ -386,21 +385,7 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
     $somaPeso     = 0.0;
     $somaVol      = 0.0;
 
-    foreach ($ctesDisponiveis as $cte) {
-        $nroCte      = (int)($cte['nroCte'] ?? 0);
-        if ($nroCte <= 0) continue;
-
-        $unidDest    = strtoupper(trim($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? ''));
-        $unidRel019  = strtoupper(trim($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? ''));
-
-        $idxOrigem = $idxCadeia[$unidRel019] ?? null;
-        if ($idxOrigem === null) continue;
-
-        $idxDest = $idxCadeia[$unidDest] ?? null;
-        if ($idxDest === null) continue;
-
-        if ($idxDest <= $idxOrigem) continue;
-
+    foreach ($filtrados as $cte) {
         $peso = parseNumero($cte['peso']    ?? 0);
         $cub  = parseNumero($cte['cubagem'] ?? 0);
 
@@ -535,7 +520,6 @@ if ($modoAutomatico) {
     }
 
     $paradasLinha         = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
-    $destinosCarregamento = array_values(array_unique(array_filter(array_merge($paradasLinha, [$dest]))));
     $placaAuto            = $unidade . '-' . $dest;
     $paradasCsv           = implode(',', $paradasLinha);
 
@@ -549,7 +533,6 @@ if ($modoAutomatico) {
     }
 
     set_time_limit(180);
-    ssw_login($domain);
     $ctesUnicos = [];
     foreach ($ctesDisponiveis as $cte) {
         $ser = strtoupper(trim((string)($cte['serCte'] ?? $cte['ser_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 0, 3))));
@@ -557,18 +540,6 @@ if ($modoAutomatico) {
         if ($ser === '' || $nro <= 0) continue;
         $k = $ser . $nro;
         if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
-    }
-    foreach ($paradasLinha as $u) {
-        $u = strtoupper(trim((string)$u));
-        if ($u === '' || $u === $unidade) continue;
-        $ctesExtra = fetchCtes019Csv($domain, $conn, $u, time());
-        foreach ($ctesExtra as $cte) {
-            $ser = strtoupper(trim((string)($cte['serCte'] ?? '')));
-            $nro = (int)($cte['nroCte'] ?? 0);
-            if ($ser === '' || $nro <= 0) continue;
-            $k = $ser . $nro;
-            if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
-        }
     }
     $ctesDisponiveis = array_values($ctesUnicos);
 
@@ -619,7 +590,6 @@ if (empty($ctesDisponiveis)) {
 }
 
 set_time_limit(180);
-ssw_login($domain);
 $ctesUnicos = [];
 foreach ($ctesDisponiveis as $cte) {
     $ser = strtoupper(trim((string)($cte['serCte'] ?? $cte['ser_cte'] ?? substr((string)($cte['ctrc'] ?? ''), 0, 3))));
@@ -627,18 +597,6 @@ foreach ($ctesDisponiveis as $cte) {
     if ($ser === '' || $nro <= 0) continue;
     $k = $ser . $nro;
     if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
-}
-foreach ($paradas as $u) {
-    $u = strtoupper(trim((string)$u));
-    if ($u === '' || $u === $unidade) continue;
-    $ctesExtra = fetchCtes019Csv($domain, $conn, $u, time());
-    foreach ($ctesExtra as $cte) {
-        $ser = strtoupper(trim((string)($cte['serCte'] ?? '')));
-        $nro = (int)($cte['nroCte'] ?? 0);
-        if ($ser === '' || $nro <= 0) continue;
-        $k = $ser . $nro;
-        if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
-    }
 }
 $ctesDisponiveis = array_values($ctesUnicos);
 
