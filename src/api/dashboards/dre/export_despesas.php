@@ -90,7 +90,7 @@ $query = "SELECT d.nro_lancto, d.nro_parcela, " .
           " LEFT JOIN $dominio" . "_evento e ON d.evento = e.evento " .
           $joinGrupo . // ✅ NOVO: Join com grupo se necessário
          " WHERE d.status <> 'C' " .
-           " AND d.data_vcto BETWEEN $1 AND $2 ";
+           " AND d.data_pgto BETWEEN $1 AND $2 ";
 
 // ✅ NOVO: Adicionar filtros baseados em viewMode
 $params = [$period['startDate'], $period['endDate']];
@@ -127,7 +127,7 @@ if ($unit) {
     $paramIndex++;
 }
 
-$query .= " ORDER BY d.data_vcto, d.nro_lancto, d.nro_parcela";
+$query .= " ORDER BY d.data_pgto, d.nro_lancto, d.nro_parcela";
 
 $result = sql($g_sql, $query, false, $params);
 

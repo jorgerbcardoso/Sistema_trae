@@ -293,8 +293,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -314,8 +313,7 @@ function getRealCostsDataByGroups($g_sql, $dominio, $period, $viewMode, $startDa
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               LEFT OUTER JOIN {$dominio}_grupo_evento ge ON e.grupo = ge.grupo
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao
               ORDER BY total_despesa DESC
@@ -431,8 +429,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}";
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -451,8 +448,7 @@ function getRealCostsDataByEvents($g_sql, $dominio, $period, $viewMode, $startDa
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.evento, e.descricao
               ORDER BY total_despesa DESC
@@ -573,8 +569,7 @@ function getMonthlyCostsByEvent($g_sql, $dominio, $data_ini, $data_fin, $eventos
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.evento, e.descricao";
 
@@ -625,8 +620,7 @@ function getMonthlyCostsByGroup($g_sql, $dominio, $data_ini, $data_fin, $grupos,
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               LEFT OUTER JOIN {$dominio}_grupo_evento ge ON e.grupo = ge.grupo
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao";
 
@@ -670,8 +664,7 @@ function getPeriodCostsByEvent($g_sql, $dominio, $startDate, $endDate, $eventos,
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.evento, e.descricao";
 
@@ -726,8 +719,7 @@ function getPeriodCostsByGroup($g_sql, $dominio, $startDate, $endDate, $grupos, 
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               LEFT OUTER JOIN {$dominio}_grupo_evento ge ON e.grupo = ge.grupo
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY ge.grupo, ge.descricao";
 
@@ -780,8 +772,7 @@ function getRealCostsDataByUnits($g_sql, $dominio, $period, $viewMode, $startDat
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.sigla_unidade
               ORDER BY total_despesa DESC
@@ -880,8 +871,7 @@ function getMonthlyCostsByUnit($g_sql, $dominio, $data_ini, $data_fin, $unidades
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.sigla_unidade";
 
@@ -924,8 +914,7 @@ function getPeriodCostsByUnit($g_sql, $dominio, $startDate, $endDate, $unidades,
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2
+                AND d.data_pgto BETWEEN $1 AND $2
                 {$filtroDespesa}
               GROUP BY d.sigla_unidade";
 

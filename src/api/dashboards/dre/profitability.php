@@ -210,8 +210,7 @@ function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $end
               FROM {$dominio}_despesa d
               INNER JOIN {$dominio}_evento e ON d.evento = e.evento
               WHERE d.status <> 'C'
-                AND e.considerar = 'S'
-                AND d.data_vcto BETWEEN $1 AND $2" . $filtroDespesa;
+                AND d.data_pgto BETWEEN $1 AND $2" . $filtroDespesa;
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
     if (!$result) throw new Exception('Erro ao buscar custos: ' . pg_last_error($g_sql));
@@ -355,7 +354,7 @@ function getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin, 
              " (SELECT SUM (vlr_frete)   FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as receita," .
              " (SELECT SUM ($custo)      FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as custo_operacional," .
              " (SELECT SUM (vlr_icms)    FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as imposto," .
-             " (SELECT SUM (d.vlr_parcela) FROM {$dominio}_despesa d INNER JOIN {$dominio}_evento e ON d.evento = e.evento WHERE d.status <> 'C' AND e.considerar = 'S' AND d.data_vcto BETWEEN $1 AND $2{$filtroDespesa}) as despesas";
+             " (SELECT SUM (d.vlr_parcela) FROM {$dominio}_despesa d INNER JOIN {$dominio}_evento e ON d.evento = e.evento WHERE d.status <> 'C' AND d.data_pgto BETWEEN $1 AND $2{$filtroDespesa}) as despesas";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
 
@@ -421,13 +420,12 @@ function getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTo
             $unid = $row['unid'];
             $receita = (float)$row['receita'];
 
-            // Buscar despesas da unidade (query otimizada) + filtro considerar='S'
+            // Buscar despesas da unidade (query otimizada)
             $queryCusto = "SELECT COALESCE(SUM(d.vlr_parcela), 0) as total
                           FROM {$dominio}_despesa d
                           INNER JOIN {$dominio}_evento e ON d.evento = e.evento
                           WHERE d.status <> 'C'
-                            AND e.considerar = 'S'
-                            AND d.data_vcto BETWEEN $1 AND $2
+                            AND d.data_pgto BETWEEN $1 AND $2
                             AND d.sigla_unidade = $3";
 
             $resultCusto = pg_query_params($g_sql, $queryCusto, [$startDate, $endDate, $unid]);
