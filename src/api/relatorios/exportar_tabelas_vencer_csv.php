@@ -89,27 +89,50 @@ try {
     $normKey = static function(string $s): string {
         return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($s)));
     };
-    $headerLine = null;
+    $delimiter = ';';
     foreach ($linhas as $l) {
         $t = trim((string)$l);
         if ($t === '') continue;
-        if (strpos($t, ';') !== false && stripos($t, 'CNPJ') !== false && stripos($t, 'Vigencia') !== false) {
+        if (strpos($t, ';') !== false) { $delimiter = ';'; break; }
+        if (strpos($t, ',') !== false) { $delimiter = ','; break; }
+    }
+
+    $headerLine = null;
+    $idx = [];
+    foreach ($linhas as $l) {
+        $t = trim((string)$l);
+        if ($t === '') continue;
+        if (strpos($t, $delimiter) === false) continue;
+        if (stripos($t, 'CNPJ') === false) continue;
+
+        $header = str_getcsv($t, $delimiter);
+        if (!empty($header)) {
+            $header[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$header[0]);
+        }
+
+        $tmpIdx = [];
+        foreach ($header as $i => $h) {
+            $k = $normKey((string)$h);
+            if ($k !== '') $tmpIdx[$k] = $i;
+        }
+
+        $hasCnpj = isset($tmpIdx['CNPJPAGADOR']) || isset($tmpIdx['CNPJ']);
+        $hasNome = isset($tmpIdx['NOMEPAGADOR']) || isset($tmpIdx['NOME']) || isset($tmpIdx['RAZAOSOCIAL']);
+        $hasQtde = isset($tmpIdx['QUANTIDADETABELAS']) || isset($tmpIdx['QUANTIDADE']);
+        $hasVig  = isset($tmpIdx['VIGENCIAATUAL']) || isset($tmpIdx['VIGENCIA']);
+
+        if ($hasCnpj && $hasNome && $hasQtde && $hasVig) {
             $headerLine = $t;
+            $idx = $tmpIdx;
             break;
         }
     }
-    if ($headerLine === null) {
-        msg('Não foi possível localizar o cabeçalho do CSV (SSW 0169).', 'error', 500);
-    }
 
-    $header = str_getcsv($headerLine, ';');
-    if (!empty($header)) {
-        $header[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$header[0]);
-    }
-    $idx = [];
-    foreach ($header as $i => $h) {
-        $k = $normKey((string)$h);
-        if ($k !== '') $idx[$k] = $i;
+    if ($headerLine === null) {
+        $preview = '';
+        foreach ($linhas as $l) { if (trim((string)$l) !== '') { $preview = trim((string)$l); break; } }
+        $preview = mb_substr($preview, 0, 200, 'UTF-8');
+        msg('Não foi possível localizar o cabeçalho do CSV (SSW 0169). Primeira linha: ' . $preview, 'error', 500);
     }
 
     $getCell = static function(array $row, array $idx, array $candidates) use ($normKey): string {
@@ -155,7 +178,7 @@ try {
             continue;
         }
         if (strpos($t, ';') === false) continue;
-        $row = str_getcsv($t, ';');
+        $row = str_getcsv($t, $delimiter);
 
         $cnpj = $parseCnpj($getCell($row, $idx, ['CNPJ pagador', 'CNPJ']));
         if ($cnpj === '') continue;
