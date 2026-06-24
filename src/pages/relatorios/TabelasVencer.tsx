@@ -68,6 +68,8 @@ const baixarCsvTabelasVencer = (dados: TabelaVencer[]) => {
   for (const r of dados) {
     const cnpj = (r.cnpj ?? '').trim();
     const cnpjPai = (r.cnpj_pai_grupo ?? '').trim();
+    const possuiGrupoRaw = (r.possui_grupo ?? '').toString().trim().toUpperCase();
+    const possuiGrupo = possuiGrupoRaw === 'SIM' ? 'SIM' : 'NAO';
     const fm = typeof r.frete_mes_anterior === 'number' ? r.frete_mes_anterior : 0;
     const f3 = typeof r.frete_3_meses === 'number' ? r.frete_3_meses : 0;
 
@@ -78,7 +80,7 @@ const baixarCsvTabelasVencer = (dados: TabelaVencer[]) => {
       cnpj ? `${cnpj}'` : '',
       cnpjPai ? `${cnpjPai}'` : '',
       (r.nome ?? '').toString(),
-      (r.possui_grupo ?? '').toString(),
+      possuiGrupo,
       (r.tp_tab ?? '').toString(),
       (r.vig_atual ?? '').toString(),
       (r.vendedor ?? '').toString(),
@@ -385,9 +387,11 @@ export default function TabelasVencer() {
                         {renderSortIcon('vendedor')}
                       </th>
                       <th 
+                        onClick={() => handleSort('ultimo_movimento')}
                         className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
                       >
-                        Grupo
+                        Último Mov.
+                        {renderSortIcon('ultimo_movimento')}
                       </th>
                     </tr>
                   </thead>
@@ -419,16 +423,8 @@ export default function TabelasVencer() {
                         <td className="py-3 px-4 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                           {item.vendedor || '—'}
                         </td>
-                        <td className="py-3 px-4 text-sm text-center whitespace-nowrap">
-                          {item.possui_grupo === 'SIM' ? (
-                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-                              SIM
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
-                              NÃO
-                            </Badge>
-                          )}
+                        <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                          {item.ultimo_movimento?.trim() ? item.ultimo_movimento : '—'}
                         </td>
                       </tr>
                     ))}

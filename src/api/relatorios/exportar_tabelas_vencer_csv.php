@@ -398,7 +398,7 @@ try {
         $parent = $grupoMap[$cnpj] ?? null;
         $isMember = $parent !== null && $parent !== '' && $parent !== $cnpj;
         $isPrincipal = isset($principaisComFilhos[$cnpj]);
-        $possuiGrupo = $isMember ? 'SIM' : ($isPrincipal ? '' : 'NAO');
+        $possuiGrupo = $isMember ? 'SIM' : 'NAO';
         $cnpjPai = $isMember ? $parent : '';
 
         $fm = $freteMap[$cnpj]['mes_anterior'] ?? 0.0;
