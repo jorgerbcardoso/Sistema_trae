@@ -3784,6 +3784,11 @@ export interface TabelaVencer {
   tp_tab: string;
   qtde_tab: number;
   vig_atual: string;
+  ultimo_movimento?: string;
+  cnpj_pai_grupo?: string;
+  possui_grupo?: string;
+  frete_mes_anterior?: number;
+  frete_3_meses?: number;
 }
 
 export const mockGetTabelasVencer = async (): Promise<{

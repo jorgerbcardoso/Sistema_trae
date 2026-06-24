@@ -20,6 +20,19 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
+if (strtoupper(trim($domain)) === 'RVE') {
+    if (in_array($sigla, ['SAL', 'DK4', 'TNE', 'DEV'], true)) {
+        respondJson([
+            'success' => true,
+            'data' => [
+                'ctes' => [],
+                'sigla' => $sigla,
+                'geradoEm' => date('d/m/Y H:i:s'),
+            ],
+        ]);
+    }
+}
+
 ssw_login($domain);
 set_time_limit(120);
 ini_set('memory_limit', '256M');

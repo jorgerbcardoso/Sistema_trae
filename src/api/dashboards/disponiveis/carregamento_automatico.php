@@ -366,6 +366,14 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
         $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
         if ($unidDest === '' || !isset($idxDestino[$unidDest])) continue;
 
+        $domainUpper = '';
+        if (isset($GLOBALS['domain'])) $domainUpper = strtoupper(trim((string)$GLOBALS['domain']));
+        if ($domainUpper === 'RVE') {
+            if (in_array($unidDest, ['SAL', 'DK4', 'TNE', 'DEV'], true)) continue;
+            if ($unidadeOrigem === 'SAO' && $unidDest === 'CAM') continue;
+            if ($unidadeOrigem === 'CAM' && $unidDest === 'SAO') continue;
+        }
+
         $cte['_prio'] = $idxDestino[$unidDest];
         $filtrados[] = $cte;
     }

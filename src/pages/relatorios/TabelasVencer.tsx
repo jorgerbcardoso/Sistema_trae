@@ -125,8 +125,23 @@ export default function TabelasVencer() {
   };
 
   const sortedDados = [...dados].sort((a, b) => {
-    if (a[sortField] < b[sortField]) return sortDirection === 'asc' ? -1 : 1;
-    if (a[sortField] > b[sortField]) return sortDirection === 'asc' ? 1 : -1;
+    const av = (a as any)[sortField];
+    const bv = (b as any)[sortField];
+
+    const aNum = typeof av === 'number' ? av : Number.NaN;
+    const bNum = typeof bv === 'number' ? bv : Number.NaN;
+    const bothNum = !Number.isNaN(aNum) && !Number.isNaN(bNum);
+
+    if (bothNum) {
+      if (aNum < bNum) return sortDirection === 'asc' ? -1 : 1;
+      if (aNum > bNum) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    }
+
+    const aStr = (av ?? '').toString();
+    const bStr = (bv ?? '').toString();
+    if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+    if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
 
@@ -145,6 +160,11 @@ export default function TabelasVencer() {
     return sortDirection === 'asc' 
       ? <ArrowUp className="w-4 h-4 ml-1 inline-block text-blue-600 dark:text-blue-400" />
       : <ArrowDown className="w-4 h-4 ml-1 inline-block text-blue-600 dark:text-blue-400" />;
+  };
+
+  const formatFrete = (v?: number) => {
+    if (!v || v <= 0) return '—';
+    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
   // ✅ HELPER: Badge colorido para Tipo de Tabela
@@ -266,13 +286,6 @@ export default function TabelasVencer() {
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-700">
                       <th 
-                        onClick={() => handleSort('vendedor')}
-                        className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        Vendedor
-                        {renderSortIcon('vendedor')}
-                      </th>
-                      <th 
                         onClick={() => handleSort('cnpj')}
                         className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
@@ -283,7 +296,7 @@ export default function TabelasVencer() {
                         onClick={() => handleSort('nome')}
                         className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
-                        Nome
+                        Razão Social
                         {renderSortIcon('nome')}
                       </th>
                       <th 
@@ -297,22 +310,38 @@ export default function TabelasVencer() {
                         onClick={() => handleSort('tp_tab')}
                         className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
-                        Tipo Tabela
+                        Tipo
                         {renderSortIcon('tp_tab')}
-                      </th>
-                      <th 
-                        onClick={() => handleSort('qtde_tab')}
-                        className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        Qtde
-                        {renderSortIcon('qtde_tab')}
                       </th>
                       <th 
                         onClick={() => handleSort('vig_atual')}
                         className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       >
-                        Validade
+                        Vigência
                         {renderSortIcon('vig_atual')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('vendedor')}
+                        className="text-left py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        Vendedor
+                        {renderSortIcon('vendedor')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('ultimo_movimento')}
+                        className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
+                      >
+                        Último Mov.
+                        {renderSortIcon('ultimo_movimento')}
+                      </th>
+                      <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        Grupo
+                      </th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        Frete M-1
+                      </th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        Frete 3M
                       </th>
                     </tr>
                   </thead>
@@ -322,16 +351,15 @@ export default function TabelasVencer() {
                         key={index}
                         className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       >
-                        <td className="py-3 px-4 text-sm text-slate-900 dark:text-slate-100">
-                          {item.vendedor}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400 font-mono">
+                        <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400 font-mono whitespace-nowrap">
                           {item.cnpj}
                         </td>
                         <td className="py-3 px-4 text-sm text-slate-900 dark:text-slate-100">
-                          {item.nome}
+                          <span className="block max-w-[420px] truncate" title={item.nome}>
+                            {item.nome}
+                          </span>
                         </td>
-                        <td className="py-3 px-4 text-sm text-center">
+                        <td className="py-3 px-4 text-sm">
                           <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 text-xs">
                             {item.unidade}
                           </Badge>
@@ -339,13 +367,33 @@ export default function TabelasVencer() {
                         <td className="py-3 px-4 text-sm">
                           {getTipoTabelaBadge(item.tp_tab)}
                         </td>
-                        <td className="py-3 px-4 text-sm text-center">
-                          <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-md font-semibold text-xs">
-                            {item.qtde_tab}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-400 font-medium">
+                        <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
                           {item.vig_atual}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                          {item.vendedor || '—'}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                          {item.ultimo_movimento?.trim() ? item.ultimo_movimento : '—'}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-center whitespace-nowrap">
+                          {item.possui_grupo === 'SIM' ? (
+                            <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                              SIM
+                            </Badge>
+                          ) : item.possui_grupo === 'NAO' ? (
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
+                              NÃO
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                          {formatFrete(item.frete_mes_anterior)}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-right text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                          {formatFrete(item.frete_3_meses)}
                         </td>
                       </tr>
                     ))}

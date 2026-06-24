@@ -20,6 +20,23 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
+function destinoBloqueadoRve(string $domain, string $siglaAtual, string $destino): bool {
+    if (strtoupper(trim($domain)) !== 'RVE') return false;
+
+    $siglaAtual = strtoupper(trim($siglaAtual));
+    $destino = strtoupper(trim($destino));
+
+    if ($destino === '') return false;
+
+    $bloqueados = ['SAL', 'DK4', 'TNE', 'DEV'];
+    if (in_array($destino, $bloqueados, true)) return true;
+
+    if ($siglaAtual === 'SAO' && $destino === 'CAM') return true;
+    if ($siglaAtual === 'CAM' && $destino === 'SAO') return true;
+
+    return false;
+}
+
 ssw_login($domain);
 set_time_limit(120);
 ini_set('memory_limit', '256M');
@@ -221,6 +238,7 @@ if ($headerLine !== null) {
 
         $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
         if ($unidadeDest === '0') continue;
+        if (destinoBloqueadoRve($domain, $sigla, $unidadeDest)) continue;
         $nomeDest    = $getNomeUnidade($unidadeDest);
 
         $emTransito = $prevChegada !== '';
@@ -373,6 +391,9 @@ if ($headerLine !== null) {
             elseif ($diffDias == 3) $indicadorSaida = 'laranja';
             else $indicadorSaida = 'vermelho';
         }
+
+        if (trim((string)$unidadeDestAtual) === '0') continue;
+        if (destinoBloqueadoRve($domain, $sigla, (string)$unidadeDestAtual)) continue;
 
         $ctes[] = [
             'ctrc'           => $ctrc,

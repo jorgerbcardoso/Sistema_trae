@@ -4,7 +4,7 @@
  * API: Tabelas a Vencer
  * ============================================
  * Busca tabelas com vencimento até o fim do mês
- * Integração com SSW via XML
+ * Integração com SSW via CSV (t_tp_geracao=S)
  * ============================================
  */
 
@@ -45,170 +45,266 @@ try {
     ssw_login($dominio);
     
     // ============================================
-    // 4. Buscar dados no SSW (Programa 0169)
+    // 4. Buscar dados no SSW (Programa 0169) - CSV
     // ============================================
-    // Receber parâmetros do corpo da requisição (JSON)
     $json = file_get_contents('php://input');
     $input = json_decode($json, true);
-    
-    $dataInicioParam = $input['data_inicio'] ?? null;
-    $dataFimParam = $input['data_fim'] ?? null;
-    $unidadeParam = $input['unidade'] ?? '';
 
-    // Parâmetros:
-    // - f6: unidade (sigla)
-    // - f7: data início (DDMMYY)
-    // - f8: data fim (DDMMYY)
-    
-    // Formatar datas para o padrão SSW (DDMMYY)
+    $dataInicioParam = $input['data_inicio'] ?? null;
+    $dataFimParam    = $input['data_fim'] ?? null;
+    $unidadeParam    = $input['unidade'] ?? '';
+
     $dataInicio = $dataInicioParam ? date('dmy', strtotime($dataInicioParam)) : date('dmy');
-    $dataFim = $dataFimParam ? date('dmy', strtotime($dataFimParam)) : date('dmy', strtotime('last day of this month'));
-    
-    // Unidade (se informada)
+    $dataFim    = $dataFimParam ? date('dmy', strtotime($dataFimParam)) : date('dmy', strtotime('last day of this month'));
     $paramUnidade = $unidadeParam ? "&f6=" . urlencode(strtoupper($unidadeParam)) : "";
-    
-    $param = "?act=PER&t_tp_geracao=N{$paramUnidade}&f7={$dataInicio}&f8={$dataFim}";
+
+    $param = "?act=PER&t_tp_geracao=S{$paramUnidade}&f7={$dataInicio}&f8={$dataFim}";
     $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
-    
-    // ============================================
-    // 5. Extrair XML da resposta
-    // ============================================
-    $str = substr($str, strpos($str, '<xml'), strlen($str));
-    $str = substr($str, 0, strpos($str, '</xml>')) . '</xml>';
-    $xml = simplexml_load_string($str);
-    
-    if (!$xml) {
-        msg('Erro ao processar XML do SSW', 'error', 500);
+
+    $strDec = urldecode((string)$str);
+    $act = function_exists('ssw_get_act') ? ssw_get_act($strDec) : null;
+    $arq = function_exists('ssw_get_arq') ? ssw_get_arq($strDec) : null;
+
+    $csvFile = null;
+    if (!empty($act) && !empty($arq)) {
+        $csvFile = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1");
+    } else {
+        $csvFile = $strDec;
     }
-    
+
+    if (empty($csvFile) || strlen((string)$csvFile) < 20) {
+        msg('Arquivo CSV do SSW (0169) vazio ou inválido.', 'error', 500);
+    }
+
+    $csvFile = mb_convert_encoding((string)$csvFile, 'UTF-8', 'ISO-8859-1');
+    $csvFile = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $csvFile);
+    $csvFile = str_replace("\r\n", "\n", str_replace("\r", "\n", $csvFile));
+    $linhas = explode("\n", $csvFile);
+
+    $normKey = static function(string $s): string {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($s)));
+    };
+    $headerLine = null;
+    foreach ($linhas as $l) {
+        $t = trim((string)$l);
+        if ($t === '') continue;
+        if (strpos($t, ';') !== false && stripos($t, 'CNPJ') !== false && stripos($t, 'Vigencia') !== false) {
+            $headerLine = $t;
+            break;
+        }
+    }
+    if ($headerLine === null) {
+        msg('Não foi possível localizar o cabeçalho do CSV (SSW 0169).', 'error', 500);
+    }
+
+    $header = str_getcsv($headerLine, ';');
+    if (!empty($header)) {
+        $header[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$header[0]);
+    }
+    $idx = [];
+    foreach ($header as $i => $h) {
+        $k = $normKey((string)$h);
+        if ($k !== '') $idx[$k] = $i;
+    }
+
+    $getCell = static function(array $row, array $idx, array $candidates) use ($normKey): string {
+        foreach ($candidates as $c) {
+            $k = $normKey($c);
+            if (isset($idx[$k])) return trim((string)($row[$idx[$k]] ?? ''));
+        }
+        return '';
+    };
+
+    $parseCnpj = static function(string $v): string {
+        $v = trim(str_replace("\xC2\xA0", '', $v));
+        $v = preg_replace('/\D+/', '', $v);
+        if ($v === '') return '';
+        return substr($v, 0, 14);
+    };
+
+    $parseVendedorLogin = static function(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        $v = preg_replace('/\s+/', ' ', $v);
+        if (strpos($v, '-') !== false) {
+            $v = trim(explode('-', $v, 2)[0]);
+        }
+        if (strpos($v, ' ') !== false) {
+            $v = trim(explode(' ', $v, 2)[0]);
+        }
+        return trim($v);
+    };
+
+    $toTipo = static function(string $v): string {
+        $v = trim($v);
+        if ($v === '') return '';
+        $v = mb_strtolower($v, 'UTF-8');
+        return mb_strtoupper(mb_substr($v, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($v, 1, null, 'UTF-8');
+    };
+
+    $dadosBase = [];
+    $cnpjs = [];
+
+    $started = false;
+    foreach ($linhas as $l) {
+        $t = trim((string)$l);
+        if ($t === '') continue;
+        if (!$started) {
+            if (trim($t) === trim($headerLine)) $started = true;
+            continue;
+        }
+        if (strpos($t, ';') === false) continue;
+
+        $row = str_getcsv($t, ';');
+        $cnpj = $parseCnpj($getCell($row, $idx, ['CNPJ pagador', 'CNPJ']));
+        if ($cnpj === '') continue;
+
+        $qtde = (int)preg_replace('/\D+/', '', $getCell($row, $idx, ['Quantidade tabelas', 'Quantidade']));
+        if ($qtde <= 0) continue;
+
+        $nome = $getCell($row, $idx, ['Nome pagador', 'Nome']);
+        $vendedor = $parseVendedorLogin($getCell($row, $idx, ['Vendedor']));
+        $unidadeResp = strtoupper(trim($getCell($row, $idx, ['Unidade responsavel', 'Unidade responsável', 'Unidade'])));
+        $ultimoMov = trim($getCell($row, $idx, ['Ultimo movimento', 'Último movimento']));
+        $tipo = $toTipo($getCell($row, $idx, ['Tipo tabela', 'Tipo']));
+        $vig = trim($getCell($row, $idx, ['Vigencia atual', 'Vigência atual', 'Vigencia']));
+
+        $dadosBase[] = [
+            'cnpj' => $cnpj,
+            'nome' => $nome,
+            'unidade' => $unidadeResp,
+            'tp_tab' => $tipo,
+            'qtde_tab' => $qtde,
+            'vig_atual' => $vig,
+            'vendedor' => $vendedor !== '' ? $vendedor : 'SEM VENDEDOR',
+            'ultimo_movimento' => $ultimoMov,
+        ];
+        $cnpjs[$cnpj] = true;
+    }
+
     // ============================================
-    // 6. CRIAR NOVA CONEXÃO (SSW pode ter fechado)
+    // 5. Enriquecimento (grupo + somas de frete) - em batch
     // ============================================
     $conn = getDBConnection();
-    
-    if (!$conn) {
-        throw new Exception('Não foi possível conectar ao banco de dados');
+    if (!$conn) throw new Exception('Não foi possível conectar ao banco de dados');
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
+        throw new Exception('Domínio inválido');
     }
-    
-    // ============================================
-    // 7. Criar tabela temporária usando pg_query()
-    // ============================================
-    // ⚠️ NOTA: Este arquivo carrega SSW (ssw.php) que sobrescreve a função sql()
-    // Por isso, usamos pg_query() diretamente aqui
-    $createTableQuery = "CREATE TEMP TABLE tmp_tabelas_vencer (
-        cnpj VARCHAR(14),
-        nome VARCHAR(255),
-        unidade VARCHAR(10),
-        tp_tab VARCHAR(50),
-        qtde_tab INTEGER,
-        vig_atual VARCHAR(10)
-    )";
-    
-    $resultCreate = pg_query($conn, $createTableQuery);
-    
-    if (!$resultCreate) {
-        throw new Exception('Erro ao criar tabela temporária: ' . pg_last_error($conn));
-    }
-    
-    // ============================================
-    // 8. Processar registros do XML (BATCH INSERT)
-    // ============================================
-    $registros = $xml->xpath('rs/r');
-    $totalRegistros = count($registros);
-    $batchSize = 100; // Inserir 100 registros por vez
-    
-    for ($offset = 0; $offset < $totalRegistros; $offset += $batchSize) {
-        $values = [];
-        $params = [];
-        $paramIndex = 1;
-        
-        $limit = min($batchSize, $totalRegistros - $offset);
-        
-        for ($i = 0; $i < $limit; $i++) {
-            $idx = $offset + $i;
-            
-            // Extrair campos do XML
-            $cnpj_raw  = (string) $xml->xpath('rs/r/f0')[$idx];
-            $nome_raw  = (string) $xml->xpath('rs/r/f1')[$idx];
-            $unidade   = (string) $xml->xpath('rs/r/f2')[$idx];
-            $tp_tab    = (string) $xml->xpath('rs/r/f3')[$idx];
-            $qtde_raw  = (string) $xml->xpath('rs/r/f4')[$idx];
-            $vig_atual = (string) $xml->xpath('rs/r/f5')[$idx];
-            
-            // Processar CNPJ
-            $cnpj = substr($cnpj_raw, 7, 14);
-            
-            // Processar nome
-            $nome = str_replace("'", "", $nome_raw);
-            
-            // Processar quantidade
-            $qtde_tab = substr($qtde_raw, 7);
-            $qtde_tab = explode('<', $qtde_tab)[0];
-            
-            // Montar placeholders para este registro
-            $values[] = "($" . $paramIndex++ . ", $" . $paramIndex++ . ", $" . $paramIndex++ . ", $" . $paramIndex++ . ", $" . $paramIndex++ . ", $" . $paramIndex++ . ")";
-            
-            // Adicionar parâmetros
-            $params[] = $cnpj;
-            $params[] = $nome;
-            $params[] = $unidade;
-            $params[] = $tp_tab;
-            $params[] = (int) $qtde_tab;
-            $params[] = $vig_atual;
-        }
-        
-        // INSERT em batch usando pg_query_params()
-        $query = "INSERT INTO tmp_tabelas_vencer (cnpj, nome, unidade, tp_tab, qtde_tab, vig_atual) VALUES " . implode(', ', $values);
-        
-        $result = pg_query_params($conn, $query, $params);
-        
-        if (!$result) {
-            throw new Exception('Erro ao inserir batch: ' . pg_last_error($conn));
+    $domainDb = strtolower($domain);
+
+    $cnpjsList = array_keys($cnpjs);
+    if (!empty($cnpjsList)) {
+        $r1 = pg_query($conn, "CREATE TEMP TABLE tmp_cnpjs (cnpj varchar(14) PRIMARY KEY)");
+        if (!$r1) throw new Exception('Erro ao criar tmp_cnpjs: ' . pg_last_error($conn));
+
+        $batch = 500;
+        for ($i = 0; $i < count($cnpjsList); $i += $batch) {
+            $chunk = array_slice($cnpjsList, $i, $batch);
+            $values = [];
+            $params = [];
+            $p = 1;
+            foreach ($chunk as $c) {
+                $values[] = "($" . $p++ . ")";
+                $params[] = $c;
+            }
+            $q = "INSERT INTO tmp_cnpjs (cnpj) VALUES " . implode(',', $values) . " ON CONFLICT DO NOTHING";
+            $r = pg_query_params($conn, $q, $params);
+            if (!$r) throw new Exception('Erro ao inserir tmp_cnpjs: ' . pg_last_error($conn));
         }
     }
-    
-    // ============================================
-    // 9. Buscar dados com JOIN vendedor usando pg_query()
-    // ============================================
-    // Cruza com ntv_vendedor_cliente para pegar o vendedor
-    // ⚠️ FILTRO: Apenas registros com qtde_tab > 0
-    $selectQuery = "SELECT 
-        t.cnpj,
-        t.nome,
-        t.unidade,
-        t.tp_tab,
-        t.qtde_tab,
-        t.vig_atual,
-        COALESCE(v.login, 'SEM VENDEDOR') as vendedor
-     FROM tmp_tabelas_vencer t
-     LEFT JOIN ntv_vendedor_cliente v ON t.cnpj = v.cnpj
-     WHERE t.qtde_tab > 0
-     ORDER BY vendedor, t.nome";
-    
-    $result = pg_query($conn, $selectQuery);
-    
-    if (!$result) {
-        throw new Exception('Erro ao buscar dados: ' . pg_last_error($conn));
+
+    $grupoMap = [];
+    $principaisComFilhos = [];
+    if (!empty($cnpjsList)) {
+        $qG = "SELECT cnpj, cnpj_principal FROM {$domainDb}_grupo_cliente WHERE cnpj IN (SELECT cnpj FROM tmp_cnpjs)";
+        $rG = pg_query($conn, $qG);
+        if ($rG) {
+            while ($row = pg_fetch_assoc($rG)) {
+                $c = preg_replace('/\D+/', '', (string)($row['cnpj'] ?? ''));
+                $p = preg_replace('/\D+/', '', (string)($row['cnpj_principal'] ?? ''));
+                $c = substr($c, 0, 14);
+                $p = substr($p, 0, 14);
+                if ($c !== '' && $p !== '') $grupoMap[$c] = $p;
+            }
+        }
+
+        $qP = "SELECT DISTINCT cnpj_principal FROM {$domainDb}_grupo_cliente
+               WHERE cnpj_principal IN (SELECT cnpj FROM tmp_cnpjs) AND cnpj <> cnpj_principal";
+        $rP = pg_query($conn, $qP);
+        if ($rP) {
+            while ($row = pg_fetch_assoc($rP)) {
+                $p = preg_replace('/\D+/', '', (string)($row['cnpj_principal'] ?? ''));
+                $p = substr($p, 0, 14);
+                if ($p !== '') $principaisComFilhos[$p] = true;
+            }
+        }
     }
-    
-    // ============================================
-    // 10. Montar array de retorno
-    // ============================================
+
+    $hoje = new DateTime('now');
+    $inicioMesAtual = new DateTime($hoje->format('Y-m-01'));
+    $fimMesAnterior = (clone $inicioMesAtual)->modify('-1 day');
+    $inicioMesAnterior = new DateTime($fimMesAnterior->format('Y-m-01'));
+    $inicio3Meses = (clone $inicioMesAtual)->modify('-3 months');
+
+    $freteMap = [];
+    if (!empty($cnpjsList)) {
+        $qF = "SELECT
+                  t.cnpj,
+                  COALESCE(SUM(c.vlr_frete) FILTER (WHERE c.data_emissao BETWEEN $1 AND $2), 0) AS frete_mes_anterior,
+                  COALESCE(SUM(c.vlr_frete) FILTER (WHERE c.data_emissao BETWEEN $3 AND $2), 0) AS frete_3_meses
+               FROM tmp_cnpjs t
+               LEFT JOIN {$domainDb}_cte c
+                      ON c.cnpj_pag = t.cnpj
+                     AND c.status <> 'C'
+                     AND c.data_emissao BETWEEN $3 AND $2
+               GROUP BY t.cnpj";
+        $rF = pg_query_params($conn, $qF, [
+            $inicioMesAnterior->format('Y-m-d'),
+            $fimMesAnterior->format('Y-m-d'),
+            $inicio3Meses->format('Y-m-d'),
+        ]);
+        if ($rF) {
+            while ($row = pg_fetch_assoc($rF)) {
+                $c = preg_replace('/\D+/', '', (string)($row['cnpj'] ?? ''));
+                $c = substr($c, 0, 14);
+                $freteMap[$c] = [
+                    'mes_anterior' => (float)($row['frete_mes_anterior'] ?? 0),
+                    'tres_meses' => (float)($row['frete_3_meses'] ?? 0),
+                ];
+            }
+        }
+    }
+
     $dados = [];
-    
-    while ($row = pg_fetch_assoc($result)) {
+    foreach ($dadosBase as $r) {
+        $cnpj = $r['cnpj'];
+        $parent = $grupoMap[$cnpj] ?? null;
+        $isMember = $parent !== null && $parent !== '' && $parent !== $cnpj;
+        $isPrincipal = isset($principaisComFilhos[$cnpj]);
+
+        $possuiGrupo = $isMember ? 'SIM' : ($isPrincipal ? '' : 'NAO');
+        $cnpjPai = $isMember ? $parent : '';
+
+        $fm = $freteMap[$cnpj]['mes_anterior'] ?? 0.0;
+        $f3 = $freteMap[$cnpj]['tres_meses'] ?? 0.0;
+
         $dados[] = [
-            'cnpj' => $row['cnpj'] ?? '',
-            'nome' => $row['nome'] ?? '',
-            'unidade' => $row['unidade'] ?? '',
-            'tp_tab' => $row['tp_tab'] ?? '',
-            'qtde_tab' => (int) ($row['qtde_tab'] ?? 0),
-            'vig_atual' => $row['vig_atual'] ?? '',
-            'vendedor' => $row['vendedor'] ?? 'SEM VENDEDOR'
+            'cnpj' => $r['cnpj'],
+            'nome' => $r['nome'],
+            'unidade' => $r['unidade'],
+            'tp_tab' => $r['tp_tab'],
+            'qtde_tab' => (int)$r['qtde_tab'],
+            'vig_atual' => $r['vig_atual'],
+            'vendedor' => $r['vendedor'],
+            'ultimo_movimento' => $r['ultimo_movimento'],
+            'cnpj_pai_grupo' => $cnpjPai,
+            'possui_grupo' => $possuiGrupo,
+            'frete_mes_anterior' => $fm,
+            'frete_3_meses' => $f3,
         ];
     }
-    
-    // Fechar conexão
+
     pg_close($conn);
     
     // ============================================

@@ -19,6 +19,23 @@ if (empty($sigla) || !preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Parâmetros inválidos.']);
 }
 
+function destinoBloqueadoRve(string $domain, string $siglaAtual, string $destino): bool {
+    if (strtoupper(trim($domain)) !== 'RVE') return false;
+
+    $siglaAtual = strtoupper(trim($siglaAtual));
+    $destino = strtoupper(trim($destino));
+
+    if ($destino === '') return false;
+
+    $bloqueados = ['SAL', 'DK4', 'TNE', 'DEV'];
+    if (in_array($destino, $bloqueados, true)) return true;
+
+    if ($siglaAtual === 'SAO' && $destino === 'CAM') return true;
+    if ($siglaAtual === 'CAM' && $destino === 'SAO') return true;
+
+    return false;
+}
+
 $unidadesCompart = [];
 
 if ($modo === 'sugestao') {
@@ -271,6 +288,7 @@ foreach ($unidadesCompart as $siglaHub) {
 
                 $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
                 if ($unidadeDest === '0') continue;
+                if (destinoBloqueadoRve($domain, $sigla, $unidadeDest)) continue;
                 $nomeDest    = $getNomeUnidade($unidadeDest);
 
                 $emTransito = $prevChegada !== '';
@@ -457,6 +475,7 @@ foreach ($unidadesCompart as $siglaHub) {
                 }
 
                 if (trim((string)$unidadeDestAtual) === '0') continue;
+                if (destinoBloqueadoRve($domain, $sigla, (string)$unidadeDestAtual)) continue;
 
                 $ctes[] = [
                     'ctrc'           => $ctrc,
