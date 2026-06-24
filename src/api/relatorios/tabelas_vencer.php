@@ -71,29 +71,54 @@ try {
 
     $csvFile = null;
     [$act, $arq] = $getActArq($strDec);
+    $csvFrom0432 = false;
 
     if (empty($act) || empty($arq)) {
+        $extractFromHtml = static function(string $html) use ($getActArq): array {
+            [$a, $f] = $getActArq($html);
+            if (!empty($a) && !empty($f)) {
+                return [$a, $f];
+            }
+            if (preg_match("/ssw0424\\?act=([^&\\s'\\\"]+).*?filename=([^&\\s'\\\"]+)/i", $html, $m2)) {
+                return [urldecode($m2[1]), urldecode($m2[2])];
+            }
+            return ['', ''];
+        };
+
         if (preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
             $url0432 = "https://sistema.ssw.inf.br/bin/ssw0432?" . $m[1];
-            $html0432 = ssw_go($url0432);
-            $html0432 = urldecode((string)$html0432);
-            [$act2, $arq2] = $getActArq($html0432);
+            for ($i = 0; $i < 30; $i++) {
+                $html0432 = ssw_go($url0432);
+                $html0432 = urldecode((string)$html0432);
+
+                if (stripos($html0432, 'CNPJ') !== false && (strpos($html0432, ';') !== false || strpos($html0432, ',') !== false) && strlen($html0432) > 50) {
+                    $csvFile = $html0432;
+                    $csvFrom0432 = true;
+                    break;
+                }
+
+                [$act2, $arq2] = $extractFromHtml($html0432);
+                if (!empty($act2) && !empty($arq2)) {
+                    $act = $act2;
+                    $arq = $arq2;
+                    break;
+                }
+                usleep(2000000);
+            }
+        }
+
+        if (empty($act) || empty($arq)) {
+            [$act2, $arq2] = $extractFromHtml($strDec);
             if (!empty($act2) && !empty($arq2)) {
                 $act = $act2;
                 $arq = $arq2;
-            } elseif (preg_match("/ssw0424\\?act=([^&\\s'\\\"]+).*?filename=([^&\\s'\\\"]+)/i", $html0432, $m2)) {
-                $act = urldecode($m2[1]);
-                $arq = urldecode($m2[2]);
             }
-        } elseif (preg_match("/ssw0424\\?act=([^&\\s'\\\"]+).*?filename=([^&\\s'\\\"]+)/i", $strDec, $m2)) {
-            $act = urldecode($m2[1]);
-            $arq = urldecode($m2[2]);
         }
     }
 
-    if (!empty($act) && !empty($arq)) {
+    if (!$csvFrom0432 && !empty($act) && !empty($arq)) {
         $csvFile = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
-    } else {
+    } elseif (!$csvFrom0432) {
         $csvFile = $strDec;
     }
 
@@ -202,7 +227,7 @@ try {
             if (trim($t) === trim($headerLine)) $started = true;
             continue;
         }
-        if (strpos($t, ';') === false) continue;
+        if (strpos($t, $delimiter) === false) continue;
 
         $row = str_getcsv($t, $delimiter);
         $cnpj = $parseCnpj($getCell($row, $idx, ['CNPJ pagador', 'CNPJ']));
