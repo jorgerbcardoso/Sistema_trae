@@ -224,11 +224,6 @@ export default function TabelasVencer() {
       : <ArrowDown className="w-4 h-4 ml-1 inline-block text-blue-600 dark:text-blue-400" />;
   };
 
-  const formatFrete = (v?: number) => {
-    if (!v || v <= 0) return '—';
-    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
-
   // ✅ HELPER: Badge colorido para Tipo de Tabela
   const getTipoTabelaBadge = (tipo: string) => {
     const badges: Record<string, { color: string; darkColor: string }> = {
@@ -390,20 +385,9 @@ export default function TabelasVencer() {
                         {renderSortIcon('vendedor')}
                       </th>
                       <th 
-                        onClick={() => handleSort('ultimo_movimento')}
-                        className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
+                        className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap"
                       >
-                        Último Mov.
-                        {renderSortIcon('ultimo_movimento')}
-                      </th>
-                      <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         Grupo
-                      </th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        Frete M-1
-                      </th>
-                      <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        Frete 3M
                       </th>
                     </tr>
                   </thead>
@@ -435,27 +419,16 @@ export default function TabelasVencer() {
                         <td className="py-3 px-4 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                           {item.vendedor || '—'}
                         </td>
-                        <td className="py-3 px-4 text-sm text-center text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-                          {item.ultimo_movimento?.trim() ? item.ultimo_movimento : '—'}
-                        </td>
                         <td className="py-3 px-4 text-sm text-center whitespace-nowrap">
                           {item.possui_grupo === 'SIM' ? (
                             <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
                               SIM
                             </Badge>
-                          ) : item.possui_grupo === 'NAO' ? (
+                          ) : (
                             <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
                               NÃO
                             </Badge>
-                          ) : (
-                            <span className="text-slate-400">—</span>
                           )}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
-                          {formatFrete(item.frete_mes_anterior)}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
-                          {formatFrete(item.frete_3_meses)}
                         </td>
                       </tr>
                     ))}
