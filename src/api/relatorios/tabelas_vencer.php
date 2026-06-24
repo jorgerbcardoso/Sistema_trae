@@ -62,12 +62,37 @@ try {
     $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
 
     $strDec = urldecode((string)$str);
-    $act = function_exists('ssw_get_act') ? ssw_get_act($strDec) : null;
-    $arq = function_exists('ssw_get_arq') ? ssw_get_arq($strDec) : null;
+
+    $getActArq = static function(string $html): array {
+        $act = function_exists('ssw_get_act') ? ssw_get_act($html) : '';
+        $arq = function_exists('ssw_get_arq') ? ssw_get_arq($html) : '';
+        return [trim((string)$act), trim((string)$arq)];
+    };
 
     $csvFile = null;
+    [$act, $arq] = $getActArq($strDec);
+
+    if (empty($act) || empty($arq)) {
+        if (preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
+            $url0432 = "https://sistema.ssw.inf.br/bin/ssw0432?" . $m[1];
+            $html0432 = ssw_go($url0432);
+            $html0432 = urldecode((string)$html0432);
+            [$act2, $arq2] = $getActArq($html0432);
+            if (!empty($act2) && !empty($arq2)) {
+                $act = $act2;
+                $arq = $arq2;
+            } elseif (preg_match("/ssw0424\\?act=([^&\\s'\\\"]+).*?filename=([^&\\s'\\\"]+)/i", $html0432, $m2)) {
+                $act = urldecode($m2[1]);
+                $arq = urldecode($m2[2]);
+            }
+        } elseif (preg_match("/ssw0424\\?act=([^&\\s'\\\"]+).*?filename=([^&\\s'\\\"]+)/i", $strDec, $m2)) {
+            $act = urldecode($m2[1]);
+            $arq = urldecode($m2[2]);
+        }
+    }
+
     if (!empty($act) && !empty($arq)) {
-        $csvFile = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1");
+        $csvFile = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
     } else {
         $csvFile = $strDec;
     }
