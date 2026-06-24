@@ -21,7 +21,7 @@ import {
   ChevronsRight
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getTabelasVencer, exportarTabelasVencerExcel } from '../../services/tabelasVencerService';
+import { getTabelasVencer } from '../../services/tabelasVencerService';
 import { type TabelaVencer } from '../../mocks/mockData';
 import { FilterSelectUnidadeSingle } from '../../components/cadastros/FilterSelectUnidadeSingle';
 
@@ -33,6 +33,75 @@ const getHoje = () => new Date().toISOString().split('T')[0];
 const getUltimoDiaMes = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+};
+
+const csvEscape = (value: string) => {
+  const needsQuotes = value.includes('"') || value.includes(';') || value.includes('\n') || value.includes('\r');
+  const escaped = value.replace(/"/g, '""');
+  return needsQuotes ? `"${escaped}"` : escaped;
+};
+
+const formatNumeroCsv = (n: number) => {
+  const s = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const trimmed = s.replace(/0+$/, '').replace(/,$/, '');
+  return trimmed === '' ? '0' : trimmed;
+};
+
+const baixarCsvTabelasVencer = (dados: TabelaVencer[]) => {
+  const semMov = 'Nao ha movimento para periodo informado.';
+  const header = [
+    'CNPJ',
+    'CNPJ PAI GRUPO',
+    'RAZAO SOCIAL',
+    'POSSUI GRUPO',
+    'TIPO',
+    'VIGENCIA',
+    'VENDEDOR',
+    'ULTIMO MOVIMENTO',
+    'TOTAL FRETE MES ANTERIOR',
+    'TOTAL FRETE DOS ULTIMOS 3 MESES'
+  ];
+
+  const lines: string[] = [];
+  lines.push(header.map(csvEscape).join(';'));
+
+  for (const r of dados) {
+    const cnpj = (r.cnpj ?? '').trim();
+    const cnpjPai = (r.cnpj_pai_grupo ?? '').trim();
+    const fm = typeof r.frete_mes_anterior === 'number' ? r.frete_mes_anterior : 0;
+    const f3 = typeof r.frete_3_meses === 'number' ? r.frete_3_meses : 0;
+
+    const fmOut = fm > 0 ? formatNumeroCsv(fm) : semMov;
+    const f3Out = f3 > 0 ? formatNumeroCsv(f3) : semMov;
+
+    const row = [
+      cnpj ? `${cnpj}'` : '',
+      cnpjPai ? `${cnpjPai}'` : '',
+      (r.nome ?? '').toString(),
+      (r.possui_grupo ?? '').toString(),
+      (r.tp_tab ?? '').toString(),
+      (r.vig_atual ?? '').toString(),
+      (r.vendedor ?? '').toString(),
+      (r.ultimo_movimento ?? '').toString(),
+      fmOut,
+      f3Out
+    ];
+
+    lines.push(row.map(v => csvEscape(String(v ?? ''))).join(';'));
+  }
+
+  const bom = '\uFEFF';
+  const content = bom + lines.join('\r\n');
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tabelas_vencer_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 };
 
 export default function TabelasVencer() {
@@ -98,14 +167,7 @@ export default function TabelasVencer() {
 
     try {
       setLoading(true);
-      
-      // ✅ Chamar função de exportação via backend PHP
-      await exportarTabelasVencerExcel(dados, periodo, {
-        data_inicio: dataInicio,
-        data_fim: dataFim,
-        unidade: filtroUnidade
-      });
-      
+      baixarCsvTabelasVencer(dados);
       toast.success('Arquivo CSV exportado com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao exportar CSV:', error);
