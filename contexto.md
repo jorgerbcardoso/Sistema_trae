@@ -53,3 +53,45 @@ PADRÕES DE CÓDIGO CRÍTICOS:
 4. CORES PADRÃO DO SISTEMA:
    - Botão de ação principal (Aplicar, Salvar, etc.): usar `bg-indigo-600 hover:bg-indigo-700`
    - Ícone de loading (Loader2): usar `text-slate-400` sem cor específica forte
+
+
+PADRÃO PARA TELAS COM FILTROS (DIALOG):
+
+Objetivo: filtros com UX consistente, sem “pulos” de layout, com scroll interno e sem aplicar alterações até o usuário confirmar.
+
+1) ESTADO (React):
+- Ter dois estados separados:
+  - `filters`: filtros aplicados
+  - `tempFilters`: filtros em edição no dialog
+- Ter um boolean: `showFilters`
+- Ao abrir o dialog, copiar `filters` → `tempFilters`:
+  - `useEffect(() => { if (showFilters) setTempFilters(filters); }, [showFilters, filters]);`
+- Implementar handlers padrão:
+  - `applyFilters()`: valida se necessário, depois `setFilters(tempFilters)` e fecha
+  - `cancelFilters()`: volta `tempFilters = filters` e fecha
+  - `clearFilters()`: zera filtros (conforme cada tela) sem fechar ou fechando (padrão da tela)
+
+2) INDICADOR DE FILTRO ATIVO:
+- Ter um boolean `hasFiltrosAtivos` (ex.: unidade selecionada, datas preenchidas, etc.)
+- No botão de abrir filtros, mostrar um indicador (ex.: bolinha) quando `hasFiltrosAtivos` for true.
+- O botão deve seguir o padrão do dashboard Performance de Entregas:
+  - `<Button variant="outline" size="icon" ...><Filter className="w-4 h-4" /></Button>`
+  - Envolver em `DialogTrigger` e `Tooltip` (TooltipTrigger → DialogTrigger → Button)
+
+3) LAYOUT DO DIALOG (scroll e altura):
+- O `DialogContent` deve ocupar o height disponível com margem e sem scroll global:
+  - `h-[calc(100vh-80px)] overflow-hidden flex flex-col`
+- O conteúdo deve scrollar dentro:
+  - wrapper: `flex-1 overflow-y-auto overscroll-contain pr-1`
+- Footer (ações) deve ficar fixo no fim:
+  - `border-t ...` com botões `Limpar / Cancelar / Aplicar`
+
+4) COMPONENTES PADRÃO:
+- Para “Unidade(s)” com seleção múltipla, usar o mesmo padrão do cadastro de usuários:
+  - `src/components/admin/UnidadesMultiSelect.tsx`
+- Para seleção de cliente (pagador/destinatário), usar `FilterSelectCliente` com botão “X” dentro do input.
+
+5) REGRAS DE DOMÍNIO / UNIDADE (quando aplicável):
+- Se a tela exigir unidade fixa para não-MTZ, o filtro de unidade deve ficar travado:
+  - o estado deve forçar `unidadeDestino = [unidadeAtual]` ao inicializar e ao aplicar filtros
+  - o componente deve receber `disabled={true}` e bloquear alterações

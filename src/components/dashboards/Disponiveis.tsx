@@ -33,6 +33,7 @@ import {
   Timer,
   Loader2,
   Home,
+  Filter,
   ListFilter,
   Plus,
   Trash2,
@@ -51,7 +52,8 @@ import {
   DollarSign,
   Wallet,
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 
@@ -3430,20 +3432,28 @@ export function Disponiveis() {
           )}
           {!isMTZ && (
             <>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowFilters(true)}
-                className="relative dark:border-slate-600 dark:hover:bg-slate-800"
-                title="Filtros"
-              >
-                <ListFilter className="w-4 h-4" />
-                {hasFiltrosAtivos && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-600" />
-                )}
-              </Button>
-
               <Dialog open={showFilters} onOpenChange={setShowFilters}>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="relative dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                        >
+                          <Filter className="w-4 h-4" />
+                          {hasFiltrosAtivos && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-600" />
+                          )}
+                        </Button>
+                      </DialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Filtros</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <DialogContent className="sm:max-w-[700px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
                   <DialogHeader>
                     <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
@@ -3454,17 +3464,6 @@ export function Disponiveis() {
 
                   <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
                     <div className="space-y-6 py-4">
-                      <div className="space-y-2">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se apenas aos disponíveis para transferência</p>
-                        <UnidadesMultiSelect
-                          value={tempFilters.unidadeDestino}
-                          onChange={(value) => setTempFilters({ ...tempFilters, unidadeDestino: value })}
-                          domain={user?.domain}
-                          label="Unidade(s) Destino"
-                          emptyHint={<><strong>Nenhuma unidade selecionada</strong> = sem filtro (todas as unidades)</>}
-                        />
-                      </div>
-
                       <div className="space-y-4">
                         <div className="space-y-1">
                           <Label className="text-slate-900 dark:text-slate-100">Período de Emissão do CT-e</Label>
@@ -3517,6 +3516,17 @@ export function Disponiveis() {
                             />
                           </div>
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se apenas aos disponíveis para transferência</p>
+                        <UnidadesMultiSelect
+                          value={tempFilters.unidadeDestino}
+                          onChange={(value) => setTempFilters({ ...tempFilters, unidadeDestino: value })}
+                          domain={user?.domain}
+                          label="Unidade(s) Destino"
+                          emptyHint={<><strong>Nenhuma unidade selecionada</strong> = sem filtro (todas as unidades)</>}
+                        />
                       </div>
                     </div>
                   </div>
