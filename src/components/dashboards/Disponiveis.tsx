@@ -12,6 +12,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
 import { toast } from 'sonner';
+import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import {
   Warehouse,
   Truck,
@@ -51,6 +52,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface Cte {
   ctrc: string;
@@ -2397,6 +2400,30 @@ export function Disponiveis() {
 
   const [sigla] = useState<string>(unidadeLogada);
 
+  type FiltrosDisponiveis = {
+    unidadeDestino: string[];
+    periodoEmissaoInicio: string;
+    periodoEmissaoFim: string;
+    periodoPrevisaoInicio: string;
+    periodoPrevisaoFim: string;
+  };
+
+  const filtrosVazios: FiltrosDisponiveis = {
+    unidadeDestino: [],
+    periodoEmissaoInicio: '',
+    periodoEmissaoFim: '',
+    periodoPrevisaoInicio: '',
+    periodoPrevisaoFim: '',
+  };
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
+  const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
+
+  useEffect(() => {
+    if (showFilters) setTempFilters(filters);
+  }, [showFilters, filters]);
+
   const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
@@ -3133,6 +3160,131 @@ export function Disponiveis() {
 
 
 
+  const hasFiltrosAtivos =
+    (filters.unidadeDestino?.length ?? 0) > 0 ||
+    !!filters.periodoEmissaoInicio ||
+    !!filters.periodoEmissaoFim ||
+    !!filters.periodoPrevisaoInicio ||
+    !!filters.periodoPrevisaoFim;
+
+  const parseDataISO = (v: string): Date | null => {
+    const s = (v ?? '').trim();
+    if (!s) return null;
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const parseDataBR = (v: string): Date | null => {
+    const s = (v ?? '').trim();
+    if (!s || s === '—') return null;
+    const m = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
+    if (!m) return null;
+    const dia = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    const anoRaw = m[3];
+    const ano = !anoRaw
+      ? new Date().getFullYear()
+      : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12) return null;
+    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const parseDiaMesBR = (v: string, ano: number): Date | null => {
+    const s = (v ?? '').trim();
+    if (!s || s === '—') return null;
+    const m = s.match(/^(\d{2})\/(\d{2})$/);
+    if (!m) return null;
+    const dia = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    if (dia < 1 || dia > 31 || mes < 1 || mes > 12) return null;
+    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const inRange = (d: Date, start: Date | null, end: Date | null): boolean => {
+    const t = d.getTime();
+    if (start && t < start.getTime()) return false;
+    if (end && t > end.getTime()) return false;
+    return true;
+  };
+
+  const matchesRangeBR = (v: string, start: Date | null, end: Date | null): boolean => {
+    if (!start && !end) return true;
+    const s = (v ?? '').trim();
+    if (!s || s === '—') return false;
+    const full = parseDataBR(s);
+    if (full) return inRange(full, start, end);
+    const hasOnlyDayMonth = /^\d{2}\/\d{2}$/.test(s);
+    if (!hasOnlyDayMonth) return false;
+    const anoStart = start ? start.getFullYear() : new Date().getFullYear();
+    const anoEnd = end ? end.getFullYear() : anoStart;
+    const cand1 = parseDiaMesBR(s, anoStart);
+    if (cand1 && inRange(cand1, start, end)) return true;
+    if (anoEnd !== anoStart) {
+      const cand2 = parseDiaMesBR(s, anoEnd);
+      if (cand2 && inRange(cand2, start, end)) return true;
+    }
+    return false;
+  };
+
+  const emissaoInicio = parseDataISO(filters.periodoEmissaoInicio);
+  const emissaoFim = parseDataISO(filters.periodoEmissaoFim);
+  const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
+  const previsaoFim = parseDataISO(filters.periodoPrevisaoFim);
+
+  const ctesTransferFiltrados = React.useMemo(() => {
+    const list: Cte[] = [];
+    if (dados?.ctes) list.push(...dados.ctes);
+    if (dadosHub) {
+      for (const unidadeData of Object.values(dadosHub.dados)) {
+        if (unidadeData?.ctes?.length) list.push(...unidadeData.ctes);
+      }
+    }
+    return list.filter((cte) => {
+      if (filters.unidadeDestino?.length) {
+        if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
+      }
+      if (emissaoInicio || emissaoFim) {
+        const d = parseDataBR(cte.emissao);
+        if (!d) return false;
+        if (!inRange(d, emissaoInicio, emissaoFim)) return false;
+      }
+      if (previsaoInicio || previsaoFim) {
+        if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
+      }
+      return true;
+    });
+  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim]);
+
+  const coletasTransferFiltradas = React.useMemo(() => {
+    const list = dados?.coletas ? [...dados.coletas] : [];
+    if (!filters.unidadeDestino?.length) return list;
+    const allowed = new Set(filters.unidadeDestino.map((u) => u.toUpperCase()));
+    return list.filter((c) => allowed.has((c.unidadeDest ?? '').toUpperCase()));
+  }, [dados, filters.unidadeDestino]);
+
+  const ctesEntregaFiltrados = React.useMemo(() => {
+    const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
+    if (!previsaoInicio && !previsaoFim) return list;
+    return list.filter((cte) => matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim));
+  }, [dadosEntrega, previsaoInicio, previsaoFim]);
+
+  const clearFilters = () => {
+    setFilters(filtrosVazios);
+    setTempFilters(filtrosVazios);
+  };
+
+  const cancelFilters = () => {
+    setTempFilters(filters);
+    setShowFilters(false);
+  };
+
+  const applyFilters = () => {
+    setFilters(tempFilters);
+    setShowFilters(false);
+  };
+
   const ORDEM_INDICADOR: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
 
   const getPiorIndicador = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf'): string | null =>
@@ -3161,13 +3313,8 @@ export function Disponiveis() {
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     };
-    for (const cte of dados.ctes) addCte(cte);
-    if (dadosHub) {
-      for (const unidadeData of Object.values(dadosHub.dados)) {
-        for (const cte of unidadeData.ctes) addCte(cte);
-      }
-    }
-    for (const coleta of dados.coletas.filter(c => !c.paraEntrega)) {
+    for (const cte of ctesTransferFiltrados) addCte(cte);
+    for (const coleta of coletasTransferFiltradas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
         const nomeGrupo = key === 'SEM DESTINO' ? (coleta.cidadeDest || key) : key;
@@ -3194,21 +3341,21 @@ export function Disponiveis() {
         default:             return mult * (b.totalCtes - a.totalCtes);
       }
     });
-  }, [dados, dadosHub, ordemCol, ordemDir]);
+  }, [dados, ctesTransferFiltrados, coletasTransferFiltradas, ordemCol, ordemDir]);
 
-  const totalArmazem  = dados?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalTransito = dados?.ctes.filter(c => c.emTransito).length ?? 0;
-  const totalColetas  = dados?.coletas.length ?? 0;
+  const totalArmazem  = ctesTransferFiltrados.filter(c => !c.emTransito).length ?? 0;
+  const totalTransito = ctesTransferFiltrados.filter(c => c.emTransito).length ?? 0;
+  const totalColetas  = coletasTransferFiltradas.length ?? 0;
   const totalVol      = grupos.reduce((s, g) => s + g.totalVol, 0);
   const totalPeso     = grupos.reduce((s, g) => s + g.totalPeso, 0);
   const totalCubagem  = grupos.reduce((s, g) => s + g.totalCubagem, 0);
-  const coletasAtrasadas = dados?.coletas.filter(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada').length ?? 0;
-  const ctesTransitoAlerta = dados?.ctes.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
+  const coletasAtrasadas = coletasTransferFiltradas.filter(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada').length ?? 0;
+  const ctesTransitoAlerta = ctesTransferFiltrados.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
 
   const gruposSetor: GrupoSetor[] = React.useMemo(() => {
     if (!dadosEntrega) return [];
     const map: Record<string, GrupoSetor> = {};
-    for (const cte of dadosEntrega.ctes) {
+    for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
         map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
@@ -3224,14 +3371,14 @@ export function Disponiveis() {
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
     return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
-  }, [dadosEntrega]);
+  }, [dadosEntrega, ctesEntregaFiltrados]);
 
-  const totalEntregaArmazem  = dadosEntrega?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalEntregaTransito = dadosEntrega?.ctes.filter(c => c.emTransito).length ?? 0;
+  const totalEntregaArmazem  = ctesEntregaFiltrados.filter(c => !c.emTransito).length ?? 0;
+  const totalEntregaTransito = ctesEntregaFiltrados.filter(c => c.emTransito).length ?? 0;
   const totalEntregaVol      = gruposSetor.reduce((s, g) => s + g.totalVol, 0);
   const totalEntregaPeso     = gruposSetor.reduce((s, g) => s + g.totalPeso, 0);
   const totalEntregaCubagem  = gruposSetor.reduce((s, g) => s + g.totalCubagem, 0);
-  const entregaAtrasadosTransito = dadosEntrega?.ctes.filter(c => c.emTransito && c.diasAtraso > 0).length ?? 0;
+  const entregaAtrasadosTransito = ctesEntregaFiltrados.filter(c => c.emTransito && c.diasAtraso > 0).length ?? 0;
 
   const totalGeralArmazem  = totalArmazem + totalEntregaArmazem;
   const totalGeralTransito = totalTransito + totalEntregaTransito;
@@ -3240,24 +3387,17 @@ export function Disponiveis() {
   const totalGeralCubagem  = totalCubagem + totalEntregaCubagem;
 
   const ctesTransferTodos = React.useMemo(() => {
-    const list: Cte[] = [];
-    if (dados?.ctes) list.push(...dados.ctes);
-    if (dadosHub) {
-      for (const unidadeData of Object.values(dadosHub.dados)) {
-        if (unidadeData?.ctes?.length) list.push(...unidadeData.ctes);
-      }
-    }
-    return list;
-  }, [dados, dadosHub]);
+    return ctesTransferFiltrados;
+  }, [ctesTransferFiltrados]);
 
   const totalGeralFrete =
     ctesTransferTodos.reduce((s, c) => s + parseMoeda(c.frete), 0) +
-    (dadosEntrega?.ctes.reduce((s, c) => s + parseMoeda(c.frete), 0) ?? 0);
+    (ctesEntregaFiltrados.reduce((s, c) => s + parseMoeda(c.frete), 0) ?? 0);
 
   const totalGeralMercadoria =
     ctesTransferTodos.reduce((s, c) => s + parseMoeda(c.vlrNf), 0) +
-    (dadosEntrega?.ctes.reduce((s, c) => s + parseMoeda(c.vlrMerc), 0) ?? 0) +
-    (dados?.coletas.reduce((s, c) => s + parseMoeda(c.valMerc), 0) ?? 0);
+    (ctesEntregaFiltrados.reduce((s, c) => s + parseMoeda(c.vlrMerc), 0) ?? 0) +
+    (coletasTransferFiltradas.reduce((s, c) => s + parseMoeda(c.valMerc), 0) ?? 0);
 
   const minutos = Math.floor(countdown / 60);
   const segundos = countdown % 60;
@@ -3287,6 +3427,129 @@ export function Disponiveis() {
               <span>Ent.</span>
               <span className="font-mono">{formatBytes(entregaLoaded)}{entregaTotal ? `/${formatBytes(entregaTotal)}` : ''}</span>
             </div>
+          )}
+          {!isMTZ && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowFilters(true)}
+                className="relative dark:border-slate-600 dark:hover:bg-slate-800"
+                title="Filtros"
+              >
+                <ListFilter className="w-4 h-4" />
+                {hasFiltrosAtivos && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-600" />
+                )}
+              </Button>
+
+              <Dialog open={showFilters} onOpenChange={setShowFilters}>
+                <DialogContent className="sm:max-w-[700px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
+                    <DialogDescription className="text-slate-600 dark:text-slate-400">
+                      Os filtros são aplicados após carregar os dados do SSW (não alteram a importação).
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+                    <div className="space-y-6 py-4">
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se apenas aos disponíveis para transferência</p>
+                        <UnidadesMultiSelect
+                          value={tempFilters.unidadeDestino}
+                          onChange={(value) => setTempFilters({ ...tempFilters, unidadeDestino: value })}
+                          domain={user?.domain}
+                          label="Unidade(s) Destino"
+                          emptyHint={<><strong>Nenhuma unidade selecionada</strong> = sem filtro (todas as unidades)</>}
+                        />
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <Label className="text-slate-900 dark:text-slate-100">Período de Emissão do CT-e</Label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se apenas aos disponíveis para transferência</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                            <Input
+                              type="date"
+                              value={tempFilters.periodoEmissaoInicio}
+                              onChange={(e) => setTempFilters({ ...tempFilters, periodoEmissaoInicio: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                            <Input
+                              type="date"
+                              value={tempFilters.periodoEmissaoFim}
+                              onChange={(e) => setTempFilters({ ...tempFilters, periodoEmissaoFim: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <Label className="text-slate-900 dark:text-slate-100">Período de Previsão de Entrega</Label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se aos disponíveis para transferência e para entrega</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
+                            <Input
+                              type="date"
+                              value={tempFilters.periodoPrevisaoInicio}
+                              onChange={(e) => setTempFilters({ ...tempFilters, periodoPrevisaoInicio: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
+                            <Input
+                              type="date"
+                              value={tempFilters.periodoPrevisaoFim}
+                              onChange={(e) => setTempFilters({ ...tempFilters, periodoPrevisaoFim: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                      variant="outline"
+                      onClick={clearFilters}
+                      className="dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Limpar Tudo
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={cancelFilters}
+                        className="dark:border-slate-700 dark:hover:bg-slate-800"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={applyFilters}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Aplicar Filtros
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
           {!isMTZ && (
             <Button

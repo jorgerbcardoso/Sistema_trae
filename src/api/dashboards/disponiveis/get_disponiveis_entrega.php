@@ -191,32 +191,41 @@ foreach ($linhas as $linha) {
 
     $isEmTransito = !empty($prevChegada) && strpos(strtoupper($prevChegada), 'HOJE') !== false;
 
-    $hoje     = date('d/m/y');
     $prevDate = '';
+    $tsPrevi = null;
     if (!empty($previ)) {
-        $parts = explode('/', $previ);
-        if (count($parts) === 3) {
-            $prevDate = $parts[0] . '/' . $parts[1];
+        $p = trim($previ);
+        if (!preg_match('/^31\/12\/50$/', $p) && !preg_match('/^31\/12\/2050$/', $p)) {
+            $parts = explode('/', $p);
+            if (count($parts) === 3) {
+                $dia = (int)$parts[0];
+                $mes = (int)$parts[1];
+                $anoRaw = trim($parts[2]);
+                $ano = (int)$anoRaw;
+                if (strlen($anoRaw) <= 2) {
+                    $ano = 2000 + $ano;
+                }
+                if ($dia >= 1 && $dia <= 31 && $mes >= 1 && $mes <= 12 && $ano >= 2000 && $ano <= ((int)date('Y') + 5)) {
+                    $prevDate = sprintf('%02d/%02d', $dia, $mes);
+                    $tsPrevi = mktime(0, 0, 0, $mes, $dia, $ano);
+                }
+            }
         }
     }
 
     $diasAtraso    = 0;
     $atrasoEntrega = null;
-    if (!empty($previ) && !$isEmTransito) {
-        $partes = explode('/', $previ);
-        if (count($partes) === 3) {
-            $tsPrevi = mktime(0, 0, 0, (int)$partes[1], (int)$partes[0], (int)('20' . $partes[2]));
-            $tsHoje  = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
-            $diasAtraso = (int)floor(($tsHoje - $tsPrevi) / 86400);
-            if ($diasAtraso <= 0) {
-                $atrasoEntrega = 'verde';
-            } elseif ($diasAtraso <= 2) {
-                $atrasoEntrega = 'amarelo';
-            } elseif ($diasAtraso <= 5) {
-                $atrasoEntrega = 'laranja';
-            } else {
-                $atrasoEntrega = 'vermelho';
-            }
+    if ($tsPrevi !== null && !$isEmTransito) {
+        $tsHoje  = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
+        $diasAtraso = (int)floor(($tsHoje - $tsPrevi) / 86400);
+        if ($diasAtraso <= 0) {
+            $atrasoEntrega = 'verde';
+        } elseif ($diasAtraso <= 2) {
+            $atrasoEntrega = 'amarelo';
+        } elseif ($diasAtraso <= 5) {
+            $atrasoEntrega = 'laranja';
+        } else {
+            $atrasoEntrega = 'vermelho';
         }
     }
 
@@ -237,7 +246,7 @@ foreach ($linhas as $linha) {
         'cidade'       => $cidade,
         'bairro'       => $bairro,
         'cep'          => $cep,
-        'prevEnt'      => $prevDate ?: $previ,
+        'prevEnt'      => $prevDate !== '' ? $prevDate : '—',
         'agendamento'  => $agendamento,
         'vlrMerc'      => $valMerc,
         'peso'         => $kgRea,
