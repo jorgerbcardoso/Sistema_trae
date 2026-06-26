@@ -81,6 +81,46 @@ const dateToInput = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+const diffDaysInclusive = (startIso: string, endIso: string): number | null => {
+  const s = Date.parse(`${startIso}T00:00:00`);
+  const e = Date.parse(`${endIso}T00:00:00`);
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return null;
+  const days = Math.floor((e - s) / (24 * 60 * 60 * 1000)) + 1;
+  return Number.isFinite(days) ? days : null;
+};
+
+const validarRecorte = (f: Filters): string | null => {
+  const p = [
+    { label: 'Inclusão', ini: f.periodo_inclusao_inicio, fim: f.periodo_inclusao_fim },
+    { label: 'Programação (Pagamento)', ini: f.periodo_programacao_inicio, fim: f.periodo_programacao_fim },
+    { label: 'Vencimento', ini: f.periodo_vencimento_inicio, fim: f.periodo_vencimento_fim },
+  ];
+
+  const hasAnyOfThree = p.some((x) => !!x.ini || !!x.fim);
+  if (!hasAnyOfThree) return 'Informe ao menos 1 dos períodos: Inclusão, Programação (Pagamento) ou Vencimento.';
+
+  for (const x of p) {
+    if (!x.ini && !x.fim) continue;
+    if (!x.ini || !x.fim) return `Informe início e fim do período de ${x.label}.`;
+    const days = diffDaysInclusive(x.ini, x.fim);
+    if (days === null) return `Período de ${x.label} inválido.`;
+    if (days < 1) return `Período de ${x.label} inválido (fim antes do início).`;
+    if (days > 62) return `Período de ${x.label} deve ter no máximo 62 dias.`;
+  }
+
+  if ((f.periodo_emissao_inicio || f.periodo_emissao_fim) && (!f.periodo_emissao_inicio || !f.periodo_emissao_fim)) {
+    return 'Informe início e fim do período de Emissão da NF.';
+  }
+  if (f.periodo_emissao_inicio && f.periodo_emissao_fim) {
+    const days = diffDaysInclusive(f.periodo_emissao_inicio, f.periodo_emissao_fim);
+    if (days === null) return 'Período de Emissão da NF inválido.';
+    if (days < 1) return 'Período de Emissão da NF inválido (fim antes do início).';
+    if (days > 62) return 'Período de Emissão da NF deve ter no máximo 62 dias.';
+  }
+
+  return null;
+};
+
 const getMesFechadoPagamento = () => {
   const now = new Date();
   const first = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -767,8 +807,15 @@ export function ContasPagar() {
   };
 
   const applyFilters = () => {
+    const err = validarRecorte(tempFilters);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     setFilters(tempFilters);
     setShowFilters(false);
+    setListPage(1);
+    void carregar(tempFilters);
   };
 
   const carregarAnoAnterior = useCallback(async (basePayload: Filters) => {
@@ -801,8 +848,19 @@ export function ContasPagar() {
     }
   }, []);
 
-  const carregar = useCallback(async (override?: Filters) => {
-    const payload = { ...(override ?? filters) };
+  const carregar = useCallback(async (override?: unknown) => {
+    const isFiltersLike =
+      !!override &&
+      typeof override === 'object' &&
+      'periodo_programacao_inicio' in (override as any) &&
+      'periodo_programacao_fim' in (override as any);
+    const base = (isFiltersLike ? (override as Filters) : filters) as Filters;
+    const payload = { ...base };
+    const err = validarRecorte(payload);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     setLoading(true);
     setLastLoadMessage('');
     setAnoAnterior(null);
@@ -1396,12 +1454,12 @@ export function ContasPagar() {
           <Button
             variant="outline"
             size="sm"
-            onClick={carregar}
+            onClick={() => { void carregar(); }}
             disabled={loading}
             className="dark:border-slate-600"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            <span className="ml-1.5">Buscar</span>
+            <span className="ml-1.5">Atualizar</span>
           </Button>
         </div>
       }

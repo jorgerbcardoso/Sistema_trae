@@ -34,15 +34,52 @@ $programacaoFim    = trim((string)($input['periodo_programacao_fim'] ?? ''));
 $vencimentoInicio = trim((string)($input['periodo_vencimento_inicio'] ?? ''));
 $vencimentoFim    = trim((string)($input['periodo_vencimento_fim'] ?? ''));
 
-$hasAnyPeriod =
-    ($emissaoInicio !== '' || $emissaoFim !== '') ||
+$parseIsoDate = static function(string $iso): ?int {
+    $iso = trim($iso);
+    if ($iso === '') return null;
+    $ts = strtotime($iso);
+    return $ts ? $ts : null;
+};
+
+$diffDaysInclusive = static function(int $startTs, int $endTs): int {
+    $days = (int)floor(($endTs - $startTs) / 86400) + 1;
+    return $days;
+};
+
+$validateRange = static function(string $label, string $ini, string $fim) use ($parseIsoDate, $diffDaysInclusive): void {
+    $ini = trim($ini);
+    $fim = trim($fim);
+    if ($ini === '' && $fim === '') return;
+    if ($ini === '' || $fim === '') {
+        respondJson(['success' => false, 'message' => "Informe início e fim do período de {$label}."]);
+    }
+    $s = $parseIsoDate($ini);
+    $e = $parseIsoDate($fim);
+    if ($s === null || $e === null) {
+        respondJson(['success' => false, 'message' => "Período de {$label} inválido."]);
+    }
+    if ($e < $s) {
+        respondJson(['success' => false, 'message' => "Período de {$label} inválido (fim antes do início)."]);
+    }
+    $days = $diffDaysInclusive($s, $e);
+    if ($days > 62) {
+        respondJson(['success' => false, 'message' => "Período de {$label} deve ter no máximo 62 dias."]);
+    }
+};
+
+$hasAnyOfThree =
     ($inclusaoInicio !== '' || $inclusaoFim !== '') ||
     ($programacaoInicio !== '' || $programacaoFim !== '') ||
     ($vencimentoInicio !== '' || $vencimentoFim !== '');
 
-if (!$hasAnyPeriod) {
-    respondJson(['success' => false, 'message' => 'Informe ao menos um dos períodos (emissão, inclusão, programação ou vencimento).']);
+if (!$hasAnyOfThree) {
+    respondJson(['success' => false, 'message' => 'Informe ao menos 1 dos períodos: inclusão, programação (pagamento) ou vencimento.']);
 }
+
+$validateRange('Inclusão', $inclusaoInicio, $inclusaoFim);
+$validateRange('Programação (Pagamento)', $programacaoInicio, $programacaoFim);
+$validateRange('Vencimento', $vencimentoInicio, $vencimentoFim);
+$validateRange('Emissão da NF', $emissaoInicio, $emissaoFim);
 
 $toDmy = static function(?string $iso): string {
     $iso = trim((string)$iso);
