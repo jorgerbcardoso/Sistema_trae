@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, LineChart, Line, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, LineChart, Line, CartesianGrid, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
@@ -18,6 +19,7 @@ import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, Filter, Loader2, Search, Wallet, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTooltipStyle } from './CustomTooltip';
 
 type GrupoEvento = { grupo: number; descricao: string };
 
@@ -212,6 +214,7 @@ const parseGrupoEvento = (v: string) => {
 export function ContasPagar() {
   usePageTitle('BI · Contas a Pagar');
   const { user } = useAuth();
+  const tooltipStyle = useTooltipStyle();
 
   const [activeTab, setActiveTab] = useState<'visao' | 'lista'>('visao');
   const [showFilters, setShowFilters] = useState(false);
@@ -230,7 +233,9 @@ export function ContasPagar() {
   const PAGE_SIZE = 80;
   const [listPage, setListPage] = useState(1);
   const [topSort, setTopSort] = useState<{ key: 'venc' | 'valor' | 'fornecedor' | 'evento' | 'unidade'; dir: 'asc' | 'desc' }>(() => ({ key: 'valor', dir: 'desc' }));
-  const [listSort, setListSort] = useState<{ key: 'prioridade' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
+  const [listSort, setListSort] = useState<{ key: 'prioridade' | 'sit' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
+  const [unidadeStacked, setUnidadeStacked] = useState(false);
+  const [selectedDespesa, setSelectedDespesa] = useState<RowDespesa | null>(null);
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
@@ -364,6 +369,11 @@ export function ContasPagar() {
       if (n.overdue7) return 0;
       return 1;
     };
+    const sitRank = (n: any) => {
+      if (n.status === 'LIQU') return 1;
+      if (n.status === 'CANC') return 2;
+      return 0;
+    };
     const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
     const safeTs = (t: number | null) => (t === null ? 9e15 : t);
     const eventoNum = (n: any) => {
@@ -394,6 +404,7 @@ export function ContasPagar() {
       }
 
       const dir = listSort.dir === 'desc' ? -1 : 1;
+      if (listSort.key === 'sit') return dir * (sitRank(a) - sitRank(b));
       if (listSort.key === 'valor') return dir * ((Number(a.valor) || 0) - (Number(b.valor) || 0));
       if (listSort.key === 'venc') return dir * (safeTs(a.vencimentoTs ?? null) - safeTs(b.vencimentoTs ?? null));
       if (listSort.key === 'pgto') return dir * (safeTs(a.programacaoTs ?? null) - safeTs(b.programacaoTs ?? null));
@@ -653,14 +664,15 @@ export function ContasPagar() {
   const donutEventos = useMemo(() => {
     const list = byEvento;
     const total = list.reduce((s, x) => s + x.total, 0);
-    const top = list.slice(0, 3);
+    const top = list.slice(0, 5);
     const topSum = top.reduce((s, x) => s + x.total, 0);
     const outros = Math.max(0, total - topSum);
+    const colors = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#a855f7'];
     const data = [
       ...top.map((x, idx) => ({
         name: x.label,
         value: x.total,
-        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+        color: colors[idx] || '#94a3b8',
       })),
       ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
     ];
@@ -670,14 +682,15 @@ export function ContasPagar() {
   const donutGrupos = useMemo(() => {
     const list = byGrupo.map((g) => ({ key: g.key, label: g.label, total: g.total }));
     const total = list.reduce((s, x) => s + x.total, 0);
-    const top = list.slice(0, 3);
+    const top = list.slice(0, 5);
     const topSum = top.reduce((s, x) => s + x.total, 0);
     const outros = Math.max(0, total - topSum);
+    const colors = ['#10b981', '#f59e0b', '#0ea5e9', '#4f46e5', '#a855f7'];
     const data = [
       ...top.map((x, idx) => ({
         name: x.label,
         value: x.total,
-        color: idx === 0 ? '#10b981' : idx === 1 ? '#f59e0b' : '#0ea5e9',
+        color: colors[idx] || '#94a3b8',
       })),
       ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
     ];
@@ -903,6 +916,34 @@ export function ContasPagar() {
     });
     baixarCsv('contas_pagar', headerCsvDespesas, rowsCsv);
   }, [baixarCsv, filtered, headerCsvDespesas]);
+
+  const exportarCsvLista = useCallback(
+    (filenameBase: string, items: any[]) => {
+      const rowsCsv = items.map((n) => {
+        const r: RowDespesa = n.raw;
+        return [
+          String(r.nro_lancto ?? ''),
+          String(r.parcela ?? ''),
+          String(r.evento ?? ''),
+          String(r.evento_descricao ?? ''),
+          String(r.fornecedor_cnpj ?? ''),
+          String(r.fornecedor_nome ?? ''),
+          String(r.vlr_parcela ?? ''),
+          String(r.data_inclusao ?? ''),
+          String(r.data_emissao_nf ?? ''),
+          String(r.data_vencimento ?? ''),
+          String(r.data_programacao_pgto ?? ''),
+          String(r.unidade ?? ''),
+          String(r.sit_des ?? ''),
+          String(r.grupo_evento ?? ''),
+          String(r.mes_competencia ?? ''),
+          String(r.historico ?? ''),
+        ];
+      });
+      baixarCsv(filenameBase, headerCsvDespesas, rowsCsv);
+    },
+    [baixarCsv, headerCsvDespesas]
+  );
 
   const exportarCsvLinha = useCallback(
     (r: RowDespesa) => {
@@ -1450,7 +1491,10 @@ export function ContasPagar() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card className="bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900">
+          <Card
+            className="bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900 cursor-pointer"
+            onClick={() => exportarCsvLista('base', filtered)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Base</div>
@@ -1461,7 +1505,10 @@ export function ContasPagar() {
             </CardContent>
           </Card>
 
-          <Card className="bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900">
+          <Card
+            className="bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900 cursor-pointer"
+            onClick={() => exportarCsvLista('total', filtered)}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold text-sky-700 dark:text-sky-300">Total</div>
@@ -1503,7 +1550,10 @@ export function ContasPagar() {
             </CardContent>
           </Card>
 
-          <Card className="bg-amber-50 border-amber-200 dark:bg-amber-950/35 dark:border-amber-900">
+          <Card
+            className="bg-amber-50 border-amber-200 dark:bg-amber-950/35 dark:border-amber-900 cursor-pointer"
+            onClick={() => exportarCsvLista('pendentes', filtered.filter((n: any) => n.status !== 'LIQU' && n.status !== 'CANC'))}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Pendentes</div>
@@ -1513,7 +1563,10 @@ export function ContasPagar() {
             </CardContent>
           </Card>
 
-          <Card className="bg-rose-50 border-rose-200 dark:bg-rose-950/35 dark:border-rose-900">
+          <Card
+            className="bg-rose-50 border-rose-200 dark:bg-rose-950/35 dark:border-rose-900 cursor-pointer"
+            onClick={() => exportarCsvLista('em_atraso', filtered.filter((n: any) => n.overdue))}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">Em atraso</div>
@@ -1523,6 +1576,15 @@ export function ContasPagar() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-slate-200 dark:border-slate-700">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <Download className="w-4 h-4 text-slate-500" />
+              <span>Clique em cards e gráficos para exportar os dados em CSV.</span>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
           <TabsContent value="visao">
@@ -1546,13 +1608,21 @@ export function ContasPagar() {
 
                     <div className="h-[260px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={serieProgramacaoComparativo} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <LineChart
+                          data={serieProgramacaoComparativo}
+                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          onClick={(e: any) => {
+                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                            if (dk === 'total' || dk === 'liqu') exportarSerieProgramacao(dk as any);
+                            else exportarSerieProgramacaoCompleta();
+                          }}
+                        >
                           <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
                           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                           <YAxis tick={{ fontSize: 11 }} width={70} />
                           <RechartsTooltip content={<ProgramacaoTooltip />} />
-                          <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} dot={false} onClick={() => exportarSerieProgramacao('total')} style={{ cursor: 'pointer' }} />
-                          <Line type="monotone" dataKey="liqu" stroke="#10b981" strokeWidth={2} dot={false} onClick={() => exportarSerieProgramacao('liqu')} style={{ cursor: 'pointer' }} />
+                          <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="liqu" stroke="#10b981" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -1632,7 +1702,7 @@ export function ContasPagar() {
                             <Cell fill="#10b981" />
                             <Cell fill="#94a3b8" />
                           </Pie>
-                          <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1665,7 +1735,7 @@ export function ContasPagar() {
                               <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
                             ))}
                           </Pie>
-                          <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1708,7 +1778,7 @@ export function ContasPagar() {
                         <BarChart data={ageing} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                           <XAxis type="number" hide />
                           <YAxis type="category" dataKey="label" width={90} tick={{ fontSize: 11 }} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v) || 0)} />
                           <Bar
                             dataKey="total"
                             fill="#f59e0b"
@@ -1741,39 +1811,87 @@ export function ContasPagar() {
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (Top 3 + Demais)</div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">Empilhado</Label>
+                      <Switch checked={unidadeStacked} onCheckedChange={(v) => setUnidadeStacked(Boolean(v))} />
+                    </div>
                   </div>
 
                   <div className="h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={serieProgramacaoPorUnidade} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} width={70} />
-                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
-                        {unidadesTop3.map((u) => (
-                          <Line
-                            key={u}
-                            type="monotone"
-                            dataKey={u}
-                            stroke={unidadeLineColors[u] || '#4f46e5'}
-                            strokeWidth={2}
-                            dot={false}
-                            onClick={() => exportarSerieProgramacaoUnidade(u)}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        ))}
-                        {byUnidade.length > 3 && (
-                          <Line
-                            type="monotone"
-                            dataKey="Demais"
-                            stroke={unidadeLineColors.Demais}
-                            strokeWidth={2}
-                            dot={false}
-                            onClick={() => exportarSerieProgramacaoUnidade('Demais')}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        )}
-                      </LineChart>
+                      {unidadeStacked ? (
+                        <AreaChart
+                          data={serieProgramacaoPorUnidade}
+                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          onClick={(e: any) => {
+                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
+                            else exportarSerieProgramacaoUnidades();
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={70} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          {unidadesTop3.map((u) => (
+                            <Area
+                              key={u}
+                              type="monotone"
+                              dataKey={u}
+                              stackId="1"
+                              stroke={unidadeLineColors[u] || '#4f46e5'}
+                              fill={unidadeLineColors[u] || '#4f46e5'}
+                              fillOpacity={0.35}
+                              strokeWidth={2}
+                            />
+                          ))}
+                          {byUnidade.length > 3 && (
+                            <Area
+                              type="monotone"
+                              dataKey="Demais"
+                              stackId="1"
+                              stroke={unidadeLineColors.Demais}
+                              fill={unidadeLineColors.Demais}
+                              fillOpacity={0.3}
+                              strokeWidth={2}
+                            />
+                          )}
+                        </AreaChart>
+                      ) : (
+                        <LineChart
+                          data={serieProgramacaoPorUnidade}
+                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          onClick={(e: any) => {
+                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
+                            else exportarSerieProgramacaoUnidades();
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={70} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          {unidadesTop3.map((u) => (
+                            <Line
+                              key={u}
+                              type="monotone"
+                              dataKey={u}
+                              stroke={unidadeLineColors[u] || '#4f46e5'}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          ))}
+                          {byUnidade.length > 3 && (
+                            <Line
+                              type="monotone"
+                              dataKey="Demais"
+                              stroke={unidadeLineColors.Demais}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          )}
+                        </LineChart>
+                      )}
                     </ResponsiveContainer>
                   </div>
 
@@ -1816,7 +1934,7 @@ export function ContasPagar() {
                             <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
                           ))}
                         </Pie>
-                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                        <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -1875,14 +1993,15 @@ export function ContasPagar() {
                             <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
                           ))}
                         </Pie>
-                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                        <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                     {donutEventos.top.map((x, idx) => {
                       const pct = donutEventos.total > 0 ? (x.total / donutEventos.total) * 100 : 0;
-                      const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                      const colors = ['bg-indigo-600', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500', 'bg-purple-500'];
+                      const color = colors[idx] || 'bg-slate-400';
                       return (
                         <div key={x.key} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1932,14 +2051,15 @@ export function ContasPagar() {
                             <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
                           ))}
                         </Pie>
-                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                        <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
                   <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                     {donutGrupos.top.map((x, idx) => {
                       const pct = donutGrupos.total > 0 ? (x.total / donutGrupos.total) * 100 : 0;
-                      const color = idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-amber-500' : 'bg-sky-500';
+                      const colors = ['bg-emerald-500', 'bg-amber-500', 'bg-sky-500', 'bg-indigo-600', 'bg-purple-500'];
+                      const color = colors[idx] || 'bg-slate-400';
                       return (
                         <div key={x.key} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1975,49 +2095,41 @@ export function ContasPagar() {
                     <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top vencidas</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">Maiores valores em atraso (recorte atual)</div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 dark:border-slate-600"
-                    onClick={() => { setQuickOnlyOverdue(true); setActiveTab('lista'); }}
-                  >
-                    Ver na Lista
-                  </Button>
                 </div>
 
                 <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <button
                       type="button"
-                      className="col-span-2 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                      className="col-span-2 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                       onClick={() => setTopSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
                     >
                       Venc.{topSort.key === 'venc' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                     </button>
                     <button
                       type="button"
-                      className="col-span-2 text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
+                      className="col-span-2 w-full text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
                       onClick={() => setTopSort((s) => (s.key === 'valor' ? { key: 'valor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'valor', dir: 'desc' }))}
                     >
                       Valor{topSort.key === 'valor' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                     </button>
                     <button
                       type="button"
-                      className="col-span-4 text-left pl-4 hover:text-slate-900 dark:hover:text-slate-100"
+                      className="col-span-4 w-full text-left pl-4 hover:text-slate-900 dark:hover:text-slate-100"
                       onClick={() => setTopSort((s) => (s.key === 'fornecedor' ? { key: 'fornecedor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'fornecedor', dir: 'asc' }))}
                     >
                       Fornecedor{topSort.key === 'fornecedor' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                     </button>
                     <button
                       type="button"
-                      className="col-span-3 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                      className="col-span-3 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                       onClick={() => setTopSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
                     >
                       Evento{topSort.key === 'evento' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                     </button>
                     <button
                       type="button"
-                      className="col-span-1 text-right hover:text-slate-900 dark:hover:text-slate-100"
+                      className="col-span-1 w-full text-right hover:text-slate-900 dark:hover:text-slate-100"
                       onClick={() => setTopSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
                     >
                       UNI{topSort.key === 'unidade' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -2035,7 +2147,7 @@ export function ContasPagar() {
                         return (
                           <button
                             key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
-                            onClick={() => { setTableSearch(String(r.nro_lancto)); setActiveTab('lista'); }}
+                            onClick={() => setSelectedDespesa(r)}
                             className="grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
                             <div className="col-span-2 font-mono text-amber-700 dark:text-amber-400">{r.data_vencimento || '-'}</div>
@@ -2193,53 +2305,59 @@ export function ContasPagar() {
                 <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <button
                     type="button"
-                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-2 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'lancto' ? { key: 'lancto', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'lancto', dir: 'asc' }))}
                   >
-                    Lanç.{listSort.key === 'lancto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    Lançamento{listSort.key === 'lancto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
-                  <div className="col-span-1">Parc.</div>
                   <button
                     type="button"
-                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-1 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
+                  >
+                    Unid{listSort.key === 'unidade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'sit' ? { key: 'sit', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'sit', dir: 'asc' }))}
+                  >
+                    Sit{listSort.key === 'sit' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
                   >
                     Evento{listSort.key === 'evento' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                   <button
                     type="button"
-                    className="col-span-4 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-3 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'fornecedor' ? { key: 'fornecedor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'fornecedor', dir: 'asc' }))}
                   >
                     Fornecedor{listSort.key === 'fornecedor' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                   <button
                     type="button"
-                    className="col-span-2 text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-2 w-full text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'valor' ? { key: 'valor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'valor', dir: 'desc' }))}
                   >
                     Valor{listSort.key === 'valor' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                   <button
                     type="button"
-                    className="col-span-1 text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-1 w-full text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
                   >
                     Venc.{listSort.key === 'venc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                   <button
                     type="button"
-                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-1 w-full text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'pgto' ? { key: 'pgto', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'pgto', dir: 'asc' }))}
                   >
                     Pgto{listSort.key === 'pgto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                  </button>
-                  <button
-                    type="button"
-                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
-                    onClick={() => setListSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
-                  >
-                    UNI{listSort.key === 'unidade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                 </div>
 
@@ -2264,18 +2382,23 @@ export function ContasPagar() {
                               : n.overdue7
                                 ? 'bg-rose-50/80 dark:bg-rose-950/25'
                                 : 'bg-amber-50/80 dark:bg-amber-950/25';
+                        const lanc = `${String(r.nro_lancto ?? 0).padStart(6, '0')}-${String(r.parcela ?? '')}`;
+                        const sitColor = r.sit_des === 'LIQU' ? 'bg-emerald-600' : r.sit_des === 'CANC' ? 'bg-slate-400' : 'bg-rose-600';
                         return (
                           <button
                             type="button"
                             key={key}
-                            onClick={() => exportarCsvLinha(r)}
+                            onClick={() => setSelectedDespesa(r)}
                             className={`grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
-                            title="Exportar CSV"
+                            title="Detalhes"
                           >
-                            <div className="col-span-1 font-mono">{r.nro_lancto}</div>
-                            <div className="col-span-1 font-mono">{r.parcela}</div>
+                            <div className="col-span-2 font-mono">{lanc}</div>
+                            <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
+                            <div className="col-span-1">
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${sitColor}`} />
+                            </div>
                             <div className="col-span-1 font-mono">{r.evento}</div>
-                            <div className="col-span-4">
+                            <div className="col-span-3">
                               <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
                               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                                 {r.fornecedor_cnpj || '-'} · {n.grupoLabel}
@@ -2283,8 +2406,7 @@ export function ContasPagar() {
                             </div>
                             <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
                             <div className="col-span-1 font-mono pl-3">{r.data_vencimento || '-'}</div>
-                            <div className="col-span-1 font-mono">{r.data_programacao_pgto || '-'}</div>
-                            <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
+                            <div className="col-span-1 font-mono pl-3">{r.data_programacao_pgto || '-'}</div>
                           </button>
                         );
                       })}
@@ -2296,6 +2418,77 @@ export function ContasPagar() {
         </Tabs>
         </div>
       </div>
+
+      <Dialog open={!!selectedDespesa} onOpenChange={(o) => { if (!o) setSelectedDespesa(null); }}>
+        <DialogContent className="sm:max-w-[780px] bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">
+              {selectedDespesa
+                ? `Despesa ${String(selectedDespesa.nro_lancto ?? 0).padStart(6, '0')}-${String(selectedDespesa.parcela ?? '')}`
+                : 'Despesa'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {selectedDespesa ? `${selectedDespesa.evento} · ${selectedDespesa.evento_descricao || '—'}` : '—'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDespesa && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Fornecedor</div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">{selectedDespesa.fornecedor_nome || '—'}</div>
+                <div className="text-xs font-mono text-slate-600 dark:text-slate-300">{selectedDespesa.fornecedor_cnpj || '—'}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Unid</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.unidade || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Situação</div>
+                  <div className="text-slate-900 dark:text-slate-100">
+                    {(selectedDespesa.sit_des || '').toString().toUpperCase() === 'LIQU' ? 'Liquidada' : 'Pendente'}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Valor</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{formatCurrency(moedaToNumber(selectedDespesa.vlr_parcela))}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Competência</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.mes_competencia || '—'}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Inclusão</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_inclusao || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Vencimento</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_vencimento || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Pagamento</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_programacao_pgto || '—'}</div>
+                </div>
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Grupo de evento</div>
+                <div className="text-slate-900 dark:text-slate-100">{selectedDespesa.grupo_evento || '—'}</div>
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Histórico</div>
+                <div className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">{selectedDespesa.historico || '—'}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
