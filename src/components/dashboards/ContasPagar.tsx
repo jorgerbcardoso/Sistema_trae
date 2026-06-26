@@ -1374,6 +1374,7 @@ export function ContasPagar() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="eventos">
