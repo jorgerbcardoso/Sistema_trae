@@ -317,12 +317,15 @@ $extractActArq = static function(string $html): array {
     return [trim((string)$act), trim((string)$arq)];
 };
 
-$downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '') use ($domain): ?string {
+$downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '') use ($domain, $summaryOnly): ?string {
     $unidadeFiltro = strtoupper(trim((string)$unidadeFiltro));
     $opcPrefix = preg_replace('/\D+/', '', (string)$opcPrefix);
     if ($opcPrefix === '') return null;
 
-    for ($try = 0; $try < 10; $try++) {
+    $maxTries = 30;
+    $sleepUs = 1000000;
+
+    for ($try = 0; $try < $maxTries; $try++) {
         $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
         $posXml = strpos($str1440, '<xml');
         if ($posXml !== false) {
@@ -353,10 +356,11 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
                 if ($unidadeFiltro !== '' && $unidF4 !== $unidadeFiltro) continue;
 
                 $sitStr = (string)$sit;
-                if ($sitStr !== 'Conclu&iacute;do' && $sitStr !== 'Concluído') continue;
+                if ($sitStr !== 'Conclu&iacute;do' && $sitStr !== 'Concluído' && $sitStr !== 'Concluido') continue;
 
                 $opcStr = (string)$opc;
-                if (substr($opcStr, 0, 3) !== $opcPrefix) continue;
+                $opcDigits = preg_replace('/\D+/', '', (string)$opcStr);
+                if ($opcDigits === '' || (int)$opcDigits !== (int)$opcPrefix) continue;
 
                 $f8dec = html_entity_decode((string)$f8);
                 if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
@@ -378,7 +382,7 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
             if (!empty($file) && strlen((string)$file) >= 100) return $file;
         }
 
-        usleep(400000);
+        usleep($sleepUs);
     }
 
     return null;
@@ -413,6 +417,7 @@ if ($looksLikeCsv($strDec)) {
 
 if (empty($csv) || strlen((string)$csv) < 50) {
     $fromQueue = $downloadFrom1440('099', $unidade);
+    if (empty($fromQueue) && $unidade !== '') $fromQueue = $downloadFrom1440('099', '');
     if (!empty($fromQueue)) $csv = $fromQueue;
 }
 

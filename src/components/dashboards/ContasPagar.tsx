@@ -839,10 +839,13 @@ export function ContasPagar() {
         });
       } else {
         setAnoAnterior(null);
+        const msg = res?.message ? String(res.message) : '';
+        if (msg) toast.message(`Ano anterior: ${msg}`);
       }
     } catch {
       if (reqId !== anoAnteriorReqRef.current) return;
       setAnoAnterior(null);
+      toast.message('Ano anterior: não foi possível obter o indicador.');
     } finally {
       if (reqId === anoAnteriorReqRef.current) setLoadingAnoAnterior(false);
     }
