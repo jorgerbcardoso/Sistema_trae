@@ -18,6 +18,7 @@ import { Disponiveis } from './components/dashboards/Disponiveis';
 import { FaturamentoClientes } from './components/dashboards/FaturamentoClientes';
 import { ColetaEntrega } from './components/dashboards/ColetaEntrega';
 import { PainelRetidos } from './components/dashboards/PainelRetidos';
+import { ContasPagar } from './components/dashboards/ContasPagar';
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
@@ -207,6 +208,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <PainelRetidos />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'dashboards/contas-pagar',
+        element: (
+          <ProtectedRoute>
+            <ContasPagar />
           </ProtectedRoute>
         )
       },
