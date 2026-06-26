@@ -10,6 +10,20 @@ import { router } from './routes.tsx';
 import { useMockUser } from './hooks/useMockUser';
 
 export default function App() {
+  if (window.location.hostname === 'sistema.webpresto.com.br') {
+    const { pathname, search, hash } = window.location;
+    const rawBaseUrl = import.meta.env.BASE_URL || '/';
+    const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+    const basePrefix = normalizedBaseUrl === '/' ? '' : normalizedBaseUrl;
+
+    const targetPathname = pathname.startsWith(basePrefix)
+      ? pathname
+      : `${basePrefix}${pathname === '/' ? '' : pathname}`;
+
+    window.location.replace(`https://webpresto.com.br${targetPathname}${search}${hash}`);
+    return null;
+  }
+
   // ✅ Configurar usuário mockado APENAS no Figma Make
   // No modo claro do navegador em produção, isso NÃO deve rodar.
   if (window.location.hostname.includes('figma')) {

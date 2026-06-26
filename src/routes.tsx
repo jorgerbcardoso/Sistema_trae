@@ -81,11 +81,9 @@ function Root() {
   return <Outlet />;
 }
 
-// ✅ BASENAME: Detectar se está em produção ou localhost
-const hostname = window.location.hostname;
-const isProduction = hostname === 'webpresto.com.br' || hostname === 'www.webpresto.com.br' || hostname === 'sistemagestao.aceville.com.br';
-const isIPAccess = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-const basename = (isProduction || isIPAccess) ? '/sistema' : '';
+const rawBaseUrl = import.meta.env.BASE_URL || '/';
+const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+const basename = normalizedBaseUrl === '/' ? undefined : normalizedBaseUrl;
 
 export const router = createBrowserRouter([
   {

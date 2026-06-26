@@ -282,6 +282,11 @@ class ApiService {
     try {
       console.log('🔍🔍🔍 [ApiService.getLoginPath] INICIANDO DETERMINAÇÃO DO CAMINHO');
       
+      const rawBaseUrl = (import.meta as any).env?.BASE_URL || '/';
+      const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+      const basePrefix = normalizedBaseUrl === '/' ? '' : normalizedBaseUrl;
+      const withBase = (path: string) => `${basePrefix}${path.startsWith('/') ? path : `/${path}`}`;
+
       // 1. Tentar ler domínio do localStorage
       const storedDomain = localStorage.getItem('presto_domain');
       console.log('🔍🔍🔍 [ApiService.getLoginPath] Domínio lido do localStorage:', storedDomain);
@@ -289,7 +294,7 @@ class ApiService {
       // 2. Se for Aceville, redirecionar para tela customizada
       if (storedDomain === 'ACV') {
         console.log('✅✅✅ [ApiService.getLoginPath] DOMÍNIO ACV DETECTADO → /login-aceville');
-        return '/login-aceville';
+        return withBase('/login-aceville');
       }
       
       // 3. Verificar se acesso é via IP (fallback)
@@ -301,15 +306,18 @@ class ApiService {
       
       if (isIPAccess) {
         console.log('✅✅✅ [ApiService.getLoginPath] ACESSO VIA IP DETECTADO → /login-aceville');
-        return '/login-aceville';
+        return withBase('/login-aceville');
       }
       
       // 4. Padrão: login convencional
       console.log('⚠️⚠️⚠️ [ApiService.getLoginPath] Nenhuma condição atendida → /login');
-      return '/login';
+      return withBase('/login');
     } catch (error) {
       console.error('❌❌❌ [ApiService.getLoginPath] ERRO:', error);
-      return '/login';
+      const rawBaseUrl = (import.meta as any).env?.BASE_URL || '/';
+      const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+      const basePrefix = normalizedBaseUrl === '/' ? '' : normalizedBaseUrl;
+      return `${basePrefix}/login`;
     }
   }
 

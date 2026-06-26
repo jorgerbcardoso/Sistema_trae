@@ -112,6 +112,8 @@ export async function handleAPIResponse(response: Response, suppressToast = fals
   // ================================================================
   if (response.status === 401) {
     console.error('❌ [apiUtils] Sessão expirada (401), fazendo logout automático...');
+
+    const storedDomain = localStorage.getItem('presto_domain');
     
     // Limpar autenticação local
     localStorage.removeItem('auth_token');
@@ -130,12 +132,12 @@ export async function handleAPIResponse(response: Response, suppressToast = fals
     
     // Aguardar 1 segundo e redirecionar
     setTimeout(() => {
-      const storedDomain = localStorage.getItem('presto_domain');
-      if (storedDomain === 'ACV') {
-        window.location.href = '/sistema/login-aceville';
-      } else {
-        window.location.href = '/sistema/login';
-      }
+      const rawBaseUrl = import.meta.env.BASE_URL || '/';
+      const normalizedBaseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+      const basePrefix = normalizedBaseUrl === '/' ? '' : normalizedBaseUrl;
+
+      const loginPath = storedDomain === 'ACV' ? '/login-aceville' : '/login';
+      window.location.href = `${basePrefix}${loginPath}`;
     }, 1000);
     
     // Retornar erro
