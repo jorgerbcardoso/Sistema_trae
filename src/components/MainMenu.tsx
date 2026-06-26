@@ -330,7 +330,18 @@ export function MainMenu() {
     }
 
     const routePath = (item.route_path || '').trim();
-    const safePath = routePath.startsWith('/') ? routePath : `/${routePath}`;
+    if (!routePath) {
+      toast.error('Item de menu sem rota configurada.');
+      return;
+    }
+
+    const baseUrl = String(import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    let safePath = routePath.startsWith('/') ? routePath : `/${routePath}`;
+    safePath = safePath.replace(/\/{2,}/g, '/');
+    if (baseUrl && baseUrl !== '/' && safePath.startsWith(`${baseUrl}/`)) {
+      safePath = safePath.slice(baseUrl.length);
+    }
+    safePath = safePath.replace(/\/+$/, '') || '/';
     navigate(safePath);
   };
 
