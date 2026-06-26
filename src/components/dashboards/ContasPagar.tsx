@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Switch } from '../ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
@@ -234,7 +233,6 @@ export function ContasPagar() {
   const [listPage, setListPage] = useState(1);
   const [topSort, setTopSort] = useState<{ key: 'venc' | 'valor' | 'fornecedor' | 'evento' | 'unidade'; dir: 'asc' | 'desc' }>(() => ({ key: 'valor', dir: 'desc' }));
   const [listSort, setListSort] = useState<{ key: 'prioridade' | 'sit' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
-  const [unidadeStacked, setUnidadeStacked] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<RowDespesa | null>(null);
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
@@ -647,14 +645,15 @@ export function ContasPagar() {
     }
     const list = Array.from(map.values()).sort((a, b) => b.total - a.total);
     const total = list.reduce((s, x) => s + x.total, 0);
-    const top = list.slice(0, 3);
+    const top = list.slice(0, 5);
     const topSum = top.reduce((s, x) => s + x.total, 0);
     const outros = Math.max(0, total - topSum);
+    const colors = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#a855f7'];
     const data = [
       ...top.map((x, idx) => ({
         name: x.label,
         value: x.total,
-        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+        color: colors[idx] || '#94a3b8',
       })),
       ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
     ];
@@ -1743,7 +1742,8 @@ export function ContasPagar() {
                     <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                       {donutFornecedores.top.map((x, idx) => {
                         const pct = donutFornecedores.total > 0 ? (x.total / donutFornecedores.total) * 100 : 0;
-                        const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                        const colors = ['bg-indigo-600', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500', 'bg-purple-500'];
+                        const color = colors[idx] || 'bg-slate-400';
                         return (
                           <div key={x.key} className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
@@ -1812,87 +1812,47 @@ export function ContasPagar() {
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (Top 3 + Demais)</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-slate-600 dark:text-slate-300">Empilhado</Label>
-                      <Switch checked={unidadeStacked} onCheckedChange={(v) => setUnidadeStacked(Boolean(v))} />
-                    </div>
                   </div>
 
                   <div className="h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      {unidadeStacked ? (
-                        <AreaChart
-                          data={serieProgramacaoPorUnidade}
-                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                          onClick={(e: any) => {
-                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
-                            else exportarSerieProgramacaoUnidades();
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} width={70} />
-                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
-                          {unidadesTop3.map((u) => (
-                            <Area
-                              key={u}
-                              type="monotone"
-                              dataKey={u}
-                              stackId="1"
-                              stroke={unidadeLineColors[u] || '#4f46e5'}
-                              fill={unidadeLineColors[u] || '#4f46e5'}
-                              fillOpacity={0.35}
-                              strokeWidth={2}
-                            />
-                          ))}
-                          {byUnidade.length > 3 && (
-                            <Area
-                              type="monotone"
-                              dataKey="Demais"
-                              stackId="1"
-                              stroke={unidadeLineColors.Demais}
-                              fill={unidadeLineColors.Demais}
-                              fillOpacity={0.3}
-                              strokeWidth={2}
-                            />
-                          )}
-                        </AreaChart>
-                      ) : (
-                        <LineChart
-                          data={serieProgramacaoPorUnidade}
-                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                          onClick={(e: any) => {
-                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
-                            else exportarSerieProgramacaoUnidades();
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} width={70} />
-                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
-                          {unidadesTop3.map((u) => (
-                            <Line
-                              key={u}
-                              type="monotone"
-                              dataKey={u}
-                              stroke={unidadeLineColors[u] || '#4f46e5'}
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                          ))}
-                          {byUnidade.length > 3 && (
-                            <Line
-                              type="monotone"
-                              dataKey="Demais"
-                              stroke={unidadeLineColors.Demais}
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                          )}
-                        </LineChart>
-                      )}
+                      <AreaChart
+                        data={serieProgramacaoPorUnidade}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                        onClick={(e: any) => {
+                          const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                          if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
+                          else exportarSerieProgramacaoUnidades();
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} width={70} />
+                        <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                        {unidadesTop3.map((u) => (
+                          <Area
+                            key={u}
+                            type="monotone"
+                            dataKey={u}
+                            stackId="1"
+                            stroke={unidadeLineColors[u] || '#4f46e5'}
+                            fill={unidadeLineColors[u] || '#4f46e5'}
+                            fillOpacity={0.55}
+                            strokeWidth={2}
+                          />
+                        ))}
+                        {byUnidade.length > 3 && (
+                          <Area
+                            type="monotone"
+                            dataKey="Demais"
+                            stackId="1"
+                            stroke={unidadeLineColors.Demais}
+                            fill={unidadeLineColors.Demais}
+                            fillOpacity={0.25}
+                            strokeWidth={2}
+                          />
+                        )}
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
 
@@ -2137,7 +2097,7 @@ export function ContasPagar() {
                           <button
                             key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
                             onClick={() => setSelectedDespesa(r)}
-                            className="grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                            className="w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
                             <div className="col-span-2 font-mono">{lanc}</div>
                             <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
@@ -2380,7 +2340,7 @@ export function ContasPagar() {
                             type="button"
                             key={key}
                             onClick={() => setSelectedDespesa(r)}
-                            className={`grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
+                            className={`w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
                             title="Detalhes"
                           >
                             <div className="col-span-2 font-mono">{lanc}</div>
