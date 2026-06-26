@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, AreaChart, Area, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
@@ -6,6 +6,7 @@ import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
@@ -16,6 +17,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { AlertTriangle, Calendar, Download, Filter, Loader2, Search, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 type GrupoEvento = { grupo: number; descricao: string };
 
@@ -68,6 +70,29 @@ const filtrosVazios: Filters = {
   periodo_vencimento_inicio: '',
   periodo_vencimento_fim: '',
   competencia_ym: '',
+};
+
+const dateToInput = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const getMesFechadoPagamento = () => {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  return { inicio: dateToInput(first), fim: dateToInput(last) };
+};
+
+const getDefaultFilters = (): Filters => {
+  const { inicio, fim } = getMesFechadoPagamento();
+  return {
+    ...filtrosVazios,
+    periodo_programacao_inicio: inicio,
+    periodo_programacao_fim: fim,
+  };
 };
 
 const meses = [
@@ -152,8 +177,9 @@ export function ContasPagar() {
 
   const [activeTab, setActiveTab] = useState<'visao' | 'eventos' | 'unidades' | 'lista'>('visao');
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<Filters>(filtrosVazios);
-  const [tempFilters, setTempFilters] = useState<Filters>(filtrosVazios);
+  const [filters, setFilters] = useState<Filters>(() => getDefaultFilters());
+  const [tempFilters, setTempFilters] = useState<Filters>(() => getDefaultFilters());
+  const initialLoadRef = useRef(false);
 
   const [grupos, setGrupos] = useState<GrupoEvento[]>([]);
   const [loadingGrupos, setLoadingGrupos] = useState(false);
@@ -166,6 +192,7 @@ export function ContasPagar() {
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
+  const [lastLoadMessage, setLastLoadMessage] = useState<string>('');
 
   useEffect(() => {
     if (showFilters) setTempFilters(filters);
@@ -450,8 +477,9 @@ export function ContasPagar() {
   }, [filtered]);
 
   const clearFilters = () => {
-    setFilters(filtrosVazios);
-    setTempFilters(filtrosVazios);
+    const d = getDefaultFilters();
+    setFilters(d);
+    setTempFilters(d);
   };
 
   const cancelFilters = () => {
@@ -464,10 +492,11 @@ export function ContasPagar() {
     setShowFilters(false);
   };
 
-  const carregar = async () => {
+  const carregar = useCallback(async (override?: Filters) => {
     setLoading(true);
+    setLastLoadMessage('');
     try {
-      const payload = { ...filters };
+      const payload = { ...(override ?? filters) };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-pagar/get_despesas.php`,
         { method: 'POST', body: JSON.stringify(payload) },
@@ -475,13 +504,31 @@ export function ContasPagar() {
       );
       if (res?.success) {
         setRows(Array.isArray(res.rows) ? res.rows : []);
+        if (res?.message) setLastLoadMessage(String(res.message));
+        if (Array.isArray(res.rows) && res.rows.length === 0) {
+          toast.message(res?.message ? String(res.message) : 'Nenhum registro encontrado para o recorte informado.');
+        }
       } else {
         setRows([]);
+        const msg = String(res?.message || 'Erro ao buscar dados no SSW.');
+        setLastLoadMessage(msg);
+        toast.error(msg);
       }
+    } catch (e: any) {
+      setRows([]);
+      const msg = e?.message ? String(e.message) : 'Erro ao buscar dados no SSW.';
+      setLastLoadMessage(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    void carregar();
+  }, [carregar]);
 
   const exportarCsv = () => {
     const header = [
@@ -596,7 +643,7 @@ export function ContasPagar() {
               <DialogHeader>
                 <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
                 <DialogDescription className="text-slate-600 dark:text-slate-400">
-                  Informe ao menos 1 período (emissão, inclusão, programação ou vencimento).
+                  Padrão: Programação (Pagamento) = mês fechado. Informe ao menos 1 período (emissão, inclusão, programação ou vencimento).
                 </DialogDescription>
               </DialogHeader>
 
@@ -607,6 +654,7 @@ export function ContasPagar() {
                       <FornecedorSearchInput
                         value={tempFilters.seq_fornecedor}
                         onChange={(v) => setTempFilters({ ...tempFilters, seq_fornecedor: v })}
+                        displayMode="nameOnly"
                       />
                     </div>
                     <div className="space-y-2">
@@ -621,23 +669,36 @@ export function ContasPagar() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-slate-900 dark:text-slate-100">Grupo de Evento</Label>
-                      <div className="relative">
-                        <Input
-                          value={tempFilters.grupo_evento}
-                          onChange={(e) => setTempFilters({ ...tempFilters, grupo_evento: e.target.value.replace(/\D+/g, '') })}
-                          placeholder={loadingGrupos ? 'Carregando...' : 'Ex: 4'}
-                          className="pr-9 dark:bg-slate-800 dark:border-slate-700"
-                        />
-                        <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                      </div>
-                      {tempFilters.grupo_evento && grupos.length > 0 && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {(() => {
-                            const g = grupos.find(x => String(x.grupo) === tempFilters.grupo_evento);
-                            return g ? `${g.grupo} - ${g.descricao}` : 'Grupo não encontrado';
-                          })()}
-                        </p>
-                      )}
+                      <Select
+                        value={tempFilters.grupo_evento || undefined}
+                        onValueChange={(v) => setTempFilters({ ...tempFilters, grupo_evento: v || '' })}
+                      >
+                        <div className="relative">
+                          <SelectTrigger className="pr-9 dark:bg-slate-800 dark:border-slate-700">
+                            <SelectValue placeholder={loadingGrupos ? 'Carregando...' : 'Selecione um grupo'} />
+                          </SelectTrigger>
+                          {tempFilters.grupo_evento && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTempFilters({ ...tempFilters, grupo_evento: '' });
+                              }}
+                              className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <SelectContent>
+                          {grupos.map((g) => (
+                            <SelectItem key={g.grupo} value={String(g.grupo)}>
+                              {String(g.grupo).padStart(2, '0')} - {g.descricao}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <EventoSearchInput
@@ -653,21 +714,43 @@ export function ContasPagar() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_emissao_inicio}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_inicio: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_emissao_inicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_inicio: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_emissao_inicio && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_emissao_inicio: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_emissao_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_fim: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_emissao_fim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_fim: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_emissao_fim && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_emissao_fim: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -677,21 +760,43 @@ export function ContasPagar() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_inclusao_inicio}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_inclusao_inicio: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_inclusao_inicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_inclusao_inicio: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_inclusao_inicio && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_inclusao_inicio: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_inclusao_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_inclusao_fim: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_inclusao_fim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_inclusao_fim: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_inclusao_fim && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_inclusao_fim: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -701,21 +806,43 @@ export function ContasPagar() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_programacao_inicio}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_programacao_inicio: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_programacao_inicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_programacao_inicio: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_programacao_inicio && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_programacao_inicio: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_programacao_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_programacao_fim: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_programacao_fim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_programacao_fim: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_programacao_fim && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_programacao_fim: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -725,33 +852,66 @@ export function ContasPagar() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_vencimento_inicio}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_vencimento_inicio: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_vencimento_inicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_vencimento_inicio: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_vencimento_inicio && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_vencimento_inicio: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_vencimento_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_vencimento_fim: e.target.value })}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodo_vencimento_fim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodo_vencimento_fim: e.target.value })}
+                            className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          {tempFilters.periodo_vencimento_fim && (
+                            <button
+                              type="button"
+                              onClick={() => setTempFilters({ ...tempFilters, periodo_vencimento_fim: '' })}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-slate-900 dark:text-slate-100">Mês de Competência</Label>
-                    <Input
-                      type="month"
-                      value={tempFilters.competencia_ym}
-                      onChange={(e) => setTempFilters({ ...tempFilters, competencia_ym: e.target.value })}
-                      className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="month"
+                        value={tempFilters.competencia_ym}
+                        onChange={(e) => setTempFilters({ ...tempFilters, competencia_ym: e.target.value })}
+                        className="pr-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                      />
+                      {tempFilters.competencia_ym && (
+                        <button
+                          type="button"
+                          onClick={() => setTempFilters({ ...tempFilters, competencia_ym: '' })}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                     {tempFilters.competencia_ym && (
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Param SSW (mes_comp): {ymToMesCompParam(tempFilters.competencia_ym)} • CSV: {ymToCompetenciaLabel(tempFilters.competencia_ym)}

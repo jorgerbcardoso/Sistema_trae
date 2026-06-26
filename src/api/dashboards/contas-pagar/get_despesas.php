@@ -83,6 +83,8 @@ $startVencTs = $vencimentoInicio !== '' ? strtotime($vencimentoInicio) ?: null :
 $endVencTs   = $vencimentoFim !== '' ? strtotime($vencimentoFim) ?: null : null;
 
 $cnpjFornecedor = '';
+$descGrupoEvento = '';
+$descEvento = '';
 if ($seqFornecedor > 0) {
     $prefix = strtolower($domain);
     $res = sql(
@@ -141,6 +143,33 @@ $parseCompetencia = static function(string $ym, string $raw): array {
 
 [$mesCompParam, $mesCompLabel] = $parseCompetencia($competenciaYm, $competenciaRaw);
 
+$prefix = strtolower($domain);
+$grupoEventoNum = (int)preg_replace('/\D+/', '', (string)$grupoEvento);
+if ($grupoEventoNum > 0) {
+    $r = sql(
+        "SELECT descricao FROM {$prefix}_grupo_evento WHERE grupo = $1",
+        [$grupoEventoNum],
+        $g_sql
+    );
+    if ($r && pg_num_rows($r) > 0) {
+        $row = pg_fetch_assoc($r);
+        $descGrupoEvento = trim((string)($row['descricao'] ?? ''));
+    }
+}
+
+$eventoNum = (int)preg_replace('/\D+/', '', (string)$evento);
+if ($eventoNum > 0) {
+    $r = sql(
+        "SELECT descricao FROM {$prefix}_evento WHERE evento = $1",
+        [$eventoNum],
+        $g_sql
+    );
+    if ($r && pg_num_rows($r) > 0) {
+        $row = pg_fetch_assoc($r);
+        $descEvento = trim((string)($row['descricao'] ?? ''));
+    }
+}
+
 try {
     require_ssw();
     ssw_login($domain);
@@ -167,12 +196,18 @@ if ($unidade !== '') {
     $params['unid_pgto'] = strtolower($unidade);
 }
 
-if (trim($grupoEvento) !== '') {
-    $params['gru_evento'] = preg_replace('/\D+/', '', $grupoEvento);
+if ($grupoEventoNum > 0) {
+    $params['gru_evento'] = (string)$grupoEventoNum;
+    if ($descGrupoEvento !== '') {
+        $params['evento_grupo'] = $descGrupoEvento;
+    }
 }
 
-if (trim($evento) !== '') {
-    $params['cod_evento'] = preg_replace('/\D+/', '', $evento);
+if ($eventoNum > 0) {
+    $params['cod_evento'] = (string)$eventoNum;
+    if ($descEvento !== '') {
+        $params['evento'] = $descEvento;
+    }
 }
 
 if ($mesCompParam !== '') {
@@ -205,6 +240,18 @@ $url = "https://sistema.ssw.inf.br/bin/ssw0099?$qs";
 $raw = ssw_go($url);
 $strDec = urldecode((string)$raw);
 
+$noLanc = [
+    'N&atilde;o h&aacute; lan&ccedil;amento',
+    'Não há lançamento',
+    'NAO HA LANCAMENTO',
+    'Não há lan&ccedil;amento',
+];
+foreach ($noLanc as $needle) {
+    if (stripos($strDec, $needle) !== false) {
+        respondJson(['success' => true, 'rows' => [], 'total' => 0, 'message' => 'SSW: não há lançamentos para o recorte informado.']);
+    }
+}
+
 $looksLikeCsv = static function(string $s): bool {
     if (stripos($s, 'NUMLANCTO') !== false && strpos($s, ';') !== false) return true;
     if (preg_match('/^\s*3;.*NUMLANCTO;/mi', $s)) return true;
@@ -214,6 +261,11 @@ $looksLikeCsv = static function(string $s): bool {
 $extractActArq = static function(string $html): array {
     $act = function_exists('ssw_get_act') ? ssw_get_act($html) : '';
     $arq = function_exists('ssw_get_arq') ? ssw_get_arq($html) : '';
+    if ((empty($act) || empty($arq)) && preg_match('/ssw0424\?([^"\']+)/i', $html, $m)) {
+        parse_str(html_entity_decode($m[1]), $q);
+        if (empty($act) && !empty($q['act'])) $act = (string)$q['act'];
+        if (empty($arq) && !empty($q['filename'])) $arq = (string)$q['filename'];
+    }
     return [trim((string)$act), trim((string)$arq)];
 };
 
@@ -352,4 +404,5 @@ respondJson([
     'success' => true,
     'rows' => $rows,
     'total' => count($rows),
+    'message' => count($rows) === 0 ? 'Nenhum registro retornado pelo SSW para o recorte informado.' : null,
 ]);

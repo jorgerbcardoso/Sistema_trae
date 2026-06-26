@@ -22,6 +22,7 @@ interface FornecedorSearchInputProps {
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  displayMode?: 'full' | 'nameOnly';
 }
 
 /**
@@ -48,7 +49,8 @@ export function FornecedorSearchInput({
   placeholder = "Busque por nome ou CNPJ...",
   disabled = false,
   required = false,
-  className = ""
+  className = "",
+  displayMode = 'full'
 }: FornecedorSearchInputProps) {
   const { user } = useAuth();
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
@@ -183,13 +185,13 @@ export function FornecedorSearchInput({
       <div className="relative">
         {/* DISPLAY DO FORNECEDOR SELECIONADO */}
         {selectedFornecedor && !isOpen ? (
-          <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-md bg-card">
-            <span className="flex-1 text-sm text-foreground">
+          <div className="flex items-center gap-2 px-3 border border-border rounded-md bg-card h-9">
+            <span className="flex-1 text-sm text-foreground truncate">
               <span className="font-semibold">{selectedFornecedor.nome}</span>
-              {selectedFornecedor.cnpj && (
+              {displayMode === 'full' && selectedFornecedor.cnpj && (
                 <span className="text-xs text-gray-500 ml-2">CNPJ: {selectedFornecedor.cnpj}</span>
               )}
-              {selectedFornecedor.cidade_nome && (
+              {displayMode === 'full' && selectedFornecedor.cidade_nome && (
                 <span className="text-xs text-gray-500 ml-2">
                   • {selectedFornecedor.cidade_nome}/{selectedFornecedor.cidade_uf}
                 </span>
