@@ -16,6 +16,8 @@ $g_sql = connect();
 
 $input = getRequestInput();
 
+$summaryOnly = (bool)($input['summary_only'] ?? false);
+
 $seqFornecedor = (int)($input['seq_fornecedor'] ?? 0);
 $unidade = strtoupper(trim((string)($input['unidade'] ?? '')));
 $grupoEvento = (string)($input['grupo_evento'] ?? '');
@@ -52,6 +54,15 @@ $toDmy = static function(?string $iso): string {
 
 $normalizeDigits = static function(string $s): string {
     return preg_replace('/\D+/', '', $s);
+};
+
+$parseMoney = static function(string $s): float {
+    $v = trim((string)$s);
+    if ($v === '') return 0.0;
+    $v = str_replace(['.', ' '], ['', ''], $v);
+    $v = str_replace(',', '.', $v);
+    $n = (float)$v;
+    return is_finite($n) ? $n : 0.0;
 };
 
 $parseDateBR = static function(string $s): ?int {
@@ -326,6 +337,10 @@ $get = static function(array $row, array $idx, string $key, int $fallbackIndex):
 };
 
 $rows = [];
+$sumTotal = 0.0;
+$sumLiqu = 0.0;
+$sumCanc = 0.0;
+$countTotal = 0;
 foreach ($lines as $l) {
     $t = trim((string)$l);
     if (!preg_match('/^5;/', $t)) continue;
@@ -380,29 +395,43 @@ foreach ($lines as $l) {
         if (!$inRangeTs($ts, $startProgTs, $endProgTs)) continue;
     }
 
-    $rows[] = [
-        'nro_lancto' => (int)$nroLancto,
-        'parcela' => (int)$parcela,
-        'evento' => (int)$codEvento,
-        'evento_descricao' => $descEvento,
-        'historico' => $historico,
-        'fornecedor_cnpj' => $cnpj,
-        'fornecedor_nome' => $nomeFornecedor,
-        'vlr_parcela' => $valorParcela,
-        'data_inclusao' => $dataInclusao,
-        'data_vencimento' => $dataVenc,
-        'data_emissao_nf' => $dataEmissao,
-        'data_programacao_pgto' => $dataPgto,
-        'unidade' => $uni,
-        'sit_des' => $sitDes,
-        'grupo_evento' => $grupoRaw,
-        'mes_competencia' => $mesCompetencia,
-    ];
+    $vlr = $parseMoney($valorParcela);
+    $sumTotal += $vlr;
+    $countTotal += 1;
+    if ($sitDes === 'LIQU') $sumLiqu += $vlr;
+    if ($sitDes === 'CANC') $sumCanc += $vlr;
+
+    if (!$summaryOnly) {
+        $rows[] = [
+            'nro_lancto' => (int)$nroLancto,
+            'parcela' => (int)$parcela,
+            'evento' => (int)$codEvento,
+            'evento_descricao' => $descEvento,
+            'historico' => $historico,
+            'fornecedor_cnpj' => $cnpj,
+            'fornecedor_nome' => $nomeFornecedor,
+            'vlr_parcela' => $valorParcela,
+            'data_inclusao' => $dataInclusao,
+            'data_vencimento' => $dataVenc,
+            'data_emissao_nf' => $dataEmissao,
+            'data_programacao_pgto' => $dataPgto,
+            'unidade' => $uni,
+            'sit_des' => $sitDes,
+            'grupo_evento' => $grupoRaw,
+            'mes_competencia' => $mesCompetencia,
+        ];
+    }
 }
 
 respondJson([
     'success' => true,
-    'rows' => $rows,
-    'total' => count($rows),
-    'message' => count($rows) === 0 ? 'Nenhum registro retornado pelo SSW para o recorte informado.' : null,
+    'rows' => $summaryOnly ? [] : $rows,
+    'total' => $summaryOnly ? $countTotal : count($rows),
+    'summary' => [
+        'count_total' => $countTotal,
+        'sum_total' => $sumTotal,
+        'sum_liqu' => $sumLiqu,
+        'sum_canc' => $sumCanc,
+    ],
+    'message' => $countTotal === 0 ? 'Nenhum registro retornado pelo SSW para o recorte informado.' : null,
 ]);

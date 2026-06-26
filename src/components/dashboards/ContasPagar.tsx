@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
-import { AlertTriangle, Calendar, Download, Filter, Loader2, Search, SlidersHorizontal, TrendingUp, X, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, Filter, Loader2, Search, SlidersHorizontal, Wallet, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type GrupoEvento = { grupo: number; descricao: string };
@@ -81,8 +81,8 @@ const dateToInput = (d: Date) => {
 
 const getMesFechadoPagamento = () => {
   const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return { inicio: dateToInput(first), fim: dateToInput(last) };
 };
 
@@ -92,6 +92,44 @@ const getDefaultFilters = (): Filters => {
     ...filtrosVazios,
     periodo_programacao_inicio: inicio,
     periodo_programacao_fim: fim,
+  };
+};
+
+const shiftIsoDateYears = (iso: string, yearsDelta: number) => {
+  const s = (iso ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  const dt = new Date(y, mo - 1, d, 12, 0, 0, 0);
+  dt.setFullYear(dt.getFullYear() + yearsDelta);
+  return dateToInput(dt);
+};
+
+const shiftIsoMonthYears = (ym: string, yearsDelta: number) => {
+  const s = (ym ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return '';
+  const y = parseInt(m[1], 10);
+  const mo = m[2];
+  return `${y + yearsDelta}-${mo}`;
+};
+
+const shiftFiltersYears = (f: Filters, yearsDelta: number): Filters => {
+  return {
+    ...f,
+    periodo_emissao_inicio: f.periodo_emissao_inicio ? shiftIsoDateYears(f.periodo_emissao_inicio, yearsDelta) : '',
+    periodo_emissao_fim: f.periodo_emissao_fim ? shiftIsoDateYears(f.periodo_emissao_fim, yearsDelta) : '',
+    periodo_inclusao_inicio: f.periodo_inclusao_inicio ? shiftIsoDateYears(f.periodo_inclusao_inicio, yearsDelta) : '',
+    periodo_inclusao_fim: f.periodo_inclusao_fim ? shiftIsoDateYears(f.periodo_inclusao_fim, yearsDelta) : '',
+    periodo_programacao_inicio: f.periodo_programacao_inicio ? shiftIsoDateYears(f.periodo_programacao_inicio, yearsDelta) : '',
+    periodo_programacao_fim: f.periodo_programacao_fim ? shiftIsoDateYears(f.periodo_programacao_fim, yearsDelta) : '',
+    periodo_vencimento_inicio: f.periodo_vencimento_inicio ? shiftIsoDateYears(f.periodo_vencimento_inicio, yearsDelta) : '',
+    periodo_vencimento_fim: f.periodo_vencimento_fim ? shiftIsoDateYears(f.periodo_vencimento_fim, yearsDelta) : '',
+    competencia_ym: f.competencia_ym ? shiftIsoMonthYears(f.competencia_ym, yearsDelta) : '',
   };
 };
 
@@ -175,7 +213,7 @@ export function ContasPagar() {
   usePageTitle('BI · Contas a Pagar');
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'visao' | 'eventos' | 'unidades' | 'lista'>('visao');
+  const [activeTab, setActiveTab] = useState<'visao' | 'unidades' | 'lista'>('visao');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>(() => getDefaultFilters());
   const [tempFilters, setTempFilters] = useState<Filters>(() => getDefaultFilters());
@@ -193,6 +231,9 @@ export function ContasPagar() {
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
   const [lastLoadMessage, setLastLoadMessage] = useState<string>('');
+  const [anoAnterior, setAnoAnterior] = useState<{ sum_total: number; sum_liqu: number; sum_canc: number; count_total: number } | null>(null);
+  const [loadingAnoAnterior, setLoadingAnoAnterior] = useState(false);
+  const anoAnteriorReqRef = useRef(0);
 
   useEffect(() => {
     if (showFilters) setTempFilters(filters);
@@ -306,6 +347,23 @@ export function ContasPagar() {
     return base;
   }, [filtered]);
 
+  const anoAnteriorValor = useMemo(() => {
+    if (!anoAnterior) return null;
+    if (quickStatus === 'LIQU') return anoAnterior.sum_liqu;
+    if (quickStatus === 'PEND') return Math.max(0, anoAnterior.sum_total - anoAnterior.sum_liqu);
+    return anoAnterior.sum_total;
+  }, [anoAnterior, quickStatus]);
+
+  const comparativoAnoAnterior = useMemo(() => {
+    if (quickOnlyOverdue) return null;
+    if (anoAnteriorValor === null) return null;
+    const prev = anoAnteriorValor;
+    const curr = totals.total;
+    const pct = prev !== 0 ? ((curr - prev) / prev) * 100 : null;
+    const delta = curr - prev;
+    return { prev, pct, delta };
+  }, [anoAnteriorValor, quickOnlyOverdue, totals.total]);
+
   const serieProgramacao = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number; liqu: number }>();
     for (const n of filtered) {
@@ -335,13 +393,6 @@ export function ContasPagar() {
       };
     });
   }, [serieProgramacao]);
-
-  const headlineProgramacao = useMemo(() => {
-    if (serieProgramacaoComparativo.length < 2) return null;
-    const curr = serieProgramacaoComparativo[serieProgramacaoComparativo.length - 1];
-    if (!curr.prevLabel || curr.delta === null || curr.pct === null) return null;
-    return curr;
-  }, [serieProgramacaoComparativo]);
 
   const serieCompetencia = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number; pend: number; liqu: number; canc: number }>();
@@ -500,6 +551,40 @@ export function ContasPagar() {
     return { total, top, data };
   }, [baseParaResumo]);
 
+  const donutEventos = useMemo(() => {
+    const list = byEvento;
+    const total = list.reduce((s, x) => s + x.total, 0);
+    const top = list.slice(0, 3);
+    const topSum = top.reduce((s, x) => s + x.total, 0);
+    const outros = Math.max(0, total - topSum);
+    const data = [
+      ...top.map((x, idx) => ({
+        name: x.label,
+        value: x.total,
+        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+      })),
+      ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
+    ];
+    return { total, top, data };
+  }, [byEvento]);
+
+  const donutGrupos = useMemo(() => {
+    const list = byGrupo.map((g) => ({ key: g.key, label: g.label, total: g.total }));
+    const total = list.reduce((s, x) => s + x.total, 0);
+    const top = list.slice(0, 3);
+    const topSum = top.reduce((s, x) => s + x.total, 0);
+    const outros = Math.max(0, total - topSum);
+    const data = [
+      ...top.map((x, idx) => ({
+        name: x.label,
+        value: x.total,
+        color: idx === 0 ? '#10b981' : idx === 1 ? '#f59e0b' : '#0ea5e9',
+      })),
+      ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
+    ];
+    return { total, top, data };
+  }, [byGrupo]);
+
   const topOverdue = useMemo(() => {
     return filtered
       .filter(n => n.overdue)
@@ -524,11 +609,44 @@ export function ContasPagar() {
     setShowFilters(false);
   };
 
+  const carregarAnoAnterior = useCallback(async (basePayload: Filters) => {
+    const reqId = (anoAnteriorReqRef.current += 1);
+    setLoadingAnoAnterior(true);
+    try {
+      const prev = shiftFiltersYears(basePayload, -1);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-pagar/get_despesas.php`,
+        { method: 'POST', body: JSON.stringify({ ...prev, summary_only: true }) },
+        true
+      );
+      if (reqId !== anoAnteriorReqRef.current) return;
+      const summary = res?.summary;
+      if (res?.success && summary) {
+        setAnoAnterior({
+          sum_total: Number(summary.sum_total) || 0,
+          sum_liqu: Number(summary.sum_liqu) || 0,
+          sum_canc: Number(summary.sum_canc) || 0,
+          count_total: Number(summary.count_total) || 0,
+        });
+      } else {
+        setAnoAnterior(null);
+      }
+    } catch {
+      if (reqId !== anoAnteriorReqRef.current) return;
+      setAnoAnterior(null);
+    } finally {
+      if (reqId === anoAnteriorReqRef.current) setLoadingAnoAnterior(false);
+    }
+  }, []);
+
   const carregar = useCallback(async (override?: Filters) => {
+    const payload = { ...(override ?? filters) };
     setLoading(true);
     setLastLoadMessage('');
+    setAnoAnterior(null);
+    setLoadingAnoAnterior(false);
+    let shouldLoadAnoAnterior = false;
     try {
-      const payload = { ...(override ?? filters) };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-pagar/get_despesas.php`,
         { method: 'POST', body: JSON.stringify(payload) },
@@ -540,6 +658,7 @@ export function ContasPagar() {
         if (Array.isArray(res.rows) && res.rows.length === 0) {
           toast.message(res?.message ? String(res.message) : 'Nenhum registro encontrado para o recorte informado.');
         }
+        shouldLoadAnoAnterior = true;
       } else {
         setRows([]);
         const msg = String(res?.message || 'Erro ao buscar dados no SSW.');
@@ -553,8 +672,9 @@ export function ContasPagar() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      if (shouldLoadAnoAnterior) void carregarAnoAnterior(payload);
     }
-  }, [filters]);
+  }, [filters, carregarAnoAnterior]);
 
   useEffect(() => {
     if (initialLoadRef.current) return;
@@ -1036,7 +1156,6 @@ export function ContasPagar() {
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="w-full md:w-auto">
               <TabsTrigger value="visao" className="px-3">Visão</TabsTrigger>
-              <TabsTrigger value="eventos" className="px-3">Eventos</TabsTrigger>
               <TabsTrigger value="unidades" className="px-3">Unidades</TabsTrigger>
               <TabsTrigger value="lista" className="px-3">Lista</TabsTrigger>
             </TabsList>
@@ -1083,8 +1202,8 @@ export function ContasPagar() {
           <Card className="bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">BASE</div>
-                <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Base</div>
+                <ClipboardList className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{totals.rows}</div>
               <div className="text-[11px] text-slate-600 dark:text-slate-400">Registros no recorte</div>
@@ -1094,40 +1213,59 @@ export function ContasPagar() {
           <Card className="bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-sky-700 dark:text-sky-300">TOTAL</div>
-                <Calendar className="w-4 h-4 text-sky-500 dark:text-sky-400" />
+                <div className="text-xs font-semibold text-sky-700 dark:text-sky-300">Total</div>
+                <Wallet className="w-4 h-4 text-sky-500 dark:text-sky-400" />
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.total)}</div>
               <div className="text-[11px] text-slate-600 dark:text-slate-400">
                 Pagto: {filters.periodo_programacao_inicio || '—'} → {filters.periodo_programacao_fim || '—'}
               </div>
-              {headlineProgramacao && (
-                <div className={`mt-1 text-[11px] ${headlineProgramacao.delta! > 0 ? 'text-rose-600' : headlineProgramacao.delta! < 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                  Δ vs {headlineProgramacao.prevLabel}: {formatCurrency(headlineProgramacao.delta!)} ({headlineProgramacao.pct!.toFixed(1)}%)
-                </div>
-              )}
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                {loadingAnoAnterior ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                    <span>Carregando ano anterior...</span>
+                  </>
+                ) : comparativoAnoAnterior ? (
+                  <>
+                    {comparativoAnoAnterior.pct !== null && comparativoAnoAnterior.pct > 0 ? (
+                      <ArrowUp className="w-3.5 h-3.5 text-rose-600" />
+                    ) : comparativoAnoAnterior.pct !== null && comparativoAnoAnterior.pct < 0 ? (
+                      <ArrowDown className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <ArrowUp className="w-3.5 h-3.5 text-slate-400 rotate-90" />
+                    )}
+                    <span>
+                      Ano anterior: {formatCurrency(comparativoAnoAnterior.prev)}
+                      {comparativoAnoAnterior.pct === null
+                        ? ''
+                        : ` (${comparativoAnoAnterior.pct >= 0 ? '+ ' : '- '}${Math.abs(comparativoAnoAnterior.pct).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)`}
+                    </span>
+                  </>
+                ) : (
+                  <span>Ano anterior: —</span>
+                )}
+              </div>
             </CardContent>
           </Card>
 
           <Card className="bg-amber-50 border-amber-200 dark:bg-amber-950/35 dark:border-amber-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">PENDENTES</div>
-                <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Pendentes</div>
+                <Clock className="w-4 h-4 text-amber-500 dark:text-amber-400" />
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.pend)}</div>
-              <div className="text-[11px] text-slate-600 dark:text-slate-400">A pagar (não LIQU)</div>
             </CardContent>
           </Card>
 
           <Card className="bg-rose-50 border-rose-200 dark:bg-rose-950/35 dark:border-rose-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">EM ATRASO</div>
+                <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">Em atraso</div>
                 <AlertTriangle className="w-4 h-4 text-rose-500 dark:text-rose-400" />
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.overdue)}</div>
-              <div className="text-[11px] text-slate-600 dark:text-slate-400">Vencimento &lt; hoje (exceto LIQU)</div>
             </CardContent>
           </Card>
         </div>
@@ -1171,11 +1309,10 @@ export function ContasPagar() {
 
                     <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                       <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                        <div className="col-span-2">Data</div>
+                        <div className="col-span-3">Data</div>
                         <div className="col-span-3 text-right">Total</div>
                         <div className="col-span-3 text-right">Liquidadas</div>
-                        <div className="col-span-2 text-right">% LIQU</div>
-                        <div className="col-span-2 text-right">Evolução</div>
+                        <div className="col-span-3 text-right">%</div>
                       </div>
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {serieProgramacaoComparativo
@@ -1183,23 +1320,22 @@ export function ContasPagar() {
                           .slice()
                           .reverse()
                           .map((p) => {
-                            const delta = p.delta as number | null;
-                            const pct = p.pct as number | null;
-                            const evoClass = delta === null ? 'text-slate-400' : delta > 0 ? 'text-rose-600' : delta < 0 ? 'text-emerald-600' : 'text-slate-500';
                             const pctLiqu = p.total > 0 ? (p.liqu / p.total) * 100 : 0;
+                            const pctClass =
+                              pctLiqu <= 40 ? 'text-rose-600 dark:text-rose-400' :
+                              pctLiqu <= 60 ? 'text-orange-600 dark:text-orange-400' :
+                              pctLiqu <= 80 ? 'text-amber-600 dark:text-amber-400' :
+                              'text-emerald-600 dark:text-emerald-400';
                             const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
                             return (
                               <div
                                 key={p.key}
                                 className="grid grid-cols-12 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200"
                               >
-                                <div className="col-span-2 font-mono">{dateLabel}</div>
+                                <div className="col-span-3 font-mono">{dateLabel}</div>
                                 <div className="col-span-3 text-right font-mono">{formatCurrency(p.total)}</div>
                                 <div className="col-span-3 text-right font-mono">{formatCurrency(p.liqu)}</div>
-                                <div className="col-span-2 text-right font-mono">{pctLiqu.toFixed(1)}%</div>
-                                <div className={`col-span-2 text-right font-mono ${evoClass}`}>
-                                  {delta === null || pct === null || !p.prevLabel ? '—' : `${formatCurrency(delta)} (${pct.toFixed(1)}%)`}
-                                </div>
+                                <div className={`col-span-3 text-right font-mono ${pctClass}`}>{pctLiqu.toFixed(1)}%</div>
                               </div>
                             );
                           })}
@@ -1231,11 +1367,11 @@ export function ContasPagar() {
                             <Cell fill="#10b981" />
                             <Cell fill="#94a3b8" />
                           </Pie>
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                    <div className="mt-2 flex flex-col items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
                       <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" />Pendentes</div>
                       <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />Liquidadas</div>
                     </div>
@@ -1260,7 +1396,7 @@ export function ContasPagar() {
                               <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
                             ))}
                           </Pie>
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1313,6 +1449,114 @@ export function ContasPagar() {
               </div>
             </div>
             
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Eventos</div>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donutEventos.data}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="55%"
+                          outerRadius="80%"
+                          stroke="none"
+                        >
+                          {donutEventos.data.map((d, idx) => (
+                            <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                    {donutEventos.top.map((x, idx) => {
+                      const pct = donutEventos.total > 0 ? (x.total / donutEventos.total) * 100 : 0;
+                      const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                      return (
+                        <div key={x.key} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-2 h-2 rounded-full ${color}`} />
+                            <span className="truncate">{x.label}</span>
+                          </div>
+                          <span className="font-mono whitespace-nowrap">{pct.toFixed(1)}%</span>
+                        </div>
+                      );
+                    })}
+                    {donutEventos.data.some(d => d.name === 'Outros') && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span className="truncate">Outros</span>
+                        </div>
+                        <span className="font-mono whitespace-nowrap">
+                          {donutEventos.total > 0
+                            ? ((donutEventos.data.find(d => d.name === 'Outros')!.value / donutEventos.total) * 100).toFixed(1)
+                            : '0.0'}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Grupos de eventos</div>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donutGrupos.data}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="55%"
+                          outerRadius="80%"
+                          stroke="none"
+                        >
+                          {donutGrupos.data.map((d, idx) => (
+                            <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                    {donutGrupos.top.map((x, idx) => {
+                      const pct = donutGrupos.total > 0 ? (x.total / donutGrupos.total) * 100 : 0;
+                      const color = idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-amber-500' : 'bg-sky-500';
+                      return (
+                        <div key={x.key} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-2 h-2 rounded-full ${color}`} />
+                            <span className="truncate">{x.label}</span>
+                          </div>
+                          <span className="font-mono whitespace-nowrap">{pct.toFixed(1)}%</span>
+                        </div>
+                      );
+                    })}
+                    {donutGrupos.data.some(d => d.name === 'Outros') && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span className="truncate">Outros</span>
+                        </div>
+                        <span className="font-mono whitespace-nowrap">
+                          {donutGrupos.total > 0
+                            ? ((donutGrupos.data.find(d => d.name === 'Outros')!.value / donutGrupos.total) * 100).toFixed(1)
+                            : '0.0'}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between gap-3">
@@ -1374,72 +1618,6 @@ export function ContasPagar() {
                 </div>
               </CardContent>
             </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="eventos">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <Card className="lg:col-span-5">
-                <CardContent className="pt-6">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Top eventos (valor)</div>
-                  <div className="h-[360px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={byEvento.slice(0, 12).map((e) => ({ ...e, short: e.label.length > 32 ? `${e.label.slice(0, 32)}…` : e.label }))}
-                        layout="vertical"
-                        margin={{ top: 0, right: 10, left: 10, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="short" width={170} tick={{ fontSize: 11 }} />
-                        <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                        <Bar
-                          dataKey="total"
-                          fill="#4f46e5"
-                          radius={[6, 6, 6, 6]}
-                          onClick={(d: any) => {
-                            const label = (d?.payload?.label ?? '').toString();
-                            const code = label.split(' ')[0] || '';
-                            if (code) {
-                              setTableSearch(code);
-                              setActiveTab('lista');
-                            }
-                          }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-7">
-                <CardContent className="pt-6">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Grupos de evento (valor)</div>
-                  <div className="h-[360px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={byGrupo.slice(0, 10).map((g) => ({ ...g, short: g.label.length > 28 ? `${g.label.slice(0, 28)}…` : g.label }))}
-                        layout="vertical"
-                        margin={{ top: 0, right: 10, left: 10, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="short" width={170} tick={{ fontSize: 11 }} />
-                        <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                        <Bar
-                          dataKey="total"
-                          fill="#10b981"
-                          radius={[6, 6, 6, 6]}
-                          onClick={(d: any) => {
-                            const label = (d?.payload?.label ?? '').toString();
-                            if (!label) return;
-                            setFocusGrupoLabel(prev => (prev === label ? '' : label));
-                            setActiveTab('lista');
-                          }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
