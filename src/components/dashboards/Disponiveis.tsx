@@ -34,7 +34,6 @@ import {
   Loader2,
   Home,
   Filter,
-  ListFilter,
   Plus,
   Trash2,
   CheckSquare,
@@ -4055,7 +4054,7 @@ export function Disponiveis() {
               onClick={() => setAbaAtiva('todos')}
               className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${abaAtiva === 'todos' ? 'border-violet-500 text-violet-600 dark:text-violet-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              <ListFilter className="w-4 h-4" />
+              <Filter className="w-4 h-4" />
               Todos os Disponíveis
               {loadingEntrega
                 ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Carregando...</Badge>

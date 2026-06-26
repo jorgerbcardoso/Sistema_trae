@@ -74,8 +74,8 @@ Objetivo: filtros com UX consistente, sem “pulos” de layout, com scroll inte
 2) INDICADOR DE FILTRO ATIVO:
 - Ter um boolean `hasFiltrosAtivos` (ex.: unidade selecionada, datas preenchidas, etc.)
 - No botão de abrir filtros, mostrar um indicador (ex.: bolinha) quando `hasFiltrosAtivos` for true.
-- O botão deve seguir o padrão do dashboard Performance de Entregas:
-  - `<Button variant="outline" size="icon" ...><Filter className="w-4 h-4" /></Button>`
+- O botão deve seguir o padrão do dashboard Performance de Entregas (`src/components/dashboards/PerformanceEntregas.tsx`):
+  - `<Button variant="outline" size="icon" className="dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"><Filter className="w-4 h-4" /></Button>`
   - Envolver em `DialogTrigger` e `Tooltip` (TooltipTrigger → DialogTrigger → Button)
 
 3) LAYOUT DO DIALOG (scroll e altura):
