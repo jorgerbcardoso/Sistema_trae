@@ -228,7 +228,7 @@ try {
 }
 
 $params = [
-    'act' => 'ARQ',
+    'act' => $summaryOnly ? 'PES' : 'ARQ',
     'cod_emp_ctb' => '00',
     'sequencia' => '477',
     'sit_desp' => 'T',
@@ -287,6 +287,33 @@ $url = "https://sistema.ssw.inf.br/bin/ssw0099?$qs";
 
 $raw = ssw_go($url);
 $strDec = urldecode((string)$raw);
+
+if ($summaryOnly) {
+    if (substr((string)$raw, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro ao ler indicador do ano anterior (0099): ' . (string)$raw]);
+    }
+    if (!function_exists('get_label')) {
+        respondJson(['success' => false, 'message' => 'Função get_label não disponível (ssw.php).']);
+    }
+    $vlrStr = (string)get_label($strDec, 'Total&nbsp;das&nbsp;despesas&nbsp;(R$):');
+    $vlrStr = trim($vlrStr);
+    if ($vlrStr === '') {
+        respondJson(['success' => false, 'message' => 'Não foi possível localizar o total de despesas no relatório (PES).']);
+    }
+    $sumTotal = $parseMoney($vlrStr);
+    respondJson([
+        'success' => true,
+        'rows' => [],
+        'total' => 0,
+        'summary' => [
+            'count_total' => 0,
+            'sum_total' => $sumTotal,
+            'sum_liqu' => 0,
+            'sum_canc' => 0,
+        ],
+        'message' => null,
+    ]);
+}
 
 $noLanc = [
     'N&atilde;o h&aacute; lan&ccedil;amento',
