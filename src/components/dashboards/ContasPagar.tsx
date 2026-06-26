@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
@@ -233,6 +234,7 @@ export function ContasPagar() {
   const [listPage, setListPage] = useState(1);
   const [topSort, setTopSort] = useState<{ key: 'venc' | 'valor' | 'fornecedor' | 'evento' | 'unidade'; dir: 'asc' | 'desc' }>(() => ({ key: 'valor', dir: 'desc' }));
   const [listSort, setListSort] = useState<{ key: 'prioridade' | 'sit' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
+  const [unidadeEmLinhas, setUnidadeEmLinhas] = useState(false);
   const [selectedDespesa, setSelectedDespesa] = useState<RowDespesa | null>(null);
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
@@ -1611,6 +1613,7 @@ export function ContasPagar() {
                         <LineChart
                           data={serieProgramacaoComparativo}
                           margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          style={{ cursor: 'pointer' }}
                           onClick={(e: any) => {
                             const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
                             if (dk === 'total' || dk === 'liqu') exportarSerieProgramacao(dk as any);
@@ -1693,6 +1696,7 @@ export function ContasPagar() {
                             innerRadius="55%"
                             outerRadius="80%"
                             stroke="none"
+                            style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
                               exportarSlice('status', String(p?.name ?? ''), Number(p?.value) || 0, totals.pend + totals.liqu + totals.canc);
@@ -1726,6 +1730,7 @@ export function ContasPagar() {
                             innerRadius="55%"
                             outerRadius="80%"
                             stroke="none"
+                            style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
                               exportarSlice('fornecedores', String(p?.name ?? ''), Number(p?.value) || 0, donutFornecedores.total);
@@ -1776,7 +1781,7 @@ export function ContasPagar() {
                     <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Envelhecimento (pendentes)</div>
                     <div className="h-[220px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={ageing} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                        <BarChart data={ageing} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }} style={{ cursor: 'pointer' }}>
                           <XAxis type="number" hide />
                           <YAxis type="category" dataKey="label" width={90} tick={{ fontSize: 11 }} />
                           <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v) || 0)} />
@@ -1784,6 +1789,7 @@ export function ContasPagar() {
                             dataKey="total"
                             fill="#f59e0b"
                             radius={[6, 6, 6, 6]}
+                            style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
                               exportarBucket('envelhecimento_pendentes', String(p?.label ?? ''), Number(p?.total) || 0);
@@ -1812,47 +1818,89 @@ export function ContasPagar() {
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (Top 3 + Demais)</div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-slate-600 dark:text-slate-300">Linhas</Label>
+                      <Switch checked={unidadeEmLinhas} onCheckedChange={(v) => setUnidadeEmLinhas(Boolean(v))} />
+                    </div>
                   </div>
 
                   <div className="h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={serieProgramacaoPorUnidade}
-                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                        onClick={(e: any) => {
-                          const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                          if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
-                          else exportarSerieProgramacaoUnidades();
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} width={70} />
-                        <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
-                        {unidadesTop3.map((u) => (
-                          <Area
-                            key={u}
-                            type="monotone"
-                            dataKey={u}
-                            stackId="1"
-                            stroke={unidadeLineColors[u] || '#4f46e5'}
-                            fill={unidadeLineColors[u] || '#4f46e5'}
-                            fillOpacity={0.55}
-                            strokeWidth={2}
-                          />
-                        ))}
-                        {byUnidade.length > 3 && (
-                          <Area
-                            type="monotone"
-                            dataKey="Demais"
-                            stackId="1"
-                            stroke={unidadeLineColors.Demais}
-                            fill={unidadeLineColors.Demais}
-                            fillOpacity={0.25}
-                            strokeWidth={2}
-                          />
-                        )}
-                      </AreaChart>
+                      {unidadeEmLinhas ? (
+                        <LineChart
+                          data={serieProgramacaoPorUnidade}
+                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e: any) => {
+                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
+                            else exportarSerieProgramacaoUnidades();
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={70} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          {unidadesTop3.map((u) => (
+                            <Line
+                              key={u}
+                              type="monotone"
+                              dataKey={u}
+                              stroke={unidadeLineColors[u] || '#4f46e5'}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          ))}
+                          {byUnidade.length > 3 && (
+                            <Line
+                              type="monotone"
+                              dataKey="Demais"
+                              stroke={unidadeLineColors.Demais}
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          )}
+                        </LineChart>
+                      ) : (
+                        <AreaChart
+                          data={serieProgramacaoPorUnidade}
+                          margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e: any) => {
+                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
+                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
+                            else exportarSerieProgramacaoUnidades();
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={70} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                          {unidadesTop3.map((u) => (
+                            <Area
+                              key={u}
+                              type="monotone"
+                              dataKey={u}
+                              stackId="1"
+                              stroke="none"
+                              fill={unidadeLineColors[u] || '#4f46e5'}
+                              fillOpacity={0.62}
+                              strokeWidth={0}
+                            />
+                          ))}
+                          {byUnidade.length > 3 && (
+                            <Area
+                              type="monotone"
+                              dataKey="Demais"
+                              stackId="1"
+                              stroke="none"
+                              fill={unidadeLineColors.Demais}
+                              fillOpacity={0.28}
+                              strokeWidth={0}
+                            />
+                          )}
+                        </AreaChart>
+                      )}
                     </ResponsiveContainer>
                   </div>
 
@@ -1886,6 +1934,7 @@ export function ContasPagar() {
                           innerRadius="55%"
                           outerRadius="80%"
                           stroke="none"
+                          style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
                             exportarSlice('unidades', String(p?.name ?? ''), Number(p?.value) || 0, donutUnidades.total);
@@ -1946,6 +1995,7 @@ export function ContasPagar() {
                           innerRadius="55%"
                           outerRadius="80%"
                           stroke="none"
+                          style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
                             exportarSlice('eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutEventos.total);
@@ -2004,6 +2054,7 @@ export function ContasPagar() {
                           innerRadius="55%"
                           outerRadius="80%"
                           stroke="none"
+                          style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
                             exportarSlice('grupos_eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutGrupos.total);
