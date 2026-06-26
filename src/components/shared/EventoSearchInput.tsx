@@ -37,6 +37,7 @@ interface EventoSearchInputProps {
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  displayMode?: 'full' | 'singleLine';
 }
 
 /**
@@ -63,7 +64,8 @@ export function EventoSearchInput({
   placeholder = "Busque por código ou descrição...",
   disabled = false,
   required = false,
-  className = ""
+  className = "",
+  displayMode = 'full'
 }: EventoSearchInputProps) {
   const { user } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -218,9 +220,11 @@ export function EventoSearchInput({
       <div className="relative">
         {/* DISPLAY DO EVENTO SELECIONADO */}
         {selectedEvento && !isOpen ? (
-          <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-md bg-card">
-            <span className="flex-1 text-sm text-foreground">
-              <span className="font-semibold">{selectedEvento.evento}</span> - {selectedEvento.descricao}
+          <div className="flex items-center gap-2 px-3 border border-border rounded-md bg-card h-9">
+            <span className={`flex-1 text-sm text-foreground ${displayMode === 'singleLine' ? 'truncate whitespace-nowrap' : ''}`}>
+              <span className="font-semibold">{selectedEvento.evento}</span>
+              <span> - </span>
+              <span className={displayMode === 'singleLine' ? 'truncate whitespace-nowrap' : ''}>{selectedEvento.descricao}</span>
             </span>
             {!disabled && (
               <button

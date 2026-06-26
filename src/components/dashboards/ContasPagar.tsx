@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, AreaChart, Area, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, LineChart, Line, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -306,6 +306,43 @@ export function ContasPagar() {
     return base;
   }, [filtered]);
 
+  const serieProgramacao = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; total: number; liqu: number }>();
+    for (const n of filtered) {
+      if (n.programacaoTs === null) continue;
+      const d = new Date(n.programacaoTs);
+      const key = dateToInput(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0));
+      const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!map.has(key)) map.set(key, { key, label, total: 0, liqu: 0 });
+      const it = map.get(key)!;
+      it.total += n.valor;
+      if (n.status === 'LIQU') it.liqu += n.valor;
+    }
+    return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [filtered]);
+
+  const serieProgramacaoComparativo = useMemo(() => {
+    return serieProgramacao.map((p, idx) => {
+      const prev = idx > 0 ? serieProgramacao[idx - 1] : null;
+      const delta = prev ? p.total - prev.total : null;
+      const pct = prev && prev.total !== 0 ? (delta! / prev.total) * 100 : null;
+      return {
+        ...p,
+        prevLabel: prev?.label ?? null,
+        prevTotal: prev?.total ?? null,
+        delta,
+        pct,
+      };
+    });
+  }, [serieProgramacao]);
+
+  const headlineProgramacao = useMemo(() => {
+    if (serieProgramacaoComparativo.length < 2) return null;
+    const curr = serieProgramacaoComparativo[serieProgramacaoComparativo.length - 1];
+    if (!curr.prevLabel || curr.delta === null || curr.pct === null) return null;
+    return curr;
+  }, [serieProgramacaoComparativo]);
+
   const serieCompetencia = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number; pend: number; liqu: number; canc: number }>();
     for (const n of filtered) {
@@ -428,52 +465,47 @@ export function ContasPagar() {
     return buckets;
   }, [filtered]);
 
-  const concentracao = useMemo(() => {
-    const make = (onlyOpen: boolean) => {
-      const base = onlyOpen ? filtered.filter(n => n.status !== 'LIQU') : filtered;
-      const map = new Map<string, { key: string; label: string; total: number }>();
-      for (const n of base) {
-        const name = (n.raw.fornecedor_nome ?? '').toString().trim() || '—';
-        const cnpj = (n.raw.fornecedor_cnpj ?? '').toString().trim();
-        const label = cnpj ? `${name} (${cnpj})` : name;
-        const key = `${name}::${cnpj}`;
-        if (!map.has(key)) map.set(key, { key, label, total: 0 });
-        map.get(key)!.total += n.valor;
-      }
-      const list = Array.from(map.values()).sort((a, b) => b.total - a.total);
-      const total = base.reduce((s, n) => s + n.valor, 0);
-      const top1 = list[0] ?? null;
-      const top3Total = list.slice(0, 3).reduce((s, x) => s + x.total, 0);
-      const shareTop3 = total > 0 ? top3Total / total : 0;
-      return { total, fornecedores: list.length, top1, top3Total, shareTop3 };
-    };
+  const baseParaResumo = useMemo(() => {
+    return normalized.filter((n) => {
+      if (focusUnidade && ((n.raw.unidade ?? '').toString().trim().toUpperCase() !== focusUnidade)) return false;
+      if (focusGrupoLabel && n.grupoLabel !== focusGrupoLabel) return false;
+      if (focusCompetenciaKey && n.competenciaKey !== focusCompetenciaKey) return false;
+      return true;
+    });
+  }, [normalized, focusUnidade, focusGrupoLabel, focusCompetenciaKey]);
 
-    const all = make(false);
-    const open = make(true);
-    const topGrupo = byGrupo[0] ?? null;
-    const shareTopGrupo = totals.total > 0 && topGrupo ? topGrupo.total / totals.total : 0;
-
-    return { all, open, topGrupo, shareTopGrupo };
-  }, [filtered, byGrupo, totals.total]);
+  const donutFornecedores = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; total: number }>();
+    for (const n of baseParaResumo) {
+      const name = (n.raw.fornecedor_nome ?? '').toString().trim() || '—';
+      const cnpj = (n.raw.fornecedor_cnpj ?? '').toString().trim();
+      const label = cnpj ? `${name} (${cnpj})` : name;
+      const key = `${name}::${cnpj}`;
+      if (!map.has(key)) map.set(key, { key, label, total: 0 });
+      map.get(key)!.total += n.valor;
+    }
+    const list = Array.from(map.values()).sort((a, b) => b.total - a.total);
+    const total = list.reduce((s, x) => s + x.total, 0);
+    const top = list.slice(0, 3);
+    const topSum = top.reduce((s, x) => s + x.total, 0);
+    const outros = Math.max(0, total - topSum);
+    const data = [
+      ...top.map((x, idx) => ({
+        name: x.label,
+        value: x.total,
+        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+      })),
+      ...(outros > 0 ? [{ name: 'Outros', value: outros, color: '#94a3b8' }] : []),
+    ];
+    return { total, top, data };
+  }, [baseParaResumo]);
 
   const topOverdue = useMemo(() => {
     return filtered
       .filter(n => n.overdue)
       .slice()
       .sort((a, b) => b.valor - a.valor)
-      .slice(0, 10);
-  }, [filtered]);
-
-  const upcoming7 = useMemo(() => {
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0).getTime();
-    const end = start + 7 * 86400000;
-    return filtered
-      .filter(n => n.status !== 'LIQU')
-      .filter(n => n.programacaoTs !== null && n.programacaoTs >= start && n.programacaoTs <= end)
-      .slice()
-      .sort((a, b) => (a.programacaoTs ?? 9e15) - (b.programacaoTs ?? 9e15))
-      .slice(0, 12);
+      .slice(0, 25);
   }, [filtered]);
 
   const clearFilters = () => {
@@ -588,7 +620,7 @@ export function ContasPagar() {
     document.body.removeChild(a);
   };
 
-  const CompetenciaTooltip = ({ active, payload, label }: any) => {
+  const ProgramacaoTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
     const d = payload[0]?.payload;
     const delta = typeof d?.delta === 'number' ? d.delta : null;
@@ -600,6 +632,9 @@ export function ContasPagar() {
         <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{label}</div>
         <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">
           Total: <span className="font-mono">{formatCurrency(Number(d?.total) || 0)}</span>
+        </div>
+        <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+          Liquidadas: <span className="font-mono">{formatCurrency(Number(d?.liqu) || 0)}</span>
         </div>
         {delta !== null && pct !== null && prevLabel && (
           <div className={`mt-0.5 text-xs ${deltaClass}`}>
@@ -673,10 +708,10 @@ export function ContasPagar() {
                         value={tempFilters.grupo_evento || undefined}
                         onValueChange={(v) => setTempFilters({ ...tempFilters, grupo_evento: v || '' })}
                       >
-                        <div className="relative">
-                          <SelectTrigger className="pr-9 dark:bg-slate-800 dark:border-slate-700">
+                        <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
+                          <div className="flex-1 min-w-0">
                             <SelectValue placeholder={loadingGrupos ? 'Carregando...' : 'Selecione um grupo'} />
-                          </SelectTrigger>
+                          </div>
                           {tempFilters.grupo_evento && (
                             <button
                               type="button"
@@ -685,12 +720,12 @@ export function ContasPagar() {
                                 e.stopPropagation();
                                 setTempFilters({ ...tempFilters, grupo_evento: '' });
                               }}
-                              className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                             >
                               <X className="w-4 h-4" />
                             </button>
                           )}
-                        </div>
+                        </SelectTrigger>
                         <SelectContent>
                           {grupos.map((g) => (
                             <SelectItem key={g.grupo} value={String(g.grupo)}>
@@ -705,6 +740,7 @@ export function ContasPagar() {
                         value={tempFilters.evento}
                         onChange={(v) => setTempFilters({ ...tempFilters, evento: v })}
                         label="Evento"
+                        displayMode="singleLine"
                       />
                     </div>
                   </div>
@@ -980,7 +1016,22 @@ export function ContasPagar() {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="relative">
+        {loading && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/25 backdrop-blur-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregando dados...</div>
+              </div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Buscando no SSW conforme o recorte informado.
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={loading ? 'space-y-4 blur-[1px] opacity-70 pointer-events-none select-none' : 'space-y-4'}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="w-full md:w-auto">
@@ -1017,14 +1068,6 @@ export function ContasPagar() {
               Liqu
             </Button>
             <Button
-              variant={quickStatus === 'CANC' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setQuickStatus('CANC')}
-              className={quickStatus === 'CANC' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'dark:border-slate-600'}
-            >
-              Canc
-            </Button>
-            <Button
               variant={quickOnlyOverdue ? 'default' : 'outline'}
               size="sm"
               onClick={() => setQuickOnlyOverdue((v) => !v)}
@@ -1037,143 +1080,133 @@ export function ContasPagar() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card>
+          <Card className="bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Base</div>
-                <TrendingUp className="w-4 h-4 text-slate-400" />
+                <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">BASE</div>
+                <TrendingUp className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
               </div>
-              <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{totals.rows}</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Registros filtrados</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{totals.rows}</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">Registros no recorte</div>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Total</div>
-                <Calendar className="w-4 h-4 text-slate-400" />
+                <div className="text-xs font-semibold text-sky-700 dark:text-sky-300">TOTAL</div>
+                <Calendar className="w-4 h-4 text-sky-500 dark:text-sky-400" />
               </div>
-              <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totals.total)}</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                Competência: {filters.competencia_ym ? ymToCompetenciaLabel(filters.competencia_ym) : 'todas'}
+              <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.total)}</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                Pagto: {filters.periodo_programacao_inicio || '—'} → {filters.periodo_programacao_fim || '—'}
               </div>
-              {headlineComparativo && (
-                <div className={`mt-1 text-[11px] ${headlineComparativo.delta! > 0 ? 'text-rose-600' : headlineComparativo.delta! < 0 ? 'text-emerald-600' : 'text-slate-500'} dark:text-inherit`}>
-                  Δ vs {headlineComparativo.prevLabel}: {formatCurrency(headlineComparativo.delta!)} ({headlineComparativo.pct!.toFixed(1)}%)
+              {headlineProgramacao && (
+                <div className={`mt-1 text-[11px] ${headlineProgramacao.delta! > 0 ? 'text-rose-600' : headlineProgramacao.delta! < 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                  Δ vs {headlineProgramacao.prevLabel}: {formatCurrency(headlineProgramacao.delta!)} ({headlineProgramacao.pct!.toFixed(1)}%)
                 </div>
               )}
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-amber-50 border-amber-200 dark:bg-amber-950/35 dark:border-amber-900">
             <CardContent className="pt-6">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Pendente</div>
-              <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totals.pend)}</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Não liquidado (inclui cancelado se houver)</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">PENDENTES</div>
+                <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.pend)}</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">A pagar (não LIQU)</div>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-rose-50 border-rose-200 dark:bg-rose-950/35 dark:border-rose-900">
             <CardContent className="pt-6">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Em atraso</div>
-              <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totals.overdue)}</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Vencimento &lt; hoje (exceto LIQU)</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-rose-700 dark:text-rose-300">EM ATRASO</div>
+                <AlertTriangle className="w-4 h-4 text-rose-500 dark:text-rose-400" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.overdue)}</div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">Vencimento &lt; hoje (exceto LIQU)</div>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
           <TabsContent value="visao">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <Card className="lg:col-span-8">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por competência</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Total filtrado por mês de competência</div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <Card className="lg:col-span-8">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Programação</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (programação)</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="h-[260px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={serieCompetenciaComparativo} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="gradTotal" x1="0" x2="0" y1="0" y2="1">
-                            <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="#4f46e5" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} width={60} />
-                        <RechartsTooltip content={<CompetenciaTooltip />} />
-                        <Area type="monotone" dataKey="total" stroke="#4f46e5" fill="url(#gradTotal)" strokeWidth={2} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {serieCompetencia.slice(-8).map((p) => (
-                      <Button
-                        key={p.key}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setFocusCompetenciaKey(prev => (prev === p.key ? '' : p.key));
-                          setActiveTab('lista');
-                        }}
-                        className={`h-7 px-2 text-xs dark:border-slate-700 ${focusCompetenciaKey === p.key ? 'border-indigo-500 text-indigo-700 dark:text-indigo-300' : ''}`}
-                      >
-                        {p.label}
-                      </Button>
-                    ))}
-                    {focusCompetenciaKey && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFocusCompetenciaKey('')}
-                        className="h-7 px-2 text-xs dark:border-slate-700"
-                      >
-                        <X className="w-3.5 h-3.5 mr-1.5" />
-                        Limpar
-                      </Button>
-                    )}
-                  </div>
 
-                  <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      <div className="col-span-3">Competência</div>
-                      <div className="col-span-4 text-right">Total</div>
-                      <div className="col-span-5 text-right">Evolução</div>
+                    <div className="h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={serieProgramacaoComparativo} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={70} />
+                          <RechartsTooltip content={<ProgramacaoTooltip />} />
+                          <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="liqu" stroke="#10b981" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {serieCompetenciaComparativo
-                        .slice(-6)
-                        .slice()
-                        .reverse()
-                        .map((p) => {
-                          const delta = p.delta;
-                          const pct = p.pct;
-                          const evoClass = delta === null ? 'text-slate-400' : delta > 0 ? 'text-rose-600' : delta < 0 ? 'text-emerald-600' : 'text-slate-500';
-                          return (
-                            <button
-                              key={p.key}
-                              onClick={() => {
-                                setFocusCompetenciaKey(prev => (prev === p.key ? '' : p.key));
-                                setActiveTab('lista');
-                              }}
-                              className="grid grid-cols-12 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                            >
-                              <div className="col-span-3 font-mono">{p.label}</div>
-                              <div className="col-span-4 text-right font-mono">{formatCurrency(p.total)}</div>
-                              <div className={`col-span-5 text-right font-mono ${evoClass}`}>
-                                {delta === null || pct === null || !p.prevLabel
-                                  ? '—'
-                                  : `${formatCurrency(delta)} (${pct.toFixed(1)}%)`}
+
+                    <div className="mt-3 flex items-center gap-4 text-[11px] text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-[2px] bg-indigo-600" />
+                        Total
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-[2px] bg-emerald-500" />
+                        Liquidadas
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        <div className="col-span-2">Data</div>
+                        <div className="col-span-3 text-right">Total</div>
+                        <div className="col-span-3 text-right">Liquidadas</div>
+                        <div className="col-span-2 text-right">% LIQU</div>
+                        <div className="col-span-2 text-right">Evolução</div>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {serieProgramacaoComparativo
+                          .slice(-10)
+                          .slice()
+                          .reverse()
+                          .map((p) => {
+                            const delta = p.delta as number | null;
+                            const pct = p.pct as number | null;
+                            const evoClass = delta === null ? 'text-slate-400' : delta > 0 ? 'text-rose-600' : delta < 0 ? 'text-emerald-600' : 'text-slate-500';
+                            const pctLiqu = p.total > 0 ? (p.liqu / p.total) * 100 : 0;
+                            const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
+                            return (
+                              <div
+                                key={p.key}
+                                className="grid grid-cols-12 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200"
+                              >
+                                <div className="col-span-2 font-mono">{dateLabel}</div>
+                                <div className="col-span-3 text-right font-mono">{formatCurrency(p.total)}</div>
+                                <div className="col-span-3 text-right font-mono">{formatCurrency(p.liqu)}</div>
+                                <div className="col-span-2 text-right font-mono">{pctLiqu.toFixed(1)}%</div>
+                                <div className={`col-span-2 text-right font-mono ${evoClass}`}>
+                                  {delta === null || pct === null || !p.prevLabel ? '—' : `${formatCurrency(delta)} (${pct.toFixed(1)}%)`}
+                                </div>
                               </div>
-                            </button>
-                          );
-                        })}
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
               <div className="lg:col-span-4 space-y-4">
                 <Card>
@@ -1202,45 +1235,60 @@ export function ContasPagar() {
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                      <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" />PEND</div>
-                      <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />LIQU</div>
-                      <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-400" />CANC</div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                      <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" />Pendentes</div>
+                      <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />Liquidadas</div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Concentração</div>
-                    <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-slate-500 dark:text-slate-400">Top 3 fornecedores (total)</div>
-                        <div className="font-mono">
-                          {(concentracao.all.shareTop3 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-slate-500 dark:text-slate-400">Top 3 fornecedores (pendente)</div>
-                        <div className="font-mono">
-                          {(concentracao.open.shareTop3 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-slate-500 dark:text-slate-400">Maior grupo</div>
-                        <div className="font-mono">
-                          {(concentracao.shareTopGrupo * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      {concentracao.open.top1 && (
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Fornecedor #1 (pendente)</div>
-                          <div className="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                            {concentracao.open.top1.label}
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Principais Fornecedores</div>
+                    <div className="h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={donutFornecedores.data}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius="55%"
+                            outerRadius="80%"
+                            stroke="none"
+                          >
+                            {donutFornecedores.data.map((d, idx) => (
+                              <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      {donutFornecedores.top.map((x, idx) => {
+                        const pct = donutFornecedores.total > 0 ? (x.total / donutFornecedores.total) * 100 : 0;
+                        const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                        return (
+                          <div key={x.key} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-2 h-2 rounded-full ${color}`} />
+                              <span className="truncate">{x.label}</span>
+                            </div>
+                            <span className="font-mono whitespace-nowrap">{pct.toFixed(1)}%</span>
                           </div>
-                          <div className="mt-0.5 text-xs font-mono text-slate-700 dark:text-slate-200">
-                            {formatCurrency(concentracao.open.top1.total)}
+                        );
+                      })}
+                      {donutFornecedores.data.some(d => d.name === 'Outros') && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="truncate">Outros</span>
                           </div>
+                          <span className="font-mono whitespace-nowrap">
+                            {donutFornecedores.total > 0
+                              ? ((donutFornecedores.data.find(d => d.name === 'Outros')!.value / donutFornecedores.total) * 100).toFixed(1)
+                              : '0.0'}%
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1262,86 +1310,70 @@ export function ContasPagar() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top vencidas</div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs dark:border-slate-700"
-                        onClick={() => { setQuickOnlyOverdue(true); setActiveTab('lista'); }}
-                      >
-                        Ver lista
-                      </Button>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {topOverdue.length === 0 ? (
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Sem vencidas no recorte atual.</div>
-                      ) : (
-                        topOverdue.map((n) => (
-                          <button
-                            key={`${n.raw.nro_lancto}-${n.raw.parcela}-${n.raw.evento}`}
-                            onClick={() => { setTableSearch(String(n.raw.nro_lancto)); setActiveTab('lista'); }}
-                            className="w-full flex items-center justify-between gap-3 text-left"
-                          >
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                                {n.raw.fornecedor_nome || '-'}
-                              </div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                                {n.raw.unidade || '-'} · {n.raw.data_vencimento || '-'} · #{n.raw.nro_lancto}-{n.raw.parcela}
-                              </div>
-                            </div>
-                            <div className="text-xs font-mono text-amber-700 dark:text-amber-400 whitespace-nowrap">{formatCurrency(n.valor)}</div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Programação (7 dias)</div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs dark:border-slate-700"
-                        onClick={() => { setActiveTab('lista'); }}
-                      >
-                        Abrir
-                      </Button>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {upcoming7.length === 0 ? (
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Sem pagamentos programados nos próximos 7 dias.</div>
-                      ) : (
-                        upcoming7.map((n) => (
-                          <button
-                            key={`${n.raw.nro_lancto}-${n.raw.parcela}-${n.raw.evento}-pgto`}
-                            onClick={() => { setTableSearch(String(n.raw.nro_lancto)); setActiveTab('lista'); }}
-                            className="w-full flex items-center justify-between gap-3 text-left"
-                          >
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                                {n.raw.fornecedor_nome || '-'}
-                              </div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                                {n.raw.data_programacao_pgto || '-'} · {n.raw.unidade || '-'} · #{n.raw.nro_lancto}-{n.raw.parcela}
-                              </div>
-                            </div>
-                            <div className="text-xs font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap">{formatCurrency(n.valor)}</div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </div>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top vencidas</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Maiores valores em atraso (recorte atual)</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 dark:border-slate-600"
+                    onClick={() => { setQuickOnlyOverdue(true); setActiveTab('lista'); }}
+                  >
+                    Ver na Lista
+                  </Button>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <div className="col-span-2">Venc.</div>
+                    <div className="col-span-2 text-right">Valor</div>
+                    <div className="col-span-4">Fornecedor</div>
+                    <div className="col-span-3">Evento</div>
+                    <div className="col-span-1 text-right">UNI</div>
+                  </div>
+
+                  {topOverdue.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                      Sem vencidas no recorte atual.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {topOverdue.map((n) => {
+                        const r = n.raw;
+                        return (
+                          <button
+                            key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
+                            onClick={() => { setTableSearch(String(r.nro_lancto)); setActiveTab('lista'); }}
+                            className="grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                          >
+                            <div className="col-span-2 font-mono text-amber-700 dark:text-amber-400">{r.data_vencimento || '-'}</div>
+                            <div className="col-span-2 text-right font-mono">{r.vlr_parcela || '-'}</div>
+                            <div className="col-span-4 min-w-0">
+                              <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                                #{r.nro_lancto}-{r.parcela} · Pgto {r.data_programacao_pgto || '-'}
+                              </div>
+                            </div>
+                            <div className="col-span-3 min-w-0">
+                              <div className="truncate">{r.evento} - {r.evento_descricao || '-'}</div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{n.grupoLabel}</div>
+                            </div>
+                            <div className="col-span-1 text-right font-mono">{r.unidade || '-'}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="eventos">
@@ -1623,6 +1655,7 @@ export function ContasPagar() {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </DashboardLayout>
   );
