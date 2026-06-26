@@ -187,7 +187,7 @@ try {
     set_time_limit(180);
     ini_set('memory_limit', '512M');
 } catch (Exception $e) {
-    respondJson(['success' => false, 'message' => 'Erro ao inicializar integração SSW: ' . $e->getMessage()]);
+    respondJson(['success' => false, 'message' => 'Erro ao inicializar integração de importação: ' . $e->getMessage()]);
 }
 
 $params = [
@@ -259,7 +259,7 @@ $noLanc = [
 ];
 foreach ($noLanc as $needle) {
     if (stripos($strDec, $needle) !== false) {
-        respondJson(['success' => true, 'rows' => [], 'total' => 0, 'message' => 'SSW: não há lançamentos para o recorte informado.']);
+        respondJson(['success' => true, 'rows' => [], 'total' => 0, 'message' => 'Não há lançamentos para o recorte informado.']);
     }
 }
 
@@ -280,12 +280,80 @@ $extractActArq = static function(string $html): array {
     return [trim((string)$act), trim((string)$arq)];
 };
 
+$downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '') use ($domain): ?string {
+    $unidadeFiltro = strtoupper(trim((string)$unidadeFiltro));
+    $opcPrefix = preg_replace('/\D+/', '', (string)$opcPrefix);
+    if ($opcPrefix === '') return null;
+
+    for ($try = 0; $try < 10; $try++) {
+        $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+        $posXml = strpos($str1440, '<xml');
+        if ($posXml !== false) {
+            $str1440 = substr($str1440, $posXml);
+            $endXml = strpos($str1440, '</xml>');
+            if ($endXml !== false) $str1440 = substr($str1440, 0, $endXml) . '</xml>';
+        }
+
+        $xml1440 = @simplexml_load_string($str1440);
+        $nomeArq = null;
+        $pathArq = null;
+
+        if ($xml1440) {
+            for ($i = 0; $i <= 140; $i++) {
+                $seq = $xml1440->xpath('rs/r/f0')[$i];
+                $opc = $xml1440->xpath('rs/r/f1')[$i];
+                $usr = $xml1440->xpath('rs/r/f3')[$i];
+                $f4  = $xml1440->xpath('rs/r/f4')[$i];
+                $sit = $xml1440->xpath('rs/r/f6')[$i];
+                $f8  = $xml1440->xpath('rs/r/f8')[$i];
+
+                if ($seq === null) break;
+
+                $usr = trim((string)$usr);
+                if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+
+                $unidF4 = strtoupper(trim((string)$f4));
+                if ($unidadeFiltro !== '' && $unidF4 !== $unidadeFiltro) continue;
+
+                $sitStr = (string)$sit;
+                if ($sitStr !== 'Conclu&iacute;do' && $sitStr !== 'Concluído') continue;
+
+                $opcStr = (string)$opc;
+                if (substr($opcStr, 0, 3) !== $opcPrefix) continue;
+
+                $f8dec = html_entity_decode((string)$f8);
+                if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
+                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
+                        $decoded = urldecode($mVal[1]);
+                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
+                            $nomeArq = $mArq[1];
+                            $pathArq = $mArq[2];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($nomeArq && $pathArq) {
+            $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq}&filename={$nomeArq}&path={$pathArq}&down=1&nw=1");
+            if (!empty($file) && strlen((string)$file) >= 100) return $file;
+        }
+
+        usleep(400000);
+    }
+
+    return null;
+};
+
 $csv = null;
+$queued = (strpos($strDec, 'Solicita &ccedil;&atilde;o enviada para processamento.') !== false);
 if ($looksLikeCsv($strDec)) {
     $csv = $strDec;
 } else {
     [$act, $arq] = $extractActArq($strDec);
-    if (!empty($act) && !empty($arq)) {
+    if (!$queued && !empty($act) && !empty($arq)) {
         $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1");
     } else if (preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
         $url0432 = "https://sistema.ssw.inf.br/bin/ssw0432?" . $m[1];
@@ -307,7 +375,12 @@ if ($looksLikeCsv($strDec)) {
 }
 
 if (empty($csv) || strlen((string)$csv) < 50) {
-    respondJson(['success' => false, 'message' => 'Não foi possível obter o CSV no SSW (ssw0099).']);
+    $fromQueue = $downloadFrom1440('099', $unidade);
+    if (!empty($fromQueue)) $csv = $fromQueue;
+}
+
+if (empty($csv) || strlen((string)$csv) < 50) {
+    respondJson(['success' => false, 'message' => 'Não foi possível obter o CSV do relatório (0099).']);
 }
 
 $csv = mb_convert_encoding((string)$csv, 'UTF-8', 'ISO-8859-1');
@@ -433,5 +506,5 @@ respondJson([
         'sum_liqu' => $sumLiqu,
         'sum_canc' => $sumCanc,
     ],
-    'message' => $countTotal === 0 ? 'Nenhum registro retornado pelo SSW para o recorte informado.' : null,
+    'message' => $countTotal === 0 ? 'Nenhum registro retornado para o recorte informado.' : null,
 ]);

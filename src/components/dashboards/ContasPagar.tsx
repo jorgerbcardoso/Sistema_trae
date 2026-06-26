@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, Filter, Loader2, Search, SlidersHorizontal, Wallet, X, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, Filter, Loader2, Search, Wallet, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type GrupoEvento = { grupo: number; descricao: string };
@@ -213,7 +213,7 @@ export function ContasPagar() {
   usePageTitle('BI · Contas a Pagar');
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'visao' | 'unidades' | 'lista'>('visao');
+  const [activeTab, setActiveTab] = useState<'visao' | 'lista'>('visao');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Filters>(() => getDefaultFilters());
   const [tempFilters, setTempFilters] = useState<Filters>(() => getDefaultFilters());
@@ -227,6 +227,10 @@ export function ContasPagar() {
   const [quickStatus, setQuickStatus] = useState<'ALL' | 'PEND' | 'LIQU' | 'CANC'>('ALL');
   const [quickOnlyOverdue, setQuickOnlyOverdue] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
+  const PAGE_SIZE = 80;
+  const [listPage, setListPage] = useState(1);
+  const [topSort, setTopSort] = useState<{ key: 'venc' | 'valor' | 'fornecedor' | 'evento' | 'unidade'; dir: 'asc' | 'desc' }>(() => ({ key: 'valor', dir: 'desc' }));
+  const [listSort, setListSort] = useState<{ key: 'prioridade' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
@@ -271,6 +275,7 @@ export function ContasPagar() {
       const status = (r.sit_des ?? '').toString().trim().toUpperCase() || 'PEND';
       const vencTs = venc?.getTime() ?? null;
       const overdue = status !== 'LIQU' && vencTs !== null && vencTs < today0;
+      const overdue7 = status !== 'LIQU' && vencTs !== null && vencTs < (today0 - (7 * 86400000));
       return {
         raw: r,
         valor,
@@ -286,6 +291,7 @@ export function ContasPagar() {
         inclusaoTs: incl?.getTime() ?? null,
         programacaoTs: pgto?.getTime() ?? null,
         overdue,
+        overdue7,
       };
     });
   }, [rows]);
@@ -346,6 +352,73 @@ export function ContasPagar() {
     }
     return base;
   }, [filtered]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [tableSearch, quickStatus, quickOnlyOverdue, focusUnidade, focusGrupoLabel, focusCompetenciaKey, rows.length, listSort.key, listSort.dir]);
+
+  const listaOrdenada = useMemo(() => {
+    const rank = (n: any) => {
+      if (n.status === 'LIQU') return 2;
+      if (n.status === 'CANC') return 3;
+      if (n.overdue7) return 0;
+      return 1;
+    };
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
+    const safeTs = (t: number | null) => (t === null ? 9e15 : t);
+    const eventoNum = (n: any) => {
+      const v = String(n?.raw?.evento ?? '').replace(/\D+/g, '');
+      const num = parseInt(v || '0', 10);
+      return Number.isFinite(num) ? num : 0;
+    };
+
+    const arr = filtered.slice();
+    arr.sort((a: any, b: any) => {
+      if (listSort.key === 'prioridade') {
+        const ra = rank(a);
+        const rb = rank(b);
+        if (ra !== rb) return ra - rb;
+
+        const pa = safeTs(a.programacaoTs ?? null);
+        const pb = safeTs(b.programacaoTs ?? null);
+        if (pa !== pb) return pa - pb;
+
+        const ea = eventoNum(a);
+        const eb = eventoNum(b);
+        if (ea !== eb) return ea - eb;
+
+        const la = Number(a?.raw?.nro_lancto ?? 0) || 0;
+        const lb = Number(b?.raw?.nro_lancto ?? 0) || 0;
+        if (la !== lb) return la - lb;
+        return 0;
+      }
+
+      const dir = listSort.dir === 'desc' ? -1 : 1;
+      if (listSort.key === 'valor') return dir * ((Number(a.valor) || 0) - (Number(b.valor) || 0));
+      if (listSort.key === 'venc') return dir * (safeTs(a.vencimentoTs ?? null) - safeTs(b.vencimentoTs ?? null));
+      if (listSort.key === 'pgto') return dir * (safeTs(a.programacaoTs ?? null) - safeTs(b.programacaoTs ?? null));
+      if (listSort.key === 'evento') return dir * (eventoNum(a) - eventoNum(b));
+      if (listSort.key === 'unidade') return dir * cmpStr(String(a?.raw?.unidade ?? ''), String(b?.raw?.unidade ?? ''));
+      if (listSort.key === 'fornecedor') return dir * cmpStr(String(a?.raw?.fornecedor_nome ?? ''), String(b?.raw?.fornecedor_nome ?? ''));
+      if (listSort.key === 'lancto') return dir * ((Number(a?.raw?.nro_lancto ?? 0) || 0) - (Number(b?.raw?.nro_lancto ?? 0) || 0));
+      return 0;
+    });
+    return arr;
+  }, [filtered, listSort.dir, listSort.key]);
+
+  const listPageCount = useMemo(() => {
+    return Math.max(1, Math.ceil(listaOrdenada.length / PAGE_SIZE));
+  }, [listaOrdenada.length, PAGE_SIZE]);
+
+  const listPageSafe = Math.min(Math.max(1, listPage), listPageCount);
+  useEffect(() => {
+    if (listPageSafe !== listPage) setListPage(listPageSafe);
+  }, [listPageSafe, listPage]);
+
+  const listaPaginada = useMemo(() => {
+    const start = (listPageSafe - 1) * PAGE_SIZE;
+    return listaOrdenada.slice(start, start + PAGE_SIZE);
+  }, [listaOrdenada, listPageSafe, PAGE_SIZE]);
 
   const anoAnteriorValor = useMemo(() => {
     if (!anoAnterior) return null;
@@ -472,6 +545,32 @@ export function ContasPagar() {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [filtered]);
 
+  const unidadesTop3 = useMemo(() => byUnidade.slice(0, 3).map(u => u.label), [byUnidade]);
+
+  const serieProgramacaoPorUnidade = useMemo(() => {
+    const topSet = new Set(unidadesTop3);
+    const map = new Map<string, Record<string, any>>();
+    for (const n of filtered) {
+      if (n.programacaoTs === null) continue;
+      const d = new Date(n.programacaoTs);
+      const key = dateToInput(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0));
+      const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!map.has(key)) {
+        const base: Record<string, any> = { key, label };
+        for (const u of unidadesTop3) base[u] = 0;
+        base.Demais = 0;
+        map.set(key, base);
+      }
+
+      const it = map.get(key)!;
+      const u = (n.raw.unidade ?? '').toString().trim().toUpperCase() || '—';
+      const k = topSet.has(u) ? u : 'Demais';
+      it[k] = (Number(it[k]) || 0) + n.valor;
+    }
+    return Array.from(map.values()).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  }, [filtered, unidadesTop3]);
+
   const byEvento = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number; count: number }>();
     for (const n of filtered) {
@@ -585,13 +684,61 @@ export function ContasPagar() {
     return { total, top, data };
   }, [byGrupo]);
 
-  const topOverdue = useMemo(() => {
+  const donutUnidades = useMemo(() => {
+    const list = byUnidade.map((u) => ({ key: u.key, label: u.label, total: u.total }));
+    const total = list.reduce((s, x) => s + x.total, 0);
+    const top = list.slice(0, 3);
+    const topSum = top.reduce((s, x) => s + x.total, 0);
+    const demais = Math.max(0, total - topSum);
+    const data = [
+      ...top.map((x, idx) => ({
+        name: x.label,
+        value: x.total,
+        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+      })),
+      ...(demais > 0 ? [{ name: 'Demais', value: demais, color: '#94a3b8' }] : []),
+    ];
+    return { total, top, data };
+  }, [byUnidade]);
+
+  const unidadeLineColors = useMemo(() => {
+    const entries: Record<string, string> = {};
+    if (unidadesTop3[0]) entries[unidadesTop3[0]] = '#4f46e5';
+    if (unidadesTop3[1]) entries[unidadesTop3[1]] = '#0ea5e9';
+    if (unidadesTop3[2]) entries[unidadesTop3[2]] = '#f59e0b';
+    entries.Demais = '#94a3b8';
+    return entries;
+  }, [unidadesTop3]);
+
+  const topOverdueBase = useMemo(() => {
     return filtered
       .filter(n => n.overdue)
       .slice()
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 25);
   }, [filtered]);
+
+  const topOverdue = useMemo(() => {
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
+    const safeTs = (t: number | null) => (t === null ? 9e15 : t);
+    const eventoNum = (n: any) => {
+      const v = String(n?.raw?.evento ?? '').replace(/\D+/g, '');
+      const num = parseInt(v || '0', 10);
+      return Number.isFinite(num) ? num : 0;
+    };
+    const dir = topSort.dir === 'desc' ? -1 : 1;
+
+    const arr = topOverdueBase.slice();
+    arr.sort((a: any, b: any) => {
+      if (topSort.key === 'valor') return dir * ((Number(a.valor) || 0) - (Number(b.valor) || 0));
+      if (topSort.key === 'venc') return dir * (safeTs(a.vencimentoTs ?? null) - safeTs(b.vencimentoTs ?? null));
+      if (topSort.key === 'evento') return dir * (eventoNum(a) - eventoNum(b));
+      if (topSort.key === 'unidade') return dir * cmpStr(String(a?.raw?.unidade ?? ''), String(b?.raw?.unidade ?? ''));
+      if (topSort.key === 'fornecedor') return dir * cmpStr(String(a?.raw?.fornecedor_nome ?? ''), String(b?.raw?.fornecedor_nome ?? ''));
+      return 0;
+    });
+    return arr;
+  }, [topOverdueBase, topSort.dir, topSort.key]);
 
   const clearFilters = () => {
     const d = getDefaultFilters();
@@ -661,18 +808,25 @@ export function ContasPagar() {
         shouldLoadAnoAnterior = true;
       } else {
         setRows([]);
-        const msg = String(res?.message || 'Erro ao buscar dados no SSW.');
+        const msg = String(res?.message || 'Erro ao ler as despesas.');
         setLastLoadMessage(msg);
         toast.error(msg);
       }
     } catch (e: any) {
       setRows([]);
-      const msg = e?.message ? String(e.message) : 'Erro ao buscar dados no SSW.';
+      const msg = e?.message ? String(e.message) : 'Erro ao ler as despesas.';
       setLastLoadMessage(msg);
       toast.error(msg);
     } finally {
       setLoading(false);
-      if (shouldLoadAnoAnterior) void carregarAnoAnterior(payload);
+      if (shouldLoadAnoAnterior) {
+        const run = () => void carregarAnoAnterior(payload);
+        if (typeof (window as any)?.requestIdleCallback === 'function') {
+          (window as any).requestIdleCallback(run, { timeout: 1500 });
+        } else {
+          window.setTimeout(run, 350);
+        }
+      }
     }
   }, [filters, carregarAnoAnterior]);
 
@@ -682,8 +836,29 @@ export function ContasPagar() {
     void carregar();
   }, [carregar]);
 
-  const exportarCsv = () => {
-    const header = [
+  const baixarCsv = useCallback(
+    (filenameBase: string, header: string[], rows: Array<Array<string | number | null | undefined>>) => {
+      const lines: string[] = [];
+      lines.push(header.map(csvEscape).join(';'));
+      for (const r of rows) lines.push(r.map(v => csvEscape(String(v ?? ''))).join(';'));
+
+      const bom = '\uFEFF';
+      const content = bom + lines.join('\r\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filenameBase}_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    []
+  );
+
+  const headerCsvDespesas = useMemo(
+    () => [
       'NUMLANCTO',
       'PARCELA',
       'EVENTO',
@@ -700,12 +875,37 @@ export function ContasPagar() {
       'GRUPO EVENTO',
       'MES COMPETENCIA',
       'HISTORICO',
-    ];
+    ],
+    []
+  );
 
-    const lines: string[] = [];
-    lines.push(header.map(csvEscape).join(';'));
-    for (const n of filtered) {
+  const exportarCsv = useCallback(() => {
+    const rowsCsv = filtered.map((n) => {
       const r = n.raw;
+      return [
+        String(r.nro_lancto ?? ''),
+        String(r.parcela ?? ''),
+        String(r.evento ?? ''),
+        String(r.evento_descricao ?? ''),
+        String(r.fornecedor_cnpj ?? ''),
+        String(r.fornecedor_nome ?? ''),
+        String(r.vlr_parcela ?? ''),
+        String(r.data_inclusao ?? ''),
+        String(r.data_emissao_nf ?? ''),
+        String(r.data_vencimento ?? ''),
+        String(r.data_programacao_pgto ?? ''),
+        String(r.unidade ?? ''),
+        String(r.sit_des ?? ''),
+        String(r.grupo_evento ?? ''),
+        String(r.mes_competencia ?? ''),
+        String(r.historico ?? ''),
+      ];
+    });
+    baixarCsv('contas_pagar', headerCsvDespesas, rowsCsv);
+  }, [baixarCsv, filtered, headerCsvDespesas]);
+
+  const exportarCsvLinha = useCallback(
+    (r: RowDespesa) => {
       const row = [
         String(r.nro_lancto ?? ''),
         String(r.parcela ?? ''),
@@ -724,21 +924,66 @@ export function ContasPagar() {
         String(r.mes_competencia ?? ''),
         String(r.historico ?? ''),
       ];
-      lines.push(row.map(v => csvEscape(String(v ?? ''))).join(';'));
-    }
+      baixarCsv('contas_pagar_linha', headerCsvDespesas, [row]);
+    },
+    [baixarCsv, headerCsvDespesas]
+  );
 
-    const bom = '\uFEFF';
-    const content = bom + lines.join('\r\n');
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `contas_pagar_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  };
+  const exportarSerieProgramacao = useCallback(
+    (serieKey: 'total' | 'liqu') => {
+      const labelCol = serieKey === 'total' ? 'TOTAL' : 'LIQUIDADAS';
+      const rowsCsv = serieProgramacaoComparativo.map((p) => {
+        const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
+        return [dateLabel, Number((p as any)[serieKey]) || 0];
+      });
+      baixarCsv(`evolucao_programacao_${labelCol.toLowerCase()}`, ['DATA', labelCol], rowsCsv);
+    },
+    [baixarCsv, serieProgramacaoComparativo]
+  );
+
+  const exportarSerieProgramacaoCompleta = useCallback(() => {
+    const rowsCsv = serieProgramacaoComparativo.map((p) => {
+      const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
+      return [dateLabel, Number(p.total) || 0, Number(p.liqu) || 0];
+    });
+    baixarCsv('evolucao_programacao', ['DATA', 'TOTAL', 'LIQUIDADAS'], rowsCsv);
+  }, [baixarCsv, serieProgramacaoComparativo]);
+
+  const exportarSerieProgramacaoUnidade = useCallback(
+    (unidadeKey: string) => {
+      const rowsCsv = serieProgramacaoPorUnidade.map((p: any) => {
+        const dateLabel = `${String(p.key).slice(8, 10)}/${String(p.key).slice(5, 7)}/${String(p.key).slice(0, 4)}`;
+        return [dateLabel, Number(p[unidadeKey]) || 0];
+      });
+      baixarCsv(`evolucao_unidade_${unidadeKey.toLowerCase()}`, ['DATA', 'TOTAL'], rowsCsv);
+    },
+    [baixarCsv, serieProgramacaoPorUnidade]
+  );
+
+  const exportarSerieProgramacaoUnidades = useCallback(() => {
+    const keys = [...unidadesTop3, ...(byUnidade.length > 3 ? ['Demais'] : [])];
+    const header = ['DATA', ...keys.map(k => String(k).toUpperCase())];
+    const rowsCsv = serieProgramacaoPorUnidade.map((p: any) => {
+      const dateLabel = `${String(p.key).slice(8, 10)}/${String(p.key).slice(5, 7)}/${String(p.key).slice(0, 4)}`;
+      return [dateLabel, ...keys.map(k => Number(p[k]) || 0)];
+    });
+    baixarCsv('evolucao_unidades', header, rowsCsv);
+  }, [baixarCsv, byUnidade.length, serieProgramacaoPorUnidade, unidadesTop3]);
+
+  const exportarSlice = useCallback(
+    (filenameBase: string, item: string, value: number, total: number) => {
+      const pct = total > 0 ? (value / total) * 100 : 0;
+      baixarCsv(filenameBase, ['ITEM', 'VALOR', '%'], [[item, value, pct.toFixed(2)]]);
+    },
+    [baixarCsv]
+  );
+
+  const exportarBucket = useCallback(
+    (filenameBase: string, item: string, value: number) => {
+      baixarCsv(filenameBase, ['ITEM', 'VALOR'], [[item, value]]);
+    },
+    [baixarCsv]
+  );
 
   const ProgramacaoTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -1070,7 +1315,7 @@ export function ContasPagar() {
                     </div>
                     {tempFilters.competencia_ym && (
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Param SSW (mes_comp): {ymToMesCompParam(tempFilters.competencia_ym)} • CSV: {ymToCompetenciaLabel(tempFilters.competencia_ym)}
+                        Param (mes_comp): {ymToMesCompParam(tempFilters.competencia_ym)} • CSV: {ymToCompetenciaLabel(tempFilters.competencia_ym)}
                       </p>
                     )}
                   </div>
@@ -1115,24 +1360,6 @@ export function ContasPagar() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             <span className="ml-1.5">Buscar</span>
           </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setQuickStatus('ALL');
-              setQuickOnlyOverdue(false);
-              setTableSearch('');
-              setActiveTab('visao');
-              setFocusUnidade('');
-              setFocusGrupoLabel('');
-              setFocusCompetenciaKey('');
-            }}
-            className="hidden md:inline-flex dark:border-slate-600"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span className="ml-1.5">Visão</span>
-          </Button>
         </div>
       }
     >
@@ -1145,7 +1372,7 @@ export function ContasPagar() {
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregando dados...</div>
               </div>
               <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Buscando no SSW conforme o recorte informado.
+                Lendo despesas conforme o recorte informado.
               </div>
             </div>
           </div>
@@ -1154,46 +1381,70 @@ export function ContasPagar() {
         <div className={loading ? 'space-y-4 blur-[1px] opacity-70 pointer-events-none select-none' : 'space-y-4'}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="visao" className="px-3">Visão</TabsTrigger>
-              <TabsTrigger value="unidades" className="px-3">Unidades</TabsTrigger>
-              <TabsTrigger value="lista" className="px-3">Lista</TabsTrigger>
+            <TabsList className="w-full md:w-auto h-11 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+              <TabsTrigger
+                value="visao"
+                className="h-9 px-4 text-sm font-semibold data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-indigo-400/40"
+              >
+                Visão Geral
+              </TabsTrigger>
+              <TabsTrigger
+                value="lista"
+                className="h-9 px-4 text-sm font-semibold data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-indigo-400/40"
+              >
+                Lista
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="flex items-center gap-2">
             <Button
-              variant={quickStatus === 'ALL' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
-              onClick={() => setQuickStatus('ALL')}
-              className={quickStatus === 'ALL' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'dark:border-slate-600'}
+              onClick={() => { setQuickStatus('ALL'); setQuickOnlyOverdue(false); }}
+              className={
+                quickStatus === 'ALL' && !quickOnlyOverdue
+                  ? 'h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600'
+                  : 'h-10 px-4 border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-950/30'
+              }
             >
               Tudo
             </Button>
             <Button
-              variant={quickStatus === 'PEND' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
-              onClick={() => setQuickStatus('PEND')}
-              className={quickStatus === 'PEND' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'dark:border-slate-600'}
+              onClick={() => { setQuickStatus('PEND'); setQuickOnlyOverdue(false); }}
+              className={
+                quickStatus === 'PEND' && !quickOnlyOverdue
+                  ? 'h-10 px-4 bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
+                  : 'h-10 px-4 border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/30'
+              }
             >
-              Pend
+              Pendentes
             </Button>
             <Button
-              variant={quickStatus === 'LIQU' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
-              onClick={() => setQuickStatus('LIQU')}
-              className={quickStatus === 'LIQU' ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'dark:border-slate-600'}
+              onClick={() => { setQuickStatus('LIQU'); setQuickOnlyOverdue(false); }}
+              className={
+                quickStatus === 'LIQU' && !quickOnlyOverdue
+                  ? 'h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                  : 'h-10 px-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-950/30'
+              }
             >
-              Liqu
+              Liquidadas
             </Button>
             <Button
-              variant={quickOnlyOverdue ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
-              onClick={() => setQuickOnlyOverdue((v) => !v)}
-              className={quickOnlyOverdue ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'dark:border-slate-600'}
+              onClick={() => { setQuickStatus('ALL'); setQuickOnlyOverdue(true); }}
+              className={
+                quickOnlyOverdue
+                  ? 'h-10 px-4 bg-rose-600 hover:bg-rose-700 text-white border-rose-600'
+                  : 'h-10 px-4 border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/30'
+              }
             >
-              <AlertTriangle className="w-4 h-4 mr-1.5" />
-              Atraso
+              Em Atraso
             </Button>
           </div>
         </div>
@@ -1214,7 +1465,10 @@ export function ContasPagar() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold text-sky-700 dark:text-sky-300">Total</div>
-                <Wallet className="w-4 h-4 text-sky-500 dark:text-sky-400" />
+                <div className="flex items-center gap-2">
+                  {loadingAnoAnterior && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                  <Wallet className="w-4 h-4 text-sky-500 dark:text-sky-400" />
+                </div>
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(totals.total)}</div>
               <div className="text-[11px] text-slate-600 dark:text-slate-400">
@@ -1277,7 +1531,14 @@ export function ContasPagar() {
                 <Card className="lg:col-span-8">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-3">
-                      <div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={exportarSerieProgramacaoCompleta}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') exportarSerieProgramacaoCompleta(); }}
+                        className="cursor-pointer"
+                        title="Exportar CSV"
+                      >
                         <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Programação</div>
                         <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (programação)</div>
                       </div>
@@ -1290,8 +1551,8 @@ export function ContasPagar() {
                           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                           <YAxis tick={{ fontSize: 11 }} width={70} />
                           <RechartsTooltip content={<ProgramacaoTooltip />} />
-                          <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} dot={false} />
-                          <Line type="monotone" dataKey="liqu" stroke="#10b981" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} dot={false} onClick={() => exportarSerieProgramacao('total')} style={{ cursor: 'pointer' }} />
+                          <Line type="monotone" dataKey="liqu" stroke="#10b981" strokeWidth={2} dot={false} onClick={() => exportarSerieProgramacao('liqu')} style={{ cursor: 'pointer' }} />
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
@@ -1362,6 +1623,10 @@ export function ContasPagar() {
                             innerRadius="55%"
                             outerRadius="80%"
                             stroke="none"
+                            onClick={(d: any) => {
+                              const p = d?.payload ?? d;
+                              exportarSlice('status', String(p?.name ?? ''), Number(p?.value) || 0, totals.pend + totals.liqu + totals.canc);
+                            }}
                           >
                             <Cell fill="#f59e0b" />
                             <Cell fill="#10b981" />
@@ -1391,6 +1656,10 @@ export function ContasPagar() {
                             innerRadius="55%"
                             outerRadius="80%"
                             stroke="none"
+                            onClick={(d: any) => {
+                              const p = d?.payload ?? d;
+                              exportarSlice('fornecedores', String(p?.name ?? ''), Number(p?.value) || 0, donutFornecedores.total);
+                            }}
                           >
                             {donutFornecedores.data.map((d, idx) => (
                               <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
@@ -1440,7 +1709,15 @@ export function ContasPagar() {
                           <XAxis type="number" hide />
                           <YAxis type="category" dataKey="label" width={90} tick={{ fontSize: 11 }} />
                           <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                          <Bar dataKey="total" fill="#f59e0b" radius={[6, 6, 6, 6]} />
+                          <Bar
+                            dataKey="total"
+                            fill="#f59e0b"
+                            radius={[6, 6, 6, 6]}
+                            onClick={(d: any) => {
+                              const p = d?.payload ?? d;
+                              exportarBucket('envelhecimento_pendentes', String(p?.label ?? ''), Number(p?.total) || 0);
+                            }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1449,6 +1726,132 @@ export function ContasPagar() {
               </div>
             </div>
             
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <Card className="lg:col-span-8">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={exportarSerieProgramacaoUnidades}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') exportarSerieProgramacaoUnidades(); }}
+                      className="cursor-pointer"
+                      title="Exportar CSV"
+                    >
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (Top 3 + Demais)</div>
+                    </div>
+                  </div>
+
+                  <div className="h-[260px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={serieProgramacaoPorUnidade} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} width={70} />
+                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                        {unidadesTop3.map((u) => (
+                          <Line
+                            key={u}
+                            type="monotone"
+                            dataKey={u}
+                            stroke={unidadeLineColors[u] || '#4f46e5'}
+                            strokeWidth={2}
+                            dot={false}
+                            onClick={() => exportarSerieProgramacaoUnidade(u)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        ))}
+                        {byUnidade.length > 3 && (
+                          <Line
+                            type="monotone"
+                            dataKey="Demais"
+                            stroke={unidadeLineColors.Demais}
+                            strokeWidth={2}
+                            dot={false}
+                            onClick={() => exportarSerieProgramacaoUnidade('Demais')}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-600 dark:text-slate-300">
+                    {unidadesTop3.map((u) => (
+                      <div key={`leg-${u}`} className="flex items-center gap-2">
+                        <span className="w-3 h-[2px]" style={{ background: unidadeLineColors[u] || '#4f46e5' }} />
+                        {u}
+                      </div>
+                    ))}
+                    {byUnidade.length > 3 && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-[2px] bg-slate-400" />
+                        Demais
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-4">
+                <CardContent className="pt-6">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Unidades</div>
+                  <div className="h-[220px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={donutUnidades.data}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="55%"
+                          outerRadius="80%"
+                          stroke="none"
+                          onClick={(d: any) => {
+                            const p = d?.payload ?? d;
+                            exportarSlice('unidades', String(p?.name ?? ''), Number(p?.value) || 0, donutUnidades.total);
+                          }}
+                        >
+                          {donutUnidades.data.map((d, idx) => (
+                            <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), String(name)]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                    {donutUnidades.top.map((x, idx) => {
+                      const pct = donutUnidades.total > 0 ? (x.total / donutUnidades.total) * 100 : 0;
+                      const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                      return (
+                        <div key={x.key} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-2 h-2 rounded-full ${color}`} />
+                            <span className="truncate">{x.label}</span>
+                          </div>
+                          <span className="font-mono whitespace-nowrap">{pct.toFixed(1)}%</span>
+                        </div>
+                      );
+                    })}
+                    {donutUnidades.data.some(d => d.name === 'Demais') && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                          <span className="truncate">Demais</span>
+                        </div>
+                        <span className="font-mono whitespace-nowrap">
+                          {donutUnidades.total > 0
+                            ? ((donutUnidades.data.find(d => d.name === 'Demais')!.value / donutUnidades.total) * 100).toFixed(1)
+                            : '0.0'}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card>
                 <CardContent className="pt-6">
@@ -1463,6 +1866,10 @@ export function ContasPagar() {
                           innerRadius="55%"
                           outerRadius="80%"
                           stroke="none"
+                          onClick={(d: any) => {
+                            const p = d?.payload ?? d;
+                            exportarSlice('eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutEventos.total);
+                          }}
                         >
                           {donutEventos.data.map((d, idx) => (
                             <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
@@ -1516,6 +1923,10 @@ export function ContasPagar() {
                           innerRadius="55%"
                           outerRadius="80%"
                           stroke="none"
+                          onClick={(d: any) => {
+                            const p = d?.payload ?? d;
+                            exportarSlice('grupos_eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutGrupos.total);
+                          }}
                         >
                           {donutGrupos.data.map((d, idx) => (
                             <Cell key={`${d.name}-${idx}`} fill={(d as any).color} />
@@ -1576,11 +1987,41 @@ export function ContasPagar() {
 
                 <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <div className="col-span-2">Venc.</div>
-                    <div className="col-span-2 text-right">Valor</div>
-                    <div className="col-span-4">Fornecedor</div>
-                    <div className="col-span-3">Evento</div>
-                    <div className="col-span-1 text-right">UNI</div>
+                    <button
+                      type="button"
+                      className="col-span-2 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
+                    >
+                      Venc.{topSort.key === 'venc' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="col-span-2 text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'valor' ? { key: 'valor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'valor', dir: 'desc' }))}
+                    >
+                      Valor{topSort.key === 'valor' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="col-span-4 text-left pl-4 hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'fornecedor' ? { key: 'fornecedor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'fornecedor', dir: 'asc' }))}
+                    >
+                      Fornecedor{topSort.key === 'fornecedor' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="col-span-3 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
+                    >
+                      Evento{topSort.key === 'evento' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="col-span-1 text-right hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
+                    >
+                      UNI{topSort.key === 'unidade' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </button>
                   </div>
 
                   {topOverdue.length === 0 ? (
@@ -1598,8 +2039,8 @@ export function ContasPagar() {
                             className="grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
                             <div className="col-span-2 font-mono text-amber-700 dark:text-amber-400">{r.data_vencimento || '-'}</div>
-                            <div className="col-span-2 text-right font-mono">{r.vlr_parcela || '-'}</div>
-                            <div className="col-span-4 min-w-0">
+                            <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
+                            <div className="col-span-4 min-w-0 pl-4">
                               <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
                               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                                 #{r.nro_lancto}-{r.parcela} · Pgto {r.data_programacao_pgto || '-'}
@@ -1618,68 +2059,6 @@ export function ContasPagar() {
                 </div>
               </CardContent>
             </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="unidades">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <Card className="lg:col-span-6">
-                <CardContent className="pt-6">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Despesa por unidade (valor)</div>
-                  <div className="h-[380px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={byUnidade.slice(0, 14)} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="label" width={70} tick={{ fontSize: 11 }} />
-                        <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                        <Bar
-                          dataKey="total"
-                          fill="#f59e0b"
-                          radius={[6, 6, 6, 6]}
-                          onClick={(d: any) => {
-                            const u = (d?.payload?.label ?? '').toString().trim().toUpperCase();
-                            if (!u) return;
-                            setFocusUnidade(prev => (prev === u ? '' : u));
-                            setActiveTab('lista');
-                          }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-6">
-                <CardContent className="pt-6">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Top fornecedores (valor)</div>
-                  <div className="h-[380px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={(() => {
-                          const map = new Map<string, { key: string; label: string; total: number }>();
-                          for (const n of filtered) {
-                            const label = (n.raw.fornecedor_nome ?? '').toString().trim() || '—';
-                            const key = `${label}::${(n.raw.fornecedor_cnpj ?? '').toString().trim()}`;
-                            if (!map.has(key)) map.set(key, { key, label, total: 0 });
-                            map.get(key)!.total += n.valor;
-                          }
-                          return Array.from(map.values())
-                            .sort((a, b) => b.total - a.total)
-                            .slice(0, 12)
-                            .map((x) => ({ ...x, short: x.label.length > 32 ? `${x.label.slice(0, 32)}…` : x.label }));
-                        })()}
-                        layout="vertical"
-                        margin={{ top: 0, right: 10, left: 10, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="short" width={170} tick={{ fontSize: 11 }} />
-                        <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                        <Bar dataKey="total" fill="#0ea5e9" radius={[6, 6, 6, 6]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
@@ -1770,17 +2149,98 @@ export function ContasPagar() {
                 </Card>
               )}
 
+              {listaOrdenada.length > 0 && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {listaOrdenada.length} registro{listaOrdenada.length !== 1 ? 's' : ''} · {PAGE_SIZE} por página
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700"
+                      onClick={() => setListSort({ key: 'prioridade', dir: 'asc' })}
+                      disabled={listSort.key === 'prioridade'}
+                    >
+                      Padrão
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700"
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      disabled={listPageSafe <= 1}
+                    >
+                      Anterior
+                    </Button>
+                    <div className="text-xs text-slate-600 dark:text-slate-300">
+                      Página <span className="font-mono">{listPageSafe}</span> de <span className="font-mono">{listPageCount}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700"
+                      onClick={() => setListPage((p) => Math.min(listPageCount, p + 1))}
+                      disabled={listPageSafe >= listPageCount}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  <div className="col-span-1">Lanç.</div>
+                  <button
+                    type="button"
+                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'lancto' ? { key: 'lancto', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'lancto', dir: 'asc' }))}
+                  >
+                    Lanç.{listSort.key === 'lancto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
                   <div className="col-span-1">Parc.</div>
-                  <div className="col-span-1">Evento</div>
-                  <div className="col-span-3">Fornecedor</div>
-                  <div className="col-span-2 text-right">Valor</div>
-                  <div className="col-span-1">Venc.</div>
-                  <div className="col-span-1">Pgto</div>
-                  <div className="col-span-1">UNI</div>
-                  <div className="col-span-1">Sit</div>
+                  <button
+                    type="button"
+                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
+                  >
+                    Evento{listSort.key === 'evento' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-4 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'fornecedor' ? { key: 'fornecedor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'fornecedor', dir: 'asc' }))}
+                  >
+                    Fornecedor{listSort.key === 'fornecedor' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-2 text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'valor' ? { key: 'valor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'valor', dir: 'desc' }))}
+                  >
+                    Valor{listSort.key === 'valor' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
+                  >
+                    Venc.{listSort.key === 'venc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'pgto' ? { key: 'pgto', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'pgto', dir: 'asc' }))}
+                  >
+                    Pgto{listSort.key === 'pgto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 text-left hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
+                  >
+                    UNI{listSort.key === 'unidade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
                 </div>
 
                 {rows.length === 0 ? (
@@ -1793,44 +2253,44 @@ export function ContasPagar() {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filtered
-                      .slice()
-                      .sort((a, b) => (a.vencimentoTs ?? 9e15) - (b.vencimentoTs ?? 9e15))
-                      .slice(0, 600)
-                      .map((n) => {
+                    {listaPaginada.map((n) => {
                         const r = n.raw;
                         const key = `${r.nro_lancto}-${r.parcela}-${r.evento}-${r.fornecedor_cnpj}`;
-                        const isOverdue = n.overdue;
+                        const rowBg =
+                          r.sit_des === 'LIQU'
+                            ? 'bg-emerald-50/80 dark:bg-emerald-950/25'
+                            : r.sit_des === 'CANC'
+                              ? 'bg-slate-50/80 dark:bg-slate-900/25'
+                              : n.overdue7
+                                ? 'bg-rose-50/80 dark:bg-rose-950/25'
+                                : 'bg-amber-50/80 dark:bg-amber-950/25';
                         return (
-                          <div key={key} className="grid grid-cols-12 px-4 py-2 text-xs text-slate-700 dark:text-slate-200">
+                          <button
+                            type="button"
+                            key={key}
+                            onClick={() => exportarCsvLinha(r)}
+                            className={`grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
+                            title="Exportar CSV"
+                          >
                             <div className="col-span-1 font-mono">{r.nro_lancto}</div>
                             <div className="col-span-1 font-mono">{r.parcela}</div>
                             <div className="col-span-1 font-mono">{r.evento}</div>
-                            <div className="col-span-3">
+                            <div className="col-span-4">
                               <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
                               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
                                 {r.fornecedor_cnpj || '-'} · {n.grupoLabel}
                               </div>
                             </div>
-                            <div className="col-span-2 text-right font-mono">{r.vlr_parcela || '-'}</div>
-                            <div className={`col-span-1 font-mono ${isOverdue ? 'text-amber-700 dark:text-amber-400' : ''}`}>{r.data_vencimento || '-'}</div>
+                            <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
+                            <div className="col-span-1 font-mono pl-3">{r.data_vencimento || '-'}</div>
                             <div className="col-span-1 font-mono">{r.data_programacao_pgto || '-'}</div>
                             <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
-                            <div className={`col-span-1 font-mono ${r.sit_des === 'LIQU' ? 'text-emerald-700 dark:text-emerald-400' : r.sit_des === 'CANC' ? 'text-slate-400' : ''}`}>
-                              {r.sit_des || '-'}
-                            </div>
-                          </div>
+                          </button>
                         );
                       })}
                   </div>
                 )}
               </div>
-
-              {filtered.length > 600 && (
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Exibindo apenas os primeiros 600 registros (filtrados: {filtered.length}).
-                </div>
-              )}
             </div>
           </TabsContent>
         </Tabs>
