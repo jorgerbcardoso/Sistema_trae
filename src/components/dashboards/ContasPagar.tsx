@@ -640,7 +640,7 @@ export function ContasPagar() {
     for (const n of baseParaResumo) {
       const name = (n.raw.fornecedor_nome ?? '').toString().trim() || '—';
       const cnpj = (n.raw.fornecedor_cnpj ?? '').toString().trim();
-      const label = cnpj ? `${name} (${cnpj})` : name;
+      const label = name;
       const key = `${name}::${cnpj}`;
       if (!map.has(key)) map.set(key, { key, label, total: 0 });
       map.get(key)!.total += n.valor;
@@ -700,14 +700,15 @@ export function ContasPagar() {
   const donutUnidades = useMemo(() => {
     const list = byUnidade.map((u) => ({ key: u.key, label: u.label, total: u.total }));
     const total = list.reduce((s, x) => s + x.total, 0);
-    const top = list.slice(0, 3);
+    const top = list.slice(0, 5);
     const topSum = top.reduce((s, x) => s + x.total, 0);
     const demais = Math.max(0, total - topSum);
+    const colors = ['#4f46e5', '#0ea5e9', '#f59e0b', '#10b981', '#a855f7'];
     const data = [
       ...top.map((x, idx) => ({
         name: x.label,
         value: x.total,
-        color: idx === 0 ? '#4f46e5' : idx === 1 ? '#0ea5e9' : '#f59e0b',
+        color: colors[idx] || '#94a3b8',
       })),
       ...(demais > 0 ? [{ name: 'Demais', value: demais, color: '#94a3b8' }] : []),
     ];
@@ -1941,7 +1942,8 @@ export function ContasPagar() {
                   <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                     {donutUnidades.top.map((x, idx) => {
                       const pct = donutUnidades.total > 0 ? (x.total / donutUnidades.total) * 100 : 0;
-                      const color = idx === 0 ? 'bg-indigo-600' : idx === 1 ? 'bg-sky-500' : 'bg-amber-500';
+                      const colors = ['bg-indigo-600', 'bg-sky-500', 'bg-amber-500', 'bg-emerald-500', 'bg-purple-500'];
+                      const color = colors[idx] || 'bg-slate-400';
                       return (
                         <div key={x.key} className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
@@ -2099,13 +2101,10 @@ export function ContasPagar() {
 
                 <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <button
-                      type="button"
-                      className="col-span-2 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
-                      onClick={() => setTopSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
-                    >
-                      Venc.{topSort.key === 'venc' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </button>
+                    <div className="col-span-2">Lançamento</div>
+                    <div className="col-span-1">Unid</div>
+                    <div className="col-span-1">Evento</div>
+                    <div className="col-span-3">Fornecedor</div>
                     <button
                       type="button"
                       className="col-span-2 w-full text-right pr-4 hover:text-slate-900 dark:hover:text-slate-100"
@@ -2115,25 +2114,13 @@ export function ContasPagar() {
                     </button>
                     <button
                       type="button"
-                      className="col-span-4 w-full text-left pl-4 hover:text-slate-900 dark:hover:text-slate-100"
-                      onClick={() => setTopSort((s) => (s.key === 'fornecedor' ? { key: 'fornecedor', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'fornecedor', dir: 'asc' }))}
+                      className="col-span-1 w-full text-left pr-2 hover:text-slate-900 dark:hover:text-slate-100"
+                      onClick={() => setTopSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
                     >
-                      Fornecedor{topSort.key === 'fornecedor' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                      Venc.{topSort.key === 'venc' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                     </button>
-                    <button
-                      type="button"
-                      className="col-span-3 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
-                      onClick={() => setTopSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
-                    >
-                      Evento{topSort.key === 'evento' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </button>
-                    <button
-                      type="button"
-                      className="col-span-1 w-full text-right hover:text-slate-900 dark:hover:text-slate-100"
-                      onClick={() => setTopSort((s) => (s.key === 'unidade' ? { key: 'unidade', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'unidade', dir: 'asc' }))}
-                    >
-                      UNI{topSort.key === 'unidade' ? (topSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </button>
+                    <div className="col-span-1 pl-2">Pgto</div>
+                    <div className="col-span-1 text-right">Sit</div>
                   </div>
 
                   {topOverdue.length === 0 ? (
@@ -2144,25 +2131,29 @@ export function ContasPagar() {
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {topOverdue.map((n) => {
                         const r = n.raw;
+                        const lanc = `${String(r.nro_lancto ?? 0).padStart(6, '0')}-${String(r.parcela ?? '')}`;
+                        const sitColor = r.sit_des === 'LIQU' ? 'bg-emerald-600' : r.sit_des === 'CANC' ? 'bg-slate-400' : 'bg-rose-600';
                         return (
                           <button
                             key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
                             onClick={() => setSelectedDespesa(r)}
                             className="grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
-                            <div className="col-span-2 font-mono text-amber-700 dark:text-amber-400">{r.data_vencimento || '-'}</div>
-                            <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
-                            <div className="col-span-4 min-w-0 pl-4">
+                            <div className="col-span-2 font-mono">{lanc}</div>
+                            <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
+                            <div className="col-span-1 font-mono">{r.evento || '-'}</div>
+                            <div className="col-span-3 min-w-0">
                               <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
                               <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                                #{r.nro_lancto}-{r.parcela} · Pgto {r.data_programacao_pgto || '-'}
+                                {r.fornecedor_cnpj || '—'}
                               </div>
                             </div>
-                            <div className="col-span-3 min-w-0">
-                              <div className="truncate">{r.evento} - {r.evento_descricao || '-'}</div>
-                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{n.grupoLabel}</div>
+                            <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
+                            <div className="col-span-1 font-mono pr-2 text-amber-700 dark:text-amber-400">{r.data_vencimento || '-'}</div>
+                            <div className="col-span-1 font-mono pl-2">{r.data_programacao_pgto || '-'}</div>
+                            <div className="col-span-1 flex justify-end">
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${sitColor}`} />
                             </div>
-                            <div className="col-span-1 text-right font-mono">{r.unidade || '-'}</div>
                           </button>
                         );
                       })}
@@ -2320,13 +2311,6 @@ export function ContasPagar() {
                   <button
                     type="button"
                     className="col-span-1 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
-                    onClick={() => setListSort((s) => (s.key === 'sit' ? { key: 'sit', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'sit', dir: 'asc' }))}
-                  >
-                    Sit{listSort.key === 'sit' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                  </button>
-                  <button
-                    type="button"
-                    className="col-span-1 w-full text-left hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'evento' ? { key: 'evento', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'evento', dir: 'asc' }))}
                   >
                     Evento{listSort.key === 'evento' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -2347,17 +2331,24 @@ export function ContasPagar() {
                   </button>
                   <button
                     type="button"
-                    className="col-span-1 w-full text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-1 w-full text-left pl-3 pr-2 hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'venc' ? { key: 'venc', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'venc', dir: 'asc' }))}
                   >
                     Venc.{listSort.key === 'venc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                   <button
                     type="button"
-                    className="col-span-1 w-full text-left pl-3 hover:text-slate-900 dark:hover:text-slate-100"
+                    className="col-span-1 w-full text-left pl-4 hover:text-slate-900 dark:hover:text-slate-100"
                     onClick={() => setListSort((s) => (s.key === 'pgto' ? { key: 'pgto', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'pgto', dir: 'asc' }))}
                   >
                     Pgto{listSort.key === 'pgto' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className="col-span-1 w-full text-right hover:text-slate-900 dark:hover:text-slate-100"
+                    onClick={() => setListSort((s) => (s.key === 'sit' ? { key: 'sit', dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: 'sit', dir: 'asc' }))}
+                  >
+                    Sit{listSort.key === 'sit' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                   </button>
                 </div>
 
@@ -2394,9 +2385,6 @@ export function ContasPagar() {
                           >
                             <div className="col-span-2 font-mono">{lanc}</div>
                             <div className="col-span-1 font-mono">{r.unidade || '-'}</div>
-                            <div className="col-span-1">
-                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${sitColor}`} />
-                            </div>
                             <div className="col-span-1 font-mono">{r.evento}</div>
                             <div className="col-span-3">
                               <div className="font-medium truncate">{r.fornecedor_nome || '-'}</div>
@@ -2405,8 +2393,11 @@ export function ContasPagar() {
                               </div>
                             </div>
                             <div className="col-span-2 text-right font-mono pr-4">{formatCurrency(n.valor)}</div>
-                            <div className="col-span-1 font-mono pl-3">{r.data_vencimento || '-'}</div>
-                            <div className="col-span-1 font-mono pl-3">{r.data_programacao_pgto || '-'}</div>
+                            <div className="col-span-1 font-mono pl-3 pr-2">{r.data_vencimento || '-'}</div>
+                            <div className="col-span-1 font-mono pl-4">{r.data_programacao_pgto || '-'}</div>
+                            <div className="col-span-1 flex justify-end">
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${sitColor}`} />
+                            </div>
                           </button>
                         );
                       })}
