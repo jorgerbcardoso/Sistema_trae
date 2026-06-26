@@ -56,6 +56,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 
+const DESTINOS_IGNORADOS_RVE = new Set<string>(['SAL', 'DK4', 'TNE', 'DEV']);
+
 interface Cte {
   ctrc: string;
   serCte: string;
@@ -2398,6 +2400,18 @@ export function Disponiveis() {
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
+  const dominioUsuario = (user?.domain ?? '').trim().toUpperCase();
+  const unidadeAtual = unidadeLogada.trim().toUpperCase();
+
+  const shouldIgnoreDestinoRVE = (destinoRaw: string | null | undefined) => {
+    if (dominioUsuario !== 'RVE') return false;
+    const destino = (destinoRaw ?? '').trim().toUpperCase();
+    if (!destino) return false;
+    if (DESTINOS_IGNORADOS_RVE.has(destino)) return true;
+    if (unidadeAtual === 'SAO' && destino === 'CAM') return true;
+    if (unidadeAtual === 'CAM' && destino === 'SAO') return true;
+    return false;
+  };
 
   const [sigla] = useState<string>(unidadeLogada);
 
@@ -3050,6 +3064,7 @@ export function Disponiveis() {
       const hubs = Object.values(res.dados as Record<string, { ctes: Cte[]; erro: string | null }>).flatMap(u => u.ctes ?? []);
       const candidatos = hubs
         .filter(c => destinosPermitidos.has(c.unidadeDest))
+        .filter(c => !shouldIgnoreDestinoRVE(c.unidadeDest))
         .filter(c => !ctesNoCarregamento.has(c.nroCte))
         .filter(c => !ctesJaCarregados.has(c.nroCte));
 
@@ -3119,7 +3134,7 @@ export function Disponiveis() {
       setLoadingHub(false);
       setHubEtapa(null);
     }
-  }, [sigla, hubModalCarregamento, hubModalDestino, hubModalUnidadesStr, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos]);
+  }, [sigla, hubModalCarregamento, hubModalDestino, hubModalUnidadesStr, loadingHub, todosCtes, ctesJaCarregados, carregarCarregamentos, dominioUsuario, unidadeAtual]);
 
   const toggleTodos = useCallback((ctes: Cte[], selecionar: boolean) => {
     setCtesSelecionados(prev => {
@@ -3243,6 +3258,7 @@ export function Disponiveis() {
       }
     }
     return list.filter((cte) => {
+      if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (filters.unidadeDestino?.length) {
         if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
       }
@@ -3256,7 +3272,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim]);
+  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
 
   const coletasTransferFiltradas = React.useMemo(() => {
     const list = dados?.coletas ? [...dados.coletas] : [];
@@ -3267,9 +3283,12 @@ export function Disponiveis() {
 
   const ctesEntregaFiltrados = React.useMemo(() => {
     const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
-    if (!previsaoInicio && !previsaoFim) return list;
-    return list.filter((cte) => matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim));
-  }, [dadosEntrega, previsaoInicio, previsaoFim]);
+    return list.filter((cte) => {
+      if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
+      if (!previsaoInicio && !previsaoFim) return true;
+      return matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim);
+    });
+  }, [dadosEntrega, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
     setFilters(filtrosVazios);
