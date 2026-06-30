@@ -90,6 +90,8 @@ const diffDaysInclusive = (startIso: string, endIso: string): number | null => {
 };
 
 const validarRecorte = (f: Filters): string | null => {
+  if (f.grupo_evento && f.evento) return 'Selecione Grupo de Evento ou Evento (não é permitido informar os dois).';
+
   const p = [
     { label: 'Inclusão', ini: f.periodo_inclusao_inicio, fim: f.periodo_inclusao_fim },
     { label: 'Programação (Pagamento)', ini: f.periodo_programacao_inicio, fim: f.periodo_programacao_fim },
@@ -1175,7 +1177,7 @@ export function ContasPagar() {
                       <Label className="text-slate-900 dark:text-slate-100">Grupo de Evento</Label>
                       <Select
                         value={tempFilters.grupo_evento || undefined}
-                        onValueChange={(v) => setTempFilters({ ...tempFilters, grupo_evento: v || '' })}
+                        onValueChange={(v) => setTempFilters({ ...tempFilters, grupo_evento: v || '', evento: '' })}
                       >
                         <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
                           <div className="flex-1 min-w-0">
@@ -1207,7 +1209,7 @@ export function ContasPagar() {
                     <div className="space-y-2">
                       <EventoSearchInput
                         value={tempFilters.evento}
-                        onChange={(v) => setTempFilters({ ...tempFilters, evento: v })}
+                        onChange={(v) => setTempFilters({ ...tempFilters, evento: v, grupo_evento: '' })}
                         label="Evento"
                         displayMode="singleLine"
                       />

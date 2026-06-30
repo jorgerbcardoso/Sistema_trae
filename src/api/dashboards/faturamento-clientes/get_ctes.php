@@ -19,6 +19,9 @@ $filters = $input['filters'] ?? [];
 $tipo    = $input['tipo']    ?? '';
 $chave   = $input['chave']   ?? '';
 $mes     = $input['mes']     ?? '';
+$excluirCnpjs = (isset($input['excluir_cnpjs']) && is_array($input['excluir_cnpjs'])) ? $input['excluir_cnpjs'] : [];
+$excluirGrupos = (isset($input['excluir_grupos']) && is_array($input['excluir_grupos'])) ? $input['excluir_grupos'] : [];
+$excluirSiglas = (isset($input['excluir_siglas']) && is_array($input['excluir_siglas'])) ? $input['excluir_siglas'] : [];
 
 $conn = connect();
 
@@ -37,7 +40,7 @@ if ($tipo === 'periodo' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo =
     }
 }
 
-if ($tipo === 'evol_cliente' || $tipo === 'evol_unidade') {
+if ($mes !== '' && ($tipo === 'evol_cliente' || $tipo === 'evol_unidade' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo')) {
     if ($mes !== '') {
         $whereConditions[] = "TO_CHAR(cte.data_emissao, 'YYYY-MM') = $" . $paramIndex++;
         $params[] = $mes;
@@ -66,12 +69,27 @@ if ($tipo === 'grupo') {
     )";
 } elseif ($tipo === 'cliente' || $tipo === 'evol_cliente') {
     if ($chave === '__demais__') {
-        $cnpjsSelecionados = !empty($filters['cnpjsPagadores']) && is_array($filters['cnpjsPagadores'])
-            ? $filters['cnpjsPagadores'] : [];
-        if (count($cnpjsSelecionados) > 0) {
-            $phs = [];
-            foreach ($cnpjsSelecionados as $c) { $phs[] = '$' . $paramIndex++; $params[] = $c; }
-            $whereConditions[] = 'cte.cnpj_pag NOT IN (' . implode(', ', $phs) . ')';
+        $hasExplicitExclusion = (count($excluirCnpjs) > 0) || (count($excluirGrupos) > 0);
+
+        if ($hasExplicitExclusion) {
+            if (count($excluirCnpjs) > 0) {
+                $phs = [];
+                foreach ($excluirCnpjs as $c) { $phs[] = '$' . $paramIndex++; $params[] = $c; }
+                $whereConditions[] = 'cte.cnpj_pag NOT IN (' . implode(', ', $phs) . ')';
+            }
+            if (count($excluirGrupos) > 0) {
+                $phs = [];
+                foreach ($excluirGrupos as $g) { $phs[] = '$' . $paramIndex++; $params[] = $g; }
+                $whereConditions[] = 'cte.cnpj_pag NOT IN (SELECT cnpj FROM ' . $domain . '_grupo_cliente WHERE cnpj_principal IN (' . implode(', ', $phs) . '))';
+            }
+        } else {
+            $cnpjsSelecionados = !empty($filters['cnpjsPagadores']) && is_array($filters['cnpjsPagadores'])
+                ? $filters['cnpjsPagadores'] : [];
+            if (count($cnpjsSelecionados) > 0) {
+                $phs = [];
+                foreach ($cnpjsSelecionados as $c) { $phs[] = '$' . $paramIndex++; $params[] = $c; }
+                $whereConditions[] = 'cte.cnpj_pag NOT IN (' . implode(', ', $phs) . ')';
+            }
         }
     } else {
         $whereConditions[] = 'cte.cnpj_pag = $' . $paramIndex++;
@@ -79,7 +97,13 @@ if ($tipo === 'grupo') {
     }
 } elseif ($tipo === 'unidade' || $tipo === 'evol_unidade') {
     if ($chave === '__demais__') {
-        $whereConditions[] = 'cte.sigla_emit IS NULL OR cte.sigla_emit NOT IN (SELECT DISTINCT sigla_emit FROM ' . $domain . '_cte WHERE status <> \'C\' ORDER BY sigla_emit LIMIT 5)';
+        if (count($excluirSiglas) > 0) {
+            $phs = [];
+            foreach ($excluirSiglas as $s) { $phs[] = '$' . $paramIndex++; $params[] = $s; }
+            $whereConditions[] = '(cte.sigla_emit IS NULL OR cte.sigla_emit NOT IN (' . implode(', ', $phs) . '))';
+        } else {
+            $whereConditions[] = 'cte.sigla_emit IS NULL';
+        }
     } else {
         $whereConditions[] = 'cte.sigla_emit = $' . $paramIndex++;
         $params[] = $chave;

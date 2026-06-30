@@ -25,6 +25,10 @@ $evento = (string)($input['evento'] ?? '');
 $competenciaRaw = trim((string)($input['competencia'] ?? ''));
 $competenciaYm = trim((string)($input['competencia_ym'] ?? ''));
 
+if (trim($grupoEvento) !== '' && trim($evento) !== '') {
+    respondJson(['success' => false, 'message' => 'Selecione Grupo de Evento ou Evento (não é permitido informar os dois).']);
+}
+
 $emissaoInicio = trim((string)($input['periodo_emissao_inicio'] ?? ''));
 $emissaoFim    = trim((string)($input['periodo_emissao_fim'] ?? ''));
 $inclusaoInicio = trim((string)($input['periodo_inclusao_inicio'] ?? ''));

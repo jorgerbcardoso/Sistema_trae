@@ -73,7 +73,9 @@ if (count($cnpjsSelecionados) > 0) {
 // ============================================================
 // RANKING: modo GRUPOS ou CLIENTES
 // ============================================================
-$LIMIT = 10;
+$TOP_N = isset($filters['topN']) ? (int)$filters['topN'] : 10;
+if (!in_array($TOP_N, [10, 20], true)) $TOP_N = 10;
+$isSelection = count($cnpjsSelecionados) > 0;
 
 if ($groupBy === 'grupos') {
     // 1. Buscar top grupos (agrupados por cnpj_principal)
@@ -96,7 +98,7 @@ if ($groupBy === 'grupos') {
         {$whereClauseClientes}
         GROUP BY gc.cnpj_principal, cli.nome
         ORDER BY total_frete DESC
-        LIMIT {$LIMIT}
+        " . ($isSelection ? "" : "LIMIT {$TOP_N}") . "
     ";
 
     $resultGrupos = pg_query_params($conn, $queryGrupos, $queryParams);
@@ -124,8 +126,8 @@ if ($groupBy === 'grupos') {
     }
 
     // 2. Se não atingiu o limite, completar com clientes individuais sem grupo
-    $faltam = $LIMIT - count($clientes);
-    if ($faltam > 0) {
+    $faltam = $TOP_N - count($clientes);
+    if (!$isSelection && $faltam > 0) {
         $excluirGruposSql = '';
         $paramsCompl = $queryParams;
         $piCompl = $queryParamIndex;
@@ -207,7 +209,7 @@ if ($groupBy === 'grupos') {
         {$whereClauseClientes}
         GROUP BY cte.cnpj_pag, cte.nome_pag
         ORDER BY total_frete DESC
-        LIMIT {$LIMIT}
+        " . ($isSelection ? "" : "LIMIT {$TOP_N}") . "
     ";
 
     $resultRanking = pg_query_params($conn, $queryRanking, $queryParams);
@@ -233,6 +235,27 @@ if ($groupBy === 'grupos') {
     }
 }
 
+$totaisSelecionados = [
+    'qtde_ctes'     => 0,
+    'total_frete'   => 0.0,
+    'total_merc'    => 0.0,
+    'total_peso'    => 0.0,
+    'total_volumes' => 0,
+    'qtde_clientes' => 0,
+    'qtde_cif'      => 0,
+    'qtde_fob'      => 0,
+];
+foreach ($clientes as $c) {
+    $totaisSelecionados['qtde_ctes']     += (int)($c['qtde_ctes'] ?? 0);
+    $totaisSelecionados['total_frete']   += (float)($c['total_frete'] ?? 0);
+    $totaisSelecionados['total_merc']    += (float)($c['total_merc'] ?? 0);
+    $totaisSelecionados['total_peso']    += (float)($c['total_peso'] ?? 0);
+    $totaisSelecionados['total_volumes'] += (int)($c['total_volumes'] ?? 0);
+    $totaisSelecionados['qtde_clientes'] += 1;
+    $totaisSelecionados['qtde_cif']      += (int)($c['qtde_cif'] ?? 0);
+    $totaisSelecionados['qtde_fob']      += (int)($c['qtde_fob'] ?? 0);
+}
+
 // ============================================================
 // TOTAIS GERAIS
 // ============================================================
@@ -243,7 +266,9 @@ $queryTotais = "
         SUM(cte.vlr_merc)               AS total_merc,
         SUM(cte.peso_real)              AS total_peso,
         SUM(cte.qtde_vol)               AS total_volumes,
-        COUNT(DISTINCT cte.cnpj_pag)    AS qtde_clientes
+        COUNT(DISTINCT cte.cnpj_pag)    AS qtde_clientes,
+        COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END) AS qtde_cif,
+        COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END) AS qtde_fob
     FROM {$domain}_cte cte
     {$whereClause}
 ";
@@ -264,7 +289,7 @@ $queryEvolucao = "
         SUM(cte.vlr_frete)                    AS total_frete,
         COUNT(*)                              AS qtde_ctes
     FROM {$domain}_cte cte
-    {$whereClauseClientes}
+    {$whereClause}
     GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY')
     ORDER BY mes ASC
 ";
@@ -293,7 +318,7 @@ $queryUnidades = "
         SUM(cte.vlr_frete) AS total_frete,
         COUNT(*)           AS qtde_ctes
     FROM {$domain}_cte cte
-    {$whereClauseClientes}
+    {$whereClause}
     GROUP BY cte.sigla_emit
     ORDER BY total_frete DESC
     LIMIT 8
@@ -338,14 +363,7 @@ if (!empty($filters['siglaDest']) && is_array($filters['siglaDest']) && count($f
 $where12 = 'WHERE ' . implode(' AND ', $where12Conditions);
 
 $params12Clientes = $params12;
-$pi12c = $pi12;
-if (count($cnpjsSelecionados) > 0) {
-    $phs = [];
-    foreach ($cnpjsSelecionados as $cnpj) { $phs[] = '$' . $pi12c++; $params12Clientes[] = $cnpj; }
-    $where12Clientes = $where12 . ' AND cte.cnpj_pag IN (' . implode(', ', $phs) . ')';
-} else {
-    $where12Clientes = $where12;
-}
+$where12Clientes = $where12;
 
 $evolClientesRaw = [];
 $clientesNomes   = [];
@@ -361,7 +379,7 @@ if ($groupBy === 'grupos') {
         FROM {$domain}_cte cte
         INNER JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
         LEFT  JOIN {$domain}_cliente cli      ON cli.cnpj = gc.cnpj_principal
-        {$where12Clientes}
+        {$where12}
         GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), gc.cnpj_principal, cli.nome
         ORDER BY mes ASC
     ";
@@ -374,7 +392,7 @@ if ($groupBy === 'grupos') {
             cte.nome_pag                          AS nome,
             SUM(cte.vlr_frete)                    AS total_frete
         FROM {$domain}_cte cte
-        {$where12Clientes}
+        {$where12}
         GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), cte.cnpj_pag, cte.nome_pag
         ORDER BY mes ASC
     ";
@@ -404,7 +422,7 @@ $queryEvolUnidades = "
         COALESCE(cte.sigla_emit, '-')         AS sigla,
         SUM(cte.vlr_frete)                    AS total_frete
     FROM {$domain}_cte cte
-    {$where12Clientes}
+    {$where12}
     GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), COALESCE(cte.sigla_emit, '-')
     ORDER BY mes ASC
 ";
@@ -436,6 +454,18 @@ respondJson([
             'total_peso'    => (float)($rowTotais['total_peso'] ?? 0),
             'total_volumes' => (int)($rowTotais['total_volumes'] ?? 0),
             'qtde_clientes' => (int)($rowTotais['qtde_clientes'] ?? 0),
+            'qtde_cif'      => (int)($rowTotais['qtde_cif'] ?? 0),
+            'qtde_fob'      => (int)($rowTotais['qtde_fob'] ?? 0),
+        ],
+        'totais_selecionados' => [
+            'qtde_ctes'     => (int)$totaisSelecionados['qtde_ctes'],
+            'total_frete'   => (float)$totaisSelecionados['total_frete'],
+            'total_merc'    => (float)$totaisSelecionados['total_merc'],
+            'total_peso'    => (float)$totaisSelecionados['total_peso'],
+            'total_volumes' => (int)$totaisSelecionados['total_volumes'],
+            'qtde_clientes' => (int)$totaisSelecionados['qtde_clientes'],
+            'qtde_cif'      => (int)$totaisSelecionados['qtde_cif'],
+            'qtde_fob'      => (int)$totaisSelecionados['qtde_fob'],
         ],
         'evolucao'           => $evolucao,
         'unidades'           => $unidades,

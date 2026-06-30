@@ -97,6 +97,7 @@ interface Filters {
   siglaEmit: string[];
   siglaDest: string[];
   cnpjsPagadores: string[];
+  topN: 10 | 20;
 }
 
 interface ClienteRanking {
@@ -120,6 +121,8 @@ interface Totais {
   total_peso: number;
   total_volumes: number;
   qtde_clientes: number;
+  qtde_cif?: number;
+  qtde_fob?: number;
 }
 
 interface EvolucaoMes {
@@ -156,12 +159,14 @@ export function FaturamentoClientes() {
     siglaEmit: userUnit && userUnit !== 'MTZ' ? [userUnit] : [],
     siglaDest: [],
     cnpjsPagadores: [],
+    topN: 10,
   });
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
   const [showFilters, setShowFilters] = useState(false);
 
   const [clientes, setClientes] = useState<ClienteRanking[]>([]);
   const [totais, setTotais] = useState<Totais | null>(null);
+  const [totaisSelecionados, setTotaisSelecionados] = useState<Totais | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoMes[]>([]);
   const [unidades, setUnidades] = useState<UnidadeFat[]>([]);
   const [evolClientes, setEvolClientes] = useState<any[]>([]);
@@ -195,6 +200,7 @@ export function FaturamentoClientes() {
       if (response.success) {
         setClientes(response.data.clientes || []);
         setTotais(response.data.totais || null);
+        setTotaisSelecionados(response.data.totais_selecionados || null);
         setEvolucao(response.data.evolucao || []);
         setUnidades(response.data.unidades || []);
         setEvolClientes(response.data.evol_clientes || []);
@@ -244,7 +250,7 @@ export function FaturamentoClientes() {
     URL.revokeObjectURL(url);
   };
 
-  const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string) => {
+  const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string, opts?: { excluir_cnpjs?: string[]; excluir_grupos?: string[]; excluir_siglas?: string[] }) => {
     setCteDialogTitulo(titulo);
     cteDialogTituloRef.current = titulo;
     setCteDialogLista([]);
@@ -255,7 +261,7 @@ export function FaturamentoClientes() {
     try {
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_ctes.php`,
-        { method: 'POST', body: JSON.stringify({ filters, tipo, chave, mes: mes ?? '' }) },
+        { method: 'POST', body: JSON.stringify({ filters, tipo, chave, mes: mes ?? '', ...(opts ?? {}) }) },
         true
       );
       if (response.success) {
@@ -335,12 +341,13 @@ export function FaturamentoClientes() {
       siglaEmit: [],
       siglaDest: [],
       cnpjsPagadores: [],
+      topN: 10,
     };
     setTempFilters(empty);
     setClientesSelecionados([]);
   };
 
-  const totalFreteSelecionados = clientes.reduce((s, c) => s + c.total_frete, 0);
+  const totalFreteGeral = totais?.total_frete ?? 0;
 
   const isDark = theme === 'dark';
   const gridColor  = isDark ? '#334155' : '#e2e8f0';
@@ -382,8 +389,8 @@ export function FaturamentoClientes() {
             </h2>
             <p className="text-slate-500 dark:text-slate-400">
               {groupBy === 'grupos'
-                ? 'Análise de faturamento por grupo de clientes — top 10 por valor de frete'
-                : 'Análise de faturamento por cliente pagador — top 10 por valor de frete'}
+                ? `Análise de faturamento por grupo de clientes — top ${filters.topN} por valor de frete`
+                : `Análise de faturamento por cliente pagador — top ${filters.topN} por valor de frete`}
             </p>
           </div>
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
@@ -424,27 +431,65 @@ export function FaturamentoClientes() {
         ) : (
           <>
             {totais && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {([
-                  { label: 'Faturamento Total',   value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
-                  { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
-                  { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
-                  { label: 'Valor de Mercadoria', value: fmtBRLCompact(totais.total_merc), icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
-                  { label: 'Peso Total',          value: fmtKg(totais.total_peso),      icon: Weight,     bg: '#fffbeb', bgDark: '#1c1003', border: '#fde68a', borderDark: '#78350f', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
-                  { label: 'Volumes',             value: fmtNum(totais.total_volumes),  icon: Package,    bg: '#fff1f2', bgDark: '#1f0a0a', border: '#fecdd3', borderDark: '#9f1239', iconColor: '#e11d48', textLabel: '#be123c', textValue: '#881337' },
-                ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
-                  <div
-                    key={label}
-                    className="rounded-xl border p-4"
-                    style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon className="w-4 h-4" style={{ color: iconColor }} />
-                      <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Geral (todos os clientes)</div>
+                  <Badge variant="outline" className="text-[10px] border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-300">TOTAL</Badge>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {([
+                    { label: 'Faturamento Total',   value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
+                    { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
+                    { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
+                    { label: 'Valor de Mercadoria', value: fmtBRLCompact(totais.total_merc), icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
+                    { label: 'Peso Total',          value: fmtKg(totais.total_peso),      icon: Weight,     bg: '#fffbeb', bgDark: '#1c1003', border: '#fde68a', borderDark: '#78350f', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
+                    { label: 'Volumes',             value: fmtNum(totais.total_volumes),  icon: Package,    bg: '#fff1f2', bgDark: '#1f0a0a', border: '#fecdd3', borderDark: '#9f1239', iconColor: '#e11d48', textLabel: '#be123c', textValue: '#881337' },
+                  ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
+                    <div
+                      key={`geral-${label}`}
+                      className="rounded-xl border p-4"
+                      style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Icon className="w-4 h-4" style={{ color: iconColor }} />
+                        <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+                      </div>
+                      <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
                     </div>
-                    <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Selecionados ({filters.cnpjsPagadores.length > 0 ? `${filters.cnpjsPagadores.length} cliente(s)` : `top ${filters.topN}`})
                   </div>
-                ))}
+                  <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300">RECORTE</Badge>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {(() => {
+                    const t = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0 };
+                    return ([
+                      { label: 'Faturamento Total',   value: fmtBRL(t.total_frete),    icon: Wallet,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#4f46e5', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Clientes Ativos',     value: fmtNum(t.qtde_clientes),  icon: Users,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#2563eb', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'CT-es Emitidos',      value: fmtNum(t.qtde_ctes),      icon: Truck,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#0891b2', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Valor de Mercadoria', value: fmtBRLCompact(t.total_merc), icon: TrendingUp, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#16a34a', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Peso Total',          value: fmtKg(t.total_peso),      icon: Weight,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#d97706', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Volumes',             value: fmtNum(t.total_volumes),  icon: Package,    bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#e11d48', textLabel: '#64748b', textValue: '#0f172a' },
+                    ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
+                      <div
+                        key={`sel-${label}`}
+                        className="rounded-xl border p-4"
+                        style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <Icon className="w-4 h-4" style={{ color: iconColor }} />
+                          <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+                        </div>
+                        <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
+                      </div>
+                    )));
+                  })()}
+                </div>
               </div>
             )}
 
@@ -462,46 +507,142 @@ export function FaturamentoClientes() {
                       <p className="text-sm">Nenhum dado encontrado</p>
                     </div>
                   ) : (
-                    clientes.map((c, i) => {
-                      const pct = totalFreteSelecionados > 0 ? (c.total_frete / totalFreteSelecionados) * 100 : 0;
-                      const color = PALETTE[i % PALETTE.length];
-                      return (
-                        <div key={c.cnpj} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => abrirCteDialog(c.nome, c.is_grupo ? 'grupo' : 'cliente', c.cnpj)}>
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                              style={{ backgroundColor: color }}
-                            >
-                              {i + 1}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-                                  {c.nome}
-                                  {c.is_grupo && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">Grupo</Badge>}
-                                </p>
-                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(c.total_frete)}</p>
+                    <>
+                      {clientes.map((c, i) => {
+                        const pct = totalFreteGeral > 0 ? (c.total_frete / totalFreteGeral) * 100 : 0;
+                        const color = PALETTE[i % PALETTE.length];
+                        return (
+                          <div
+                            key={c.cnpj}
+                            className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                            onClick={() => abrirCteDialog(c.nome, c.is_grupo ? 'grupo' : 'cliente', c.cnpj)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                                style={{ backgroundColor: color }}
+                              >
+                                {i + 1}
                               </div>
-                              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
-                                <div
-                                  className="h-1.5 rounded-full transition-all duration-500"
-                                  style={{ width: `${pct}%`, backgroundColor: color }}
-                                />
-                              </div>
-                              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                                <span>{c.qtde_ctes} CT-es</span>
-                                <span>·</span>
-                                <span>Ticket: {fmtBRL(c.ticket_medio)}</span>
-                                <span>·</span>
-                                <span>{pct.toFixed(1)}% do total</span>
-                                {c.qtde_cif > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {c.qtde_cif}</Badge>}
-                                {c.qtde_fob > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {c.qtde_fob}</Badge>}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                    {c.nome}
+                                    {c.is_grupo && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">Grupo</Badge>}
+                                  </p>
+                                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(c.total_frete)}</p>
+                                </div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
+                                  <div
+                                    className="h-1.5 rounded-full transition-all duration-500"
+                                    style={{ width: `${pct}%`, backgroundColor: color }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                  <span>{c.qtde_ctes} CT-es</span>
+                                  <span>·</span>
+                                  <span>Ticket: {fmtBRL(c.ticket_medio)}</span>
+                                  <span>·</span>
+                                  <span>{pct.toFixed(1)}% do total</span>
+                                  {c.qtde_cif > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {c.qtde_cif}</Badge>}
+                                  {c.qtde_fob > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {c.qtde_fob}</Badge>}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })}
+
+                      {(() => {
+                        const sel = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0, qtde_cif: 0, qtde_fob: 0 };
+                        const dem = {
+                          qtde_ctes: Math.max(0, (totais?.qtde_ctes ?? 0) - (sel.qtde_ctes ?? 0)),
+                          total_frete: Math.max(0, (totais?.total_frete ?? 0) - (sel.total_frete ?? 0)),
+                          total_merc: Math.max(0, (totais?.total_merc ?? 0) - (sel.total_merc ?? 0)),
+                          total_peso: Math.max(0, (totais?.total_peso ?? 0) - (sel.total_peso ?? 0)),
+                          total_volumes: Math.max(0, (totais?.total_volumes ?? 0) - (sel.total_volumes ?? 0)),
+                          qtde_clientes: Math.max(0, (totais?.qtde_clientes ?? 0) - (sel.qtde_clientes ?? 0)),
+                          qtde_cif: Math.max(0, (totais?.qtde_cif ?? 0) - (sel.qtde_cif ?? 0)),
+                          qtde_fob: Math.max(0, (totais?.qtde_fob ?? 0) - (sel.qtde_fob ?? 0)),
+                        };
+                        const demTicket = dem.qtde_ctes > 0 ? dem.total_frete / dem.qtde_ctes : 0;
+                        const pctDem = totalFreteGeral > 0 ? (dem.total_frete / totalFreteGeral) * 100 : 0;
+
+                        const selectionIsActive = filters.cnpjsPagadores.length > 0;
+                        const excluirCnpjs = selectionIsActive
+                          ? filters.cnpjsPagadores
+                          : clientes.filter(c => !c.is_grupo).map(c => c.cnpj);
+                        const excluirGrupos = selectionIsActive ? [] : clientes.filter(c => c.is_grupo).map(c => c.cnpj);
+
+                        return (
+                          <>
+                            <div
+                              className="px-5 py-3 bg-slate-50 dark:bg-slate-800/30 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
+                              onClick={() => abrirCteDialog('Demais', 'cliente', '__demais__', '', { excluir_cnpjs: excluirCnpjs, excluir_grupos: excluirGrupos })}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 shrink-0">
+                                  —
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                      Demais
+                                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300">RESTO</Badge>
+                                    </p>
+                                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(dem.total_frete)}</p>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
+                                    <div className="h-1.5 rounded-full" style={{ width: `${pctDem}%`, backgroundColor: '#94a3b8' }} />
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                    <span>{dem.qtde_ctes} CT-es</span>
+                                    <span>·</span>
+                                    <span>Ticket: {fmtBRL(demTicket)}</span>
+                                    <span>·</span>
+                                    <span>{pctDem.toFixed(1)}% do total</span>
+                                    {dem.qtde_cif > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {dem.qtde_cif}</Badge>}
+                                    {dem.qtde_fob > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {dem.qtde_fob}</Badge>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              className="px-5 py-3 bg-indigo-50 dark:bg-indigo-950/30 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors"
+                              onClick={() => abrirCteDialog('Total', 'periodo', '')}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-indigo-600 shrink-0">
+                                  Σ
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                      Total
+                                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-300">UNIVERSO</Badge>
+                                    </p>
+                                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(totais?.total_frete ?? 0)}</p>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
+                                    <div className="h-1.5 rounded-full bg-indigo-600" style={{ width: '100%' }} />
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                    <span>{totais?.qtde_ctes ?? 0} CT-es</span>
+                                    <span>·</span>
+                                    <span>Ticket: {fmtBRL((totais?.qtde_ctes ?? 0) > 0 ? (totais?.total_frete ?? 0) / (totais?.qtde_ctes ?? 1) : 0)}</span>
+                                    <span>·</span>
+                                    <span>100% do total</span>
+                                    {(totais?.qtde_cif ?? 0) > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {totais?.qtde_cif}</Badge>}
+                                    {(totais?.qtde_fob ?? 0) > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {totais?.qtde_fob}</Badge>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
                   )}
                 </div>
               </div>
@@ -520,8 +661,24 @@ export function FaturamentoClientes() {
                     const totalTop5 = top5.reduce((s, c) => s + c.total_frete, 0);
                     const demais = totalGeral - totalTop5;
                     const pieData = [
-                      ...top5.map(c => ({ nome: c.nome, label: c.nome.substring(0, 8), value: c.total_frete })),
-                      ...(demais > 0 ? [{ nome: 'Demais', label: 'Demais', value: demais }] : []),
+                      ...top5.map(c => ({
+                        nome: c.nome,
+                        label: c.nome.substring(0, 8),
+                        value: c.total_frete,
+                        tipo: c.is_grupo ? 'grupo' : 'cliente',
+                        chave: c.cnpj,
+                        is_grupo: !!c.is_grupo,
+                      })),
+                      ...(demais > 0
+                        ? [{
+                          nome: 'Demais',
+                          label: 'Demais',
+                          value: demais,
+                          tipo: 'cliente',
+                          chave: '__demais__',
+                          is_grupo: false,
+                        }]
+                        : []),
                     ];
                     return (
                       <ResponsiveContainer width="100%" height={220}>
@@ -537,7 +694,19 @@ export function FaturamentoClientes() {
                             paddingAngle={2}
                             stroke="none"
                             style={{ cursor: 'pointer' }}
-                            onClick={(d: any) => abrirCteDialog(d.nome, 'cliente', d.nome === 'Demais' ? '__demais__' : (top5.find(c => c.nome === d.nome)?.cnpj ?? ''))}
+                            onClick={(d: any) => {
+                              const p = d?.payload ?? d;
+                              const nome = String(p?.nome ?? '');
+                              if (nome === 'Demais') {
+                                const excluirGrupos = top5.filter(c => c.is_grupo).map(c => c.cnpj);
+                                const excluirCnpjs = top5.filter(c => !c.is_grupo).map(c => c.cnpj);
+                                abrirCteDialog('Demais', 'cliente', '__demais__', '', { excluir_cnpjs: excluirCnpjs, excluir_grupos: excluirGrupos });
+                                return;
+                              }
+                              const tipo = p?.tipo === 'grupo' ? 'grupo' : 'cliente';
+                              const chave = String(p?.chave ?? '');
+                              abrirCteDialog(nome, tipo, chave);
+                            }}
                           >
                             {pieData.map((_, i) => (
                               <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
@@ -588,7 +757,15 @@ export function FaturamentoClientes() {
                             paddingAngle={2}
                             stroke="none"
                             style={{ cursor: 'pointer' }}
-                            onClick={(d: any) => abrirCteDialog(d.sigla === 'Demais' ? 'Demais Unidades' : `Unidade ${d.sigla}`, 'unidade', d.sigla === 'Demais' ? '__demais__' : d.sigla)}
+                            onClick={(d: any) => {
+                              const p = d?.payload ?? d;
+                              const sigla = String(p?.sigla ?? '');
+                              if (sigla === 'Demais') {
+                                abrirCteDialog('Demais Unidades', 'unidade', '__demais__', '', { excluir_siglas: top5u.map(u => u.sigla) });
+                                return;
+                              }
+                              abrirCteDialog(`Unidade ${sigla}`, 'unidade', sigla);
+                            }}
                           >
                             {pieDataU.map((_, i) => (
                               <Cell key={i} fill={i < PALETTE.length ? PALETTE[i] : '#94a3b8'} />
@@ -655,11 +832,23 @@ export function FaturamentoClientes() {
                   if (row[cnpj]) totaisPorCnpj[cnpj] = (totaisPorCnpj[cnpj] || 0) + row[cnpj];
                 });
               });
-              const top5cnpjs = Object.entries(totaisPorCnpj)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([cnpj]) => cnpj);
-              const demaisCnpjs = Object.keys(totaisPorCnpj).filter(c => !top5cnpjs.includes(c));
+              const allKeys = Object.keys(totaisPorCnpj);
+              const baseKeys = (() => {
+                if (filters.cnpjsPagadores.length > 0 && groupBy === 'clientes') {
+                  const inter = filters.cnpjsPagadores.filter(k => allKeys.includes(k));
+                  return inter.length > 0 ? inter : allKeys;
+                }
+                const rankKeys = clientes.map(c => c.cnpj);
+                const inter = rankKeys.filter(k => allKeys.includes(k));
+                return inter.length > 0 ? inter : allKeys;
+              })();
+
+              const top5cnpjs = baseKeys
+                .slice()
+                .sort((a, b) => (totaisPorCnpj[b] || 0) - (totaisPorCnpj[a] || 0))
+                .slice(0, 5);
+
+              const demaisCnpjs = allKeys.filter(c => !top5cnpjs.includes(c));
               const dataComDemais = evolClientes.map(row => {
                 const novo: any = { mes: row.mes, mes_label: row.mes_label };
                 top5cnpjs.forEach(cnpj => { novo[cnpj] = row[cnpj] ?? null; });
@@ -692,12 +881,19 @@ export function FaturamentoClientes() {
                         const key = e.activePayload[0].dataKey;
                         const l = linhas.find(l => l.key === key);
                         if (!l) return;
-                        abrirCteDialog(
-                          `${l.label} — ${mes}`,
-                          'evol_cliente',
-                          key === '__demais__' ? '__demais__' : key,
-                          mesIso
-                        );
+                        if (key === '__demais__') {
+                          if (groupBy === 'grupos') {
+                            abrirCteDialog(`Demais — ${mes}`, 'cliente', '__demais__', mesIso, { excluir_grupos: top5cnpjs });
+                          } else {
+                            abrirCteDialog(`Demais — ${mes}`, 'cliente', '__demais__', mesIso, { excluir_cnpjs: top5cnpjs });
+                          }
+                          return;
+                        }
+                        if (groupBy === 'grupos') {
+                          abrirCteDialog(`${l.label} — ${mes}`, 'grupo', key, mesIso);
+                        } else {
+                          abrirCteDialog(`${l.label} — ${mes}`, 'cliente', key, mesIso);
+                        }
                       }}
                       style={{ cursor: 'pointer' }}
                     >
@@ -735,12 +931,19 @@ export function FaturamentoClientes() {
                           onClick: (_: any, payload: any) => {
                             const mesIso = payload?.payload?.mes ?? '';
                             const mesLabel = payload?.payload?.mes_label ?? mesIso;
-                            abrirCteDialog(
-                              `${label} — ${mesLabel}`,
-                              'evol_cliente',
-                              key === '__demais__' ? '__demais__' : key,
-                              mesIso
-                            );
+                            if (key === '__demais__') {
+                              if (groupBy === 'grupos') {
+                                abrirCteDialog(`Demais — ${mesLabel}`, 'cliente', '__demais__', mesIso, { excluir_grupos: top5cnpjs });
+                              } else {
+                                abrirCteDialog(`Demais — ${mesLabel}`, 'cliente', '__demais__', mesIso, { excluir_cnpjs: top5cnpjs });
+                              }
+                              return;
+                            }
+                            if (groupBy === 'grupos') {
+                              abrirCteDialog(`${label} — ${mesLabel}`, 'grupo', key, mesIso);
+                            } else {
+                              abrirCteDialog(`${label} — ${mesLabel}`, 'cliente', key, mesIso);
+                            }
                           },
                         }}
                         connectNulls
@@ -796,12 +999,11 @@ export function FaturamentoClientes() {
                         const key = e.activePayload[0].dataKey;
                         const l = linhasU.find(l => l.key === key);
                         if (!l) return;
-                        abrirCteDialog(
-                          `${l.label === 'Demais' ? 'Demais Unidades' : `Unidade ${l.label}`} — ${mes}`,
-                          'evol_unidade',
-                          key === '__demais__' ? '__demais__' : key,
-                          mesIso
-                        );
+                        if (key === '__demais__') {
+                          abrirCteDialog(`Demais Unidades — ${mes}`, 'unidade', '__demais__', mesIso, { excluir_siglas: top5siglas });
+                          return;
+                        }
+                        abrirCteDialog(`Unidade ${l.label} — ${mes}`, 'unidade', key, mesIso);
                       }}
                       style={{ cursor: 'pointer' }}
                     >
@@ -838,12 +1040,11 @@ export function FaturamentoClientes() {
                           onClick: (_: any, payload: any) => {
                             const mesIso = payload?.payload?.mes ?? '';
                             const mesLabel = payload?.payload?.mes_label ?? mesIso;
-                            abrirCteDialog(
-                              `${label === 'Demais' ? 'Demais Unidades' : `Unidade ${label}`} — ${mesLabel}`,
-                              'evol_unidade',
-                              key === '__demais__' ? '__demais__' : key,
-                              mesIso
-                            );
+                            if (key === '__demais__') {
+                              abrirCteDialog(`Demais Unidades — ${mesLabel}`, 'unidade', '__demais__', mesIso, { excluir_siglas: top5siglas });
+                              return;
+                            }
+                            abrirCteDialog(`Unidade ${label} — ${mesLabel}`, 'unidade', key, mesIso);
                           },
                         }}
                         connectNulls
@@ -1007,8 +1208,29 @@ export function FaturamentoClientes() {
             <div className="space-y-2">
               <Label className="text-slate-900 dark:text-slate-100">Clientes Pagadores</Label>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Por padrão exibe os 10 maiores. Selecione até 10 clientes específicos.
+                Por padrão exibe os {tempFilters.topN} maiores. Selecione até 10 clientes específicos.
               </p>
+              <div className="space-y-2 pt-1">
+                <Label className="text-xs text-slate-500">Tamanho do ranking</Label>
+                <div className="flex gap-2">
+                  {([
+                    { v: 10 as const, l: 'Top 10' },
+                    { v: 20 as const, l: 'Top 20' },
+                  ]).map(({ v, l }) => (
+                    <button
+                      key={v}
+                      onClick={() => setTempFilters({ ...tempFilters, topN: v })}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        tempFilters.topN === v
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Button
                 variant="outline"
                 className="w-full justify-between dark:border-slate-600 dark:hover:bg-slate-800"
@@ -1025,7 +1247,7 @@ export function FaturamentoClientes() {
               >
                 <span className="text-slate-600 dark:text-slate-300">
                   {tempFilters.cnpjsPagadores.length === 0
-                    ? 'Top 10 automático'
+                    ? `Top ${tempFilters.topN} automático`
                     : `${tempFilters.cnpjsPagadores.length} cliente(s) selecionado(s)`}
                 </span>
                 <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -1035,7 +1257,7 @@ export function FaturamentoClientes() {
                   className="text-xs text-red-500 hover:underline"
                   onClick={() => setTempFilters({ ...tempFilters, cnpjsPagadores: [] })}
                 >
-                  Limpar seleção (voltar ao top 10)
+                  Limpar seleção (voltar ao top {tempFilters.topN})
                 </button>
               )}
             </div>
