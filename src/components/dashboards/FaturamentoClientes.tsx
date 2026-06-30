@@ -487,7 +487,7 @@ export function FaturamentoClientes() {
                         </div>
                         <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
                       </div>
-                    )));
+                    ));
                   })()}
                 </div>
               </div>
