@@ -102,12 +102,31 @@ $normStatus = static function(string $s): string {
 };
 
 $fetch1440Rows = static function() use ($extractXml): array {
-    $raw = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
-    $xmlStr = $extractXml((string)$raw);
-    $xml = @simplexml_load_string($xmlStr);
-    if (!$xml) {
-        return [];
+    $raw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+
+    $candidates = [];
+    $candidates[] = $raw;
+
+    $ud = urldecode($raw);
+    if ($ud !== $raw) $candidates[] = $ud;
+
+    $he = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($he !== $raw) $candidates[] = $he;
+
+    $udhe = urldecode($he);
+    if ($udhe !== $he && $udhe !== $raw) $candidates[] = $udhe;
+
+    $xml = null;
+    foreach ($candidates as $cand) {
+        $xmlStr = $extractXml((string)$cand);
+        $parsed = @simplexml_load_string($xmlStr);
+        if ($parsed) {
+            $xml = $parsed;
+            break;
+        }
     }
+
+    if (!$xml) return [];
 
     $rows = [];
     for ($i = 0; $i <= 200; $i++) {
@@ -179,7 +198,7 @@ while (time() <= $deadline) {
         $jobRow = $r;
         break 2;
     }
-    sleep(1);
+    usleep(400000);
 }
 
 if (!$jobRow) {
