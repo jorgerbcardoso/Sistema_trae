@@ -7,7 +7,6 @@ validateRequestMethod('POST');
 
 $auth = authenticateAndGetUser();
 $domain = $auth['domain'];
-$username = strtolower(trim((string)($auth['user']['username'] ?? '')));
 $g_sql = connect();
 
 $input = getRequestInput();
@@ -46,19 +45,25 @@ if ($tpCliente !== '' && !in_array($tpCliente, ['R', 'D', 'P'], true)) {
     respondJson(['success' => false, 'message' => 'Tipo de cliente inválido (use R, D ou P).']);
 }
 
-if (!$validDate($emissaoIni) || !$validDate($emissaoFim)) {
-    respondJson(['success' => false, 'message' => 'Informe um período de emissão válido (início e fim).']);
-}
-
-if (strtotime($emissaoIni) > strtotime($emissaoFim)) {
-    respondJson(['success' => false, 'message' => 'Período de emissão inválido (início maior que fim).']);
-}
-
-if ($diffDays($emissaoIni, $emissaoFim) > 31) {
-    respondJson(['success' => false, 'message' => 'Período de emissão não pode ser maior que 31 dias.']);
-}
-
+$hasEmissao = ($emissaoIni !== '' || $emissaoFim !== '');
 $hasEntrega = ($entregaIni !== '' || $entregaFim !== '');
+
+if (!$hasEmissao && !$hasEntrega) {
+    respondJson(['success' => false, 'message' => 'Informe pelo menos 1 período (emissão ou entrega).']);
+}
+
+if ($hasEmissao) {
+    if (!$validDate($emissaoIni) || !$validDate($emissaoFim)) {
+        respondJson(['success' => false, 'message' => 'Período de emissão inválido (informe início e fim).']);
+    }
+    if (strtotime($emissaoIni) > strtotime($emissaoFim)) {
+        respondJson(['success' => false, 'message' => 'Período de emissão inválido (início maior que fim).']);
+    }
+    if ($diffDays($emissaoIni, $emissaoFim) > 31) {
+        respondJson(['success' => false, 'message' => 'Período de emissão não pode ser maior que 31 dias.']);
+    }
+}
+
 if ($hasEntrega) {
     if (!$validDate($entregaIni) || !$validDate($entregaFim)) {
         respondJson(['success' => false, 'message' => 'Período de entrega inválido (informe início e fim).']);
@@ -121,11 +126,11 @@ $fetch1440Rows = static function() use ($extractXml): array {
     return $rows;
 };
 
-$isOpc0057 = static function(string $opc): bool {
+$isOpcFretes = static function(string $opc): bool {
     $opc = trim((string)$opc);
     if ($opc === '') return false;
-    if (preg_match('/(\d{1,5})/', $opc, $m)) {
-        return ((int)$m[1]) === 57;
+    if (preg_match('/^\s*(\d{1,5})\s*/', $opc, $m)) {
+        return ((int)$m[1]) === 453;
     }
     return false;
 };
@@ -140,13 +145,15 @@ $params = [
     'act' => 'ENV',
     'cod_emp_ctb' => '01',
     'tp_unid' => 'A',
-    'data_emis_ini' => date('dmy', strtotime($emissaoIni)),
-    'data_emis_fin' => date('dmy', strtotime($emissaoFim)),
 ];
 
 if ($siglaUnid !== '') $params['sigla_unid'] = strtolower($siglaUnid);
 if ($cgcCliente !== '') $params['cgc_cliente'] = $cgcCliente;
 if ($tpCliente !== '') $params['tp_cliente'] = $tpCliente;
+if ($hasEmissao) {
+    $params['data_emis_ini'] = date('dmy', strtotime($emissaoIni));
+    $params['data_emis_fin'] = date('dmy', strtotime($emissaoFim));
+}
 if ($hasEntrega) {
     $params['data_ent_ini'] = date('dmy', strtotime($entregaIni));
     $params['data_ent_fin'] = date('dmy', strtotime($entregaFim));
@@ -163,11 +170,8 @@ $deadline = time() + 30;
 while (time() <= $deadline) {
     $rows = $fetch1440Rows();
     foreach ($rows as $r) {
-        if (!$isOpc0057((string)$r['opc'])) continue;
+        if (!$isOpcFretes((string)$r['opc'])) continue;
         if ((int)$r['seq'] <= $baselineSeq) continue;
-
-        $usr = strtolower(trim((string)($r['usr'] ?? '')));
-        if ($usr !== '' && $username !== '' && $usr !== $username) continue;
 
         $status = $normStatus((string)$r['sit']);
         if ($status !== 'CONCLUIDO') continue;
@@ -191,10 +195,10 @@ if (!$jobRow) {
     }, $sample);
     respondJson([
         'success' => false,
-        'message' => 'Timeout aguardando o relatório na fila SSW 1440 (não foi localizado como concluído).',
+        'message' => 'Timeout aguardando o relatório na fila SSW 1440 (opção 453).',
         'debug' => [
             'baseline_seq' => $baselineSeq,
-            'username' => $username,
+            'expected_opc' => 453,
             'top_rows' => $debug,
         ],
     ]);

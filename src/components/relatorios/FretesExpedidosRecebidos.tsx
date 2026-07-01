@@ -64,11 +64,9 @@ type ApiResponse = {
   meta?: any;
 };
 
-function getUltimoMesFechadoPeriod(): { ini: string; fim: string } {
+function getMesCorrentePeriod(): { ini: string; fim: string } {
   const now = new Date();
-  const firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastClosedMonthEnd = new Date(firstThisMonth.getTime() - 1);
-  const lastClosedMonthStart = new Date(lastClosedMonthEnd.getFullYear(), lastClosedMonthEnd.getMonth(), 1);
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const fmt = (d: Date) => {
     const y = d.getFullYear();
@@ -77,7 +75,7 @@ function getUltimoMesFechadoPeriod(): { ini: string; fim: string } {
     return `${y}-${m}-${day}`;
   };
 
-  return { ini: fmt(lastClosedMonthStart), fim: fmt(lastClosedMonthEnd) };
+  return { ini: fmt(start), fim: fmt(now) };
 }
 
 function diffDaysInclusive(ini: string, fim: string): number {
@@ -225,7 +223,7 @@ function buildDonut(rows: RowAgg[]) {
 const DONUT_COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
 export function FretesExpedidosRecebidos() {
-  const defaultPeriod = useMemo(() => getUltimoMesFechadoPeriod(), []);
+  const defaultPeriod = useMemo(() => getMesCorrentePeriod(), []);
   const [filters, setFilters] = useState<Filters>({
     sigla_unid: '',
     cgc_cliente: '',
@@ -243,16 +241,25 @@ export function FretesExpedidosRecebidos() {
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
 
   const validar = (f: Filters): string | null => {
-    if (!f.periodo_emissao_ini || !f.periodo_emissao_fim) return 'Informe o período de emissão.';
-    if (new Date(f.periodo_emissao_ini) > new Date(f.periodo_emissao_fim)) return 'Período de emissão inválido (início maior que fim).';
-    if (diffDaysInclusive(f.periodo_emissao_ini, f.periodo_emissao_fim) > 31) return 'Período de emissão não pode ser maior que 31 dias.';
-
+    const hasEmissao = Boolean(f.periodo_emissao_ini || f.periodo_emissao_fim);
     const hasEntrega = Boolean(f.periodo_entrega_ini || f.periodo_entrega_fim);
+
+    if (!hasEmissao && !hasEntrega) {
+      return 'Informe pelo menos 1 período (emissão ou entrega).';
+    }
+
+    if (hasEmissao) {
+      if (!f.periodo_emissao_ini || !f.periodo_emissao_fim) return 'Para filtrar por emissão, informe início e fim.';
+      if (new Date(f.periodo_emissao_ini) > new Date(f.periodo_emissao_fim)) return 'Período de emissão inválido (início maior que fim).';
+      if (diffDaysInclusive(f.periodo_emissao_ini, f.periodo_emissao_fim) > 31) return 'Período de emissão não pode ser maior que 31 dias.';
+    }
+
     if (hasEntrega) {
       if (!f.periodo_entrega_ini || !f.periodo_entrega_fim) return 'Para filtrar por entrega, informe início e fim.';
       if (new Date(f.periodo_entrega_ini) > new Date(f.periodo_entrega_fim)) return 'Período de entrega inválido (início maior que fim).';
       if (diffDaysInclusive(f.periodo_entrega_ini, f.periodo_entrega_fim) > 31) return 'Período de entrega não pode ser maior que 31 dias.';
     }
+
     return null;
   };
 
@@ -312,7 +319,7 @@ export function FretesExpedidosRecebidos() {
               <div className="space-y-1">
                 <CardTitle className="text-base">Filtros</CardTitle>
                 <div className="text-sm text-muted-foreground">
-                  Tipo de unidade sempre A. Período de emissão padrão: último mês fechado. Nenhum período pode exceder 31 dias.
+                  Informe pelo menos 1 período (emissão ou entrega). Nenhum período pode exceder 31 dias.
                 </div>
               </div>
               <Button
@@ -329,18 +336,17 @@ export function FretesExpedidosRecebidos() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label>Tipo de unidade</Label>
-                <Input value="A" disabled />
-              </div>
-              <div className="space-y-2">
-                <Label>Sigla da unidade (opcional)</Label>
+                <Label>Unidade (opcional)</Label>
                 <FilterSelectUnidadeSingle
                   value={filters.sigla_unid}
                   onChange={(v) => setFilters({ ...filters, sigla_unid: v || '' })}
                 />
               </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente (CNPJ/CPF) (opcional)</Label>
                 <ClienteSearchSelect
@@ -348,9 +354,6 @@ export function FretesExpedidosRecebidos() {
                   onChange={(cnpj) => setFilters({ ...filters, cgc_cliente: cnpj || '' })}
                 />
               </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de cliente</Label>
                 <Select
@@ -367,6 +370,9 @@ export function FretesExpedidosRecebidos() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Período de emissão (início)</Label>
                 <Input
@@ -387,7 +393,7 @@ export function FretesExpedidosRecebidos() {
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Período de entrega (início) (opcional)</Label>
+                <Label>Período de entrega (início)</Label>
                 <Input
                   type="date"
                   value={filters.periodo_entrega_ini}
@@ -395,7 +401,7 @@ export function FretesExpedidosRecebidos() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Período de entrega (fim) (opcional)</Label>
+                <Label>Período de entrega (fim)</Label>
                 <Input
                   type="date"
                   value={filters.periodo_entrega_fim}
