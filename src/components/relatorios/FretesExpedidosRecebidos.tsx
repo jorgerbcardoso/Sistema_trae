@@ -119,6 +119,91 @@ function formatNumber(v: number, digits = 0): string {
   return (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+function csvEscape(v: any): string {
+  const s = String(v ?? '');
+  if (s.includes('"') || s.includes(';') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData): string {
+  const header = [
+    'Tipo',
+    'Sigla',
+    'Unidade',
+    'UF',
+    'CTRC',
+    'Vol',
+    'Peso (Ton)',
+    'Valor Mercadoria',
+    'Frete CIF',
+    'Frete FOB',
+    'Frete TER',
+    'Frete SUB',
+    'Frete Total',
+  ];
+
+  const lines: string[] = [];
+  lines.push(header.map(csvEscape).join(';'));
+
+  for (const r of data.rows || []) {
+    lines.push(
+      [
+        kind,
+        r.sigla,
+        r.unidade,
+        r.uf,
+        formatNumber(r.quant_ctrc),
+        formatNumber(r.quant_vol),
+        formatNumber(r.peso_ton, 3),
+        formatCurrency(r.val_merc),
+        formatCurrency(r.frete_cif),
+        formatCurrency(r.frete_fob),
+        formatCurrency(r.frete_ter),
+        formatCurrency(r.frete_sub),
+        formatCurrency(r.frete_tot),
+      ]
+        .map(csvEscape)
+        .join(';')
+    );
+  }
+
+  lines.push(
+    [
+      kind,
+      'TOTAL',
+      '',
+      '',
+      formatNumber(data.totals.quant_ctrc),
+      formatNumber(data.totals.quant_vol),
+      formatNumber(data.totals.peso_ton, 3),
+      formatCurrency(data.totals.val_merc),
+      formatCurrency(data.totals.frete_cif),
+      formatCurrency(data.totals.frete_fob),
+      formatCurrency(data.totals.frete_ter),
+      formatCurrency(data.totals.frete_sub),
+      formatCurrency(data.totals.frete_tot),
+    ]
+      .map(csvEscape)
+      .join(';')
+  );
+
+  return lines.join('\n');
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 type ClienteOption = { cnpj: string; nome: string; cidade?: string };
 
 function ClienteSearchSelect({
@@ -569,6 +654,33 @@ export function FretesExpedidosRecebidos() {
                   <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
                 )}
               </button>
+
+              <div className="flex-1" />
+
+              <div className="flex items-center gap-2 px-3">
+                <Button
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => {
+                    const isExp = tab === 'expedidos';
+                    const data = isExp ? dataExp : dataRec;
+                    if (!data) {
+                      toast.info('Nenhum dado carregado para exportar.');
+                      return;
+                    }
+                    const kind = isExp ? 'Expedidos' : 'Recebidos';
+                    const csv = buildCsv(kind, data);
+                    const stamp = new Date();
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    const name = `fretes_${kind.toLowerCase()}_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(
+                      stamp.getMinutes()
+                    )}.csv`;
+                    downloadCsv(name, csv);
+                  }}
+                >
+                  CSV
+                </Button>
+              </div>
             </div>
 
             {tab === 'expedidos' ? (

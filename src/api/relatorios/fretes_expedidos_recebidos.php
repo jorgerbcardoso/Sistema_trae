@@ -347,8 +347,8 @@ if ($step === 'POLL') {
 
     $f8dec = html_entity_decode((string)($best['f8'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     if (stripos($f8dec, 'Nenhum registro encontrado') !== false) {
-        $elapsed = max(0, time() - $requestStartTsIn);
-        msg("Relatório localizado na fila (seq " . (int)($best['seq'] ?? 0) . ") em {$elapsed}s. Nenhum registro encontrado.", 'success', 200, [
+        respondJson([
+            'success' => true,
             'status' => 'ready',
             'result' => 'empty',
             'ssw_seq' => (int)($best['seq'] ?? 0),
@@ -356,8 +356,8 @@ if ($step === 'POLL') {
     }
 
     $acts = $extractActsFromF8((string)($best['f8'] ?? ''));
-    $elapsed = max(0, time() - $requestStartTsIn);
-    msg("Relatório localizado na fila (seq " . (int)($best['seq'] ?? 0) . ") em {$elapsed}s. Links encontrados: " . count($acts) . '.', 'success', 200, [
+    respondJson([
+        'success' => true,
         'status' => 'ready',
         'result' => 'links',
         'ssw_seq' => (int)($best['seq'] ?? 0),
