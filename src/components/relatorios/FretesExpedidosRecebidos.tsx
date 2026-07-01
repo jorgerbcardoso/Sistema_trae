@@ -2,12 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Filter, Loader2, RefreshCw, Search, X } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { Inbox, Loader2, Send, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -237,8 +236,7 @@ export function FretesExpedidosRecebidos() {
     periodo_entrega_fim: '',
   });
 
-  const [tempFilters, setTempFilters] = useState<Filters>(filters);
-  const [showFilters, setShowFilters] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'expedidos' | 'recebidos'>('expedidos');
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
@@ -299,12 +297,6 @@ export function FretesExpedidosRecebidos() {
     }
   };
 
-  const aplicarFiltros = () => {
-    setFilters(tempFilters);
-    setShowFilters(false);
-    buscar(tempFilters);
-  };
-
   const donutExp = useMemo(() => (dataExp ? buildDonut(dataExp.rows) : []), [dataExp]);
   const donutRec = useMemo(() => (dataRec ? buildDonut(dataRec.rows) : []), [dataRec]);
 
@@ -314,146 +306,164 @@ export function FretesExpedidosRecebidos() {
       description="Consulta SSW 0057 (expedidos e recebidos)"
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Dialog open={showFilters} onOpenChange={(v) => {
-              setShowFilters(v);
-              if (v) setTempFilters(filters);
-            }}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="relative">
-                  <Filter className="w-4 h-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[760px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>Filtros</DialogTitle>
-                  <DialogDescription>
-                    Período de emissão (padrão): último mês fechado. Nenhum período pode ser maior que 31 dias.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
-                  <div className="space-y-6 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Tipo de unidade</Label>
-                        <Input value="A" disabled />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Sigla da unidade (opcional)</Label>
-                        <FilterSelectUnidadeSingle
-                          value={tempFilters.sigla_unid}
-                          onChange={(v) => setTempFilters({ ...tempFilters, sigla_unid: v || '' })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Cliente (CNPJ/CPF) (opcional)</Label>
-                        <ClienteSearchSelect
-                          value={tempFilters.cgc_cliente}
-                          onChange={(cnpj) => setTempFilters({ ...tempFilters, cgc_cliente: cnpj || '' })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Tipo de cliente</Label>
-                        <Select
-                          value={tempFilters.tp_cliente}
-                          onValueChange={(v) => setTempFilters({ ...tempFilters, tp_cliente: (v as TpCliente) || '' })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="P">Pagador (P)</SelectItem>
-                            <SelectItem value="R">Remetente (R)</SelectItem>
-                            <SelectItem value="D">Destinatário (D)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Período de emissão (início)</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_emissao_ini}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_ini: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Período de emissão (fim)</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_emissao_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_emissao_fim: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Período de entrega (início) (opcional)</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_entrega_ini}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_entrega_ini: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Período de entrega (fim) (opcional)</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodo_entrega_fim}
-                          onChange={(e) => setTempFilters({ ...tempFilters, periodo_entrega_fim: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-base">Filtros</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  Tipo de unidade sempre A. Período de emissão padrão: último mês fechado. Nenhum período pode exceder 31 dias.
                 </div>
+              </div>
+              <Button
+                onClick={() => {
+                  setHasGenerated(true);
+                  buscar(filters);
+                }}
+                disabled={loading}
+                className="gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Gerar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de unidade</Label>
+                <Input value="A" disabled />
+              </div>
+              <div className="space-y-2">
+                <Label>Sigla da unidade (opcional)</Label>
+                <FilterSelectUnidadeSingle
+                  value={filters.sigla_unid}
+                  onChange={(v) => setFilters({ ...filters, sigla_unid: v || '' })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cliente (CNPJ/CPF) (opcional)</Label>
+                <ClienteSearchSelect
+                  value={filters.cgc_cliente}
+                  onChange={(cnpj) => setFilters({ ...filters, cgc_cliente: cnpj || '' })}
+                />
+              </div>
+            </div>
 
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => setShowFilters(false)} disabled={loading}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={aplicarFiltros} disabled={loading}>
-                    Aplicar filtros
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de cliente</Label>
+                <Select
+                  value={filters.tp_cliente}
+                  onValueChange={(v) => setFilters({ ...filters, tp_cliente: (v as TpCliente) || '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="P">Pagador (P)</SelectItem>
+                    <SelectItem value="R">Remetente (R)</SelectItem>
+                    <SelectItem value="D">Destinatário (D)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Período de emissão (início)</Label>
+                <Input
+                  type="date"
+                  value={filters.periodo_emissao_ini}
+                  onChange={(e) => setFilters({ ...filters, periodo_emissao_ini: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Período de emissão (fim)</Label>
+                <Input
+                  type="date"
+                  value={filters.periodo_emissao_fim}
+                  onChange={(e) => setFilters({ ...filters, periodo_emissao_fim: e.target.value })}
+                />
+              </div>
+            </div>
 
-            <Button
-              onClick={() => buscar(filters)}
-              disabled={loading}
-              className="gap-2"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Atualizar
-            </Button>
-          </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Período de entrega (início) (opcional)</Label>
+                <Input
+                  type="date"
+                  value={filters.periodo_entrega_ini}
+                  onChange={(e) => setFilters({ ...filters, periodo_entrega_ini: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Período de entrega (fim) (opcional)</Label>
+                <Input
+                  type="date"
+                  value={filters.periodo_entrega_fim}
+                  onChange={(e) => setFilters({ ...filters, periodo_entrega_fim: e.target.value })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="text-xs text-muted-foreground">
-            Emissão: {filters.periodo_emissao_ini} → {filters.periodo_emissao_fim}
-            {filters.sigla_unid ? ` · Unidade: ${filters.sigla_unid}` : ''}
-            {filters.cgc_cliente ? ` · Cliente: ${filters.cgc_cliente}` : ''}
-          </div>
-        </div>
+        {!hasGenerated ? null : (
+          <div className="space-y-4">
+            <div className="flex border-b border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setTab('expedidos')}
+                className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  tab === 'expedidos'
+                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Send className="w-4 h-4" />
+                Expedidos
+                {loading ? (
+                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Carregando...
+                  </Badge>
+                ) : dataExp ? (
+                  <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs">
+                    {formatNumber(dataExp.totals.quant_ctrc)}
+                  </Badge>
+                ) : (
+                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
+                )}
+              </button>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="expedidos">EXPEDIDOS</TabsTrigger>
-            <TabsTrigger value="recebidos">RECEBIDOS</TabsTrigger>
-          </TabsList>
+              <button
+                onClick={() => setTab('recebidos')}
+                className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  tab === 'recebidos'
+                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Inbox className="w-4 h-4" />
+                Recebidos
+                {loading ? (
+                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Carregando...
+                  </Badge>
+                ) : dataRec ? (
+                  <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                    {formatNumber(dataRec.totals.quant_ctrc)}
+                  </Badge>
+                ) : (
+                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
+                )}
+              </button>
+            </div>
 
-          <TabsContent value="expedidos" className="mt-4">
+            {tab === 'expedidos' ? (
+              <div>
             {!dataExp ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  Nenhum dado de EXPEDIDOS carregado.
+                  Nenhum dado de Expedidos carregado.
                 </CardContent>
               </Card>
             ) : (
@@ -554,13 +564,13 @@ export function FretesExpedidosRecebidos() {
                 </div>
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="recebidos" className="mt-4">
+              </div>
+            ) : (
+              <div>
             {!dataRec ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  Nenhum dado de RECEBIDOS carregado.
+                  Nenhum dado de Recebidos carregado.
                 </CardContent>
               </Card>
             ) : (
@@ -661,8 +671,10 @@ export function FretesExpedidosRecebidos() {
                 </div>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

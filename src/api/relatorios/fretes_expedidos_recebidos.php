@@ -7,6 +7,7 @@ validateRequestMethod('POST');
 
 $auth = authenticateAndGetUser();
 $domain = $auth['domain'];
+$username = strtolower(trim((string)($auth['user']['username'] ?? '')));
 $g_sql = connect();
 
 $input = getRequestInput();
@@ -75,10 +76,10 @@ set_time_limit(180);
 ini_set('memory_limit', '512M');
 
 $extractXml = static function(string $s): string {
-    $pos = strpos($s, '<xml');
+    $pos = stripos($s, '<xml');
     if ($pos === false) return $s;
     $s = substr($s, $pos);
-    $end = strpos($s, '</xml>');
+    $end = stripos($s, '</xml>');
     if ($end === false) return $s;
     return substr($s, 0, $end) . '</xml>';
 };
@@ -99,7 +100,9 @@ $fetch1440Rows = static function() use ($extractXml): array {
     $raw = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
     $xmlStr = $extractXml((string)$raw);
     $xml = @simplexml_load_string($xmlStr);
-    if (!$xml) return [];
+    if (!$xml) {
+        return [];
+    }
 
     $rows = [];
     for ($i = 0; $i <= 200; $i++) {
@@ -121,15 +124,16 @@ $fetch1440Rows = static function() use ($extractXml): array {
 $isOpc0057 = static function(string $opc): bool {
     $opc = trim((string)$opc);
     if ($opc === '') return false;
-    return (strpos($opc, '057') !== false) || (strpos($opc, '0057') !== false);
+    if (preg_match('/(\d{1,5})/', $opc, $m)) {
+        return ((int)$m[1]) === 57;
+    }
+    return false;
 };
 
 $rowsBefore = $fetch1440Rows();
 $baselineSeq = 0;
 foreach ($rowsBefore as $r) {
-    if ($isOpc0057((string)$r['opc'])) {
-        $baselineSeq = max($baselineSeq, (int)$r['seq']);
-    }
+    $baselineSeq = max($baselineSeq, (int)$r['seq']);
 }
 
 $params = [
@@ -154,13 +158,16 @@ $q = http_build_query($params);
 ssw_go("https://sistema.ssw.inf.br/bin/ssw0057?$q");
 
 $jobRow = null;
-$deadline = time() + 120;
+$deadline = time() + 30;
 
 while (time() <= $deadline) {
     $rows = $fetch1440Rows();
     foreach ($rows as $r) {
         if (!$isOpc0057((string)$r['opc'])) continue;
         if ((int)$r['seq'] <= $baselineSeq) continue;
+
+        $usr = strtolower(trim((string)($r['usr'] ?? '')));
+        if ($usr !== '' && $username !== '' && $usr !== $username) continue;
 
         $status = $normStatus((string)$r['sit']);
         if ($status !== 'CONCLUIDO') continue;
@@ -172,7 +179,25 @@ while (time() <= $deadline) {
 }
 
 if (!$jobRow) {
-    respondJson(['success' => false, 'message' => 'Relatório não ficou pronto no tempo esperado (fila SSW 1440). Tente novamente.']);
+    $rowsNow = $fetch1440Rows();
+    $sample = array_slice($rowsNow, 0, 10);
+    $debug = array_map(static function($r) {
+        return [
+            'seq' => (int)($r['seq'] ?? 0),
+            'opc' => (string)($r['opc'] ?? ''),
+            'usr' => (string)($r['usr'] ?? ''),
+            'sit' => (string)($r['sit'] ?? ''),
+        ];
+    }, $sample);
+    respondJson([
+        'success' => false,
+        'message' => 'Timeout aguardando o relatório na fila SSW 1440 (não foi localizado como concluído).',
+        'debug' => [
+            'baseline_seq' => $baselineSeq,
+            'username' => $username,
+            'top_rows' => $debug,
+        ],
+    ]);
 }
 
 $f8 = html_entity_decode((string)$jobRow['f8'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -493,4 +518,3 @@ respondJson([
         ],
     ],
 ]);
-
