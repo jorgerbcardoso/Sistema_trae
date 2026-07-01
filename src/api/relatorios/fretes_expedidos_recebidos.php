@@ -228,9 +228,17 @@ $sswFetch = static function(string $url, int $tries = 3): string {
     return (string)$last;
 };
 
+$lerXml1440 = static function() use ($extractXml, $sswFetch): ?SimpleXMLElement {
+    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
+    if ($raw === '') return null;
+    if (stripos($raw, '504 Gateway Time-out') !== false) return null;
+    $xmlStr = $extractXml($raw);
+    if (stripos($xmlStr, '<xml') === false) return null;
+    return @simplexml_load_string($xmlStr) ?: null;
+};
+
 $get1440Rows = static function() use ($parse1440RowsFromRaw, $sswFetch): array {
-    $dummy = (string)((int)(microtime(true) * 1000));
-    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440?dummy=' . $dummy);
+    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
     return $parse1440RowsFromRaw($raw);
 };
 
@@ -271,38 +279,62 @@ if ($step === 'POLL') {
         respondJson(['success' => false, 'message' => 'Parâmetros inválidos para consulta de status (baseline_seq/request_start_ts).']);
     }
 
-    $rows = $get1440Rows();
+    $xml1440 = $lerXml1440();
+    if (!$xml1440) {
+        respondJson([
+            'success' => false,
+            'message' => 'Não foi possível ler a fila do SSW (1440) neste momento (erro/timeout do SSW).',
+        ], 500);
+    }
+
     $best = null;
     $bestSeq = -1;
 
-    foreach ($rows as $r) {
-        if (!$isOpcFretes((string)($r['opc'] ?? ''))) continue;
+    for ($i = 0; $i <= 200; $i++) {
+        $seq = $xml1440->xpath('rs/r/f0')[$i] ?? null;
+        $opc = $xml1440->xpath('rs/r/f1')[$i] ?? null;
+        $usr = $xml1440->xpath('rs/r/f3')[$i] ?? null;
+        $sit = $xml1440->xpath('rs/r/f6')[$i] ?? null;
+        $f8  = $xml1440->xpath('rs/r/f8')[$i] ?? null;
+        $f2  = $xml1440->xpath('rs/r/f2')[$i] ?? null;
 
-        $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
-        if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
+        if ($seq === null) break;
 
-        $status = $normStatus((string)($r['sit'] ?? ''));
-        if (strpos($status, 'CONCLUIDO') === false) continue;
+        $seqVal = (int)$seq;
+        if ($seqVal <= 0) continue;
 
-        $seq = (int)($r['seq'] ?? 0);
-        if ($seq <= 0) continue;
+        $opcStr = (string)$opc;
+        if (substr(trim($opcStr), 0, 3) !== '453') continue;
 
-        $f8raw = (string)($r['f8'] ?? '');
+        $usrStr = trim((string)$usr);
+        $usrNorm = $normSswUser($usrStr);
+        if (!in_array($usrNorm, $allowedSswUsers, true)) continue;
+
+        $sitStr = (string)$sit;
+        if ($sitStr !== 'Conclu&iacute;do') continue;
+
+        $f8raw = (string)$f8;
         if ($f8raw === '') continue;
+
+        $okBySeq = ($seqVal > $baselineSeqIn);
+        $f2ts = $parseF2Ts((string)$f2);
+        $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 120));
+        if (!$okBySeq && !$okByTime) continue;
 
         $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
         if (!$hasLinksOrNone) continue;
 
-        $okBySeq = ($seq > $baselineSeqIn);
-        $f2ts = $parseF2Ts((string)($r['f2'] ?? ''));
-        $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 120));
-
-        if (!$okBySeq && !$okByTime) continue;
-
-        if ($seq > $bestSeq) {
-            $best = $r;
-            $bestSeq = $seq;
+        if ($seqVal > $bestSeq) {
+            $bestSeq = $seqVal;
+            $best = [
+                'seq' => $seqVal,
+                'opc' => $opcStr,
+                'usr' => $usrStr,
+                'sit' => $sitStr,
+                'f8'  => $f8raw,
+                'f2'  => (string)$f2,
+            ];
         }
     }
 
