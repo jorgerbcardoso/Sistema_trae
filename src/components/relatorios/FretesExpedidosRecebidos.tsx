@@ -150,7 +150,6 @@ function csvEscape(v: any): string {
 function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: string): string {
   const header = [
     'Tipo',
-    'Sigla',
     unidadeLabel,
     'UF',
     'CT-es',
@@ -171,7 +170,6 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
     lines.push(
       [
         kind,
-        r.sigla,
         r.unidade,
         r.uf,
         formatNumber(r.quant_ctrc),
@@ -193,7 +191,6 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
     [
       kind,
       'TOTAL',
-      '',
       '',
       formatNumber(data.totals.quant_ctrc),
       formatNumber(data.totals.quant_vol),
