@@ -39,6 +39,20 @@ $emissaoFim = trim((string)($input['periodo_emissao_fim'] ?? ''));
 $entregaIni = trim((string)($input['periodo_entrega_ini'] ?? ''));
 $entregaFim = trim((string)($input['periodo_entrega_fim'] ?? ''));
 
+$knownSiglas = null;
+try {
+    $resSiglas = sql("SELECT UPPER(sigla) AS sigla FROM {$domain}_unidade", [], $g_sql);
+    if ($resSiglas) {
+        $knownSiglas = [];
+        while ($row = pg_fetch_assoc($resSiglas)) {
+            $s = strtoupper(trim((string)($row['sigla'] ?? '')));
+            if ($s !== '') $knownSiglas[$s] = true;
+        }
+    }
+} catch (Throwable $e) {
+    $knownSiglas = null;
+}
+
 $validDate = static function(string $s): bool {
     if ($s === '') return false;
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $s) === 1;
@@ -331,7 +345,7 @@ $splitByBreaks = static function(string $line, array $plus): array {
     return $parts;
 };
 
-$parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $splitByBreaks, $parseMoney, $parseIntBr): array {
+$parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $splitByBreaks, $parseMoney, $parseIntBr, $knownSiglas): array {
     $content = mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
     $content = str_replace("\r\n", "\n", str_replace("\r", "\n", $content));
     $content = str_replace("\f", "\n", $content);
@@ -419,6 +433,8 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
         if ($unLabel === '' || $uf === '') continue;
 
         $sigla = strtoupper(substr($unLabel, 0, 3));
+        if (!preg_match('/^[A-Z0-9]{3}$/', $sigla)) continue;
+        if (is_array($knownSiglas) && !isset($knownSiglas[$sigla])) continue;
 
         $current['rows'][] = [
             'sigla' => $sigla,

@@ -6,13 +6,13 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Inbox, Loader2, Send, Search, X } from 'lucide-react';
+import { Inbox, Loader2, Send, Search, Truck, TrendingUp, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Pie, PieChart, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Pie, PieChart, Cell, Legend, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 
 type TpCliente = '' | 'R' | 'D' | 'P';
 
@@ -131,13 +131,13 @@ function csvEscape(v: any): string {
   return s;
 }
 
-function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData): string {
+function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: string): string {
   const header = [
     'Tipo',
     'Sigla',
-    'Unidade',
+    unidadeLabel,
     'UF',
-    'CTRC',
+    'CT-es',
     'Vol',
     'Peso (Ton)',
     'Valor Mercadoria',
@@ -326,8 +326,8 @@ function ClienteSearchSelect({
 }
 
 function buildDonut(rows: RowAgg[]) {
-  const top = rows.slice(0, 8);
-  const rest = rows.slice(8);
+  const top = rows.slice(0, 5);
+  const rest = rows.slice(5);
   const demais = rest.reduce((acc, r) => acc + (Number(r.frete_tot) || 0), 0);
   const data = top.map((r) => ({ name: r.sigla, value: Number(r.frete_tot) || 0 }));
   if (demais > 0) data.push({ name: 'Demais', value: demais });
@@ -355,6 +355,51 @@ export function FretesExpedidosRecebidos() {
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
   const runRef = useRef(0);
+
+  const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
+  const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
+
+  const rowsExpSorted = useMemo(() => {
+    const rows = [...(dataExp?.rows || [])];
+    const { key, dir } = sortExp;
+    rows.sort((a, b) => {
+      const av: any = (a as any)[key];
+      const bv: any = (b as any)[key];
+      let cmp = 0;
+      if (typeof av === 'string' || typeof bv === 'string') cmp = String(av || '').localeCompare(String(bv || ''), 'pt-BR');
+      else cmp = (Number(av) || 0) - (Number(bv) || 0);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [dataExp, sortExp]);
+
+  const rowsRecSorted = useMemo(() => {
+    const rows = [...(dataRec?.rows || [])];
+    const { key, dir } = sortRec;
+    rows.sort((a, b) => {
+      const av: any = (a as any)[key];
+      const bv: any = (b as any)[key];
+      let cmp = 0;
+      if (typeof av === 'string' || typeof bv === 'string') cmp = String(av || '').localeCompare(String(bv || ''), 'pt-BR');
+      else cmp = (Number(av) || 0) - (Number(bv) || 0);
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [dataRec, sortRec]);
+
+  const toggleSort = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
+    if (kind === 'expedidos') {
+      setSortExp((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+    } else {
+      setSortRec((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+    }
+  };
+
+  const sortIcon = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
+    const s = kind === 'expedidos' ? sortExp : sortRec;
+    if (s.key !== key) return null;
+    return <span className="ml-1 text-[10px] opacity-70">{s.dir === 'asc' ? '▲' : '▼'}</span>;
+  };
 
   const validar = (f: Filters): string | null => {
     const hasEmissao = Boolean(f.periodo_emissao_ini || f.periodo_emissao_fim);
@@ -691,7 +736,9 @@ export function FretesExpedidosRecebidos() {
                       return;
                     }
                     const kind = isExp ? 'Expedidos' : 'Recebidos';
-                    const csv = buildCsv(kind, data);
+                    const unidadeLabel = isExp ? 'Unidade Destino' : 'Unidade Origem';
+                    const rows = isExp ? rowsExpSorted : rowsRecSorted;
+                    const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
                     const pad = (n: number) => String(n).padStart(2, '0');
                     const name = `fretes_${kind.toLowerCase()}_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(
@@ -714,39 +761,36 @@ export function FretesExpedidosRecebidos() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">CTRC</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatNumber(dataExp.totals.quant_ctrc)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Frete Total</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatCurrency(dataExp.totals.frete_tot)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Valor Mercadoria</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatCurrency(dataExp.totals.val_merc)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Peso (Ton)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatNumber(dataExp.totals.peso_ton, 3)}</CardContent>
-                  </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
+                  <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 p-4 flex items-start gap-3">
+                    <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-cyan-700 dark:text-cyan-200">CT-es</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_ctrc)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
+                    <Wallet className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete Total</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_tot)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
+                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor Mercadoria</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.val_merc)}</div>
+                    </div>
+                  </div>
                 </div>
 
-                <Card className="lg:col-span-1">
+                <Card className="lg:col-span-1 flex flex-col h-full">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">Frete por unidade (Top)</CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[220px]">
+                  <CardContent className="flex-1 min-h-[260px]">
                     {donutExp.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                     ) : (
@@ -754,15 +798,14 @@ export function FretesExpedidosRecebidos() {
                         <PieChart>
                           <RechartsTooltip
                             formatter={(value: any, name: any) => [formatCurrency(Number(value) || 0), String(name)]}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--popover))',
+                              border: '1px solid hsl(var(--border))',
+                              color: 'hsl(var(--popover-foreground))',
+                            }}
                           />
-                          <Pie
-                            data={donutExp}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={58}
-                            outerRadius={90}
-                            stroke="none"
-                          >
+                          <Legend verticalAlign="bottom" height={36} />
+                          <Pie data={donutExp} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} stroke="none">
                             {donutExp.map((_, i) => (
                               <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                             ))}
@@ -782,16 +825,28 @@ export function FretesExpedidosRecebidos() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left border-b">
-                            <th className="py-2 pr-3">Unidade</th>
-                            <th className="py-2 pr-3">UF</th>
-                            <th className="py-2 pr-3 text-right">CTRC</th>
-                            <th className="py-2 pr-3 text-right">Peso (Ton)</th>
-                            <th className="py-2 pr-3 text-right">Valor Merc.</th>
-                            <th className="py-2 pr-3 text-right">Frete Total</th>
+                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'unidade')}>
+                              Unidade Destino{sortIcon('expedidos', 'unidade')}
+                            </th>
+                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'uf')}>
+                              UF{sortIcon('expedidos', 'uf')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'quant_ctrc')}>
+                              CT-es{sortIcon('expedidos', 'quant_ctrc')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'peso_ton')}>
+                              Peso (Ton){sortIcon('expedidos', 'peso_ton')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'val_merc')}>
+                              Valor Merc.{sortIcon('expedidos', 'val_merc')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'frete_tot')}>
+                              Frete Total{sortIcon('expedidos', 'frete_tot')}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {dataExp.rows.slice(0, 200).map((r) => (
+                          {rowsExpSorted.slice(0, 200).map((r) => (
                             <tr key={`${r.sigla}-${r.uf}`} className="border-b last:border-0">
                               <td className="py-2 pr-3">
                                 <div className="font-medium">{r.sigla}</div>
@@ -821,39 +876,36 @@ export function FretesExpedidosRecebidos() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">CTRC</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatNumber(dataRec.totals.quant_ctrc)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Frete Total</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatCurrency(dataRec.totals.frete_tot)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Valor Mercadoria</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatCurrency(dataRec.totals.val_merc)}</CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Peso (Ton)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-2xl font-semibold">{formatNumber(dataRec.totals.peso_ton, 3)}</CardContent>
-                  </Card>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
+                  <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 p-4 flex items-start gap-3">
+                    <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-cyan-700 dark:text-cyan-200">CT-es</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataRec.totals.quant_ctrc)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
+                    <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Frete Total</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.frete_tot)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
+                    <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Valor Mercadoria</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.val_merc)}</div>
+                    </div>
+                  </div>
                 </div>
 
-                <Card className="lg:col-span-1">
+                <Card className="lg:col-span-1 flex flex-col h-full">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">Frete por unidade (Top)</CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[220px]">
+                  <CardContent className="flex-1 min-h-[260px]">
                     {donutRec.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                     ) : (
@@ -861,15 +913,14 @@ export function FretesExpedidosRecebidos() {
                         <PieChart>
                           <RechartsTooltip
                             formatter={(value: any, name: any) => [formatCurrency(Number(value) || 0), String(name)]}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--popover))',
+                              border: '1px solid hsl(var(--border))',
+                              color: 'hsl(var(--popover-foreground))',
+                            }}
                           />
-                          <Pie
-                            data={donutRec}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={58}
-                            outerRadius={90}
-                            stroke="none"
-                          >
+                          <Legend verticalAlign="bottom" height={36} />
+                          <Pie data={donutRec} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} stroke="none">
                             {donutRec.map((_, i) => (
                               <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                             ))}
@@ -889,16 +940,28 @@ export function FretesExpedidosRecebidos() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left border-b">
-                            <th className="py-2 pr-3">Unidade</th>
-                            <th className="py-2 pr-3">UF</th>
-                            <th className="py-2 pr-3 text-right">CTRC</th>
-                            <th className="py-2 pr-3 text-right">Peso (Ton)</th>
-                            <th className="py-2 pr-3 text-right">Valor Merc.</th>
-                            <th className="py-2 pr-3 text-right">Frete Total</th>
+                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'unidade')}>
+                              Unidade Origem{sortIcon('recebidos', 'unidade')}
+                            </th>
+                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'uf')}>
+                              UF{sortIcon('recebidos', 'uf')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'quant_ctrc')}>
+                              CT-es{sortIcon('recebidos', 'quant_ctrc')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'peso_ton')}>
+                              Peso (Ton){sortIcon('recebidos', 'peso_ton')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'val_merc')}>
+                              Valor Merc.{sortIcon('recebidos', 'val_merc')}
+                            </th>
+                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'frete_tot')}>
+                              Frete Total{sortIcon('recebidos', 'frete_tot')}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {dataRec.rows.slice(0, 200).map((r) => (
+                          {rowsRecSorted.slice(0, 200).map((r) => (
                             <tr key={`${r.sigla}-${r.uf}`} className="border-b last:border-0">
                               <td className="py-2 pr-3">
                                 <div className="font-medium">{r.sigla}</div>
