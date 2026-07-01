@@ -176,7 +176,7 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
         r.uf,
         formatNumber(r.quant_ctrc),
         formatNumber(r.quant_vol),
-        formatNumber(Math.round((Number(r.peso_ton) || 0) * 1000)),
+        formatNumber(Math.round(Number(r.peso_ton) || 0)),
         formatCurrency(r.val_merc),
         formatCurrency(r.frete_cif),
         formatCurrency(r.frete_fob),
@@ -197,7 +197,7 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
       '',
       formatNumber(data.totals.quant_ctrc),
       formatNumber(data.totals.quant_vol),
-      formatNumber(Math.round((Number(data.totals.peso_ton) || 0) * 1000)),
+      formatNumber(Math.round(Number(data.totals.peso_ton) || 0)),
       formatCurrency(data.totals.val_merc),
       formatCurrency(data.totals.frete_cif),
       formatCurrency(data.totals.frete_fob),
@@ -875,12 +875,19 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_ctrc)}</div>
                     </div>
                   </div>
+                  <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4 flex items-start gap-3">
+                    <Package className="w-5 h-5 text-teal-700 dark:text-teal-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-teal-800 dark:text-teal-200">Quantidade de Volumes</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_vol)}</div>
+                    </div>
+                  </div>
                   <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
                     <Weight className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatNumber(Math.round((Number(dataExp.totals.peso_ton) || 0) * 1000))}
+                        {formatNumber(Math.round(Number(dataExp.totals.peso_ton) || 0))}
                       </div>
                     </div>
                   </div>
@@ -906,7 +913,7 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete por Peso (R$/Kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
                         {(() => {
-                          const pesoKg = Math.round((Number(dataExp.totals.peso_ton) || 0) * 1000);
+                          const pesoKg = Math.round(Number(dataExp.totals.peso_ton) || 0);
                           const freteTotal =
                             (Number(dataExp.totals.frete_cif) || 0) + (Number(dataExp.totals.frete_fob) || 0) + (Number(dataExp.totals.frete_ter) || 0);
                           return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
@@ -984,7 +991,7 @@ export function FretesExpedidosRecebidos() {
                               </td>
                               <td className="py-2 pr-3">{r.uf}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatNumber(r.quant_ctrc)}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round((Number(r.peso_ton) || 0) * 1000))}</td>
+                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(r.peso_ton) || 0))}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.val_merc)}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete_tot)}</td>
                             </tr>
@@ -1037,12 +1044,19 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataRec.totals.quant_ctrc)}</div>
                     </div>
                   </div>
+                  <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4 flex items-start gap-3">
+                    <Package className="w-5 h-5 text-teal-700 dark:text-teal-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-teal-800 dark:text-teal-200">Quantidade de Volumes</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataRec.totals.quant_vol)}</div>
+                    </div>
+                  </div>
                   <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
                     <Weight className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatNumber(Math.round((Number(dataRec.totals.peso_ton) || 0) * 1000))}
+                        {formatNumber(Math.round(Number(dataRec.totals.peso_ton) || 0))}
                       </div>
                     </div>
                   </div>
@@ -1068,7 +1082,7 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete por Peso (R$/Kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
                         {(() => {
-                          const pesoKg = Math.round((Number(dataRec.totals.peso_ton) || 0) * 1000);
+                          const pesoKg = Math.round(Number(dataRec.totals.peso_ton) || 0);
                           const freteTotal =
                             (Number(dataRec.totals.frete_cif) || 0) + (Number(dataRec.totals.frete_fob) || 0) + (Number(dataRec.totals.frete_ter) || 0);
                           return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
@@ -1146,7 +1160,7 @@ export function FretesExpedidosRecebidos() {
                               </td>
                               <td className="py-2 pr-3">{r.uf}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatNumber(r.quant_ctrc)}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round((Number(r.peso_ton) || 0) * 1000))}</td>
+                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(r.peso_ton) || 0))}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.val_merc)}</td>
                               <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete_tot)}</td>
                             </tr>
