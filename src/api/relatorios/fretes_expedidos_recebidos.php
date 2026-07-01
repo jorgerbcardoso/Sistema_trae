@@ -11,8 +11,16 @@ $g_sql = connect();
 
 $input = getRequestInput();
 
+register_shutdown_function(function() {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Erro fatal PHP: ' . $err['message'] . ' em ' . $err['file'] . ':' . $err['line']], JSON_UNESCAPED_UNICODE);
+    }
+});
+
 $step = strtoupper(trim((string)($input['step'] ?? 'RUN')));
-if (!in_array($step, ['RUN', 'START', 'POLL', DOWNLOAD'], true)) $step = 'RUN';
+if (!in_array($step, ['RUN', 'START', 'POLL', 'DOWNLOAD'], true)) $step = 'RUN';
 
 $actIn = trim((string)($input['act'] ?? ''));
 
