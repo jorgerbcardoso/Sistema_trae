@@ -87,6 +87,10 @@ type DownloadResponse = {
   kind?: 'expedidos' | 'recebidos';
   filename?: string;
   data?: ApiData;
+  meta?: {
+    timing_ms?: Record<string, number>;
+    size_bytes?: Record<string, number>;
+  };
 };
 
 function getMesCorrentePeriod(): { ini: string; fim: string } {
@@ -346,6 +350,7 @@ export function FretesExpedidosRecebidos() {
 
   const [hasGenerated, setHasGenerated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string>('');
   const [tab, setTab] = useState<'expedidos' | 'recebidos'>('expedidos');
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
@@ -386,6 +391,7 @@ export function FretesExpedidosRecebidos() {
 
     setHasGenerated(true);
     setLoading(true);
+    setStatus('Comandando relatório...');
     setDataExp(null);
     setDataRec(null);
     try {
@@ -405,6 +411,7 @@ export function FretesExpedidosRecebidos() {
 
       if (runRef.current !== runId) return;
       if (!start?.success || start.status !== 'started' || !start.baseline_seq || !start.request_start_ts) {
+        setStatus('');
         toast.error(start?.message || 'Não foi possível iniciar a geração no SSW.');
         return;
       }
@@ -427,6 +434,7 @@ export function FretesExpedidosRecebidos() {
         if (runRef.current !== runId) return;
 
         if (!poll?.success) {
+          setStatus('');
           toast.error(poll?.message || 'Falha ao consultar status no SSW (1440).');
           return;
         }
@@ -446,20 +454,35 @@ export function FretesExpedidosRecebidos() {
       if (runRef.current !== runId) return;
 
       if (empty) {
+        setStatus('');
         toast.info('Nenhum registro encontrado para os parâmetros informados.');
         return;
       }
 
       if (!acts.length) {
+        setStatus('');
         toast.error('O relatório foi concluído, mas não foi possível localizar os links de download.');
         return;
       }
+
+      const rankAct = (a: string) => {
+        const s = String(a || '').toUpperCase();
+        if (s.includes('_E.SSWWEB')) return 1;
+        if (s.includes('_R.SSWWEB')) return 2;
+        return 9;
+      };
+      acts = [...acts].sort((a, b) => rankAct(a) - rankAct(b));
+
+      setStatus('Relatório encontrado... Iniciando leitura');
 
       let exp: ApiData | null = null;
       let rec: ApiData | null = null;
 
       for (const act of acts) {
         if (runRef.current !== runId) return;
+
+        if (String(act).toUpperCase().includes('_E.SSWWEB')) setStatus('Relatório encontrado... Iniciando leitura');
+        if (String(act).toUpperCase().includes('_R.SSWWEB')) setStatus('Relatório encontrado... Iniciando leitura');
 
         const dl = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
           method: 'POST',
@@ -482,6 +505,7 @@ export function FretesExpedidosRecebidos() {
 
       setDataExp(exp);
       setDataRec(rec);
+      setStatus('Concluído');
 
       if (!exp && !rec) {
         toast.info('Nenhum dado disponível após o download.');
@@ -617,12 +641,7 @@ export function FretesExpedidosRecebidos() {
               >
                 <Send className="w-4 h-4" />
                 Expedidos
-                {loading ? (
-                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Carregando...
-                  </Badge>
-                ) : dataExp ? (
+                {dataExp ? (
                   <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs">
                     {formatNumber(dataExp.totals.quant_ctrc)}
                   </Badge>
@@ -641,12 +660,7 @@ export function FretesExpedidosRecebidos() {
               >
                 <Inbox className="w-4 h-4" />
                 Recebidos
-                {loading ? (
-                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Carregando...
-                  </Badge>
-                ) : dataRec ? (
+                {dataRec ? (
                   <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
                     {formatNumber(dataRec.totals.quant_ctrc)}
                   </Badge>
@@ -658,6 +672,14 @@ export function FretesExpedidosRecebidos() {
               <div className="flex-1" />
 
               <div className="flex items-center gap-2 px-3">
+                {loading ? (
+                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    {status || 'Processando...'}
+                  </Badge>
+                ) : status ? (
+                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">{status}</Badge>
+                ) : null}
                 <Button
                   variant="outline"
                   disabled={loading}

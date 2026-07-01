@@ -242,6 +242,304 @@ $get1440Rows = static function() use ($parse1440RowsFromRaw, $sswFetch): array {
     return $parse1440RowsFromRaw($raw);
 };
 
+$downloadFromAct = static function(string $act) use ($sswFetch): ?array {
+    $dummy = (string)((int)(microtime(true) * 1000));
+    $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
+    $t0 = microtime(true);
+    $html = (string)$sswFetch($url, 3);
+    $t1 = microtime(true);
+
+    if (!preg_match('/id=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
+        if (!preg_match('/name=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
+            return null;
+        }
+    }
+
+    $decoded = urldecode((string)$mVal[1]);
+    if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/", $decoded, $mArq)) {
+        return null;
+    }
+
+    $filename = (string)$mArq[1];
+    $path = (string)$mArq[2];
+    if ($filename === '' || $path === '') return null;
+
+    $t2 = microtime(true);
+    $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
+    $t3 = microtime(true);
+    if ($file === '' || strlen($file) < 50) return null;
+
+    return [
+        'filename' => $filename,
+        'path' => $path,
+        'content' => $file,
+        'timing_ms' => [
+            'ssw1440_act' => (int)round(($t1 - $t0) * 1000),
+            'ssw0424' => (int)round(($t3 - $t2) * 1000),
+        ],
+        'size_bytes' => [
+            'ssw1440_html' => strlen($html),
+            'file' => strlen($file),
+        ],
+    ];
+};
+
+$parseMoney = static function(string $s): float {
+    $s = trim($s);
+    if ($s === '') return 0.0;
+    $neg = false;
+    if (strpos($s, '-') !== false) $neg = true;
+    $s = preg_replace('/[^0-9,\\.\\-]/', '', $s);
+    $s = str_replace('.', '', $s);
+    $s = str_replace(',', '.', $s);
+    $v = (float)$s;
+    return $neg ? -abs($v) : $v;
+};
+
+$parseIntBr = static function(string $s): int {
+    $s = trim($s);
+    if ($s === '') return 0;
+    $s = preg_replace('/[^0-9\\-]/', '', str_replace('.', '', $s));
+    return (int)$s;
+};
+
+$deriveBreaks = static function(string $delim): array {
+    $plus = [];
+    $len = strlen($delim);
+    for ($i = 0; $i < $len; $i++) {
+        if ($delim[$i] === '+') $plus[] = $i;
+    }
+    return $plus;
+};
+
+$splitByBreaks = static function(string $line, array $plus): array {
+    $parts = [];
+    $len = strlen($line);
+    $starts = [0];
+    foreach ($plus as $p) $starts[] = $p + 1;
+    $ends = [];
+    foreach ($plus as $p) $ends[] = $p;
+    $ends[] = $len;
+
+    $count = min(count($starts), count($ends));
+    for ($i = 0; $i < $count; $i++) {
+        $start = $starts[$i];
+        $end = $ends[$i];
+        if ($end < $start) $end = $start;
+        $parts[] = trim(substr($line, $start, $end - $start));
+    }
+    return $parts;
+};
+
+$parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $splitByBreaks, $parseMoney, $parseIntBr): array {
+    $content = mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
+    $content = str_replace("\r\n", "\n", str_replace("\r", "\n", $content));
+    $content = str_replace("\f", "\n", $content);
+    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $content);
+
+    $lines = explode("\n", $content);
+
+    $groups = [];
+    $current = null;
+    $plus = [];
+    $periodo = '';
+
+    $flush = static function() use (&$groups, &$current) {
+        if ($current && !empty($current['unidade_base_sigla'])) {
+            $groups[] = $current;
+        }
+        $current = null;
+    };
+
+    foreach ($lines as $rawLine) {
+        $line = rtrim((string)$rawLine);
+        $trim = trim($line);
+        if ($trim === '') continue;
+
+        if (strpos($trim, 'UNIDADE ') === 0 && strpos($trim, ':') !== false) {
+            if (strpos($trim, 'EXPEDIDORA') !== false || strpos($trim, 'RECEBEDORA') !== false) {
+                $flush();
+                $label = trim(substr($trim, strpos($trim, ':') + 1));
+                $sigla = strtoupper(substr($label, 0, 3));
+                $current = [
+                    'tipo' => $tipo,
+                    'unidade_base_sigla' => $sigla,
+                    'unidade_base_nome' => $label,
+                    'periodo_emissao' => $periodo,
+                    'rows' => [],
+                    'total' => null,
+                ];
+                continue;
+            }
+        }
+
+        if (strpos($trim, 'PERIODO DE EMISSAO') === 0 && strpos($trim, ':') !== false) {
+            $periodo = trim(substr($trim, strpos($trim, ':') + 1));
+            if ($current) $current['periodo_emissao'] = $periodo;
+            continue;
+        }
+
+        if ($trim[0] === '-' && strpos($trim, '+') !== false) {
+            $plus = $deriveBreaks($trim);
+            continue;
+        }
+
+        if (!$current || empty($plus)) {
+            continue;
+        }
+
+        if (strpos($trim, 'TOTAL:') === 0) {
+            $cols = $splitByBreaks($line, $plus);
+            if (count($cols) >= 14) {
+                $current['total'] = [
+                    'quant_vol' => $parseIntBr((string)($cols[2] ?? '0')),
+                    'quant_ctrc' => $parseIntBr((string)($cols[3] ?? '0')),
+                    'peso_ton' => $parseMoney((string)($cols[4] ?? '0')),
+                    'val_merc' => $parseMoney((string)($cols[5] ?? '0')),
+                    'frete_cif' => $parseMoney((string)($cols[6] ?? '0')),
+                    'frete_fob' => $parseMoney((string)($cols[7] ?? '0')),
+                    'frete_ter' => $parseMoney((string)($cols[8] ?? '0')),
+                    'frete_sub' => $parseMoney((string)($cols[9] ?? '0')),
+                    'frete_tot' => $parseMoney((string)($cols[10] ?? '0')),
+                    'frete_ctrc' => $parseMoney((string)($cols[11] ?? '0')),
+                    'frete_vmerc_pct' => $parseMoney((string)($cols[12] ?? '0')),
+                    'desc_pct' => $parseMoney((string)($cols[13] ?? '0')),
+                ];
+            }
+            continue;
+        }
+
+        if ($trim[0] === '-') continue;
+
+        $cols = $splitByBreaks($line, $plus);
+        if (count($cols) < 10) continue;
+
+        $unLabel = trim((string)($cols[0] ?? ''));
+        $uf = strtoupper(trim((string)($cols[1] ?? '')));
+        if ($unLabel === '' || $uf === '') continue;
+
+        $sigla = strtoupper(substr($unLabel, 0, 3));
+
+        $current['rows'][] = [
+            'sigla' => $sigla,
+            'unidade' => $unLabel,
+            'uf' => $uf,
+            'quant_vol' => $parseIntBr((string)($cols[2] ?? '0')),
+            'quant_ctrc' => $parseIntBr((string)($cols[3] ?? '0')),
+            'peso_ton' => $parseMoney((string)($cols[4] ?? '0')),
+            'val_merc' => $parseMoney((string)($cols[5] ?? '0')),
+            'frete_cif' => $parseMoney((string)($cols[6] ?? '0')),
+            'frete_fob' => $parseMoney((string)($cols[7] ?? '0')),
+            'frete_ter' => $parseMoney((string)($cols[8] ?? '0')),
+            'frete_sub' => $parseMoney((string)($cols[9] ?? '0')),
+            'frete_tot' => $parseMoney((string)($cols[10] ?? '0')),
+            'frete_ctrc' => $parseMoney((string)($cols[11] ?? '0')),
+            'frete_vmerc_pct' => $parseMoney((string)($cols[12] ?? '0')),
+            'desc_pct' => $parseMoney((string)($cols[13] ?? '0')),
+        ];
+    }
+
+    $flush();
+
+    $by = [];
+    $totals = [
+        'quant_vol' => 0,
+        'quant_ctrc' => 0,
+        'peso_ton' => 0.0,
+        'val_merc' => 0.0,
+        'frete_tot' => 0.0,
+        'frete_cif' => 0.0,
+        'frete_fob' => 0.0,
+        'frete_ter' => 0.0,
+        'frete_sub' => 0.0,
+    ];
+
+    foreach ($groups as $g) {
+        foreach (($g['rows'] ?? []) as $r) {
+            $k = (string)$r['sigla'];
+            if (!isset($by[$k])) {
+                $by[$k] = [
+                    'sigla' => $r['sigla'],
+                    'unidade' => $r['unidade'],
+                    'uf' => $r['uf'],
+                    'quant_vol' => 0,
+                    'quant_ctrc' => 0,
+                    'peso_ton' => 0.0,
+                    'val_merc' => 0.0,
+                    'frete_cif' => 0.0,
+                    'frete_fob' => 0.0,
+                    'frete_ter' => 0.0,
+                    'frete_sub' => 0.0,
+                    'frete_tot' => 0.0,
+                ];
+            }
+            $by[$k]['quant_vol'] += (int)$r['quant_vol'];
+            $by[$k]['quant_ctrc'] += (int)$r['quant_ctrc'];
+            $by[$k]['peso_ton'] += (float)$r['peso_ton'];
+            $by[$k]['val_merc'] += (float)$r['val_merc'];
+            $by[$k]['frete_cif'] += (float)$r['frete_cif'];
+            $by[$k]['frete_fob'] += (float)$r['frete_fob'];
+            $by[$k]['frete_ter'] += (float)$r['frete_ter'];
+            $by[$k]['frete_sub'] += (float)$r['frete_sub'];
+            $by[$k]['frete_tot'] += (float)$r['frete_tot'];
+        }
+
+        if (!empty($g['total'])) {
+            $t = $g['total'];
+            $totals['quant_vol'] += (int)$t['quant_vol'];
+            $totals['quant_ctrc'] += (int)$t['quant_ctrc'];
+            $totals['peso_ton'] += (float)$t['peso_ton'];
+            $totals['val_merc'] += (float)$t['val_merc'];
+            $totals['frete_tot'] += (float)$t['frete_tot'];
+            $totals['frete_cif'] += (float)$t['frete_cif'];
+            $totals['frete_fob'] += (float)$t['frete_fob'];
+            $totals['frete_ter'] += (float)$t['frete_ter'];
+            $totals['frete_sub'] += (float)$t['frete_sub'];
+        }
+    }
+
+    $rowsAgg = array_values($by);
+    usort($rowsAgg, static function($a, $b) {
+        return ($b['frete_tot'] <=> $a['frete_tot']);
+    });
+
+    return [
+        'totals' => $totals,
+        'rows' => $rowsAgg,
+        'groups' => $groups,
+    ];
+};
+
+if ($step === 'DOWNLOAD') {
+    if ($actIn === '') {
+        respondJson(['success' => false, 'message' => 'Parâmetro act obrigatório para download.']);
+    }
+
+    $dl = $downloadFromAct($actIn);
+    if (!$dl) {
+        respondJson(['success' => false, 'message' => 'Não foi possível baixar o arquivo pelo ssw1440/ssw0424.']);
+    }
+
+    $fn = strtoupper((string)$dl['filename']);
+    $tipo = (strpos($fn, '_R.SSWWEB') !== false) ? 'R' : 'E';
+    $t0 = microtime(true);
+    $data = $parseTxt((string)$dl['content'], $tipo);
+    $t1 = microtime(true);
+
+    respondJson([
+        'success' => true,
+        'kind' => $tipo === 'R' ? 'recebidos' : 'expedidos',
+        'filename' => (string)$dl['filename'],
+        'data' => $data,
+        'meta' => [
+            'timing_ms' => array_merge(($dl['timing_ms'] ?? []), [
+                'parse' => (int)round(($t1 - $t0) * 1000),
+            ]),
+            'size_bytes' => ($dl['size_bytes'] ?? []),
+        ],
+    ]);
+}
+
 $isOpcFretes = static function(string $opc): bool {
     $opc = trim((string)$opc);
     if ($opc === '') return false;
@@ -534,281 +832,20 @@ if (empty($acts)) {
     respondJson(['success' => false, 'message' => 'Não foi possível localizar links de download no ssw1440.']);
 }
 
-$downloadFromAct = static function(string $act) use ($extractXml, $sswFetch): ?array {
-    $dummy = (string)((int)(microtime(true) * 1000));
-    $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
-    $html = (string)$sswFetch($url, 3);
-
-    if (!preg_match('/id=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
-        if (!preg_match('/name=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
-            return null;
-        }
-    }
-
-    $decoded = urldecode((string)$mVal[1]);
-    if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/", $decoded, $mArq)) {
-        return null;
-    }
-
-    $filename = (string)$mArq[1];
-    $path = (string)$mArq[2];
-    if ($filename === '' || $path === '') return null;
-
-    $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
-    if ($file === '' || strlen($file) < 50) return null;
-
-    return ['filename' => $filename, 'path' => $path, 'content' => $file];
+$rankAct = static function(string $act): int {
+    $a = strtoupper($act);
+    if (strpos($a, '_E.SSWWEB') !== false) return 1;
+    if (strpos($a, '_R.SSWWEB') !== false) return 2;
+    return 9;
 };
 
-$parseMoney = static function(string $s): float {
-    $s = trim($s);
-    if ($s === '') return 0.0;
-    $neg = false;
-    if (strpos($s, '-') !== false) $neg = true;
-    $s = preg_replace('/[^0-9,\\.\\-]/', '', $s);
-    $s = str_replace('.', '', $s);
-    $s = str_replace(',', '.', $s);
-    $v = (float)$s;
-    return $neg ? -abs($v) : $v;
-};
-
-$parseIntBr = static function(string $s): int {
-    $s = trim($s);
-    if ($s === '') return 0;
-    $s = preg_replace('/[^0-9\\-]/', '', str_replace('.', '', $s));
-    return (int)$s;
-};
-
-$deriveBreaks = static function(string $delim): array {
-    $plus = [];
-    $len = strlen($delim);
-    for ($i = 0; $i < $len; $i++) {
-        if ($delim[$i] === '+') $plus[] = $i;
-    }
-    return $plus;
-};
-
-$splitByBreaks = static function(string $line, array $plus): array {
-    $parts = [];
-    $len = strlen($line);
-    $starts = [0];
-    foreach ($plus as $p) $starts[] = $p + 1;
-    $ends = [];
-    foreach ($plus as $p) $ends[] = $p;
-    $ends[] = $len;
-
-    $count = min(count($starts), count($ends));
-    for ($i = 0; $i < $count; $i++) {
-        $start = $starts[$i];
-        $end = $ends[$i];
-        if ($end < $start) $end = $start;
-        $parts[] = trim(substr($line, $start, $end - $start));
-    }
-    return $parts;
-};
-
-$parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $splitByBreaks, $parseMoney, $parseIntBr): array {
-    $content = mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
-    $content = str_replace("\r\n", "\n", str_replace("\r", "\n", $content));
-    $content = str_replace("\f", "\n", $content);
-    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $content);
-
-    $lines = explode("\n", $content);
-
-    $groups = [];
-    $current = null;
-    $plus = [];
-    $periodo = '';
-
-    $flush = static function() use (&$groups, &$current) {
-        if ($current && !empty($current['unidade_base_sigla'])) {
-            $groups[] = $current;
-        }
-        $current = null;
-    };
-
-    foreach ($lines as $rawLine) {
-        $line = rtrim((string)$rawLine);
-        $trim = trim($line);
-        if ($trim === '') continue;
-
-        if (preg_match('/^UNIDADE\\s+(EXPEDIDORA|RECEBEDORA)\\s*:\\s*(.+)$/u', $trim, $mUn)) {
-            $flush();
-            $label = trim((string)$mUn[2]);
-            $sigla = strtoupper(substr($label, 0, 3));
-            $current = [
-                'tipo' => $tipo,
-                'unidade_base_sigla' => $sigla,
-                'unidade_base_nome' => $label,
-                'periodo_emissao' => $periodo,
-                'rows' => [],
-                'total' => null,
-            ];
-            continue;
-        }
-
-        if (preg_match('/^PERIODO\\s+DE\\s+EMISSAO\\s*:\\s*(.+)$/u', $trim, $mPer)) {
-            $periodo = trim((string)$mPer[1]);
-            if ($current) $current['periodo_emissao'] = $periodo;
-            continue;
-        }
-
-        if (preg_match('/^-+\\+--\\+-+/u', $trim)) {
-            $plus = $deriveBreaks($trim);
-            continue;
-        }
-
-        if (!$current || empty($plus)) {
-            continue;
-        }
-
-        if (strpos($trim, 'TOTAL:') === 0) {
-            $cols = $splitByBreaks($line, $plus);
-            if (count($cols) >= 14) {
-                $current['total'] = [
-                    'quant_vol' => $parseIntBr((string)($cols[2] ?? '0')),
-                    'quant_ctrc' => $parseIntBr((string)($cols[3] ?? '0')),
-                    'peso_ton' => $parseMoney((string)($cols[4] ?? '0')),
-                    'val_merc' => $parseMoney((string)($cols[5] ?? '0')),
-                    'frete_cif' => $parseMoney((string)($cols[6] ?? '0')),
-                    'frete_fob' => $parseMoney((string)($cols[7] ?? '0')),
-                    'frete_ter' => $parseMoney((string)($cols[8] ?? '0')),
-                    'frete_sub' => $parseMoney((string)($cols[9] ?? '0')),
-                    'frete_tot' => $parseMoney((string)($cols[10] ?? '0')),
-                    'frete_ctrc' => $parseMoney((string)($cols[11] ?? '0')),
-                    'frete_vmerc_pct' => $parseMoney((string)($cols[12] ?? '0')),
-                    'desc_pct' => $parseMoney((string)($cols[13] ?? '0')),
-                ];
-            }
-            continue;
-        }
-
-        if ($trim[0] === '-') continue;
-
-        $cols = $splitByBreaks($line, $plus);
-        if (count($cols) < 10) continue;
-
-        $unLabel = trim((string)($cols[0] ?? ''));
-        $uf = strtoupper(trim((string)($cols[1] ?? '')));
-        if ($unLabel === '' || $uf === '') continue;
-
-        $sigla = strtoupper(substr($unLabel, 0, 3));
-
-        $current['rows'][] = [
-            'sigla' => $sigla,
-            'unidade' => $unLabel,
-            'uf' => $uf,
-            'quant_vol' => $parseIntBr((string)($cols[2] ?? '0')),
-            'quant_ctrc' => $parseIntBr((string)($cols[3] ?? '0')),
-            'peso_ton' => $parseMoney((string)($cols[4] ?? '0')),
-            'val_merc' => $parseMoney((string)($cols[5] ?? '0')),
-            'frete_cif' => $parseMoney((string)($cols[6] ?? '0')),
-            'frete_fob' => $parseMoney((string)($cols[7] ?? '0')),
-            'frete_ter' => $parseMoney((string)($cols[8] ?? '0')),
-            'frete_sub' => $parseMoney((string)($cols[9] ?? '0')),
-            'frete_tot' => $parseMoney((string)($cols[10] ?? '0')),
-            'frete_ctrc' => $parseMoney((string)($cols[11] ?? '0')),
-            'frete_vmerc_pct' => $parseMoney((string)($cols[12] ?? '0')),
-            'desc_pct' => $parseMoney((string)($cols[13] ?? '0')),
-        ];
-    }
-
-    $flush();
-
-    $by = [];
-    $totals = [
-        'quant_vol' => 0,
-        'quant_ctrc' => 0,
-        'peso_ton' => 0.0,
-        'val_merc' => 0.0,
-        'frete_tot' => 0.0,
-        'frete_cif' => 0.0,
-        'frete_fob' => 0.0,
-        'frete_ter' => 0.0,
-        'frete_sub' => 0.0,
-    ];
-
-    foreach ($groups as $g) {
-        foreach (($g['rows'] ?? []) as $r) {
-            $k = (string)$r['sigla'];
-            if (!isset($by[$k])) {
-                $by[$k] = [
-                    'sigla' => $r['sigla'],
-                    'unidade' => $r['unidade'],
-                    'uf' => $r['uf'],
-                    'quant_vol' => 0,
-                    'quant_ctrc' => 0,
-                    'peso_ton' => 0.0,
-                    'val_merc' => 0.0,
-                    'frete_cif' => 0.0,
-                    'frete_fob' => 0.0,
-                    'frete_ter' => 0.0,
-                    'frete_sub' => 0.0,
-                    'frete_tot' => 0.0,
-                ];
-            }
-            $by[$k]['quant_vol'] += (int)$r['quant_vol'];
-            $by[$k]['quant_ctrc'] += (int)$r['quant_ctrc'];
-            $by[$k]['peso_ton'] += (float)$r['peso_ton'];
-            $by[$k]['val_merc'] += (float)$r['val_merc'];
-            $by[$k]['frete_cif'] += (float)$r['frete_cif'];
-            $by[$k]['frete_fob'] += (float)$r['frete_fob'];
-            $by[$k]['frete_ter'] += (float)$r['frete_ter'];
-            $by[$k]['frete_sub'] += (float)$r['frete_sub'];
-            $by[$k]['frete_tot'] += (float)$r['frete_tot'];
-        }
-
-        if (!empty($g['total'])) {
-            $t = $g['total'];
-            $totals['quant_vol'] += (int)$t['quant_vol'];
-            $totals['quant_ctrc'] += (int)$t['quant_ctrc'];
-            $totals['peso_ton'] += (float)$t['peso_ton'];
-            $totals['val_merc'] += (float)$t['val_merc'];
-            $totals['frete_tot'] += (float)$t['frete_tot'];
-            $totals['frete_cif'] += (float)$t['frete_cif'];
-            $totals['frete_fob'] += (float)$t['frete_fob'];
-            $totals['frete_ter'] += (float)$t['frete_ter'];
-            $totals['frete_sub'] += (float)$t['frete_sub'];
-        }
-    }
-
-    $rowsAgg = array_values($by);
-    usort($rowsAgg, static function($a, $b) {
-        return ($b['frete_tot'] <=> $a['frete_tot']);
-    });
-
-    return [
-        'totals' => $totals,
-        'rows' => $rowsAgg,
-        'groups' => $groups,
-    ];
-};
+usort($acts, static function($a, $b) use ($rankAct) {
+    return ($rankAct((string)$a) <=> $rankAct((string)$b));
+});
 
 $exp = null;
 $rec = null;
 $downloads = [];
-
-if ($step === 'DOWNLOAD') {
-    if ($actIn === '') {
-        respondJson(['success' => false, 'message' => 'Parâmetro act obrigatório para download.']);
-    }
-
-    $dl = $downloadFromAct($actIn);
-    if (!$dl) {
-        respondJson(['success' => false, 'message' => 'Não foi possível baixar o arquivo pelo ssw1440/ssw0424.']);
-    }
-
-    $fn = strtoupper((string)$dl['filename']);
-    $tipo = (strpos($fn, '_R.SSWWEB') !== false) ? 'R' : 'E';
-    $data = $parseTxt((string)$dl['content'], $tipo);
-
-    respondJson([
-        'success' => true,
-        'kind' => $tipo === 'R' ? 'recebidos' : 'expedidos',
-        'filename' => (string)$dl['filename'],
-        'data' => $data,
-    ]);
-}
 
 foreach ($acts as $act) {
     $dl = $downloadFromAct($act);
