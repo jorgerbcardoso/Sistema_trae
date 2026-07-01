@@ -34,6 +34,7 @@ import { ControleTransbordo } from './components/relatorios/ControleTransbordo';
 import { TotaisVendedores } from './components/relatorios/TotaisVendedores';
 import { FretesExpedidosRecebidos } from './components/relatorios/FretesExpedidosRecebidos';
 import TabelasVencer from './pages/relatorios/TabelasVencer';
+import { DynamicMenuRoute } from './components/DynamicRouter';
 
 // Estoque
 import { CadastroEstoques } from './components/estoque/CadastroEstoques';
@@ -325,6 +326,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <FretesExpedidosRecebidos />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'relatorios/*',
+        element: (
+          <ProtectedRoute>
+            <DynamicMenuRoute />
           </ProtectedRoute>
         )
       },

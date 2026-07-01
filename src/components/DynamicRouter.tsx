@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense, useMemo } from 'react';
-import { Routes, Route, Link } from 'react-router';
+import { Routes, Route, Link, useLocation } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL, ENVIRONMENT } from '../config/environment';
@@ -227,3 +227,96 @@ export const DynamicRouter: React.FC = () => {
 };
 
 export default DynamicRouter;
+
+export const DynamicMenuRoute: React.FC = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [resolved, setResolved] = useState<null | { component_path: string; permissions?: MenuItem['permissions'] }>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!user) {
+        return;
+      }
+
+      setLoading(true);
+      setNotFound(false);
+
+      try {
+        const result = await getMenu(user.domain, user.username, user.is_admin);
+        if (!result?.success) {
+          setNotFound(true);
+          return;
+        }
+
+        const baseUrl = String(import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+        const normalize = (p: string) => {
+          let x = (p || '').trim();
+          if (!x.startsWith('/')) x = `/${x}`;
+          x = x.replace(/\/{2,}/g, '/');
+          if (baseUrl && baseUrl !== '/' && x.startsWith(`${baseUrl}/`)) {
+            x = x.slice(baseUrl.length);
+          }
+          x = x.replace(/\/+$/, '') || '/';
+          return x.toLowerCase();
+        };
+
+        const currentPath = normalize(location.pathname);
+        const currentPathDash = currentPath.replace(/_/g, '-');
+
+        const allItems: MenuItem[] = [];
+        (result.menu.sections || []).forEach((section: any) => {
+          (section.items || []).forEach((item: any) => {
+            if (item?.route_path && item?.component_path) {
+              allItems.push(item);
+            }
+          });
+        });
+
+        const match = allItems.find((it) => {
+          const itemPath = normalize(it.route_path);
+          const itemPathDash = itemPath.replace(/_/g, '-');
+          return itemPath === currentPath || itemPathDash === currentPathDash;
+        });
+
+        if (!match) {
+          setNotFound(true);
+          return;
+        }
+
+        setResolved({ component_path: match.component_path, permissions: match.permissions });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [user, location.pathname]);
+
+  if (loading) {
+    return <PageLoader />;
+  }
+
+  if (notFound || !resolved) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">PÁGINA NÃO ENCONTRADA</h2>
+          <p className="text-gray-600 mb-4">A página que você procura não existe.</p>
+          <Link to="/menu" className="text-blue-600 hover:text-blue-800 underline">
+            Voltar ao Menu Principal
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const Component = getComponent(resolved.component_path);
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Component permissions={resolved.permissions} />
+    </Suspense>
+  );
+};
