@@ -27,7 +27,7 @@ COMO ADICIONAR UMA NOVA TELA/FUNCIONALIDADE (RESUMO PRÁTICO):
 
 3) BACKEND (PHP)
 - Cadastros costumam ficar em: src/api/cadastros/
-- Importações SSW seguem o padrão de: src/api/eventos/import_eventos.php (require_ssw + ask() + imp_ssw_*)
+- Importações do sistema externo seguem o padrão de: src/api/eventos/import_eventos.php (require_ssw + ask() + imp_ssw_*)
 
 
 PADRÕES DE CÓDIGO CRÍTICOS:
@@ -37,12 +37,12 @@ PADRÕES DE CÓDIGO CRÍTICOS:
    - SEMPRE utilize a função wrapper `sql($query, $params=[])` disponível no `config.php`.
    - Exemplo: `$resultado = sql("SELECT * FROM usuarios WHERE id = $1", [1]);`
 
-2. COMUNICAÇÃO COM SSW (PHP):
-   - NUNCA crie novas classes ou métodos para se comunicar com o SSW.
+2. COMUNICAÇÃO COM SISTEMA EXTERNO (PHP):
+   - NUNCA crie novas classes ou métodos para se comunicar com o sistema externo.
    - SEMPRE use as funções existentes na biblioteca `ssw.php`.
    - O fluxo padrão é:
-     a) `ssw_login()`: Para garantir que a sessão com o SSW está ativa.
-     b) `ssw_go($programa, $params)`: Para executar um programa no SSW e obter o resultado (seja HTML, XML, ou relatório de texto).
+     a) `ssw_login()`: Para garantir que a sessão está ativa.
+     b) `ssw_go($programa, $params)`: Para executar um programa e obter o resultado (seja HTML, XML, ou relatório de texto).
 
 3. GRÁFICOS RECHARTS — PADRÕES VISUAIS:
    - Gráfico Donut (PieChart + Pie): SEMPRE usar `stroke="none"` no componente `<Pie>` para eliminar a borda branca entre as seções.
