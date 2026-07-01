@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, ServerCrash } from 'lucide-react';
-import { apiFetch } from '../../utils/api';
-import { ENVIRONMENT } from '../../utils/environment';
+import { apiFetch } from '../../utils/apiUtils';
+import { ENVIRONMENT } from '../../config/environment';
 
 interface UnidadeCompartilhadaCardProps {
   sigla: string;

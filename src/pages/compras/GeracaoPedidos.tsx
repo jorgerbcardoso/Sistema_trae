@@ -15,7 +15,8 @@ import {
 import { SortableTableHeader, useSortableTable } from '../../components/table/SortableTableHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
-import api from '../../utils/api';
+import { apiFetch } from '../../utils/apiUtils';
+import { ENVIRONMENT } from '../../config/environment';
 
 interface Totalizadores {
   ordensDisponiveis: {
@@ -73,32 +74,39 @@ export default function GeracaoPedidos() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      // ✅ BUSCAR DADOS REAIS - Ordens Disponíveis
-      const responseOrdens = await api.get('/api/compras/pedidos.php', {
-        params: { action: 'ordens_disponiveis' }
-      });
-      console.log('📦 Ordens Disponíveis:', responseOrdens.data);
-      
-      // ✅ BUSCAR DADOS REAIS - Totalizadores de Pedidos
-      const responseTotalizadores = await api.get('/api/compras/pedidos.php', {
-        params: { action: 'totalizadores' }
-      });
-      console.log('📊 Totalizadores:', responseTotalizadores.data);
-      
-      // ✅ BUSCAR DADOS REAIS - Lista de Pedidos
-      const params: any = {};
-      if (filtroStatus) {
-        params.status = filtroStatus;
-      }
-      const responsePedidos = await api.get('/api/compras/pedidos.php', { params });
-      console.log('📋 Pedidos:', responsePedidos.data);
-      
+      const buildUrl = (path: string, params?: Record<string, string>) => {
+        const usp = new URLSearchParams();
+        Object.entries(params || {}).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && String(v).trim() !== '') usp.set(k, String(v));
+        });
+        const qs = usp.toString();
+        return qs ? `${path}?${qs}` : path;
+      };
+
+      const base = `${ENVIRONMENT.apiBaseUrl}/compras/pedidos.php`;
+
+      const responseOrdens = await apiFetch(buildUrl(base, { action: 'ordens_disponiveis' }), { method: 'GET' }, true);
+      const responseTotalizadores = await apiFetch(buildUrl(base, { action: 'totalizadores' }), { method: 'GET' }, true);
+
+      const paramsLista: Record<string, string> = {};
+      if (filtroStatus) paramsLista.status = filtroStatus;
+      const responsePedidos = await apiFetch(buildUrl(base, paramsLista), { method: 'GET' }, true);
+
+      const ordens = responseOrdens?.data || { total: 0, valor_total: 0 };
+      const tots = responseTotalizadores?.data || { total: 0, aguardando: 0, aprovados: 0, entregues: 0, valor_total: 0 };
+
       setTotalizadores({
-        ordensDisponiveis: responseOrdens.data.data || { total: 0, valor_total: 0 },
-        pedidos: responseTotalizadores.data.data || { total: 0, pendentes: 0, aprovados: 0, entregues: 0, valor_total: 0 }
+        ordensDisponiveis: ordens,
+        pedidos: {
+          total: Number(tots.total) || 0,
+          pendentes: Number(tots.aguardando) || 0,
+          aprovados: Number(tots.aprovados) || 0,
+          entregues: Number(tots.entregues) || 0,
+          valor_total: Number(tots.valor_total) || 0,
+        },
       });
-      
-      setPedidos(responsePedidos.data.data || []);
+
+      setPedidos((responsePedidos?.data as Pedido[]) || []);
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados dos pedidos');
