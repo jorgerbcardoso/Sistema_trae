@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -62,6 +62,31 @@ type ApiResponse = {
   expedidos: ApiData | null;
   recebidos: ApiData | null;
   meta?: any;
+};
+
+type StartResponse = {
+  success: boolean;
+  message?: string;
+  status?: 'started';
+  baseline_seq?: number;
+  request_start_ts?: number;
+};
+
+type PollResponse = {
+  success: boolean;
+  message?: string;
+  status?: 'pending' | 'ready';
+  result?: 'empty' | 'links';
+  ssw_seq?: number;
+  acts?: string[];
+};
+
+type DownloadResponse = {
+  success: boolean;
+  message?: string;
+  kind?: 'expedidos' | 'recebidos';
+  filename?: string;
+  data?: ApiData;
 };
 
 function getMesCorrentePeriod(): { ini: string; fim: string } {
@@ -239,6 +264,7 @@ export function FretesExpedidosRecebidos() {
   const [tab, setTab] = useState<'expedidos' | 'recebidos'>('expedidos');
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
+  const runRef = useRef(0);
 
   const validar = (f: Filters): string | null => {
     const hasEmissao = Boolean(f.periodo_emissao_ini || f.periodo_emissao_fim);
@@ -263,18 +289,25 @@ export function FretesExpedidosRecebidos() {
     return null;
   };
 
-  const buscar = async (f: Filters) => {
+  const gerar = async (f: Filters) => {
     const err = validar(f);
     if (err) {
       toast.error(err);
       return;
     }
 
+    runRef.current += 1;
+    const runId = runRef.current;
+
+    setHasGenerated(true);
     setLoading(true);
+    setDataExp(null);
+    setDataRec(null);
     try {
-      const res = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
+      const start = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
         method: 'POST',
         body: JSON.stringify({
+          step: 'START',
           sigla_unid: f.sigla_unid || '',
           cgc_cliente: f.cgc_cliente || '',
           tp_cliente: f.tp_cliente || '',
@@ -283,24 +316,99 @@ export function FretesExpedidosRecebidos() {
           periodo_entrega_ini: f.periodo_entrega_ini || '',
           periodo_entrega_fim: f.periodo_entrega_fim || '',
         }),
-      })) as ApiResponse;
+      })) as StartResponse;
 
-      if (!res?.success) return;
+      if (runRef.current !== runId) return;
+      if (!start?.success || start.status !== 'started' || !start.baseline_seq || !start.request_start_ts) {
+        toast.error(start?.message || 'Não foi possível iniciar a geração no SSW.');
+        return;
+      }
 
-      setDataExp(res.expedidos || null);
-      setDataRec(res.recebidos || null);
+      let acts: string[] = [];
+      let empty = false;
 
-      if (!res.expedidos && !res.recebidos) {
-        toast.info(res.message || 'Nenhum registro encontrado.');
-      } else if (!res.expedidos) {
+      for (let i = 0; i < 25; i++) {
+        if (runRef.current !== runId) return;
+
+        const poll = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
+          method: 'POST',
+          body: JSON.stringify({
+            step: 'POLL',
+            baseline_seq: start.baseline_seq,
+            request_start_ts: start.request_start_ts,
+          }),
+        })) as PollResponse;
+
+        if (runRef.current !== runId) return;
+
+        if (!poll?.success) {
+          toast.error(poll?.message || 'Falha ao consultar status no SSW (1440).');
+          return;
+        }
+
+        if (poll.status === 'ready') {
+          if (poll.result === 'empty') {
+            empty = true;
+            break;
+          }
+          acts = poll.acts || [];
+          break;
+        }
+
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+
+      if (runRef.current !== runId) return;
+
+      if (empty) {
+        toast.info('Nenhum registro encontrado para os parâmetros informados.');
+        return;
+      }
+
+      if (!acts.length) {
+        toast.error('O relatório foi concluído, mas não foi possível localizar os links de download.');
+        return;
+      }
+
+      let exp: ApiData | null = null;
+      let rec: ApiData | null = null;
+
+      for (const act of acts) {
+        if (runRef.current !== runId) return;
+
+        const dl = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
+          method: 'POST',
+          body: JSON.stringify({
+            step: 'DOWNLOAD',
+            act,
+          }),
+        })) as DownloadResponse;
+
+        if (runRef.current !== runId) return;
+
+        if (!dl?.success || !dl.data || !dl.kind) {
+          toast.error(dl?.message || 'Falha ao baixar/processar arquivo do SSW.');
+          continue;
+        }
+
+        if (dl.kind === 'expedidos') exp = dl.data;
+        if (dl.kind === 'recebidos') rec = dl.data;
+      }
+
+      setDataExp(exp);
+      setDataRec(rec);
+
+      if (!exp && !rec) {
+        toast.info('Nenhum dado disponível após o download.');
+      } else if (!exp) {
         setTab('recebidos');
-        toast.info('O SSW retornou apenas RECEBIDOS para os parâmetros informados.');
-      } else if (!res.recebidos) {
+        toast.info('O SSW retornou apenas Recebidos para os parâmetros informados.');
+      } else if (!rec) {
         setTab('expedidos');
-        toast.info('O SSW retornou apenas EXPEDIDOS para os parâmetros informados.');
+        toast.info('O SSW retornou apenas Expedidos para os parâmetros informados.');
       }
     } finally {
-      setLoading(false);
+      if (runRef.current === runId) setLoading(false);
     }
   };
 
@@ -324,8 +432,7 @@ export function FretesExpedidosRecebidos() {
               </div>
               <Button
                 onClick={() => {
-                  setHasGenerated(true);
-                  buscar(filters);
+                  gerar(filters);
                 }}
                 disabled={loading}
                 className="gap-2"

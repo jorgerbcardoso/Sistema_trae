@@ -11,6 +11,17 @@ $g_sql = connect();
 
 $input = getRequestInput();
 
+$step = strtoupper(trim((string)($input['step'] ?? 'RUN')));
+if (!in_array($step, ['RUN', 'START', 'POLL', DOWNLOAD'], true)) $step = 'RUN';
+
+$actIn = trim((string)($input['act'] ?? ''));
+
+$allowedSswUsers = ['presto', 'damasce1'];
+$normSswUser = static function(string $s): string {
+    $s = html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return strtolower(trim($s));
+};
+
 $siglaUnid = strtoupper(trim((string)($input['sigla_unid'] ?? '')));
 $cgcCliente = preg_replace('/\D+/', '', (string)($input['cgc_cliente'] ?? ''));
 $tpCliente = strtoupper(trim((string)($input['tp_cliente'] ?? '')));
@@ -48,31 +59,33 @@ if ($tpCliente !== '' && !in_array($tpCliente, ['R', 'D', 'P'], true)) {
 $hasEmissao = ($emissaoIni !== '' || $emissaoFim !== '');
 $hasEntrega = ($entregaIni !== '' || $entregaFim !== '');
 
-if (!$hasEmissao && !$hasEntrega) {
-    respondJson(['success' => false, 'message' => 'Informe pelo menos 1 período (emissão ou entrega).']);
-}
+if (in_array($step, ['RUN', 'START'], true)) {
+    if (!$hasEmissao && !$hasEntrega) {
+        respondJson(['success' => false, 'message' => 'Informe pelo menos 1 período (emissão ou entrega).']);
+    }
 
-if ($hasEmissao) {
-    if (!$validDate($emissaoIni) || !$validDate($emissaoFim)) {
-        respondJson(['success' => false, 'message' => 'Período de emissão inválido (informe início e fim).']);
+    if ($hasEmissao) {
+        if (!$validDate($emissaoIni) || !$validDate($emissaoFim)) {
+            respondJson(['success' => false, 'message' => 'Período de emissão inválido (informe início e fim).']);
+        }
+        if (strtotime($emissaoIni) > strtotime($emissaoFim)) {
+            respondJson(['success' => false, 'message' => 'Período de emissão inválido (início maior que fim).']);
+        }
+        if ($diffDays($emissaoIni, $emissaoFim) > 31) {
+            respondJson(['success' => false, 'message' => 'Período de emissão não pode ser maior que 31 dias.']);
+        }
     }
-    if (strtotime($emissaoIni) > strtotime($emissaoFim)) {
-        respondJson(['success' => false, 'message' => 'Período de emissão inválido (início maior que fim).']);
-    }
-    if ($diffDays($emissaoIni, $emissaoFim) > 31) {
-        respondJson(['success' => false, 'message' => 'Período de emissão não pode ser maior que 31 dias.']);
-    }
-}
 
-if ($hasEntrega) {
-    if (!$validDate($entregaIni) || !$validDate($entregaFim)) {
-        respondJson(['success' => false, 'message' => 'Período de entrega inválido (informe início e fim).']);
-    }
-    if (strtotime($entregaIni) > strtotime($entregaFim)) {
-        respondJson(['success' => false, 'message' => 'Período de entrega inválido (início maior que fim).']);
-    }
-    if ($diffDays($entregaIni, $entregaFim) > 31) {
-        respondJson(['success' => false, 'message' => 'Período de entrega não pode ser maior que 31 dias.']);
+    if ($hasEntrega) {
+        if (!$validDate($entregaIni) || !$validDate($entregaFim)) {
+            respondJson(['success' => false, 'message' => 'Período de entrega inválido (informe início e fim).']);
+        }
+        if (strtotime($entregaIni) > strtotime($entregaFim)) {
+            respondJson(['success' => false, 'message' => 'Período de entrega inválido (início maior que fim).']);
+        }
+        if ($diffDays($entregaIni, $entregaFim) > 31) {
+            respondJson(['success' => false, 'message' => 'Período de entrega não pode ser maior que 31 dias.']);
+        }
     }
 }
 
@@ -189,9 +202,27 @@ $parse1440RowsFromRaw = static function(string $raw) use ($extractXml, $parse144
     return [];
 };
 
-$get1440Rows = static function() use ($parse1440RowsFromRaw): array {
+$sswFetch = static function(string $url, int $tries = 3): string {
+    $last = '';
+    for ($i = 0; $i < $tries; $i++) {
+        $s = (string)ssw_go($url);
+        $last = $s;
+        if ($s === '') {
+            usleep(300000);
+            continue;
+        }
+        if (stripos($s, '504 Gateway Time-out') !== false) {
+            usleep(350000);
+            continue;
+        }
+        return $s;
+    }
+    return (string)$last;
+};
+
+$get1440Rows = static function() use ($parse1440RowsFromRaw, $sswFetch): array {
     $dummy = (string)((int)(microtime(true) * 1000));
-    $raw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440?dummy=' . $dummy);
+    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440?dummy=' . $dummy);
     return $parse1440RowsFromRaw($raw);
 };
 
@@ -204,10 +235,133 @@ $isOpcFretes = static function(string $opc): bool {
     return false;
 };
 
-$rowsBefore = $get1440Rows();
-$baselineSeq = 0;
-foreach ($rowsBefore as $r) {
-    $baselineSeq = max($baselineSeq, (int)$r['seq']);
+$extractActsFromF8 = static function(string $f8raw): array {
+    $f8 = html_entity_decode((string)$f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $acts = [];
+    if (preg_match_all("/ajaxEnvia\\('\\s*([^']+)\\s*'\\)/", $f8, $m)) {
+        foreach ($m[1] as $act) {
+            $act = trim((string)$act);
+            if ($act !== '') $acts[] = $act;
+        }
+    }
+    return array_values(array_unique($acts));
+};
+
+$parseF2Ts = static function(string $f2) : ?int {
+    $f2 = trim((string)$f2);
+    if ($f2 === '') return null;
+    $dt = \DateTime::createFromFormat('d/m/y H:i:s', $f2);
+    if (!$dt) return null;
+    return $dt->getTimestamp();
+};
+
+if ($step === 'POLL') {
+    $baselineSeqIn = (int)($input['baseline_seq'] ?? 0);
+    $requestStartTsIn = (int)($input['request_start_ts'] ?? 0);
+
+    if ($baselineSeqIn <= 0 || $requestStartTsIn <= 0) {
+        respondJson(['success' => false, 'message' => 'Parâmetros inválidos para consulta de status (baseline_seq/request_start_ts).']);
+    }
+
+    $rows = $get1440Rows();
+    $best = null;
+    $bestSeq = -1;
+
+    foreach ($rows as $r) {
+        if (!$isOpcFretes((string)($r['opc'] ?? ''))) continue;
+
+        $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
+        if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
+
+        $status = $normStatus((string)($r['sit'] ?? ''));
+        if (strpos($status, 'CONCLUIDO') === false) continue;
+
+        $seq = (int)($r['seq'] ?? 0);
+        if ($seq <= 0) continue;
+
+        $f8raw = (string)($r['f8'] ?? '');
+        if ($f8raw === '') continue;
+
+        $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
+        if (!$hasLinksOrNone) continue;
+
+        $okBySeq = ($seq > $baselineSeqIn);
+        $f2ts = $parseF2Ts((string)($r['f2'] ?? ''));
+        $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 120));
+
+        if (!$okBySeq && !$okByTime) continue;
+
+        if ($seq > $bestSeq) {
+            $best = $r;
+            $bestSeq = $seq;
+        }
+    }
+
+    if (!$best) {
+        respondJson([
+            'success' => true,
+            'status' => 'pending',
+        ]);
+    }
+
+    $f8dec = html_entity_decode((string)($best['f8'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (stripos($f8dec, 'Nenhum registro encontrado') !== false) {
+        $elapsed = max(0, time() - $requestStartTsIn);
+        msg("Relatório localizado na fila (seq " . (int)($best['seq'] ?? 0) . ") em {$elapsed}s. Nenhum registro encontrado.", 'success', 200, [
+            'status' => 'ready',
+            'result' => 'empty',
+            'ssw_seq' => (int)($best['seq'] ?? 0),
+        ]);
+    }
+
+    $acts = $extractActsFromF8((string)($best['f8'] ?? ''));
+    $elapsed = max(0, time() - $requestStartTsIn);
+    msg("Relatório localizado na fila (seq " . (int)($best['seq'] ?? 0) . ") em {$elapsed}s. Links encontrados: " . count($acts) . '.', 'success', 200, [
+        'status' => 'ready',
+        'result' => 'links',
+        'ssw_seq' => (int)($best['seq'] ?? 0),
+        'acts' => $acts,
+    ]);
+}
+
+if ($step === 'START') {
+    $rowsBefore = $get1440Rows();
+    $baselineSeq = 0;
+    foreach ($rowsBefore as $r) {
+        $baselineSeq = max($baselineSeq, (int)$r['seq']);
+    }
+
+    $params = [
+        'act' => 'ENV',
+        'cod_emp_ctb' => '01',
+        'tp_unid' => 'A',
+    ];
+
+    if ($siglaUnid !== '') $params['sigla_unid'] = strtolower($siglaUnid);
+    if ($cgcCliente !== '') $params['cgc_cliente'] = $cgcCliente;
+    if ($tpCliente !== '') $params['tp_cliente'] = $tpCliente;
+    if ($hasEmissao) {
+        $params['data_emis_ini'] = date('dmy', strtotime($emissaoIni));
+        $params['data_emis_fin'] = date('dmy', strtotime($emissaoFim));
+    }
+    if ($hasEntrega) {
+        $params['data_ent_ini'] = date('dmy', strtotime($entregaIni));
+        $params['data_ent_fin'] = date('dmy', strtotime($entregaFim));
+    }
+
+    $params['dummy'] = (string)((int)(microtime(true) * 1000));
+    $q = http_build_query($params);
+    $requestStartTs = time();
+
+    $sswFetch("https://sistema.ssw.inf.br/bin/ssw0057?$q", 2);
+
+    respondJson([
+        'success' => true,
+        'status' => 'started',
+        'baseline_seq' => $baselineSeq,
+        'request_start_ts' => $requestStartTs,
+    ]);
 }
 
 $params = [
@@ -232,18 +386,15 @@ $params['dummy'] = (string)((int)(microtime(true) * 1000));
 
 $q = http_build_query($params);
 $requestStartTs = time();
-ssw_go("https://sistema.ssw.inf.br/bin/ssw0057?$q");
+$rowsBefore = $get1440Rows();
+$baselineSeq = 0;
+foreach ($rowsBefore as $r) {
+    $baselineSeq = max($baselineSeq, (int)$r['seq']);
+}
+$sswFetch("https://sistema.ssw.inf.br/bin/ssw0057?$q", 2);
 
 $jobRow = null;
 $deadline = time() + 45;
-
-$parseF2Ts = static function(string $f2) : ?int {
-    $f2 = trim((string)$f2);
-    if ($f2 === '') return null;
-    $dt = \DateTime::createFromFormat('d/m/y H:i:s', $f2);
-    if (!$dt) return null;
-    return $dt->getTimestamp();
-};
 
 while (time() <= $deadline) {
     $rows = $get1440Rows();
@@ -253,6 +404,9 @@ while (time() <= $deadline) {
 
     foreach ($rows as $r) {
         if (!$isOpcFretes((string)($r['opc'] ?? ''))) continue;
+
+        $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
+        if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
 
         $status = $normStatus((string)($r['sit'] ?? ''));
         if (strpos($status, 'CONCLUIDO') === false) continue;
@@ -340,10 +494,10 @@ if (empty($acts)) {
     respondJson(['success' => false, 'message' => 'Não foi possível localizar links de download no ssw1440.']);
 }
 
-$downloadFromAct = static function(string $act) use ($extractXml): ?array {
+$downloadFromAct = static function(string $act) use ($extractXml, $sswFetch): ?array {
     $dummy = (string)((int)(microtime(true) * 1000));
     $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
-    $html = (string)ssw_go($url);
+    $html = (string)$sswFetch($url, 3);
 
     if (!preg_match('/id=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
         if (!preg_match('/name=web_body[^>]*value="([^"]+)"/', $html, $mVal)) {
@@ -360,7 +514,7 @@ $downloadFromAct = static function(string $act) use ($extractXml): ?array {
     $path = (string)$mArq[2];
     if ($filename === '' || $path === '') return null;
 
-    $file = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1');
+    $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
     if ($file === '' || strlen($file) < 50) return null;
 
     return ['filename' => $filename, 'path' => $path, 'content' => $file];
@@ -593,6 +747,28 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
 $exp = null;
 $rec = null;
 $downloads = [];
+
+if ($step === 'DOWNLOAD') {
+    if ($actIn === '') {
+        respondJson(['success' => false, 'message' => 'Parâmetro act obrigatório para download.']);
+    }
+
+    $dl = $downloadFromAct($actIn);
+    if (!$dl) {
+        respondJson(['success' => false, 'message' => 'Não foi possível baixar o arquivo pelo ssw1440/ssw0424.']);
+    }
+
+    $fn = strtoupper((string)$dl['filename']);
+    $tipo = (strpos($fn, '_R.SSWWEB') !== false) ? 'R' : 'E';
+    $data = $parseTxt((string)$dl['content'], $tipo);
+
+    respondJson([
+        'success' => true,
+        'kind' => $tipo === 'R' ? 'recebidos' : 'expedidos',
+        'filename' => (string)$dl['filename'],
+        'data' => $data,
+    ]);
+}
 
 foreach ($acts as $act) {
     $dl = $downloadFromAct($act);
