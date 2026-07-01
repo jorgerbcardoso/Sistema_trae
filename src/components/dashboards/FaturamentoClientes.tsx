@@ -51,10 +51,10 @@ import {
 } from '../ui/dialog';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
 
-function getLastMonthPeriod() {
+function getMesAtualFechadoPeriod() {
   const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const last  = new Date(now.getFullYear(), now.getMonth(), 0);
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   return { inicio: fmt(first), fim: fmt(last) };
@@ -149,7 +149,7 @@ export function FaturamentoClientes() {
   const { theme } = useTheme();
   usePageTitle('Faturamento de Clientes');
 
-  const defaultPeriod = getLastMonthPeriod();
+  const defaultPeriod = getMesAtualFechadoPeriod();
   const userUnit = user?.unidade_atual || user?.unidade;
 
   const [filters, setFilters] = useState<Filters>({

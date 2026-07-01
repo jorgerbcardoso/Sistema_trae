@@ -27,6 +27,7 @@ import { ClientesVendedor } from './cadastros/ClientesVendedor';
 import { ConferenciaSaidas } from './relatorios/ConferenciaSaidas';
 import { ControleTransbordo } from './relatorios/ControleTransbordo';
 import { TotaisVendedores } from './relatorios/TotaisVendedores';
+import { FretesExpedidosRecebidos } from './relatorios/FretesExpedidosRecebidos';
 import { GestaoMenu } from './admin/GestaoMenu';
 
 // Componentes de ESTOQUE
@@ -144,6 +145,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'relatorios/ConferenciaSaidas': ConferenciaSaidas,
   'relatorios/ControleTransbordo': ControleTransbordo,
   'relatorios/TotaisVendedores': TotaisVendedores,
+  'relatorios/FretesExpedidosRecebidos': FretesExpedidosRecebidos,
   
   // ============================================
   // ADMINISTRAÇÃO

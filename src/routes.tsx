@@ -32,6 +32,7 @@ import { ClientesVendedor } from './components/cadastros/ClientesVendedor';
 import { ConferenciaSaidas } from './components/relatorios/ConferenciaSaidas';
 import { ControleTransbordo } from './components/relatorios/ControleTransbordo';
 import { TotaisVendedores } from './components/relatorios/TotaisVendedores';
+import { FretesExpedidosRecebidos } from './components/relatorios/FretesExpedidosRecebidos';
 import TabelasVencer from './pages/relatorios/TabelasVencer';
 
 // Estoque
@@ -316,6 +317,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <TabelasVencer />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'relatorios/fretes-expedidos-recebidos',
+        element: (
+          <ProtectedRoute>
+            <FretesExpedidosRecebidos />
           </ProtectedRoute>
         )
       },
