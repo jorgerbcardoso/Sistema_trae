@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Inbox, Loader2, Send, Search, Truck, TrendingUp, Wallet, X } from 'lucide-react';
+import { Calculator, DollarSign, Inbox, Loader2, Package, Percent, Route, Send, Search, Truck, TrendingUp, Users, Wallet, Weight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -93,9 +93,8 @@ type DownloadResponse = {
   };
 };
 
-function getMesCorrentePeriod(): { ini: string; fim: string } {
+function getUltimos30DiasSemHojePeriod(): { ini: string; fim: string } {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const fmt = (d: Date) => {
     const y = d.getFullYear();
@@ -104,7 +103,9 @@ function getMesCorrentePeriod(): { ini: string; fim: string } {
     return `${y}-${m}-${day}`;
   };
 
-  return { ini: fmt(start), fim: fmt(now) };
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - 29);
+  return { ini: fmt(start), fim: fmt(yesterday) };
 }
 
 function diffDaysInclusive(ini: string, fim: string): number {
@@ -115,12 +116,27 @@ function diffDaysInclusive(ini: string, fim: string): number {
   return Math.floor(ms / 86400000) + 1;
 }
 
+function dateToInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function formatCurrency(v: number): string {
   return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatNumber(v: number, digits = 0): string {
   return (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function formatCurrencyPerKg(v: number): string {
+  return `${formatCurrency(v)}/kg`;
+}
+
+function formatPercent(v: number): string {
+  return `${formatNumber(v, 2)}%`;
 }
 
 function csvEscape(v: any): string {
@@ -337,7 +353,7 @@ function buildDonut(rows: RowAgg[]) {
 const DONUT_COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
 export function FretesExpedidosRecebidos() {
-  const defaultPeriod = useMemo(() => getMesCorrentePeriod(), []);
+  const defaultPeriod = useMemo(() => getUltimos30DiasSemHojePeriod(), []);
   const [filters, setFilters] = useState<Filters>({
     sigla_unid: '',
     cgc_cliente: '',
@@ -404,6 +420,7 @@ export function FretesExpedidosRecebidos() {
   const validar = (f: Filters): string | null => {
     const hasEmissao = Boolean(f.periodo_emissao_ini || f.periodo_emissao_fim);
     const hasEntrega = Boolean(f.periodo_entrega_ini || f.periodo_entrega_fim);
+    const today = dateToInput(new Date());
 
     if (!hasEmissao && !hasEntrega) {
       return 'Informe pelo menos 1 período (emissão ou entrega).';
@@ -411,12 +428,14 @@ export function FretesExpedidosRecebidos() {
 
     if (hasEmissao) {
       if (!f.periodo_emissao_ini || !f.periodo_emissao_fim) return 'Para filtrar por emissão, informe início e fim.';
+      if ((f.periodo_emissao_ini === today) !== (f.periodo_emissao_fim === today)) return 'Não é permitido misturar a data de hoje com datas anteriores no período de emissão.';
       if (new Date(f.periodo_emissao_ini) > new Date(f.periodo_emissao_fim)) return 'Período de emissão inválido (início maior que fim).';
       if (diffDaysInclusive(f.periodo_emissao_ini, f.periodo_emissao_fim) > 31) return 'Período de emissão não pode ser maior que 31 dias.';
     }
 
     if (hasEntrega) {
       if (!f.periodo_entrega_ini || !f.periodo_entrega_fim) return 'Para filtrar por entrega, informe início e fim.';
+      if ((f.periodo_entrega_ini === today) !== (f.periodo_entrega_fim === today)) return 'Não é permitido misturar a data de hoje com datas anteriores no período de entrega.';
       if (new Date(f.periodo_entrega_ini) > new Date(f.periodo_entrega_fim)) return 'Período de entrega inválido (início maior que fim).';
       if (diffDaysInclusive(f.periodo_entrega_ini, f.periodo_entrega_fim) > 31) return 'Período de entrega não pode ser maior que 31 dias.';
     }
@@ -639,7 +658,25 @@ export function FretesExpedidosRecebidos() {
                 <Input
                   type="date"
                   value={filters.periodo_emissao_ini}
-                  onChange={(e) => setFilters({ ...filters, periodo_emissao_ini: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const today = dateToInput(new Date());
+                    const yd = new Date();
+                    yd.setDate(yd.getDate() - 1);
+                    const yesterday = dateToInput(yd);
+                    setFilters((prev) => {
+                      let ini = v;
+                      let fim = prev.periodo_emissao_fim;
+                      if (v === today) {
+                        ini = today;
+                        fim = today;
+                      } else if (fim === today) {
+                        fim = yesterday;
+                        if (ini && fim && new Date(ini) > new Date(fim)) fim = ini;
+                      }
+                      return { ...prev, periodo_emissao_ini: ini, periodo_emissao_fim: fim };
+                    });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -647,7 +684,21 @@ export function FretesExpedidosRecebidos() {
                 <Input
                   type="date"
                   value={filters.periodo_emissao_fim}
-                  onChange={(e) => setFilters({ ...filters, periodo_emissao_fim: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const today = dateToInput(new Date());
+                    setFilters((prev) => {
+                      let ini = prev.periodo_emissao_ini;
+                      let fim = v;
+                      if (v === today) {
+                        ini = today;
+                        fim = today;
+                      } else if (ini === today && v) {
+                        ini = v;
+                      }
+                      return { ...prev, periodo_emissao_ini: ini, periodo_emissao_fim: fim };
+                    });
+                  }}
                 />
               </div>
             </div>
@@ -658,7 +709,25 @@ export function FretesExpedidosRecebidos() {
                 <Input
                   type="date"
                   value={filters.periodo_entrega_ini}
-                  onChange={(e) => setFilters({ ...filters, periodo_entrega_ini: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const today = dateToInput(new Date());
+                    const yd = new Date();
+                    yd.setDate(yd.getDate() - 1);
+                    const yesterday = dateToInput(yd);
+                    setFilters((prev) => {
+                      let ini = v;
+                      let fim = prev.periodo_entrega_fim;
+                      if (v === today) {
+                        ini = today;
+                        fim = today;
+                      } else if (fim === today) {
+                        fim = yesterday;
+                        if (ini && fim && new Date(ini) > new Date(fim)) fim = ini;
+                      }
+                      return { ...prev, periodo_entrega_ini: ini, periodo_entrega_fim: fim };
+                    });
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -666,7 +735,21 @@ export function FretesExpedidosRecebidos() {
                 <Input
                   type="date"
                   value={filters.periodo_entrega_fim}
-                  onChange={(e) => setFilters({ ...filters, periodo_entrega_fim: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const today = dateToInput(new Date());
+                    setFilters((prev) => {
+                      let ini = prev.periodo_entrega_ini;
+                      let fim = v;
+                      if (v === today) {
+                        ini = today;
+                        fim = today;
+                      } else if (ini === today && v) {
+                        ini = v;
+                      }
+                      return { ...prev, periodo_entrega_ini: ini, periodo_entrega_fim: fim };
+                    });
+                  }}
                 />
               </div>
             </div>
@@ -761,8 +844,30 @@ export function FretesExpedidosRecebidos() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 auto-rows-fr content-start">
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
+                    <DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete CIF</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_cif)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-start gap-3">
+                    <Route className="w-5 h-5 text-sky-700 dark:text-sky-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-sky-800 dark:text-sky-200">Frete FOB</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_fob)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-fuchsia-200 dark:border-fuchsia-800 bg-fuchsia-50 dark:bg-fuchsia-950/30 p-4 flex items-start gap-3">
+                    <Users className="w-5 h-5 text-fuchsia-700 dark:text-fuchsia-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-fuchsia-800 dark:text-fuchsia-200">Frete Terceiro</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_ter)}</div>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 p-4 flex items-start gap-3">
                     <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
@@ -770,18 +875,54 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_ctrc)}</div>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
-                    <Wallet className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
+                    <Weight className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
-                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete Total</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_tot)}</div>
+                      <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatNumber((Number(dataExp.totals.peso_ton) || 0) * 1000)}
+                      </div>
                     </div>
                   </div>
+                  <div className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-4 flex items-start gap-3">
+                    <Calculator className="w-5 h-5 text-orange-700 dark:text-orange-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-orange-800 dark:text-orange-200">Frete por Peso (R$/kg)</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatCurrencyPerKg(
+                          (Number(dataExp.totals.peso_ton) || 0) * 1000 > 0
+                            ? (Number(dataExp.totals.frete_tot) || 0) / ((Number(dataExp.totals.peso_ton) || 0) * 1000)
+                            : 0
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
                     <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
-                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor Mercadoria</div>
+                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor de Mercadoria</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.val_merc)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-4 flex items-start gap-3">
+                    <Package className="w-5 h-5 text-slate-700 dark:text-slate-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Volumes</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_vol)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 p-4 flex items-start gap-3">
+                    <Percent className="w-5 h-5 text-rose-700 dark:text-rose-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete / Valor Merc.</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatPercent(
+                          (Number(dataExp.totals.val_merc) || 0) > 0
+                            ? ((Number(dataExp.totals.frete_tot) || 0) / (Number(dataExp.totals.val_merc) || 0)) * 100
+                            : 0
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -816,7 +957,7 @@ export function FretesExpedidosRecebidos() {
                   </CardContent>
                 </Card>
 
-                <div className="lg:col-span-3">
+                <div className="lg:col-span-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">Lista (unidades)</CardTitle>
@@ -876,8 +1017,30 @@ export function FretesExpedidosRecebidos() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 auto-rows-fr content-start">
+                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
+                    <DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete CIF</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.frete_cif)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-start gap-3">
+                    <Route className="w-5 h-5 text-sky-700 dark:text-sky-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-sky-800 dark:text-sky-200">Frete FOB</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.frete_fob)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-fuchsia-200 dark:border-fuchsia-800 bg-fuchsia-50 dark:bg-fuchsia-950/30 p-4 flex items-start gap-3">
+                    <Users className="w-5 h-5 text-fuchsia-700 dark:text-fuchsia-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-fuchsia-800 dark:text-fuchsia-200">Frete Terceiro</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.frete_ter)}</div>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 p-4 flex items-start gap-3">
                     <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
@@ -885,18 +1048,54 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataRec.totals.quant_ctrc)}</div>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
-                    <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
+                    <Weight className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
-                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Frete Total</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.frete_tot)}</div>
+                      <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatNumber((Number(dataRec.totals.peso_ton) || 0) * 1000)}
+                      </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
-                    <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
+                  <div className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-4 flex items-start gap-3">
+                    <Calculator className="w-5 h-5 text-orange-700 dark:text-orange-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
-                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Valor Mercadoria</div>
+                      <div className="text-xs font-medium text-orange-800 dark:text-orange-200">Frete por Peso (R$/kg)</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatCurrencyPerKg(
+                          (Number(dataRec.totals.peso_ton) || 0) * 1000 > 0
+                            ? (Number(dataRec.totals.frete_tot) || 0) / ((Number(dataRec.totals.peso_ton) || 0) * 1000)
+                            : 0
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
+                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor de Mercadoria</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataRec.totals.val_merc)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-4 flex items-start gap-3">
+                    <Package className="w-5 h-5 text-slate-700 dark:text-slate-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Volumes</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataRec.totals.quant_vol)}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 p-4 flex items-start gap-3">
+                    <Percent className="w-5 h-5 text-rose-700 dark:text-rose-300 mt-0.5 shrink-0" />
+                    <div className="flex flex-col">
+                      <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete / Valor Merc.</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        {formatPercent(
+                          (Number(dataRec.totals.val_merc) || 0) > 0
+                            ? ((Number(dataRec.totals.frete_tot) || 0) / (Number(dataRec.totals.val_merc) || 0)) * 100
+                            : 0
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -931,7 +1130,7 @@ export function FretesExpedidosRecebidos() {
                   </CardContent>
                 </Card>
 
-                <div className="lg:col-span-3">
+                <div className="lg:col-span-4">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">Lista (unidades)</CardTitle>
