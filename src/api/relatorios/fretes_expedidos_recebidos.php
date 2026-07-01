@@ -98,11 +98,14 @@ $normStatus = static function(string $s): string {
     $s = str_replace(['Ó','Ò','Ô','Õ','Ö'], 'O', $s);
     $s = str_replace(['Ú','Ù','Û','Ü'], 'U', $s);
     $s = str_replace(['Ç'], 'C', $s);
+    $s = str_replace(["\xc2\xa0", "\xa0"], ' ', $s);
+    $s = preg_replace('/\s+/', ' ', $s);
     return $s;
 };
 
 $fetch1440Rows = static function() use ($extractXml): array {
-    $raw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+    $dummy = (string)((int)(microtime(true) * 1000));
+    $raw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440?dummy=' . $dummy);
 
     $candidates = [];
     $candidates[] = $raw;
@@ -143,6 +146,67 @@ $fetch1440Rows = static function() use ($extractXml): array {
         ];
     }
     return $rows;
+};
+
+$parse1440RowsByRegex = static function(string $raw): array {
+    $raw = (string)$raw;
+    if ($raw === '') return [];
+
+    $decoded = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    if (!preg_match_all('/<r>(.*?)<\/r>/s', $decoded, $mm)) {
+        return [];
+    }
+
+    $rows = [];
+    foreach ($mm[1] as $block) {
+        $seq = null;
+        $opc = '';
+        $usr = '';
+        $sit = '';
+        $f8  = '';
+
+        if (preg_match('/<f0>(\d+)<\/f0>/', $block, $m0)) $seq = (int)$m0[1];
+        if (preg_match('/<f1>(.*?)<\/f1>/s', $block, $m1)) $opc = trim(strip_tags((string)$m1[1]));
+        if (preg_match('/<f3>(.*?)<\/f3>/s', $block, $m3)) $usr = trim(strip_tags((string)$m3[1]));
+        if (preg_match('/<f6>(.*?)<\/f6>/s', $block, $m6)) $sit = trim(strip_tags((string)$m6[1]));
+        if (preg_match('/<f8>(.*?)<\/f8>/s', $block, $m8)) $f8 = (string)$m8[1];
+
+        if (!$seq) continue;
+
+        $rows[] = [
+            'seq' => (int)$seq,
+            'opc' => (string)$opc,
+            'usr' => (string)$usr,
+            'sit' => (string)$sit,
+            'f8'  => (string)$f8,
+        ];
+        if (count($rows) >= 200) break;
+    }
+
+    return $rows;
+};
+
+$fetch1440RowsRobust = static function() use ($fetch1440Rows, $parse1440RowsByRegex, $extractXml): array {
+    $dummy = (string)((int)(microtime(true) * 1000));
+    $raw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440?dummy=' . $dummy);
+
+    $rows = $fetch1440Rows();
+    if (!empty($rows)) return $rows;
+
+    $candidates = [$raw];
+    $ud = urldecode($raw);
+    if ($ud !== $raw) $candidates[] = $ud;
+    $he = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($he !== $raw) $candidates[] = $he;
+
+    foreach ($candidates as $cand) {
+        $xmlOnly = $extractXml((string)$cand);
+        $rxRows = $parse1440RowsByRegex($xmlOnly);
+        if (!empty($rxRows)) return $rxRows;
+    }
+
+    return [];
 };
 
 $isOpcFretes = static function(string $opc): bool {
@@ -187,22 +251,22 @@ $jobRow = null;
 $deadline = time() + 30;
 
 while (time() <= $deadline) {
-    $rows = $fetch1440Rows();
+    $rows = $fetch1440RowsRobust();
     foreach ($rows as $r) {
         if (!$isOpcFretes((string)$r['opc'])) continue;
         if ((int)$r['seq'] <= $baselineSeq) continue;
 
         $status = $normStatus((string)$r['sit']);
-        if ($status !== 'CONCLUIDO') continue;
+        if (strpos($status, 'CONCLUIDO') === false) continue;
 
         $jobRow = $r;
         break 2;
     }
-    usleep(400000);
+    sleep(1);
 }
 
 if (!$jobRow) {
-    $rowsNow = $fetch1440Rows();
+    $rowsNow = $fetch1440RowsRobust();
     $sample = array_slice($rowsNow, 0, 10);
     $debug = array_map(static function($r) {
         return [
