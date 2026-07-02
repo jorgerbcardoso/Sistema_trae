@@ -56,7 +56,8 @@ $query = "
     SELECT DISTINCT ON (cte.seq_cte)
         cte.nro_cte,
         cte.ser_cte,
-        TO_CHAR(cte.data_emissao, 'DD/MM/YYYY') AS data_emissao,
+        cte.nfs,
+        TO_CHAR(cte.data_emissao, 'DD/MM') AS data_emissao,
         TO_CHAR(oc.data_ocorrencia, 'DD/MM/YYYY') AS data_ocorrencia_82,
         cte.sigla_emit,
         cte.sigla_dest,
@@ -104,6 +105,7 @@ while ($row = pg_fetch_assoc($result)) {
     $cte = [
         'nro_cte' => $row['nro_cte'],
         'ser_cte' => $row['ser_cte'],
+        'nfs' => $row['nfs'] ?? '',
         'data_emissao' => $row['data_emissao'],
         'data_ocorrencia_82' => $row['data_ocorrencia_82'],
         'sigla_emit' => $row['sigla_emit'],

@@ -36,6 +36,7 @@ interface Filters {
 interface CteRetido {
   nro_cte: string;
   ser_cte: string;
+  nfs: string;
   data_emissao: string;
   data_ocorrencia_82: string;
   sigla_emit: string;
@@ -90,6 +91,14 @@ function formatNum(v: number) {
 
 function formatTon(kg: number) {
   return (kg / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' t';
+}
+
+function getFirstNfNumber(nfs: string): string {
+  if (!nfs) return '-';
+  // Example: "1/18733, 1/18717" → "18733"
+  const firstNf = nfs.split(',')[0].trim();
+  const parts = firstNf.split('/');
+  return parts[parts.length - 1] || '-';
 }
 
 function getLast30Days() {
@@ -341,6 +350,7 @@ export function PainelRetidos() {
   const exportarCSV = (ctes: CteRetido[], filename: string) => {
     const header = [
       'CT-e',
+      'NF',
       'Emissão',
       'Ocorrência 82',
       'Status',
@@ -358,6 +368,7 @@ export function PainelRetidos() {
     ];
     const rows = ctes.map((cte) => [
       `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`,
+      cte.nfs,
       cte.data_emissao,
       cte.data_ocorrencia_82,
       cte.is_ativo ? 'RETIDO' : 'RESOLVIDO',
@@ -618,19 +629,20 @@ export function PainelRetidos() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                  <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 80px 180px 180px 100px 60px 110px 110px 100px' }}>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nro_cte')}>{capitalizeFirst('CT-e')} {sortConfig?.key === 'nro_cte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_emissao')}>{capitalizeFirst('Emissão')} {sortConfig?.key === 'data_emissao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>{capitalizeFirst('Ocorrência')} {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('is_ativo')}>{capitalizeFirst('Status')} {sortConfig?.key === 'is_ativo' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_dest')}>{capitalizeFirst('Cidade Destino')} {sortConfig?.key === 'cidade_dest' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_destinatario')}>{capitalizeFirst('Destinatário')} {sortConfig?.key === 'nome_destinatario' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_pagador')}>{capitalizeFirst('Pagador')} {sortConfig?.key === 'nome_pagador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('peso_real')}>{capitalizeFirst('Peso (kg)')} {sortConfig?.key === 'peso_real' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('qt_vol')}>{capitalizeFirst('Vol')} {sortConfig?.key === 'qt_vol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_merc')}>{capitalizeFirst('Vlr Merc')} {sortConfig?.key === 'vlr_merc' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_frete')}>{capitalizeFirst('Vlr Frete')} {sortConfig?.key === 'vlr_frete' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('ult_ocor')}>{capitalizeFirst('Últ. Ocorrência')} {sortConfig?.key === 'ult_ocor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                  <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nro_cte')}>CT-e {sortConfig?.key === 'nro_cte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200">NF</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_emissao')}>Emissão {sortConfig?.key === 'data_emissao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>Ocorrência {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('is_ativo')}>Status {sortConfig?.key === 'is_ativo' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_dest')}>Cidade Destino {sortConfig?.key === 'cidade_dest' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_destinatario')}>Destinatário {sortConfig?.key === 'nome_destinatario' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_pagador')}>Pagador {sortConfig?.key === 'nome_pagador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('peso_real')}>Peso (kg) {sortConfig?.key === 'peso_real' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('qt_vol')}>Vol {sortConfig?.key === 'qt_vol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_merc')}>Vlr Merc {sortConfig?.key === 'vlr_merc' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('vlr_frete')}>Vlr Frete {sortConfig?.key === 'vlr_frete' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSort('ult_ocor')}>Ocor {sortConfig?.key === 'ult_ocor' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                   </div>
 
                   <div className="min-h-0 overflow-y-auto">
@@ -643,16 +655,18 @@ export function PainelRetidos() {
                         {sortData(ctesRetidos, sortConfig).map((cte, idx) => (
                           <div
                             key={idx}
-                            className="grid gap-2 px-4 py-2 text-sm"
-                            style={{ gridTemplateColumns: '100px 100px 100px 80px 180px 180px 100px 60px 110px 110px 100px' }}
+                            className="grid gap-2 px-4 py-2 text-[11px]"
+                            style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}
                           >
-                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                            <span className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                            <span className="self-center text-slate-500 dark:text-slate-400">{getFirstNfNumber(cte.nfs)}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
                             <span className="self-center">
                               <Badge variant="outline" className={cte.is_ativo
-                                ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-xs'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-xs'}>
+                                ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-[10px]'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-[10px]'
+                              }>
                                 {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
                               </Badge>
                             </span>
@@ -783,18 +797,20 @@ export function PainelRetidos() {
 
           <div className="grid h-full min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)]">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '100px 100px 100px 180px 180px 100px 60px 110px 110px 100px' }}>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nro_cte')}>{capitalizeFirst('CT-e')} {sortConfigDialog?.key === 'nro_cte' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_emissao')}>{capitalizeFirst('Emissão')} {sortConfigDialog?.key === 'data_emissao' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_ocorrencia_82')}>{capitalizeFirst('Ocorrência')} {sortConfigDialog?.key === 'data_ocorrencia_82' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('cidade_dest')}>{capitalizeFirst('Cidade Destino')} {sortConfigDialog?.key === 'cidade_dest' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_destinatario')}>{capitalizeFirst('Destinatário')} {sortConfigDialog?.key === 'nome_destinatario' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_pagador')}>{capitalizeFirst('Pagador')} {sortConfigDialog?.key === 'nome_pagador' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('qt_vol')}>{capitalizeFirst('Vol')} {sortConfigDialog?.key === 'qt_vol' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('peso_real')}>{capitalizeFirst('Peso (kg)')} {sortConfigDialog?.key === 'peso_real' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_merc')}>{capitalizeFirst('Vlr Merc')} {sortConfigDialog?.key === 'vlr_merc' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_frete')}>{capitalizeFirst('Vlr Frete')} {sortConfigDialog?.key === 'vlr_frete' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('ult_ocor')}>{capitalizeFirst('Últ. Ocorrência')} {sortConfigDialog?.key === 'ult_ocor' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+              <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nro_cte')}>CT-e {sortConfigDialog?.key === 'nro_cte' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200">NF</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_emissao')}>Emissão {sortConfigDialog?.key === 'data_emissao' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_ocorrencia_82')}>Ocorrência {sortConfigDialog?.key === 'data_ocorrencia_82' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('is_ativo')}>Status {sortConfigDialog?.key === 'is_ativo' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('cidade_dest')}>Cidade Destino {sortConfigDialog?.key === 'cidade_dest' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_destinatario')}>Destinatário {sortConfigDialog?.key === 'nome_destinatario' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_pagador')}>Pagador {sortConfigDialog?.key === 'nome_pagador' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('peso_real')}>Peso (kg) {sortConfigDialog?.key === 'peso_real' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('qt_vol')}>Vol {sortConfigDialog?.key === 'qt_vol' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_merc')}>Vlr Merc {sortConfigDialog?.key === 'vlr_merc' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('vlr_frete')}>Vlr Frete {sortConfigDialog?.key === 'vlr_frete' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 text-right" onClick={() => handleSortDialog('ult_ocor')}>Ocor {sortConfigDialog?.key === 'ult_ocor' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
               </div>
 
               <div className="min-h-0 overflow-y-auto">
@@ -812,17 +828,26 @@ export function PainelRetidos() {
                     {sortData(ctesDialog, sortConfigDialog).map((cte, idx) => (
                       <div
                         key={idx}
-                        className="grid gap-2 px-4 py-2 text-sm"
-                        style={{ gridTemplateColumns: '100px 100px 100px 180px 180px 100px 60px 110px 110px 100px' }}
+                        className="grid gap-2 px-4 py-2 text-[11px]"
+                        style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}
                       >
-                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                        <span className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                        <span className="self-center text-slate-500 dark:text-slate-400">{getFirstNfNumber(cte.nfs)}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
+                        <span className="self-center">
+                          <Badge variant="outline" className={cte.is_ativo
+                            ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-[10px]'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-[10px]'
+                          }>
+                            {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
+                          </Badge>
+                        </span>
                         <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>{cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}</span>
                         <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario || '-'}</span>
                         <span className="truncate self-center text-slate-500 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador || '-'}</span>
-                        <span className="self-center text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</span>
                         <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatNum(cte.peso_real)}</span>
+                        <span className="self-center text-right text-slate-700 dark:text-slate-300">{cte.qt_vol}</span>
                         <span className="self-center text-right text-slate-700 dark:text-slate-300">{formatMoeda(cte.vlr_merc)}</span>
                         <span className="self-center text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoeda(cte.vlr_frete)}</span>
                         <span className="truncate self-center text-right font-mono text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
