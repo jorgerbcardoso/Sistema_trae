@@ -561,21 +561,44 @@ export function PainelRetidos() {
                 </div>
                 <div className="p-4">
                   {topClientes.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={topClientes} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
                         <defs>
-                          <linearGradient id="gradTop5" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="#f97316" stopOpacity={0.7} />
-                            <stop offset="100%" stopColor="#ef4444" stopOpacity={1} />
+                          <linearGradient id="gradTop5" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f97316" />
+                            <stop offset="100%" stopColor="#ef4444" />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} opacity={0.3} />
-                        <XAxis type="number" tick={{ fontSize: 10, fill: textColor }} />
-                        <YAxis type="category" dataKey="nome" tick={{ fontSize: 10, fill: textColor }} width={100} />
-                        <RechartTooltip formatter={(v: number) => [v, 'Retidos']}
-                          contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }} />
-                        <Bar dataKey="quantidade" fill="url(#gradTop5)" radius={[0, 6, 6, 0]} />
-                      </BarChart>
+                        <Pie
+                          data={topClientes}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={5}
+                          dataKey="quantidade"
+                        >
+                          {topClientes.map((_, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={COLORS_PALETTE[index % COLORS_PALETTE.length]} 
+                            />
+                          ))}
+                        </Pie>
+                        <RechartTooltip 
+                          formatter={(v: number, name: string) => [v, `Retidos - ${name}`]}
+                          contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        />
+                        <Legend 
+                          verticalAlign="bottom" 
+                          height={60}
+                          iconType="circle"
+                          formatter={(value) => {
+                            const truncated = value.length > 18 ? value.substring(0, 18) + '...' : value;
+                            return <span className="text-xs text-slate-700 dark:text-slate-300" title={value}>{truncated}</span>;
+                          }}
+                        />
+                      </PieChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
