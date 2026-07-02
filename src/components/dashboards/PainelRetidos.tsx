@@ -596,9 +596,9 @@ export function PainelRetidos() {
                           verticalAlign="bottom" 
                           height={60}
                           iconType="circle"
-                          formatter={(value, entry, index) => {
+                          formatter={(value) => {
                             const truncated = value.length > 15 ? value.substring(0, 15) + '...' : value;
-                            return <span className="text-xs text-slate-700 dark:text-slate-300" title={value}>{index + 1}. {truncated}</span>;
+                            return <span className="text-xs text-slate-700 dark:text-slate-300" title={value}>{truncated}</span>;
                           }}
                         />
                       </PieChart>
