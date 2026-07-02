@@ -624,17 +624,24 @@ export function PainelRetidos() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
                   <Truck className="w-5 h-5 text-red-500" />
-                  CT-e Retidos
+                  CT-es Retidos
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="px-4 pb-3">
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                    <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Linhas vermelhas representam CT-es retidos; linhas verdes representam retenções resolvidas.
+                  </div>
+                </div>
                 <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                  <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}>
+                  <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400" style={{ gridTemplateColumns: '90px 70px 70px 80px 105px 100px 100px 70px 30px 90px 90px 70px' }}>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nro_cte')}>CT-e {sortConfig?.key === 'nro_cte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200">NF</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_emissao')}>Emissão {sortConfig?.key === 'data_emissao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>Ocorrência {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('is_ativo')}>Status {sortConfig?.key === 'is_ativo' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_dest')}>Cidade Destino {sortConfig?.key === 'cidade_dest' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_destinatario')}>Destinatário {sortConfig?.key === 'nome_destinatario' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_pagador')}>Pagador {sortConfig?.key === 'nome_pagador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
@@ -655,21 +662,13 @@ export function PainelRetidos() {
                         {sortData(ctesRetidos, sortConfig).map((cte, idx) => (
                           <div
                             key={idx}
-                            className="grid gap-2 px-4 py-2 text-[11px]"
-                            style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}
+                            className={`grid gap-2 px-4 py-2 text-[11px] ${cte.is_ativo ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}
+                            style={{ gridTemplateColumns: '90px 70px 70px 80px 105px 100px 100px 70px 30px 90px 90px 70px' }}
                           >
                             <span className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{getFirstNfNumber(cte.nfs)}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
-                            <span className="self-center">
-                              <Badge variant="outline" className={cte.is_ativo
-                                ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 text-[10px]'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800 text-[10px]'
-                              }>
-                                {cte.is_ativo ? 'RETIDO' : 'RESOLVIDO'}
-                              </Badge>
-                            </span>
                             <span className="truncate self-center text-slate-700 dark:text-slate-300" title={`${cte.cidade_dest || '-'}/${cte.uf_dest || ''}`}>{cte.cidade_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '-'}</span>
                             <span className="truncate self-center text-slate-700 dark:text-slate-300" title={cte.nome_destinatario}>{cte.nome_destinatario || '-'}</span>
                             <span className="truncate self-center text-slate-500 dark:text-slate-400" title={cte.nome_pagador}>{cte.nome_pagador || '-'}</span>
