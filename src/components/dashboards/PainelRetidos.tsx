@@ -232,7 +232,8 @@ export function PainelRetidos() {
         setCtesRetidos(res.ctes_retidos ?? []);
         setSerie(res.serie_cronologica ?? []);
         setTotais(res.totais ?? null);
-        setTopClientes(res.top_clientes ?? []);
+        const clientesOrdenados = [...(res.top_clientes ?? [])].sort((a, b) => b.quantidade - a.quantidade);
+        setTopClientes(clientesOrdenados);
         setHasSearched(true);
       } else {
         toast.error(res.message || 'Erro ao gerar relatório.');
