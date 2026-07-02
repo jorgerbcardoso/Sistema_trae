@@ -253,6 +253,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
              "FROM {$dominio}_despesa d " .
              "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
              "WHERE d.status <> 'C' " .
+             "  AND COALESCE(e.considerar, 'S') <> 'N' " .
              "  AND d.data_pgto BETWEEN '$startDate' AND '$endDate'" .
              $filtroDespesa;
 
@@ -306,6 +307,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
                "FROM {$dominio}_despesa d " .
                "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
                "WHERE d.status <> 'C' " .
+               "  AND COALESCE(e.considerar, 'S') <> 'N' " .
                "  AND d.data_pgto BETWEEN '$data_ini' AND '$data_fin'" .
                $filtroDespesa;
       $result = sql ($g_sql, $query);
@@ -340,6 +342,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
                 " FROM {$dominio}_despesa d " .
                 "INNER JOIN {$dominio}_evento e ON d.evento = e.evento " .
                " WHERE d.status <> 'C' " .
+                 " AND COALESCE(e.considerar, 'S') <> 'N' " .
                  " AND d.data_pgto BETWEEN '$startDate' AND '$endDate' " .
                  " AND d.sigla_unidade = '{$unidEsc}'";
 

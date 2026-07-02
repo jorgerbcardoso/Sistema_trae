@@ -81,7 +81,8 @@ $query = "SELECT d.nro_lancto, d.nro_parcela, " .
                " d.historico, " .
                " CASE " .
                "   WHEN d.status = 'A' THEN 'Aberto' " .
-               "   WHEN d.status = 'P' THEN 'Pago' " .
+               "   WHEN d.status = 'P' THEN 'Pendente' " .
+               "   WHEN d.status = 'L' THEN 'Liquidado' " .
                "   WHEN d.status = 'C' THEN 'Cancelado' " .
                "   ELSE d.status " .
                " END AS status, " .
@@ -90,6 +91,7 @@ $query = "SELECT d.nro_lancto, d.nro_parcela, " .
           " LEFT JOIN $dominio" . "_evento e ON d.evento = e.evento " .
           $joinGrupo . // ✅ NOVO: Join com grupo se necessário
          " WHERE d.status <> 'C' " .
+           " AND COALESCE(e.considerar, 'S') <> 'N' " .
            " AND d.data_pgto BETWEEN $1 AND $2 ";
 
 // ✅ NOVO: Adicionar filtros baseados em viewMode
