@@ -577,6 +577,8 @@ export function PainelRetidos() {
                           outerRadius={90}
                           paddingAngle={5}
                           dataKey="quantidade"
+                          nameKey="nome"
+                          stroke="none"
                         >
                           {topClientes.map((_, index) => (
                             <Cell 
@@ -593,9 +595,9 @@ export function PainelRetidos() {
                           verticalAlign="bottom" 
                           height={60}
                           iconType="circle"
-                          formatter={(value) => {
-                            const truncated = value.length > 18 ? value.substring(0, 18) + '...' : value;
-                            return <span className="text-xs text-slate-700 dark:text-slate-300" title={value}>{truncated}</span>;
+                          formatter={(value, entry, index) => {
+                            const truncated = value.length > 15 ? value.substring(0, 15) + '...' : value;
+                            return <span className="text-xs text-slate-700 dark:text-slate-300" title={value}>{index + 1}. {truncated}</span>;
                           }}
                         />
                       </PieChart>
