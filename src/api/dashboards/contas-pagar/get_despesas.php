@@ -361,7 +361,31 @@ $extractActArq = static function(string $html): array {
     return [trim((string)$act), trim((string)$arq)];
 };
 
-$downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '') use ($domain, $summaryOnly): ?string {
+$extract0424ParamsFromDecoded = static function(string $decoded): ?array {
+    $decoded = (string)$decoded;
+    if ($decoded === '') return null;
+
+    if (preg_match('/ssw0424\?([^"\']+)/i', $decoded, $m)) {
+        parse_str(html_entity_decode((string)$m[1]), $q);
+        $act = trim((string)($q['act'] ?? ''));
+        $filename = trim((string)($q['filename'] ?? ''));
+        $path = trim((string)($q['path'] ?? ''));
+        if ($act !== '' && $filename === '') $filename = $act;
+        if ($act !== '' && $path !== '') return ['act' => $act, 'filename' => $filename, 'path' => $path];
+    }
+
+    if (preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'([^']*)'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/", $decoded, $mArq)) {
+        $act = trim((string)$mArq[1]);
+        $filename = trim((string)$mArq[2]);
+        $path = trim((string)$mArq[3]);
+        if ($act !== '' && $filename === '') $filename = $act;
+        if ($act !== '' && $path !== '') return ['act' => $act, 'filename' => $filename, 'path' => $path];
+    }
+
+    return null;
+};
+
+$downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '') use ($domain, $summaryOnly, $extract0424ParamsFromDecoded): ?string {
     $unidadeFiltro = strtoupper(trim((string)$unidadeFiltro));
     $opcPrefix = preg_replace('/\D+/', '', (string)$opcPrefix);
     if ($opcPrefix === '') return null;
@@ -378,8 +402,9 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
         }
 
         $xml1440 = @simplexml_load_string($str1440);
-        $nomeArq = null;
-        $pathArq = null;
+        $dlAct = null;
+        $dlFilename = null;
+        $dlPath = null;
 
         if ($xml1440) {
             for ($i = 0; $i <= 140; $i++) {
@@ -408,11 +433,18 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
                 $f8dec = html_entity_decode((string)$f8);
                 if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
                     $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-                    if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
-                        $decoded = urldecode($mVal[1]);
-                        if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
-                            $nomeArq = $mArq[1];
-                            $pathArq = $mArq[2];
+                    $val = null;
+                    if (preg_match('/\b(?:id|name)\s*=\s*["\']?web_body["\']?[^>]*\bvalue\s*=\s*"([^"]+)"/i', $htmlDow, $mVal)) $val = (string)$mVal[1];
+                    else if (preg_match("/\\b(?:id|name)\\s*=\\s*['\\\"]?web_body['\\\"]?[^>]*\\bvalue\\s*=\\s*'([^']+)'/i", $htmlDow, $mVal)) $val = (string)$mVal[1];
+                    else if (preg_match('/<textarea[^>]*(?:id|name)\s*=\s*["\']?web_body["\']?[^>]*>([\s\S]*?)<\/textarea>/i', $htmlDow, $mTa)) $val = (string)$mTa[1];
+
+                    if ($val !== null) {
+                        $decoded = urldecode((string)$val);
+                        $params0424 = $extract0424ParamsFromDecoded($decoded);
+                        if ($params0424) {
+                            $dlAct = (string)$params0424['act'];
+                            $dlFilename = (string)$params0424['filename'];
+                            $dlPath = (string)$params0424['path'];
                             break;
                         }
                     }
@@ -420,8 +452,11 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
             }
         }
 
-        if ($nomeArq && $pathArq) {
-            $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq}&filename={$nomeArq}&path={$pathArq}&down=1&nw=1");
+        if ($dlAct && $dlPath) {
+            $actQ = urlencode((string)$dlAct);
+            $fnQ = urlencode((string)($dlFilename ?: $dlAct));
+            $pathQ = urlencode((string)$dlPath);
+            $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$actQ}&filename={$fnQ}&path={$pathQ}&down=1&nw=1");
             if (!empty($file) && strlen((string)$file) >= 100) return $file;
         }
 
@@ -433,14 +468,31 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
 };
 
 $csv = null;
-$queued = (strpos($strDec, 'Solicita &ccedil;&atilde;o enviada para processamento.') !== false);
+$queued = false;
+{
+    $q = html_entity_decode((string)$strDec, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (stripos($q, 'Solicita') !== false && stripos($q, 'processamento') !== false) $queued = true;
+}
 if ($looksLikeCsv($strDec)) {
     $csv = $strDec;
 } else {
-    [$act, $arq] = $extractActArq($strDec);
-    if (!$queued && !empty($act) && !empty($arq)) {
-        $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1");
-    } else if (preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
+    $decodedNow = html_entity_decode(urldecode((string)$strDec), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $params0424 = $extract0424ParamsFromDecoded($decodedNow);
+    if (!$queued && $params0424) {
+        $act = urlencode((string)$params0424['act']);
+        $filename = urlencode((string)($params0424['filename'] ?: $params0424['act']));
+        $path = (string)$params0424['path'];
+        $pathQ = $path === '' ? '' : urlencode($path);
+        $nw = $path === '' ? '0' : '1';
+        $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$filename}&path={$pathQ}&down=1&nw={$nw}");
+    } else {
+        [$act, $arq] = $extractActArq($strDec);
+        if (!$queued && !empty($act) && !empty($arq)) {
+            $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
+        }
+    }
+
+    if (empty($csv) && preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
         $url0432 = "https://sistema.ssw.inf.br/bin/ssw0432?" . $m[1];
         for ($i = 0; $i < 20; $i++) {
             $html0432 = ssw_go($url0432);
@@ -451,7 +503,7 @@ if ($looksLikeCsv($strDec)) {
             }
             [$act2, $arq2] = $extractActArq($html0432);
             if (!empty($act2) && !empty($arq2)) {
-                $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act2}&filename={$arq2}&path=&down=1&nw=1");
+                $csv = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act2}&filename={$arq2}&path=&down=1&nw=0");
                 break;
             }
             usleep(2000000);
@@ -460,8 +512,8 @@ if ($looksLikeCsv($strDec)) {
 }
 
 if (empty($csv) || strlen((string)$csv) < 50) {
-    $fromQueue = $downloadFrom1440('099', $unidade);
-    if (empty($fromQueue) && $unidade !== '') $fromQueue = $downloadFrom1440('099', '');
+    $fromQueue = $downloadFrom1440('477', $unidade);
+    if (empty($fromQueue) && $unidade !== '') $fromQueue = $downloadFrom1440('477', '');
     if (!empty($fromQueue)) $csv = $fromQueue;
 }
 
