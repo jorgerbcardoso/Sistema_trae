@@ -447,15 +447,31 @@ if (strpos($str166, 'Sem movimento de coletas') !== false) {
         respondJson(['success' => false, 'message' => 'Erro SSW (0166): ' . $str166]);
     }
 
-    $str166 = urldecode($str166);
-    $act166 = ssw_get_act($str166);
-    $arq166 = ssw_get_arq($str166);
+    $extractDownloadParams0166 = static function(string $html): ?array {
+        $mVal = null;
+        if (preg_match('/\\bid\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*"([^"]*)"/i', $html, $m)) $mVal = $m[1];
+        elseif (preg_match('/\\bname\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*"([^"]*)"/i', $html, $m)) $mVal = $m[1];
+        elseif (preg_match("/\\bid\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*'([^']*)'/i", $html, $m)) $mVal = $m[1];
+        elseif (preg_match("/\\bname\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*'([^']*)'/i", $html, $m)) $mVal = $m[1];
 
-    if (empty($act166) || empty($arq166)) {
+        $decoded = $mVal !== null ? urldecode((string)$mVal) : urldecode($html);
+        if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'([^']+)'/i", $decoded, $m2)) {
+            return null;
+        }
+        $act = trim((string)$m2[1]);
+        $filename = trim((string)$m2[2]);
+        if ($act === '' || $filename === '') return null;
+        return ['act' => $act, 'filename' => $filename];
+    };
+
+    $params0166 = $extractDownloadParams0166($str166);
+    if (!$params0166) {
         respondJson(['success' => false, 'message' => 'Erro SSW (0166): parâmetros de download não encontrados.']);
     }
 
-    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=0");
+    $act166 = urlencode((string)$params0166['act']);
+    $arq166 = urlencode((string)$params0166['filename']);
+    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=1");
 
     if (empty($file166) || strlen($file166) < 100) {
         respondJson(['success' => false, 'message' => 'Arquivo do relatório 0166 vazio ou inválido.']);

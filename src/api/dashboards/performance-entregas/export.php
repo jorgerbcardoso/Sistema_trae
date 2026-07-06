@@ -99,26 +99,29 @@ $whereConditions = [];
 // ✅ FILTRO OBRIGATÓRIO: Status diferente de 'C' (Cancelado)
 $whereConditions[] = "cte.status <> 'C'";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
+$whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+
 // ✅ FILTRO DE STATUS DE ENTREGA (dos cards ou da tabela)
 if ($statusEntrega) {
     switch ($statusEntrega) {
         case 'entregue_no_prazo':
-            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
+            $whereConditions[] = "(cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'entregue_em_atraso':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
+            $whereConditions[] = "(cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'pendente_no_prazo':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
+            $whereConditions[] = "(cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
             break;
         case 'pendente_em_atraso':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
+            $whereConditions[] = "(cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
             break;
         case 'prazo_total':
-            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE))";
+            $whereConditions[] = "((cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE))";
             break;
         case 'atraso_total':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND ((cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)))";
+            $whereConditions[] = "((cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE))";
             break;
     }
 }
@@ -130,16 +133,16 @@ if ($coluna) {
             // Não adiciona filtro, pega todos os CTRCs da unidade
             break;
         case 'entregues_no_prazo':
-            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
+            $whereConditions[] = "(cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'entregues_em_atraso':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
+            $whereConditions[] = "(cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'pendentes_no_prazo':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
+            $whereConditions[] = "(cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
             break;
         case 'pendentes_em_atraso':
-            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
+            $whereConditions[] = "(cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
             break;
     }
 }

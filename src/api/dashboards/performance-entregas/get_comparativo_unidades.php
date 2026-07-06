@@ -92,6 +92,9 @@ $whereConditions = [];
 // ✅ FILTRO OBRIGATÓRIO: Status diferente de 'C' (Cancelado)
 $whereConditions[] = "cte.status <> 'C'";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
+$whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+
 // Filtro: Período de Emissão
 if (!empty($filters['periodoEmissaoInicio'])) {
     $whereConditions[] = "cte.data_emissao >= $" . $paramIndex;
@@ -147,24 +150,21 @@ $query = "
         cte.sigla_dest as sigla,
         COALESCE(u.nome, cte.sigla_dest) as nome,
         COUNT(*) as total,
-        COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
-                     OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
+        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
+                    AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
               THEN 1 END) as entregues_no_prazo,
-        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                    AND cte.data_entrega IS NOT NULL
+        COUNT(CASE WHEN cte.data_entrega IS NOT NULL
                     AND cte.data_entrega > (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
               THEN 1 END) as entregues_em_atraso,
-        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                    AND cte.data_entrega IS NULL
+        COUNT(CASE WHEN cte.data_entrega IS NULL
                     AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE
               THEN 1 END) as pendentes_no_prazo,
-        COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                    AND cte.data_entrega IS NULL
+        COUNT(CASE WHEN cte.data_entrega IS NULL
                     AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE
               THEN 1 END) as pendentes_em_atraso,
         ROUND(
-            CAST(COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
-                              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
+            CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
+                              AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
                   THEN 1 END) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1

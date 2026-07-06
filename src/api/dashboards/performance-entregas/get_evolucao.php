@@ -99,6 +99,9 @@ $whereConditions = [];
 // ✅ FILTRO OBRIGATÓRIO: Status diferente de 'C' (Cancelado)
 $whereConditions[] = "cte.status <> 'C'";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
+$whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+
 // ❌ NÃO APLICAR: Período de Emissão
 // ❌ NÃO APLICAR: Período de Previsão de Entrega
 

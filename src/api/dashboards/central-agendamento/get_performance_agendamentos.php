@@ -25,6 +25,7 @@ $params     = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
+    "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')",
     "cte.ult_ocor_agend = 15",
 ];
 

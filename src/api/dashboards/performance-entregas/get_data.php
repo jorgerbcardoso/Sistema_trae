@@ -76,6 +76,9 @@ try {
     // ✅ FILTRO OBRIGATÓRIO: Status diferente de 'C' (Cancelado)
     $whereConditions[] = "cte.status <> 'C'";
 
+    // ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
+    $whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+
     // Filtro: Período de Emissão
     if (!empty($filters['periodoEmissaoInicio'])) {
         $whereConditions[] = "cte.data_emissao >= $" . $paramIndex;
@@ -137,14 +140,10 @@ try {
     try {
         $query = "
             SELECT 
-                COUNT(*) FILTER (WHERE cte.tp_documento = 'COMPLEMENTAR FRETE'
-                                    OR (data_entrega IS NOT NULL AND data_entrega <= data_prev_ent)) AS entregues_no_prazo,
-                COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                                   AND data_entrega IS NOT NULL AND data_entrega > data_prev_ent) AS entregues_atraso,
-                COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                                   AND data_entrega IS NULL AND data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
-                COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                                   AND data_entrega IS NULL AND data_prev_ent < CURRENT_DATE) AS pendentes_atraso,
+                COUNT(*) FILTER (WHERE data_entrega IS NOT NULL AND data_entrega <= data_prev_ent) AS entregues_no_prazo,
+                COUNT(*) FILTER (WHERE data_entrega IS NOT NULL AND data_entrega > data_prev_ent) AS entregues_atraso,
+                COUNT(*) FILTER (WHERE data_entrega IS NULL AND data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
+                COUNT(*) FILTER (WHERE data_entrega IS NULL AND data_prev_ent < CURRENT_DATE) AS pendentes_atraso,
                 COUNT(*) AS total
             FROM {$domain}_cte cte
             $whereClause
@@ -231,14 +230,10 @@ try {
             u.sigla,
             u.nome AS unidade,
             COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE cte.tp_documento = 'COMPLEMENTAR FRETE'
-                               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)) AS entregues_no_prazo,
-            COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                              AND cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent) AS entregues_atraso,
-            COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                              AND cte.data_entrega IS NULL AND cte.data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
-            COUNT(*) FILTER (WHERE cte.tp_documento <> 'COMPLEMENTAR FRETE'
-                              AND cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE) AS pendentes_atraso
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent) AS entregues_no_prazo,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent) AS entregues_atraso,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND cte.data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE) AS pendentes_atraso
         FROM {$domain}_cte cte
         LEFT JOIN {$domain}_unidade u ON cte.sigla_dest = u.sigla
         $whereClause
@@ -272,8 +267,7 @@ try {
         SELECT 
             cte.data_prev_ent::DATE AS date,
             COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE cte.tp_documento = 'COMPLEMENTAR FRETE'
-                               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)) AS entregues_no_prazo
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent) AS entregues_no_prazo
         FROM {$domain}_cte cte
         WHERE cte.data_prev_ent >= CURRENT_DATE - INTERVAL '30 days'
           AND cte.data_prev_ent <= CURRENT_DATE

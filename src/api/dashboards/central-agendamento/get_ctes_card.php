@@ -19,6 +19,8 @@ $whereConditions = [];
 
 $whereConditions[] = "cte.status <> 'C'";
 
+$whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+
 if (!empty($filters['periodoEmissaoInicio'])) {
     $whereConditions[] = "cte.data_emissao >= $" . $paramIndex++;
     $params[] = $filters['periodoEmissaoInicio'];
