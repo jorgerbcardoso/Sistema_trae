@@ -29,11 +29,11 @@ if (!empty($filters['periodoEmissaoFim'])) {
     $params[] = $filters['periodoEmissaoFim'];
 }
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoInicio'];
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoFim'];
 }
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -75,7 +75,7 @@ $query = "
 
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 15
-             AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= '$data_hoje'
+             AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= '$data_hoje'
              AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS agendados_no_prazo,
@@ -83,14 +83,14 @@ $query = "
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 15
              AND cte.data_entrega IS NOT NULL
-             AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
+             AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
             THEN 1 END
         ) AS agendamentos_cumpridos,
 
         COUNT(CASE
             WHEN (
-                 (cte.data_entrega IS NULL     AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < '$data_hoje')
-              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
+                 (cte.data_entrega IS NULL     AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < '$data_hoje')
+              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END))
              )
             AND cte.ult_ocor_agend = 15
             THEN 1 END

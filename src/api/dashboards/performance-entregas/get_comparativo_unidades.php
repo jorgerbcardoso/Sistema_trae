@@ -109,12 +109,12 @@ if (!empty($filters['periodoEmissaoFim'])) {
 
 // Filtro: Período de Previsão de Entrega
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoInicio'];
     $paramIndex++;
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoFim'];
     $paramIndex++;
 }
@@ -151,20 +151,20 @@ $query = "
         COALESCE(u.nome, cte.sigla_dest) as nome,
         COUNT(*) as total,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                    AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
+                    AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as entregues_no_prazo,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                    AND cte.data_entrega > (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
+                    AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as entregues_em_atraso,
         COUNT(CASE WHEN cte.data_entrega IS NULL
-                    AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE
+                    AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE
               THEN 1 END) as pendentes_no_prazo,
         COUNT(CASE WHEN cte.data_entrega IS NULL
-                    AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE
+                    AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < CURRENT_DATE
               THEN 1 END) as pendentes_em_atraso,
         ROUND(
             CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                              AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
+                              AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
                   THEN 1 END) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1

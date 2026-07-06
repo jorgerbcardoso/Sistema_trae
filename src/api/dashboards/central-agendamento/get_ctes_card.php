@@ -30,11 +30,11 @@ if (!empty($filters['periodoEmissaoFim'])) {
     $params[] = $filters['periodoEmissaoFim'];
 }
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoInicio'];
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoFim'];
 }
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -68,16 +68,16 @@ switch ($cardId) {
         break;
     case 3:
         $whereConditions[] = "cte.ult_ocor_agend = 15";
-        $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE";
+        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE";
         $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 4:
         $whereConditions[] = "cte.ult_ocor_agend = 15";
         $whereConditions[] = "cte.data_entrega IS NOT NULL";
-        $whereConditions[] = "cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
+        $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
         break;
     case 5:
-        $whereConditions[] = "((cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
+        $whereConditions[] = "((cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)))";
         $whereConditions[] = "cte.ult_ocor_agend = 15";
         break;
     default:
@@ -91,8 +91,8 @@ $query = "
         cte.ser_cte,
         cte.nro_cte,
         TO_CHAR(cte.data_emissao, 'DD/MM/YYYY')  AS data_emissao,
-        TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
-        TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
+        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'DD/MM/YYYY') AS data_prev_ent,
+        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'YYYY-MM-DD') AS data_prev_ent_iso,
         cte.nome_pag,
         cte.nome_dest,
         cte.cnpj_dest,

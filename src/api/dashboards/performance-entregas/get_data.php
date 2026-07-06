@@ -94,13 +94,13 @@ try {
 
     // Filtro: Período de Previsão de Entrega
     if (!empty($filters['periodoPrevisaoInicio'])) {
-        $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex;
+        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex;
         $params[] = $filters['periodoPrevisaoInicio'];
         $paramIndex++;
     }
 
     if (!empty($filters['periodoPrevisaoFim'])) {
-        $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex;
+        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex;
         $params[] = $filters['periodoPrevisaoFim'];
         $paramIndex++;
     }
@@ -140,10 +140,10 @@ try {
     try {
         $query = "
             SELECT 
-                COUNT(*) FILTER (WHERE data_entrega IS NOT NULL AND data_entrega <= data_prev_ent) AS entregues_no_prazo,
-                COUNT(*) FILTER (WHERE data_entrega IS NOT NULL AND data_entrega > data_prev_ent) AS entregues_atraso,
-                COUNT(*) FILTER (WHERE data_entrega IS NULL AND data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
-                COUNT(*) FILTER (WHERE data_entrega IS NULL AND data_prev_ent < CURRENT_DATE) AS pendentes_atraso,
+                COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)) AS entregues_no_prazo,
+                COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)) AS entregues_atraso,
+                COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE) AS pendentes_no_prazo,
+                COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE) AS pendentes_atraso,
                 COUNT(*) AS total
             FROM {$domain}_cte cte
             $whereClause
@@ -230,10 +230,10 @@ try {
             u.sigla,
             u.nome AS unidade,
             COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent) AS entregues_no_prazo,
-            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent) AS entregues_atraso,
-            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND cte.data_prev_ent >= CURRENT_DATE) AS pendentes_no_prazo,
-            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE) AS pendentes_atraso
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)) AS entregues_no_prazo,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)) AS entregues_atraso,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE) AS pendentes_no_prazo,
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE) AS pendentes_atraso
         FROM {$domain}_cte cte
         LEFT JOIN {$domain}_unidade u ON cte.sigla_dest = u.sigla
         $whereClause
@@ -265,15 +265,15 @@ try {
     // ================================================================
     $queryEvolucao = "
         SELECT 
-            cte.data_prev_ent::DATE AS date,
+            (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)::DATE AS date,
             COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent) AS entregues_no_prazo
+            COUNT(*) FILTER (WHERE cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)) AS entregues_no_prazo
         FROM {$domain}_cte cte
-        WHERE cte.data_prev_ent >= CURRENT_DATE - INTERVAL '30 days'
-          AND cte.data_prev_ent <= CURRENT_DATE
+        WHERE (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE - INTERVAL '30 days'
+          AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= CURRENT_DATE
         " . (count($whereConditions) > 0 ? " AND " . implode(" AND ", $whereConditions) : "") . "
-        GROUP BY cte.data_prev_ent::DATE
-        ORDER BY cte.data_prev_ent::DATE
+        GROUP BY (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)::DATE
+        ORDER BY (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)::DATE
     ";
 
     $resultEvolucao = sql($g_sql, $queryEvolucao, false, $params);

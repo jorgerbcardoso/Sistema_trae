@@ -32,13 +32,13 @@ $whereConditions = [
     "cte.status <> 'C'",
     "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')",
     "cte.ult_ocor_agend = 15",
-    "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) = $" . $paramIndex++,
+    "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) = $" . $paramIndex++,
 ];
 $params[] = $data;
 
 if ($tipo === 'no_prazo') {
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
+    $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -65,8 +65,8 @@ $query = "
         cte.ser_cte,
         cte.nro_cte,
         TO_CHAR(cte.data_emissao,  'DD/MM/YYYY') AS data_emissao,
-        TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
-        TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
+        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'DD/MM/YYYY') AS data_prev_ent,
+        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'YYYY-MM-DD') AS data_prev_ent_iso,
         cte.nome_pag,
         cte.nome_dest,
         cte.cnpj_dest,

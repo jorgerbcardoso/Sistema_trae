@@ -196,6 +196,19 @@ $parseCompetencia = static function(string $ym, string $raw): array {
 [$mesCompParam, $mesCompLabel] = $parseCompetencia($competenciaYm, $competenciaRaw);
 
 $prefix = strtolower($domain);
+$eventosNaoConsiderar = [];
+$rEv = sql(
+    "SELECT evento FROM {$prefix}_evento WHERE COALESCE(considerar, 'S') = 'N'",
+    [],
+    $g_sql
+);
+if ($rEv && pg_num_rows($rEv) > 0) {
+    while ($rowEv = pg_fetch_assoc($rEv)) {
+        $ev = preg_replace('/\D+/', '', (string)($rowEv['evento'] ?? ''));
+        if ($ev !== '') $eventosNaoConsiderar[$ev] = true;
+    }
+}
+
 $grupoEventoNum = (int)preg_replace('/\D+/', '', (string)$grupoEvento);
 if ($grupoEventoNum > 0) {
     $r = sql(
@@ -496,6 +509,7 @@ foreach ($lines as $l) {
     $nroLancto = $get($arr, $headerIdx, 'NUMLANCTO', 2);
     $parcela   = $get($arr, $headerIdx, 'PARCELA', 3);
     $codEvento = $get($arr, $headerIdx, 'EVENTO', 4);
+    $codEventoDigits = preg_replace('/\D+/', '', (string)$codEvento);
     $descEvento = $get($arr, $headerIdx, 'DESCR EVENTO', 5);
     $historico = $get($arr, $headerIdx, 'HISTORICO DA DESPESA', 6);
     $cnpj = $normalizeDigits($get($arr, $headerIdx, 'CNPJ FORNECEDOR', 7));
@@ -510,6 +524,7 @@ foreach ($lines as $l) {
     $grupoRaw = $get($arr, $headerIdx, 'GRUPO EVENTO', 41);
     $mesCompetencia = $get($arr, $headerIdx, 'MES COMPETENCIA', 42);
 
+    if ($codEventoDigits !== '' && isset($eventosNaoConsiderar[$codEventoDigits])) continue;
     if ($cnpjFornecedor !== '' && $cnpj !== '' && $cnpj !== $cnpjFornecedor) continue;
     if ($unidade !== '' && $uni !== $unidade) continue;
     if ($evento !== '' && preg_replace('/\D+/', '', $codEvento) !== preg_replace('/\D+/', '', (string)$evento)) continue;
