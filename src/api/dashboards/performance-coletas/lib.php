@@ -767,6 +767,9 @@ function getColetasRaw($g_sql, $tableName = 'tmp_coleta_rt', $extraWhere = '') {
             cep_emit,
             setor,
             cnpj_dest,
+            nome_dest,
+            cidade_dest,
+            uf_dest,
             solicitante,
             CASE situacao
                 WHEN '9' THEN 'PRE-CADASTRADA'

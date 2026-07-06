@@ -78,6 +78,9 @@ interface ColetaRaw {
   cep_emit: string;
   setor: string;
   cnpj_dest: string;
+  nome_dest?: string;
+  cidade_dest?: string;
+  uf_dest?: string;
   solicitante: string;
   situacao: string;
   vlr_merc: string;
@@ -444,13 +447,13 @@ export function PerformanceColetas() {
   // Funções de exportação
   const CSV_HEADER = ['Unidade','Nº Coleta','Data Inclusão','Hora Inclusão','Data Limite','Hora Limite',
     'CNPJ Remetente','Nome Remetente','Endereço','Bairro','Cidade','UF','CEP','Setor',
-    'CNPJ Destinatário','Solicitante','Situação','Vlr Mercadoria','Qtde Vol','Peso',
+    'CNPJ Destinatário','DESTINATARIO','CIDADE_DESTINO','UF_DESTINO','Solicitante','Situação','Vlr Mercadoria','Qtde Vol','Peso',
     'Placa','Observação','Data Efetivação','Hora Efetivação'];
 
   const coletaToRow = (c: ColetaRaw) => [
     c.unidade, c.nro_coleta, c.data_inclusao, c.hora_inclusao, c.data_limite, c.hora_limite,
     c.cnpj_emit, c.nome_emit, c.endereco_emit, c.bairro_emit, c.cidade_emit, c.uf_emit, c.cep_emit, c.setor,
-    c.cnpj_dest, c.solicitante, c.situacao, c.vlr_merc, c.qtde_vol, c.peso,
+    c.cnpj_dest, c.nome_dest ?? '', c.cidade_dest ?? '', c.uf_dest ?? '', c.solicitante, c.situacao, c.vlr_merc, c.qtde_vol, c.peso,
     c.placa, c.observacao, c.data_efetivacao ?? '', c.hora_efetivacao ?? ''
   ];
 

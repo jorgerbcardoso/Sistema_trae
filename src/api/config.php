@@ -1068,7 +1068,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
             unidade varchar, nro_coleta varchar, data_limite date, hora_limite varchar,
             cnpj_emit varchar, nome_emit varchar, endereco_emit varchar, bairro_emit varchar,
             cep_emit varchar, cidade_emit varchar, uf_emit varchar, setor varchar,
-            cnpj_dest varchar, solicitante varchar, situacao varchar,
+            cnpj_dest varchar, nome_dest varchar, cidade_dest varchar, uf_dest varchar, solicitante varchar, situacao varchar,
             vlr_merc numeric, qtde_vol numeric, peso numeric, placa varchar,
             observacao varchar, data_inclusao date, hora_inclusao varchar,
             data_efetivacao date, hora_efetivacao varchar
@@ -1093,7 +1093,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
         unidade varchar, nro_coleta varchar, data_limite date, hora_limite varchar,
         cnpj_emit varchar, nome_emit varchar, endereco_emit varchar, bairro_emit varchar,
         cep_emit varchar, cidade_emit varchar, uf_emit varchar, setor varchar,
-        cnpj_dest varchar, solicitante varchar, situacao varchar,
+        cnpj_dest varchar, nome_dest varchar, cidade_dest varchar, uf_dest varchar, solicitante varchar, situacao varchar,
         vlr_merc numeric, qtde_vol numeric, peso numeric, placa varchar,
         observacao varchar, data_inclusao date, hora_inclusao varchar,
         data_efetivacao date, hora_efetivacao varchar
@@ -1131,6 +1131,16 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
         $cep_emit        = pg_escape_string($g_sql, $arr[14]);
         $cnpj_dest_raw   = $arr[19];
         $cnpj_dest       = pg_escape_string($g_sql, strlen($cnpj_dest_raw) < 5 ? '' : substr($cnpj_dest_raw, 0, 14));
+        $nome_dest       = pg_escape_string($g_sql, str_replace("'", '', (string)($arr[20] ?? '')));
+        $cidade_dest     = pg_escape_string($g_sql, str_replace("'", '', (string)($arr[21] ?? '')));
+        $uf_dest_raw     = strtoupper(trim((string)($arr[22] ?? '')));
+        if (!preg_match('/^[A-Z]{2}$/', $uf_dest_raw)) {
+            for ($k = 20; $k <= 24; $k++) {
+                $cand = strtoupper(trim((string)($arr[$k] ?? '')));
+                if (preg_match('/^[A-Z]{2}$/', $cand)) { $uf_dest_raw = $cand; break; }
+            }
+        }
+        $uf_dest = pg_escape_string($g_sql, $uf_dest_raw);
         $peso            = (float) str_replace(',', '.', str_replace('.', '', $arr[25]));
         $qtde_vol        = (float) $arr[27];
         $vlr_merc        = (float) str_replace(',', '.', str_replace('.', '', $arr[28]));
@@ -1163,7 +1173,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
         $values[] = "('$unidade','$nro_coleta','$data_limite_fmt','$hora_limite'," .
                     "'$cnpj_emit','$nome_emit','$endereco_emit','$bairro_emit'," .
                     "'$cep_emit','$cidade_emit','$uf_emit','$setor'," .
-                    "'$cnpj_dest','$solicitante','$situacao'," .
+                    "'$cnpj_dest','$nome_dest','$cidade_dest','$uf_dest','$solicitante','$situacao'," .
                     "$vlr_merc,$qtde_vol,$peso,'$placa'," .
                     "'$observacao','$data_inclusao_fmt','$hora_inclusao'," .
                     "$data_efet_sql,$hora_efet_sql)";
