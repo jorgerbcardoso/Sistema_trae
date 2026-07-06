@@ -1042,7 +1042,7 @@ export function PerformanceEntregas() {
                         {group.percentage.toFixed(1)}%
                       </div>
                       <p className={`text-sm mt-1 ${group.color}`}>
-                        {group.count} CTRC{group.count !== 1 ? 's' : ''}
+                        {group.count} CT-e{group.count !== 1 ? 's' : ''}
                       </p>
                     </div>
                     <div style={{ width: 80, height: 80 }}>
@@ -1080,11 +1080,14 @@ export function PerformanceEntregas() {
                 className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ flex: noPrazoCount }}
                 title="Clique para exportar CSV"
+                aria-label="No Prazo - exportar CSV"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-blue-500" />
-                <div className="relative z-10 flex items-center justify-between w-full px-4">
-                  <span className="text-sm font-semibold">No Prazo</span>
-                  <span className="text-sm font-semibold">{noPrazoPct.toFixed(1)}%</span>
+                <div
+                  className="absolute inset-0"
+                  style={{ backgroundImage: 'linear-gradient(90deg, #073F1F, #192F72)' }}
+                />
+                <div className="relative z-10 px-2 text-sm font-semibold whitespace-nowrap">
+                  {noPrazoPct.toFixed(1)}%
                 </div>
               </button>
 
@@ -1095,17 +1098,24 @@ export function PerformanceEntregas() {
                 className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ flex: emAtrasoCount }}
                 title="Clique para exportar CSV"
+                aria-label="Em Atraso - exportar CSV"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-red-500" />
-                <div className="relative z-10 flex items-center justify-between w-full px-4">
-                  <span className="text-sm font-semibold">Em Atraso</span>
-                  <span className="text-sm font-semibold">{emAtrasoPct.toFixed(1)}%</span>
+                <div
+                  className="absolute inset-0"
+                  style={{ backgroundImage: 'linear-gradient(90deg, #663608, #741416)' }}
+                />
+                <div className="relative z-10 px-2 text-sm font-semibold whitespace-nowrap">
+                  {emAtrasoPct.toFixed(1)}%
                 </div>
               </button>
             </div>
             <div className="flex items-center justify-between px-4 py-2 text-xs bg-white dark:bg-slate-900">
-              <span className="text-slate-600 dark:text-slate-400">{noPrazoCount} CTRC</span>
-              <span className="text-slate-600 dark:text-slate-400">{emAtrasoCount} CTRC</span>
+              <span className="text-slate-600 dark:text-slate-400">
+                No Prazo - {noPrazoCount} CT-e{noPrazoCount !== 1 ? 's' : ''}
+              </span>
+              <span className="text-slate-600 dark:text-slate-400">
+                Em Atraso - {emAtrasoCount} CT-e{emAtrasoCount !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
         )}
@@ -1141,7 +1151,7 @@ export function PerformanceEntregas() {
                       className="text-right py-3 px-2 text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       onClick={() => handleSort('total')}
                     >
-                      Qtde CTRC{renderSortIcon('total')}
+                      Qtde CT-e{renderSortIcon('total')}
                     </th>
                     <th 
                       className="text-right py-3 px-2 text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -1195,7 +1205,7 @@ export function PerformanceEntregas() {
                         </td>
                         <td className="py-3 px-2 text-right dark:text-slate-300">
                           <button
-                            onClick={() => handleExportComparativo(unit.sigla, 'total', 'Total CTRCs')}
+                            onClick={() => handleExportComparativo(unit.sigla, 'total', 'Total CT-es')}
                             className="hover:underline cursor-pointer"
                             disabled={unit.total === 0}
                           >
