@@ -31,13 +31,13 @@ $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
     "cte.ult_ocor_agend = 15",
-    "cte.data_prev_ent::date = $" . $paramIndex++,
+    "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) = $" . $paramIndex++,
 ];
 $params[] = $data;
 
 if ($tipo === 'no_prazo') {
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "cte.data_entrega <= cte.data_prev_ent";
+    $whereConditions[] = "cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {

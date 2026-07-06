@@ -28,11 +28,11 @@ if (!empty($filters['periodoEmissaoFim'])) {
     $params[] = $filters['periodoEmissaoFim'];
 }
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoInicio'];
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoFim'];
 }
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -66,16 +66,16 @@ switch ($cardId) {
         break;
     case 3:
         $whereConditions[] = "cte.ult_ocor_agend = 15";
-        $whereConditions[] = "cte.data_prev_ent >= CURRENT_DATE";
+        $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE";
         $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 4:
         $whereConditions[] = "cte.ult_ocor_agend = 15";
         $whereConditions[] = "cte.data_entrega IS NOT NULL";
-        $whereConditions[] = "cte.data_entrega <= cte.data_prev_ent";
+        $whereConditions[] = "cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
         break;
     case 5:
-        $whereConditions[] = "((cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent))";
+        $whereConditions[] = "((cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
         $whereConditions[] = "cte.ult_ocor_agend = 15";
         break;
     default:

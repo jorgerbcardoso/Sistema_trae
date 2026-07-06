@@ -144,23 +144,25 @@ $query = "
     ),
     previstos AS (
         SELECT 
-            data_prev_ent::date as dia,
+            (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) as dia,
             COUNT(*) as total
         FROM {$domain}_cte cte
-        WHERE data_prev_ent IS NOT NULL
+        LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
+        WHERE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) IS NOT NULL
         AND $whereClause
-        GROUP BY data_prev_ent::date
+        GROUP BY dia
     ),
     entregues AS (
         SELECT 
-            data_prev_ent::date as dia,
+            (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) as dia,
             COUNT(*) as total
         FROM {$domain}_cte cte
-        WHERE data_prev_ent IS NOT NULL
+        LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
+        WHERE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) IS NOT NULL
         AND data_entrega IS NOT NULL
-        AND data_entrega <= data_prev_ent
+        AND data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
         AND $whereClause
-        GROUP BY data_prev_ent::date
+        GROUP BY dia
     )
     SELECT
         dias.dia,

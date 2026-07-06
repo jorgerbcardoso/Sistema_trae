@@ -106,12 +106,12 @@ if (!empty($filters['periodoEmissaoFim'])) {
 
 // Filtro: Período de Previsão de Entrega
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoInicio'];
     $paramIndex++;
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoFim'];
     $paramIndex++;
 }
@@ -148,28 +148,29 @@ $query = "
         COALESCE(u.nome, cte.sigla_dest) as nome,
         COUNT(*) as total,
         COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
-                     OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)
+                     OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
               THEN 1 END) as entregues_no_prazo,
         COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
                     AND cte.data_entrega IS NOT NULL
-                    AND cte.data_entrega > cte.data_prev_ent
+                    AND cte.data_entrega > (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
               THEN 1 END) as entregues_em_atraso,
         COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
                     AND cte.data_entrega IS NULL
-                    AND cte.data_prev_ent >= CURRENT_DATE
+                    AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE
               THEN 1 END) as pendentes_no_prazo,
         COUNT(CASE WHEN cte.tp_documento <> 'COMPLEMENTAR FRETE'
                     AND cte.data_entrega IS NULL
-                    AND cte.data_prev_ent < CURRENT_DATE
+                    AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE
               THEN 1 END) as pendentes_em_atraso,
         ROUND(
             CAST(COUNT(CASE WHEN cte.tp_documento = 'COMPLEMENTAR FRETE'
-                              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent)
+                              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
                   THEN 1 END) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1
         ) as percentage
     FROM {$domain}_cte cte
+    LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
     LEFT OUTER JOIN {$domain}_unidade u ON cte.sigla_dest = u.sigla
     $whereClause
     GROUP BY cte.sigla_dest, u.nome

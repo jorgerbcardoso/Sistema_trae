@@ -973,6 +973,12 @@ export function PerformanceEntregas() {
     </div>
   );
 
+  const noPrazoCount = (deliveryGroups[0]?.count ?? 0) + (deliveryGroups[2]?.count ?? 0);
+  const emAtrasoCount = (deliveryGroups[1]?.count ?? 0) + (deliveryGroups[3]?.count ?? 0);
+  const totalResumo = noPrazoCount + emAtrasoCount;
+  const noPrazoPct = totalResumo > 0 ? (noPrazoCount / totalResumo) * 100 : 0;
+  const emAtrasoPct = totalResumo > 0 ? (emAtrasoCount / totalResumo) * 100 : 0;
+
   return (
     <DashboardLayout 
       title="Performance de Entregas"
@@ -1036,7 +1042,7 @@ export function PerformanceEntregas() {
                         {group.percentage.toFixed(1)}%
                       </div>
                       <p className={`text-sm mt-1 ${group.color}`}>
-                        {group.count} CT-e{group.count !== 1 ? 's' : ''}
+                        {group.count} CTRC{group.count !== 1 ? 's' : ''}
                       </p>
                     </div>
                     <div style={{ width: 80, height: 80 }}>
@@ -1063,6 +1069,46 @@ export function PerformanceEntregas() {
             );
           })}
         </div>
+
+        {totalResumo > 0 && (
+          <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="flex h-12">
+              <button
+                type="button"
+                onClick={() => handleExportCard('prazo_total', 'No Prazo')}
+                disabled={noPrazoCount === 0}
+                className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ flex: noPrazoCount }}
+                title="Clique para exportar CSV"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-blue-500" />
+                <div className="relative z-10 flex items-center justify-between w-full px-4">
+                  <span className="text-sm font-semibold">No Prazo</span>
+                  <span className="text-sm font-semibold">{noPrazoPct.toFixed(1)}%</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExportCard('atraso_total', 'Em Atraso')}
+                disabled={emAtrasoCount === 0}
+                className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ flex: emAtrasoCount }}
+                title="Clique para exportar CSV"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-red-500" />
+                <div className="relative z-10 flex items-center justify-between w-full px-4">
+                  <span className="text-sm font-semibold">Em Atraso</span>
+                  <span className="text-sm font-semibold">{emAtrasoPct.toFixed(1)}%</span>
+                </div>
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2 text-xs bg-white dark:bg-slate-900">
+              <span className="text-slate-600 dark:text-slate-400">{noPrazoCount} CTRC</span>
+              <span className="text-slate-600 dark:text-slate-400">{emAtrasoCount} CTRC</span>
+            </div>
+          </div>
+        )}
 
         {/* ✅ SEÇÃO: Comparativo por Unidade Entregadora */}
         <Card className="dark:bg-slate-900 dark:border-slate-700">
@@ -1095,7 +1141,7 @@ export function PerformanceEntregas() {
                       className="text-right py-3 px-2 text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                       onClick={() => handleSort('total')}
                     >
-                      Qtde CT-e{renderSortIcon('total')}
+                      Qtde CTRC{renderSortIcon('total')}
                     </th>
                     <th 
                       className="text-right py-3 px-2 text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -1149,7 +1195,7 @@ export function PerformanceEntregas() {
                         </td>
                         <td className="py-3 px-2 text-right dark:text-slate-300">
                           <button
-                            onClick={() => handleExportComparativo(unit.sigla, 'total', 'Total CT-es')}
+                            onClick={() => handleExportComparativo(unit.sigla, 'total', 'Total CTRCs')}
                             className="hover:underline cursor-pointer"
                             disabled={unit.total === 0}
                           >
@@ -1378,7 +1424,7 @@ export function PerformanceEntregas() {
                             Exportação de Dados
                           </p>
                           <p className="text-xs">
-                            Para imprimir os CT-es previstos para o dia, clique sobre o ponto do dia no gráfico.
+                            Para imprimir os CTRCs previstos para o dia, clique sobre o ponto do dia no gráfico.
                           </p>
                         </div>
                       </div>
@@ -1387,7 +1433,7 @@ export function PerformanceEntregas() {
                 </div>
                 
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Percentual de entregas realizadas no prazo por dia - clique em um ponto do gráfico para exportar CT-es com aquela previsão de entrega
+                  Percentual de entregas realizadas no prazo por dia - clique em um ponto do gráfico para exportar CTRCs com aquela previsão de entrega
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                   <FileSpreadsheet className="w-3 h-3" />

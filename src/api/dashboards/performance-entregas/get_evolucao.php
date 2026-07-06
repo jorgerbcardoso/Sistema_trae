@@ -139,21 +139,22 @@ if (count($whereConditions) > 0) {
 // ✅ TERMINA SEMPRE EM ONTEM (dia anterior a hoje)
 $query = "
     SELECT
-        cte.data_prev_ent::date as dia,
+        (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) as dia,
         COUNT(*) as total,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-              AND cte.data_entrega <= cte.data_prev_ent THEN 1 END) as entregues_no_prazo,
+              AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) THEN 1 END) as entregues_no_prazo,
         ROUND(
             CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                  AND cte.data_entrega <= cte.data_prev_ent THEN 1 END) AS DECIMAL) /
+                  AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) THEN 1 END) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1
         ) as percentual
     FROM {$domain}_cte cte
+    LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
     " . ($whereClause ? $whereClause . ' AND ' : ' WHERE ') . "
-        cte.data_prev_ent >= CURRENT_DATE - INTERVAL '$periodo days'
-        AND cte.data_prev_ent < CURRENT_DATE
-    GROUP BY cte.data_prev_ent::date
+        (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) >= CURRENT_DATE - INTERVAL '$periodo days'
+        AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) < CURRENT_DATE
+    GROUP BY dia
     HAVING COUNT(*) > 0
     ORDER BY dia ASC
 ";

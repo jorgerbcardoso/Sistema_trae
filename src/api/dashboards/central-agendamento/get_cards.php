@@ -27,11 +27,11 @@ if (!empty($filters['periodoEmissaoFim'])) {
     $params[] = $filters['periodoEmissaoFim'];
 }
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoInicio'];
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex++;
+    $whereConditions[] = "(CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoFim'];
 }
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -73,7 +73,7 @@ $query = "
 
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 15
-             AND cte.data_prev_ent >= '$data_hoje'
+             AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= '$data_hoje'
              AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS agendados_no_prazo,
@@ -81,19 +81,20 @@ $query = "
         COUNT(CASE
             WHEN cte.ult_ocor_agend = 15
              AND cte.data_entrega IS NOT NULL
-             AND cte.data_entrega <= cte.data_prev_ent
+             AND cte.data_entrega <= (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)
             THEN 1 END
         ) AS agendamentos_cumpridos,
 
         COUNT(CASE
             WHEN (
-                 (cte.data_entrega IS NULL     AND cte.data_prev_ent < '$data_hoje')
-              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)
+                 (cte.data_entrega IS NULL     AND (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < '$data_hoje')
+              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))
              )
             AND cte.ult_ocor_agend = 15
             THEN 1 END
         ) AS agendamentos_perdidos
     FROM {$domain}_cte cte
+    LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
     LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj
     $whereClause
 ";

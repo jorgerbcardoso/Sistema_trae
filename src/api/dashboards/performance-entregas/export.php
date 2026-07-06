@@ -103,16 +103,22 @@ $whereConditions[] = "cte.status <> 'C'";
 if ($statusEntrega) {
     switch ($statusEntrega) {
         case 'entregue_no_prazo':
-            $whereConditions[] = "cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent";
+            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
             break;
         case 'entregue_em_atraso':
-            $whereConditions[] = "cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'pendente_no_prazo':
-            $whereConditions[] = "cte.data_entrega IS NULL AND cte.data_prev_ent >= CURRENT_DATE";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
             break;
         case 'pendente_em_atraso':
-            $whereConditions[] = "cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
+            break;
+        case 'prazo_total':
+            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE))";
+            break;
+        case 'atraso_total':
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND ((cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)) OR (cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)))";
             break;
     }
 }
@@ -121,26 +127,26 @@ if ($statusEntrega) {
 if ($coluna) {
     switch ($coluna) {
         case 'total':
-            // Não adiciona filtro, pega todos os CT-es da unidade
+            // Não adiciona filtro, pega todos os CTRCs da unidade
             break;
         case 'entregues_no_prazo':
-            $whereConditions[] = "cte.data_entrega IS NOT NULL AND cte.data_entrega <= cte.data_prev_ent";
+            $whereConditions[] = "(cte.tp_documento = 'COMPLEMENTAR FRETE' OR (cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)))";
             break;
         case 'entregues_em_atraso':
-            $whereConditions[] = "cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END))";
             break;
         case 'pendentes_no_prazo':
-            $whereConditions[] = "cte.data_entrega IS NULL AND cte.data_prev_ent >= CURRENT_DATE";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= CURRENT_DATE)";
             break;
         case 'pendentes_em_atraso':
-            $whereConditions[] = "cte.data_entrega IS NULL AND cte.data_prev_ent < CURRENT_DATE";
+            $whereConditions[] = "(cte.tp_documento <> 'COMPLEMENTAR FRETE' AND cte.data_entrega IS NULL AND (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) < CURRENT_DATE)";
             break;
     }
 }
 
 // ✅ FILTRO DE DATA DE PREVISÃO (do grfico de evolução)
 if ($dataPrevisao) {
-    $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) = $" . $paramIndex;
     $params[] = $dataPrevisao;
     $paramIndex++;
 }
@@ -164,18 +170,18 @@ if ($tipo && $data) {
             
         case 'previstos_dia':
             // Previstos do dia: data_prev_ent = data
-            $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
+            $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) = $" . $paramIndex;
             $params[] = $data;
             $paramIndex++;
             break;
             
         case 'entregues_dia':
             // Entregues no prazo do dia: data_prev_ent = data AND data_entrega <= data_prev_ent
-            $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
+            $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) = $" . $paramIndex;
             $params[] = $data;
             $paramIndex++;
             $whereConditions[] = "cte.data_entrega IS NOT NULL";
-            $whereConditions[] = "cte.data_entrega <= cte.data_prev_ent";
+            $whereConditions[] = "cte.data_entrega <= (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
             break;
     }
 }
@@ -196,12 +202,12 @@ if (!$dataPrevisao && !$tipo) {
 
     // Filtro: Período de Previsão de Entrega
     if ($periodoPrevisaoInicio) {
-        $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex;
+        $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex;
         $params[] = $periodoPrevisaoInicio;
         $paramIndex++;
     }
     if ($periodoPrevisaoFim) {
-        $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex;
+        $whereConditions[] = "(CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex;
         $params[] = $periodoPrevisaoFim;
         $paramIndex++;
     }
@@ -240,12 +246,29 @@ if (count($whereConditions) > 0) {
 // ================================================================
 // QUERY PARA BUSCAR CONHECIMENTOS
 // ================================================================
-$query = "SELECT ser_cte, nro_cte, to_char (data_emissao, 'DD/MM/YY') AS data_emissao,
-                 nome_emit, nome_dest, nome_pag, sigla_emit, sigla_dest, vlr_frete, peso_real,
-                 to_char (data_prev_ent, 'DD/MM/YY') AS data_prev_ent,
-                 CASE WHEN data_entrega IS NULL THEN '' ELSE to_char (data_entrega, 'DD/MM/YY') END AS data_entrega,
-                 CASE WHEN data_entrega IS NULL THEN current_date - data_prev_ent ELSE data_entrega - data_prev_ent END AS atraso
-            FROM $domain" . "_cte cte $whereClause
+$query = "SELECT cte.ser_cte,
+                 cte.nro_cte,
+                 COALESCE(cte.nfs::text, '') AS nfs,
+                 to_char (cte.data_emissao, 'DD/MM/YY') AS data_emissao,
+                 cte.nome_emit,
+                 cte.nome_dest,
+                 cte.nome_pag,
+                 cte.sigla_emit,
+                 cte.sigla_dest,
+                 cte.vlr_frete,
+                 cte.peso_real,
+                 to_char (cte.data_prev_ent, 'DD/MM/YY') AS data_prev_ent,
+                 CASE WHEN cte.data_entrega IS NULL THEN '' ELSE to_char (cte.data_entrega, 'DD/MM/YY') END AS data_entrega,
+                 CASE WHEN cte.data_entrega IS NULL THEN current_date - (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) ELSE cte.data_entrega - (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END AS atraso,
+                 CASE
+                     WHEN cte.ult_ocor IS NULL OR cte.ult_ocor::text = '' THEN ''
+                     WHEN ocor.descricao IS NULL OR ocor.descricao = '' THEN cte.ult_ocor::text
+                     ELSE cte.ult_ocor::text || ' - ' || ocor.descricao
+                 END AS ultima_ocorrencia,
+                 CASE WHEN cte.data_ult_ocor IS NULL THEN '' ELSE to_char (cte.data_ult_ocor, 'DD/MM/YY') END AS data_ult_ocor
+            FROM $domain" . "_cte cte
+            LEFT JOIN $domain" . "_ocorrencia ocor ON ocor.codigo::text = cte.ult_ocor::text
+            $whereClause
            ORDER BY 1, 2";
 
 // ✅ EXECUTAR QUERY E VERIFICAR ERRO **ANTES** DE ENVIAR HEADERS CSV
@@ -281,8 +304,9 @@ echo "\xEF\xBB\xBF";
 
 // Cabeçalho
 $headers = [
-    'Série CT-e',
-    'Número CT-e',
+    'Série CTRC',
+    'Número CTRC',
+    'NFs',
     'Emissão',
     'Remetente',
     'Destinatário',
@@ -293,7 +317,9 @@ $headers = [
     'Peso Real (Kg)',
     'Previsão de Entrega',
     'Entrega',
-    'Atraso'
+    'Atraso',
+    'Última Ocorrência',
+    'Data Última Ocorrência'
 ];
 
 echo implode(';', $headers) . "\n";
@@ -302,6 +328,7 @@ echo implode(';', $headers) . "\n";
 while ($row = pg_fetch_assoc($result)) {
     $line = [$row['ser_cte'],
              $row['nro_cte'],
+             $row['nfs'],
              $row['data_emissao'],
              $row['nome_emit'],
              $row['nome_dest'],
@@ -312,7 +339,9 @@ while ($row = pg_fetch_assoc($result)) {
              fmtdec (floatval ($row['peso_real']), 2),
              $row['data_prev_ent'],
              $row['data_entrega'],
-             $row['atraso']
+             $row['atraso'],
+             $row['ultima_ocorrencia'],
+             $row['data_ult_ocor']
     ];
 
     echo implode(';', array_map(function($value) {
@@ -337,8 +366,9 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
     echo "\xEF\xBB\xBF";
 
     // Cabeçalho
-    $headers = ['Série CT-e',
-                'Número CT-e',
+    $headers = ['Série CTRC',
+                'Número CTRC',
+                'NFs',
                 'Emissão',
                 'Remetente',
                 'Destinatário',
@@ -349,7 +379,9 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
                 'Peso Real (Kg)',
                 'Previsão de Entrega',
                 'Entrega',
-                'Atraso'];
+                'Atraso',
+                'Última Ocorrência',
+                'Data Última Ocorrência'];
 
     echo implode(';', $headers) . "\n";
 
@@ -376,6 +408,7 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
         $line = [
             'SPO',
             $numero,
+            'NF' . str_pad((string)rand(1, 999999), 6, '0', STR_PAD_LEFT),
             $dataEmissao,
             'EMPRESA REMETENTE LTDA',
             'EMPRESA DESTINATARIA LTDA',
@@ -386,7 +419,9 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
             number_format(rand(100, 5000), 2, ',', '.'),
             $dataPrev,
             $dataEntrega,
-            0
+            0,
+            '01 - ENTREGA REALIZADA.',
+            $dataEntrega ?: ''
         ];
 
         echo implode(';', array_map(function($value) {
