@@ -440,38 +440,25 @@ $param0166 = 'act=FIL_COL'
 
 $str166 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param0166);
 
-if (strpos($str166, 'Sem movimento de coletas') !== false) {
+if (
+    strpos($str166, 'Sem movimento de coletas') !== false
+    || strpos($str166, 'Nenhuma coleta encontrada') !== false
+) {
     $coletas = [];
 } else {
     if (substr($str166, 0, 5) === '<foc ') {
         respondJson(['success' => false, 'message' => 'Erro SSW (0166): ' . $str166]);
     }
 
-    $extractDownloadParams0166 = static function(string $html): ?array {
-        $mVal = null;
-        if (preg_match('/\\bid\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*"([^"]*)"/i', $html, $m)) $mVal = $m[1];
-        elseif (preg_match('/\\bname\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*"([^"]*)"/i', $html, $m)) $mVal = $m[1];
-        elseif (preg_match("/\\bid\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*'([^']*)'/i", $html, $m)) $mVal = $m[1];
-        elseif (preg_match("/\\bname\\s*=\\s*web_body\\b[^>]*\\bvalue\\s*=\\s*'([^']*)'/i", $html, $m)) $mVal = $m[1];
+    $str166 = urldecode($str166);
+    $act166 = ssw_get_act($str166);
+    $arq166 = ssw_get_arq($str166);
 
-        $decoded = $mVal !== null ? urldecode((string)$mVal) : urldecode($html);
-        if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'([^']+)'/i", $decoded, $m2)) {
-            return null;
-        }
-        $act = trim((string)$m2[1]);
-        $filename = trim((string)$m2[2]);
-        if ($act === '' || $filename === '') return null;
-        return ['act' => $act, 'filename' => $filename];
-    };
-
-    $params0166 = $extractDownloadParams0166($str166);
-    if (!$params0166) {
+    if (empty($act166) || empty($arq166)) {
         respondJson(['success' => false, 'message' => 'Erro SSW (0166): parâmetros de download não encontrados.']);
     }
 
-    $act166 = urlencode((string)$params0166['act']);
-    $arq166 = urlencode((string)$params0166['filename']);
-    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=1");
+    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=0");
 
     if (empty($file166) || strlen($file166) < 100) {
         respondJson(['success' => false, 'message' => 'Arquivo do relatório 0166 vazio ou inválido.']);
