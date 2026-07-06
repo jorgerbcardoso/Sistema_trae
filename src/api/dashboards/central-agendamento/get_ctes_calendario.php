@@ -16,8 +16,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
     respondJson(['success' => false, 'message' => 'Data inválida']);
 }
 
-if (!in_array($tipo, ['agendados', 'no_prazo'])) {
-    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados ou no_prazo']);
+if (!in_array($tipo, ['agendados', 'no_prazo', 'atrasados'])) {
+    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados, no_prazo ou atrasados']);
 }
 
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
@@ -39,6 +39,9 @@ $params[] = $data;
 if ($tipo === 'no_prazo') {
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
     $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+}
+if ($tipo === 'atrasados') {
+    $whereConditions[] = "((cte.data_entrega IS NULL) OR (cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)))";
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {

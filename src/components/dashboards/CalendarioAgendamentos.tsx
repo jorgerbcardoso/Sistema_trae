@@ -18,7 +18,7 @@ interface CalendarioAgendamentosProps {
   setPeriodo: (periodo: 7 | 15 | 30) => void;
   diasData: DiaAgendamento[];
   loading: boolean;
-  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo') => void;
+  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados') => void;
 }
 
 export function CalendarioAgendamentos({
@@ -80,6 +80,7 @@ export function CalendarioAgendamentos({
               const performance = dia.agendados > 0
                 ? (dia.entregues / dia.agendados) * 100
                 : 0;
+              const atrasados = Math.max(0, dia.agendados - dia.entregues);
 
               const isToday = dia.data === new Date().toISOString().slice(0, 10);
 
@@ -141,6 +142,16 @@ export function CalendarioAgendamentos({
                       </span>
                     </div>
 
+                    <div
+                      className={`flex justify-between items-center px-2 py-1 rounded ${atrasados > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={atrasados > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados') : undefined}
+                    >
+                      <span className="text-slate-600 dark:text-slate-400">Atrasados:</span>
+                      <span className={`font-semibold text-red-600 dark:text-red-400 ${atrasados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {atrasados}
+                      </span>
+                    </div>
+
                     {dia.agendados > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center px-2">
@@ -161,6 +172,15 @@ export function CalendarioAgendamentos({
                       <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">No prazo</p>
                       <p className={`font-semibold text-green-600 dark:text-green-400 ${dia.agendados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {dia.entregues}/{dia.agendados}
+                      </p>
+                    </div>
+                    <div
+                      className={`px-2 py-1 text-center rounded ${atrasados > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={atrasados > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados') : undefined}
+                    >
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atrasados</p>
+                      <p className={`font-semibold text-red-600 dark:text-red-400 ${atrasados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {atrasados}
                       </p>
                     </div>
                     {dia.agendados > 0 && (
