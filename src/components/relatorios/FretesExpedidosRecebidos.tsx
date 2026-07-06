@@ -152,8 +152,8 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
     'Tipo',
     unidadeLabel,
     'UF',
-    'CT-es',
     'Vol',
+    'CT-es',
     'Peso (Kg)',
     'Valor Mercadoria',
     'Frete CIF',
@@ -167,13 +167,17 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
   lines.push(header.map(csvEscape).join(';'));
 
   for (const r of data.rows || []) {
+    const unidadeSigla = String((r as any)?.sigla ?? r.unidade ?? '')
+      .trim()
+      .slice(0, 3)
+      .toUpperCase();
     lines.push(
       [
         kind,
-        r.unidade,
+        unidadeSigla,
         r.uf,
-        formatNumber(r.quant_ctrc),
         formatNumber(r.quant_vol),
+        formatNumber(r.quant_ctrc),
         formatNumber(Math.round(Number(r.peso_ton) || 0)),
         formatCurrency(r.val_merc),
         formatCurrency(r.frete_cif),
@@ -192,8 +196,8 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
       kind,
       'TOTAL',
       '',
-      formatNumber(data.totals.quant_ctrc),
       formatNumber(data.totals.quant_vol),
+      formatNumber(data.totals.quant_ctrc),
       formatNumber(Math.round(Number(data.totals.peso_ton) || 0)),
       formatCurrency(data.totals.val_merc),
       formatCurrency(data.totals.frete_cif),
