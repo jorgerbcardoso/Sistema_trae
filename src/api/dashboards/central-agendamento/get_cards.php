@@ -93,6 +93,7 @@ $query = "
               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END))
              )
             AND cte.ult_ocor_agend = 15
+            AND COALESCE(cte.entrega_abonada, false) = false
             THEN 1 END
         ) AS agendamentos_perdidos
     FROM {$domain}_cte cte

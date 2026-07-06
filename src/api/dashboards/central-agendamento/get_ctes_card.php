@@ -79,6 +79,7 @@ switch ($cardId) {
     case 5:
         $whereConditions[] = "((cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)))";
         $whereConditions[] = "cte.ult_ocor_agend = 15";
+        $whereConditions[] = "COALESCE(cte.entrega_abonada, false) = false";
         break;
     default:
         respondJson(['success' => false, 'message' => 'Card inválido']);

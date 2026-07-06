@@ -758,7 +758,7 @@ export function CentralAgendamento() {
   );
 
   const exportarCSV = (lista: Cte[], nomeArquivo: string) => {
-    const header = ['CT-e', 'NFs', 'Pagador', 'Destinatário', 'CNPJ', 'Emissão', 'Prev. Entrega', 'Últ. Ocorrência'];
+    const header = ['CTRC', 'NFs', 'Pagador', 'Destinatário', 'CNPJ', 'Emissão', 'Prev. Entrega', 'Últ. Ocorrência'];
     const rows = lista.map((c) => [
       `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
       c.nfs || '',
@@ -1023,7 +1023,7 @@ export function CentralAgendamento() {
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
                 <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
                   {cardDialogId === 1 && <span></span>}
-                  <span>CT-e</span>
+                  <span>CTRC</span>
                   <span>NF</span>
                   <span>Pagador</span>
                   <span>Destinatário</span>
@@ -1168,7 +1168,7 @@ export function CentralAgendamento() {
             <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden">
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
                 <div className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                  <span>CT-e</span>
+                  <span>CTRC</span>
                   <span>NF</span>
                   <span>Pagador</span>
                   <span>Destinatário</span>
