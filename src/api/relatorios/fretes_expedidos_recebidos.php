@@ -24,7 +24,7 @@ if (!in_array($step, ['RUN', 'START', 'POLL', 'DOWNLOAD'], true)) $step = 'RUN';
 
 $actIn = trim((string)($input['act'] ?? ''));
 
-$allowedSswUsers = ['presto', 'damasce1'];
+$allowedSswUsers = ['presto', 'damasce1', 'claraj'];
 $normSswUser = static function(string $s): string {
     $s = html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     return strtolower(trim($s));

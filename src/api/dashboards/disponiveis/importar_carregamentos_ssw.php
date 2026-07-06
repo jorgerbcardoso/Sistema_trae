@@ -80,11 +80,21 @@ $logs = [];
 
 $loginEsc   = pg_escape_string($conn, $login);
 
-// Reimportação: remove todas as linhas anteriormente importadas do SSW
-$resDelSsw = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = true");
-if ($resDelSsw === false) {
-    respondJson(['success' => false, 'message' => 'Erro ao limpar importações anteriores (origem_ssw=true).']);
+// Remove do Presto apenas os carregamentos que não existem mais no SSW (evita apagar placas que falharam na importação)
+$placasIn = implode(',', array_map(function ($p) use ($conn) {
+    return "'" . pg_escape_string($conn, strtoupper(trim($p))) . "'";
+}, $placas_ssw));
+$resDelInexistentes = pg_query(
+    $conn,
+    "DELETE FROM {$tabela}
+     WHERE UPPER(unidade) = '{$unidadeEsc}'
+       AND origem_ssw = true
+       AND UPPER(placa_provisoria) NOT IN ({$placasIn})"
+);
+if ($resDelInexistentes === false) {
+    respondJson(['success' => false, 'message' => 'Erro ao remover carregamentos que não existem mais no SSW.']);
 }
+$removidosInexistentes = pg_affected_rows($resDelInexistentes);
 
 function normalizarNumero($v) {
     $s = trim((string)$v);
@@ -333,4 +343,9 @@ foreach ($placas_ssw as $placa) {
     }
 }
 
-respondJson(['success' => true, 'placas_ssw' => $placas_ssw, 'logs' => $logs]);
+respondJson([
+    'success' => true,
+    'placas_ssw' => $placas_ssw,
+    'removidos_inexistentes' => $removidosInexistentes ?? 0,
+    'logs' => $logs,
+]);

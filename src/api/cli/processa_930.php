@@ -95,7 +95,7 @@ foreach ($dominios as $dominio) {
 
             $usr = trim($usr);
 
-            if ((substr($opc, 0, 3) == '930') && (($usr == 'presto') || ($usr == 'damasce1')) && ($sit == 'Conclu&iacute;do')) {
+            if ((substr($opc, 0, 3) == '930') && (($usr == 'presto') || ($usr == 'damasce1') || ($usr == 'claraj')) && ($sit == 'Conclu&iacute;do')) {
                 $encontrado = true;
                 echo "Arquivo encontrado. Iniciando importação.\n";
 

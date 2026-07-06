@@ -114,7 +114,7 @@ function downloadRelatorio019($sigla, $agora) {
                 $unidF4 = strtoupper(trim((string)$f4));
                 if ($unidF4 !== $sigla) continue;
                 $usr = trim((string)$usr);
-                if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+                if (!(($usr === 'presto') || ($usr === 'damasce1') || ($usr === 'claraj'))) continue;
                 if ((string)$sit !== 'Conclu&iacute;do') continue;
                 if (substr((string)$opc, 0, 3) !== '019') continue;
 

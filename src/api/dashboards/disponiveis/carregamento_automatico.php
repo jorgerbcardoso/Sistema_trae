@@ -144,7 +144,7 @@ function fetchCtes019Csv($domain, $g_sql, $siglaUnidade, $agora) {
                     $unidF4 = strtoupper(trim((string)$f4));
                     if ($unidF4 !== strtoupper($siglaUnidade)) continue;
                     $usr = trim((string)$usr);
-                    if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+                    if (!(($usr === 'presto') || ($usr === 'damasce1') || ($usr === 'claraj'))) continue;
                     if ((string)$sit !== 'Conclu&iacute;do') continue;
                     if (substr((string)$opc, 0, 3) !== '019') continue;
                     $f8dec = html_entity_decode((string)$f8);

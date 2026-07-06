@@ -381,7 +381,7 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
                 if ($seq === null) break;
 
                 $usr = trim((string)$usr);
-                if (!(($usr === 'presto') || ($usr === 'damasce1'))) continue;
+                if (!(($usr === 'presto') || ($usr === 'damasce1') || ($usr === 'claraj'))) continue;
 
                 $unidF4 = strtoupper(trim((string)$f4));
                 if ($unidadeFiltro !== '' && $unidF4 !== $unidadeFiltro) continue;

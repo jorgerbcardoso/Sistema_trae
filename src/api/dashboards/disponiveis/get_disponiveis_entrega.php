@@ -114,7 +114,7 @@ if (empty($file) || strlen($file) < 100) {
             $unidF4 = strtoupper(trim((string)$f4));
 
             if ((substr($opc, 0, 3) == '081')
-                && (($usr == 'presto') || ($usr == 'damasce1'))
+                && (($usr == 'presto') || ($usr == 'damasce1') || ($usr == 'claraj'))
                 && ((string)$sit == 'Conclu&iacute;do')
                 && ($unidF4 === strtoupper($sigla))
             ) {

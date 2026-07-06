@@ -116,7 +116,7 @@ for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
         $seqNum = (int)(string)$seq;
 
         if ((substr((string)$opc, 0, 3) == '076')
-            && (($usr == 'presto') || ($usr == 'damasce1'))
+            && (($usr == 'presto') || ($usr == 'damasce1') || ($usr == 'claraj'))
         ) {
             if ($seqRelatorio === null) {
                 $seqRelatorio = $seqNum;
