@@ -965,7 +965,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'unidade')}>
-                              Unidade Destino{sortIcon('expedidos', 'unidade')}
+                              Unidade Origem{sortIcon('expedidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'uf')}>
                               UF{sortIcon('expedidos', 'uf')}
@@ -1134,7 +1134,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'unidade')}>
-                              Unidade Origem{sortIcon('recebidos', 'unidade')}
+                              Unidade Destino{sortIcon('recebidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'uf')}>
                               UF{sortIcon('recebidos', 'uf')}
