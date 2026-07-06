@@ -28,6 +28,7 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 
 $tabela    = "{$domain}_carregamento";
 $tabelaCap = "{$domain}_carregamento_capacidade";
+$tabelaVeiculo = "{$domain}_veiculo";
 
 $conn = connect();
 
@@ -315,6 +316,7 @@ if ($acao === 'atualizar_capacidade') {
     $placa  = strtoupper(trim($input['placa'] ?? ''));
     $capTon = ($input['cap_ton'] !== '' && $input['cap_ton'] !== null) ? (float)$input['cap_ton'] : null;
     $capM3  = ($input['cap_m3']  !== '' && $input['cap_m3']  !== null) ? (float)$input['cap_m3']  : null;
+    $vlrMinFrete = ($input['vlr_min_frete'] !== '' && $input['vlr_min_frete'] !== null) ? (float)$input['vlr_min_frete'] : null;
 
     if (empty($placa)) respondJson(['success' => false, 'message' => 'Placa não informada.']);
 
@@ -336,6 +338,25 @@ if ($acao === 'atualizar_capacidade') {
          VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql})
          ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3"
     );
+
+    if (strpos($placa, '-') === false) {
+        $vlrMinSql = $vlrMinFrete !== null ? $vlrMinFrete : 'NULL';
+        $resVeic = @pg_query($conn,
+            "UPDATE {$tabelaVeiculo}
+             SET capacidade_ton = {$capTonSql},
+                 capacidade_m3 = {$capM3Sql},
+                 vlr_min_frete = {$vlrMinSql}
+             WHERE UPPER(placa) = UPPER('" . pg_escape_string($conn, $placa) . "')"
+        );
+        if ($resVeic === false) {
+            @pg_query($conn,
+                "UPDATE {$tabelaVeiculo}
+                 SET capacidade_ton = {$capTonSql},
+                     capacidade_m3 = {$capM3Sql}
+                 WHERE UPPER(placa) = UPPER('" . pg_escape_string($conn, $placa) . "')"
+            );
+        }
+    }
 
     respondJson(['success' => true]);
 }

@@ -187,7 +187,11 @@ interface CteCarregamento {
   nroCte?: number;
   destinatario?: string;
   remetente?: string;
+  pagador?: string;
   cidade?: string;
+  vlr_merc?: string;
+  vlr_frete?: string;
+  frete?: string;
   peso?: string;
   cubagem?: string;
   qtdeVol?: string;
@@ -201,6 +205,7 @@ interface Carregamento {
   login_criacao: string;
   capacidade_ton: number | null;
   capacidade_m3: number | null;
+  vlr_min_frete?: number | null;
   destino?: string | null;
   paradas?: string | null;
   ctes: CteCarregamento[];
@@ -1017,6 +1022,41 @@ function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: num
   );
 }
 
+function BarraFreteSegmentada({ cif, fob, minimo }: { cif: number; fob: number; minimo?: number | null }) {
+  const total = (Number.isFinite(cif) ? cif : 0) + (Number.isFinite(fob) ? fob : 0);
+  const pctCif = total > 0 ? Math.max(0, Math.min((cif / total) * 100, 100)) : 0;
+  const pctFob = total > 0 ? Math.max(0, Math.min((fob / total) * 100, 100)) : 0;
+  const minVal = minimo && Number.isFinite(minimo) && minimo > 0 ? minimo : null;
+  const abaixoMin = minVal !== null && total > 0 && total < minVal;
+  const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Frete (R$)</span>
+        <span className={`text-[10px] font-bold whitespace-nowrap ${abaixoMin ? 'text-red-700 dark:text-red-300' : 'text-slate-700 dark:text-slate-300'}`}>
+          {fmt(total)}{minVal !== null ? ` / mín. ${fmt(minVal)}` : ''}
+        </span>
+      </div>
+      <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex">
+        <div
+          className="h-3"
+          style={{ width: `${pctCif}%`, backgroundImage: 'linear-gradient(90deg, #059669, #10b981)' }}
+          title={`CIF: ${fmt(cif)}`}
+        />
+        <div
+          className="h-3"
+          style={{ width: `${pctFob}%`, backgroundImage: 'linear-gradient(90deg, #b45309, #f59e0b)' }}
+          title={`FOB: ${fmt(fob)}`}
+        />
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+        <span className="whitespace-nowrap">CIF: <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{fmt(cif)}</span></span>
+        <span className="whitespace-nowrap">FOB: <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{fmt(fob)}</span></span>
+      </div>
+    </div>
+  );
+}
+
 function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string, destino: string, paradas: string) => void; onFechar: () => void }) {
   const [placa, setPlaca] = useState('');
   const [destino, setDestino] = useState('');
@@ -1223,6 +1263,7 @@ function CardCarregamento({
   const [editandoCapacidade, setEditandoCapacidade] = useState(false);
   const [novaCapTon, setNovaCapTon] = useState('');
   const [novaCapM3, setNovaCapM3] = useState('');
+  const [novaVlrMinFrete, setNovaVlrMinFrete] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
@@ -1307,7 +1348,7 @@ function CardCarregamento({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: novaCapTon !== '' ? parseFloat(novaCapTon) : null, cap_m3: novaCapM3 !== '' ? parseFloat(novaCapM3) : null }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: novaCapTon !== '' ? parseFloat(novaCapTon) : null, cap_m3: novaCapM3 !== '' ? parseFloat(novaCapM3) : null, vlr_min_frete: novaVlrMinFrete !== '' ? parseFloat(novaVlrMinFrete) : null }) },
         true
       );
       if (res.success) { toast.success('Capacidade atualizada.'); setEditandoCapacidade(false); onRecarregarCarregamentos(); }
@@ -1331,6 +1372,17 @@ function CardCarregamento({
 
   const totalPeso = ctesDetalhados.reduce((s, c) => s + parsePeso(c.det?.peso ?? ''), 0);
   const totalCubagem = ctesDetalhados.reduce((s, c) => s + parseCubagem(c.det?.cubagem ?? ''), 0);
+  const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+  const freteTotals = ctesDetalhados.reduce((acc: { cif: number; fob: number }, c) => {
+    const v = parseMoeda(String(c.vlr_frete ?? c.frete ?? ''));
+    const rem = normalizePessoa(String(c.remetente ?? ''));
+    const pag = normalizePessoa(String(c.pagador ?? ''));
+    if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
+    else acc.fob += v;
+    return acc;
+  }, { cif: 0, fob: 0 });
+  const freteCif = freteTotals.cif;
+  const freteFob = freteTotals.fob;
   const temCapacidade = carregamento.capacidade_ton !== null && carregamento.capacidade_m3 !== null;
 
   const primeiroCte = carregamento.ctes.length > 0 ? carregamento.ctes[0] : null;
@@ -1424,7 +1476,7 @@ function CardCarregamento({
 
         {editandoCapacidade && (
           <div className="mb-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 space-y-2">
-            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Capacidade do veículo</p>
+            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Parâmetros do veículo</p>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-[10px] text-slate-500 dark:text-slate-400">Ton</label>
@@ -1433,6 +1485,10 @@ function CardCarregamento({
               <div className="flex-1">
                 <label className="text-[10px] text-slate-500 dark:text-slate-400">m³</label>
                 <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapM3} onChange={e => setNovaCapM3(e.target.value)} placeholder="Ex: 40" />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Vlr. Min. Frete (R$)</label>
+                <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrMinFrete} onChange={e => setNovaVlrMinFrete(e.target.value)} placeholder="Ex: 3500" />
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -1458,6 +1514,7 @@ function CardCarregamento({
               corGradient="linear-gradient(90deg, #0369a1, #0ea5e9)"
               label="Cubagem (m³)"
             />
+            <BarraFreteSegmentada cif={freteCif} fob={freteFob} minimo={carregamento.vlr_min_frete ?? null} />
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -1496,7 +1553,7 @@ function CardCarregamento({
             </Button>
           </div>
           <div className="flex gap-1.5 justify-end">
-            <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setEditandoCapacidade(v => !v); }} title="Editar capacidade do veículo">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setEditandoCapacidade(v => !v); }} title="Editar parâmetros do veículo">
               <Gauge className="w-3.5 h-3.5" />
             </Button>
             <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
@@ -3774,7 +3831,7 @@ export function Disponiveis() {
                 </div>
                 <div className="flex-1 min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
                   <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
-                  {' '}linha{(!loadingLinhasOrigem && linhasCarregamHoje.length !== 1) ? 's' : ''} carregam HOJE. Clique aqui para visualizar.
+                  {' '}linha(s) carrega(m) HOJE. Clique aqui para visualizar.
                 </div>
                 <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap hidden lg:block">
                   {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}

@@ -43,6 +43,7 @@ $sqlCarregamentos = "
         (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' LIMIT 1) AS paradas,
         v.capacidade_ton,
         v.capacidade_m3,
+        v.vlr_min_frete,
         cap.cap_ton,
         cap.cap_m3
     FROM {$tabelaCarregamento} c
@@ -51,7 +52,7 @@ $sqlCarregamentos = "
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = \$1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, v.vlr_min_frete, cap.cap_ton, cap.cap_m3
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -77,6 +78,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
     $capTon = $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null);
     $capM3  = $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null);
+    $vlrMinFrete = $row['vlr_min_frete'] !== null ? (float)$row['vlr_min_frete'] : null;
 
     if ($capTon === null || $capTon <= 0) $capTon = 27.0;
     if ($capM3  === null || $capM3  <= 0) $capM3  = 67.0;
@@ -91,6 +93,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'login_criacao'    => $row['login_criacao'] ?? '',
         'capacidade_ton'   => $capTon,
         'capacidade_m3'    => $capM3,
+        'vlr_min_frete'    => $vlrMinFrete,
         'destino'          => $destino !== '' ? $destino : null,
         'paradas'          => $paradas !== '' ? $paradas : null,
         'ctes'             => [],
