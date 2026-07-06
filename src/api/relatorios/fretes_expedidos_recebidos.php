@@ -526,6 +526,13 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
     ];
 };
 
+$inferTipoFromFilename = static function(string $filename): string {
+    $fn = strtoupper((string)$filename);
+    if (strpos($fn, '_E.SSWWEB') !== false) return 'R';
+    if (strpos($fn, '_R.SSWWEB') !== false) return 'E';
+    return 'E';
+};
+
 if ($step === 'DOWNLOAD') {
     if ($actIn === '') {
         respondJson(['success' => false, 'message' => 'Parâmetro act obrigatório para download.']);
@@ -536,8 +543,7 @@ if ($step === 'DOWNLOAD') {
         respondJson(['success' => false, 'message' => 'Não foi possível baixar o arquivo pelo ssw1440/ssw0424.']);
     }
 
-    $fn = strtoupper((string)$dl['filename']);
-    $tipo = (strpos($fn, '_R.SSWWEB') !== false) ? 'R' : 'E';
+    $tipo = $inferTipoFromFilename((string)$dl['filename']);
     $t0 = microtime(true);
     $data = $parseTxt((string)$dl['content'], $tipo);
     $t1 = microtime(true);
@@ -850,8 +856,8 @@ if (empty($acts)) {
 
 $rankAct = static function(string $act): int {
     $a = strtoupper($act);
-    if (strpos($a, '_E.SSWWEB') !== false) return 1;
-    if (strpos($a, '_R.SSWWEB') !== false) return 2;
+    if (strpos($a, '_R.SSWWEB') !== false) return 1;
+    if (strpos($a, '_E.SSWWEB') !== false) return 2;
     return 9;
 };
 
@@ -868,10 +874,10 @@ foreach ($acts as $act) {
     if (!$dl) continue;
     $downloads[] = ['act' => $act, 'filename' => $dl['filename']];
 
-    $fn = strtoupper($dl['filename']);
-    if (strpos($fn, '_E.SSWWEB') !== false) {
+    $tipo = $inferTipoFromFilename((string)$dl['filename']);
+    if ($tipo === 'E') {
         $exp = $parseTxt($dl['content'], 'E');
-    } elseif (strpos($fn, '_R.SSWWEB') !== false) {
+    } elseif ($tipo === 'R') {
         $rec = $parseTxt($dl['content'], 'R');
     } else {
         if ($exp === null) $exp = $parseTxt($dl['content'], 'E');

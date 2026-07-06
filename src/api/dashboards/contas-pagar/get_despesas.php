@@ -366,8 +366,7 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
     $opcPrefix = preg_replace('/\D+/', '', (string)$opcPrefix);
     if ($opcPrefix === '') return null;
 
-    $maxTries = 30;
-    $sleepUs = 1000000;
+    $maxTries = 90;
 
     for ($try = 0; $try < $maxTries; $try++) {
         $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
@@ -426,6 +425,7 @@ $downloadFrom1440 = static function(string $opcPrefix, string $unidadeFiltro = '
             if (!empty($file) && strlen((string)$file) >= 100) return $file;
         }
 
+        $sleepUs = $try < 8 ? 450000 : ($try < 25 ? 1000000 : 1800000);
         usleep($sleepUs);
     }
 
