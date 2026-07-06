@@ -167,10 +167,9 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
   lines.push(header.map(csvEscape).join(';'));
 
   for (const r of data.rows || []) {
-    const unidadeSigla = String((r as any)?.sigla ?? r.unidade ?? '')
+    const unidadeSigla = String(r.unidade ?? (r as any)?.sigla ?? '')
       .trim()
-      .split(/\s+/)[0]
-      .slice(0, 3)
+      .substring(0, 3)
       .toUpperCase();
     lines.push(
       [
