@@ -1111,7 +1111,7 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               Placa livre
             </button>
             <button
-              onClick={() => { setModoVeiculo(true); setPlaca(''); setDestino(''); setParadas(''); }}
+              onClick={() => { setModoVeiculo(true); setPlaca(''); }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${modoVeiculo ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-emerald-400'}`}
             >
               <Car className="w-4 h-4 inline mr-1.5" />Veículo cadastrado
@@ -1158,36 +1158,32 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               )}
             </div>
           )}
-          {!modoVeiculo && (
-            <>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Unid. destino <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={destino}
-                  onChange={e => setDestino(e.target.value.toUpperCase())}
-                  placeholder="Ex: SPO"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Paradas intermediárias <span className="font-normal text-slate-400">(opcional)</span></label>
-                <input
-                  type="text"
-                  value={paradas}
-                  onChange={e => setParadas(e.target.value.toUpperCase())}
-                  placeholder="Ex: CWB, LDA"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-            </>
-          )}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Unid. destino <span className="text-red-400">*</span></label>
+            <input
+              type="text"
+              value={destino}
+              onChange={e => setDestino(e.target.value.toUpperCase())}
+              placeholder="Ex: SPO"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Paradas intermediárias <span className="font-normal text-slate-400">(opcional)</span></label>
+            <input
+              type="text"
+              value={paradas}
+              onChange={e => setParadas(e.target.value.toUpperCase())}
+              placeholder="Ex: CWB, LDA"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
         </div>
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" className="flex-1" onClick={onFechar}>Cancelar</Button>
           <Button
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-            disabled={!placaFinal.trim() || (!modoVeiculo && !destino.trim())}
+            disabled={!placaFinal.trim() || !destino.trim()}
             onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim(), destino.trim(), paradas.trim()); }}
           >
             <Plus className="w-4 h-4 mr-1.5" />Carregamento Manual
