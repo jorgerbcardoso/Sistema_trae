@@ -169,6 +169,7 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
   for (const r of data.rows || []) {
     const unidadeSigla = String((r as any)?.sigla ?? r.unidade ?? '')
       .trim()
+      .split(/\s+/)[0]
       .slice(0, 3)
       .toUpperCase();
     lines.push(
@@ -820,7 +821,7 @@ export function FretesExpedidosRecebidos() {
                       return;
                     }
                     const kind = isExp ? 'Expedidos' : 'Recebidos';
-                    const unidadeLabel = isExp ? 'Unidade Destino' : 'Unidade Origem';
+                    const unidadeLabel = isExp ? 'Unidade Origem' : 'Unidade Destino';
                     const rows = isExp ? rowsExpSorted : rowsRecSorted;
                     const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
