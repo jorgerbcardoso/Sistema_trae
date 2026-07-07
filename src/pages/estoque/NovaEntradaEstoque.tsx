@@ -1678,10 +1678,6 @@ export default function NovaEntradaEstoque() {
                   <div className="text-center py-8 text-gray-500">
                     <MapPin className="size-12 mx-auto mb-4 opacity-50" />
                     <p>Nenhuma posição disponível</p>
-                    <Button onClick={abrirModalCriarPosicao} className="mt-4 gap-2">
-                      <Plus className="size-4" />
-                      Criar Nova Posição
-                    </Button>
                   </div>
                 )}
               </div>
@@ -1691,7 +1687,7 @@ export default function NovaEntradaEstoque() {
 
         {/* Modal de Criar Nova Posição */}
         <Dialog open={modalCriarPosicao} onOpenChange={setModalCriarPosicao}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Criar Nova Posição</DialogTitle>
               <DialogDescription>

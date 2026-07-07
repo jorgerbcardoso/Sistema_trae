@@ -37,6 +37,8 @@ $isMTZ = (strtoupper($unidadeAtual) === 'MTZ');
 // ✅ CONECTAR AO BANCO
 $g_sql = connect();
 
+header('Content-Type: application/json; charset=utf-8');
+
 try {
     $method = $_SERVER['REQUEST_METHOD'];
     $input = json_decode(file_get_contents('php://input'), true);
