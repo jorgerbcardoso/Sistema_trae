@@ -31,11 +31,13 @@ if ($method === 'GET') {
 
         $where = '';
         $params = [];
+        $limitPlaceholder = '$1';
 
         if ($search !== '') {
             $s = '%' . removeAccents($search) . '%';
             $where = "WHERE (CAST(o.codigo AS TEXT) ILIKE $1 OR UPPER(remove_accents(COALESCE(o.descricao, ''))) LIKE UPPER($1))";
             $params[] = $s;
+            $limitPlaceholder = '$2';
         }
 
         $params[] = $limit;
@@ -45,7 +47,7 @@ if ($method === 'GET') {
             FROM {$tableOcor} o
             {$where}
             ORDER BY COALESCE(o.descricao, '') ASC
-            LIMIT $2::int
+            LIMIT {$limitPlaceholder}::int
         ";
 
         $result = sql($query, $params, $conn);
