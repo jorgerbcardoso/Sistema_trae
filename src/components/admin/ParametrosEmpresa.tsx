@@ -200,7 +200,7 @@ export function ParametrosEmpresa() {
             }}
           >
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+              <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 min-w-0 justify-between">
                 <span className="truncate">{buttonLabel}</span>
                 <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
               </Button>

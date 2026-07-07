@@ -29,28 +29,43 @@ if ($method === 'GET') {
             $limit = 200;
         }
 
-        $where = '';
-        $params = [];
-        $limitPlaceholder = '$1';
-
+        $result = null;
         if ($search !== '') {
             $s = '%' . removeAccents($search) . '%';
-            $where = "WHERE (CAST(o.codigo AS TEXT) ILIKE $1 OR UPPER(remove_accents(COALESCE(o.descricao, ''))) LIKE UPPER($1))";
-            $params[] = $s;
-            $limitPlaceholder = '$2';
+            $params = [$s, $limit];
+
+            $queryUnaccent = "
+                SELECT o.codigo, COALESCE(o.descricao, '') AS descricao, COALESCE(o.tipo, '') AS tipo
+                FROM {$tableOcor} o
+                WHERE (CAST(o.codigo AS TEXT) ILIKE $1::text OR unaccent(COALESCE(o.descricao, '')) ILIKE unaccent($1::text))
+                ORDER BY o.codigo ASC
+                LIMIT $2::int
+            ";
+
+            try {
+                $result = sql($queryUnaccent, $params, $conn);
+            } catch (Exception $e) {
+                $queryPlain = "
+                    SELECT o.codigo, COALESCE(o.descricao, '') AS descricao, COALESCE(o.tipo, '') AS tipo
+                    FROM {$tableOcor} o
+                    WHERE (CAST(o.codigo AS TEXT) ILIKE $1::text OR COALESCE(o.descricao, '') ILIKE $1::text)
+                    ORDER BY o.codigo ASC
+                    LIMIT $2::int
+                ";
+                $result = sql($queryPlain, $params, $conn);
+            }
+        } else {
+            $params = [$limit];
+
+            $query = "
+                SELECT o.codigo, COALESCE(o.descricao, '') AS descricao, COALESCE(o.tipo, '') AS tipo
+                FROM {$tableOcor} o
+                ORDER BY o.codigo ASC
+                LIMIT $1::int
+            ";
+
+            $result = sql($query, $params, $conn);
         }
-
-        $params[] = $limit;
-
-        $query = "
-            SELECT o.codigo, COALESCE(o.descricao, '') AS descricao, COALESCE(o.tipo, '') AS tipo
-            FROM {$tableOcor} o
-            {$where}
-            ORDER BY COALESCE(o.descricao, '') ASC
-            LIMIT {$limitPlaceholder}::int
-        ";
-
-        $result = sql($query, $params, $conn);
 
         $ocorrencias = [];
         while ($row = pg_fetch_assoc($result)) {
