@@ -132,9 +132,9 @@ export function FilterSelectEstoque({
   };
 
   return (
-    <div className={label ? "grid gap-2" : ""}>
+    <div className={label ? "grid gap-2 min-w-0" : "min-w-0"}>
       {label && <Label>{label}</Label>}
-      <div className="relative">
+      <div className="relative min-w-0 w-full">
         <Popover open={open} onOpenChange={(isOpen) => {
           setOpen(isOpen);
           if (isOpen && allEstoques.length === 0) {
@@ -144,10 +144,10 @@ export function FilterSelectEstoque({
           <PopoverTrigger asChild>
             <Button 
               variant="outline" 
-              className="w-full h-10 justify-start text-left dark:bg-slate-800 dark:border-slate-700 relative overflow-hidden"
+              className="w-full h-10 justify-start text-left dark:bg-slate-800 dark:border-slate-700 relative overflow-hidden min-w-0 max-w-full"
               disabled={disabled}
             >
-              <span className={`truncate min-w-0 ${selectedEstoque ? 'pr-16' : 'pr-10'}`}>
+              <span className={`block truncate min-w-0 max-w-full ${selectedEstoque ? 'pr-16' : 'pr-10'}`}>
                 {selectedEstoque 
                   ? `${selectedEstoque.unidade}${String(selectedEstoque.nro_estoque).padStart(6, '0')} - ${selectedEstoque.descricao}` 
                   : placeholder}
