@@ -26,6 +26,10 @@ type EmpParam = {
 
 type FieldKey = keyof EmpParam;
 
+function formatOcorCodigo(codigo: number) {
+  return String(codigo).padStart(2, '0');
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
 
@@ -177,9 +181,9 @@ export function ParametrosEmpresa() {
     const inputRef = useRef<HTMLInputElement | null>(null);
 
     const buttonLabel = selected
-      ? `${selected.codigo} — ${selected.descricao}`
+      ? `${formatOcorCodigo(selected.codigo)}. ${selected.descricao}`
       : selectedCode != null
-        ? `${selectedCode}`
+        ? `${formatOcorCodigo(selectedCode)}`
         : 'Selecionar ocorrência';
 
     return (
@@ -226,7 +230,7 @@ export function ParametrosEmpresa() {
                   <div className="p-1">
                     {list.map((o) => {
                       const isSelected = selectedCode === o.codigo;
-                      const title = `${o.codigo} — ${o.descricao}`;
+                      const title = `${formatOcorCodigo(o.codigo)}. ${o.descricao}`;
                       return (
                         <button
                           key={o.codigo}
@@ -243,7 +247,6 @@ export function ParametrosEmpresa() {
                           <Check className={cn('h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
                           <div className="min-w-0">
                             <div className="truncate">{title}</div>
-                            {o.tipo ? <div className="text-xs text-slate-500 truncate">{o.tipo}</div> : null}
                           </div>
                         </button>
                       );
