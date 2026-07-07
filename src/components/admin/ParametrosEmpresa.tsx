@@ -195,7 +195,13 @@ export function ParametrosEmpresa() {
             onOpenChange={(v) => {
               setOcorrenciasOpen((prev) => ({ ...prev, [field]: v }));
               if (v) {
-                window.setTimeout(() => inputRef.current?.focus(), 0);
+                window.setTimeout(() => {
+                  const el = inputRef.current;
+                  if (!el) return;
+                  el.focus();
+                  const len = el.value.length;
+                  el.setSelectionRange(len, len);
+                }, 0);
               }
             }}
           >
@@ -213,6 +219,12 @@ export function ParametrosEmpresa() {
                     ref={inputRef}
                     value={searchTerm[field]}
                     onChange={(e) => setSearchTerm((prev) => ({ ...prev, [field]: e.target.value }))}
+                    onFocus={() => {
+                      const el = inputRef.current;
+                      if (!el) return;
+                      const len = el.value.length;
+                      el.setSelectionRange(len, len);
+                    }}
                     placeholder={placeholder}
                     className="pl-9"
                   />
