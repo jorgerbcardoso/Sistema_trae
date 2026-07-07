@@ -353,7 +353,7 @@ export function PainelRetidos() {
       'CT-e',
       'NF',
       'Emissão',
-      'Ocorrência 82',
+      'Ocorrência Retido',
       'Status',
       'Unidade Emit',
       'Cidade Origem',
@@ -667,7 +667,7 @@ export function PainelRetidos() {
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nro_cte')}>CT-e {sortConfig?.key === 'nro_cte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200">NF</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_emissao')}>Emissão {sortConfig?.key === 'data_emissao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
-                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>Ocorrência {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
+                    <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('data_ocorrencia_82')}>Ocorrência Retido {sortConfig?.key === 'data_ocorrencia_82' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('cidade_dest')}>Cidade Destino {sortConfig?.key === 'cidade_dest' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_destinatario')}>Destinatário {sortConfig?.key === 'nome_destinatario' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
                     <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSort('nome_pagador')}>Pagador {sortConfig?.key === 'nome_pagador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</span>
@@ -826,7 +826,7 @@ export function PainelRetidos() {
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nro_cte')}>CT-e {sortConfigDialog?.key === 'nro_cte' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200">NF</span>
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_emissao')}>Emissão {sortConfigDialog?.key === 'data_emissao' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
-                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_ocorrencia_82')}>Ocorrência {sortConfigDialog?.key === 'data_ocorrencia_82' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
+                <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('data_ocorrencia_82')}>Ocorrência Retido {sortConfigDialog?.key === 'data_ocorrencia_82' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('is_ativo')}>Status {sortConfigDialog?.key === 'is_ativo' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('cidade_dest')}>Cidade Destino {sortConfigDialog?.key === 'cidade_dest' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>
                 <span className="cursor-pointer hover:text-slate-700 dark:hover:text-slate-200" onClick={() => handleSortDialog('nome_destinatario')}>Destinatário {sortConfigDialog?.key === 'nome_destinatario' && (sortConfigDialog.direction === 'asc' ? '↑' : '↓')}</span>

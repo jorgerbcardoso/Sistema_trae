@@ -78,37 +78,35 @@ if (!in_array($TOP_N, [10, 20], true)) $TOP_N = 10;
 $isSelection = count($cnpjsSelecionados) > 0;
 
 if ($groupBy === 'grupos') {
-    // 1. Buscar top grupos (agrupados por cnpj_principal)
-    $queryGrupos = "
+    $queryRanking = "
         SELECT
-            gc.cnpj_principal                                   AS chave,
-            COALESCE(cli.nome, gc.cnpj_principal)               AS nome,
-            COUNT(*)                                            AS qtde_ctes,
-            SUM(cte.vlr_frete)                                  AS total_frete,
-            SUM(cte.vlr_merc)                                   AS total_merc,
-            SUM(cte.peso_real)                                  AS total_peso,
-            SUM(cte.qtde_vol)                                   AS total_volumes,
-            AVG(cte.vlr_frete)                                  AS ticket_medio,
-            COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)     AS qtde_cif,
-            COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)     AS qtde_fob,
-            TRUE                                                AS is_grupo
+            COALESCE(gc.cnpj_principal, cte.cnpj_pag)                         AS chave,
+            COALESCE(MAX(cli.nome), MAX(cte.nome_pag), COALESCE(gc.cnpj_principal, cte.cnpj_pag)) AS nome,
+            COUNT(*)                                                         AS qtde_ctes,
+            SUM(cte.vlr_frete)                                               AS total_frete,
+            SUM(cte.vlr_merc)                                                AS total_merc,
+            SUM(cte.peso_real)                                               AS total_peso,
+            SUM(cte.qtde_vol)                                                AS total_volumes,
+            AVG(cte.vlr_frete)                                               AS ticket_medio,
+            COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)                   AS qtde_cif,
+            COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)                   AS qtde_fob,
+            (MAX(CASE WHEN gc.cnpj_principal IS NULL THEN 0 ELSE 1 END) = 1) AS is_grupo
         FROM {$domain}_cte cte
-        INNER JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
-        LEFT  JOIN {$domain}_cliente cli      ON cli.cnpj = gc.cnpj_principal
+        LEFT JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
+        LEFT JOIN {$domain}_cliente cli      ON cli.cnpj = COALESCE(gc.cnpj_principal, cte.cnpj_pag)
         {$whereClauseClientes}
-        GROUP BY gc.cnpj_principal, cli.nome
+        GROUP BY 1
         ORDER BY total_frete DESC
         " . ($isSelection ? "" : "LIMIT {$TOP_N}") . "
     ";
 
-    $resultGrupos = pg_query_params($conn, $queryGrupos, $queryParams);
-    if (!$resultGrupos) {
-        respondJson(['success' => false, 'message' => 'Erro na query grupos: ' . pg_last_error($conn)]);
+    $resultRanking = pg_query_params($conn, $queryRanking, $queryParams);
+    if (!$resultRanking) {
+        respondJson(['success' => false, 'message' => 'Erro na query ranking grupos: ' . pg_last_error($conn)]);
     }
 
     $clientes = [];
-    $cnpjPrincipaisUsados = [];
-    while ($row = pg_fetch_assoc($resultGrupos)) {
+    while ($row = pg_fetch_assoc($resultRanking)) {
         $clientes[] = [
             'cnpj'          => $row['chave'],
             'nome'          => $row['nome'] ?: 'SEM NOME',
@@ -120,75 +118,8 @@ if ($groupBy === 'grupos') {
             'ticket_medio'  => (float)$row['ticket_medio'],
             'qtde_cif'      => (int)$row['qtde_cif'],
             'qtde_fob'      => (int)$row['qtde_fob'],
-            'is_grupo'      => true,
+            'is_grupo'      => pgBoolToPHP($row['is_grupo'] ?? false),
         ];
-        $cnpjPrincipaisUsados[] = $row['chave'];
-    }
-
-    // 2. Se não atingiu o limite, completar com clientes individuais sem grupo
-    $faltam = $TOP_N - count($clientes);
-    if (!$isSelection && $faltam > 0) {
-        $excluirGruposSql = '';
-        $paramsCompl = $queryParams;
-        $piCompl = $queryParamIndex;
-
-        if (!empty($cnpjPrincipaisUsados)) {
-            $phs = [];
-            foreach ($cnpjPrincipaisUsados as $cp) {
-                $phs[] = '$' . $piCompl++;
-                $paramsCompl[] = $cp;
-            }
-            $excluirGruposSql = "AND cte.cnpj_pag NOT IN (
-                SELECT gc2.cnpj FROM {$domain}_grupo_cliente gc2
-                WHERE gc2.cnpj_principal IN (" . implode(', ', $phs) . ")
-            )";
-        } else {
-            $excluirGruposSql = "AND cte.cnpj_pag NOT IN (
-                SELECT gc2.cnpj FROM {$domain}_grupo_cliente gc2
-            )";
-        }
-
-        $queryCompl = "
-            SELECT
-                cte.cnpj_pag                                        AS chave,
-                cte.nome_pag                                        AS nome,
-                COUNT(*)                                            AS qtde_ctes,
-                SUM(cte.vlr_frete)                                  AS total_frete,
-                SUM(cte.vlr_merc)                                   AS total_merc,
-                SUM(cte.peso_real)                                  AS total_peso,
-                SUM(cte.qtde_vol)                                   AS total_volumes,
-                AVG(cte.vlr_frete)                                  AS ticket_medio,
-                COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END)     AS qtde_cif,
-                COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END)     AS qtde_fob,
-                FALSE                                               AS is_grupo
-            FROM {$domain}_cte cte
-            {$whereClauseClientes}
-            {$excluirGruposSql}
-            GROUP BY cte.cnpj_pag, cte.nome_pag
-            ORDER BY total_frete DESC
-            LIMIT {$faltam}
-        ";
-
-        $resultCompl = pg_query_params($conn, $queryCompl, $paramsCompl);
-        if ($resultCompl) {
-            while ($row = pg_fetch_assoc($resultCompl)) {
-                $clientes[] = [
-                    'cnpj'          => $row['chave'],
-                    'nome'          => $row['nome'] ?: 'SEM NOME',
-                    'qtde_ctes'     => (int)$row['qtde_ctes'],
-                    'total_frete'   => (float)$row['total_frete'],
-                    'total_merc'    => (float)$row['total_merc'],
-                    'total_peso'    => (float)$row['total_peso'],
-                    'total_volumes' => (int)$row['total_volumes'],
-                    'ticket_medio'  => (float)$row['ticket_medio'],
-                    'qtde_cif'      => (int)$row['qtde_cif'],
-                    'qtde_fob'      => (int)$row['qtde_fob'],
-                    'is_grupo'      => false,
-                ];
-            }
-        }
-
-        usort($clientes, fn($a, $b) => $b['total_frete'] <=> $a['total_frete']);
     }
 
 } else {
@@ -373,14 +304,14 @@ if ($groupBy === 'grupos') {
         SELECT
             TO_CHAR(cte.data_emissao, 'YYYY-MM')        AS mes,
             TO_CHAR(cte.data_emissao, 'Mon/YY')         AS mes_label,
-            gc.cnpj_principal                            AS chave,
-            COALESCE(cli.nome, gc.cnpj_principal)        AS nome,
+            COALESCE(gc.cnpj_principal, cte.cnpj_pag)    AS chave,
+            COALESCE(MAX(cli.nome), MAX(cte.nome_pag), COALESCE(gc.cnpj_principal, cte.cnpj_pag)) AS nome,
             SUM(cte.vlr_frete)                           AS total_frete
         FROM {$domain}_cte cte
-        INNER JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
-        LEFT  JOIN {$domain}_cliente cli      ON cli.cnpj = gc.cnpj_principal
+        LEFT JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
+        LEFT JOIN {$domain}_cliente cli      ON cli.cnpj = COALESCE(gc.cnpj_principal, cte.cnpj_pag)
         {$where12}
-        GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), gc.cnpj_principal, cli.nome
+        GROUP BY 1, 2, 3
         ORDER BY mes ASC
     ";
 } else {

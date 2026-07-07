@@ -20,9 +20,23 @@ $periodoEmissaoInicio = $filters['periodoEmissaoInicio'] ?? '';
 $periodoEmissaoFim = $filters['periodoEmissaoFim'] ?? '';
 $siglaEmit = $filters['siglaEmit'] ?? [];
 
+$conn = connect();
+
+$defaultOcorRetido = 82;
+$ocorRetido = $defaultOcorRetido;
+
+try {
+    $resultEmpParam = sql("SELECT ocor_cte_retido FROM {$domain}_emp_param LIMIT 1", [], $conn);
+    $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
+    if ($rowEmpParam && $rowEmpParam['ocor_cte_retido'] !== null && $rowEmpParam['ocor_cte_retido'] !== '') {
+        $ocorRetido = (int)$rowEmpParam['ocor_cte_retido'];
+    }
+} catch (Exception $e) {
+}
+
 $params = [];
 $paramIndex = 1;
-$whereConditions = ["oc.codigo = 82"];
+$whereConditions = ["oc.codigo = {$ocorRetido}"];
 
 if (!empty($periodoOcorrenciaInicio)) {
     $whereConditions[] = 'oc.data_ocorrencia >= $' . $paramIndex++;
@@ -51,12 +65,10 @@ if (!empty($siglaEmit) && is_array($siglaEmit) && count($siglaEmit) > 0) {
 
 // Add filter for card type
 if ($cardId === 'ativos') {
-    $whereConditions[] = 'cte.ult_ocor = 82';
+    $whereConditions[] = "cte.ult_ocor = {$ocorRetido}";
 } elseif ($cardId === 'resolvidos') {
-    $whereConditions[] = 'cte.ult_ocor != 82';
+    $whereConditions[] = "cte.ult_ocor != {$ocorRetido}";
 }
-
-$conn = connect();
 
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
@@ -97,7 +109,7 @@ if (!$result) {
 
 $ctes = [];
 while ($row = pg_fetch_assoc($result)) {
-    $isAtivo = (int)$row['ult_ocor'] === 82;
+    $isAtivo = (int)$row['ult_ocor'] === $ocorRetido;
     $ctes[] = [
         'nro_cte' => $row['nro_cte'],
         'ser_cte' => $row['ser_cte'],

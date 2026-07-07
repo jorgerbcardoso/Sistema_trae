@@ -177,7 +177,7 @@ try {
         'A' => 'CT-e',
         'B' => 'NF',
         'C' => 'EMISSÃO',
-        'D' => 'OCORRÊNCIA 82',
+        'D' => 'OCORRÊNCIA RETIDO',
         'E' => 'STATUS',
         'F' => 'UNIDADE',
         'G' => 'CIDADE ORIGEM',

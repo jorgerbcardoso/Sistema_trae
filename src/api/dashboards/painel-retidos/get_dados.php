@@ -20,9 +20,21 @@ $siglaEmit = $input['siglaEmit'] ?? [];
 
 $conn = connect();
 
+$defaultOcorRetido = 82;
+$ocorRetido = $defaultOcorRetido;
+
+try {
+    $resultEmpParam = sql("SELECT ocor_cte_retido FROM {$domain}_emp_param LIMIT 1", [], $conn);
+    $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
+    if ($rowEmpParam && $rowEmpParam['ocor_cte_retido'] !== null && $rowEmpParam['ocor_cte_retido'] !== '') {
+        $ocorRetido = (int)$rowEmpParam['ocor_cte_retido'];
+    }
+} catch (Exception $e) {
+}
+
 $params = [];
 $paramIndex = 1;
-$whereConditions = ["oc.codigo = 82"];
+$whereConditions = ["oc.codigo = {$ocorRetido}"];
 
 if (!empty($periodoOcorrenciaInicio)) {
     $whereConditions[] = 'oc.data_ocorrencia >= $' . $paramIndex++;
@@ -101,7 +113,7 @@ $serieDias = [];
 $clientesQuantidade = [];
 
 while ($row = pg_fetch_assoc($result)) {
-    $isAtivo = (int)$row['ult_ocor'] === 82;
+    $isAtivo = (int)$row['ult_ocor'] === $ocorRetido;
     $cte = [
         'nro_cte' => $row['nro_cte'],
         'ser_cte' => $row['ser_cte'],
