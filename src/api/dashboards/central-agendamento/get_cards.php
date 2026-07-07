@@ -56,7 +56,25 @@ if (!empty($filters['cnpjDestinatario'])) {
 $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
 $data_hoje = date('Y-m-d');
-$ocorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
+$defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
+$defaultOcorAgendamento = 15;
+
+$ocorAguardando = $defaultOcorAguardando;
+$ocorAgendamento = $defaultOcorAgendamento;
+
+try {
+    $resultEmpParam = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento FROM {$domain}_emp_param LIMIT 1", [], $conn);
+    $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
+    if ($rowEmpParam) {
+        if ($rowEmpParam['ocor_aguardando_agendamento'] !== null && $rowEmpParam['ocor_aguardando_agendamento'] !== '') {
+            $ocorAguardando = (int)$rowEmpParam['ocor_aguardando_agendamento'];
+        }
+        if ($rowEmpParam['ocor_agendamento'] !== null && $rowEmpParam['ocor_agendamento'] !== '') {
+            $ocorAgendamento = (int)$rowEmpParam['ocor_agendamento'];
+        }
+    }
+} catch (Exception $e) {
+}
 
 $query = "
     SELECT
@@ -74,14 +92,14 @@ $query = "
         ) AS aguardando_agendamento,
 
         COUNT(CASE
-            WHEN cte.ult_ocor_agend = 15
+            WHEN cte.ult_ocor_agend = {$ocorAgendamento}
              AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= '$data_hoje'
              AND cte.data_entrega IS NULL
             THEN 1 END
         ) AS agendados_no_prazo,
 
         COUNT(CASE
-            WHEN cte.ult_ocor_agend = 15
+            WHEN cte.ult_ocor_agend = {$ocorAgendamento}
              AND cte.data_entrega IS NOT NULL
              AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
             THEN 1 END
@@ -92,7 +110,7 @@ $query = "
                  (cte.data_entrega IS NULL     AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < '$data_hoje')
               OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END))
              )
-            AND cte.ult_ocor_agend = 15
+            AND cte.ult_ocor_agend = {$ocorAgendamento}
             AND COALESCE(cte.entrega_abonada, false) = false
             THEN 1 END
         ) AS agendamentos_perdidos
@@ -145,7 +163,7 @@ respondJson([
             [
                 'id'        => 3,
                 'nome'      => 'Agendados ainda no Prazo',
-                'descricao' => 'Ocorrência 15, previsão futura e sem entrega registrada',
+                'descricao' => "Ocorrência {$ocorAgendamento}, previsão futura e sem entrega registrada",
                 'quantidade' => $agendadosNoPrazo,
                 'percentual' => $pct($agendadosNoPrazo),
                 'cor'       => '#10b981',

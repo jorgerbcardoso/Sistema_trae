@@ -155,8 +155,8 @@ export function CentralAgendamento() {
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
   const [relógios, setRelógios] = useState<Relógio[]>([
     { id: 1, nome: 'CT-es Agendáveis',          descricao: 'Clientes agendáveis sem ocorrência de agendamento',         quantidade: 0, percentual: 0, cor: '#6366f1', icone: 'CalendarCheck' },
-    { id: 2, nome: 'Aguardando Agendamento',     descricao: 'CT-es com ocorrência 14 (aguardando agendamento)',          quantidade: 0, percentual: 0, cor: '#3b82f6', icone: 'Clock'         },
-    { id: 3, nome: 'Agendados ainda no Prazo',   descricao: 'Ocorrência 15, previsão futura e sem entrega registrada',   quantidade: 0, percentual: 0, cor: '#10b981', icone: 'ClockCheck'    },
+    { id: 2, nome: 'Aguardando Agendamento',     descricao: 'CT-es aguardando agendamento',                               quantidade: 0, percentual: 0, cor: '#3b82f6', icone: 'Clock'         },
+    { id: 3, nome: 'Agendados ainda no Prazo',   descricao: 'Entrega agendada, previsão futura e sem entrega registrada',  quantidade: 0, percentual: 0, cor: '#10b981', icone: 'ClockCheck'    },
     { id: 4, nome: 'Agendamentos Cumpridos',     descricao: 'Entregues dentro do prazo previsto',                        quantidade: 0, percentual: 0, cor: '#059669', icone: 'CheckCircle', destaque: true },
     { id: 5, nome: 'Agendamentos Perdidos',      descricao: 'Sem entrega no prazo ou entregues com atraso',              quantidade: 0, percentual: 0, cor: '#ef4444', icone: 'AlertCircle'   },
   ]);

@@ -54,7 +54,25 @@ if (!empty($filters['cnpjDestinatario'])) {
     $params[] = $filters['cnpjDestinatario'];
 }
 
-$ocorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
+$defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
+$defaultOcorAgendamento = 15;
+
+$ocorAguardando = $defaultOcorAguardando;
+$ocorAgendamento = $defaultOcorAgendamento;
+
+try {
+    $resultEmpParam = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento FROM {$domain}_emp_param LIMIT 1", [], $conn);
+    $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
+    if ($rowEmpParam) {
+        if ($rowEmpParam['ocor_aguardando_agendamento'] !== null && $rowEmpParam['ocor_aguardando_agendamento'] !== '') {
+            $ocorAguardando = (int)$rowEmpParam['ocor_aguardando_agendamento'];
+        }
+        if ($rowEmpParam['ocor_agendamento'] !== null && $rowEmpParam['ocor_agendamento'] !== '') {
+            $ocorAgendamento = (int)$rowEmpParam['ocor_agendamento'];
+        }
+    }
+} catch (Exception $e) {
+}
 
 switch ($cardId) {
     case 1:
@@ -67,18 +85,18 @@ switch ($cardId) {
         $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 3:
-        $whereConditions[] = "cte.ult_ocor_agend = 15";
+        $whereConditions[] = "cte.ult_ocor_agend = $ocorAgendamento";
         $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE";
         $whereConditions[] = "cte.data_entrega IS NULL";
         break;
     case 4:
-        $whereConditions[] = "cte.ult_ocor_agend = 15";
+        $whereConditions[] = "cte.ult_ocor_agend = $ocorAgendamento";
         $whereConditions[] = "cte.data_entrega IS NOT NULL";
         $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
         break;
     case 5:
         $whereConditions[] = "((cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < CURRENT_DATE) OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)))";
-        $whereConditions[] = "cte.ult_ocor_agend = 15";
+        $whereConditions[] = "cte.ult_ocor_agend = $ocorAgendamento";
         $whereConditions[] = "COALESCE(cte.entrega_abonada, false) = false";
         break;
     default:

@@ -21,12 +21,24 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido']);
 }
 
+$defaultOcorAgendamento = 15;
+$ocorAgendamento = $defaultOcorAgendamento;
+
+try {
+    $resultEmpParam = sql("SELECT ocor_agendamento FROM {$domain}_emp_param LIMIT 1", [], $g_sql);
+    $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
+    if ($rowEmpParam && $rowEmpParam['ocor_agendamento'] !== null && $rowEmpParam['ocor_agendamento'] !== '') {
+        $ocorAgendamento = (int)$rowEmpParam['ocor_agendamento'];
+    }
+} catch (Exception $e) {
+}
+
 $params     = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
     "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')",
-    "cte.ult_ocor_agend = 15",
+    "cte.ult_ocor_agend = {$ocorAgendamento}",
 ];
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
