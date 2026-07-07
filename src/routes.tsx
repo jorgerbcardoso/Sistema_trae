@@ -78,6 +78,7 @@ import GestaoPermissoes from './components/admin/GestaoPermissoes';
 import CadastroUsuarios from './pages/admin/CadastroUsuarios';
 import { GestaoMenu } from './components/admin/GestaoMenu';
 import DomainPermissions from './pages/admin/DomainPermissions';
+import { ParametrosEmpresa } from './components/admin/ParametrosEmpresa';
 
 // Componente Root que renderiza as rotas filhas
 function Root() {
@@ -376,6 +377,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <DomainPermissions />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'admin/parametros-empresa',
+        element: (
+          <ProtectedRoute>
+            <ParametrosEmpresa />
           </ProtectedRoute>
         )
       },

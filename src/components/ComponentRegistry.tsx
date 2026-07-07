@@ -29,6 +29,7 @@ import { ControleTransbordo } from './relatorios/ControleTransbordo';
 import { TotaisVendedores } from './relatorios/TotaisVendedores';
 import { FretesExpedidosRecebidos } from './relatorios/FretesExpedidosRecebidos';
 import { GestaoMenu } from './admin/GestaoMenu';
+import { ParametrosEmpresa } from './admin/ParametrosEmpresa';
 
 // Componentes de ESTOQUE
 import Produtos from '../pages/estoque/Produtos';
@@ -153,6 +154,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'admin/GestaoDominios': lazy(() => import('./admin/GestaoDominios').then(module => ({ default: module.default }))),
   'admin/GestaoPermissoes': lazy(() => import('./admin/GestaoPermissoes').then(module => ({ default: module.default }))),
   'admin/GestaoMenu': GestaoMenu,
+  'admin/ParametrosEmpresa': ParametrosEmpresa,
   'UserManagement': UserManagement, // ✅ Para rota /gerenciamento/usuarios
   'DomainManagement': DomainManagement,
   
