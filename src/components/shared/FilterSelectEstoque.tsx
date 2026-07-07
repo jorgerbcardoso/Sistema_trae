@@ -144,10 +144,10 @@ export function FilterSelectEstoque({
           <PopoverTrigger asChild>
             <Button 
               variant="outline" 
-              className="w-full h-10 justify-start text-left dark:bg-slate-800 dark:border-slate-700 relative"
+              className="w-full h-10 justify-start text-left dark:bg-slate-800 dark:border-slate-700 relative overflow-hidden"
               disabled={disabled}
             >
-              <span className={`truncate ${selectedEstoque ? 'pr-16' : 'pr-10'}`}>
+              <span className={`truncate min-w-0 ${selectedEstoque ? 'pr-16' : 'pr-10'}`}>
                 {selectedEstoque 
                   ? `${selectedEstoque.unidade}${String(selectedEstoque.nro_estoque).padStart(6, '0')} - ${selectedEstoque.descricao}` 
                   : placeholder}

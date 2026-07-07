@@ -182,11 +182,15 @@ try {
                 exit;
             }
             
-            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM
-            $checkDuplicata = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND ativa = 'S'", 
-                        false, [$seq_estoque, $rua, $altura, $coluna, $seq_item]);
+            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (independente de ativa)
+            $checkDuplicata = sql(
+                $g_sql,
+                "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5",
+                false,
+                [$seq_estoque, $rua, $altura, $coluna, $seq_item]
+            );
             if (pg_num_rows($checkDuplicata) > 0) {
-                msg('Já existe uma posição ATIVA para este ITEM nesta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
+                msg('Já existe uma posição com este endereço, neste estoque e com este item.', 'error', 409);
                 exit;
             }
             
@@ -240,12 +244,16 @@ try {
                 exit;
             }
             
-            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (exceto a posi��ão atual)
+            // ✅ Verificar duplicidade: MESMA LOCALIZAÇÃO + MESMO ITEM (exceto a posição atual; independente de ativa)
             if ($seq_item !== null && $seq_item > 0) {
-                $check = sql($g_sql, "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND ativa = 'S' AND seq_posicao != $6", 
-                            false, [$seq_estoque, $rua, $altura, $coluna, $seq_item, $seq]);
+                $check = sql(
+                    $g_sql,
+                    "SELECT seq_posicao FROM $tblPosicao WHERE seq_estoque = $1 AND rua = $2 AND altura = $3 AND coluna = $4 AND seq_item = $5 AND seq_posicao != $6",
+                    false,
+                    [$seq_estoque, $rua, $altura, $coluna, $seq_item, $seq]
+                );
                 if (pg_num_rows($check) > 0) {
-                    msg('Já existe outra posição ativa para este ITEM nesta localização (ESTOQUE/RUA/ALTURA/COLUNA)');
+                    msg('Já existe uma posição com este endereço, neste estoque e com este item.', 'error', 409);
                     exit;
                 }
             }
