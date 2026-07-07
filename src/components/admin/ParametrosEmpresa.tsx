@@ -41,6 +41,122 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
+function OcorrenciaPicker({
+  field,
+  label,
+  placeholder,
+  open,
+  setOpen,
+  searchValue,
+  setSearchValue,
+  list,
+  isLoadingList,
+  selectedCode,
+  selectedLabel,
+  onSelect,
+  onClear,
+}: {
+  field: FieldKey;
+  label: string;
+  placeholder: string;
+  open: boolean;
+  setOpen: (field: FieldKey, open: boolean) => void;
+  searchValue: string;
+  setSearchValue: (field: FieldKey, value: string) => void;
+  list: Ocorrencia[];
+  isLoadingList: boolean;
+  selectedCode: number | null;
+  selectedLabel: string;
+  onSelect: (field: FieldKey, codigo: number) => void;
+  onClear: (field: FieldKey) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex items-center gap-2">
+        <Popover
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(field, v);
+            if (v) {
+              window.setTimeout(() => inputRef.current?.focus(), 0);
+            }
+          }}
+        >
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 min-w-0 justify-between">
+              <span className="truncate">{selectedLabel}</span>
+              <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <div className="p-3 border-b border-border">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  ref={inputRef}
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(field, e.target.value)}
+                  placeholder={placeholder}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="max-h-[320px] overflow-y-auto">
+              {isLoadingList ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Buscando...
+                </div>
+              ) : list.length === 0 ? (
+                <div className="py-6 text-center text-sm text-slate-500">Nenhuma ocorrência encontrada.</div>
+              ) : (
+                <div className="p-1">
+                  {list.map((o) => {
+                    const isSelected = selectedCode === o.codigo;
+                    const title = `${formatOcorCodigo(o.codigo)}. ${o.descricao}`;
+                    return (
+                      <button
+                        key={o.codigo}
+                        type="button"
+                        className={cn(
+                          'w-full flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800',
+                          isSelected ? 'bg-slate-100 dark:bg-slate-800' : ''
+                        )}
+                        onClick={() => {
+                          onSelect(field, o.codigo);
+                          setOpen(field, false);
+                        }}
+                      >
+                        <Check className={cn('h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
+                        <div className="min-w-0">
+                          <div className="truncate">{title}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          disabled={selectedCode == null}
+          onClick={() => onClear(field)}
+          title="Limpar seleção"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ParametrosEmpresa() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -164,124 +280,10 @@ export function ParametrosEmpresa() {
     }
   };
 
-  const FieldPicker = ({
-    field,
-    label,
-    placeholder,
-  }: {
-    field: FieldKey;
-    label: string;
-    placeholder: string;
-  }) => {
-    const selectedCode = params[field];
-    const selected = selectedCode != null ? occurrenceMap.get(selectedCode) : undefined;
-    const open = ocorrenciasOpen[field];
-    const list = ocorrencias[field];
-    const isLoadingList = loadingOcor[field];
-    const inputRef = useRef<HTMLInputElement | null>(null);
-
-    const buttonLabel = selected
-      ? `${formatOcorCodigo(selected.codigo)}. ${selected.descricao}`
-      : selectedCode != null
-        ? `${formatOcorCodigo(selectedCode)}`
-        : 'Selecionar ocorrência';
-
-    return (
-      <div className="space-y-2">
-        <Label>{label}</Label>
-        <div className="flex items-center gap-2">
-          <Popover
-            open={open}
-            onOpenChange={(v) => {
-              setOcorrenciasOpen((prev) => ({ ...prev, [field]: v }));
-              if (v) {
-                window.setTimeout(() => {
-                  const el = inputRef.current;
-                  if (!el) return;
-                  el.focus();
-                  const len = el.value.length;
-                  el.setSelectionRange(len, len);
-                }, 0);
-              }
-            }}
-          >
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 min-w-0 justify-between">
-                <span className="truncate">{buttonLabel}</span>
-                <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-              <div className="p-3 border-b border-border">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    ref={inputRef}
-                    value={searchTerm[field]}
-                    onChange={(e) => setSearchTerm((prev) => ({ ...prev, [field]: e.target.value }))}
-                    onFocus={() => {
-                      const el = inputRef.current;
-                      if (!el) return;
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }}
-                    placeholder={placeholder}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-              <div className="max-h-[320px] overflow-y-auto">
-                {isLoadingList ? (
-                  <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Buscando...
-                  </div>
-                ) : list.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-slate-500">Nenhuma ocorrência encontrada.</div>
-                ) : (
-                  <div className="p-1">
-                    {list.map((o) => {
-                      const isSelected = selectedCode === o.codigo;
-                      const title = `${formatOcorCodigo(o.codigo)}. ${o.descricao}`;
-                      return (
-                        <button
-                          key={o.codigo}
-                          type="button"
-                          className={cn(
-                            'w-full flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800',
-                            isSelected ? 'bg-slate-100 dark:bg-slate-800' : ''
-                          )}
-                          onClick={() => {
-                            setParams((prev) => ({ ...prev, [field]: o.codigo }));
-                            setOcorrenciasOpen((prev) => ({ ...prev, [field]: false }));
-                          }}
-                        >
-                          <Check className={cn('h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
-                          <div className="min-w-0">
-                            <div className="truncate">{title}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={params[field] == null}
-            onClick={() => setParams((prev) => ({ ...prev, [field]: null }))}
-            title="Limpar seleção"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  };
+  const setOpen = (field: FieldKey, open: boolean) => setOcorrenciasOpen((prev) => ({ ...prev, [field]: open }));
+  const setSearchValue = (field: FieldKey, value: string) => setSearchTerm((prev) => ({ ...prev, [field]: value }));
+  const handleSelect = (field: FieldKey, codigo: number) => setParams((prev) => ({ ...prev, [field]: codigo }));
+  const handleClear = (field: FieldKey) => setParams((prev) => ({ ...prev, [field]: null }));
 
   return (
     <AdminLayout title="PARÂMETROS DA EMPRESA" description="CONFIGURAÇÕES GERAIS DA TRANSPORTADORA">
@@ -292,22 +294,82 @@ export function ParametrosEmpresa() {
             <CardDescription>Defina os códigos de ocorrência usados pelos painéis de agendamento.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <FieldPicker
+            <OcorrenciaPicker
               field="ocor_aguardando_agendamento"
               label="Aguardando agendamento"
               placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_aguardando_agendamento}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_aguardando_agendamento}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_aguardando_agendamento}
+              isLoadingList={loadingOcor.ocor_aguardando_agendamento}
+              selectedCode={params.ocor_aguardando_agendamento}
+              selectedLabel={
+                params.ocor_aguardando_agendamento != null
+                  ? `${formatOcorCodigo(params.ocor_aguardando_agendamento)}. ${occurrenceMap.get(params.ocor_aguardando_agendamento)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
             />
-            <FieldPicker
+            <OcorrenciaPicker
               field="ocor_agendamento"
               label="Entrega agendada"
               placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_agendamento}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_agendamento}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_agendamento}
+              isLoadingList={loadingOcor.ocor_agendamento}
+              selectedCode={params.ocor_agendamento}
+              selectedLabel={
+                params.ocor_agendamento != null
+                  ? `${formatOcorCodigo(params.ocor_agendamento)}. ${occurrenceMap.get(params.ocor_agendamento)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
             />
-            <FieldPicker
+            <OcorrenciaPicker
               field="ocor_chegada_unid_dest"
               label="Chegada na unidade destino"
               placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_chegada_unid_dest}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_chegada_unid_dest}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_chegada_unid_dest}
+              isLoadingList={loadingOcor.ocor_chegada_unid_dest}
+              selectedCode={params.ocor_chegada_unid_dest}
+              selectedLabel={
+                params.ocor_chegada_unid_dest != null
+                  ? `${formatOcorCodigo(params.ocor_chegada_unid_dest)}. ${occurrenceMap.get(params.ocor_chegada_unid_dest)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
             />
-            <FieldPicker field="ocor_cte_retido" label="CT-e Retido" placeholder="Busque por código ou descrição..." />
+            <OcorrenciaPicker
+              field="ocor_cte_retido"
+              label="CT-e Retido"
+              placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_cte_retido}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_cte_retido}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_cte_retido}
+              isLoadingList={loadingOcor.ocor_cte_retido}
+              selectedCode={params.ocor_cte_retido}
+              selectedLabel={
+                params.ocor_cte_retido != null
+                  ? `${formatOcorCodigo(params.ocor_cte_retido)}. ${occurrenceMap.get(params.ocor_cte_retido)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
+            />
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button type="button" variant="outline" disabled={loading || saving} onClick={loadParams}>
