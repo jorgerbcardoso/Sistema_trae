@@ -69,6 +69,15 @@ export function CadastroLinhas() {
     carrega_dom: true,
   });
 
+  const parsePtBrDecimal = (raw: string): number | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+    const value = Number(normalized);
+    if (!Number.isFinite(value)) return null;
+    return value;
+  };
+
   usePageTitle('Cadastro de Linhas');
 
   useEffect(() => {
@@ -120,7 +129,9 @@ export function CadastroLinhas() {
       sigla_dest: linha.sigla_dest,
       unidades: linha.unidades.split(',').filter(u => u.trim()),
       km_ida: String(linha.km_ida),
-      vlr_min_frete: linha.vlr_min_frete !== null && linha.vlr_min_frete !== undefined ? Number(linha.vlr_min_frete).toFixed(2) : '',
+      vlr_min_frete: linha.vlr_min_frete !== null && linha.vlr_min_frete !== undefined
+        ? Number(linha.vlr_min_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
       carrega_seg: linha.carrega_seg ?? true,
       carrega_ter: linha.carrega_ter ?? true,
       carrega_qua: linha.carrega_qua ?? true,
@@ -198,7 +209,11 @@ export function CadastroLinhas() {
         sigla_dest: formData.sigla_dest.toUpperCase(),
         unidades: unidadesStr,
         km_ida: parseFloat(formData.km_ida),
-        vlr_min_frete: formData.vlr_min_frete.trim() ? Number(parseFloat(formData.vlr_min_frete).toFixed(2)) : null,
+        vlr_min_frete: (() => {
+          const parsed = parsePtBrDecimal(formData.vlr_min_frete);
+          if (parsed === null) return null;
+          return Number(parsed.toFixed(2));
+        })(),
         carrega_seg: !!formData.carrega_seg,
         carrega_ter: !!formData.carrega_ter,
         carrega_qua: !!formData.carrega_qua,
@@ -413,8 +428,8 @@ export function CadastroLinhas() {
                                 {getSortIcon('sigla_emit')}
                               </div>
                             </TableHead>
-                            <TableHead className="w-[250px]">
-                              Unidades
+                            <TableHead className="w-[180px]">
+                              Passagens
                             </TableHead>
                             <TableHead className="w-[95px]">
                               Dias Carr.
@@ -429,13 +444,16 @@ export function CadastroLinhas() {
                               </div>
                             </TableHead>
                             <TableHead 
-                              className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" 
+                              className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 w-[90px]" 
                               onClick={() => handleSort('km_ida')}
                             >
                               <div className="flex items-center">
-                                Distância (km)
+                                Km
                                 {getSortIcon('km_ida')}
                               </div>
+                            </TableHead>
+                            <TableHead className="w-[140px]">
+                              Vlr mín. frete
                             </TableHead>
                             <TableHead className="text-right w-[100px]">Ações</TableHead>
                           </TableRow>
@@ -454,6 +472,11 @@ export function CadastroLinhas() {
                               </TableCell>
                               <TableCell>{linha.sigla_dest}</TableCell>
                               <TableCell>{linha.km_ida.toLocaleString('pt-BR')}</TableCell>
+                              <TableCell className="tabular-nums">
+                                {linha.vlr_min_frete !== null && linha.vlr_min_frete !== undefined
+                                  ? linha.vlr_min_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                  : ''}
+                              </TableCell>
                               <TableCell>
                                 <div className="flex items-center justify-end gap-2">
                                   <Button
@@ -559,12 +582,10 @@ export function CadastroLinhas() {
                   <Label htmlFor="vlr_min_frete">Vlr mín. frete</Label>
                   <Input
                     id="vlr_min_frete"
-                    type="number"
-                    step="0.01"
-                    min="0"
                     value={formData.vlr_min_frete}
                     onChange={(e) => setFormData({ ...formData, vlr_min_frete: e.target.value })}
-                    placeholder="Ex: 150.00"
+                    placeholder="Ex: 30.000,00"
+                    inputMode="decimal"
                   />
                 </div>
 
