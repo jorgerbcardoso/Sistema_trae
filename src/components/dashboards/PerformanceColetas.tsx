@@ -125,8 +125,9 @@ export function PerformanceColetas() {
   };
 
   const defaultPeriod = getDefaultPeriod();
-  const isMTZ = (user?.unidade_atual || user?.unidade || '') === 'MTZ';
-  const unidadeUsuario = user?.unidade_atual || user?.unidade || '';
+  const unidadeLogada = (user?.unidade_atual || user?.unidade || '').trim().toUpperCase();
+  const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
+  const unidadeUsuario = unidadeLogada;
 
   const [filters, setFilters] = useState<Filters>({
     periodoInicio: defaultPeriod.inicio,
@@ -165,6 +166,12 @@ export function PerformanceColetas() {
 
   usePageTitle('Performance de Coletas');
 
+  useEffect(() => {
+    if (!isMTZ) return;
+    toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
+    setLoading(false);
+  }, [isMTZ]);
+
   const handleBackToMenu = () => {
     navigate('/');
   };
@@ -193,17 +200,19 @@ export function PerformanceColetas() {
 
   // useEffect: Carregar dados ao montar o componente
   useEffect(() => {
+    if (isMTZ) return;
     console.log('🔍 [PerformanceColetas] Carregando dados iniciais...');
     loadMockData();
-  }, []);
+  }, [isMTZ]);
 
   // useEffect: Recarregar dados quando os filtros mudarem
   useEffect(() => {
+    if (isMTZ) return;
     if (coletaGroups.length > 0 || evolucaoData.length > 0 || unitPerformances.length > 0) {
       console.log('🔄 [PerformanceColetas] Filtros mudaram, recarregando dados...');
       loadMockData();
     }
-  }, [filters]);
+  }, [filters, isMTZ]);
 
 
 
@@ -214,6 +223,7 @@ export function PerformanceColetas() {
 
   // Autoatualizador: countdown de 5 minutos
   useEffect(() => {
+    if (isMTZ) return;
     if (coletaGroups.length === 0) return;
     setCountdown(300);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -227,9 +237,14 @@ export function PerformanceColetas() {
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [filters, coletaGroups.length > 0]);
+  }, [filters, coletaGroups.length > 0, isMTZ]);
 
   const loadMockData = async () => {
+    if (isMTZ) {
+      setLoading(false);
+      setReprocessing(false);
+      return;
+    }
     if (coletaGroups.length > 0) {
       setReprocessing(true);
     } else {
@@ -874,6 +889,37 @@ export function PerformanceColetas() {
       </Dialog>
     </div>
   );
+
+  if (isMTZ) {
+    return (
+      <DashboardLayout
+        title="Performance de Coletas"
+        description={user?.client_name}
+        headerActions={headerActions}
+      >
+        <main className="container mx-auto px-3 md:px-6 py-6">
+          <Card className="dark:bg-slate-900 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="dark:text-slate-100 flex items-center gap-2">
+                <Ban className="w-5 h-5 text-red-600 dark:text-red-400" />
+                Acesso não disponível para a unidade MTZ
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-slate-600 dark:text-slate-400">
+                Faça login em uma unidade específica para visualizar este painel.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleBackToMenu}>
+                  Voltar ao menu
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout 

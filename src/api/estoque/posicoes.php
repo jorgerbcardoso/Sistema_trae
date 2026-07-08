@@ -130,7 +130,7 @@ try {
                 
                 // ✅ Filtrar apenas posições ativas (se especificado)
                 if (isset($_GET['ativa'])) {
-                    $where[] = "p.ativa = $" . $paramCount++;
+                    $where[] = "COALESCE(NULLIF(p.ativa, ''), 'S') = $" . $paramCount++;
                     $params[] = strtoupper($_GET['ativa']);
                 }
                 

@@ -31,6 +31,7 @@ try {
     $sigla_dest = $input['sigla_dest'] ?? null;
     $unidades = $input['unidades'] ?? null;
     $km_ida = $input['km_ida'] ?? null;
+    $vlr_min_frete = $input['vlr_min_frete'] ?? null;
 
     $parseBoolOrNull = function($arr, $key) {
         if (!is_array($arr) || !array_key_exists($key, $arr)) return null;
@@ -80,6 +81,12 @@ try {
     
     if ($km_ida === null || $km_ida === '' || $km_ida <= 0) {
         throw new Exception('Distância deve ser maior que zero');
+    }
+
+    if ($vlr_min_frete === '' || $vlr_min_frete === null) {
+        $vlr_min_frete = null;
+    } else {
+        $vlr_min_frete = (float)$vlr_min_frete;
     }
     
     // Validar domínio (apenas letras e números)
@@ -142,17 +149,18 @@ try {
     
     // Atualizar linha
     $updateQuery = "UPDATE $tableName 
-                    SET nome = $1, sigla_emit = $2, sigla_dest = $3, unidades = $4, km_ida = $5,
-                        carrega_seg = COALESCE($6::boolean, carrega_seg),
-                        carrega_ter = COALESCE($7::boolean, carrega_ter),
-                        carrega_qua = COALESCE($8::boolean, carrega_qua),
-                        carrega_qui = COALESCE($9::boolean, carrega_qui),
-                        carrega_sex = COALESCE($10::boolean, carrega_sex),
-                        carrega_sab = COALESCE($11::boolean, carrega_sab),
-                        carrega_dom = COALESCE($12::boolean, carrega_dom)
-                    WHERE nro_linha = $13
+                    SET nome = $1, sigla_emit = $2, sigla_dest = $3, unidades = $4, km_ida = $5, vlr_min_frete = $6,
+                        carrega_seg = COALESCE($7::boolean, carrega_seg),
+                        carrega_ter = COALESCE($8::boolean, carrega_ter),
+                        carrega_qua = COALESCE($9::boolean, carrega_qua),
+                        carrega_qui = COALESCE($10::boolean, carrega_qui),
+                        carrega_sex = COALESCE($11::boolean, carrega_sex),
+                        carrega_sab = COALESCE($12::boolean, carrega_sab),
+                        carrega_dom = COALESCE($13::boolean, carrega_dom)
+                    WHERE nro_linha = $14
                     RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
-                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom";
+                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                              vlr_min_frete";
     
     $updateResult = sql($g_sql, $updateQuery, false, [
         strtoupper($nome),
@@ -160,6 +168,7 @@ try {
         strtoupper($sigla_dest),
         strtoupper($unidades),
         (int)$km_ida,
+        $vlr_min_frete,
         $carrega_seg,
         $carrega_ter,
         $carrega_qua,
@@ -182,6 +191,7 @@ try {
             'unidades' => trim($updatedLinha['unidades']),
             'km_ida' => (int)$updatedLinha['km_ida'],
             'km_volta' => (int)$updatedLinha['km_volta'],
+            'vlr_min_frete' => ($updatedLinha['vlr_min_frete'] === null || $updatedLinha['vlr_min_frete'] === '') ? null : (float)$updatedLinha['vlr_min_frete'],
             'carrega_seg' => ((string)($updatedLinha['carrega_seg'] ?? '') === 't'),
             'carrega_ter' => ((string)($updatedLinha['carrega_ter'] ?? '') === 't'),
             'carrega_qua' => ((string)($updatedLinha['carrega_qua'] ?? '') === 't'),

@@ -59,6 +59,7 @@ export function CadastroLinhas() {
     sigla_dest: '',
     unidades: [] as string[],
     km_ida: '',
+    vlr_min_frete: '',
     carrega_seg: true,
     carrega_ter: true,
     carrega_qua: true,
@@ -98,6 +99,7 @@ export function CadastroLinhas() {
       sigla_dest: '',
       unidades: [],
       km_ida: '',
+      vlr_min_frete: '',
       carrega_seg: true,
       carrega_ter: true,
       carrega_qua: true,
@@ -118,6 +120,7 @@ export function CadastroLinhas() {
       sigla_dest: linha.sigla_dest,
       unidades: linha.unidades.split(',').filter(u => u.trim()),
       km_ida: String(linha.km_ida),
+      vlr_min_frete: linha.vlr_min_frete !== null && linha.vlr_min_frete !== undefined ? Number(linha.vlr_min_frete).toFixed(2) : '',
       carrega_seg: linha.carrega_seg ?? true,
       carrega_ter: linha.carrega_ter ?? true,
       carrega_qua: linha.carrega_qua ?? true,
@@ -195,6 +198,7 @@ export function CadastroLinhas() {
         sigla_dest: formData.sigla_dest.toUpperCase(),
         unidades: unidadesStr,
         km_ida: parseFloat(formData.km_ida),
+        vlr_min_frete: formData.vlr_min_frete.trim() ? Number(parseFloat(formData.vlr_min_frete).toFixed(2)) : null,
         carrega_seg: !!formData.carrega_seg,
         carrega_ter: !!formData.carrega_ter,
         carrega_qua: !!formData.carrega_qua,
@@ -550,7 +554,20 @@ export function CadastroLinhas() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid gap-2 min-w-0">
+                  <Label htmlFor="vlr_min_frete">Vlr mín. frete</Label>
+                  <Input
+                    id="vlr_min_frete"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.vlr_min_frete}
+                    onChange={(e) => setFormData({ ...formData, vlr_min_frete: e.target.value })}
+                    placeholder="Ex: 150.00"
+                  />
+                </div>
+
                 <div className="grid gap-2 min-w-0">
                   <Label>Unidade de Origem *</Label>
                   <FilterSelectUnidadeSingle

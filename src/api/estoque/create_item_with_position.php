@@ -187,9 +187,10 @@ try {
             altura,
             coluna,
             saldo,
+            ativa,
             login_inclusao
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7
+            $1, $2, $3, $4, $5, $6, 'S', $7
         ) RETURNING seq_posicao, seq_estoque, seq_item, rua, altura, coluna, saldo";
         
         $result = pg_query_params($conn, $query, [

@@ -30,6 +30,7 @@ try {
     $sigla_dest = $input['sigla_dest'] ?? null;
     $unidades = $input['unidades'] ?? null;
     $km_ida = $input['km_ida'] ?? null;
+    $vlr_min_frete = $input['vlr_min_frete'] ?? null;
 
     $parseBool = function($v, $default = true) {
         if ($v === null) return $default;
@@ -80,6 +81,12 @@ try {
     
     if ($km_ida === null || $km_ida === '' || $km_ida <= 0) {
         throw new Exception('Distância deve ser maior que zero');
+    }
+
+    if ($vlr_min_frete === '' || $vlr_min_frete === null) {
+        $vlr_min_frete = null;
+    } else {
+        $vlr_min_frete = (float)$vlr_min_frete;
     }
     
     // Validar domínio (apenas letras e números)
@@ -139,13 +146,16 @@ try {
     // Inserir linha
     $insertQuery = "INSERT INTO $tableName (
                         nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
-                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                        vlr_min_frete
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6, 0,
-                        $7, $8, $9, $10, $11, $12, $13
+                        $7, $8, $9, $10, $11, $12, $13,
+                        $14
                     )
                     RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
-                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom";
+                              carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                              vlr_min_frete";
     
     $insertResult = sql($g_sql, $insertQuery, false, [
         $nextId,
@@ -161,6 +171,7 @@ try {
         $carrega_sex,
         $carrega_sab,
         $carrega_dom,
+        $vlr_min_frete,
     ]);
     
     $newLinha = pg_fetch_assoc($insertResult);
@@ -175,6 +186,7 @@ try {
             'unidades' => trim($newLinha['unidades']),
             'km_ida' => (int)$newLinha['km_ida'],
             'km_volta' => (int)$newLinha['km_volta'],
+            'vlr_min_frete' => ($newLinha['vlr_min_frete'] === null || $newLinha['vlr_min_frete'] === '') ? null : (float)$newLinha['vlr_min_frete'],
             'carrega_seg' => ((string)($newLinha['carrega_seg'] ?? '') === 't'),
             'carrega_ter' => ((string)($newLinha['carrega_ter'] ?? '') === 't'),
             'carrega_qua' => ((string)($newLinha['carrega_qua'] ?? '') === 't'),
