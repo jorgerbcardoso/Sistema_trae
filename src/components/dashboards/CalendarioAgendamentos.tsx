@@ -83,11 +83,14 @@ export function CalendarioAgendamentos({
                 ? (dia.entregues / dia.agendados) * 100
                 : 0;
               const isFromTodayOn = dia.data >= todayISO;
+              const isFuture = dia.data > todayISO;
               const atrasados = isFromTodayOn ? 0 : Math.max(0, dia.agendados - dia.entregues);
 
               const isToday = dia.data === todayISO;
 
-              const bgColor = dia.agendados === 0
+              const bgColor = isFuture
+                ? 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                : dia.agendados === 0
                 ? 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                 : performance >= 90
                 ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
@@ -97,7 +100,9 @@ export function CalendarioAgendamentos({
                 ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
                 : 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800';
 
-              const textColor = dia.agendados === 0
+              const textColor = isFuture
+                ? 'text-slate-400 dark:text-slate-500'
+                : dia.agendados === 0
                 ? 'text-slate-400 dark:text-slate-500'
                 : performance >= 90
                 ? 'text-green-700 dark:text-green-300'
@@ -155,7 +160,7 @@ export function CalendarioAgendamentos({
                       </span>
                     </div>
 
-                    {dia.agendados > 0 && (
+                    {dia.agendados > 0 && !isFuture && (
                       <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center px-2">
                           <span className="text-slate-600 dark:text-slate-400">Perf.:</span>
@@ -186,7 +191,7 @@ export function CalendarioAgendamentos({
                         {atrasados}
                       </p>
                     </div>
-                    {dia.agendados > 0 && (
+                    {dia.agendados > 0 && !isFuture && (
                       <div className="pt-1 border-t border-slate-200 dark:border-slate-700 text-center px-2 py-1">
                         <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Perf.</p>
                         <p className={`font-bold text-sm ${textColor}`}>
