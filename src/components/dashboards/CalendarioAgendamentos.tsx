@@ -28,6 +28,8 @@ export function CalendarioAgendamentos({
   loading,
   onClickDia,
 }: CalendarioAgendamentosProps) {
+  const todayISO = new Date().toISOString().slice(0, 10);
+
   return (
     <Card className="dark:bg-slate-900 dark:border-slate-700">
       <CardHeader>
@@ -80,9 +82,10 @@ export function CalendarioAgendamentos({
               const performance = dia.agendados > 0
                 ? (dia.entregues / dia.agendados) * 100
                 : 0;
-              const atrasados = Math.max(0, dia.agendados - dia.entregues);
+              const isFromTodayOn = dia.data >= todayISO;
+              const atrasados = isFromTodayOn ? 0 : Math.max(0, dia.agendados - dia.entregues);
 
-              const isToday = dia.data === new Date().toISOString().slice(0, 10);
+              const isToday = dia.data === todayISO;
 
               const bgColor = dia.agendados === 0
                 ? 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
