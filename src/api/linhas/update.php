@@ -84,7 +84,7 @@ try {
     }
 
     if ($vlr_min_frete === '' || $vlr_min_frete === null) {
-        $vlr_min_frete = null;
+        $vlr_min_frete = 0;
     } else {
         $vlr_min_frete = (float)$vlr_min_frete;
     }

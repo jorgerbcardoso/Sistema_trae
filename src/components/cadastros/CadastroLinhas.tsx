@@ -211,7 +211,7 @@ export function CadastroLinhas() {
         km_ida: parseFloat(formData.km_ida),
         vlr_min_frete: (() => {
           const parsed = parsePtBrDecimal(formData.vlr_min_frete);
-          if (parsed === null) return null;
+          if (parsed === null) return 0;
           return Number(parsed.toFixed(2));
         })(),
         carrega_seg: !!formData.carrega_seg,
