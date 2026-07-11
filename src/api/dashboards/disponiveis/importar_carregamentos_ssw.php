@@ -60,6 +60,13 @@ foreach ($xml->xpath('//f8') as $f8) {
         $placas_ssw[] = $placa;
     }
 }
+$matchesPlacas = [];
+if (preg_match_all('/\b[A-Z]{3}[A-Z0-9]{4}\b/i', $xml_string, $matchesPlacas)) {
+    foreach (($matchesPlacas[0] ?? []) as $p) {
+        $p = strtoupper(trim((string)$p));
+        if ($p !== '') $placas_ssw[] = $p;
+    }
+}
 $placas_ssw = array_values(array_unique($placas_ssw));
 
 $unidadeEsc = pg_escape_string($conn, $unidade);
@@ -156,7 +163,7 @@ function parseRelatorioCarregamentos($texto) {
             $offset += $w + 1;
         }
 
-        $ctrcRaw = trim($cols[0] ?? '');
+        $ctrcRaw = $ctrc;
         $emiss   = trim($cols[1] ?? '');
         $prevEnt = trim($cols[2] ?? '');
         $qVol    = trim($cols[6] ?? '');
@@ -245,6 +252,12 @@ for ($i = 0; $i < count($placasLote); $i += $tamanhoLote) {
         $carregamentos[$placa]['destinos'] = array_merge($carregamentos[$placa]['destinos'], $data['destinos'] ?? []);
     }
 }
+
+$placasDoRelatorio = array_map(function($p) {
+    return strtoupper(trim((string)$p));
+}, array_keys($carregamentos));
+$placasDoRelatorio = array_values(array_filter($placasDoRelatorio, function($p) { return $p !== ''; }));
+$placas_ssw = array_values(array_unique(array_merge($placas_ssw, $placasDoRelatorio)));
 
 foreach ($placas_ssw as $placa) {
     $placa = strtoupper(trim((string)$placa));

@@ -1,0 +1,403 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: GIT0F71                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO113934-7  07/07 17/07     163505                         2             LUYAN COMERCIO       CENTRAL DO FRETE INT RAFAEL RIVERA        ALTO PARAISO D GI5         413,08      164,61      43    0,1 80
+SAO114729-3  08/07 20/07       3213                         4             VITORIA REGIA IND E  VITORIA REGIA IND E  MONICA COSTA         ALTO PARAISO D GI5       4.622,00      339,63     157    0,4 80
+SAO115515-6  08/07 20/07    3018958                        11             LORENZETTI SA INDS B LORENZETTI SA INDS B REZENDE FERREIRA M.  ANICUNS        GI5       6.326,76      212,22      49    0,5 80
+SAO113935-5  07/07 17/07      23064                        27             MOMENTO IND E COM DE MOMENTO IND E COM DE ANICUNS ATLANTIS HOT ANICUNS        GI5       3.959,90      407,69     224    0,6 80
+SAO115490-7  08/07 16/07    3018921                        20             LORENZETTI SA INDS B LORENZETTI SA INDS B WR COMERCIO DE MATER BELA VISTA DE  GI5       8.397,54      267,44      64    0,7 80
+SAO113981-9  07/07 15/07       2513                        12             NOVA RENOVO VAROES U NOVA RENOVO VAROES U CASA CHINA BELA VIST BELA VISTA DE  GI5         953,28      618,49      98    0,9 80
+SAO116155-5  10/07 22/07       1800              UETAB      1             G.B. FERREIRA BELIZI TRANSPORTES DE CARGA JR SERVICOS E COMERC BRAZABRANTES   GI5       1.265,00      155,38       7    0,2 80
+SAO114932-6  08/07 20/07      21284                         1             NOVA ERA AMBIENTAL S ONIX TECNOLOGIA E PA FUNDACAO UNIVERSITAR GOIANESIA      GI5       7.898,76      654,49     463    1,0 80
+SAO116120-2  10/07 21/07       1378                         3             CHEN XIANGJUN        WU JINSHENG LTDA     WU JINSHENG LTDA     GOIANESIA      GI5       2.750,00      178,51      70    0,0 80
+SAO114040-0  07/07 17/07     326681                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B J MAGNO MATERIAIS DE GOIANESIA      GI5         481,30      100,55      14    0,1 80
+SAO115038-3  08/07 20/07      72359                         2             CHIPI IMPLEMENTOS RO CARRETEIRO%20AUTO%20 CARRETEIRO%20AUTO%20 GOIANESIA      GI5      25.638,22    1.765,69   1.650    1,7 80
+FRA114188-1  07/07 17/07    4314555                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN ANTONIO OLIVEIRA     GOIANIRA       GI5         528,65      127,11       8    0,2 83
+SAO115414-1  08/07 16/07    3018863                         5             LORENZETTI SA INDS B LORENZETTI SA INDS B ZAILDO ANTONIO       GOIANIRA       GI5       1.891,52      109,19      14    0,1 80
+                            3018864
+SAO115426-5  08/07 16/07    3017754                         4             LORENZETTI SA INDS B LORENZETTI SA INDS B CL BRASIL ALIMENTOS  INHUMAS        GI5       1.948,12      123,28      14    0,2 80
+SAO115386-2  08/07 16/07    3017690                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B RODRIGO R SOUZA      INHUMAS        GI5       1.331,71       93,95       6    0,1 80
+SAO116538-1  10/07 22/07    3020011                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B CONSTRUIR MATERIAIS  IPORA          GI5       5.045,02      210,74      42    0,5 80
+SAO114082-5  07/07 17/07     326609                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B ART GESSO MATERIAIS  IPORA          GI5         308,33       87,68      13    0,1 80
+SAO113926-6  07/07 17/07      17304                         3             PINUS INDUSTRIA E CO COOPERATIVA AGROIND  COOPERATIVA AGROIND  IPORA          GI5       5.575,32      297,52      36    0,1 80
+SAO113818-9  07/07 17/07      40495                        20             M3 IMPORTADORA E DIS H.M LIDER COMERCIO A H.M LIDER COMERCIO A IPORA          GI5       1.900,00      457,00     510    0,6 80
+FND111861-7  03/07 17/07      97201                         2             MOBIGU COMERCIO DE M MOBIGU COMERCIO DE M CLEITON SABINO PIMEN ITABERAI       GI5         227,42      184,61      42    0,1 83
+FRA114232-1  07/07 21/07    4315360                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN HELLEN COSTA 5078147 ITABERAI       GI5       1.477,34      123,53      44    0,0 83
+SAO115228-9  08/07 20/07     210314                         1             SODEXO DO BRASIL COM PS LOGISTICA E PROMO SODEXO DO BRASIL COM ITABERAI       GI5         308,00      351,47       4    0,0 80
+SAO115915-1  10/07 22/07     183678                         1             CERCENA S/A INDUSTRI DIAS MOTA AUTO PECAS DIAS MOTA AUTO PECAS JUSSARA        GI5       9.994,19      921,10     786    0,9 80
+SAO114081-7  07/07 17/07     326612                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B HENRIQUE DE ASSIS EA LEOPOLDO DE BU GI5         308,33       93,78      12    0,1 80
+SAO113830-8  07/07 17/07       2543                         3             R J M MATERIAIS ESPO R J M MATERIAIS ESPO MORAES  CARVALHO CON MONTES CLAROS  GI5       2.400,00      192,32      55    0,0 80
+SAO115393-5  08/07 20/07    3017700                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B COMERCIAL NEROPOLIS  NEROPOLIS      GI5       4.088,50      194,25      41    0,5 80
+SAO116489-9  10/07 22/07    3019911                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B ALFREDO MARINHO DE O NEROPOLIS      GI5       2.184,83      141,58      18    0,2 80
+SAO112952-0  06/07 16/07     282929                         1             NIPO CENTER IMPORT L NIPO CENTER IMPORT L BISMARCK FERNANDES G ORIZONA        GI5         874,30      130,66      41    0,1 80
+SAO115413-3  08/07 20/07    3017736                         5             LORENZETTI SA INDS B LORENZETTI SA INDS B L EAMP L MATERIAS PA PALMEIRAS DE G GI5       2.051,12      140,76      18    0,2 80
+SAO115476-1  08/07 20/07    3018904                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B COMERCIAL J L FERRAG PARAUNA        GI5       4.904,59      195,00      41    0,4 80
+SAO115462-1  08/07 20/07    3018890                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B GECASA MATS CONSTR E PIRES DO RIO   GI5       4.433,91      192,11      36    0,4 80
+SAO112691-1  06/07 16/07      25297                         1             CACULE METALURGICA L CACULE METALURGICA L RODRIGO GONCALVES RI POSSE          GI5         600,00      226,39     120    0,2 50
+FRA114185-6  07/07 21/07    4314534                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN DOMINGOS COSTA       POSSE          GI5       1.021,33      179,59      14    0,4 83
+CAT114747-1  08/07 22/07     258881                         2             HMDK DIGITAL MOVEIS  HMDK DIGITAL MOVEIS  DEBORA JESUS DA SILV SAO FRANCISCO  GI5       1.188,02      189,83      65    0,2 83
+VIX023411-7  08/07 17/07    3084417                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  INES MARIA CRUVINEL  SAO LUIS DE MO GI5       1.488,90       93,93      30    0,0 83
+SAO115408-7  08/07 20/07    3018859                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B FURUYA MATERIAIS PAR SAO MIGUEL DO  GI5       4.609,47      177,15      35    0,3 80
+SAO114090-6  07/07 17/07     326674                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B DIAS NASCIMENTO E SO SAO MIGUEL DO  GI5         219,09       93,24      10    0,1 80
+CBA017241-3  25/06 06/07     502679                         1             GERACAO 2000 COM DE  GERACAO 2000 COM DE  FUNDO MUNICIPAL DE E TAQUARAL DE GO GI5          10,00      120,00       1    0,0 50
+FND115607-1  09/07 23/07       1014                         3             ESSENCIAL DETALHE LT ESSENCIAL DETALHE LT MARCIO FERREIRA DOS  TERESINA DE GO GI5         317,24      220,23      51    0,1 83
+VIX023461-3  08/07 21/07    3084453                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  AIRLENY PADIELLO NUL VIANOPOLIS     GI5       1.707,51      101,33      31    0,0 83
+SAO114057-4  07/07 17/07     326239                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B MADEREIRA MIRANDA E  CAMPINORTE     GIT         277,53      113,04      12    0,2 80
+SAO114103-1  07/07 17/07     148335                         4             ETILUX IMP E DISTR D ETILUX IMP E DISTR D GERALDO EUSTAQUIO DE CORUMBA DE GOI GIT       2.986,81      165,29      56    0,1 80
+SAO115383-8  08/07 20/07    3017686                        12             LORENZETTI SA INDS B LORENZETTI SA INDS B CASA LESSA MATERIAIS CRIXAS         GIT       6.232,51      205,27      43    0,5 80
+FND112266-5  03/07 17/07        406                         1             TERMICAS INDUSTRIA E TERMICAS INDUSTRIA E VICTOR HUGO PEIXOTO  ITAPACI        GIT         785,15      135,25       8    0,1 83
+SAO114067-1  07/07 17/07     326440                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B CSJ MATERIAIS PARA C ITAPACI        GIT          70,35       86,22       5    0,1 80
+SAO116561-5  10/07 22/07    3020070                         9             LORENZETTI SA INDS B LORENZETTI SA INDS B NOVA CONSTRUVALE MAT MARA ROSA      GIT       9.003,21      260,52      74    0,6 80
+FRA114201-1  07/07 21/07    4316161                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN TIAGO SILVA          MINACU         GIT         287,36      103,06       4    0,1 83
+SAO115158-4  08/07 20/07     382298                        26             MOAS IND E COM IMP E MOAS IND E COM IMP E SHALLON DECOR LTDA   MINACU         GIT      19.546,13      787,68     219    2,1 80
+SAO114607-6  08/07 20/07    1324822                         1             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C 4 REDES S.A.         NIQUELANDIA    GIT          88,25       92,92       5    0,0 80
+SAO116177-6  10/07 22/07     126084                         7             RAVEN COM IMPOR FERR BFHORN GESTAO E COME BFHORN GESTAO E COME NIQUELANDIA    GIT       9.881,95      708,15     101    0,3 80
+SAO115018-9  08/07 20/07      97139                        10             CRUZEIRO-IND MALAS A CRUZEIRO-IND MALAS A DOUGLAS OLIVEIRA RIB NOVO PLANALTO  GIT       2.229,52      394,72      82    1,2 80
+SAO116184-9  10/07 22/07     388563              KUNHQ      5             PROFILE STORAGE ARMA PROFILE STORAGE ARMA COMPENSADOS ANGATU E PORANGATU      GIT         632,50      112,44      69    0,2 80
+SAO114064-7  07/07 17/07     326484                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B DEBORA PATRICIA ALVE PORANGATU      GIT         154,89       92,84       8    0,1 80
+SAO113100-1  06/07 16/07       3037                         6             YE JIANHONG COMERCIO MK MOTOS LTDA        MK MOTOS LTDA        PORANGATU      GIT       6.480,00    1.827,33     630    3,3 95
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: GIT0F71                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO116537-2  10/07 22/07    3020009                         5             LORENZETTI SA INDS B LORENZETTI SA INDS B RAYLANE LEMES BARBOS PORANGATU      GIT       2.283,37      142,19      22    0,3 80
+SAO114065-5  07/07 17/07     326480                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B PAIOL STOREHOUSE LTD PORANGATU      GIT         385,23       99,97      14    0,1 80
+FRA114177-5  07/07 21/07    4313415                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN KATRINNI BORBA       RUBIATABA      GIT       8.650,47      309,85     197    0,2 83
+SAO116004-4  10/07 22/07     148528                         6             ETILUX IMP E DISTR D ETILUX IMP E DISTR D MATERIAIS DE CONSTRU SANTA RITA DO  GIT       4.294,50      174,43      66    0,2 80
+SAO114035-3  07/07 17/07     326675                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B OLIVEIRA E FERNANDES SAO LUIZ DO NO GIT         165,90       92,91       9    0,1 80
+SAO116183-1  10/07 22/07     388564              KUNHQ      5             PROFILE STORAGE ARMA PROFILE STORAGE ARMA COMERCIAL ANGATU MAD URUACU         GIT         632,50      112,44      69    0,2 80
+TOTAIS:                                 60 CTRCS          319                                                                                                   200.716,73   16.650,55   6.664   22,5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: ITB7F39                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO114771-4  08/07 16/07     191477                         1             EXPK INDUSTRIA E COM EXPK INDUSTRIA E COM ATACADAO DIA A DIA S CALDAS NOVAS   ITB       6.595,80      721,59     273    0,9 80
+SAO114110-4  07/07 13/07     382273                         1             MOAS IND E COM IMP E MOAS IND E COM IMP E CGR FARMACEUTICA LTD ITUMBIARA      ITB       2.127,44       96,23      12    0,1 80
+SAO115039-1  08/07 14/07     222766                         1             IABV - INDUSTRIA DE  RODRIGO DO VALE E VA RODRIGO DO VALE E VA ITUMBIARA      ITB      11.090,89      357,76     202    0,6 80
+SAO113911-8  07/07 13/07        235                         1             TIAGO RODRIGUES 3138 ALCA FOODS LTDA      ALCA FOODS LTDA      ITUMBIARA      ITB       6.790,00      320,52      18    0,1 80
+SAO114780-3  08/07 14/07     191492                         1             EXPK INDUSTRIA E COM EXPK INDUSTRIA E COM ATACADAO DIA A DIA S ITUMBIARA      ITB       4.397,20      618,47     182    0,8 80
+SAO114972-5  08/07 14/07      82893                         1             00003 - LADEIRA ARMA SALULU FOLHEADOS LTD SALULU FOLHEADOS LTD ITUMBIARA      ITB       2.356,17      169,18      21    0,1 80
+SAO114770-6  08/07 14/07      13443                         1             MOMAG AUTO PARTS IND INADIESEL PECAS E AC INADIESEL PECAS E AC ITUMBIARA      ITB       5.610,19      290,87     486    0,8 80
+SAO114944-0  08/07 14/07      69956                         1             UNITEC FABRICACAO DE AGROMIL MAQUINAS IMP AGROMIL MAQUINAS IMP ITUMBIARA      ITB      54.423,81    1.492,30     522    0,6 80
+TOTAIS:                                  8 CTRCS            8                                                                                                    93.391,50    4.066,92   1.717    4,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   4
+ssw0194                                                                                     PLACA: LVR0H80                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO115164-9  08/07 20/07      80516                       568             DAMARFE PRODUTOS QUI SR BONFARINI LTDA    SR BONFARINI LTDA    LUCAS DO RIO V FEC      49.380,78    9.924,11   6.392    7,1 80
+SAO115116-9  08/07 20/07     340919                         6             ADEGA ALENTEJANA COM ADEGA ALENTEJANA COM BOUTIQUE DO VINHO CO LUCAS DO RIO V LVR       2.796,90      207,16      24    0,1 80
+SAO116212-8  10/07 22/07       9156                         2             HYD COMERCIO DE PRES JESSICA  BRUNA FAVAR JESSICA  BRUNA FAVAR LUCAS DO RIO V LVR       2.023,96      234,48      54    0,2 80
+SAO116216-1  10/07 22/07        609                         1             STUDIO LAMPLUZ COMER ESPACO LUZ ILUMINACA ESPACO LUZ ILUMINACA LUCAS DO RIO V LVR       2.350,00      198,96      13    0,3 80
+SAO115396-0  08/07 20/07    3018852                         4             LORENZETTI SA INDS B LORENZETTI SA INDS B PARANA MATERIAIS DE  LUCAS DO RIO V LVR       2.110,17      126,88      18    0,2 80
+SAO115195-9  08/07 20/07      59345                         9             AERO DINAMICA EQUIPA BIOPLANTA NUTRICAO V BIOPLANTA NUTRICAO V LUCAS DO RIO V LVR      22.392,71      905,53      87    0,2 80
+                              59346,      59347
+SAO115137-1  08/07 20/07      13045                         6             THE MAGIC NUTS COMER GUIDORIZZE E CIA COM GUIDORIZZE E CIA COM LUCAS DO RIO V LVR         906,94      138,26      44    0,1 80
+FRA114187-2  07/07 20/07    4314551                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN GAMETRASHPLAY UUEHUE LUCAS DO RIO V LVR         693,05      166,60      10    0,3 83
+VIX023498-2  08/07 20/07    3084063                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  E R B MARTUCCI LTDA  LUCAS DO RIO V LVR       1.426,24      209,42      29    0,4 83
+SAO115250-5  08/07 20/07     612096              BFNOL      7             AGIS EQUIP. E SERV I CNLOG - RDP TRANSP E TALKLINE TELECOM LTD LUCAS DO RIO V LVR      22.062,42      295,02      27    0,4 80
+SAO116511-9  10/07 22/07    3019959                        35             LORENZETTI SA INDS B LORENZETTI SA INDS B TODIMO MATERIAIS PAR LUCAS DO RIO V LVR      19.662,86      638,67     145    1,5 80
+SAO114965-2  08/07 20/07       2188                         2             LIBERALIS VARIEDADES JESSICA  BRUNA FAVAR JESSICA  BRUNA FAVAR LUCAS DO RIO V LVR         576,00      126,50      38    0,3 80
+SAO116214-4  10/07 22/07        941                         1             SANDRA OLIVEIRA GUIM SANDRA OLIVEIRA GUIM ELIANE VENTURA SOARE LUCAS DO RIO V LVR         665,10      297,83      38    0,4 80
+SAO114777-3  08/07 20/07     105934                         5             NLI ILUMINACAO IMPOR ESPACO LUZ ILUMINACA ESPACO LUZ ILUMINACA LUCAS DO RIO V LVR       4.286,74      224,18      24    0,4 80
+SAO114469-3  08/07 20/07    1322341                        27             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C BLUEFIT ACADEMIAS DE LUCAS DO RIO V LVR       1.941,40      282,19     128    0,0 80
+SAO116251-9  10/07 22/07       1772                         1             TRIKE PECAS E ACESSO TRIKE PECAS E ACESSO ALO GAS COMERCIO LTD LUCAS DO RIO V LVR       2.086,85      229,97       5    0,0 80
+SAO114899-1  08/07 20/07      48948                        17             TOP RIO COMERCIAL LT MARINALVA M.BERTOTTI MARINALVA M.BERTOTTI LUCAS DO RIO V LVR      18.107,94      845,62     355    0,5 80
+SAO115812-1  10/07 22/07     445903                         1             CAVALETTI S/A CADEIR CAVALETTI S/A CADEIR INDUSTRIA E COMERCIO LUCAS DO RIO V LVR          18,43      181,08       1    0,0 80
+SAO116117-2  10/07 22/07        143                         2             ROS COMERCIO E SERVI MARINALVA M.BERTOTTI MARINALVA M.BERTOTTI LUCAS DO RIO V LVR       1.200,00      204,52      60    0,3 80
+VIX023404-4  08/07 20/07    3084438                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  GRACIELE DRESCH DE O LUCAS DO RIO V LVR         728,90      112,08      27    0,1 83
+SAO115387-1  08/07 20/07    3018849                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B PARANA MATERIAIS DE  LUCAS DO RIO V LVR       1.366,06      121,37      13    0,2 80
+SAO115950-0  10/07 22/07       1399                         1             PERSIANAS COIMBRA IN 66.568.409 MARCELO S 66.568.409 MARCELO S LUCAS DO RIO V LVR         302,37      156,46       3    0,0 80
+SAO114906-7  08/07 20/07     267339                         5             INTERLIGHT SISTEMAS  ESPACO LUZ ILUMINACA ESPACO LUZ ILUMINACA LUCAS DO RIO V LVR       7.131,31      337,65      13    0,1 80
+SAO115859-7  10/07 22/07     328804                         4             TRACK E FIELD CO S.A ZG COMERCIO LTDA     ZG COMERCIO LTDA     LUCAS DO RIO V LVR       9.361,74      290,26      29    0,3 80
+                             329031
+SAO115365-0  08/07 22/07    3017655                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B PARANA MATERIAIS DE  TAPURAH        LVR       1.582,63      124,34      13    0,1 80
+TOTAIS:                                 25 CTRCS          713                                                                                                   175.161,50   16.579,14   7.592   13,6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   5
+ssw0194                                                                                     PLACA: NVM0H80                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO115154-1  08/07 17/07     159044                        18             SILVER PLASTIC COM I SILVER PLASTIC COM I PLANETA FESTAS EIREL NOVA MUTUM     NVM      13.934,74      873,11     136    1,3 80
+SAO114850-8  08/07 17/07      79977                        18             SCUADRA EMBALAGENS D VILLA SUSHI LTDA     VILLA SUSHI LTDA     NOVA MUTUM     NVM       2.506,00      650,78      39    1,3 80
+SAO114811-7  08/07 17/07      82633                         7             UNY GIFT COMERCIO DE ANDREA CRISTINA LEIT ANDREA CRISTINA LEIT NOVA MUTUM     NVM       4.908,95      271,23     140    0,7 80
+SAO115392-7  08/07 17/07    3018850                        12             LORENZETTI SA INDS B LORENZETTI SA INDS B PARANA MATERIAIS DE  NOVA MUTUM     NVM       5.752,99      247,60      53    0,7 80
+TOTAIS:                                  4 CTRCS           55                                                                                                    27.102,68    2.042,72     368    4,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   6
+ssw0194                                                                                     PLACA: SOR0H80                                                                              11/07/2026 16:39
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO114561-4  08/07 21/07    1323447                         1             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C BANCO DO BRASIL S/A  IPIRANGA DO NO SOR       3.066,95      167,53      61    0,9 80
+SAO115788-4  10/07 21/07       2359                         3             R. A. MILANI VESTUAR L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR       3.135,00      136,80      76    0,4 80
+SAO115564-4  08/07 17/07    1327738                         7             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C ENGEDELTA ENGENHARIA SORRISO        SOR       1.869,55      121,48      14    0,0 80
+SAO115751-5  10/07 21/07     249131                         1             SIVA IND E COM DE AR L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR      11.819,45      421,31     362    1,2 80
+SAO116137-7  10/07 21/07     376321                         8             SODRAMAR INDUSTRIA E AGUAPE COMERCIO DE P AGUAPE COMERCIO DE P SORRISO        SOR       3.788,16      312,69      62    0,4 80
+SJP113607-1  07/07 20/07      10446                         1             EUROMANTAS COMERCIO  EUROMANTAS COMERCIO  MARCOS DE ROSSI      SORRISO        SOR       2.632,00      385,01     135    0,0 83
+SAO115860-1  10/07 21/07     268009              ERWRD      2             BREMEN IMPORTADORA D HB TRANSPORTES E LOG SAMAR COMERCIAL AGRI SORRISO        SOR         999,00      205,13      36    0,1 80
+SAO115679-9  10/07 21/07     198398                         8             CAMESA INDUSTRIA TEX A ESPECIALISTA COLCH A ESPECIALISTA COLCH SORRISO        SOR       1.692,48      180,57      61    1,4 80
+SAO116210-1  10/07 21/07        262                         2             JULIA BIJOUX LTDA    C.A. DIAMANTINO ME   C.A. DIAMANTINO ME   SORRISO        SOR       1.410,00      163,47      41    0,3 80
+SAO115951-8  10/07 21/07      74275                         2             JT ATIVA EQUIPAMENTO MATRINCHA CACA E PES MATRINCHA CACA E PES SORRISO        SOR       4.221,13      199,90      19    1,3 80
+SAO115947-0  10/07 21/07     243213                        14             KAZAN COM IMP E EXPO CENTRO MOVEIS PAPELA CENTRO MOVEIS PAPELA SORRISO        SOR       2.755,28      270,56      84    0,7 80
+SAO116379-5  10/07 21/07      25795                         5             SOUDAL BRASIL IND CO L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR       7.830,04      343,88      59    0,3 80
+SAO114702-1  08/07 17/07     405608                        50             IBIRA INDUSTRIA E CO L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR      26.378,24    1.953,61     804    6,8 80
+SAO116380-9  10/07 21/07      34492                         1             SOUDAL BRASIL IND. E L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR       9.258,01      449,74     486    0,0 80
+SAO114939-3  08/07 17/07      94945                       278             AMAZONIA AROMATIZANT ELINELTON XAVIER SIL ELINELTON XAVIER SIL SORRISO        SOR      22.662,48    1.062,53     734    2,6 80
+                              94946
+SAO116203-9  10/07 21/07       1614                         2             BEAUTY MAKE PRESENTE M HENRIQUE SANTOS DA M HENRIQUE SANTOS DA SORRISO        SOR       1.506,45      238,01      75    0,0 80
+SAO115749-3  10/07 21/07       2344                        10             JARSON CORREA FILHO  L M COMERCIO DE FERR L M COMERCIO DE FERR SORRISO        SOR       1.875,00      418,72     225    2,1 80
+SAO115841-4  10/07 21/07      12963              XFKEV      1             CLAUDIO R. SEVERO CI HB TRANSPORTES E LOG NIED E CIA LTDA      SORRISO        SOR       1.130,40      206,12       6    0,0 80
+TOTAIS:                                 18 CTRCS          396                                                                                                   108.029,62    7.237,06   3.339   18,6
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                            115 CTRCS        1.491                                                                                                   604.402,03   46.576,39  19.680   62,6
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
