@@ -185,6 +185,7 @@ interface CteCarregamento {
   hora_inclusao: string;
   ctrc?: string;
   nroCte?: number;
+  destino_cte?: string;
   destinatario?: string;
   remetente?: string;
   pagador?: string;
@@ -1723,6 +1724,7 @@ type LinhaCarregamento = {
   unidades: string;
   km_ida: number | null;
   km_volta: number | null;
+  vlr_min_frete?: number | null;
   carrega_seg?: boolean;
   carrega_ter?: boolean;
   carrega_qua?: boolean;
@@ -1730,6 +1732,14 @@ type LinhaCarregamento = {
   carrega_sex?: boolean;
   carrega_sab?: boolean;
   carrega_dom?: boolean;
+};
+
+type LinhaHojeStatus = {
+  podeCarregar: boolean;
+  motivoBloqueio: string | null;
+  freteTotalDestino: number;
+  pesoKgDestino: number;
+  cubagemDestino: number;
 };
 
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
@@ -2498,6 +2508,8 @@ export function Disponiveis() {
   const [carregandoNroLinhaHoje, setCarregandoNroLinhaHoje] = useState<number | null>(null);
   const [linhasHojeSortKey, setLinhasHojeSortKey] = useState<'nro' | 'nome' | 'dest' | 'inter' | 'km'>('nro');
   const [linhasHojeSortDir, setLinhasHojeSortDir] = useState<'asc' | 'desc'>('asc');
+  const [linhasHojeStatus, setLinhasHojeStatus] = useState<Record<number, LinhaHojeStatus>>({});
+  const [loadingLinhasHojeStatus, setLoadingLinhasHojeStatus] = useState(false);
 
   const [resumoHojeDialogOpen, setResumoHojeDialogOpen] = useState(false);
   const [resumoHojePlaca, setResumoHojePlaca] = useState('');
@@ -2556,6 +2568,10 @@ export function Disponiveis() {
     const dir = linhasHojeSortDir === 'asc' ? 1 : -1;
     const copy = [...linhasCarregamHoje];
     copy.sort((a, b) => {
+      const aPode = (linhasHojeStatus[a.nro_linha]?.podeCarregar ?? true);
+      const bPode = (linhasHojeStatus[b.nro_linha]?.podeCarregar ?? true);
+      if (aPode !== bPode) return aPode ? -1 : 1;
+
       const aN = a.nro_linha ?? 0;
       const bN = b.nro_linha ?? 0;
       const aNome = (a.nome ?? '').toUpperCase();
@@ -2576,7 +2592,11 @@ export function Disponiveis() {
       return cmp(aKm, bKm) * dir;
     });
     return copy;
-  }, [linhasCarregamHoje, linhasHojeSortDir, linhasHojeSortKey]);
+  }, [linhasCarregamHoje, linhasHojeSortDir, linhasHojeSortKey, linhasHojeStatus]);
+
+  const qtdLinhasHojeViaveis = React.useMemo(() => {
+    return linhasCarregamHoje.reduce((s, l) => s + ((linhasHojeStatus[l.nro_linha]?.podeCarregar ?? true) ? 1 : 0), 0);
+  }, [linhasCarregamHoje, linhasHojeStatus]);
   const [progressoEntrega, setProgressoEntrega] = useState(0);
   const progressoRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -2746,8 +2766,12 @@ export function Disponiveis() {
       );
       if (res.success) {
         setCarregamentos(res.carregamentos ?? []);
+      } else {
+        toast.error(res.message || 'Erro ao buscar carregamentos.');
       }
-    } catch {}
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao buscar carregamentos.');
+    }
     finally { setLoadingCarregamentos(false); }
   }, []);
 
@@ -2772,6 +2796,14 @@ export function Disponiveis() {
       setImportandoCarregamentos(false);
     }
   }, [carregarCarregamentos]);
+
+  const importarCarregamentosSSWObrigatorio = useCallback(async () => {
+    const res = await handleImportarCarregamentos();
+    if (!res?.success) {
+      await carregarCarregamentos();
+    }
+    return res;
+  }, [handleImportarCarregamentos, carregarCarregamentos]);
 
   useEffect(() => {
     if (!importacaoAutomatica) return;
@@ -3201,31 +3233,41 @@ export function Disponiveis() {
     });
   }, []);
 
+  const handleAtualizarTransferencia = useCallback(async () => {
+    if (!sigla) return;
+    await importarCarregamentosSSWObrigatorio();
+    await carregar();
+  }, [sigla, importarCarregamentosSSWObrigatorio, carregar]);
+
   useEffect(() => {
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
       return;
     }
-    if (sigla) {
-      carregar();
-      carregarEntrega();
-      carregarCarregamentos();
-    }
-  }, [sigla]);
+    if (!sigla) return;
+    let ativo = true;
+    void (async () => {
+      await importarCarregamentosSSWObrigatorio();
+      if (!ativo) return;
+      await carregar();
+      await carregarEntrega();
+    })();
+    return () => { ativo = false; };
+  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio]);
 
   useEffect(() => {
     if (!sigla) return;
     timerRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          carregar();
+          void importarCarregamentosSSWObrigatorio().finally(() => { void carregar(); });
           return 300;
         }
         return prev - 1;
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [sigla, carregar]);
+  }, [sigla, carregar, importarCarregamentosSSWObrigatorio]);
 
 
 
@@ -3326,6 +3368,66 @@ export function Disponiveis() {
       return true;
     });
   }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
+
+  useEffect(() => {
+    let ativo = true;
+    setLoadingLinhasHojeStatus(true);
+    const t = window.setTimeout(() => {
+      if (!ativo) return;
+      const MIN_TON = 27;
+      const MIN_M3 = 67;
+
+      const hasDiretaPorDestino = new Set<string>();
+      for (const l of linhasCarregamHoje) {
+        const unidades = (l.unidades ?? '').trim();
+        const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+        if (!dest) continue;
+        if (!unidades) hasDiretaPorDestino.add(dest);
+      }
+
+      const totalsPorDestino: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
+      for (const cte of ctesTransferFiltrados) {
+        if (cte.emTransito) continue;
+        const dest = (cte.unidadeDest ?? '').trim().toUpperCase();
+        if (!dest) continue;
+        if (!totalsPorDestino[dest]) totalsPorDestino[dest] = { pesoKg: 0, cubagem: 0, frete: 0 };
+        totalsPorDestino[dest].pesoKg += parsePeso(cte.peso);
+        totalsPorDestino[dest].cubagem += parseCubagem(cte.cubagem);
+        totalsPorDestino[dest].frete += parseMoeda(cte.frete);
+      }
+
+      const diretaLotaPorDestino = new Set<string>();
+      for (const dest of hasDiretaPorDestino) {
+        const t = totalsPorDestino[dest] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+        const ton = t.pesoKg / 1000;
+        if (ton >= MIN_TON || t.cubagem >= MIN_M3) diretaLotaPorDestino.add(dest);
+      }
+
+      const status: Record<number, LinhaHojeStatus> = {};
+      for (const l of linhasCarregamHoje) {
+        const nro = l.nro_linha ?? 0;
+        const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+        const unidades = (l.unidades ?? '').trim();
+        const totals = (dest && totalsPorDestino[dest]) ? totalsPorDestino[dest] : { pesoKg: 0, cubagem: 0, frete: 0 };
+        const bloqueada = !!unidades && diretaLotaPorDestino.has(dest);
+        status[nro] = {
+          podeCarregar: !bloqueada,
+          motivoBloqueio: bloqueada ? 'Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.' : null,
+          freteTotalDestino: totals.frete,
+          pesoKgDestino: totals.pesoKg,
+          cubagemDestino: totals.cubagem,
+        };
+      }
+
+      setLinhasHojeStatus(status);
+      setLoadingLinhasHojeStatus(false);
+    }, 0);
+
+    return () => {
+      ativo = false;
+      window.clearTimeout(t);
+    };
+  }, [ctesTransferFiltrados, linhasCarregamHoje]);
 
   const coletasTransferFiltradas = React.useMemo(() => {
     const list = dados?.coletas ? [...dados.coletas] : [];
@@ -3636,7 +3738,7 @@ export function Disponiveis() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => carregar()}
+              onClick={() => { void handleAtualizarTransferencia(); }}
               disabled={loading || !sigla}
               className="dark:border-slate-600"
             >
@@ -3817,7 +3919,7 @@ export function Disponiveis() {
             onClick={() => { if (!loadingLinhasOrigem) setLinhasHojeDialogOpen(true); }}
             onKeyDown={(e) => { if (!loadingLinhasOrigem && (e.key === 'Enter' || e.key === ' ')) setLinhasHojeDialogOpen(true); }}
             className={`dark:bg-slate-900 dark:border-slate-700 transition-colors ${
-              loadingLinhasOrigem ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
+              (loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
             <CardContent className="min-h-16 px-3 py-2">
@@ -3826,25 +3928,25 @@ export function Disponiveis() {
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div className="flex-1 min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
-                  <span className="font-semibold">{loadingLinhasOrigem ? '...' : linhasCarregamHoje.length}</span>
+                  <span className="font-semibold">{(loadingLinhasOrigem || loadingLinhasHojeStatus) ? '...' : qtdLinhasHojeViaveis}</span>
                   {' '}linha(s) carrega(m) HOJE. Clique aqui para visualizar.
                 </div>
                 <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap hidden lg:block">
-                  {loadingLinhasOrigem ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
+                  {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Dialog open={linhasHojeDialogOpen} onOpenChange={setLinhasHojeDialogOpen}>
-            <DialogContent className="sm:max-w-[900px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+            <DialogContent className="sm:max-w-[1100px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>Linhas que carregam hoje</DialogTitle>
                 <DialogDescription>Linhas com origem na unidade atual e frequência ativa para o dia de hoje</DialogDescription>
               </DialogHeader>
               <div className="flex-1 overflow-y-auto pr-1">
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <div className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  <div className="grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_110px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                     <button
                       type="button"
                       className="text-left hover:text-slate-800 dark:hover:text-slate-100"
@@ -3915,9 +4017,11 @@ export function Disponiveis() {
                           : <ChevronDown className="w-3 h-3 inline ml-1" />
                       )}
                     </button>
+                    <span className="text-right">Min. frete</span>
+                    <span className="text-right">Frete atual</span>
                     <span className="text-right">Ação</span>
                   </div>
-                  {loadingLinhasOrigem ? (
+                  {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? (
                     <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Carregando linhas...
@@ -3928,29 +4032,47 @@ export function Disponiveis() {
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {linhasCarregamHojeOrdenadas.map((l) => (
-                        <div
-                          key={l.nro_linha}
-                          className="grid grid-cols-[60px_minmax(0,1fr)_70px_minmax(0,1fr)_80px_100px] gap-2 px-3 py-2 text-sm items-center"
-                        >
-                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
-                          <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
-                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
-                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{(l.unidades ?? '').toUpperCase() || '-'}</span>
-                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
-                          <div className="flex justify-end">
-                            <Button
-                              size="sm"
-                              className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white"
-                              onClick={() => handleCarregarLinhaHoje(l.nro_linha)}
-                              disabled={carregandoNroLinhaHoje !== null}
-                            >
-                              {carregandoNroLinhaHoje === l.nro_linha ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-                              Carregar
-                            </Button>
+                      {linhasCarregamHojeOrdenadas.map((l) => {
+                        const s = linhasHojeStatus[l.nro_linha];
+                        const pode = s?.podeCarregar ?? true;
+                        const minFrete = (l.vlr_min_frete ?? 0);
+                        const freteAtual = s?.freteTotalDestino ?? 0;
+                        const motivo = s?.motivoBloqueio ?? '';
+                        return (
+                          <div
+                            key={l.nro_linha}
+                            title={!pode ? motivo : undefined}
+                            className={`grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_110px] gap-2 px-3 py-2 text-sm items-center ${!pode ? 'opacity-50' : ''}`}
+                          >
+                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
+                            <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
+                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{(l.unidades ?? '').toUpperCase() || '-'}</span>
+                            <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
+                            <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
+                              {minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </span>
+                            <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
+                              {freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </span>
+                            <div className="flex justify-end">
+                              {pode ? (
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white"
+                                  onClick={() => handleCarregarLinhaHoje(l.nro_linha)}
+                                  disabled={carregandoNroLinhaHoje !== null}
+                                >
+                                  {carregandoNroLinhaHoje === l.nro_linha ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                                  Carregar
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-slate-500 dark:text-slate-400">Indisponível</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

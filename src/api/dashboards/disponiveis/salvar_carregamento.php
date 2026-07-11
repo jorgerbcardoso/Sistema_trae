@@ -56,7 +56,7 @@ if ($acao === 'criar') {
 
     $res = pg_query($conn,
         "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, origem_ssw, unidade_carregamento)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, false, '" . pg_escape_string($conn, $unidade) . "')"
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, NULL, '" . pg_escape_string($conn, $unidade) . "')"
     );
 
     if (!$res) {
@@ -184,7 +184,7 @@ if ($acao === 'adicionar_ctes') {
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', false, '{$unidCar}')"
+              '{$destEsc}', '{$unidEsc}', NULL, '{$unidCar}')"
         );
 
         if (!$res) {
@@ -239,7 +239,7 @@ if ($acao === 'remover_cte') {
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
         pg_query($conn,
             "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, unidade_carregamento)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, false, '" . pg_escape_string($conn, $unidade) . "')"
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $unidade) . "')"
         );
     }
 

@@ -36,7 +36,7 @@ $modoAutomatico = empty($placa) && empty($unidadeDestino);
 if ($acao === 'listar_linhas') {
     try {
         $res = sql(
-            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
                     carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
              FROM {$tabelaLinha}
              WHERE sigla_emit = \$1
@@ -53,6 +53,7 @@ if ($acao === 'listar_linhas') {
                 'unidades'   => (string)($r['unidades'] ?? ''),
                 'km_ida'     => $r['km_ida']   !== null ? (int)$r['km_ida']   : null,
                 'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
+                'vlr_min_frete' => $r['vlr_min_frete'] !== null ? (float)$r['vlr_min_frete'] : null,
                 'carrega_seg' => ((string)($r['carrega_seg'] ?? '') === 't'),
                 'carrega_ter' => ((string)($r['carrega_ter'] ?? '') === 't'),
                 'carrega_qua' => ((string)($r['carrega_qua'] ?? '') === 't'),
@@ -492,7 +493,7 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', false, '{$unidCar}')"
+              '{$destEsc}', '{$unidEsc}', NULL, '{$unidCar}')"
         );
 
         if (!$res) {

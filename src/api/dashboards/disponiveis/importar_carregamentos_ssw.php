@@ -23,6 +23,8 @@ ssw_login($domain);
 set_time_limit(300);
 
 $tabela = "{$domain}_carregamento";
+$tabelaVeiculo = "{$domain}_veiculo";
+$domainUpper = strtoupper(trim((string)$domain));
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&prioritario=N");
@@ -58,13 +60,14 @@ foreach ($xml->xpath('//f8') as $f8) {
         $placas_ssw[] = $placa;
     }
 }
+$placas_ssw = array_values(array_unique($placas_ssw));
 
 $unidadeEsc = pg_escape_string($conn, $unidade);
 
 if (empty($placas_ssw)) {
-    $resDelSsw = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = true");
+    $resDelSsw = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw IS NOT NULL AND origem_ssw <> ''");
     if ($resDelSsw === false) {
-        respondJson(['success' => false, 'message' => 'Erro ao limpar importações anteriores (origem_ssw=true).']);
+        respondJson(['success' => false, 'message' => 'Erro ao limpar importações anteriores (origem_ssw preenchido).']);
     }
     $removidos = pg_affected_rows($resDelSsw);
     respondJson([
@@ -88,8 +91,8 @@ $resDelInexistentes = pg_query(
     $conn,
     "DELETE FROM {$tabela}
      WHERE UPPER(unidade) = '{$unidadeEsc}'
-       AND origem_ssw = true
-       AND UPPER(placa_provisoria) NOT IN ({$placasIn})"
+       AND origem_ssw IS NOT NULL AND origem_ssw <> ''
+       AND UPPER(origem_ssw) NOT IN ({$placasIn})"
 );
 if ($resDelInexistentes === false) {
     respondJson(['success' => false, 'message' => 'Erro ao remover carregamentos que não existem mais no SSW.']);
@@ -244,21 +247,43 @@ for ($i = 0; $i < count($placasLote); $i += $tamanhoLote) {
 }
 
 foreach ($placas_ssw as $placa) {
+    $placa = strtoupper(trim((string)$placa));
+    if ($placa === '') continue;
     $placaEsc = pg_escape_string($conn, $placa);
 
-    $res_check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' LIMIT 1");
+    $placaProvisoriaSalvar = $placa;
+    $destinoFromPlaca = null;
+
+    if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{7}$/', $placa)) {
+        $destinoFromPlaca = substr($placa, 0, 3);
+        $sufixo = substr($placa, 3, 4);
+        if ($sufixo !== '') {
+            $resVeic = sql(
+                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
+                [$sufixo],
+                $conn
+            );
+            if ($resVeic && pg_num_rows($resVeic) > 0) {
+                $rowV = pg_fetch_assoc($resVeic);
+                $cand = strtoupper(trim((string)($rowV['placa'] ?? '')));
+                if ($cand !== '') $placaProvisoriaSalvar = $cand;
+            }
+        }
+    }
+
+    $placaProvEsc = pg_escape_string($conn, $placaProvisoriaSalvar);
+
+    $res_check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' LIMIT 1");
     $ja_existe = $res_check && pg_num_rows($res_check) > 0;
 
     $info = $carregamentos[$placa] ?? null;
     $ctes = $info['ctes'] ?? [];
-    if (empty($ctes)) {
-        $logs[] = ['placa' => $placa, 'status' => 'aviso', 'msg' => 'Nenhum CT-e válido encontrado no relatório.'];
-        continue;
-    }
 
     $destinos = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
     $destinoCar = null;
-    if (!empty($destinos)) {
+    if ($destinoFromPlaca !== null && $destinoFromPlaca !== '') {
+        $destinoCar = strtoupper($destinoFromPlaca);
+    } elseif (!empty($destinos)) {
         $freq = array_count_values($destinos);
         arsort($freq);
         $destinoCar = array_key_first($freq);
@@ -267,60 +292,66 @@ foreach ($placas_ssw as $placa) {
 
     pg_query($conn, 'BEGIN');
     try {
-        // Remove somente o que veio do SSW para esta placa (mantém apontamentos manuais)
-        $resDel = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND origem_ssw = true");
+        $resDel = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}'");
         if ($resDel === false) throw new Exception(pg_last_error($conn));
 
         $inseridos = 0;
-        foreach ($ctes as $cte_info) {
-            $ser = pg_escape_string($conn, strtoupper(trim($cte_info['ser_cte'] ?? '')));
-            $nro = (int)($cte_info['nro_cte'] ?? 0);
-            if ($ser === '' || $nro <= 0) continue;
-
-            $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
-            if ($check_dup && pg_num_rows($check_dup) > 0) continue;
-
-            $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
-            $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
-            $pagador    = pg_escape_string($conn, trim($cte_info['pagador'] ?? ''));
-            $destinat   = pg_escape_string($conn, trim($cte_info['destinatario'] ?? ''));
-            $cidade     = pg_escape_string($conn, trim($cte_info['cidade'] ?? ''));
-
-            $emissao = trim($cte_info['emissao'] ?? '');
-            $prevEnt = trim($cte_info['prev_ent'] ?? '');
-            $emissaoSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $emissao) ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')" : 'NULL';
-            $prevEntSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $prevEnt) ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')" : 'NULL';
-
-            $vlrMerc  = normalizarNumero($cte_info['vlr_merc']  ?? 0);
-            $vlrFrete = normalizarNumero($cte_info['vlr_frete'] ?? 0);
-            $pesoVal  = normalizarNumero($cte_info['peso']      ?? 0);
-            $cubVal   = normalizarNumero($cte_info['cubagem']   ?? 0);
-            $qtdeVol  = (int)($cte_info['qtde_vol'] ?? 0);
-
-            $resIns = pg_query($conn,
+        if (empty($ctes)) {
+            $resInsSent = pg_query(
+                $conn,
                 "INSERT INTO {$tabela}
                  (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                  destino, unidades,
-                  ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
-                  remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-                  vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                  origem_ssw, unidade_carregamento)
+                  nro_cte, destino, unidades, origem_ssw, unidade_carregamento)
                  VALUES
-                 ('{$unidadeEsc}', '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
-                  {$destinoCarEsc}, NULL,
-                  '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
-                  '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
-                  {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
-                  true, '{$unidadeEsc}')"
+                 ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
+                  0, {$destinoCarEsc}, NULL, '{$placaEsc}', '{$unidadeEsc}')"
             );
-            if (!$resIns) throw new Exception(pg_last_error($conn));
-            $inseridos++;
-        }
+            if (!$resInsSent) throw new Exception(pg_last_error($conn));
+        } else {
+            foreach ($ctes as $cte_info) {
+                $ser = pg_escape_string($conn, strtoupper(trim($cte_info['ser_cte'] ?? '')));
+                $nro = (int)($cte_info['nro_cte'] ?? 0);
+                if ($ser === '' || $nro <= 0) continue;
 
-        if ($inseridos === 0) {
-            pg_query($conn, 'ROLLBACK');
-            $logs[] = ['placa' => $placa, 'status' => 'aviso', 'msg' => 'Nenhum CT-e importado.'];
-            continue;
+                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaProvEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
+                if ($check_dup && pg_num_rows($check_dup) > 0) continue;
+
+                $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
+                $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
+                $pagador    = pg_escape_string($conn, trim($cte_info['pagador'] ?? ''));
+                $destinat   = pg_escape_string($conn, trim($cte_info['destinatario'] ?? ''));
+                $cidade     = pg_escape_string($conn, trim($cte_info['cidade'] ?? ''));
+
+                $emissao = trim($cte_info['emissao'] ?? '');
+                $prevEnt = trim($cte_info['prev_ent'] ?? '');
+                $emissaoSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $emissao) ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')" : 'NULL';
+                $prevEntSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $prevEnt) ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')" : 'NULL';
+
+                $vlrMerc  = normalizarNumero($cte_info['vlr_merc']  ?? 0);
+                $vlrFrete = normalizarNumero($cte_info['vlr_frete'] ?? 0);
+                $pesoVal  = normalizarNumero($cte_info['peso']      ?? 0);
+                $cubVal   = normalizarNumero($cte_info['cubagem']   ?? 0);
+                $qtdeVol  = (int)($cte_info['qtde_vol'] ?? 0);
+
+                $resIns = pg_query($conn,
+                    "INSERT INTO {$tabela}
+                     (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                      destino, unidades,
+                      ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                      remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                      vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+                      origem_ssw, unidade_carregamento)
+                     VALUES
+                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
+                      {$destinoCarEsc}, NULL,
+                      '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
+                      '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
+                      {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
+                      '{$placaEsc}', '{$unidadeEsc}')"
+                );
+                if (!$resIns) throw new Exception(pg_last_error($conn));
+                $inseridos++;
+            }
         }
 
         // Atualiza timestamps/usuário do carregamento inteiro (inclui linhas manuais)
@@ -330,13 +361,16 @@ foreach ($placas_ssw as $placa) {
                  hora_inclusao = CURRENT_TIME,
                  login_inclusao = '{$loginEsc}'
              WHERE UPPER(unidade) = '{$unidadeEsc}'
-               AND placa_provisoria = '{$placaEsc}'"
+               AND placa_provisoria = '{$placaProvEsc}'"
         );
         if ($resUpd === false) throw new Exception(pg_last_error($conn));
 
         pg_query($conn, 'COMMIT');
         $status = $ja_existe ? 'sobrescrito' : 'importado';
-        $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => "{$inseridos} CT-e(s) importado(s)."];
+        $msg = ($placaProvisoriaSalvar !== $placa)
+            ? "{$inseridos} CT-e(s) importado(s). Agrupado em {$placaProvisoriaSalvar}."
+            : "{$inseridos} CT-e(s) importado(s).";
+        $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => $msg];
     } catch (Exception $e) {
         pg_query($conn, 'ROLLBACK');
         $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Erro ao salvar: ' . $e->getMessage()];

@@ -29,13 +29,19 @@ $conn = connect();
 $tabelaCarregamento = "{$domain}_carregamento";
 $tabelaVeiculo      = "{$domain}_veiculo";
 $tabelaCap          = "{$domain}_carregamento_capacidade";
+$tabelaLinha        = "{$domain}_linha";
 
 // ─── Busca carregamentos agrupados por placa ──────────────────────────────────
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
     SELECT
         c.placa_provisoria,
-        COUNT(*) FILTER (WHERE c.nro_cte > 0)  AS total_ctes,
+        SUM(
+            CASE
+                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN 1
+                ELSE 0
+            END
+        ) AS total_ctes,
         MIN(c.data_inclusao)                    AS data_criacao,
         MIN(c.hora_inclusao)                    AS hora_criacao,
         MIN(c.login_inclusao)                   AS login_criacao,
@@ -43,7 +49,6 @@ $sqlCarregamentos = "
         (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' LIMIT 1) AS paradas,
         v.capacidade_ton,
         v.capacidade_m3,
-        v.vlr_min_frete,
         cap.cap_ton,
         cap.cap_m3
     FROM {$tabelaCarregamento} c
@@ -52,7 +57,7 @@ $sqlCarregamentos = "
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = \$1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, v.vlr_min_frete, cap.cap_ton, cap.cap_m3
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -78,7 +83,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
     $capTon = $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null);
     $capM3  = $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null);
-    $vlrMinFrete = $row['vlr_min_frete'] !== null ? (float)$row['vlr_min_frete'] : null;
+    $vlrMinFrete = null;
 
     if ($capTon === null || $capTon <= 0) $capTon = 27.0;
     if ($capM3  === null || $capM3  <= 0) $capM3  = 67.0;
@@ -104,6 +109,58 @@ if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
 }
 
+$rotas = [];
+$rotaPorIdx = [];
+foreach ($carregamentos as $idx => $car) {
+    $dest = strtoupper(trim((string)($car['destino'] ?? '')));
+    if ($dest === '') continue;
+    $paradasStr = (string)($car['paradas'] ?? '');
+    $paradasArr = array_filter(array_map('trim', explode(',', strtoupper($paradasStr))), function($p) { return $p !== ''; });
+    $paradasNorm = implode(',', $paradasArr);
+    $key = $dest . '|' . $paradasNorm;
+    $rotaPorIdx[$idx] = $key;
+    $rotas[$key] = ['dest' => $dest, 'paradas' => $paradasNorm];
+}
+
+if (count($rotas) > 0) {
+    $valuesSql = [];
+    $paramsLinhas = [$unidade];
+    $p = 2;
+    foreach ($rotas as $r) {
+        $valuesSql[] = '($' . $p . ', $' . ($p + 1) . ')';
+        $paramsLinhas[] = $r['dest'];
+        $paramsLinhas[] = $r['paradas'];
+        $p += 2;
+    }
+
+    $sqlLinhas = "
+        SELECT
+            l.sigla_dest,
+            COALESCE(l.unidades, '') AS unidades,
+            l.vlr_min_frete
+        FROM {$tabelaLinha} l
+        INNER JOIN (VALUES " . implode(', ', $valuesSql) . ") AS v(sigla_dest, unidades)
+            ON v.sigla_dest = l.sigla_dest
+           AND v.unidades = COALESCE(l.unidades, '')
+        WHERE l.sigla_emit = \$1
+    ";
+
+    try {
+        $resLinhas = sql($sqlLinhas, $paramsLinhas, $conn);
+        $minPorRota = [];
+        while ($resLinhas && ($lr = pg_fetch_assoc($resLinhas))) {
+            $k = strtoupper(trim((string)($lr['sigla_dest'] ?? ''))) . '|' . (string)($lr['unidades'] ?? '');
+            $minPorRota[$k] = ($lr['vlr_min_frete'] !== null && $lr['vlr_min_frete'] !== '') ? (float)$lr['vlr_min_frete'] : null;
+        }
+        foreach ($rotaPorIdx as $idx => $key) {
+            if (array_key_exists($key, $minPorRota)) {
+                $carregamentos[$idx]['vlr_min_frete'] = $minPorRota[$key];
+            }
+        }
+    } catch (Exception $e) {
+    }
+}
+
 // ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
 $sqlCtes = "
     SELECT
@@ -127,7 +184,7 @@ $sqlCtes = "
         c.hora_inclusao
     FROM {$tabelaCarregamento} c
     WHERE c.unidade = \$1
-      AND c.nro_cte > 0
+      AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
 ";
 

@@ -54,17 +54,28 @@ export function getDefaultHeaders(): HeadersInit {
     }
   }
   
-  // Em localhost, não enviar headers customizados para evitar CORS
   const hostname = window.location.hostname;
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const apiBaseUrl = ENVIRONMENT.apiBaseUrl;
+  const shouldSendCustomHeaders = (() => {
+    if (!isLocalhost) return true;
+    if (!apiBaseUrl || typeof apiBaseUrl !== 'string') return true;
+    if (!apiBaseUrl.startsWith('http')) return true;
+    try {
+      const apiOrigin = new URL(apiBaseUrl).origin;
+      return apiOrigin === window.location.origin;
+    } catch {
+      return true;
+    }
+  })();
   
   return {
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
-    ...(isLocalhost ? {} : {
+    ...(shouldSendCustomHeaders ? {
       'X-Domain': domain,
       'X-Unidade': unidade
-    })
+    } : {})
   };
 }
 
