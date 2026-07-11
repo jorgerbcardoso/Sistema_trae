@@ -200,6 +200,7 @@ interface CteCarregamento {
 
 interface Carregamento {
   placa_provisoria: string;
+  origem_criacao?: 'MANUAL' | 'AUTO' | 'SSW' | null;
   total_ctes: number;
   data_criacao: string;
   hora_criacao: string;
@@ -1378,14 +1379,43 @@ function CardCarregamento({
   };
 
   const handleSalvarCapacidade = async () => {
+    const capTonNum = novaCapTon !== '' ? parseFloat(novaCapTon) : null;
+    const capM3Num = novaCapM3 !== '' ? parseFloat(novaCapM3) : null;
+    const vlrMinNum = novaVlrMinFrete !== '' ? parseFloat(novaVlrMinFrete) : null;
+    const mudouTon = capTonNum !== null && carregamento.capacidade_ton !== null
+      ? Math.abs(capTonNum - carregamento.capacidade_ton) > 0.0001
+      : capTonNum !== carregamento.capacidade_ton;
+    const mudouM3 = capM3Num !== null && carregamento.capacidade_m3 !== null
+      ? Math.abs(capM3Num - carregamento.capacidade_m3) > 0.0001
+      : capM3Num !== carregamento.capacidade_m3;
+    const mudouMinFrete = vlrMinNum !== null && carregamento.vlr_min_frete !== null && carregamento.vlr_min_frete !== undefined
+      ? Math.abs(vlrMinNum - (carregamento.vlr_min_frete as number)) > 0.0001
+      : vlrMinNum !== (carregamento.vlr_min_frete ?? null);
+
+    if (mudouTon || mudouM3 || mudouMinFrete) {
+      const linhas: string[] = [];
+      linhas.push('Confirmar alteração dos parâmetros?');
+      if (mudouMinFrete) linhas.push('- Min. Frete: será alterado também na linha (tabela [dominio]_linha).');
+      if (mudouTon || mudouM3) linhas.push('- Capacidades: serão alteradas também no veículo (tabela [dominio]_veiculo).');
+      const ok = confirm(linhas.join('\n'));
+      if (!ok) return;
+    }
+
     setSalvandoEdicao(true);
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: novaCapTon !== '' ? parseFloat(novaCapTon) : null, cap_m3: novaCapM3 !== '' ? parseFloat(novaCapM3) : null, vlr_min_frete: novaVlrMinFrete !== '' ? parseFloat(novaVlrMinFrete) : null }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, destino, paradas: (paradasArray || []).join(',') }) },
         true
       );
-      if (res.success) { toast.success('Capacidade atualizada.'); setEditandoCapacidade(false); onRecarregarCarregamentos(); }
+      if (res.success) {
+        toast.success('Parâmetros atualizados.');
+        if (mudouMinFrete && res.atualizou_linha === false) {
+          toast.info('Min. Frete não foi aplicado em nenhuma linha (rota não encontrada).');
+        }
+        setEditandoCapacidade(false);
+        onRecarregarCarregamentos();
+      }
       else toast.error(res.message || 'Erro ao atualizar capacidade.');
     } catch (e: any) { toast.error(e.message || 'Erro ao atualizar capacidade.'); }
     finally { setSalvandoEdicao(false); }
@@ -1447,6 +1477,14 @@ function CardCarregamento({
     ? todasUnidades.map((u, i) => i === todasUnidades.length - 1 ? <span key={i} className="font-bold">{u}</span> : <span key={i}>{u}{i < todasUnidades.length - 1 ? ', ' : ''}</span>)
     : null;
 
+  const origemTag = (() => {
+    const o = (carregamento.origem_criacao ?? null);
+    if (o === 'SSW') return { label: 'SSW', className: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' };
+    if (o === 'AUTO') return { label: 'Auto', className: 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200' };
+    if (o === 'MANUAL') return { label: 'Manual', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' };
+    return null;
+  })();
+
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
@@ -1471,6 +1509,9 @@ function CardCarregamento({
               ) : (
                 <div className="flex items-center gap-1 group">
                   <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
+                  {origemTag && (
+                    <Badge className={`${origemTag.className} text-[10px] h-5 px-2`}>{origemTag.label}</Badge>
+                  )}
                   <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" title="Editar placa">
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -1504,7 +1545,7 @@ function CardCarregamento({
 
         {editandoCapacidade && (
           <div className="mb-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 space-y-2">
-            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Parâmetros do veículo</p>
+            <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Parâmetros do carregamento</p>
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-[10px] text-slate-500 dark:text-slate-400">Ton</label>
@@ -1583,7 +1624,7 @@ function CardCarregamento({
             variant="outline"
             className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
             onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
-            title="Editar parâmetros do veículo"
+            title="Editar Parâmetros do Carregamento."
           >
             <Gauge className="w-3.5 h-3.5 mr-1" />Param.
           </Button>

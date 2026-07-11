@@ -31,11 +31,21 @@ $tabelaVeiculo      = "{$domain}_veiculo";
 $tabelaCap          = "{$domain}_carregamento_capacidade";
 $tabelaLinha        = "{$domain}_linha";
 
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+
 // ─── Busca carregamentos agrupados por placa ──────────────────────────────────
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
     SELECT
         c.placa_provisoria,
+        MAX(
+            CASE
+                WHEN UPPER(COALESCE(c.origem_criacao, '')) = 'SSW' THEN 3
+                WHEN UPPER(COALESCE(c.origem_criacao, '')) = 'AUTO' THEN 2
+                WHEN UPPER(COALESCE(c.origem_criacao, '')) = 'MANUAL' THEN 1
+                ELSE 0
+            END
+        ) AS origem_rank,
         SUM(
             CASE
                 WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN 1
@@ -90,8 +100,18 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
     $idx = count($carregamentos);
     $idxPorPlaca[$placa] = $idx;
+    $rank = (int)($row['origem_rank'] ?? 0);
+    $origemCriacao = null;
+    if ($rank >= 3) $origemCriacao = 'SSW';
+    elseif ($rank === 2) $origemCriacao = 'AUTO';
+    elseif ($rank === 1) $origemCriacao = 'MANUAL';
+    else {
+        if (preg_match('/^[A-Z0-9]{2,5}-[A-Z0-9]{2,5}$/', $placa)) $origemCriacao = 'AUTO';
+        else $origemCriacao = 'MANUAL';
+    }
     $carregamentos[] = [
         'placa_provisoria' => $placa,
+        'origem_criacao'   => $origemCriacao,
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
         'data_criacao'     => $row['data_criacao'] ?? null,
         'hora_criacao'     => $row['hora_criacao'] ?? null,

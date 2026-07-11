@@ -26,6 +26,8 @@ $tabela = "{$domain}_carregamento";
 $tabelaVeiculo = "{$domain}_veiculo";
 $domainUpper = strtoupper(trim((string)$domain));
 
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&prioritario=N");
 
@@ -314,10 +316,10 @@ foreach ($placas_ssw as $placa) {
                 $conn,
                 "INSERT INTO {$tabela}
                  (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                  nro_cte, destino, unidades, origem_ssw, unidade_carregamento)
+                  nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                  VALUES
                  ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
-                  0, {$destinoCarEsc}, NULL, '{$placaEsc}', '{$unidadeEsc}')"
+                  0, {$destinoCarEsc}, NULL, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
             );
             if (!$resInsSent) throw new Exception(pg_last_error($conn));
         } else {
@@ -353,14 +355,14 @@ foreach ($placas_ssw as $placa) {
                       ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                       remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                      origem_ssw, unidade_carregamento)
+                      origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
                       {$destinoCarEsc}, NULL,
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
-                      '{$placaEsc}', '{$unidadeEsc}')"
+                      '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
                 );
                 if (!$resIns) throw new Exception(pg_last_error($conn));
                 $inseridos++;
@@ -372,7 +374,8 @@ foreach ($placas_ssw as $placa) {
             "UPDATE {$tabela}
              SET data_inclusao = CURRENT_DATE,
                  hora_inclusao = CURRENT_TIME,
-                 login_inclusao = '{$loginEsc}'
+                 login_inclusao = '{$loginEsc}',
+                 origem_criacao = 'SSW'
              WHERE UPPER(unidade) = '{$unidadeEsc}'
                AND placa_provisoria = '{$placaProvEsc}'"
         );

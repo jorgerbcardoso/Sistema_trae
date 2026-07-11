@@ -29,8 +29,11 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 $tabela    = "{$domain}_carregamento";
 $tabelaCap = "{$domain}_carregamento_capacidade";
 $tabelaVeiculo = "{$domain}_veiculo";
+$tabelaLinha = "{$domain}_linha";
 
 $conn = connect();
+
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 
 // ─── Ação: criar carregamento manual (linha sentinela com nro_cte = 0) ────────
 if ($acao === 'criar') {
@@ -55,8 +58,8 @@ if ($acao === 'criar') {
     $unidadesSql = $paradas !== '' ? "'" . pg_escape_string($conn, $paradas) . "'" : 'NULL';
 
     $res = pg_query($conn,
-        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, origem_ssw, unidade_carregamento)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, NULL, '" . pg_escape_string($conn, $unidade) . "')"
+        "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, NULL, 'MANUAL', '" . pg_escape_string($conn, $unidade) . "')"
     );
 
     if (!$res) {
@@ -78,8 +81,9 @@ if ($acao === 'adicionar_ctes') {
     // Busca destino/unidades do carregamento existente (para replicar em cada linha)
     $destinoCarreg  = '';
     $unidadesCarreg = '';
+    $origemCriacao  = '';
     $resCarreg = pg_query($conn,
-        "SELECT destino, unidades FROM {$tabela}
+        "SELECT destino, unidades, origem_criacao FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
            AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
          LIMIT 1"
@@ -88,7 +92,9 @@ if ($acao === 'adicionar_ctes') {
         $rowCarreg      = pg_fetch_assoc($resCarreg);
         $destinoCarreg  = $rowCarreg['destino']  ?? '';
         $unidadesCarreg = $rowCarreg['unidades'] ?? '';
+        $origemCriacao  = strtoupper(trim($rowCarreg['origem_criacao'] ?? ''));
     }
+    if ($origemCriacao === '') $origemCriacao = 'MANUAL';
 
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
@@ -178,13 +184,13 @@ if ($acao === 'adicionar_ctes') {
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-              destino, unidades, origem_ssw, unidade_carregamento)
+              destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', NULL, '{$unidCar}')"
+              '{$destEsc}', '{$unidEsc}', NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '{$unidCar}')"
         );
 
         if (!$res) {
@@ -237,9 +243,21 @@ if ($acao === 'remover_cte') {
          LIMIT 1"
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
+        $origemCriacao = '';
+        $resOrig = pg_query($conn,
+            "SELECT origem_criacao FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+             LIMIT 1"
+        );
+        if ($resOrig && pg_num_rows($resOrig) > 0) {
+            $rowO = pg_fetch_assoc($resOrig);
+            $origemCriacao = strtoupper(trim($rowO['origem_criacao'] ?? ''));
+        }
+        if ($origemCriacao === '') $origemCriacao = 'MANUAL';
         pg_query($conn,
-            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, unidade_carregamento)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $unidade) . "')"
+            "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, origem_criacao, unidade_carregamento)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
         );
     }
 
@@ -289,6 +307,18 @@ if ($acao === 'remover_ctes') {
          LIMIT 1"
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
+        $origemCriacao = '';
+        $resOrig = pg_query($conn,
+            "SELECT origem_criacao FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+             LIMIT 1"
+        );
+        if ($resOrig && pg_num_rows($resOrig) > 0) {
+            $rowO = pg_fetch_assoc($resOrig);
+            $origemCriacao = strtoupper(trim($rowO['origem_criacao'] ?? ''));
+        }
+        if ($origemCriacao === '') $origemCriacao = 'MANUAL';
         $checkSent = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
@@ -298,8 +328,8 @@ if ($acao === 'remover_ctes') {
         );
         if (!$checkSent || pg_num_rows($checkSent) === 0) {
             pg_query($conn,
-                "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, unidade_carregamento)
-                 VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $unidade) . "')"
+                "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, origem_criacao, unidade_carregamento)
+                 VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
             );
         }
     }
@@ -379,6 +409,8 @@ if ($acao === 'atualizar_capacidade') {
     $capTon = ($input['cap_ton'] !== '' && $input['cap_ton'] !== null) ? (float)$input['cap_ton'] : null;
     $capM3  = ($input['cap_m3']  !== '' && $input['cap_m3']  !== null) ? (float)$input['cap_m3']  : null;
     $vlrMinFrete = ($input['vlr_min_frete'] !== '' && $input['vlr_min_frete'] !== null) ? (float)$input['vlr_min_frete'] : null;
+    $destinoLinha = strtoupper(trim((string)($input['destino'] ?? '')));
+    $paradasLinha = strtoupper(trim((string)($input['paradas'] ?? $input['unidades'] ?? '')));
 
     if (empty($placa)) respondJson(['success' => false, 'message' => 'Placa não informada.']);
 
@@ -402,12 +434,10 @@ if ($acao === 'atualizar_capacidade') {
     );
 
     if (strpos($placa, '-') === false) {
-        $vlrMinSql = $vlrMinFrete !== null ? $vlrMinFrete : 'NULL';
         $resVeic = @pg_query($conn,
             "UPDATE {$tabelaVeiculo}
              SET capacidade_ton = {$capTonSql},
-                 capacidade_m3 = {$capM3Sql},
-                 vlr_min_frete = {$vlrMinSql}
+                 capacidade_m3 = {$capM3Sql}
              WHERE UPPER(placa) = UPPER('" . pg_escape_string($conn, $placa) . "')"
         );
         if ($resVeic === false) {
@@ -420,7 +450,22 @@ if ($acao === 'atualizar_capacidade') {
         }
     }
 
-    respondJson(['success' => true]);
+    $atualizouLinha = false;
+    if ($vlrMinFrete !== null && $destinoLinha !== '') {
+        $vlrMinSql = $vlrMinFrete;
+        $paradasNorm = $paradasLinha;
+        $paradasNorm = preg_replace('/\s+/', ' ', trim($paradasNorm));
+        $resLinha = @pg_query($conn,
+            "UPDATE {$tabelaLinha}
+             SET vlr_min_frete = {$vlrMinSql}
+             WHERE sigla_emit = '" . pg_escape_string($conn, $unidade) . "'
+               AND sigla_dest = '" . pg_escape_string($conn, $destinoLinha) . "'
+               AND COALESCE(unidades, '') = '" . pg_escape_string($conn, $paradasNorm) . "'"
+        );
+        if ($resLinha && pg_affected_rows($resLinha) > 0) $atualizouLinha = true;
+    }
+
+    respondJson(['success' => true, 'atualizou_linha' => $atualizouLinha]);
 }
 
 // ─── Ação: excluir todos ──────────────────────────────────────────────────────
