@@ -254,7 +254,7 @@ foreach ($placas_ssw as $placa) {
     $placaProvisoriaSalvar = $placa;
     $destinoFromPlaca = null;
 
-    if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{7}$/', $placa)) {
+    if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $placa)) {
         $destinoFromPlaca = substr($placa, 0, 3);
         $sufixo = substr($placa, 3, 4);
         if ($sufixo !== '') {

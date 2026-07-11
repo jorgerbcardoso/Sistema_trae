@@ -2605,7 +2605,7 @@ export function Disponiveis() {
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
-  const [importacaoAutomatica, setImportacaoAutomatica] = useState(false);
+  const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const importandoCarregamentosRef = useRef(false);
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
@@ -3928,11 +3928,10 @@ export function Disponiveis() {
                   <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div className="flex-1 min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
-                  <span className="font-semibold">{(loadingLinhasOrigem || loadingLinhasHojeStatus) ? '...' : qtdLinhasHojeViaveis}</span>
-                  {' '}linha(s) carrega(m) HOJE. Clique aqui para visualizar.
-                </div>
-                <div className="shrink-0 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap hidden lg:block">
-                  {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'Carregando...' : `${linhasOrigem.length} linha(s) cadastrada(s)`}
+                  <span className="font-semibold">
+                    {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? '...' : `${qtdLinhasHojeViaveis}/${linhasOrigem.length}`}
+                  </span>
+                  {' '}linha(s) com carregamento disponível para hoje
                 </div>
               </div>
             </CardContent>
