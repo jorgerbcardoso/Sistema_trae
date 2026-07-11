@@ -1254,7 +1254,6 @@ function CardCarregamento({
   onRecarregarCarregamentos: () => Promise<void>;
   importandoCarregamentos: boolean;
 }) {
-  const [expandido, setExpandido] = useState(false);
   const [editandoPlaca, setEditandoPlaca] = useState(false);
   const [novaPlaca, setNovaPlaca] = useState('');
   const [editandoCapacidade, setEditandoCapacidade] = useState(false);
@@ -1266,6 +1265,7 @@ function CardCarregamento({
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
   const [loadingCteDetalhe, setLoadingCteDetalhe] = useState(false);
+  const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
 
@@ -1275,6 +1275,7 @@ function CardCarregamento({
     cteDetalheListaRef.current = [];
     setCteDetalheTotais(null);
     setLoadingCteDetalhe(true);
+    setCteDetalheSelecionados(new Set());
     const titulo = `Carregamento ${carregamento.placa_provisoria}`;
     cteDetalheTituloRef.current = titulo;
     try {
@@ -1292,6 +1293,42 @@ function CardCarregamento({
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar CT-es');
+    } finally {
+      setLoadingCteDetalhe(false);
+    }
+  };
+
+  const removerCtesSelecionados = async () => {
+    if (cteDetalheSelecionados.size === 0) return;
+    const qtd = cteDetalheSelecionados.size;
+    if (!confirm(`Excluir ${qtd} CT-e(s) selecionado(s) deste carregamento?`)) return;
+    setLoadingCteDetalhe(true);
+    try {
+      const seq_ctes = Array.from(cteDetalheSelecionados.values()).filter(n => Number.isFinite(n) && n > 0);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', placa: carregamento.placa_provisoria, seq_ctes }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res.message || 'Erro ao remover CT-es');
+        return;
+      }
+      const resList = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria }) },
+        true
+      );
+      if (resList.success) {
+        setCteDetalheLista(resList.ctes ?? []);
+        cteDetalheListaRef.current = resList.ctes ?? [];
+        setCteDetalheTotais(resList.totais ?? null);
+        setCteDetalheSelecionados(new Set());
+      }
+      await onRecarregarCarregamentos();
+      toast.success(`${res.removidos ?? qtd} CT-e(s) removido(s).`);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao remover CT-es');
     } finally {
       setLoadingCteDetalhe(false);
     }
@@ -1443,13 +1480,7 @@ function CardCarregamento({
           </div>
           <div className="flex items-center gap-1.5 shrink-0 justify-end">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-              {importandoCarregamentos ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
-                </>
-              )}
+              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
           </div>
           <div className="col-span-2 flex gap-2 min-w-0">
@@ -1484,7 +1515,7 @@ function CardCarregamento({
                 <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapM3} onChange={e => setNovaCapM3(e.target.value)} placeholder="Ex: 40" />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-slate-500 dark:text-slate-400">Vlr. Min. Frete (R$)</label>
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Min. Frete (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrMinFrete} onChange={e => setNovaVlrMinFrete(e.target.value)} placeholder="Ex: 3500" />
               </div>
             </div>
@@ -1520,101 +1551,68 @@ function CardCarregamento({
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex gap-1.5">
-            {!ativo ? (
-              <Button size="sm" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}>
-                <CheckSquare className="w-3.5 h-3.5 mr-1" />Apontar
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="flex-1 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs h-8" onClick={onCancelarApontamento}>
-                <X className="w-3.5 h-3.5 mr-1" />Cancelar
-              </Button>
-            )}
-            <Button size="sm" className="flex-1 bg-sky-500 hover:bg-sky-600 text-white text-xs h-8" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
-              <Truck className="w-3.5 h-3.5 mr-1" />SSW
+        <div className="grid grid-cols-3 gap-1.5">
+          {!ativo ? (
+            <Button size="sm" className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)} title="Apontar CT-es neste carregamento">
+              <CheckSquare className="w-3.5 h-3.5 mr-1" />Apont.
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className={`flex-1 h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
-              onClick={() => onCarregarHub(carregamento)}
-              disabled={loadingHub}
-              title="Completar carregamento com CT-es via Hub"
-            >
-              {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                : <Share2 className="w-3.5 h-3.5 mr-1" />
-              }
-              Hub
+          ) : (
+            <Button size="sm" variant="outline" className="h-8 border-emerald-400 text-emerald-700 dark:text-emerald-400 text-xs" onClick={onCancelarApontamento} title="Cancelar apontamento">
+              <X className="w-3.5 h-3.5 mr-1" />Canc.
             </Button>
-          </div>
-          <div className="flex gap-1.5 justify-end">
-            <Button size="sm" variant="outline" className="h-7 px-2.5 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setEditandoCapacidade(v => !v); }} title="Editar parâmetros do veículo">
-              <Gauge className="w-3.5 h-3.5" />
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700" onClick={() => setExpandido(!expandido)} title={expandido ? 'Recolher CT-es' : 'Ver CT-es'}>
-              {expandido ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-2 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 border-slate-200 dark:border-slate-700" onClick={abrirCteDetalhe} title="Detalhar CT-es">
-              <Search className="w-3.5 h-3.5" />
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 px-2 text-red-400 hover:text-red-600 hover:border-red-300 border-slate-200 dark:border-slate-700" onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)} title="Excluir carregamento">
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+          )}
+          <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
+            <Truck className="w-3.5 h-3.5 mr-1" />SSW
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
+            onClick={() => onCarregarHub(carregamento)}
+            disabled={loadingHub}
+            title="Completar carregamento com CT-es via Hub"
+          >
+            {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+              : <Share2 className="w-3.5 h-3.5 mr-1" />
+            }
+            Hub
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
+            title="Editar parâmetros do veículo"
+          >
+            <Gauge className="w-3.5 h-3.5 mr-1" />Param.
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            onClick={abrirCteDetalhe}
+            title="Lista de CT-es com exclusão"
+          >
+            <Search className="w-3.5 h-3.5 mr-1" />Lista
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)}
+            title="Excluir carregamento"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />Excl.
+          </Button>
         </div>
       </div>
-
-      {expandido && carregamento.ctes.length > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800">
-          <div className="max-h-52 overflow-y-auto">
-            <table className="w-full text-xs table-fixed">
-              <colgroup>
-                <col className="w-[90px]" />
-                <col />
-                <col className="w-[42px]" />
-                <col className="w-[46px]" />
-                <col className="w-[22px]" />
-              </colgroup>
-              <tbody>
-                {ctesDetalhados.map((c, i) => {
-                  const d = c.det;
-                  const pesoTon = d ? (parsePeso(d.peso) / 1000) : 0;
-                  const cub = d ? parseCubagem(d.cubagem) : 0;
-                  return (
-                    <tr key={i} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-2 py-1.5 font-mono font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {d ? (d.ctrc || `#${c.seq_cte}`) : `#${c.seq_cte}`}
-                      </td>
-                      <td className="px-1 py-1.5 text-slate-500 dark:text-slate-400 truncate">
-                        {d ? d.destinatario : <span className="italic text-slate-300 dark:text-slate-600">—</span>}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-                        {d ? `${pesoTon.toFixed(3)}t` : '—'}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-slate-500 dark:text-slate-500 whitespace-nowrap">
-                        {d ? `${cub.toFixed(3)}` : '—'}
-                      </td>
-                      <td className="pr-2 py-1.5 text-center">
-                        <button onClick={() => onRemoverCte(carregamento.placa_provisoria, c.seq_cte)} className="text-red-400 hover:text-red-600" title="Remover">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
       <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
         <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
               <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
-              <DialogDescription>Lista detalhada de CT-es</DialogDescription>
+              <DialogDescription>Selecione os CT-es e clique em “Excluir selecionados” para remover do carregamento</DialogDescription>
             </DialogHeader>
 
             {/* Destinos do carregamento */}
@@ -1635,21 +1633,51 @@ function CardCarregamento({
             })()}
           </div>
 
-          {cteDetalheLista.length > 0 && (
+          <div className="absolute top-4 right-10 flex items-center gap-2 z-10">
+            {cteDetalheLista.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportarCteDetalheCSV}
+                className="gap-1.5"
+                disabled={loadingCteDetalhe}
+              >
+                <FileDown className="w-4 h-4" />
+                Exportar CSV
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={exportarCteDetalheCSV}
-              className="absolute top-4 right-10 gap-1.5 z-10"
+              onClick={removerCtesSelecionados}
+              className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+              disabled={loadingCteDetalhe || cteDetalheSelecionados.size === 0}
             >
-              <FileDown className="w-4 h-4" />
-              Exportar CSV
+              <Trash2 className="w-4 h-4" />
+              Excluir selecionados
             </Button>
-          )}
+          </div>
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  className="self-center"
+                  checked={cteDetalheLista.length > 0 && cteDetalheSelecionados.size === cteDetalheLista.length}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setCteDetalheSelecionados(() => {
+                      if (!checked) return new Set();
+                      const next = new Set<number>();
+                      for (const c of cteDetalheLista) {
+                        const id = Number((c as any).seq_cte ?? 0);
+                        if (id > 0) next.add(id);
+                      }
+                      return next;
+                    });
+                  }}
+                />
                 <span>CT-e</span>
                 <span>Carr.</span>
                 <span>Emissão</span>
@@ -1673,11 +1701,30 @@ function CardCarregamento({
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {cteDetalheLista.map((cte, idx) => (
+                    {cteDetalheLista.map((cte, idx) => {
+                      const id = Number((cte as any).seq_cte ?? 0);
+                      const checked = id > 0 && cteDetalheSelecionados.has(id);
+                      return (
                       <div
                         key={idx}
-                        className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
                       >
+                        <input
+                          type="checkbox"
+                          className="self-center"
+                          checked={checked}
+                          onChange={(e) => {
+                            const nextChecked = e.target.checked;
+                            setCteDetalheSelecionados(prev => {
+                              const next = new Set(prev);
+                              if (id > 0) {
+                                if (nextChecked) next.add(id);
+                                else next.delete(id);
+                              }
+                              return next;
+                            });
+                          }}
+                        />
                         <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
@@ -1688,14 +1735,16 @@ function CardCarregamento({
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
 
             {cteDetalheTotais && (
-              <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                <span className="text-slate-500 dark:text-slate-400">{cteDetalheSelecionados.size > 0 ? `${cteDetalheSelecionados.size} selecionado(s)` : ''}</span>
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
                 <span />
                 <span />
@@ -2342,94 +2391,108 @@ function CarregamentoArea({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="flex items-center gap-2">
-          <Truck className="w-4 h-4 text-emerald-500" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
-          {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-          {carregamentos.length > 0 && (
-            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-              {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
-            </Badge>
-          )}
-          {modoApontamento && (
-            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
-              <CheckSquare className="w-3 h-3" />
-              Apontando para: <strong>{modoApontamento}</strong>
-            </Badge>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {carregamentos.length > 0 && (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative">
+      <div className={`${importandoCarregamentos ? 'blur-sm pointer-events-none select-none' : ''}`}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
+            {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+            {carregamentos.length > 0 && (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+            {modoApontamento && (
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
+                <CheckSquare className="w-3 h-3" />
+                Apontando para: <strong>{modoApontamento}</strong>
+              </Badge>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {carregamentos.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                onClick={handleExcluirTodos}
+                title="Excluir todos os carregamentos"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
-              className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-              onClick={handleExcluirTodos}
-              title="Excluir todos os carregamentos"
+              className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+              onClick={() => setModalImportarAberto(true)}
+              disabled={importandoCarregamentos}
             >
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
+              <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
             </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-            onClick={() => setModalImportarAberto(true)}
-            disabled={importandoCarregamentos}
-          >
-            <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
-          </Button>
-          <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
-            <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
+            <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
+              <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+              onClick={() => setModalAberto(true)}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+              onClick={() => setModalAutomaticoAberto(true)}
+            >
+              <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-            onClick={() => setModalAberto(true)}
-          >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
-            onClick={() => setModalAutomaticoAberto(true)}
-          >
-            <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
-          </Button>
         </div>
+
+        {carregamentos.length === 0 && !loadingCarregamentos ? (
+          <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
+            <Truck className="w-10 h-10 mb-2 opacity-20" />
+            <p className="text-sm">Nenhum carregamento em andamento</p>
+            <p className="text-xs mt-0.5">Clique em "Carregamento Manual" para começar</p>
+          </div>
+        ) : (
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {carregamentos.map((c, i) => (
+              <CardCarregamento
+                key={i}
+                carregamento={c}
+                todosCtes={todosCtes}
+                modoApontamento={modoApontamento}
+                onIniciarApontamento={onIniciarApontamento}
+                onCancelarApontamento={onCancelarApontamento}
+                onExcluirCarregamento={onExcluirCarregamento}
+                onRemoverCte={onRemoverCte}
+                onCarregarSSW={onCarregarSSW}
+                onCarregarHub={onCarregarHub}
+                loadingHub={loadingHub}
+                hubCarregamentoPlaca={hubCarregamentoPlaca}
+                onRecarregarCarregamentos={onRecarregarCarregamentos}
+                importandoCarregamentos={importandoCarregamentos}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {carregamentos.length === 0 && !loadingCarregamentos ? (
-        <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
-          <Truck className="w-10 h-10 mb-2 opacity-20" />
-          <p className="text-sm">Nenhum carregamento em andamento</p>
-          <p className="text-xs mt-0.5">Clique em "Carregamento Manual" para começar</p>
-        </div>
-      ) : (
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {carregamentos.map((c, i) => (
-            <CardCarregamento
-              key={i}
-              carregamento={c}
-              todosCtes={todosCtes}
-              modoApontamento={modoApontamento}
-              onIniciarApontamento={onIniciarApontamento}
-              onCancelarApontamento={onCancelarApontamento}
-              onExcluirCarregamento={onExcluirCarregamento}
-              onRemoverCte={onRemoverCte}
-              onCarregarSSW={onCarregarSSW}
-              onCarregarHub={onCarregarHub}
-              loadingHub={loadingHub}
-              hubCarregamentoPlaca={hubCarregamentoPlaca}
-              onRecarregarCarregamentos={onRecarregarCarregamentos}
-              importandoCarregamentos={importandoCarregamentos}
-            />
-          ))}
+      {importandoCarregamentos && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-white/35 dark:bg-black/35" />
+          <div className="relative rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-4 shadow-xl">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+              Atualizando Carregamentos
+            </div>
+          </div>
         </div>
       )}
 
@@ -3059,13 +3122,10 @@ export function Disponiveis() {
       .map(u => u.trim().toUpperCase())
       .filter(Boolean)
       .filter(u => /^[A-Z0-9]{2,5}$/.test(u));
-
-    if (unidades.length === 0) {
-      toast.error('Informe ao menos uma unidade intermediária.');
-      return;
-    }
-
-    const destinosPermitidos = new Set<string>([destino, ...unidades]);
+    const ordemDestinos = [destino, ...unidades];
+    const idxDestino = new Map<string, number>();
+    ordemDestinos.forEach((d, i) => { if (d) idxDestino.set(d, i); });
+    const destinosPermitidos = new Set<string>(ordemDestinos);
 
     const parsePrevEntTs = (s: string): number => {
       const m = s?.match(/^(\d{2})\/(\d{2})$/);
@@ -3158,7 +3218,15 @@ export function Disponiveis() {
         return;
       }
 
-      candidatos.sort((a, b) => parsePrevEntTs(a.prevEnt) - parsePrevEntTs(b.prevEnt));
+      candidatos.sort((a, b) => {
+        const pa = idxDestino.has(a.unidadeDest) ? (idxDestino.get(a.unidadeDest) as number) : 999;
+        const pb = idxDestino.has(b.unidadeDest) ? (idxDestino.get(b.unidadeDest) as number) : 999;
+        if (pa !== pb) return pa - pb;
+        const da = parsePrevEntTs(a.prevEnt);
+        const db = parsePrevEntTs(b.prevEnt);
+        if (da !== db) return da - db;
+        return (a.nroCte ?? 0) - (b.nroCte ?? 0);
+      });
 
       const selecionarCtes: Cte[] = [];
       for (const c of candidatos) {

@@ -246,6 +246,68 @@ if ($acao === 'remover_cte') {
     respondJson(['success' => true]);
 }
 
+// ─── Ação: remover múltiplos CT-es ─────────────────────────────────────────────
+if ($acao === 'remover_ctes') {
+    $placa = strtoupper(trim($input['placa'] ?? ''));
+    $seqs  = $input['seq_ctes'] ?? $input['nro_ctes'] ?? [];
+
+    if (empty($placa) || !is_array($seqs)) {
+        respondJson(['success' => false, 'message' => 'Placa ou lista de CT-es inválida.']);
+    }
+
+    $ids = [];
+    foreach ($seqs as $v) {
+        $n = (int)$v;
+        if ($n > 0) $ids[] = $n;
+    }
+    $ids = array_values(array_unique($ids));
+    if (count($ids) === 0) {
+        respondJson(['success' => false, 'message' => 'Nenhum CT-e válido informado.']);
+    }
+
+    pg_query($conn, 'BEGIN');
+    $idsSql = implode(',', $ids);
+    $res = pg_query($conn,
+        "DELETE FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND nro_cte IN ({$idsSql})"
+    );
+
+    if (!$res) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao remover CT-es.']);
+    }
+
+    $removidos = pg_affected_rows($res);
+
+    $checkRestantes = pg_query($conn,
+        "SELECT 1 FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND nro_cte > 0
+         LIMIT 1"
+    );
+    if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
+        $checkSent = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND nro_cte = 0
+             LIMIT 1"
+        );
+        if (!$checkSent || pg_num_rows($checkSent) === 0) {
+            pg_query($conn,
+                "INSERT INTO {$tabela} (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, unidade_carregamento)
+                 VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $unidade) . "')"
+            );
+        }
+    }
+
+    pg_query($conn, 'COMMIT');
+    respondJson(['success' => true, 'removidos' => $removidos]);
+}
+
 // ─── Ação: excluir carregamento ───────────────────────────────────────────────
 if ($acao === 'excluir_carregamento') {
     $placa = strtoupper(trim($input['placa'] ?? ''));
