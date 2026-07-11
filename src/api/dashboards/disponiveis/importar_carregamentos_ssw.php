@@ -61,8 +61,8 @@ foreach ($xml->xpath('//f8') as $f8) {
     }
 }
 $matchesPlacas = [];
-if (preg_match_all('/\b[A-Z]{3}[A-Z0-9]{4}\b/i', $xml_string, $matchesPlacas)) {
-    foreach (($matchesPlacas[0] ?? []) as $p) {
+if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPlacas)) {
+    foreach (($matchesPlacas[1] ?? []) as $p) {
         $p = strtoupper(trim((string)$p));
         if ($p !== '') $placas_ssw[] = $p;
     }
