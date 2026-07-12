@@ -16,22 +16,6 @@ import { Cliente, deleteClienteLogo, listClientes, normalizeDocumento, upsertCli
 
 const onlyDigits = (v: string) => (v ?? '').replace(/\D/g, '');
 
-const formatCPF = (digits: string) => {
-  const d = onlyDigits(digits).padStart(11, '0').slice(-11);
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11)}`;
-};
-
-const formatCNPJ = (digits: string) => {
-  const d = onlyDigits(digits).padStart(14, '0').slice(-14);
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12, 14)}`;
-};
-
-const formatDocumento = (digits: string) => {
-  const d = onlyDigits(digits);
-  if (d.length === 11) return { tipo: 'CPF', formatado: formatCPF(d) };
-  return { tipo: 'CNPJ', formatado: formatCNPJ(d) };
-};
-
 const formatDateBR = (iso: string | null | undefined) => {
   if (!iso) return '-';
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -364,7 +348,7 @@ export function CadastroClientes() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableHead field="cnpj" label="Documento" />
+                    <SortableHead field="cnpj" label="CNPJ/CPF" />
                     <SortableHead field="nome" label="Nome" className="w-[220px]" />
                     <SortableHead field="cidade_nome" label="Cidade" />
                     <SortableHead field="cidade_uf" label="UF" className="w-[80px]" />
@@ -390,9 +374,7 @@ export function CadastroClientes() {
                   ) : (
                     paginatedClientes.map((c) => (
                       <TableRow key={c.cnpj}>
-                        <TableCell className="font-mono text-xs">
-                          {formatDocumento(c.cnpj).formatado}
-                        </TableCell>
+                        <TableCell className="font-mono text-xs">{onlyDigits(c.cnpj)}</TableCell>
                         <TableCell className="max-w-[190px] truncate">{c.nome || '-'}</TableCell>
                         <TableCell className="max-w-[260px] truncate">{c.cidade_nome || '-'}</TableCell>
                         <TableCell className="text-xs">{c.cidade_uf || '-'}</TableCell>
@@ -435,23 +417,21 @@ export function CadastroClientes() {
           <DialogContent className="sm:max-w-[780px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>{editing ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
-              <DialogDescription>Logo ideal (mínimo): 200 x 150px. Formatos: PNG ou JPG. Opcional.</DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto overscroll-contain pr-1 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Documento</Label>
+                  <Label>CNPJ/CPF</Label>
                   {editing ? (
                     <div className="rounded-md border border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50 dark:bg-slate-900/40">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{formatDocumento(form.cnpj).tipo}</div>
-                      <div className="font-mono text-sm text-slate-900 dark:text-slate-100">{formatDocumento(form.cnpj).formatado}</div>
+                      <div className="font-mono text-sm text-slate-900 dark:text-slate-100">{onlyDigits(form.cnpj)}</div>
                     </div>
                   ) : (
                     <Input
                       value={form.cnpj}
                       onChange={(e) => setForm((p) => ({ ...p, cnpj: e.target.value }))}
-                      placeholder="CPF (11) ou CNPJ (14) - somente números"
+                      placeholder="Somente números"
                     />
                   )}
                 </div>
