@@ -213,7 +213,8 @@ export function FaturamentoClientes() {
   const resolveLogoUrlAbs = (url: string) => {
     if (!url) return '';
     if (/^https?:\/\//i.test(url)) return url;
-    return `${window.location.origin}${url}`;
+    const p = url.startsWith('/') ? url : `/${url}`;
+    return `${window.location.origin}${p}`;
   };
 
   const fetchClienteLogoUrl = async (cnpj: string): Promise<string | null> => {
@@ -224,25 +225,6 @@ export function FaturamentoClientes() {
     );
     if (!res?.success) return null;
     return res.url ? resolveLogoUrlAbs(res.url) : null;
-  };
-
-  const fileToDataUrl = (file: Blob): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
-      reader.readAsDataURL(file);
-    });
-
-  const fetchAsDataUrl = async (url: string): Promise<string | null> => {
-    try {
-      const r = await fetch(url, { cache: 'no-store' });
-      if (!r.ok) return null;
-      const blob = await r.blob();
-      return await fileToDataUrl(blob);
-    } catch {
-      return null;
-    }
   };
 
   const abrirPdfDialog = useCallback(async () => {
@@ -325,27 +307,23 @@ export function FaturamentoClientes() {
 
       const nomeEmpresa = user?.client_name || 'Transportadora';
       const logoEmpresaUrl = clientConfig?.theme?.logo_light ? resolveLogoUrlAbs(clientConfig.theme.logo_light) : '';
-      const logoEmpresaData = logoEmpresaUrl ? await fetchAsDataUrl(logoEmpresaUrl) : null;
-
-      const itensComLogo = await Promise.all(pdfItems.map(async (it) => {
-        const dataUrl = it.logo_url ? await fetchAsDataUrl(it.logo_url) : null;
-        return { ...it, logo_data: dataUrl };
-      }));
+      const itensComLogo = pdfItems;
 
       const periodo = formatPeriodDisplay(filters.periodoEmissaoInicio, filters.periodoEmissaoFim) || 'Sem período';
       const agora = new Date().toLocaleString('pt-BR');
       const titulo = groupBy === 'grupos' ? 'RANKING DE GRUPOS (FATURAMENTO)' : 'RANKING DE CLIENTES (FATURAMENTO)';
       const recorteLabel = filters.cnpjsPagadores.length > 0 ? `Selecionados (${filters.cnpjsPagadores.length})` : `Top ${filters.topN}`;
-      const cols = pdfItems.length >= 13 ? 4 : 3;
+      const listLayout = pdfItems.length > 10;
+      const cols = listLayout ? 1 : 5;
 
-      const cardsHtml = itensComLogo.map((it) => {
+      const gridHtml = itensComLogo.map((it) => {
         const metaParts: string[] = [];
         if (pdfShowQtdCtes) metaParts.push(`<span class="chip">${it.qtde_ctes} CT-es</span>`);
         if (pdfShowFaturamento) metaParts.push(`<span class="chip">${fmtBRL(it.total_frete)}</span>`);
         const meta = metaParts.length ? `<div class="meta">${metaParts.join('')}</div>` : '';
 
-        const logo = it.logo_data
-          ? `<img class="logo-img" src="${it.logo_data}" alt="Logo" />`
+        const logo = it.logo_url
+          ? `<img class="logo-img" src="${it.logo_url}" alt="Logo" />`
           : `<div class="logo-text">${it.nome || '-'}</div>`;
 
         return `
@@ -358,6 +336,29 @@ export function FaturamentoClientes() {
         `;
       }).join('');
 
+      const listHeaderCols = `
+        <th class="col-rank">#</th>
+        <th class="col-logo">Logo</th>
+        <th class="col-name">Cliente</th>
+        ${pdfShowQtdCtes ? `<th class="col-num">CT-es</th>` : ''}
+        ${pdfShowFaturamento ? `<th class="col-num">Faturamento</th>` : ''}
+      `;
+
+      const listRows = itensComLogo.map((it) => {
+        const logo = it.logo_url
+          ? `<img class="logo-img" src="${it.logo_url}" alt="Logo" />`
+          : `<div class="logo-text">${it.nome || '-'}</div>`;
+        return `
+          <tr>
+            <td class="col-rank"><span class="rank-pill">${it.rank}</span></td>
+            <td class="col-logo"><div class="logo-box">${logo}</div></td>
+            <td class="col-name"><div class="name">${it.nome || '-'}</div></td>
+            ${pdfShowQtdCtes ? `<td class="col-num">${fmtNum(it.qtde_ctes)}</td>` : ''}
+            ${pdfShowFaturamento ? `<td class="col-num">${fmtBRL(it.total_frete)}</td>` : ''}
+          </tr>
+        `;
+      }).join('');
+
       const html = `
       <!DOCTYPE html>
       <html>
@@ -365,27 +366,33 @@ export function FaturamentoClientes() {
           <meta charset="UTF-8" />
           <title>${titulo}</title>
           <style>
-            @page { size: A4 landscape; margin: 10mm; }
+            @page { size: ${listLayout ? 'A4' : 'A4 landscape'}; margin: ${listLayout ? '12mm' : '10mm'}; }
             * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; color: #0f172a; font-size: 9pt; }
-            .header { display:flex; align-items:center; justify-content:space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 8px; margin-bottom: 10px; }
+            body { font-family: Arial, sans-serif; color: #0f172a; font-size: ${listLayout ? '9pt' : '8.7pt'}; }
+            .header { display:flex; align-items:center; justify-content:space-between; border-bottom: 3px solid #4f46e5; padding-bottom: ${listLayout ? '10px' : '8px'}; margin-bottom: ${listLayout ? '12px' : '10px'}; }
             .header-left { display:flex; align-items:center; gap: 12px; }
             .logo-empresa { width: 160px; height: 44px; object-fit: contain; }
             .logo-empresa-text { font-size: 13pt; font-weight: 800; color: #1e3a8a; max-width: 260px; }
             .header-info h1 { font-size: 13pt; margin: 0; color: #111827; letter-spacing: 0.3px; }
             .header-info p { margin: 2px 0 0 0; font-size: 8.5pt; color: #475569; }
-            .filters { display:flex; justify-content:space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px; font-size: 8.5pt; color: #334155; }
+            .filters { display:flex; justify-content:space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: ${listLayout ? '8px 10px' : '6px 10px'}; margin-bottom: ${listLayout ? '12px' : '10px'}; font-size: 8.5pt; color: #334155; }
             .filters strong { color: #0f172a; }
             .grid { display:grid; grid-template-columns: repeat(${cols}, 1fr); gap: 8px; }
-            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 8px; background: #ffffff; box-shadow: 0 1px 0 rgba(15,23,42,0.04); }
-            .rank { font-size: 9.5pt; font-weight: 900; color: #4f46e5; margin-bottom: 6px; }
-            .logo-box { width: 100%; height: 62px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; display:flex; align-items:center; justify-content:center; padding: 7px; overflow:hidden; }
+            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 7px; background: #ffffff; box-shadow: 0 1px 0 rgba(15,23,42,0.04); break-inside: avoid; }
+            .rank { font-size: 9pt; font-weight: 900; color: #4f46e5; margin-bottom: 5px; }
+            .logo-box { width: 100%; height: ${listLayout ? '34px' : '52px'}; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; display:flex; align-items:center; justify-content:center; padding: 6px; overflow:hidden; }
             .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
             .logo-text { font-size: 8.5pt; font-weight: 900; color: #0f172a; text-align: center; line-height: 1.05; }
-            .name { margin-top: 7px; font-size: 9.5pt; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .meta { margin-top: 5px; display:flex; gap: 6px; flex-wrap: wrap; }
+            .name { margin-top: ${listLayout ? '0' : '6px'}; font-size: ${listLayout ? '9pt' : '9pt'}; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .meta { margin-top: 4px; display:flex; gap: 6px; flex-wrap: wrap; }
             .chip { font-size: 8.2pt; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 2px 8px; border-radius: 999px; }
-            .footer { margin-top: 10px; font-size: 8pt; color: #64748b; text-align: right; }
+            table { width: 100%; border-collapse: collapse; }
+            thead th { text-align: left; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.3px; color: #64748b; padding: 6px 6px; border-bottom: 1px solid #e2e8f0; }
+            tbody td { padding: 6px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+            .col-rank { width: 42px; }
+            .col-logo { width: 72px; }
+            .col-num { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+            .rank-pill { display:inline-flex; align-items:center; justify-content:center; width: 26px; height: 26px; border-radius: 999px; background: #4f46e5; color: #fff; font-weight: 800; font-size: 9pt; }
             @media print {
               .no-print { display: none !important; }
             }
@@ -394,7 +401,11 @@ export function FaturamentoClientes() {
         <body>
           <div class="header">
             <div class="header-left">
-              ${logoEmpresaData ? `<img src="${logoEmpresaData}" class="logo-empresa" />` : `<div class="logo-empresa-text">${nomeEmpresa}</div>`}
+              ${logoEmpresaUrl
+                ? `<img src="${logoEmpresaUrl}" class="logo-empresa" onerror="this.style.display='none'; document.getElementById('logoEmpresaText').style.display='block';" />
+                   <div id="logoEmpresaText" class="logo-empresa-text" style="display:none;">${nomeEmpresa}</div>`
+                : `<div class="logo-empresa-text">${nomeEmpresa}</div>`
+              }
               <div class="header-info">
                 <h1>${titulo}</h1>
                 <p>${groupBy === 'grupos' ? 'Visão por grupo (logo do CNPJ principal)' : 'Visão por cliente pagador'}</p>
@@ -412,11 +423,20 @@ export function FaturamentoClientes() {
             <div><strong>Destino(s):</strong> ${filters.siglaDest?.length ? filters.siglaDest.join(', ') : 'Todos'}</div>
           </div>
 
-          <div class="grid">
-            ${cardsHtml}
-          </div>
-
-          <div class="footer">Gerado pelo Sistema Presto</div>
+          ${listLayout ? `
+            <table>
+              <thead>
+                <tr>${listHeaderCols}</tr>
+              </thead>
+              <tbody>
+                ${listRows}
+              </tbody>
+            </table>
+          ` : `
+            <div class="grid">
+              ${gridHtml}
+            </div>
+          `}
 
           <div class="no-print" style="margin-top:16px; font-size:10pt; color:#475569;">
             Dica: use “Salvar como PDF” na janela de impressão.
