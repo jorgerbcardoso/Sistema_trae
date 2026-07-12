@@ -22,10 +22,25 @@ export const normalizeDocumento = (v: string) => {
   return '';
 };
 
-export async function listClientes(search = ''): Promise<{ success: boolean; clientes?: Cliente[]; message?: string }> {
+export async function listClientes(params: {
+  search: string;
+  page: number;
+  limit: number;
+  sort_field: string;
+  sort_dir: 'asc' | 'desc';
+}): Promise<{
+  success: boolean;
+  clientes?: Cliente[];
+  total?: number;
+  page?: number;
+  limit?: number;
+  requires_search?: boolean;
+  min_search_len?: number;
+  message?: string;
+}> {
   return apiFetch(`${ENVIRONMENT.apiBaseUrl}/clientes/list.php`, {
     method: 'POST',
-    body: JSON.stringify({ search }),
+    body: JSON.stringify(params),
   }, true);
 }
 

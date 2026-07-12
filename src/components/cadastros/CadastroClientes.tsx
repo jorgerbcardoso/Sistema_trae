@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Image as ImageIcon, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, Image as ImageIcon, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -50,7 +50,9 @@ export function CadastroClientes() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -74,19 +76,37 @@ export function CadastroClientes() {
   const [showCidadeDropdown, setShowCidadeDropdown] = useState(false);
   const [selectedCidade, setSelectedCidade] = useState<{ seq_cidade: number; nome: string; uf: string; label: string } | null>(null);
 
+  type SortField = 'data_ult_mvto' | 'nome' | 'cnpj' | 'cidade_nome' | 'cidade_uf' | 'email' | 'agenda';
+  const [sortField, setSortField] = useState<SortField>('data_ult_mvto');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const limit = 80;
+
   const load = async () => {
     if (search.trim().length < 3) {
       setClientes([]);
+      setTotal(0);
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      const res = await listClientes(search.trim());
-      if (res.success) setClientes(res.clientes ?? []);
-      else setClientes([]);
+      const res = await listClientes({
+        search: search.trim(),
+        page,
+        limit,
+        sort_field: sortField,
+        sort_dir: sortDirection,
+      });
+      if (res.success) {
+        setClientes(res.clientes ?? []);
+        setTotal(res.total ?? 0);
+      } else {
+        setClientes([]);
+        setTotal(0);
+      }
     } catch {
       setClientes([]);
+      setTotal(0);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +117,7 @@ export function CadastroClientes() {
   useEffect(() => {
     const t = window.setTimeout(() => { void load(); }, 250);
     return () => window.clearTimeout(t);
-  }, [search]);
+  }, [search, page, sortField, sortDirection]);
 
   useEffect(() => {
     if (!logoFile) { setLogoPreview(null); return; }
@@ -106,11 +126,35 @@ export function CadastroClientes() {
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
 
-  const clientesFiltrados = useMemo(() => {
-    const q = search.trim().toUpperCase();
-    if (!q) return clientes;
-    return clientes.filter(c => (c.cnpj ?? '').includes(q.replace(/\D/g, '')) || (c.nome ?? '').toUpperCase().includes(q));
-  }, [clientes, search]);
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil((total || 0) / limit));
+  }, [total]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setPage(1);
+  };
+
+  const SortableHead = ({ field, label, className = '' }: { field: SortField; label: string; className?: string }) => {
+    const isActive = sortField === field;
+    const Icon = isActive ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <TableHead
+        className={`cursor-pointer select-none hover:bg-slate-50 dark:hover:bg-slate-800 ${className}`}
+        onClick={() => handleSort(field)}
+      >
+        <div className="flex items-center gap-2">
+          <span>{label}</span>
+          <Icon className="w-4 h-4 text-slate-500" />
+        </div>
+      </TableHead>
+    );
+  };
 
   const openNew = () => {
     setEditing(false);
@@ -253,10 +297,14 @@ export function CadastroClientes() {
           <CardContent className="space-y-4">
             <div className="flex gap-3 items-center">
               <div className="flex-1">
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por CNPJ ou Nome" />
+                <Input
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  placeholder="Buscar por CPF/CNPJ ou Nome"
+                />
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                {isLoading ? 'Carregando...' : `${clientesFiltrados.length} cliente(s)`}
+                {isLoading ? 'Carregando...' : (search.trim().length < 3 ? 'Digite 3+ caracteres' : `${total} cliente(s)`)}
               </div>
             </div>
 
@@ -264,40 +312,40 @@ export function CadastroClientes() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Cidade</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Agenda</TableHead>
-                    <TableHead>Últ. Mov.</TableHead>
-                    <TableHead>Logo</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <SortableHead field="cnpj" label="Documento" />
+                    <SortableHead field="nome" label="Nome" className="w-[220px]" />
+                    <SortableHead field="cidade_nome" label="Cidade" />
+                    <SortableHead field="cidade_uf" label="UF" className="w-[80px]" />
+                    <SortableHead field="email" label="E-mail" className="min-w-[420px]" />
+                    <SortableHead field="agenda" label="Agenda" className="w-[90px]" />
+                    <SortableHead field="data_ult_mvto" label="Últ. Mov." className="w-[120px]" />
+                    <TableHead className="w-[70px]">Logo</TableHead>
+                    <TableHead className="text-right w-[90px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                      <TableCell colSpan={9} className="py-10 text-center text-sm text-slate-500">
                         Carregando...
                       </TableCell>
                     </TableRow>
-                  ) : clientesFiltrados.length === 0 ? (
+                  ) : clientes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                      <TableCell colSpan={9} className="py-10 text-center text-sm text-slate-500">
                         {search.trim().length < 3 ? 'Digite ao menos 3 caracteres para buscar.' : 'Nenhum cliente encontrado.'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    clientesFiltrados.map((c) => (
+                    clientes.map((c) => (
                       <TableRow key={c.cnpj}>
                         <TableCell className="font-mono text-xs">
                           {formatDocumento(c.cnpj).formatado}
                         </TableCell>
-                        <TableCell className="max-w-[380px] truncate">{c.nome || '-'}</TableCell>
-                        <TableCell className="max-w-[260px] truncate">
-                          {c.cidade_nome ? `${c.cidade_nome}${c.cidade_uf ? ` - ${c.cidade_uf}` : ''}` : '-'}
-                        </TableCell>
-                        <TableCell className="max-w-[260px] truncate">{c.email || '-'}</TableCell>
+                        <TableCell className="max-w-[190px] truncate">{c.nome || '-'}</TableCell>
+                        <TableCell className="max-w-[260px] truncate">{c.cidade_nome || '-'}</TableCell>
+                        <TableCell className="text-xs">{c.cidade_uf || '-'}</TableCell>
+                        <TableCell className="max-w-[520px] truncate" title={c.email || ''}>{c.email || '-'}</TableCell>
                         <TableCell>{c.agenda ? 'Sim' : 'Não'}</TableCell>
                         <TableCell className="whitespace-nowrap text-xs">{formatDateBR(c.data_ult_mvto)}</TableCell>
                         <TableCell className="text-xs">
@@ -316,6 +364,22 @@ export function CadastroClientes() {
                 </TableBody>
               </Table>
             </div>
+
+            {search.trim().length >= 3 && (
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Página {page} de {totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
+                    Anterior
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

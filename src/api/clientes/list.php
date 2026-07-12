@@ -15,7 +15,29 @@ $input = getRequestInput();
 $search = trim((string)($input['search'] ?? ''));
 
 $minSearchLen = 3;
-$limit = 1000;
+$defaultLimit = 80;
+$maxLimit = 500;
+$limitIn = (int)($input['limit'] ?? $defaultLimit);
+$limit = max(1, min($maxLimit, $limitIn));
+$pageIn = (int)($input['page'] ?? 1);
+$page = max(1, $pageIn);
+$offset = ($page - 1) * $limit;
+
+$sortFieldIn = strtolower(trim((string)($input['sort_field'] ?? 'data_ult_mvto')));
+$sortDirIn = strtolower(trim((string)($input['sort_dir'] ?? 'desc')));
+$sortDir = ($sortDirIn === 'asc') ? 'ASC' : 'DESC';
+
+$allowedSort = [
+    'data_ult_mvto' => 'c.data_ult_mvto',
+    'nome' => 'c.nome',
+    'cnpj' => 'c.cnpj',
+    'cidade_nome' => 'cid.nome',
+    'cidade_uf' => 'cid.uf',
+    'email' => 'c.email',
+    'agenda' => 'c.agenda',
+];
+$sortExpr = $allowedSort[$sortFieldIn] ?? $allowedSort['data_ult_mvto'];
+
 if (mb_strlen($search) < $minSearchLen) {
     respondJson([
         'success' => true,
@@ -23,6 +45,8 @@ if (mb_strlen($search) < $minSearchLen) {
         'requires_search' => true,
         'min_search_len' => $minSearchLen,
         'limit' => $limit,
+        'page' => 1,
+        'total' => 0,
     ]);
 }
 
@@ -39,6 +63,20 @@ if ($search !== '') {
     $p++;
 }
 
+$whereClause = count($where) ? ("WHERE " . implode(' AND ', $where)) : "";
+
+$countSql = "
+    SELECT COUNT(*) AS total
+    FROM {$tabela} c
+    {$whereClause}
+";
+$resCount = @sql($countSql, $params, $conn);
+if (!$resCount) {
+    respondJson(['success' => false, 'message' => 'Erro ao contar clientes.']);
+}
+$totalRow = pg_fetch_assoc($resCount);
+$total = (int)($totalRow['total'] ?? 0);
+
 $sql = "
     SELECT
         c.cnpj,
@@ -51,9 +89,10 @@ $sql = "
         cid.uf AS cidade_uf
     FROM {$tabela} c
     LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
-    " . (count($where) ? ("WHERE " . implode(' AND ', $where)) : "") . "
-    ORDER BY c.data_ult_mvto DESC NULLS LAST, COALESCE(c.nome, ''), c.cnpj
+    {$whereClause}
+    ORDER BY {$sortExpr} {$sortDir} NULLS LAST, COALESCE(c.nome, ''), c.cnpj
     LIMIT {$limit}
+    OFFSET {$offset}
 ";
 
 $res = @sql($sql, $params, $conn);
@@ -105,4 +144,8 @@ respondJson([
     'requires_search' => false,
     'min_search_len' => $minSearchLen,
     'limit' => $limit,
+    'page' => $page,
+    'total' => $total,
+    'sort_field' => $sortFieldIn,
+    'sort_dir' => strtolower($sortDir),
 ]);
