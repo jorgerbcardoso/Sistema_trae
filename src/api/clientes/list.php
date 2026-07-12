@@ -65,18 +65,7 @@ if ($search !== '') {
 
 $whereClause = count($where) ? ("WHERE " . implode(' AND ', $where)) : "";
 
-$countSql = "
-    SELECT COUNT(*) AS total
-    FROM {$tabela} c
-    {$whereClause}
-";
-$resCount = @sql($countSql, $params, $conn);
-if (!$resCount) {
-    respondJson(['success' => false, 'message' => 'Erro ao contar clientes.']);
-}
-$totalRow = pg_fetch_assoc($resCount);
-$total = (int)($totalRow['total'] ?? 0);
-
+$effectiveLimit = $limit + 1;
 $sql = "
     SELECT
         c.cnpj,
@@ -91,7 +80,7 @@ $sql = "
     LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
     {$whereClause}
     ORDER BY {$sortExpr} {$sortDir} NULLS LAST, COALESCE(c.nome, ''), c.cnpj
-    LIMIT {$limit}
+    LIMIT {$effectiveLimit}
     OFFSET {$offset}
 ";
 
@@ -138,6 +127,12 @@ while ($row = pg_fetch_assoc($res)) {
     ];
 }
 
+$truncated = false;
+if (count($clientes) > $limit) {
+    $truncated = true;
+    $clientes = array_slice($clientes, 0, $limit);
+}
+
 respondJson([
     'success' => true,
     'clientes' => $clientes,
@@ -145,7 +140,7 @@ respondJson([
     'min_search_len' => $minSearchLen,
     'limit' => $limit,
     'page' => $page,
-    'total' => $total,
     'sort_field' => $sortFieldIn,
     'sort_dir' => strtolower($sortDir),
+    'truncated' => $truncated,
 ]);

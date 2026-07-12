@@ -31,11 +31,11 @@ export async function listClientes(params: {
 }): Promise<{
   success: boolean;
   clientes?: Cliente[];
-  total?: number;
   page?: number;
   limit?: number;
   requires_search?: boolean;
   min_search_len?: number;
+  truncated?: boolean;
   message?: string;
 }> {
   return apiFetch(`${ENVIRONMENT.apiBaseUrl}/clientes/list.php`, {

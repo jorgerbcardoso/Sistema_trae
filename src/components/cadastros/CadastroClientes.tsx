@@ -50,7 +50,7 @@ export function CadastroClientes() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [total, setTotal] = useState(0);
+  const [truncated, setTruncated] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
@@ -79,12 +79,13 @@ export function CadastroClientes() {
   type SortField = 'data_ult_mvto' | 'nome' | 'cnpj' | 'cidade_nome' | 'cidade_uf' | 'email' | 'agenda';
   const [sortField, setSortField] = useState<SortField>('data_ult_mvto');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const limit = 80;
+  const pageSize = 80;
+  const fetchLimit = 500;
 
   const load = async () => {
     if (search.trim().length < 3) {
       setClientes([]);
-      setTotal(0);
+      setTruncated(false);
       setIsLoading(false);
       return;
     }
@@ -92,21 +93,21 @@ export function CadastroClientes() {
     try {
       const res = await listClientes({
         search: search.trim(),
-        page,
-        limit,
-        sort_field: sortField,
-        sort_dir: sortDirection,
+        page: 1,
+        limit: fetchLimit,
+        sort_field: 'data_ult_mvto',
+        sort_dir: 'desc',
       });
       if (res.success) {
         setClientes(res.clientes ?? []);
-        setTotal(res.total ?? 0);
+        setTruncated(!!res.truncated);
       } else {
         setClientes([]);
-        setTotal(0);
+        setTruncated(false);
       }
     } catch {
       setClientes([]);
-      setTotal(0);
+      setTruncated(false);
     } finally {
       setIsLoading(false);
     }
@@ -117,7 +118,7 @@ export function CadastroClientes() {
   useEffect(() => {
     const t = window.setTimeout(() => { void load(); }, 250);
     return () => window.clearTimeout(t);
-  }, [search, page, sortField, sortDirection]);
+  }, [search]);
 
   useEffect(() => {
     if (!logoFile) { setLogoPreview(null); return; }
@@ -126,9 +127,60 @@ export function CadastroClientes() {
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
 
+  const parseDateToTime = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    const t = Date.parse(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+    return Number.isNaN(t) ? null : t;
+  };
+
+  const sortedClientes = useMemo(() => {
+    const data = [...clientes];
+    data.sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      const nullsLast = (aVal: any, bVal: any) => {
+        const aNull = aVal === null || aVal === undefined || aVal === '';
+        const bNull = bVal === null || bVal === undefined || bVal === '';
+        if (aNull && bNull) return 0;
+        if (aNull) return 1;
+        if (bNull) return -1;
+        return null;
+      };
+
+      if (sortField === 'data_ult_mvto') {
+        const aT = parseDateToTime(a.data_ult_mvto);
+        const bT = parseDateToTime(b.data_ult_mvto);
+        const n = nullsLast(aT, bT);
+        if (n !== null) return n;
+        return dir * ((aT as number) - (bT as number));
+      }
+
+      if (sortField === 'agenda') {
+        const aV = a.agenda ? 1 : 0;
+        const bV = b.agenda ? 1 : 0;
+        return dir * (aV - bV);
+      }
+
+      const aRaw = (a as any)[sortField];
+      const bRaw = (b as any)[sortField];
+      const n = nullsLast(aRaw, bRaw);
+      if (n !== null) return n;
+      const aS = String(aRaw ?? '');
+      const bS = String(bRaw ?? '');
+      return dir * aS.localeCompare(bS, 'pt-BR', { numeric: true });
+    });
+    return data;
+  }, [clientes, sortField, sortDirection]);
+
   const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil((total || 0) / limit));
-  }, [total]);
+    return Math.max(1, Math.ceil(sortedClientes.length / pageSize));
+  }, [sortedClientes.length]);
+
+  const paginatedClientes = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedClientes.slice(start, start + pageSize);
+  }, [sortedClientes, page]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -304,7 +356,7 @@ export function CadastroClientes() {
                 />
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                {isLoading ? 'Carregando...' : (search.trim().length < 3 ? 'Digite 3+ caracteres' : `${total} cliente(s)`)}
+                {isLoading ? 'Carregando...' : (search.trim().length < 3 ? 'Digite 3+ caracteres' : `${sortedClientes.length}${truncated ? '+' : ''} cliente(s)`)}
               </div>
             </div>
 
@@ -316,28 +368,27 @@ export function CadastroClientes() {
                     <SortableHead field="nome" label="Nome" className="w-[220px]" />
                     <SortableHead field="cidade_nome" label="Cidade" />
                     <SortableHead field="cidade_uf" label="UF" className="w-[80px]" />
-                    <SortableHead field="email" label="E-mail" className="min-w-[420px]" />
+                    <SortableHead field="email" label="E-mail" className="min-w-[300px]" />
                     <SortableHead field="agenda" label="Agenda" className="w-[90px]" />
                     <SortableHead field="data_ult_mvto" label="Últ. Mov." className="w-[120px]" />
-                    <TableHead className="w-[70px]">Logo</TableHead>
                     <TableHead className="text-right w-[90px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="py-10 text-center text-sm text-slate-500">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
                         Carregando...
                       </TableCell>
                     </TableRow>
                   ) : clientes.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="py-10 text-center text-sm text-slate-500">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
                         {search.trim().length < 3 ? 'Digite ao menos 3 caracteres para buscar.' : 'Nenhum cliente encontrado.'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    clientes.map((c) => (
+                    paginatedClientes.map((c) => (
                       <TableRow key={c.cnpj}>
                         <TableCell className="font-mono text-xs">
                           {formatDocumento(c.cnpj).formatado}
@@ -348,9 +399,6 @@ export function CadastroClientes() {
                         <TableCell className="max-w-[520px] truncate" title={c.email || ''}>{c.email || '-'}</TableCell>
                         <TableCell>{c.agenda ? 'Sim' : 'Não'}</TableCell>
                         <TableCell className="whitespace-nowrap text-xs">{formatDateBR(c.data_ult_mvto)}</TableCell>
-                        <TableCell className="text-xs">
-                          {c.logo_url ? 'Sim' : 'Não'}
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button size="sm" variant="outline" onClick={() => openEdit(c)}>
