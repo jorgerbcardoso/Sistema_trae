@@ -22,7 +22,17 @@ if ($doc === '' || !(strlen($doc) === 11 || strlen($doc) === 14)) {
 
 $nome = trim((string)($input['nome'] ?? ''));
 $seqCidade = $input['seq_cidade'] ?? null;
-$agenda = (bool)($input['agenda'] ?? false);
+$agendaIn = $input['agenda'] ?? false;
+$agendaBool = false;
+if (is_bool($agendaIn)) {
+    $agendaBool = $agendaIn;
+} elseif (is_int($agendaIn)) {
+    $agendaBool = ($agendaIn === 1);
+} elseif (is_string($agendaIn)) {
+    $v = strtolower(trim($agendaIn));
+    $agendaBool = in_array($v, ['1', 'true', 't', 'on', 'yes', 'sim'], true);
+}
+$agenda = $agendaBool ? 'true' : 'false';
 $email = trim((string)($input['email'] ?? ''));
 
 $seqCidadeSql = null;
