@@ -48,8 +48,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '../ui/dialog';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
+import { Switch } from '../ui/switch';
+import { getCompanyLogoUrl } from '../../config/clientLogos';
+import { uploadClienteLogo } from '../../services/clientesService';
 
 function getMesAtualFechadoPeriod() {
   const now = new Date();
@@ -114,6 +118,17 @@ interface ClienteRanking {
   is_grupo?: boolean;
 }
 
+type PdfClienteItem = {
+  rank: number;
+  cnpj: string;
+  nome: string;
+  qtde_ctes: number;
+  total_frete: number;
+  is_grupo: boolean;
+  logo_url: string | null;
+  uploading: boolean;
+};
+
 interface Totais {
   qtde_ctes: number;
   total_frete: number;
@@ -145,7 +160,7 @@ interface ClienteOpcao {
 }
 
 export function FaturamentoClientes() {
-  const { user } = useAuth();
+  const { user, clientConfig } = useAuth();
   const { theme } = useTheme();
   usePageTitle('Faturamento de Clientes');
 
@@ -188,6 +203,234 @@ export function FaturamentoClientes() {
   const [cteDialogLista, setCteDialogLista] = useState<any[]>([]);
   const [cteDialogTotais, setCteDialogTotais] = useState<any>(null);
   const [loadingCtes, setLoadingCtes] = useState(false);
+
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfItems, setPdfItems] = useState<PdfClienteItem[]>([]);
+  const [pdfShowQtdCtes, setPdfShowQtdCtes] = useState(true);
+  const [pdfShowFaturamento, setPdfShowFaturamento] = useState(true);
+
+  const resolveLogoUrlAbs = (url: string) => {
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url)) return url;
+    return `${window.location.origin}${url}`;
+  };
+
+  const fetchClienteLogoUrl = async (cnpj: string): Promise<string | null> => {
+    const res = await apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/clientes/logo_get.php`,
+      { method: 'POST', body: JSON.stringify({ cnpj }) },
+      true
+    );
+    if (!res?.success) return null;
+    return res.url ? resolveLogoUrlAbs(res.url) : null;
+  };
+
+  const fileToDataUrl = (file: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo.'));
+      reader.readAsDataURL(file);
+    });
+
+  const fetchAsDataUrl = async (url: string): Promise<string | null> => {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return null;
+      const blob = await r.blob();
+      return await fileToDataUrl(blob);
+    } catch {
+      return null;
+    }
+  };
+
+  const abrirPdfDialog = useCallback(async () => {
+    if (!clientes.length) {
+      toast.error('Não há clientes ranqueados para gerar o PDF.');
+      return;
+    }
+
+    setPdfShowQtdCtes(true);
+    setPdfShowFaturamento(true);
+    setPdfDialogOpen(true);
+    setPdfLoading(true);
+
+    const baseItems: PdfClienteItem[] = clientes.map((c, i) => ({
+      rank: i + 1,
+      cnpj: c.cnpj,
+      nome: c.nome,
+      qtde_ctes: c.qtde_ctes,
+      total_frete: c.total_frete,
+      is_grupo: !!c.is_grupo,
+      logo_url: null,
+      uploading: false,
+    }));
+    setPdfItems(baseItems);
+
+    try {
+      const urls = await Promise.all(baseItems.map(i => fetchClienteLogoUrl(i.cnpj)));
+      setPdfItems(prev => prev.map((it, idx) => ({ ...it, logo_url: urls[idx] })));
+    } catch {
+      setPdfItems(prev => prev);
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [clientes]);
+
+  const handleUploadLogoFromDialog = async (cnpj: string, file: File) => {
+    setPdfItems(prev => prev.map(i => i.cnpj === cnpj ? { ...i, uploading: true } : i));
+    try {
+      const res = await uploadClienteLogo(cnpj, file);
+      if (!res?.success) {
+        toast.error(res?.message || 'Erro ao enviar logo.');
+        return;
+      }
+      const url = res.url ? resolveLogoUrlAbs(res.url) : await fetchClienteLogoUrl(cnpj);
+      setPdfItems(prev => prev.map(i => i.cnpj === cnpj ? { ...i, logo_url: url || null } : i));
+      if (res.warning) toast.info(res.warning);
+      toast.success('Logo enviada.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao enviar logo.');
+    } finally {
+      setPdfItems(prev => prev.map(i => i.cnpj === cnpj ? { ...i, uploading: false } : i));
+    }
+  };
+
+  const gerarPdfRanking = async () => {
+    if (!pdfItems.length) {
+      toast.error('Não há clientes na lista do PDF.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Não foi possível abrir a janela do PDF.');
+      return;
+    }
+
+    setPdfGenerating(true);
+    try {
+      printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Gerando PDF...</title></head><body style="font-family:Arial,sans-serif;padding:20px;">Gerando documento...</body></html>`);
+      printWindow.document.close();
+
+      const dominio = user?.domain?.toUpperCase() || 'PRESTO';
+      const nomeEmpresa = user?.client_name || 'Transportadora';
+      const logoEmpresaUrl = getCompanyLogoUrl(dominio, clientConfig);
+      const logoEmpresaData = logoEmpresaUrl ? await fetchAsDataUrl(logoEmpresaUrl) : null;
+
+      const itensComLogo = await Promise.all(pdfItems.map(async (it) => {
+        const dataUrl = it.logo_url ? await fetchAsDataUrl(it.logo_url) : null;
+        return { ...it, logo_data: dataUrl };
+      }));
+
+      const periodo = formatPeriodDisplay(filters.periodoEmissaoInicio, filters.periodoEmissaoFim) || 'Sem período';
+      const agora = new Date().toLocaleString('pt-BR');
+      const titulo = groupBy === 'grupos' ? 'RANKING DE GRUPOS (FATURAMENTO)' : 'RANKING DE CLIENTES (FATURAMENTO)';
+      const recorteLabel = filters.cnpjsPagadores.length > 0 ? `Selecionados (${filters.cnpjsPagadores.length})` : `Top ${filters.topN}`;
+
+      const cardsHtml = itensComLogo.map((it) => {
+        const metaParts: string[] = [];
+        if (pdfShowQtdCtes) metaParts.push(`<span class="chip">${it.qtde_ctes} CT-es</span>`);
+        if (pdfShowFaturamento) metaParts.push(`<span class="chip">${fmtBRL(it.total_frete)}</span>`);
+        const meta = metaParts.length ? `<div class="meta">${metaParts.join('')}</div>` : '';
+
+        const logo = it.logo_data
+          ? `<img class="logo-img" src="${it.logo_data}" alt="Logo" />`
+          : `<div class="logo-empty">Sem logo</div>`;
+
+        return `
+          <div class="card">
+            <div class="rank">#${it.rank}</div>
+            <div class="logo-box">${logo}</div>
+            <div class="name" title="${(it.nome || '').replace(/"/g, '&quot;')}">${it.nome || '-'}</div>
+            ${meta}
+          </div>
+        `;
+      }).join('');
+
+      const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>${titulo}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; color: #0f172a; }
+            .header { display:flex; align-items:center; justify-content:space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 10px; margin-bottom: 12px; }
+            .header-left { display:flex; align-items:center; gap: 12px; }
+            .logo-empresa { width: 140px; height: 50px; object-fit: contain; }
+            .logo-empresa-text { font-size: 14pt; font-weight: 700; color: #1e3a8a; max-width: 260px; }
+            .header-info h1 { font-size: 14pt; margin: 0; color: #111827; letter-spacing: 0.3px; }
+            .header-info p { margin: 2px 0 0 0; font-size: 9pt; color: #475569; }
+            .filters { display:flex; justify-content:space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; font-size: 9pt; color: #334155; }
+            .filters strong { color: #0f172a; }
+            .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; background: #ffffff; box-shadow: 0 1px 0 rgba(15,23,42,0.04); }
+            .rank { font-size: 10pt; font-weight: 800; color: #4f46e5; margin-bottom: 6px; }
+            .logo-box { width: 100%; height: 74px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; display:flex; align-items:center; justify-content:center; padding: 8px; overflow:hidden; }
+            .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+            .logo-empty { font-size: 9pt; color: #94a3b8; }
+            .name { margin-top: 8px; font-size: 10pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .meta { margin-top: 6px; display:flex; gap: 6px; flex-wrap: wrap; }
+            .chip { font-size: 8.5pt; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 2px 8px; border-radius: 999px; }
+            .footer { margin-top: 12px; font-size: 8pt; color: #64748b; text-align: right; }
+            @media print {
+              .no-print { display: none !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="header-left">
+              ${logoEmpresaData ? `<img src="${logoEmpresaData}" class="logo-empresa" />` : `<div class="logo-empresa-text">${nomeEmpresa}</div>`}
+              <div class="header-info">
+                <h1>${titulo}</h1>
+                <p>${groupBy === 'grupos' ? 'Visão por grupo (logo do CNPJ principal)' : 'Visão por cliente pagador'}</p>
+              </div>
+            </div>
+            <div class="header-info" style="text-align:right">
+              <p><strong>${recorteLabel}</strong></p>
+              <p>${agora}</p>
+            </div>
+          </div>
+
+          <div class="filters">
+            <div><strong>Período:</strong> ${periodo}</div>
+            <div><strong>Unidade(s):</strong> ${filters.siglaEmit?.length ? filters.siglaEmit.join(', ') : 'Todas'}</div>
+            <div><strong>Destino(s):</strong> ${filters.siglaDest?.length ? filters.siglaDest.join(', ') : 'Todos'}</div>
+          </div>
+
+          <div class="grid">
+            ${cardsHtml}
+          </div>
+
+          <div class="footer">Gerado pelo Sistema Presto</div>
+
+          <div class="no-print" style="margin-top:16px; font-size:10pt; color:#475569;">
+            Dica: use “Salvar como PDF” na janela de impressão.
+          </div>
+
+          <script>
+            window.onload = function () { setTimeout(function(){ window.print(); }, 250); };
+          </script>
+        </body>
+      </html>
+    `;
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao gerar PDF.');
+      try { printWindow.close(); } catch {}
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   const carregarDados = useCallback(async (f: Filters, gb: 'grupos' | 'clientes' = 'grupos') => {
     setLoading(true);
@@ -498,7 +741,17 @@ export function FaturamentoClientes() {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
                   <Award className="w-5 h-5 text-indigo-500" />
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100">Ranking de Clientes</h3>
-                  <span className="ml-auto text-xs text-slate-400">por faturamento de frete</span>
+                  <span className="ml-auto text-xs text-slate-400 hidden sm:inline">por faturamento de frete</span>
+                  <Button
+                    onClick={abrirPdfDialog}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 ml-2"
+                    disabled={loading || clientes.length === 0}
+                    title="Gerar PDF do ranking (com logos)"
+                    size="sm"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Gerar PDF
+                  </Button>
                 </div>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {clientes.length === 0 ? (
@@ -1058,6 +1311,110 @@ export function FaturamentoClientes() {
           </>
         )}
       </main>
+
+      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+        <DialogContent className="sm:max-w-[900px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Gerar PDF do Ranking</DialogTitle>
+            <DialogDescription>
+              O PDF será gerado somente com os clientes do ranking atual (recorte do painel).
+              {groupBy === 'grupos' ? ' Em visão por grupo, a logo usada é do CNPJ principal.' : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto overscroll-contain pr-1 space-y-4">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-3">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Switch checked={pdfShowQtdCtes} onCheckedChange={setPdfShowQtdCtes} />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Exibir quantidade de CT-es</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={pdfShowFaturamento} onCheckedChange={setPdfShowFaturamento} />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Exibir faturamento (R$)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Clientes no PDF ({pdfItems.length})
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {pdfLoading ? 'Lendo logos...' : 'PNG prioritário, depois JPG'}
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {pdfItems.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-slate-500">Nenhum cliente no ranking.</div>
+                ) : (
+                  pdfItems.map((it) => (
+                    <div key={it.cnpj} className="px-4 py-3 bg-white dark:bg-slate-900 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                        {it.rank}
+                      </div>
+                      <div className="w-[84px] h-[52px] rounded-md border border-slate-200 dark:border-slate-700 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                        {it.logo_url ? (
+                          <img src={it.logo_url} className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Sem logo</span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                            {it.nome}
+                          </div>
+                          {it.is_grupo && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">
+                              Grupo
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          CNPJ/CPF: {it.cnpj}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Input
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          disabled={it.uploading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void handleUploadLogoFromDialog(it.cnpj, f);
+                            e.currentTarget.value = '';
+                          }}
+                          className="w-[210px]"
+                        />
+                        {it.uploading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 border-t border-slate-200 dark:border-slate-700 pt-4">
+            <Button variant="outline" onClick={() => setPdfDialogOpen(false)} disabled={pdfGenerating}>
+              Fechar
+            </Button>
+            <Button
+              onClick={() => void gerarPdfRanking()}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+              disabled={pdfGenerating || pdfLoading || pdfItems.length === 0}
+            >
+              {pdfGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              {pdfGenerating ? 'Gerando...' : 'Gerar PDF'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
         <DialogContent className="max-w-5xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
