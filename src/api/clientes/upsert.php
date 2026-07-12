@@ -15,15 +15,13 @@ $input = getRequestInput();
 
 $cnpjIn = (string)($input['cnpj'] ?? '');
 $digits = preg_replace('/\D/', '', $cnpjIn);
-$cnpj = str_pad($digits, 14, '0', STR_PAD_LEFT);
-
-if ($cnpj === '' || strlen($cnpj) !== 14) {
-    respondJson(['success' => false, 'message' => 'CNPJ inválido.']);
+$doc = $digits;
+if ($doc === '' || !(strlen($doc) === 11 || strlen($doc) === 14)) {
+    respondJson(['success' => false, 'message' => 'Documento inválido (CPF 11 dígitos ou CNPJ 14 dígitos).']);
 }
 
 $nome = trim((string)($input['nome'] ?? ''));
 $seqCidade = $input['seq_cidade'] ?? null;
-$dataUlt = trim((string)($input['data_ult_mvto'] ?? ''));
 $agenda = (bool)($input['agenda'] ?? false);
 $email = trim((string)($input['email'] ?? ''));
 
@@ -32,33 +30,23 @@ if ($seqCidade !== null && $seqCidade !== '') {
     $seqCidadeSql = (int)$seqCidade;
 }
 
-$dataUltSql = null;
-if ($dataUlt !== '') {
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataUlt)) {
-        respondJson(['success' => false, 'message' => 'Data inválida (use YYYY-MM-DD).']);
-    }
-    $dataUltSql = $dataUlt;
-}
-
 $conn = connect();
 $tabela = "{$domain}_cliente";
 
 $sql = "
-    INSERT INTO {$tabela} (cnpj, nome, seq_cidade, data_ult_mvto, agenda, email)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO {$tabela} (cnpj, nome, seq_cidade, agenda, email)
+    VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (cnpj) DO UPDATE SET
         nome = EXCLUDED.nome,
         seq_cidade = EXCLUDED.seq_cidade,
-        data_ult_mvto = EXCLUDED.data_ult_mvto,
         agenda = EXCLUDED.agenda,
         email = EXCLUDED.email
 ";
 
 $params = [
-    $cnpj,
+    $doc,
     $nome !== '' ? $nome : null,
     $seqCidadeSql,
-    $dataUltSql,
     $agenda,
     $email !== '' ? $email : null,
 ];
@@ -69,4 +57,3 @@ if (!$res) {
 }
 
 respondJson(['success' => true]);
-

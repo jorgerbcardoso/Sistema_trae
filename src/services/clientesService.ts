@@ -8,12 +8,19 @@ export type Cliente = {
   data_ult_mvto: string | null;
   agenda: boolean;
   email: string;
+  cidade_nome?: string | null;
+  cidade_uf?: string | null;
   logo_url?: string | null;
   logo_ext?: 'png' | 'jpg' | null;
 };
 
 const onlyDigits = (v: string) => (v ?? '').replace(/\D/g, '');
-export const padCnpj14 = (v: string) => onlyDigits(v).padStart(14, '0').slice(-14);
+export const padDoc14 = (v: string) => onlyDigits(v).padStart(14, '0').slice(-14);
+export const normalizeDocumento = (v: string) => {
+  const digits = onlyDigits(v);
+  if (digits.length === 11 || digits.length === 14) return digits;
+  return '';
+};
 
 export async function listClientes(search = ''): Promise<{ success: boolean; clientes?: Cliente[]; message?: string }> {
   return apiFetch(`${ENVIRONMENT.apiBaseUrl}/clientes/list.php`, {
@@ -26,20 +33,12 @@ export async function upsertCliente(cliente: {
   cnpj: string;
   nome: string;
   seq_cidade: number | null;
-  data_ult_mvto: string | null;
   agenda: boolean;
   email: string;
 }): Promise<{ success: boolean; message?: string }> {
   return apiFetch(`${ENVIRONMENT.apiBaseUrl}/clientes/upsert.php`, {
     method: 'POST',
     body: JSON.stringify(cliente),
-  }, true);
-}
-
-export async function deleteCliente(cnpj: string): Promise<{ success: boolean; message?: string }> {
-  return apiFetch(`${ENVIRONMENT.apiBaseUrl}/clientes/delete.php`, {
-    method: 'POST',
-    body: JSON.stringify({ cnpj }),
   }, true);
 }
 
@@ -74,4 +73,3 @@ export async function uploadClienteLogo(cnpj: string, file: File): Promise<{ suc
   if (!data) return { success: false, message: 'Resposta inválida do servidor.' };
   return data;
 }
-

@@ -13,11 +13,11 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 
 $cnpjIn = (string)($_POST['cnpj'] ?? '');
 $digits = preg_replace('/\D/', '', $cnpjIn);
-$cnpj = str_pad($digits, 14, '0', STR_PAD_LEFT);
-
-if ($cnpj === '' || strlen($cnpj) !== 14) {
-    respondJson(['success' => false, 'message' => 'CNPJ inválido.']);
+$doc = $digits;
+if ($doc === '' || !(strlen($doc) === 11 || strlen($doc) === 14)) {
+    respondJson(['success' => false, 'message' => 'Documento inválido.']);
 }
+$doc14 = str_pad($doc, 14, '0', STR_PAD_LEFT);
 
 if (!isset($_FILES['logo'])) {
     respondJson(['success' => false, 'message' => 'Arquivo não enviado.']);
@@ -78,7 +78,7 @@ if (!@is_dir($dirAbs)) {
     }
 }
 
-$base = strtoupper($domain) . $cnpj;
+$base = strtoupper($domain) . $doc14;
 $dest = $dirAbs . '/' . $base . '.' . $ext;
 
 @unlink($dirAbs . '/' . $base . '.png');

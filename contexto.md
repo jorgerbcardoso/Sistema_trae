@@ -86,6 +86,12 @@ Objetivo: filtros com UX consistente, sem “pulos” de layout, com scroll inte
 - Footer (ações) deve ficar fixo no fim:
   - `border-t ...` com botões `Limpar / Cancelar / Aplicar`
 
+REGRA GERAL PARA DIALOGS (CADASTROS/EDIÇÃO):
+- Se o dialog puder ficar alto (muitos campos), aplicar o mesmo padrão de layout:
+  - `DialogContent`: `h-[calc(100vh-80px)] overflow-hidden flex flex-col`
+  - Conteúdo: `flex-1 overflow-y-auto overscroll-contain pr-1`
+  - Footer: fixo com `border-t ...` e botões (sem scroll)
+
 4) COMPONENTES PADRÃO:
 - Para “Unidade(s)” com seleção múltipla, usar o mesmo padrão do cadastro de usuários:
   - `src/components/admin/UnidadesMultiSelect.tsx`

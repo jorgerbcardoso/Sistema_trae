@@ -14,15 +14,15 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 $input = getRequestInput();
 $cnpjIn = (string)($input['cnpj'] ?? '');
 $digits = preg_replace('/\D/', '', $cnpjIn);
-$cnpj = str_pad($digits, 14, '0', STR_PAD_LEFT);
-
-if ($cnpj === '' || strlen($cnpj) !== 14) {
-    respondJson(['success' => false, 'message' => 'CNPJ inválido.']);
+$doc = $digits;
+if ($doc === '' || !(strlen($doc) === 11 || strlen($doc) === 14)) {
+    respondJson(['success' => false, 'message' => 'Documento inválido.']);
 }
+$doc14 = str_pad($doc, 14, '0', STR_PAD_LEFT);
 
 $root = @realpath(__DIR__ . '/../../..');
 $dirAbs = $root ? (rtrim($root, '/') . '/logos_clientes') : null;
-$base = strtoupper($domain) . $cnpj;
+$base = strtoupper($domain) . $doc14;
 
 $removed = 0;
 if ($dirAbs) {

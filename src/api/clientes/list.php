@@ -34,22 +34,25 @@ $params = [];
 $p = 1;
 
 if ($search !== '') {
-    $where[] = "(cnpj ILIKE $" . $p . " OR nome ILIKE $" . $p . ")";
+    $where[] = "(c.cnpj ILIKE $" . $p . " OR c.nome ILIKE $" . $p . ")";
     $params[] = '%' . $search . '%';
     $p++;
 }
 
 $sql = "
     SELECT
-        cnpj,
-        nome,
-        seq_cidade,
-        data_ult_mvto,
-        agenda,
-        email
-    FROM {$tabela}
+        c.cnpj,
+        c.nome,
+        c.seq_cidade,
+        c.data_ult_mvto,
+        c.agenda,
+        c.email,
+        cid.nome AS cidade_nome,
+        cid.uf AS cidade_uf
+    FROM {$tabela} c
+    LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
     " . (count($where) ? ("WHERE " . implode(' AND ', $where)) : "") . "
-    ORDER BY COALESCE(nome, ''), cnpj
+    ORDER BY c.data_ult_mvto DESC NULLS LAST, COALESCE(c.nome, ''), c.cnpj
     LIMIT {$limit}
 ";
 
@@ -66,8 +69,8 @@ $clientes = [];
 while ($row = pg_fetch_assoc($res)) {
     $cnpjRaw = (string)($row['cnpj'] ?? '');
     $digits = preg_replace('/\D/', '', $cnpjRaw);
-    $cnpj14 = str_pad($digits, 14, '0', STR_PAD_LEFT);
-    $base = strtoupper($domain) . $cnpj14;
+    $doc14 = str_pad($digits, 14, '0', STR_PAD_LEFT);
+    $base = strtoupper($domain) . $doc14;
 
     $logoUrl = null;
     $logoExt = null;
@@ -83,12 +86,14 @@ while ($row = pg_fetch_assoc($res)) {
     }
 
     $clientes[] = [
-        'cnpj' => $cnpj14,
+        'cnpj' => $digits,
         'nome' => $row['nome'] ?? '',
         'seq_cidade' => ($row['seq_cidade'] === null || $row['seq_cidade'] === '') ? null : (int)$row['seq_cidade'],
         'data_ult_mvto' => $row['data_ult_mvto'] ?? null,
         'agenda' => ((string)($row['agenda'] ?? '') === 't'),
         'email' => $row['email'] ?? '',
+        'cidade_nome' => $row['cidade_nome'] ?? null,
+        'cidade_uf' => $row['cidade_uf'] ?? null,
         'logo_url' => $logoUrl,
         'logo_ext' => $logoExt,
     ];
