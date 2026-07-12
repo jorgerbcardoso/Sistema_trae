@@ -65,12 +65,11 @@ if (!$info || !is_array($info)) {
 $width = (int)($info[0] ?? 0);
 $height = (int)($info[1] ?? 0);
 
-$docRoot = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
-$dirRel = '/images/logos_clientes';
-$dirAbs = rtrim($docRoot, '/') . $dirRel;
-
-if ($docRoot === '') {
-    respondJson(['success' => false, 'message' => 'Document root não disponível no servidor.']);
+$root = @realpath(__DIR__ . '/../../..');
+$dirRel = '/sistema/logos_clientes';
+$dirAbs = $root ? (rtrim($root, '/') . '/logos_clientes') : null;
+if (!$dirAbs) {
+    respondJson(['success' => false, 'message' => 'Não foi possível localizar o diretório do sistema.']);
 }
 
 if (!@is_dir($dirAbs)) {
@@ -105,4 +104,3 @@ respondJson([
     'height' => $height,
     'warning' => $warning,
 ]);
-

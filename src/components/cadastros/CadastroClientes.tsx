@@ -49,6 +49,11 @@ export function CadastroClientes() {
   const [logoRemoving, setLogoRemoving] = useState(false);
 
   const load = async () => {
+    if (search.trim().length < 3) {
+      setClientes([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await listClientes(search.trim());
@@ -61,7 +66,7 @@ export function CadastroClientes() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { setIsLoading(false); }, []);
 
   useEffect(() => {
     const t = window.setTimeout(() => { void load(); }, 250);
@@ -229,7 +234,7 @@ export function CadastroClientes() {
                   ) : clientesFiltrados.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                        Nenhum cliente encontrado.
+                        {search.trim().length < 3 ? 'Digite ao menos 3 caracteres para buscar.' : 'Nenhum cliente encontrado.'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -383,4 +388,3 @@ export function CadastroClientes() {
     </AdminLayout>
   );
 }
-

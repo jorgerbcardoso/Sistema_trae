@@ -29,15 +29,13 @@ if (!$res) {
     respondJson(['success' => false, 'message' => 'Erro ao excluir cliente.']);
 }
 
-$docRoot = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
-$dirRel = '/images/logos_clientes';
-$dirAbs = rtrim($docRoot, '/') . $dirRel;
+$root = @realpath(__DIR__ . '/../../..');
+$dirAbs = $root ? (rtrim($root, '/') . '/logos_clientes') : null;
 $base = strtoupper($domain) . $cnpj;
 
-if ($docRoot !== '') {
+if ($dirAbs) {
     @unlink($dirAbs . '/' . $base . '.png');
     @unlink($dirAbs . '/' . $base . '.jpg');
 }
 
 respondJson(['success' => true]);
-

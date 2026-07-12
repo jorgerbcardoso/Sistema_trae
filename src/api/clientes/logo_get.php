@@ -20,23 +20,23 @@ if ($cnpj === '' || strlen($cnpj) !== 14) {
     respondJson(['success' => false, 'message' => 'CNPJ inválido.']);
 }
 
-$docRoot = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
-$dirRel = '/images/logos_clientes';
-$dirAbs = rtrim($docRoot, '/') . $dirRel;
+$root = @realpath(__DIR__ . '/../../..');
+$dirRel = '/sistema/logos_clientes';
+$dirAbs = $root ? (rtrim($root, '/') . '/logos_clientes') : null;
 $base = strtoupper($domain) . $cnpj;
 
-$png = $dirAbs . '/' . $base . '.png';
-$jpg = $dirAbs . '/' . $base . '.jpg';
+$png = $dirAbs ? ($dirAbs . '/' . $base . '.png') : null;
+$jpg = $dirAbs ? ($dirAbs . '/' . $base . '.jpg') : null;
 
 $url = null;
 $ext = null;
 $size = null;
 
-if ($docRoot !== '' && @is_file($png)) {
+if ($png && @is_file($png)) {
     $url = $dirRel . '/' . $base . '.png';
     $ext = 'png';
     $size = @filesize($png) ?: null;
-} elseif ($docRoot !== '' && @is_file($jpg)) {
+} elseif ($jpg && @is_file($jpg)) {
     $url = $dirRel . '/' . $base . '.jpg';
     $ext = 'jpg';
     $size = @filesize($jpg) ?: null;
@@ -49,4 +49,3 @@ respondJson([
     'ext' => $ext,
     'size' => $size,
 ]);
-

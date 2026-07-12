@@ -14,6 +14,18 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 $input = getRequestInput();
 $search = trim((string)($input['search'] ?? ''));
 
+$minSearchLen = 3;
+$limit = 1000;
+if (mb_strlen($search) < $minSearchLen) {
+    respondJson([
+        'success' => true,
+        'clientes' => [],
+        'requires_search' => true,
+        'min_search_len' => $minSearchLen,
+        'limit' => $limit,
+    ]);
+}
+
 $conn = connect();
 $tabela = "{$domain}_cliente";
 
@@ -38,6 +50,7 @@ $sql = "
     FROM {$tabela}
     " . (count($where) ? ("WHERE " . implode(' AND ', $where)) : "") . "
     ORDER BY COALESCE(nome, ''), cnpj
+    LIMIT {$limit}
 ";
 
 $res = @sql($sql, $params, $conn);
@@ -45,9 +58,9 @@ if (!$res) {
     respondJson(['success' => false, 'message' => 'Erro ao listar clientes.']);
 }
 
-$docRoot = (string)($_SERVER['DOCUMENT_ROOT'] ?? '');
-$dirRel = '/images/logos_clientes';
-$dirAbs = rtrim($docRoot, '/') . $dirRel;
+$root = @realpath(__DIR__ . '/../../..');
+$dirRel = '/sistema/logos_clientes';
+$dirAbs = $root ? (rtrim($root, '/') . '/logos_clientes') : null;
 
 $clientes = [];
 while ($row = pg_fetch_assoc($res)) {
@@ -59,12 +72,12 @@ while ($row = pg_fetch_assoc($res)) {
     $logoUrl = null;
     $logoExt = null;
 
-    $pngPath = $dirAbs . '/' . $base . '.png';
-    $jpgPath = $dirAbs . '/' . $base . '.jpg';
-    if ($docRoot !== '' && @is_file($pngPath)) {
+    $pngPath = $dirAbs ? ($dirAbs . '/' . $base . '.png') : null;
+    $jpgPath = $dirAbs ? ($dirAbs . '/' . $base . '.jpg') : null;
+    if ($pngPath && @is_file($pngPath)) {
         $logoUrl = $dirRel . '/' . $base . '.png';
         $logoExt = 'png';
-    } elseif ($docRoot !== '' && @is_file($jpgPath)) {
+    } elseif ($jpgPath && @is_file($jpgPath)) {
         $logoUrl = $dirRel . '/' . $base . '.jpg';
         $logoExt = 'jpg';
     }
@@ -81,5 +94,10 @@ while ($row = pg_fetch_assoc($res)) {
     ];
 }
 
-respondJson(['success' => true, 'clientes' => $clientes]);
-
+respondJson([
+    'success' => true,
+    'clientes' => $clientes,
+    'requires_search' => false,
+    'min_search_len' => $minSearchLen,
+    'limit' => $limit,
+]);
