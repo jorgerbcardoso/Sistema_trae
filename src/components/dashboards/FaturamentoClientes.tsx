@@ -52,7 +52,6 @@ import {
 } from '../ui/dialog';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
 import { Switch } from '../ui/switch';
-import { getCompanyLogoUrl } from '../../config/clientLogos';
 import { uploadClienteLogo } from '../../services/clientesService';
 
 function getMesAtualFechadoPeriod() {
@@ -304,6 +303,15 @@ export function FaturamentoClientes() {
       return;
     }
 
+    const semLogo = pdfItems.filter(i => !i.logo_url);
+    if (semLogo.length > 0) {
+      const ok = confirm(
+        `Existem ${semLogo.length} cliente(s) sem logo. Deseja gerar o PDF mesmo assim?\n\n` +
+        `Nesses casos, o documento mostrará o nome do cliente estilizado no lugar da logo.`
+      );
+      if (!ok) return;
+    }
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('Não foi possível abrir a janela do PDF.');
@@ -315,9 +323,8 @@ export function FaturamentoClientes() {
       printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Gerando PDF...</title></head><body style="font-family:Arial,sans-serif;padding:20px;">Gerando documento...</body></html>`);
       printWindow.document.close();
 
-      const dominio = user?.domain?.toUpperCase() || 'PRESTO';
       const nomeEmpresa = user?.client_name || 'Transportadora';
-      const logoEmpresaUrl = getCompanyLogoUrl(dominio, clientConfig);
+      const logoEmpresaUrl = clientConfig?.theme?.logo_light ? resolveLogoUrlAbs(clientConfig.theme.logo_light) : '';
       const logoEmpresaData = logoEmpresaUrl ? await fetchAsDataUrl(logoEmpresaUrl) : null;
 
       const itensComLogo = await Promise.all(pdfItems.map(async (it) => {
@@ -329,6 +336,7 @@ export function FaturamentoClientes() {
       const agora = new Date().toLocaleString('pt-BR');
       const titulo = groupBy === 'grupos' ? 'RANKING DE GRUPOS (FATURAMENTO)' : 'RANKING DE CLIENTES (FATURAMENTO)';
       const recorteLabel = filters.cnpjsPagadores.length > 0 ? `Selecionados (${filters.cnpjsPagadores.length})` : `Top ${filters.topN}`;
+      const cols = pdfItems.length >= 13 ? 4 : 3;
 
       const cardsHtml = itensComLogo.map((it) => {
         const metaParts: string[] = [];
@@ -338,7 +346,7 @@ export function FaturamentoClientes() {
 
         const logo = it.logo_data
           ? `<img class="logo-img" src="${it.logo_data}" alt="Logo" />`
-          : `<div class="logo-empty">Sem logo</div>`;
+          : `<div class="logo-text">${it.nome || '-'}</div>`;
 
         return `
           <div class="card">
@@ -357,27 +365,27 @@ export function FaturamentoClientes() {
           <meta charset="UTF-8" />
           <title>${titulo}</title>
           <style>
-            @page { size: A4; margin: 12mm; }
+            @page { size: A4 landscape; margin: 10mm; }
             * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; color: #0f172a; }
-            .header { display:flex; align-items:center; justify-content:space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 10px; margin-bottom: 12px; }
+            body { font-family: Arial, sans-serif; color: #0f172a; font-size: 9pt; }
+            .header { display:flex; align-items:center; justify-content:space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 8px; margin-bottom: 10px; }
             .header-left { display:flex; align-items:center; gap: 12px; }
-            .logo-empresa { width: 140px; height: 50px; object-fit: contain; }
-            .logo-empresa-text { font-size: 14pt; font-weight: 700; color: #1e3a8a; max-width: 260px; }
-            .header-info h1 { font-size: 14pt; margin: 0; color: #111827; letter-spacing: 0.3px; }
-            .header-info p { margin: 2px 0 0 0; font-size: 9pt; color: #475569; }
-            .filters { display:flex; justify-content:space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; font-size: 9pt; color: #334155; }
+            .logo-empresa { width: 160px; height: 44px; object-fit: contain; }
+            .logo-empresa-text { font-size: 13pt; font-weight: 800; color: #1e3a8a; max-width: 260px; }
+            .header-info h1 { font-size: 13pt; margin: 0; color: #111827; letter-spacing: 0.3px; }
+            .header-info p { margin: 2px 0 0 0; font-size: 8.5pt; color: #475569; }
+            .filters { display:flex; justify-content:space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px; font-size: 8.5pt; color: #334155; }
             .filters strong { color: #0f172a; }
-            .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; background: #ffffff; box-shadow: 0 1px 0 rgba(15,23,42,0.04); }
-            .rank { font-size: 10pt; font-weight: 800; color: #4f46e5; margin-bottom: 6px; }
-            .logo-box { width: 100%; height: 74px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; display:flex; align-items:center; justify-content:center; padding: 8px; overflow:hidden; }
+            .grid { display:grid; grid-template-columns: repeat(${cols}, 1fr); gap: 8px; }
+            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 8px; background: #ffffff; box-shadow: 0 1px 0 rgba(15,23,42,0.04); }
+            .rank { font-size: 9.5pt; font-weight: 900; color: #4f46e5; margin-bottom: 6px; }
+            .logo-box { width: 100%; height: 62px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; display:flex; align-items:center; justify-content:center; padding: 7px; overflow:hidden; }
             .logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-            .logo-empty { font-size: 9pt; color: #94a3b8; }
-            .name { margin-top: 8px; font-size: 10pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .meta { margin-top: 6px; display:flex; gap: 6px; flex-wrap: wrap; }
-            .chip { font-size: 8.5pt; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 2px 8px; border-radius: 999px; }
-            .footer { margin-top: 12px; font-size: 8pt; color: #64748b; text-align: right; }
+            .logo-text { font-size: 8.5pt; font-weight: 900; color: #0f172a; text-align: center; line-height: 1.05; }
+            .name { margin-top: 7px; font-size: 9.5pt; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .meta { margin-top: 5px; display:flex; gap: 6px; flex-wrap: wrap; }
+            .chip { font-size: 8.2pt; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 2px 8px; border-radius: 999px; }
+            .footer { margin-top: 10px; font-size: 8pt; color: #64748b; text-align: right; }
             @media print {
               .no-print { display: none !important; }
             }
