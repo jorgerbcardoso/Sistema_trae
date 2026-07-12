@@ -213,6 +213,9 @@ export function FaturamentoClientes() {
   const resolveLogoUrlAbs = (url: string) => {
     if (!url) return '';
     if (/^https?:\/\//i.test(url)) return url;
+    if (/^\/\//.test(url)) return `https:${url}`;
+    if (/^www\./i.test(url)) return `https://${url}`;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(url)) return `https://${url}`;
     const p = url.startsWith('/') ? url : `/${url}`;
     return `${window.location.origin}${p}`;
   };
@@ -443,7 +446,41 @@ export function FaturamentoClientes() {
           </div>
 
           <script>
-            window.onload = function () { setTimeout(function(){ window.print(); }, 250); };
+            function waitForImages(maxWaitMs) {
+              var start = Date.now();
+              var imgs = Array.prototype.slice.call(document.images || []);
+              if (!imgs.length) return Promise.resolve();
+              return new Promise(function(resolve) {
+                var done = false;
+                function finish() {
+                  if (done) return;
+                  done = true;
+                  resolve();
+                }
+                var remaining = 0;
+                function oneDone() {
+                  remaining--;
+                  if (remaining <= 0) finish();
+                }
+                imgs.forEach(function(img) {
+                  if (img.complete) return;
+                  remaining++;
+                  img.addEventListener('load', oneDone, { once: true });
+                  img.addEventListener('error', oneDone, { once: true });
+                });
+                if (remaining <= 0) return finish();
+                (function tick() {
+                  if (Date.now() - start >= maxWaitMs) return finish();
+                  setTimeout(tick, 50);
+                })();
+              });
+            }
+
+            window.onload = function () {
+              waitForImages(2000).then(function() {
+                setTimeout(function(){ window.print(); }, 50);
+              });
+            };
           </script>
         </body>
       </html>
