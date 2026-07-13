@@ -171,6 +171,7 @@ interface GrupoDestino {
   totalVol: number;
   totalPeso: number;
   totalCubagem: number;
+  totalFrete: number;
 }
 
 interface DadosHub {
@@ -212,6 +213,12 @@ interface Carregamento {
   paradas?: string | null;
   ctes: CteCarregamento[];
 }
+
+type CarregamentoInexistente = {
+  origem_ssw: string;
+  placa_provisoria: string;
+  total_ctes: number;
+};
 
 /** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
@@ -295,6 +302,113 @@ function TabelaCtes({
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
 
+  type SortCol =
+    | 'ctrc'
+    | 'nfiscal'
+    | 'emissao'
+    | 'prevEnt'
+    | 'remetente'
+    | 'pagador'
+    | 'destinatario'
+    | 'cidadeUf'
+    | 'vlrNf'
+    | 'frete'
+    | 'peso'
+    | 'cubagem'
+    | 'qtdeVol'
+    | 'manifesto'
+    | 'prevChegada'
+    | 'indicadorSaida';
+
+  const [sortCol, setSortCol] = useState<SortCol>('ctrc');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (col: SortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const toDateVal = (v: string): number => {
+    const s = (v ?? '').trim();
+    if (!s || s === '—') return 0;
+    const m = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
+    if (!m) return 0;
+    const dia = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    const anoRaw = m[3];
+    const ano = !anoRaw
+      ? new Date().getFullYear()
+      : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
+    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    const t = d.getTime();
+    return Number.isNaN(t) ? 0 : t;
+  };
+
+  const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+
+  const ctesOrdenados = React.useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const copy = [...ctes];
+    const getStr = (v: any) => String(v ?? '').toUpperCase().trim();
+    const getNum = (cte: Cte): number => {
+      switch (sortCol) {
+        case 'vlrNf': return parseMoeda(cte.vlrNf);
+        case 'frete': return parseMoeda(cte.frete);
+        case 'peso': return parsePeso(cte.peso);
+        case 'cubagem': return parseCubagem(cte.cubagem);
+        case 'qtdeVol': return parseInt(String(cte.qtdeVol ?? '').replace(/\D/g, ''), 10) || 0;
+        case 'emissao': return toDateVal(cte.emissao);
+        case 'prevEnt': return toDateVal(cte.prevEnt);
+        case 'prevChegada': return toDateVal(cte.prevChegada);
+        case 'indicadorSaida': return ORDEM_IND[cte.indicadorSaida ?? ''] ?? 0;
+        default: return 0;
+      }
+    };
+    const getCmp = (a: Cte, b: Cte): number => {
+      switch (sortCol) {
+        case 'ctrc': return getStr(a.ctrc).localeCompare(getStr(b.ctrc));
+        case 'nfiscal': return getStr(a.nfiscal).localeCompare(getStr(b.nfiscal));
+        case 'remetente': return getStr(a.remetente).localeCompare(getStr(b.remetente));
+        case 'pagador': return getStr(a.pagador).localeCompare(getStr(b.pagador));
+        case 'destinatario': return getStr(a.destinatario).localeCompare(getStr(b.destinatario));
+        case 'cidadeUf': return `${getStr(a.cidade)}/${getStr(a.uf)}`.localeCompare(`${getStr(b.cidade)}/${getStr(b.uf)}`);
+        case 'manifesto': return getStr(a.manifesto).localeCompare(getStr(b.manifesto));
+        case 'emissao':
+        case 'prevEnt':
+        case 'prevChegada':
+        case 'vlrNf':
+        case 'frete':
+        case 'peso':
+        case 'cubagem':
+        case 'qtdeVol':
+        case 'indicadorSaida':
+          return getNum(a) - getNum(b);
+        default:
+          return 0;
+      }
+    };
+    copy.sort((a, b) => dir * getCmp(a, b));
+    return copy;
+  }, [ctes, sortCol, sortDir]);
+
+  const ThBtn = ({ col, children, align }: { col: SortCol; children: React.ReactNode; align?: 'left' | 'right' | 'center' }) => {
+    const base =
+      align === 'right' ? 'justify-end text-right' :
+      align === 'center' ? 'justify-center text-center' :
+      'justify-start text-left';
+    return (
+      <button
+        onClick={() => toggleSort(col)}
+        className={`w-full flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors ${base}`}
+      >
+        {children}
+        {sortCol === col
+          ? (sortDir === 'asc' ? <ChevronDown className="w-3 h-3 shrink-0 rotate-180" /> : <ChevronDown className="w-3 h-3 shrink-0" />)
+          : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
+      </button>
+    );
+  };
+
   const selecionaveis = ctes.filter(c => {
     if (ctesNoCarregamento?.has(cteId(c))) return false;
     if (ctesJaCarregados?.has(cteId(c))) return false;
@@ -334,25 +448,26 @@ function TabelaCtes({
                 </button>
               </th>
             )}
-            <th className="px-3 py-2 text-left font-semibold">CT-e</th>
-            <th className="px-3 py-2 text-left font-semibold">Emissão</th>
-            <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
-            <th className="px-3 py-2 text-left font-semibold">Remetente</th>
-            <th className="px-3 py-2 text-left font-semibold">Pagador</th>
-            <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
-            <th className="px-3 py-2 text-left font-semibold">Cidade/UF</th>
-            <th className="px-3 py-2 text-right font-semibold">Vlr. NF</th>
-            <th className="px-3 py-2 text-right font-semibold">Frete</th>
-            <th className="px-3 py-2 text-right font-semibold">Peso</th>
-            <th className="px-3 py-2 text-right font-semibold">M³</th>
-            <th className="px-3 py-2 text-right font-semibold">Vol.</th>
-            <th className="px-3 py-2 text-left font-semibold">Manifesto</th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
-            <th className="px-3 py-2 text-center font-semibold">Saída</th>
+            <th className="px-3 py-2 text-left"><ThBtn col="ctrc">CT-e</ThBtn></th>
+            <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="pagador">Pagador</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="destinatario">Destinatário</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="cidadeUf">Cidade/UF</ThBtn></th>
+            <th className="px-3 py-2 text-right"><ThBtn col="vlrNf" align="right">Vlr. NF</ThBtn></th>
+            <th className="px-3 py-2 text-right"><ThBtn col="frete" align="right">Frete</ThBtn></th>
+            <th className="px-3 py-2 text-right"><ThBtn col="peso" align="right">Peso</ThBtn></th>
+            <th className="px-3 py-2 text-right"><ThBtn col="cubagem" align="right">M³</ThBtn></th>
+            <th className="px-3 py-2 text-right"><ThBtn col="qtdeVol" align="right">Vol.</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="manifesto">Manifesto</ThBtn></th>
+            {tipo === 'transito' && <th className="px-3 py-2 text-left"><ThBtn col="prevChegada">Prev. Chegada</ThBtn></th>}
+            <th className="px-3 py-2 text-center"><ThBtn col="indicadorSaida" align="center">Saída</ThBtn></th>
           </tr>
         </thead>
         <tbody>
-          {ctes.map((cte, i) => {
+          {ctesOrdenados.map((cte, i) => {
             const jaNoCarregamento = ctesNoCarregamento?.has(cteId(cte)) ?? false;
             const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
@@ -391,6 +506,9 @@ function TabelaCtes({
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
                 </td>
+                <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap" title={cte.nfiscal || ''}>
+                  {cte.nfiscal || '-'}
+                </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
@@ -420,8 +538,6 @@ function TabelaCtes({
 
 function GrupoDestinoCard({
   grupo,
-  maxPeso,
-  maxCubagem,
   modoApontamento,
   ctesSelecionados,
   ctesNoCarregamento,
@@ -430,8 +546,6 @@ function GrupoDestinoCard({
   onToggleTodos,
 }: {
   grupo: GrupoDestino;
-  maxPeso: number;
-  maxCubagem: number;
   modoApontamento?: string | null;
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
@@ -442,9 +556,6 @@ function GrupoDestinoCard({
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
 
-  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
-  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
-
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
   const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
     ctes.reduce<string | null>((p, c) => {
@@ -453,6 +564,66 @@ function GrupoDestinoCard({
     }, null);
 
   const piorTransito = getPior(grupo.transito, 'atrasoTransf');
+
+  const exportarDestinoCSV = (ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    const lista = [...grupo.armazem, ...grupo.transito];
+    if (!lista.length) return;
+
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
+    const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+
+    const header = [
+      'Destino',
+      'CT-e',
+      'NF',
+      'Situação',
+      'Emissão',
+      'Prev. Ent.',
+      'Pagador',
+      'Destinatário',
+      'Cidade/UF',
+      'Vlr. NF',
+      'Frete (R$)',
+      'Peso (kg)',
+      'Cubagem (m³)',
+      'Volumes',
+      'Manifesto',
+      'Prev. Chegada',
+    ];
+
+    const rows = lista.map((c) => {
+      const situacao = c.emTransito ? 'EM TRÂNSITO' : 'NO ARMAZÉM';
+      return [
+        esc(grupo.sigla),
+        esc(c.ctrc),
+        esc(c.nfiscal || ''),
+        esc(situacao),
+        esc(c.emissao),
+        esc(c.prevEnt),
+        esc(c.pagador),
+        esc(c.destinatario),
+        esc(`${c.cidade}/${c.uf}`),
+        fmtMoeda(parseMoeda(c.vlrNf)),
+        fmtMoeda(parseMoeda(c.frete)),
+        fmtNum(parsePeso(c.peso), 2),
+        fmtNum(parseCubagem(c.cubagem), 3),
+        esc(c.qtdeVol),
+        esc(c.manifesto || ''),
+        esc(c.prevChegada || ''),
+      ];
+    });
+
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ctes_${String(grupo.sigla || 'destino').replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const pctEntregueNoPrazo = (() => {
     const comEntrega = [...grupo.armazem, ...grupo.transito].filter(c => c.indicadorSaida !== null);
@@ -465,7 +636,7 @@ function GrupoDestinoCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -487,34 +658,13 @@ function GrupoDestinoCard({
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.coletas.length > 0 ? grupo.coletas.length : '-'}</span>
         <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            const label = grupo.totalPeso >= 1000
-              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
-              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
-                />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
-              </div>
-            );
-          })()}
+        <span className="flex items-center justify-center font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300">
+          {grupo.totalFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </span>
-        <span className="flex items-center justify-center px-2">
-          {(() => {
-            return (
-              <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
-                />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
-              </div>
-            );
-          })()}
+        <span className="flex items-center justify-center">
+          <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={exportarDestinoCSV}>
+            <FileDown className="w-3.5 h-3.5 mr-1" />CSV
+          </Button>
         </span>
       </button>
 
@@ -2712,6 +2862,12 @@ export function Disponiveis() {
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const importandoCarregamentosRef = useRef(false);
 
+  const [carregInexistDialogOpen, setCarregInexistDialogOpen] = useState(false);
+  const [carregInexistLista, setCarregInexistLista] = useState<CarregamentoInexistente[]>([]);
+  const [carregInexistSelecionados, setCarregInexistSelecionados] = useState<Set<string>>(new Set());
+  const [carregInexistExcluindo, setCarregInexistExcluindo] = useState(false);
+  const carregInexistLastKeyRef = useRef<string>('');
+
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
   const [loadingHub, setLoadingHub] = useState(false);
@@ -2784,8 +2940,8 @@ export function Disponiveis() {
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 
-  type OrdemCol = 'sigla' | 'armazem' | 'transito' | 'coletas' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
-  const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes' as any);
+  type OrdemCol = 'totalCtes' | 'sigla' | 'armazem' | 'transito' | 'coletas' | 'totalVol' | 'totalFrete' | 'totalPeso' | 'totalCubagem' | 'piorSaida' | 'piorTransito';
+  const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes');
   const [ordemDir, setOrdemDir]   = useState<'asc' | 'desc'>('desc');
 
   const carregar = useCallback(async (siglaParam?: string) => {
@@ -2892,6 +3048,16 @@ export function Disponiveis() {
       if (res?.success) {
         await carregarCarregamentos();
       }
+      const inexist: CarregamentoInexistente[] = Array.isArray(res?.carregamentos_inexistentes) ? res.carregamentos_inexistentes : [];
+      if (inexist.length > 0) {
+        const key = inexist.map((i) => String(i.origem_ssw ?? '').toUpperCase()).sort().join('|');
+        if (key && key !== carregInexistLastKeyRef.current && !carregInexistDialogOpen) {
+          setCarregInexistLista(inexist);
+          setCarregInexistSelecionados(new Set(inexist.map((i) => String(i.origem_ssw ?? '').toUpperCase())));
+          setCarregInexistDialogOpen(true);
+          carregInexistLastKeyRef.current = key;
+        }
+      }
       return res;
     } catch (e: any) {
       return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
@@ -2899,7 +3065,33 @@ export function Disponiveis() {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos]);
+  }, [carregarCarregamentos, carregInexistDialogOpen]);
+
+  const excluirCarregamentosInexistentes = useCallback(async () => {
+    const origens_ssw = Array.from(carregInexistSelecionados.values()).filter(Boolean);
+    if (!origens_ssw.length) return;
+    setCarregInexistExcluindo(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'EXCLUIR_INEXISTENTES', origens_ssw }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message || 'Erro ao excluir carregamentos inexistentes do Presto');
+        return;
+      }
+      toast.success(`${res.removidos ?? 0} carregamento(s) removido(s).`);
+      setCarregInexistDialogOpen(false);
+      setCarregInexistLista([]);
+      setCarregInexistSelecionados(new Set());
+      await carregarCarregamentos();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao excluir carregamentos inexistentes do Presto');
+    } finally {
+      setCarregInexistExcluindo(false);
+    }
+  }, [carregarCarregamentos, carregInexistSelecionados]);
 
   const importarCarregamentosSSWObrigatorio = useCallback(async () => {
     const res = await handleImportarCarregamentos();
@@ -3585,7 +3777,7 @@ export function Disponiveis() {
     const addCte = (cte: Cte) => {
       const key = cte.unidadeDest;
       if (!map[key]) {
-        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -3596,13 +3788,14 @@ export function Disponiveis() {
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+      map[key].totalFrete   += parseMoeda(cte.frete);
     };
     for (const cte of ctesTransferFiltrados) addCte(cte);
     for (const coleta of coletasTransferFiltradas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
         const nomeGrupo = key === 'SEM DESTINO' ? (coleta.cidadeDest || key) : key;
-        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
       }
       map[key].coletas.push(coleta);
       const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;
@@ -3618,6 +3811,7 @@ export function Disponiveis() {
         case 'transito':     return mult * (a.transito.length - b.transito.length);
         case 'coletas':      return mult * (a.coletas.length - b.coletas.length);
         case 'totalVol':     return mult * (a.totalVol - b.totalVol);
+        case 'totalFrete':   return mult * (a.totalFrete - b.totalFrete);
         case 'totalPeso':    return mult * (a.totalPeso - b.totalPeso);
         case 'totalCubagem': return mult * (a.totalCubagem - b.totalCubagem);
         case 'piorSaida':    return mult * ((ORDEM_INDICADOR[getPiorIndicador([...a.armazem, ...a.transito], 'indicadorSaida') ?? ''] ?? 0) - (ORDEM_INDICADOR[getPiorIndicador([...b.armazem, ...b.transito], 'indicadorSaida') ?? ''] ?? 0));
@@ -4289,6 +4483,93 @@ export function Disponiveis() {
             todosCtes={todosCtes}
           />
 
+          <Dialog open={carregInexistDialogOpen} onOpenChange={(open) => { if (!open) setCarregInexistDialogOpen(false); }}>
+            <DialogContent className="sm:max-w-[780px]">
+              <DialogHeader>
+                <DialogTitle>Carregamentos do SSW não encontrados</DialogTitle>
+                <DialogDescription>
+                  A importação do SSW encontrou carregamentos que não existem mais no SSW, mas ainda estão no Presto. Deseja excluir do Presto também?
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm text-slate-700 dark:text-slate-300">
+                    <strong>{carregInexistLista.length}</strong> carregamento(s) listado(s)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8"
+                      onClick={() => setCarregInexistSelecionados(new Set(carregInexistLista.map((i) => String(i.origem_ssw ?? '').toUpperCase())))}
+                    >
+                      Selecionar todos
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8"
+                      onClick={() => setCarregInexistSelecionados(new Set())}
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  <div className="grid grid-cols-[32px_140px_minmax(0,1fr)_90px] gap-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <span />
+                    <span>Origem SSW</span>
+                    <span>Placa (Presto)</span>
+                    <span className="text-right">CT-es</span>
+                  </div>
+                  <div className="max-h-[45vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {carregInexistLista.map((i, idx) => {
+                      const origem = String(i.origem_ssw ?? '').toUpperCase();
+                      const checked = carregInexistSelecionados.has(origem);
+                      return (
+                        <button
+                          key={`${origem}-${idx}`}
+                          className="w-full grid grid-cols-[32px_140px_minmax(0,1fr)_90px] gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                          onClick={() => {
+                            setCarregInexistSelecionados(prev => {
+                              const next = new Set(prev);
+                              if (checked) next.delete(origem);
+                              else next.add(origem);
+                              return next;
+                            });
+                          }}
+                        >
+                          <span className="flex items-center justify-center">
+                            {checked ? <CheckSquare className="w-4 h-4 text-amber-500" /> : <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />}
+                          </span>
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{origem || '-'}</span>
+                          <span className="text-slate-600 dark:text-slate-400 truncate">{i.placa_provisoria || '-'}</span>
+                          <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">{Number(i.total_ctes ?? 0).toLocaleString('pt-BR')}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" onClick={() => setCarregInexistDialogOpen(false)} disabled={carregInexistExcluindo}>
+                    Manter no Presto
+                  </Button>
+                  <Button
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={excluirCarregamentosInexistentes}
+                    disabled={carregInexistExcluindo || carregInexistSelecionados.size === 0}
+                  >
+                    {carregInexistExcluindo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                    Excluir selecionados
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {hubModalAberto && hubModalCarregamento && (
             <ModalHub
               placa={hubModalCarregamento.placa_provisoria}
@@ -4399,11 +4680,11 @@ export function Disponiveis() {
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     {(() => {
-                      const toggleOrdem = (col: string) => {
+                      const toggleOrdem = (col: OrdemCol) => {
                         if (ordemCol === col) setOrdemDir(d => d === 'desc' ? 'asc' : 'desc');
-                        else { setOrdemCol(col as any); setOrdemDir('desc'); }
+                        else { setOrdemCol(col); setOrdemDir('desc'); }
                       };
-                      const ThBtn = ({ col, children, center }: { col: string; children: React.ReactNode; center?: boolean }) => (
+                      const ThBtn = ({ col, children, center }: { col: OrdemCol; children: React.ReactNode; center?: boolean }) => (
                         <button
                           onClick={() => toggleOrdem(col)}
                           className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${center ? 'justify-center w-full' : ''}`}
@@ -4417,7 +4698,7 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
@@ -4426,18 +4707,16 @@ export function Disponiveis() {
                             <ThBtn col="transito" center>Trans.</ThBtn>
                             <ThBtn col="coletas" center>Coletas</ThBtn>
                             <ThBtn col="totalVol" center>Volumes</ThBtn>
-                            <ThBtn col="totalPeso" center>Peso</ThBtn>
-                            <ThBtn col="totalCubagem" center>Cubagem</ThBtn>
+                            <ThBtn col="totalFrete" center>Frete</ThBtn>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
                               {(() => {
-                                const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
-                                const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
                                 const ctesNoCarregamentoAtual = modoApontamento
                                   ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                                   : undefined;
                                 return grupos.map((g, i) => (
-                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                                  <GrupoDestinoCard key={i} grupo={g} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
                                 ));
                               })()}
                             </div>
@@ -4596,25 +4875,23 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Trans.</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Coletas</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Frete</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {
-                        const maxPeso    = Math.max(...grupos.map(g => g.totalPeso), 1);
-                        const maxCubagem = Math.max(...grupos.map(g => g.totalCubagem), 1);
                         const ctesNoCarregamentoAtual = modoApontamento
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return grupos.map((g, i) => (
-                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                          <GrupoDestinoCard key={i} grupo={g} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>

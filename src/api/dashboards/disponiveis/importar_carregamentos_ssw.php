@@ -19,6 +19,42 @@ $input       = getRequestInput();
 
 $conn = connect();
 
+$acao = strtoupper(trim((string)($input['acao'] ?? '')));
+if ($acao === 'EXCLUIR_INEXISTENTES') {
+    $tabela = "{$domain}_carregamento";
+    $origens = $input['origens_ssw'] ?? [];
+    if (!is_array($origens)) $origens = [];
+    $origens = array_values(array_unique(array_filter(array_map(function ($v) {
+        $s = strtoupper(trim((string)$v));
+        return $s !== '' ? $s : null;
+    }, $origens))));
+
+    if (empty($origens)) {
+        respondJson(['success' => false, 'message' => 'Nenhuma origem_ssw informada para exclusão.']);
+    }
+
+    $unidadeEsc = pg_escape_string($conn, $unidade);
+    $in = implode(',', array_map(function ($p) use ($conn) {
+        return "'" . pg_escape_string($conn, $p) . "'";
+    }, $origens));
+
+    $resDel = pg_query(
+        $conn,
+        "DELETE FROM {$tabela}
+         WHERE UPPER(unidade) = '{$unidadeEsc}'
+           AND origem_ssw IS NOT NULL AND origem_ssw <> ''
+           AND UPPER(origem_ssw) IN ({$in})"
+    );
+    if ($resDel === false) {
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos inexistentes.']);
+    }
+
+    respondJson([
+        'success' => true,
+        'removidos' => pg_affected_rows($resDel),
+    ]);
+}
+
 ssw_login($domain);
 set_time_limit(300);
 
@@ -74,17 +110,35 @@ $placas_ssw = array_values(array_unique($placas_ssw));
 $unidadeEsc = pg_escape_string($conn, $unidade);
 
 if (empty($placas_ssw)) {
-    $resDelSsw = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw IS NOT NULL AND origem_ssw <> ''");
-    if ($resDelSsw === false) {
-        respondJson(['success' => false, 'message' => 'Erro ao limpar importações anteriores (origem_ssw preenchido).']);
+    $carregamentosInexistentes = [];
+    $resList = pg_query(
+        $conn,
+        "SELECT
+            UPPER(origem_ssw) AS origem_ssw,
+            placa_provisoria,
+            SUM(CASE WHEN (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::int) > 0) THEN 1 ELSE 0 END) AS total_ctes
+         FROM {$tabela}
+         WHERE UPPER(unidade) = '{$unidadeEsc}'
+           AND origem_ssw IS NOT NULL AND origem_ssw <> ''
+         GROUP BY UPPER(origem_ssw), placa_provisoria
+         ORDER BY UPPER(origem_ssw), placa_provisoria"
+    );
+    if ($resList !== false) {
+        while ($r = pg_fetch_assoc($resList)) {
+            $carregamentosInexistentes[] = [
+                'origem_ssw' => (string)($r['origem_ssw'] ?? ''),
+                'placa_provisoria' => (string)($r['placa_provisoria'] ?? ''),
+                'total_ctes' => (int)($r['total_ctes'] ?? 0),
+            ];
+        }
     }
-    $removidos = pg_affected_rows($resDelSsw);
     respondJson([
         'success' => true,
-        'message' => "Nenhum carregamento encontrado no SSW para esta unidade. Removidos {$removidos} registro(s) importado(s).",
+        'message' => "Nenhum carregamento encontrado no SSW para esta unidade.",
         'logs' => [],
         'placas_ssw' => [],
-        'removidos' => $removidos,
+        'removidos' => 0,
+        'carregamentos_inexistentes' => $carregamentosInexistentes,
     ]);
 }
 
@@ -96,17 +150,30 @@ $loginEsc   = pg_escape_string($conn, $login);
 $placasIn = implode(',', array_map(function ($p) use ($conn) {
     return "'" . pg_escape_string($conn, strtoupper(trim($p))) . "'";
 }, $placas_ssw));
-$resDelInexistentes = pg_query(
+$carregamentosInexistentes = [];
+$resListInexistentes = pg_query(
     $conn,
-    "DELETE FROM {$tabela}
+    "SELECT
+        UPPER(origem_ssw) AS origem_ssw,
+        placa_provisoria,
+        SUM(CASE WHEN (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::int) > 0) THEN 1 ELSE 0 END) AS total_ctes
+     FROM {$tabela}
      WHERE UPPER(unidade) = '{$unidadeEsc}'
        AND origem_ssw IS NOT NULL AND origem_ssw <> ''
-       AND UPPER(origem_ssw) NOT IN ({$placasIn})"
+       AND UPPER(origem_ssw) NOT IN ({$placasIn})
+     GROUP BY UPPER(origem_ssw), placa_provisoria
+     ORDER BY UPPER(origem_ssw), placa_provisoria"
 );
-if ($resDelInexistentes === false) {
-    respondJson(['success' => false, 'message' => 'Erro ao remover carregamentos que não existem mais no SSW.']);
+if ($resListInexistentes !== false) {
+    while ($r = pg_fetch_assoc($resListInexistentes)) {
+        $carregamentosInexistentes[] = [
+            'origem_ssw' => (string)($r['origem_ssw'] ?? ''),
+            'placa_provisoria' => (string)($r['placa_provisoria'] ?? ''),
+            'total_ctes' => (int)($r['total_ctes'] ?? 0),
+        ];
+    }
 }
-$removidosInexistentes = pg_affected_rows($resDelInexistentes);
+$removidosInexistentes = 0;
 
 function normalizarNumero($v) {
     $s = trim((string)$v);
@@ -397,5 +464,6 @@ respondJson([
     'success' => true,
     'placas_ssw' => $placas_ssw,
     'removidos_inexistentes' => $removidosInexistentes ?? 0,
+    'carregamentos_inexistentes' => $carregamentosInexistentes,
     'logs' => $logs,
 ]);
