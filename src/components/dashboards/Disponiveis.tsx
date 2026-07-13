@@ -573,6 +573,13 @@ function GrupoDestinoCard({
 
   const piorTransito = getPior(grupo.transito, 'atrasoTransf');
 
+  const pctEntregueNoPrazo = (() => {
+    const comEntrega = [...grupo.armazem, ...grupo.transito].filter(c => c.indicadorSaida !== null);
+    if (comEntrega.length === 0) return null;
+    const noPrazo = comEntrega.filter(c => c.indicadorSaida === 'verde').length;
+    return Math.round((noPrazo / comEntrega.length) * 100);
+  })();
+
   const exportarDestinoCSV = (ev: React.MouseEvent) => {
     ev.stopPropagation();
     const lista = [...grupo.armazem, ...grupo.transito];
@@ -632,13 +639,6 @@ function GrupoDestinoCard({
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const pctEntregueNoPrazo = (() => {
-    const comEntrega = [...grupo.armazem, ...grupo.transito].filter(c => c.indicadorSaida !== null);
-    if (comEntrega.length === 0) return null;
-    const noPrazo = comEntrega.filter(c => c.indicadorSaida === 'verde').length;
-    return Math.round((noPrazo / comEntrega.length) * 100);
-  })();
 
   return (
     <div className="overflow-hidden">
@@ -4428,67 +4428,34 @@ export function Disponiveis() {
                 <DialogTitle>Resumo · Carregamento {resumoHojePlaca}</DialogTitle>
                 <DialogDescription>CT-es adicionados por unidade de destino</DialogDescription>
               </DialogHeader>
-              <div className="flex gap-3">
-                <div className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
-                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade carregadora</p>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                    <span>Unid.</span>
-                    <span className="text-right">CT-es</span>
-                    <span className="text-right">Kg</span>
-                    <span className="text-right">M³</span>
-                    <span className="text-right">Frete</span>
-                  </div>
-                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                    {resumoHojeUnidades.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoHojeUnidades.map((r, idx) => (
-                      <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
-                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
-                        <span className="text-right font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">{r.qtd}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
-                    <span className="text-slate-600 dark:text-slate-300">Total</span>
-                    <span className="text-right font-bold text-indigo-700 dark:text-indigo-300 tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + r.qtd, 0)}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeUnidades.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+                <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade destino</p>
                 </div>
-
-                <div className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
-                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Por unidade destino</p>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                    <span>Unid.</span>
-                    <span className="text-right">CT-es</span>
-                    <span className="text-right">Kg</span>
-                    <span className="text-right">M³</span>
-                    <span className="text-right">Frete</span>
-                  </div>
-                  <div className="max-h-44 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                    {resumoHojeDestinos.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoHojeDestinos.map((r, idx) => (
-                      <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
-                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
-                        <span className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.qtd}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
-                        <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
-                    <span className="text-slate-600 dark:text-slate-300">Total</span>
-                    <span className="text-right font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + r.qtd, 0)}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
-                    <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                  </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                  <span>Unid.</span>
+                  <span className="text-right">CT-es</span>
+                  <span className="text-right">Kg</span>
+                  <span className="text-right">M³</span>
+                  <span className="text-right">Frete</span>
+                </div>
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                  {resumoHojeDestinos.length === 0 ? <div className="px-3 py-3 text-xs text-slate-400 text-center">—</div> : resumoHojeDestinos.map((r, idx) => (
+                    <div key={idx} className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 px-2 py-1.5 text-xs">
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.unidade || '-'}</span>
+                      <span className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{r.qtd}</span>
+                      <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                      <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                      <span className="text-right font-mono text-[10px] tabular-nums text-slate-600 dark:text-slate-400">{(r.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_38px_54px_48px_74px] gap-1 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-2 py-1.5 text-xs font-semibold">
+                  <span className="text-slate-600 dark:text-slate-300">Total</span>
+                  <span className="text-right font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + r.qtd, 0)}</span>
+                  <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.peso_kg ?? 0), 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                  <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.cubagem ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                  <span className="text-right font-mono text-[10px] tabular-nums">{resumoHojeDestinos.reduce((s, r) => s + (r.frete ?? 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                 </div>
               </div>
               <div className="flex justify-end">
