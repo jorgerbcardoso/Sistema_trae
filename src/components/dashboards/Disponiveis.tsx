@@ -308,7 +308,6 @@ function TabelaCtes({
     | 'emissao'
     | 'prevEnt'
     | 'remetente'
-    | 'pagador'
     | 'destinatario'
     | 'cidadeUf'
     | 'vlrNf'
@@ -345,6 +344,11 @@ function TabelaCtes({
   };
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+  const stripDv = (v: string): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    return s.replace(/-\d+$/, '');
+  };
 
   const ctesOrdenados = React.useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -369,7 +373,6 @@ function TabelaCtes({
         case 'ctrc': return getStr(a.ctrc).localeCompare(getStr(b.ctrc));
         case 'nfiscal': return getStr(a.nfiscal).localeCompare(getStr(b.nfiscal));
         case 'remetente': return getStr(a.remetente).localeCompare(getStr(b.remetente));
-        case 'pagador': return getStr(a.pagador).localeCompare(getStr(b.pagador));
         case 'destinatario': return getStr(a.destinatario).localeCompare(getStr(b.destinatario));
         case 'cidadeUf': return `${getStr(a.cidade)}/${getStr(a.uf)}`.localeCompare(`${getStr(b.cidade)}/${getStr(b.uf)}`);
         case 'manifesto': return getStr(a.manifesto).localeCompare(getStr(b.manifesto));
@@ -448,12 +451,11 @@ function TabelaCtes({
                 </button>
               </th>
             )}
-            <th className="px-3 py-2 text-left"><ThBtn col="ctrc">CT-e</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="ctrc">CTRC</ThBtn></th>
             <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="pagador">Pagador</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="destinatario">Destinatário</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="cidadeUf">Cidade/UF</ThBtn></th>
             <th className="px-3 py-2 text-right"><ThBtn col="vlrNf" align="right">Vlr. NF</ThBtn></th>
@@ -499,9 +501,9 @@ function TabelaCtes({
                     )}
                   </td>
                 )}
-                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {cte.ctrc}
+                <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5 flex-nowrap">
+                    {stripDv(cte.ctrc)}
                     {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
@@ -512,7 +514,6 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.pagador}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
@@ -520,7 +521,7 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
-                <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400">{cte.manifesto || '-'}</td>
+                <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{stripDv(cte.manifesto || '-') || '-'}</td>
                 {tipo === 'transito' && (
                   <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{cte.prevChegada}</td>
                 )}
@@ -538,6 +539,8 @@ function TabelaCtes({
 
 function GrupoDestinoCard({
   grupo,
+  maxPeso,
+  maxCubagem,
   modoApontamento,
   ctesSelecionados,
   ctesNoCarregamento,
@@ -546,6 +549,8 @@ function GrupoDestinoCard({
   onToggleTodos,
 }: {
   grupo: GrupoDestino;
+  maxPeso: number;
+  maxCubagem: number;
   modoApontamento?: string | null;
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
@@ -555,6 +560,9 @@ function GrupoDestinoCard({
 }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
+
+  const pctPeso    = maxPeso > 0 ? (grupo.totalPeso / maxPeso) * 100 : 0;
+  const pctCubagem = maxCubagem > 0 ? (grupo.totalCubagem / maxCubagem) * 100 : 0;
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
   const getPior = (ctes: Cte[], campo: 'indicadorSaida' | 'atrasoTransf') =>
@@ -576,7 +584,7 @@ function GrupoDestinoCard({
 
     const header = [
       'Destino',
-      'CT-e',
+      'CTRC',
       'NF',
       'Situação',
       'Emissão',
@@ -636,7 +644,7 @@ function GrupoDestinoCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -658,7 +666,36 @@ function GrupoDestinoCard({
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.transito.length}</span>
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.coletas.length > 0 ? grupo.coletas.length : '-'}</span>
         <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
-        <span className="flex items-center justify-center font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300">
+        <span className="flex items-center justify-center px-1">
+          {(() => {
+            const label = grupo.totalPeso >= 1000
+              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
+              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
+            return (
+              <div className="relative w-full h-3.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #4c1d95, #6d28d9, #8b5cf6)' }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{label}</span>
+              </div>
+            );
+          })()}
+        </span>
+        <span className="flex items-center justify-center px-1">
+          {(() => {
+            return (
+              <div className="relative w-full h-3.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+              </div>
+            );
+          })()}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-1">
           {grupo.totalFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </span>
         <span className="flex items-center justify-center">
@@ -912,7 +949,7 @@ function TabelaEntrega({
                 </button>
               </th>
             )}
-            <th className="px-3 py-2 text-left font-semibold">CT-e</th>
+            <th className="px-3 py-2 text-left font-semibold">CTRC</th>
             <th className="px-3 py-2 text-left font-semibold">NF</th>
             <th className="px-3 py-2 text-left font-semibold">Pagador</th>
             <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
@@ -1489,7 +1526,7 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CT-e', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
+    const header = ['CTRC', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
     const rows = lista.map((c: any) => [
       c.ctrc,
       `"${c.unidade_carregamento || ''}"`,
@@ -4684,39 +4721,49 @@ export function Disponiveis() {
                         if (ordemCol === col) setOrdemDir(d => d === 'desc' ? 'asc' : 'desc');
                         else { setOrdemCol(col); setOrdemDir('desc'); }
                       };
-                      const ThBtn = ({ col, children, center }: { col: OrdemCol; children: React.ReactNode; center?: boolean }) => (
+                      const ThBtn = ({ col, children, align }: { col: OrdemCol; children: React.ReactNode; align?: 'left' | 'center' | 'right' }) => {
+                        const cls =
+                          align === 'right' ? 'justify-end w-full text-right' :
+                          align === 'center' ? 'justify-center w-full text-center' :
+                          'justify-start text-left';
+                        return (
                         <button
                           onClick={() => toggleOrdem(col)}
-                          className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${center ? 'justify-center w-full' : ''}`}
+                          className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${cls}`}
                         >
                           {children}
                           {ordemCol === col
                             ? (ordemDir === 'desc' ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />)
                             : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
                         </button>
-                      );
+                        );
+                      };
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
-                            <ThBtn col="piorSaida" center>Perf. saída</ThBtn>
-                            <ThBtn col="armazem" center>Piso</ThBtn>
-                            <ThBtn col="transito" center>Trans.</ThBtn>
-                            <ThBtn col="coletas" center>Coletas</ThBtn>
-                            <ThBtn col="totalVol" center>Volumes</ThBtn>
-                            <ThBtn col="totalFrete" center>Frete</ThBtn>
+                            <ThBtn col="piorSaida" align="center">Perf. saída</ThBtn>
+                            <ThBtn col="armazem" align="center">Piso</ThBtn>
+                            <ThBtn col="transito" align="center">Trans.</ThBtn>
+                            <ThBtn col="coletas" align="center">Coletas</ThBtn>
+                            <ThBtn col="totalVol" align="center">Volumes</ThBtn>
+                            <ThBtn col="totalPeso" align="center">Peso</ThBtn>
+                            <ThBtn col="totalCubagem" align="center">Cubagem</ThBtn>
+                            <ThBtn col="totalFrete" align="right">Frete</ThBtn>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
                               {(() => {
+                                const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
+                                const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
                                 const ctesNoCarregamentoAtual = modoApontamento
                                   ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                                   : undefined;
                                 return grupos.map((g, i) => (
-                                  <GrupoDestinoCard key={i} grupo={g} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
                                 ));
                               })()}
                             </div>
@@ -4875,23 +4922,27 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 120px 60px' }}>
+                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Trans.</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Coletas</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Frete</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {
+                        const maxPeso     = Math.max(...grupos.map(g => g.totalPeso), 1);
+                        const maxCubagem  = Math.max(...grupos.map(g => g.totalCubagem), 1);
                         const ctesNoCarregamentoAtual = modoApontamento
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return grupos.map((g, i) => (
-                          <GrupoDestinoCard key={i} grupo={g} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>
