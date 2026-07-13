@@ -695,10 +695,10 @@ function GrupoDestinoCard({
             );
           })()}
         </span>
-        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-1">
-          {grupo.totalFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-        <span className="flex items-center justify-center">
+        <span className="flex items-center justify-center pl-1">
           <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={exportarDestinoCSV}>
             <FileDown className="w-3.5 h-3.5 mr-1" />CSV
           </Button>
@@ -4752,7 +4752,7 @@ export function Disponiveis() {
                             <ThBtn col="totalVol" align="center">Volumes</ThBtn>
                             <ThBtn col="totalPeso" align="center">Peso</ThBtn>
                             <ThBtn col="totalCubagem" align="center">Cubagem</ThBtn>
-                            <ThBtn col="totalFrete" align="right">Frete</ThBtn>
+                            <ThBtn col="totalFrete" align="right">Frete (R$)</ThBtn>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -4931,7 +4931,7 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
