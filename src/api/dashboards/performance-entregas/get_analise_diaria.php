@@ -160,9 +160,18 @@ $query = "
             cte.data_prev_ent::date as dia,
             COUNT(*) as total
         FROM {$domain}_cte cte
+        LEFT JOIN (
+            SELECT codigo::text as codigo, MAX(tipo) as tipo
+            FROM {$domain}_ocorrencia
+            GROUP BY codigo::text
+        ) oc ON oc.codigo = cte.ult_ocor::text
         WHERE cte.data_prev_ent IS NOT NULL
         AND data_entrega IS NOT NULL
-        AND data_entrega <= cte.data_prev_ent
+        AND (
+            data_entrega <= cte.data_prev_ent
+            OR COALESCE(cte.entrega_abonada, false) = TRUE
+            OR oc.tipo = 'C'
+        )
         AND $whereClause
         GROUP BY cte.data_prev_ent::date
     )

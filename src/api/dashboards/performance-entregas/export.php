@@ -184,7 +184,7 @@ if ($tipo && $data) {
             $params[] = $data;
             $paramIndex++;
             $whereConditions[] = "cte.data_entrega IS NOT NULL";
-            $whereConditions[] = "cte.data_entrega <= cte.data_prev_ent";
+            $whereConditions[] = "(cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR ocor.tipo = 'C')";
             break;
     }
 }
