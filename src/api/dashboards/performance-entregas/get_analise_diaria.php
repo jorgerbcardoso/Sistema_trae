@@ -148,33 +148,23 @@ $query = "
     ),
     previstos AS (
         SELECT 
-            (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) as dia,
+            cte.data_prev_ent::date as dia,
             COUNT(*) as total
         FROM {$domain}_cte cte
-        LEFT JOIN (
-            SELECT codigo::text as codigo, MAX(tipo) as tipo
-            FROM {$domain}_ocorrencia
-            GROUP BY codigo::text
-        ) oc ON oc.codigo = cte.ult_ocor::text
-        WHERE (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) IS NOT NULL
+        WHERE cte.data_prev_ent IS NOT NULL
         AND $whereClause
-        GROUP BY dia
+        GROUP BY cte.data_prev_ent::date
     ),
     entregues AS (
         SELECT 
-            (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) as dia,
+            cte.data_prev_ent::date as dia,
             COUNT(*) as total
         FROM {$domain}_cte cte
-        LEFT JOIN (
-            SELECT codigo::text as codigo, MAX(tipo) as tipo
-            FROM {$domain}_ocorrencia
-            GROUP BY codigo::text
-        ) oc ON oc.codigo = cte.ult_ocor::text
-        WHERE (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) IS NOT NULL
+        WHERE cte.data_prev_ent IS NOT NULL
         AND data_entrega IS NOT NULL
-        AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+        AND data_entrega <= cte.data_prev_ent
         AND $whereClause
-        GROUP BY dia
+        GROUP BY cte.data_prev_ent::date
     )
     SELECT
         dias.dia,
