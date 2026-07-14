@@ -200,7 +200,7 @@ export async function getPerformanceComparativo(filters: PerformanceFilters): Pr
  * Buscar dados da análise diária
  */
 export async function getAnaliseDiaria(
-  periodo: 7 | 15 | 30,
+  periodo: 15 | 30 | 45,
   filters?: { unidadeDestino?: string[], cnpjPagador?: string, cnpjDestinatario?: string }
 ): Promise<{ diasData: DayData[] }> {
   const token = getAuthToken();

@@ -179,7 +179,7 @@ export function PerformanceEntregas() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // ✅ NOVO: Estados para Análise Diária
-  const [analisePeriodo, setAnalisePeriodo] = useState<7 | 15 | 30>(7);
+  const [analisePeriodo, setAnalisePeriodo] = useState<15 | 30 | 45>(15);
   const [diasData, setDiasData] = useState<DayData[]>([]);
   const [loadingAnalise, setLoadingAnalise] = useState(false);
 

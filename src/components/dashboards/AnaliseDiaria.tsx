@@ -7,8 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DayData } from '../../services/performanceEntregasService';
 
 interface AnaliseDiariaProps {
-  analisePeriodo: 7 | 15 | 30;
-  setAnalisePeriodo: (periodo: 7 | 15 | 30) => void;
+  analisePeriodo: 15 | 30 | 45;
+  setAnalisePeriodo: (periodo: 15 | 30 | 45) => void;
   diasData: DayData[];
   loadingAnalise: boolean;
   handleExportEntregasDia: (data: string) => void;
@@ -72,7 +72,7 @@ export function AnaliseDiaria({
                         📅 Período Considerado
                       </p>
                       <p>
-                        O período analisado é determinado pela chave selecionada: <strong>7 dias</strong>, <strong>15 dias</strong> ou <strong>1 mês</strong>.
+                        O período analisado é determinado pela chave selecionada: <strong>15 dias</strong>, <strong>30 dias</strong> ou <strong>45 dias</strong>, sempre incluindo <strong>hoje</strong> e os <strong>próximos 5 dias</strong>.
                       </p>
                     </div>
                     
@@ -136,14 +136,6 @@ export function AnaliseDiaria({
           </div>
           <div className="flex gap-2">
             <Button
-              variant={analisePeriodo === 7 ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAnalisePeriodo(7)}
-              className={analisePeriodo === 7 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
-            >
-              7 dias
-            </Button>
-            <Button
               variant={analisePeriodo === 15 ? 'default' : 'outline'}
               size="sm"
               onClick={() => setAnalisePeriodo(15)}
@@ -157,7 +149,15 @@ export function AnaliseDiaria({
               onClick={() => setAnalisePeriodo(30)}
               className={analisePeriodo === 30 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
             >
-              1 mês
+              30 dias
+            </Button>
+            <Button
+              variant={analisePeriodo === 45 ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setAnalisePeriodo(45)}
+              className={analisePeriodo === 45 ? 'bg-blue-600 hover:bg-blue-700' : 'dark:border-slate-600'}
+            >
+              45 dias
             </Button>
           </div>
         </div>
@@ -169,9 +169,9 @@ export function AnaliseDiaria({
           </div>
         ) : (
           <div className={`grid gap-3 ${
-            analisePeriodo === 7 ? 'grid-cols-7' : 
             analisePeriodo === 15 ? 'grid-cols-5 md:grid-cols-8' : 
-            'grid-cols-5 md:grid-cols-7 lg:grid-cols-10'
+            analisePeriodo === 30 ? 'grid-cols-5 md:grid-cols-8 lg:grid-cols-10' : 
+            'grid-cols-5 md:grid-cols-9 lg:grid-cols-12'
           }`}>
             {diasData.map((dia, index) => {
               // Calcular performance do dia

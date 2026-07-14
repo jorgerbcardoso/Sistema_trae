@@ -3278,16 +3278,20 @@ export const mockGetPerformanceComparativo = async (filters: PerformanceFilters)
 };
 
 // ✅ MOCK: ANÁLISE DIÁRIA (INDEPENDENTE DOS FILTROS)
-export const mockGetAnaliseDiaria = async (periodo: 7 | 15 | 30) => {
+export const mockGetAnaliseDiaria = async (periodo: 15 | 30 | 45) => {
   await mockDelay(300);
   
   const diasData = [];
   const hoje = new Date();
+  const hoje0 = new Date(hoje);
+  hoje0.setHours(0, 0, 0, 0);
+  const end = new Date(hoje0);
+  end.setDate(end.getDate() + 5);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (periodo - 1));
   
-  // Gerar dados para os últimos N dias até ONTEM
-  for (let i = periodo; i >= 1; i--) {
-    const data = new Date(hoje);
-    data.setDate(hoje.getDate() - i);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const data = new Date(d);
     
     const diaSemana = data.getDay(); // 0 = domingo, 1 = segunda, etc
     const dia = String(data.getDate()).padStart(2, '0');
@@ -3306,7 +3310,15 @@ export const mockGetAnaliseDiaria = async (periodo: 7 | 15 | 30) => {
     let previstosDia = 0;
     let entreguesDia = 0;
     
-    if (isDomingo) {
+    const data0 = new Date(data);
+    data0.setHours(0, 0, 0, 0);
+    const isFuturo = data0.getTime() > hoje0.getTime();
+
+    if (isFuturo) {
+      entregasDia = 0;
+      previstosDia = (isDomingo) ? 0 : Math.floor(Math.random() * 30) + 5; // 5-35
+      entreguesDia = 0;
+    } else if (isDomingo) {
       // Domingo: sem entregas
       entregasDia = 0;
       previstosDia = 0;

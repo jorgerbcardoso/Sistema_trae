@@ -4,12 +4,12 @@
  * API: DASHBOARD PERFORMANCE DE ENTREGAS - ANÁLISE DIÁRIA
  * ================================================================
  * Retorna dados DIÁRIOS para a seção de Análise Diária
- * Período: 7, 15 ou 30 dias (sempre terminando em ONTEM)
- * IGNORA todos os filtros do dashboard (período independente)
+ * Período: 15, 30 ou 45 dias (sempre incluindo HOJE e os próximos 5 dias)
+ * Período independente do filtro de datas do dashboard
  * Requer autenticação via token
  *
  * POST /api/dashboards/performance-entregas/get_analise_diaria.php
- * Body: { periodo: 7|15|30 }
+ * Body: { periodo: 15|30|45 }
  * Response: JSON com dados diários
  * ================================================================
  */
@@ -33,7 +33,7 @@ $domain = $auth['domain'];
 // RECEBER E PROCESSAR PARÂMETROS
 // ================================================================
 $input = getRequestInput();
-$periodo = $input['periodo'] ?? 7;
+$periodo = $input['periodo'] ?? 15;
 
 // ✅ FILTROS: Apenas unidades, pagador e destinatário
 $unidadeDestino = $input['unidadeDestino'] ?? [];
@@ -41,8 +41,8 @@ $cnpjPagador = $input['cnpjPagador'] ?? null;
 $cnpjDestinatario = $input['cnpjDestinatario'] ?? null;
 
 // Validar período
-if (!in_array($periodo, [7, 15, 30])) {
-    msg('Período inválido. Use 7, 15 ou 30 dias.', 'error');
+if (!in_array($periodo, [15, 30, 45])) {
+    msg('Período inválido. Use 15, 30 ou 45 dias.', 'error');
 }
 
 // ================================================================
@@ -92,7 +92,7 @@ if (!$tableExists) {
 // ================================================================
 // QUERY PARA BUSCAR DADOS DIÁRIOS
 // ================================================================
-// ✅ TERMINA EM ONTEM (exclui hoje)
+// ✅ Sempre inclui HOJE e os próximos 5 dias
 // ✅ Retorna TODOS os dias do período (com ou sem CT-e)
 // ✅ APLICA FILTROS: unidades, pagador, destinatário
 
@@ -127,12 +127,13 @@ if ($cnpjDestinatario) {
 }
 
 $whereClause = implode(' AND ', $whereConditions);
+$diasAtras = (int)$periodo - 6; // Janela termina em hoje+5, então começa em hoje-(periodo-6)
 
 $query = "
     WITH dias AS (
         SELECT generate_series(
-            CURRENT_DATE - INTERVAL '$periodo days',
-            CURRENT_DATE - INTERVAL '1 day',
+            CURRENT_DATE - INTERVAL '{$diasAtras} day',
+            CURRENT_DATE + INTERVAL '5 day',
             '1 day'::interval
         )::date as dia
     ),
@@ -216,19 +217,28 @@ respondJson([
 // ================================================================
 function getMockAnaliseDiaria($periodo) {
     $diasData = [];
-    $ontem = strtotime('-1 day');
+    $hoje = strtotime('today');
+    $diasAtras = (int)$periodo - 6;
+    $startTs = strtotime("-{$diasAtras} days", $hoje);
+    $endTs = strtotime("+5 days", $hoje);
 
-    for ($i = $periodo; $i >= 1; $i--) {
-        $diaTimestamp = strtotime("-$i days", $ontem);
-        $diaNum = date('d', $diaTimestamp);
-        $mesNum = date('m', $diaTimestamp);
-        $diaSemana = date('w', $diaTimestamp);
-        $dataCompleta = date('Y-m-d', $diaTimestamp);
+    for ($t = $startTs; $t <= $endTs; $t = strtotime('+1 day', $t)) {
+        $diaNum = date('d', $t);
+        $mesNum = date('m', $t);
+        $diaSemana = date('w', $t);
+        $dataCompleta = date('Y-m-d', $t);
 
         // Simular dados realistas
-        $entregasDia = ($diaSemana == 0) ? 0 : rand(15, 45); // Domingo = 0
-        $previstosDia = ($diaSemana == 0) ? 0 : rand(10, 35);
-        $entreguesDia = $previstosDia > 0 ? rand((int)($previstosDia * 0.7), $previstosDia) : 0;
+        $isFuturo = $t > $hoje;
+        if ($isFuturo) {
+            $entregasDia = 0;
+            $previstosDia = ($diaSemana == 0) ? 0 : rand(5, 35);
+            $entreguesDia = 0;
+        } else {
+            $entregasDia = ($diaSemana == 0) ? 0 : rand(15, 45); // Domingo = 0
+            $previstosDia = ($diaSemana == 0) ? 0 : rand(10, 35);
+            $entreguesDia = $previstosDia > 0 ? rand((int)($previstosDia * 0.7), $previstosDia) : 0;
+        }
 
         $diasData[] = [
             'dia' => $diaNum,
