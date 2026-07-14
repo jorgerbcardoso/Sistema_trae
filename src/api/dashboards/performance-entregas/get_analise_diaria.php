@@ -101,7 +101,7 @@ $params = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
-    "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')"
+    "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')"
 ];
 
 if (!empty($unidadeDestino) && is_array($unidadeDestino) && count($unidadeDestino) > 0) {
