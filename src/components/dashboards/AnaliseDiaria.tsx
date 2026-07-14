@@ -25,6 +25,10 @@ export function AnaliseDiaria({
   handleExportPrevistosDia,
   handleExportEntreguesDia
 }: AnaliseDiariaProps) {
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const todayMidday = new Date(`${todayIso}T12:00:00`);
+
   return (
     <Card className="dark:bg-slate-900 dark:border-slate-700">
       <CardHeader>
@@ -174,10 +178,15 @@ export function AnaliseDiaria({
             'grid-cols-5 md:grid-cols-9 lg:grid-cols-12'
           }`}>
             {diasData.map((dia, index) => {
-              // Calcular performance do dia
-              const performanceDia = dia.previstosDia > 0 
+              const diaMidday = new Date(`${dia.data}T12:00:00`);
+              const isHoje = dia.data === todayIso;
+              const isFuturo = diaMidday.getTime() > todayMidday.getTime();
+              const temEntregasAntecipadas = isFuturo && (dia.entreguesDia > 0 || dia.entregasDia > 0);
+
+              const performanceDiaBase = dia.previstosDia > 0 
                 ? (dia.entreguesDia / dia.previstosDia) * 100 
                 : 0;
+              const performanceDia = temEntregasAntecipadas ? 100 : isFuturo ? 0 : performanceDiaBase;
               
               // Cor baseada na performance
               const bgColor = performanceDia >= 90 
@@ -195,11 +204,17 @@ export function AnaliseDiaria({
                 : performanceDia > 0
                 ? 'text-red-700 dark:text-red-300'
                 : 'text-slate-500 dark:text-slate-400';
+
+              const destaqueDia = isHoje
+                ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900'
+                : temEntregasAntecipadas
+                ? 'ring-2 ring-violet-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-900'
+                : '';
               
               return (
                 <div
                   key={index}
-                  className={`${bgColor} border-2 rounded-lg p-3 transition-all hover:shadow-md`}
+                  className={`${bgColor} ${destaqueDia} border-2 rounded-lg p-3 transition-all hover:shadow-md`}
                 >
                   {/* Cabeçalho: Dia da semana */}
                   <div className="text-center mb-2">
@@ -212,6 +227,11 @@ export function AnaliseDiaria({
                     <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">
                       {dia.mesNome}
                     </p>
+                    {isHoje ? (
+                      <p className="mt-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400">HOJE</p>
+                    ) : temEntregasAntecipadas ? (
+                      <p className="mt-1 text-[10px] font-semibold text-violet-700 dark:text-violet-300">ADIANTADAS</p>
+                    ) : null}
                   </div>
                   
                   {/* Dados do dia - VERSÃO DESKTOP */}
@@ -286,7 +306,7 @@ export function AnaliseDiaria({
                     </TooltipProvider>
                     
                     {/* Indicador de Performance */}
-                    {performanceDia > 0 && (
+                    {(performanceDia > 0 || temEntregasAntecipadas) && (
                       <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-600 dark:text-slate-400">Perf.:</span>
