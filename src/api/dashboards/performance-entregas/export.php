@@ -149,7 +149,7 @@ if ($coluna) {
 
 // ✅ FILTRO DE DATA DE PREVISÃO (do grfico de evolução)
 if ($dataPrevisao) {
-    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) = $" . $paramIndex;
+    $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
     $params[] = $dataPrevisao;
     $paramIndex++;
 }
@@ -173,18 +173,18 @@ if ($tipo && $data) {
             
         case 'previstos_dia':
             // Previstos do dia: data_prev_ent = data
-            $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) = $" . $paramIndex;
+            $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
             $params[] = $data;
             $paramIndex++;
             break;
             
         case 'entregues_dia':
             // Entregues no prazo do dia: data_prev_ent = data AND data_entrega <= data_prev_ent
-            $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) = $" . $paramIndex;
+            $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
             $params[] = $data;
             $paramIndex++;
             $whereConditions[] = "cte.data_entrega IS NOT NULL";
-            $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+            $whereConditions[] = "cte.data_entrega <= cte.data_prev_ent";
             break;
     }
 }
@@ -246,6 +246,14 @@ if (count($whereConditions) > 0) {
     $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 }
 
+$usarPrevisaoReal = (bool)($tipo || $dataPrevisao);
+$exprDataPrev = $usarPrevisaoReal
+    ? "cte.data_prev_ent"
+    : "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END)";
+$exprPrazoComp = $usarPrevisaoReal
+    ? "cte.data_prev_ent"
+    : "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+
 // ================================================================
 // QUERY PARA BUSCAR CONHECIMENTOS
 // ================================================================
@@ -260,9 +268,9 @@ $query = "SELECT cte.ser_cte,
                  cte.sigla_dest,
                  cte.vlr_frete,
                  cte.peso_real,
-                 to_char((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'DD/MM/YY') AS data_prev_ent,
+                 to_char(($exprDataPrev), 'DD/MM/YY') AS data_prev_ent,
                  CASE WHEN cte.data_entrega IS NULL THEN '' ELSE to_char (cte.data_entrega, 'DD/MM/YY') END AS data_entrega,
-                 CASE WHEN cte.data_entrega IS NULL THEN current_date - (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) ELSE cte.data_entrega - (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) END AS atraso,
+                 CASE WHEN cte.data_entrega IS NULL THEN current_date - ($exprPrazoComp) ELSE cte.data_entrega - ($exprPrazoComp) END AS atraso,
                  CASE
                      WHEN cte.ult_ocor IS NULL OR cte.ult_ocor::text = '' THEN ''
                      WHEN ocor.descricao IS NULL OR ocor.descricao = '' THEN cte.ult_ocor::text
@@ -270,7 +278,11 @@ $query = "SELECT cte.ser_cte,
                  END AS ultima_ocorrencia,
                  CASE WHEN cte.data_ult_ocor IS NULL THEN '' ELSE to_char (cte.data_ult_ocor, 'DD/MM/YY') END AS data_ult_ocor
             FROM $domain" . "_cte cte
-            LEFT JOIN $domain" . "_ocorrencia ocor ON ocor.codigo::text = cte.ult_ocor::text
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo, MAX(descricao) as descricao
+                FROM $domain" . "_ocorrencia
+                GROUP BY codigo::text
+            ) ocor ON ocor.codigo = cte.ult_ocor::text
             $whereClause
            ORDER BY 1, 2";
 
