@@ -38,6 +38,19 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
   const { user } = useAuth(); // ✅ Pegar unidade escolhida pelo usuário
   const [lancamentos, setLancamentos] = useState<LancamentoReceita[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const normIsoDate = (v: string) => {
+    const s = String(v ?? '').trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  };
+
+  const formatDateBR = (v: string) => {
+    const iso = normIsoDate(v);
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
   
   // Ordenação
   const [sortField, setSortField] = useState<SortField>('data_emissao');
@@ -89,8 +102,10 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
   };
 
   const handleNew = () => {
+    const now = new Date();
+    const hojeIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     setFormData({
-      data_emissao: new Date().toISOString().split('T')[0],
+      data_emissao: hojeIso,
       sigla_emit: unidadeAtual, // ✅ Preencher com unidade escolhida
       cnpj_pag: '',
       nome_pag: '',
@@ -107,7 +122,7 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
     setFormData({
       nro_cte: lancamento.nro_cte,
       ser_cte: lancamento.ser_cte,
-      data_emissao: lancamento.data_emissao,
+      data_emissao: normIsoDate(lancamento.data_emissao),
       sigla_emit: lancamento.sigla_emit,
       cnpj_pag: lancamento.cnpj_pag,
       nome_pag: lancamento.nome_pag,
@@ -341,7 +356,7 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">
-                              {new Date(lancamento.data_emissao).toLocaleDateString('pt-BR')}
+                              {formatDateBR(lancamento.data_emissao)}
                             </td>
                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
                               {lancamento.nome_pag}
@@ -490,10 +505,8 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-500">Data Inclusão</p>
-                  <p className="font-medium text-slate-700 dark:text-slate-300">
+                          <p className="text-slate-900 dark:text-slate-100">{selectedRecord.data_inclusao ? formatDateBR(selectedRecord.data_inclusao) : '-'}</p>
                     {selectedRecord.data_inclusao ? new Date(selectedRecord.data_inclusao).toLocaleDateString('pt-BR') : '-'}
-                  </p>
-                </div>
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-500">Hora Inclusão</p>
                   <p className="font-medium text-slate-700 dark:text-slate-300">

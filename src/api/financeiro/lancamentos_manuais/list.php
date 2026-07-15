@@ -74,7 +74,8 @@ try {
             login_inclusao,
             (ser_cte || TRIM(TO_CHAR(nro_cte, '000000'))) as cte_formatado
         FROM {$tableName}
-        WHERE data_emissao BETWEEN $1 AND $2
+        WHERE data_emissao::date >= $1::date
+          AND data_emissao::date < $2::date
           AND tp_documento = 'MANUAL'
         ORDER BY data_emissao DESC, nro_cte DESC
         LIMIT $3 OFFSET $4
@@ -111,7 +112,8 @@ try {
     $countQuery = "
         SELECT COUNT(*) as total
         FROM {$tableName}
-        WHERE data_emissao BETWEEN $1 AND $2
+        WHERE data_emissao::date >= $1::date
+          AND data_emissao::date < $2::date
           AND tp_documento = 'MANUAL'
     ";
     
@@ -126,7 +128,8 @@ try {
             COALESCE(SUM(vlr_frete), 0) as total_vlr_frete,
             COALESCE(SUM(vlr_icms), 0) as total_vlr_icms
         FROM {$tableName}
-        WHERE data_emissao BETWEEN $1 AND $2
+        WHERE data_emissao::date >= $1::date
+          AND data_emissao::date < $2::date
           AND tp_documento = 'MANUAL'
     ";
     
