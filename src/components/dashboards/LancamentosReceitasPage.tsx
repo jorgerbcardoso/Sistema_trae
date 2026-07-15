@@ -505,8 +505,10 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-500">Data Inclusão</p>
-                          <p className="text-slate-900 dark:text-slate-100">{selectedRecord.data_inclusao ? formatDateBR(selectedRecord.data_inclusao) : '-'}</p>
-                    {selectedRecord.data_inclusao ? new Date(selectedRecord.data_inclusao).toLocaleDateString('pt-BR') : '-'}
+                  <p className="text-slate-900 dark:text-slate-100">
+                    {selectedRecord.data_inclusao ? formatDateBR(selectedRecord.data_inclusao) : '-'}
+                  </p>
+                </div>
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-500">Hora Inclusão</p>
                   <p className="font-medium text-slate-700 dark:text-slate-300">
