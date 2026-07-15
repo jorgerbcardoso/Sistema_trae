@@ -34,6 +34,10 @@ $input = getRequestInput();
 $period = processPeriod($input['period'] ?? []);
 $viewMode = $input['viewMode'] ?? 'GERAL';
 $unit = $input['unit'] ?? null; // ✅ NOVO: Filtro por unidade
+$destino = $input['destino'] ?? null;
+$unidadeEmit = $input['unidade_emit'] ?? null;
+$excludeUnits = $input['exclude_units'] ?? [];
+$destinosTop = $input['destinos_top'] ?? [];
 
 // ================================================================
 // BUSCAR DADOS DO BANCO
@@ -57,10 +61,50 @@ $query = "SELECT ser_cte, nro_cte, to_char (data_emissao, 'DD/MM/YY') AS emissao
 // ✅ NOVO: Adicionar filtro por unidade (CIF emitidos + FOB recebidos)
 $params = [$period['startDate'], $period['endDate']];
 
-if ($unit && $unit !== 'Demais') {
+if ($destino && $unidadeEmit) {
+    $unidadeEmit = strtoupper(trim((string)$unidadeEmit));
+    $destino = strtoupper(trim((string)$destino));
+    if ($unidadeEmit !== '') {
+        $query .= " AND ($dominio" . "_cte.sigla_emit = $3)";
+        $params[] = $unidadeEmit;
+    }
+    if ($destino !== '' && $destino !== 'DEMAIS') {
+        $query .= " AND ($dominio" . "_cte.sigla_dest = $" . (count($params) + 1) . ")";
+        $params[] = $destino;
+    } else if (is_array($destinosTop) && count($destinosTop) > 0) {
+        $destinosTop = array_values(array_unique(array_filter(array_map(function ($v) { return strtoupper(trim((string)$v)); }, $destinosTop))));
+        if (count($destinosTop) > 0) {
+            $placeholders = [];
+            foreach ($destinosTop as $sigla) {
+                $placeholders[] = '$' . (count($params) + 1);
+                $params[] = $sigla;
+            }
+            $query .= " AND ($dominio" . "_cte.sigla_dest NOT IN (" . implode(',', $placeholders) . "))";
+        }
+    }
+} else if ($unit && $unit !== 'Demais') {
     // Receita da unidade = CIF emitidos (sigla_emit) + FOB recebidos (sigla_dest)
     $query .= " AND (($dominio" . "_cte.tp_frete = 'C' AND $dominio" . "_cte.sigla_emit = $3) OR ($dominio" . "_cte.tp_frete = 'F' AND $dominio" . "_cte.sigla_dest = $3))";
     $params[] = $unit;
+} else if ($unit === 'Demais' && is_array($excludeUnits) && count($excludeUnits) > 0) {
+    $excludeUnits = array_values(array_unique(array_filter(array_map(function ($v) { return strtoupper(trim((string)$v)); }, $excludeUnits))));
+    if (count($excludeUnits) > 0) {
+        $phEmit = [];
+        $phDest = [];
+        foreach ($excludeUnits as $sigla) {
+            $phEmit[] = '$' . (count($params) + 1);
+            $params[] = $sigla;
+        }
+        foreach ($excludeUnits as $sigla) {
+            $phDest[] = '$' . (count($params) + 1);
+            $params[] = $sigla;
+        }
+        $query .= " AND ((" .
+            "$dominio" . "_cte.tp_frete = 'C' AND $dominio" . "_cte.sigla_emit NOT IN (" . implode(',', $phEmit) . ")" .
+            ") OR (" .
+            "$dominio" . "_cte.tp_frete = 'F' AND $dominio" . "_cte.sigla_dest NOT IN (" . implode(',', $phDest) . ")" .
+            "))";
+    }
 }
 
 $g_sql = connect();

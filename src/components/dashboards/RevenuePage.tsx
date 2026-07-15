@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTooltipStyle } from './CustomTooltip';
 import { useState } from 'react';
 import { LancamentosReceitasPage } from './LancamentosReceitasPage';
+import { ENVIRONMENT } from '../../config/environment';
 import {
   AreaChart,
   Area,
@@ -55,32 +56,97 @@ export function RevenuePage({ viewMode = 'GERAL', domainModalidade = 'CARGAS', p
   }
 
   const handleExportUnit = async (unitName: string) => {
-    const loadingToastId = toast.loading('Gerando planilha de receitas...');
-    
+    if (isMockData) {
+      toast.warning('Exportação Indisponível', {
+        description: 'A exportação de dados só funciona com dados reais do servidor. Os dados mockados não podem ser exportados.'
+      });
+      return;
+    }
+
+    const loadingToastId = toast.info('Gerando planilha...', {
+      description: 'Aguarde enquanto preparamos os dados.',
+      duration: Infinity
+    });
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const csvData = data?.monthly.map(month => ({
-        mes: month.month,
-        receita: month[unitName] || 0
-      })) || [];
-      
-      const csvContent = [
-        'Mês,Receita',
-        ...csvData.map(row => `${row.mes},${row.receita}`)
-      ].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `receitas_${unitName.toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
-      
+      const token = localStorage.getItem('auth_token');
+      const periodBody = periodRangeToDashboardPeriod(period);
+
+      const body: any = {
+        period: periodBody,
+        viewMode,
+      };
+
+      if (porDestino && unidades.length === 1) {
+        body.unidade_emit = String(unidades[0] ?? '').toUpperCase();
+        body.destino = unitName;
+        body.destinos_top = unitName === 'Demais'
+          ? unitNames.filter((u) => u !== 'Demais')
+          : [];
+      } else {
+        body.unit = unitName;
+        body.exclude_units = unitName === 'Demais'
+          ? unitNames.filter((u) => u !== 'Demais')
+          : [];
+      }
+
+      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/dre/export_receitas.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const json = await response.json();
+        toast.dismiss(loadingToastId);
+        if (json.toast) {
+          const type = json.toast.type || 'error';
+          const msg = json.toast.message || json.message || 'Erro ao gerar planilha';
+          if (type === 'success') toast.success(msg);
+          else if (type === 'warning') toast.warning(msg);
+          else if (type === 'info') toast.info(msg);
+          else toast.error(msg);
+          return;
+        }
+        toast.error('Erro ao exportar', {
+          description: json.error || json.message || 'Não foi possível gerar a planilha. Tente novamente.'
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        toast.dismiss(loadingToastId);
+        throw new Error('Erro ao gerar planilha');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const dateStr = new Date().toISOString().split('T')[0];
+      let filename = `receitas_${dateStr}.csv`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       toast.dismiss(loadingToastId);
-      toast.success('Planilha gerada com sucesso!');
+      toast.success('Planilha exportada com sucesso!');
     } catch (error) {
       toast.dismiss(loadingToastId);
-      toast.error('Erro ao gerar planilha', {
+      toast.error('Erro ao exportar', {
         description: 'Não foi possível gerar a planilha. Tente novamente.'
       });
     }
