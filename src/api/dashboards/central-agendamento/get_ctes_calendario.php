@@ -42,18 +42,19 @@ $params     = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
-    "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')",
+    "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')",
     "cte.ult_ocor_agend = {$ocorAgendamento}",
-    "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) = $" . $paramIndex++,
+    "cte.data_prev_ent::date = $" . $paramIndex++,
 ];
 $params[] = $data;
 
 if ($tipo === 'no_prazo') {
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+    $whereConditions[] = "(cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR ocor.tipo = 'C')";
 }
 if ($tipo === 'atrasados') {
-    $whereConditions[] = "((cte.data_entrega IS NULL) OR (cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)))";
+    $whereConditions[] = "(cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -80,8 +81,8 @@ $query = "
         cte.ser_cte,
         cte.nro_cte,
         TO_CHAR(cte.data_emissao,  'DD/MM/YYYY') AS data_emissao,
-        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'DD/MM/YYYY') AS data_prev_ent,
-        TO_CHAR((CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END), 'YYYY-MM-DD') AS data_prev_ent_iso,
+        TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
+        TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
         cte.nome_pag,
         cte.nome_dest,
         cte.cnpj_dest,
@@ -94,7 +95,11 @@ $query = "
         END AS ult_ocor
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_cliente    c    ON cte.cnpj_dest = c.cnpj
-    LEFT JOIN {$domain}_ocorrencia ocor ON cte.ult_ocor  = ocor.codigo
+    LEFT JOIN (
+        SELECT codigo::text as codigo, MAX(tipo) as tipo, MAX(descricao) as descricao
+        FROM {$domain}_ocorrencia
+        GROUP BY codigo::text
+    ) ocor ON ocor.codigo = cte.ult_ocor::text
     {$whereClause}
     ORDER BY cte.cnpj_dest, cte.nome_dest, cte.data_emissao DESC
 ";

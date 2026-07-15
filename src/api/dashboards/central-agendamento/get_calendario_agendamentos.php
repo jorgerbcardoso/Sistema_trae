@@ -37,7 +37,7 @@ $params     = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
-    "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')",
+    "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')",
     "cte.ult_ocor_agend = {$ocorAgendamento}",
 ];
 
@@ -70,24 +70,27 @@ $query = "
     ),
     agendados AS (
         SELECT
-            (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) AS dia,
+            cte.data_prev_ent::date AS dia,
             COUNT(*) AS total
         FROM {$domain}_cte cte
-        LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
         WHERE {$whereClause}
-          AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) IS NOT NULL
+          AND cte.data_prev_ent IS NOT NULL
         GROUP BY dia
     ),
     entregues AS (
         SELECT
-            (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) AS dia,
+            cte.data_prev_ent::date AS dia,
             COUNT(*) AS total
         FROM {$domain}_cte cte
-        LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
+        LEFT JOIN (
+            SELECT codigo::text as codigo, MAX(tipo) as tipo
+            FROM {$domain}_ocorrencia
+            GROUP BY codigo::text
+        ) oc ON oc.codigo = cte.ult_ocor::text
         WHERE {$whereClause}
-          AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent::date END) END) IS NOT NULL
+          AND cte.data_prev_ent IS NOT NULL
           AND data_entrega IS NOT NULL
-          AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+          AND (data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR oc.tipo = 'C')
         GROUP BY dia
     )
     SELECT
@@ -100,9 +103,8 @@ $query = "
     ORDER BY dias.dia ASC
 ";
 
-$allParams = array_merge($params, $params);
-$result = count($allParams) > 0
-    ? pg_query_params($g_sql, $query, $allParams)
+$result = count($params) > 0
+    ? pg_query_params($g_sql, $query, $params)
     : pg_query($g_sql, $query);
 
 if (!$result) {

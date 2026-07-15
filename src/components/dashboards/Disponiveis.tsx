@@ -214,12 +214,6 @@ interface Carregamento {
   ctes: CteCarregamento[];
 }
 
-type CarregamentoInexistente = {
-  origem_ssw: string;
-  placa_provisoria: string;
-  total_ctes: number;
-};
-
 /** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
 const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
@@ -2899,12 +2893,6 @@ export function Disponiveis() {
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const importandoCarregamentosRef = useRef(false);
 
-  const [carregInexistDialogOpen, setCarregInexistDialogOpen] = useState(false);
-  const [carregInexistLista, setCarregInexistLista] = useState<CarregamentoInexistente[]>([]);
-  const [carregInexistSelecionados, setCarregInexistSelecionados] = useState<Set<string>>(new Set());
-  const [carregInexistExcluindo, setCarregInexistExcluindo] = useState(false);
-  const carregInexistLastKeyRef = useRef<string>('');
-
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
   const [loadingHub, setLoadingHub] = useState(false);
@@ -3085,16 +3073,6 @@ export function Disponiveis() {
       if (res?.success) {
         await carregarCarregamentos();
       }
-      const inexist: CarregamentoInexistente[] = Array.isArray(res?.carregamentos_inexistentes) ? res.carregamentos_inexistentes : [];
-      if (inexist.length > 0) {
-        const key = inexist.map((i) => String(i.origem_ssw ?? '').toUpperCase()).sort().join('|');
-        if (key && key !== carregInexistLastKeyRef.current && !carregInexistDialogOpen) {
-          setCarregInexistLista(inexist);
-          setCarregInexistSelecionados(new Set(inexist.map((i) => String(i.origem_ssw ?? '').toUpperCase())));
-          setCarregInexistDialogOpen(true);
-          carregInexistLastKeyRef.current = key;
-        }
-      }
       return res;
     } catch (e: any) {
       return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
@@ -3102,33 +3080,7 @@ export function Disponiveis() {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos, carregInexistDialogOpen]);
-
-  const excluirCarregamentosInexistentes = useCallback(async () => {
-    const origens_ssw = Array.from(carregInexistSelecionados.values()).filter(Boolean);
-    if (!origens_ssw.length) return;
-    setCarregInexistExcluindo(true);
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'EXCLUIR_INEXISTENTES', origens_ssw }) },
-        true
-      );
-      if (!res?.success) {
-        toast.error(res?.message || 'Erro ao excluir carregamentos inexistentes do Presto');
-        return;
-      }
-      toast.success(`${res.removidos ?? 0} carregamento(s) removido(s).`);
-      setCarregInexistDialogOpen(false);
-      setCarregInexistLista([]);
-      setCarregInexistSelecionados(new Set());
-      await carregarCarregamentos();
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao excluir carregamentos inexistentes do Presto');
-    } finally {
-      setCarregInexistExcluindo(false);
-    }
-  }, [carregarCarregamentos, carregInexistSelecionados]);
+  }, [carregarCarregamentos]);
 
   const importarCarregamentosSSWObrigatorio = useCallback(async () => {
     const res = await handleImportarCarregamentos();
@@ -4486,93 +4438,6 @@ export function Disponiveis() {
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
-
-          <Dialog open={carregInexistDialogOpen} onOpenChange={(open) => { if (!open) setCarregInexistDialogOpen(false); }}>
-            <DialogContent className="sm:max-w-[780px]">
-              <DialogHeader>
-                <DialogTitle>Carregamentos do SSW não encontrados</DialogTitle>
-                <DialogDescription>
-                  A importação do SSW encontrou carregamentos que não existem mais no SSW, mas ainda estão no Presto. Deseja excluir do Presto também?
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm text-slate-700 dark:text-slate-300">
-                    <strong>{carregInexistLista.length}</strong> carregamento(s) listado(s)
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-8"
-                      onClick={() => setCarregInexistSelecionados(new Set(carregInexistLista.map((i) => String(i.origem_ssw ?? '').toUpperCase())))}
-                    >
-                      Selecionar todos
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-8"
-                      onClick={() => setCarregInexistSelecionados(new Set())}
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <div className="grid grid-cols-[32px_140px_minmax(0,1fr)_90px] gap-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    <span />
-                    <span>Origem SSW</span>
-                    <span>Placa (Presto)</span>
-                    <span className="text-right">CT-es</span>
-                  </div>
-                  <div className="max-h-[45vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                    {carregInexistLista.map((i, idx) => {
-                      const origem = String(i.origem_ssw ?? '').toUpperCase();
-                      const checked = carregInexistSelecionados.has(origem);
-                      return (
-                        <button
-                          key={`${origem}-${idx}`}
-                          className="w-full grid grid-cols-[32px_140px_minmax(0,1fr)_90px] gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
-                          onClick={() => {
-                            setCarregInexistSelecionados(prev => {
-                              const next = new Set(prev);
-                              if (checked) next.delete(origem);
-                              else next.add(origem);
-                              return next;
-                            });
-                          }}
-                        >
-                          <span className="flex items-center justify-center">
-                            {checked ? <CheckSquare className="w-4 h-4 text-amber-500" /> : <Square className="w-4 h-4 text-slate-300 dark:text-slate-600" />}
-                          </span>
-                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{origem || '-'}</span>
-                          <span className="text-slate-600 dark:text-slate-400 truncate">{i.placa_provisoria || '-'}</span>
-                          <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">{Number(i.total_ctes ?? 0).toLocaleString('pt-BR')}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" onClick={() => setCarregInexistDialogOpen(false)} disabled={carregInexistExcluindo}>
-                    Manter no Presto
-                  </Button>
-                  <Button
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    onClick={excluirCarregamentosInexistentes}
-                    disabled={carregInexistExcluindo || carregInexistSelecionados.size === 0}
-                  >
-                    {carregInexistExcluindo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                    Excluir selecionados
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           {hubModalAberto && hubModalCarregamento && (
             <ModalHub
