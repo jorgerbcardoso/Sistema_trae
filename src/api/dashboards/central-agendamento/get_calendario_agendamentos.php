@@ -64,7 +64,7 @@ if (!empty($filters['cnpjDestinatario'])) {
 
 $whereClause = implode(' AND ', $whereConditions);
 
-$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit,'') || '|' || COALESCE(cte.cep_entrega,'') || '|' || COALESCE(cte.endereco_entrega,''))";
+$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit::text,'') || '|' || COALESCE(cte.cep_entrega::text,'') || '|' || COALESCE(cte.endereco_entrega::text,''))";
 $countExpr = ($modo === 'AGENDA') ? "COUNT(DISTINCT {$agendaKeyExpr})" : "COUNT(*)";
 
 $query = "

@@ -80,7 +80,7 @@ try {
 } catch (Exception $e) {
 }
 
-$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit,'') || '|' || COALESCE(cte.cep_entrega,'') || '|' || COALESCE(cte.endereco_entrega,''))";
+$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit::text,'') || '|' || COALESCE(cte.cep_entrega::text,'') || '|' || COALESCE(cte.endereco_entrega::text,''))";
 $countExpr = function (string $conditionSql) use ($modo, $agendaKeyExpr) {
     if ($modo === 'AGENDA') {
         return "COUNT(DISTINCT (CASE WHEN {$conditionSql} THEN {$agendaKeyExpr} END))";

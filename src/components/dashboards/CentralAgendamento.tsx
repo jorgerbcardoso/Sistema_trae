@@ -683,31 +683,6 @@ export function CentralAgendamento() {
         <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{getPeriodDisplay()}</p>
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800 print:hidden">
-        <button
-          type="button"
-          onClick={() => setModoVisao('CTE')}
-          className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-            modoVisao === 'CTE'
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
-              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
-          }`}
-        >
-          Por CT-e
-        </button>
-        <button
-          type="button"
-          onClick={() => setModoVisao('AGENDA')}
-          className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-            modoVisao === 'AGENDA'
-              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
-              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
-          }`}
-        >
-          Por Agenda
-        </button>
-      </div>
-
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
         <TooltipProvider>
           <Tooltip>
@@ -936,6 +911,33 @@ export function CentralAgendamento() {
         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
           <Calendar className="h-4 w-4 shrink-0" />
           Clique nos cards para visualizar {modoVisao === 'AGENDA' ? 'as agendas' : 'os CT-es'} do grupo.
+        </div>
+
+        <div className="flex items-center justify-end">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0 print:hidden">
+            <button
+              type="button"
+              onClick={() => setModoVisao('AGENDA')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                modoVisao === 'AGENDA'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Por Agenda
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoVisao('CTE')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                modoVisao === 'CTE'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Por CT-e
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6">

@@ -133,10 +133,10 @@ if ($modo === 'AGENDA') {
                 cte.cnpj_dest,
                 COALESCE(c.email, '') AS email_dest,
                 COALESCE(cte.nfs, '') AS nfs,
-                COALESCE(cte.cnpj_emit, '') AS cnpj_emit,
-                COALESCE(cte.cep_entrega, '') AS cep_entrega,
-                COALESCE(cte.endereco_entrega, '') AS endereco_entrega,
-                COALESCE(cte.bairro_entrega, '') AS bairro_entrega,
+                COALESCE(cte.cnpj_emit::text, '') AS cnpj_emit,
+                COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
+                COALESCE(cte.endereco_entrega::text, '') AS endereco_entrega,
+                COALESCE(cte.bairro_entrega::text, '') AS bairro_entrega,
                 COALESCE(cte.vlr_frete, 0) AS vlr_frete,
                 COALESCE(cte.vlr_merc, 0) AS vlr_merc,
                 COALESCE(cte.peso_real, 0) AS peso_real,
@@ -153,7 +153,7 @@ if ($modo === 'AGENDA') {
             {$whereClause}
         )
         SELECT
-            md5(COALESCE(cnpj_emit,'') || '|' || COALESCE(cep_entrega,'') || '|' || COALESCE(endereco_entrega,'')) AS agenda_id,
+            md5(COALESCE(cnpj_emit::text,'') || '|' || COALESCE(cep_entrega::text,'') || '|' || COALESCE(endereco_entrega::text,'')) AS agenda_id,
             MAX(cnpj_emit) AS cnpj_emit,
             MAX(cep_entrega) AS cep_entrega,
             MAX(endereco_entrega) AS endereco_entrega,
