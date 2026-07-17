@@ -108,6 +108,13 @@ if ($modo === 'AGENDA') {
                 COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
                 COALESCE(cte.endereco_entrega::text, '') AS endereco_entrega,
                 COALESCE(cte.bairro_entrega::text, '') AS bairro_entrega,
+                CASE
+                    WHEN cid_entr.seq_cidade IS NULL THEN ''
+                    WHEN COALESCE(cid_entr.nome, '') = '' AND COALESCE(cid_entr.uf, '') = '' THEN ''
+                    WHEN COALESCE(cid_entr.nome, '') = '' THEN COALESCE(cid_entr.uf, '')
+                    WHEN COALESCE(cid_entr.uf, '') = '' THEN COALESCE(cid_entr.nome, '')
+                    ELSE COALESCE(cid_entr.nome, '') || '/' || COALESCE(cid_entr.uf, '')
+                END AS cidade_uf_entrega,
                 COALESCE(cte.vlr_frete, 0) AS vlr_frete,
                 COALESCE(cte.vlr_merc, 0) AS vlr_merc,
                 COALESCE(cte.peso_real, 0) AS peso_real,
@@ -120,6 +127,7 @@ if ($modo === 'AGENDA') {
                 END AS ult_ocor
             FROM {$domain}_cte cte
             LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj
+            LEFT JOIN cidade cid_entr ON cte.seq_cidade_entr = cid_entr.seq_cidade
             {$ocorrenciaJoin}
             {$whereClause}
         )
@@ -158,6 +166,9 @@ if ($modo === 'AGENDA') {
                     'cnpj_dest', cnpj_dest,
                     'email_dest', email_dest,
                     'nfs', nfs,
+                    'cidade_uf_entrega', cidade_uf_entrega,
+                    'endereco_entrega', endereco_entrega,
+                    'bairro_entrega', bairro_entrega,
                     'ult_ocor', ult_ocor,
                     'vlr_frete', vlr_frete,
                     'vlr_merc', vlr_merc,
