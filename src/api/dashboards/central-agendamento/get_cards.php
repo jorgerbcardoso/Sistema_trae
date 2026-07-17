@@ -9,6 +9,10 @@ $domain = $auth['domain'];
 
 $input = getRequestInput();
 $filters = $input['filters'] ?? [];
+$modo = strtoupper(trim((string)($input['modo'] ?? 'CTE')));
+if (!in_array($modo, ['CTE', 'AGENDA'])) {
+    $modo = 'CTE';
+}
 
 $conn = connect();
 
@@ -18,7 +22,7 @@ $whereConditions = [];
 
 $whereConditions[] = "cte.status <> 'C'";
 
-$whereConditions[] = "(cte.tp_documento IS NULL OR cte.tp_documento NOT ILIKE '%COMPLEMENTAR%')";
+$whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 
 if (!empty($filters['periodoEmissaoInicio'])) {
     $whereConditions[] = "cte.data_emissao >= $" . $paramIndex++;
@@ -29,11 +33,11 @@ if (!empty($filters['periodoEmissaoFim'])) {
     $params[] = $filters['periodoEmissaoFim'];
 }
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex++;
+    $whereConditions[] = "cte.data_prev_ent >= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoInicio'];
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex++;
+    $whereConditions[] = "cte.data_prev_ent <= $" . $paramIndex++;
     $params[] = $filters['periodoPrevisaoFim'];
 }
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -76,44 +80,25 @@ try {
 } catch (Exception $e) {
 }
 
+$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit,'') || '|' || COALESCE(cte.cep_entrega,'') || '|' || COALESCE(cte.endereco_entrega,''))";
+$countExpr = function (string $conditionSql) use ($modo, $agendaKeyExpr) {
+    if ($modo === 'AGENDA') {
+        return "COUNT(DISTINCT (CASE WHEN {$conditionSql} THEN {$agendaKeyExpr} END))";
+    }
+    return "COUNT(CASE WHEN {$conditionSql} THEN 1 END)";
+};
+
 $query = "
     SELECT
-        COUNT(CASE
-            WHEN c.agenda = true
-             AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0)
-             AND cte.data_entrega IS NULL
-            THEN 1 END
-        ) AS agendaveis,
+        " . $countExpr("c.agenda = true AND (cte.ult_ocor_agend IS NULL OR cte.ult_ocor_agend = 0) AND cte.data_entrega IS NULL") . " AS agendaveis,
 
-        COUNT(CASE
-            WHEN cte.ult_ocor_agend = $ocorAguardando
-             AND cte.data_entrega IS NULL
-            THEN 1 END
-        ) AS aguardando_agendamento,
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAguardando} AND cte.data_entrega IS NULL") . " AS aguardando_agendamento,
 
-        COUNT(CASE
-            WHEN cte.ult_ocor_agend = {$ocorAgendamento}
-             AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= '$data_hoje'
-             AND cte.data_entrega IS NULL
-            THEN 1 END
-        ) AS agendados_no_prazo,
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_prev_ent >= '{$data_hoje}' AND cte.data_entrega IS NULL") . " AS agendados_no_prazo,
 
-        COUNT(CASE
-            WHEN cte.ult_ocor_agend = {$ocorAgendamento}
-             AND cte.data_entrega IS NOT NULL
-             AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
-            THEN 1 END
-        ) AS agendamentos_cumpridos,
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_entrega IS NOT NULL AND (cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR oc.tipo = 'C')") . " AS agendamentos_cumpridos,
 
-        COUNT(CASE
-            WHEN (
-                 (cte.data_entrega IS NULL     AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < '$data_hoje')
-              OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END))
-             )
-            AND cte.ult_ocor_agend = {$ocorAgendamento}
-            AND COALESCE(cte.entrega_abonada, false) = false
-            THEN 1 END
-        ) AS agendamentos_perdidos
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND ((cte.data_entrega IS NULL AND cte.data_prev_ent < '{$data_hoje}') OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)) AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C'))") . " AS agendamentos_perdidos
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
     LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj

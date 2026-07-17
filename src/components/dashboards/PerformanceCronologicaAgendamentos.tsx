@@ -28,6 +28,7 @@ interface PerformanceCronologicaAgendamentosProps {
   setPeriodo: (periodo: 7 | 15 | 30) => void;
   diasData: DiaPerformanceAgendamento[];
   loading: boolean;
+  modoVisao?: 'CTE' | 'AGENDA';
 }
 
 export function PerformanceCronologicaAgendamentos({
@@ -35,6 +36,7 @@ export function PerformanceCronologicaAgendamentos({
   setPeriodo,
   diasData,
   loading,
+  modoVisao = 'CTE',
 }: PerformanceCronologicaAgendamentosProps) {
   const { theme } = useTheme();
 
@@ -58,7 +60,7 @@ export function PerformanceCronologicaAgendamentos({
               Performance Cronológica de Agendamentos
             </CardTitle>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Percentual de CT-es agendados entregues no prazo, dia a dia
+              Percentual de {modoVisao === 'AGENDA' ? 'agendas' : 'CT-es'} agendados entregues no prazo, dia a dia
             </p>
           </div>
           <div className="flex gap-2">

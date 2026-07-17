@@ -19,6 +19,7 @@ interface CalendarioAgendamentosProps {
   diasData: DiaAgendamento[];
   loading: boolean;
   onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados') => void;
+  modoVisao?: 'CTE' | 'AGENDA';
 }
 
 export function CalendarioAgendamentos({
@@ -27,6 +28,7 @@ export function CalendarioAgendamentos({
   diasData,
   loading,
   onClickDia,
+  modoVisao = 'CTE',
 }: CalendarioAgendamentosProps) {
   const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -40,7 +42,7 @@ export function CalendarioAgendamentos({
               Calendário de Agendamentos
             </CardTitle>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              CT-es com ocorrência 15 — agendados por data de previsão de entrega
+              {modoVisao === 'AGENDA' ? 'Agendas' : 'CT-es'} com ocorrência 15 — agendados por data de previsão de entrega
             </p>
           </div>
           <div className="flex gap-2">

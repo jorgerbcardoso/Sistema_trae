@@ -3,6 +3,7 @@ import {
   Building2, 
   Calendar, 
   CalendarCheck,
+  ChevronDown,
   Check, 
   CheckCircle, 
   Clock, 
@@ -64,6 +65,39 @@ interface Cte {
   email_dest: string;
   nfs: string;
   ult_ocor: string;
+  vlr_frete?: number;
+  vlr_merc?: number;
+  peso_real?: number;
+  cubagem?: number;
+  qtde_vol?: number;
+}
+
+type ModoVisao = 'CTE' | 'AGENDA';
+
+interface Agenda {
+  agenda_id: string;
+  cnpj_emit: string;
+  cep_entrega: string;
+  endereco_entrega: string;
+  bairro_entrega: string;
+  ser_cte: string;
+  nro_cte: string;
+  nfs: string;
+  data_emissao: string;
+  data_prev_ent: string;
+  data_prev_ent_iso: string;
+  nome_pag: string;
+  nome_dest: string;
+  cnpj_dest: string;
+  email_dest: string;
+  ult_ocor: string;
+  qtde_entregas: number;
+  total_vlr_frete: number;
+  total_vlr_merc: number;
+  total_peso_real: number;
+  total_cubagem: number;
+  total_qtde_vol: number;
+  ctes: Cte[];
 }
 
 interface Filters {
@@ -138,6 +172,7 @@ export function CentralAgendamento() {
   const defaultPeriod = getLast30DaysPeriod();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [modoVisao, setModoVisao] = useState<ModoVisao>('AGENDA');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
   const [clientes, setClientes] = useState<ClienteAgendavel[]>([]);
@@ -166,9 +201,11 @@ export function CentralAgendamento() {
   const [cardDialogId, setCardDialogId] = useState<number | null>(null);
   const [cardDialogNome, setCardDialogNome] = useState('');
   const [ctes, setCtes] = useState<Cte[]>([]);
+  const [agendas, setAgendas] = useState<Agenda[]>([]);
   const [isLoadingCtes, setIsLoadingCtes] = useState(false);
   const [selectedCtes, setSelectedCtes] = useState<Set<string>>(new Set());
   const [selectedCnpjDest, setSelectedCnpjDest] = useState<string | null>(null);
+  const [expandedAgendas, setExpandedAgendas] = useState<Set<string>>(new Set());
 
   const [confirmAllDialogOpen, setConfirmAllDialogOpen] = useState(false);
   const [pendingCte, setPendingCte] = useState<Cte | null>(null);
@@ -184,7 +221,9 @@ export function CentralAgendamento() {
   const [calendarioDialogTipo, setCalendarioDialogTipo] = useState<'agendados' | 'no_prazo' | 'atrasados'>('agendados');
   const [calendarioDialogNome, setCalendarioDialogNome] = useState('');
   const [ctesCalendario, setCtesCalendario] = useState<Cte[]>([]);
+  const [agendasCalendario, setAgendasCalendario] = useState<Agenda[]>([]);
   const [isLoadingCtesCalendario, setIsLoadingCtesCalendario] = useState(false);
+  const [expandedAgendasCalendario, setExpandedAgendasCalendario] = useState<Set<string>>(new Set());
 
   const [performancePeriodo, setPerformancePeriodo] = useState<7 | 15 | 30>(7);
   const [performanceDias, setPerformanceDias] = useState<DiaPerformanceAgendamento[]>([]);
@@ -222,15 +261,15 @@ export function CentralAgendamento() {
 
   useEffect(() => {
     carregarRelógios();
-  }, [filters]);
+  }, [filters, modoVisao]);
 
   useEffect(() => {
     carregarCalendario();
-  }, [filters, calendarioPeriodo]);
+  }, [filters, calendarioPeriodo, modoVisao]);
 
   useEffect(() => {
     carregarPerformance();
-  }, [filters, performancePeriodo]);
+  }, [filters, performancePeriodo, modoVisao]);
 
   const totalAgendaveis = useMemo(
     () => clientes.filter((cliente) => cliente.agenda).length,
@@ -383,7 +422,7 @@ export function CentralAgendamento() {
         `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_cards.php`,
         {
           method: 'POST',
-          body: JSON.stringify({ filters }),
+          body: JSON.stringify({ filters, modo: modoVisao }),
         },
         true
       );
@@ -408,7 +447,7 @@ export function CentralAgendamento() {
         `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_calendario_agendamentos.php`,
         {
           method: 'POST',
-          body: JSON.stringify({ periodo: calendarioPeriodo, filters }),
+          body: JSON.stringify({ periodo: calendarioPeriodo, filters, modo: modoVisao }),
         },
         true
       );
@@ -431,7 +470,7 @@ export function CentralAgendamento() {
         `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_performance_agendamentos.php`,
         {
           method: 'POST',
-          body: JSON.stringify({ periodo: performancePeriodo, filters }),
+          body: JSON.stringify({ periodo: performancePeriodo, filters, modo: modoVisao }),
         },
         true
       );
@@ -455,17 +494,23 @@ export function CentralAgendamento() {
     setCalendarioDialogTipo(tipo);
     setCalendarioDialogNome(`${nomesTipo[tipo]} — ${dataFormatada}`);
     setCtesCalendario([]);
+    setAgendasCalendario([]);
+    setExpandedAgendasCalendario(new Set());
     setCalendarioDialogOpen(true);
     setIsLoadingCtesCalendario(true);
 
     try {
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_ctes_calendario.php`,
-        { method: 'POST', body: JSON.stringify({ data, tipo, filters }) },
+        { method: 'POST', body: JSON.stringify({ data, tipo, filters, modo: modoVisao }) },
         true
       );
       if (response.success) {
-        setCtesCalendario(response.data?.ctes || []);
+        if (modoVisao === 'AGENDA') {
+          setAgendasCalendario(response.data?.agendas || []);
+        } else {
+          setCtesCalendario(response.data?.ctes || []);
+        }
       } else {
         toast.error(response.message || 'Erro ao carregar CT-es');
       }
@@ -482,21 +527,30 @@ export function CentralAgendamento() {
     setSelectedCtes(new Set());
     setSelectedCnpjDest(null);
     setCtes([]);
+    setAgendas([]);
+    setExpandedAgendas(new Set());
     setCardDialogOpen(true);
     setIsLoadingCtes(true);
 
     try {
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/central-agendamento/get_ctes_card.php`,
-        { method: 'POST', body: JSON.stringify({ cardId: relógio.id, filters }) },
+        { method: 'POST', body: JSON.stringify({ cardId: relógio.id, filters, modo: modoVisao }) },
         true
       );
       if (response.success) {
-        const ctesData: Cte[] = response.data?.ctes || [];
-        setCtes(ctesData);
-
-        if (relógio.id === 1 && ctesData.length > 0) {
-          setAgendEmail(ctesData[0].email_dest || '');
+        if (modoVisao === 'AGENDA') {
+          const agendasData: Agenda[] = response.data?.agendas || [];
+          setAgendas(agendasData);
+          if (relógio.id === 1 && agendasData.length > 0) {
+            setAgendEmail(agendasData[0].email_dest || '');
+          }
+        } else {
+          const ctesData: Cte[] = response.data?.ctes || [];
+          setCtes(ctesData);
+          if (relógio.id === 1 && ctesData.length > 0) {
+            setAgendEmail(ctesData[0].email_dest || '');
+          }
         }
       } else {
         toast.error(response.message || 'Erro ao carregar CT-es');
@@ -604,11 +658,54 @@ export function CentralAgendamento() {
     }
   };
 
+  const toggleExpandedAgenda = (agendaId: string) => {
+    setExpandedAgendas((prev) => {
+      const next = new Set(prev);
+      if (next.has(agendaId)) next.delete(agendaId);
+      else next.add(agendaId);
+      return next;
+    });
+  };
+
+  const toggleExpandedAgendaCalendario = (agendaId: string) => {
+    setExpandedAgendasCalendario((prev) => {
+      const next = new Set(prev);
+      if (next.has(agendaId)) next.delete(agendaId);
+      else next.add(agendaId);
+      return next;
+    });
+  };
+
   const headerActions = (
     <div className="flex items-center gap-2 md:gap-4">
       <div className="text-right print:block">
         <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden md:block">Período</p>
         <p className="text-slate-900 dark:text-slate-100 text-xs md:text-base">{getPeriodDisplay()}</p>
+      </div>
+
+      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800 print:hidden">
+        <button
+          type="button"
+          onClick={() => setModoVisao('CTE')}
+          className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+            modoVisao === 'CTE'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
+          }`}
+        >
+          Por CT-e
+        </button>
+        <button
+          type="button"
+          onClick={() => setModoVisao('AGENDA')}
+          className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+            modoVisao === 'AGENDA'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
+          }`}
+        >
+          Por Agenda
+        </button>
       </div>
 
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
@@ -779,6 +876,49 @@ export function CentralAgendamento() {
     URL.revokeObjectURL(url);
   };
 
+  const exportarCSVAgendas = (lista: Agenda[], nomeArquivo: string) => {
+    const header = [
+      'CTRC',
+      'NF',
+      'Entregas',
+      'Pagador',
+      'Destinatário',
+      'CNPJ',
+      'CEP',
+      'Endereço',
+      'Prev. Entrega',
+      'Peso(kg)',
+      'M³',
+      'Volumes',
+      'Vlr. Merc.',
+      'Frete',
+    ];
+    const rows = lista.map((agenda) => [
+      `${agenda.ser_cte}${String(agenda.nro_cte).padStart(6, '0')}`,
+      agenda.nfs ? agenda.nfs.split(',')[0].trim() : '',
+      String(agenda.qtde_entregas ?? 0),
+      agenda.nome_pag || '',
+      agenda.nome_dest || '',
+      agenda.cnpj_dest || '',
+      agenda.cep_entrega || '',
+      `${agenda.endereco_entrega || ''}${agenda.bairro_entrega ? ` - ${agenda.bairro_entrega}` : ''}`,
+      agenda.data_prev_ent || '',
+      (agenda.total_peso_real ?? 0).toFixed(3).replace('.', ','),
+      (agenda.total_cubagem ?? 0).toFixed(4).replace('.', ','),
+      String(agenda.total_qtde_vol ?? 0),
+      (agenda.total_vlr_merc ?? 0).toFixed(2).replace('.', ','),
+      (agenda.total_vlr_frete ?? 0).toFixed(2).replace('.', ','),
+    ]);
+    const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nomeArquivo;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <DashboardLayout
       title="Central de Agendamento"
@@ -795,7 +935,7 @@ export function CentralAgendamento() {
 
         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
           <Calendar className="h-4 w-4 shrink-0" />
-          Clique nos cards para visualizar os CT-es do grupo.
+          Clique nos cards para visualizar {modoVisao === 'AGENDA' ? 'as agendas' : 'os CT-es'} do grupo.
         </div>
 
         <div className="grid gap-6">
@@ -831,7 +971,8 @@ export function CentralAgendamento() {
                               {relógio.percentual.toFixed(1)}%
                             </div>
                             <p className={`text-sm mt-1 ${cfg.textColor}`}>
-                              {relógio.quantidade} CT-e{relógio.quantidade !== 1 ? 's' : ''}
+                              {relógio.quantidade} {modoVisao === 'AGENDA' ? 'agenda' : 'CT-e'}
+                              {relógio.quantidade !== 1 ? 's' : ''}
                             </p>
                           </>
                         )}
@@ -867,6 +1008,7 @@ export function CentralAgendamento() {
             diasData={calendarioDias}
             loading={isLoadingCalendario}
             onClickDia={abrirCalendarioDialog}
+            modoVisao={modoVisao}
           />
 
           <PerformanceCronologicaAgendamentos
@@ -874,6 +1016,7 @@ export function CentralAgendamento() {
             setPeriodo={setPerformancePeriodo}
             diasData={performanceDias}
             loading={isLoadingPerformance}
+            modoVisao={modoVisao}
           />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -985,13 +1128,24 @@ export function CentralAgendamento() {
                 <div>
                   <DialogTitle>{cardDialogNome}</DialogTitle>
                   <DialogDescription>
-                    {cardDialogId === 1
-                      ? 'Selecione CT-es do mesmo destinatário para solicitar agendamento.'
-                      : 'Lista de CT-es neste grupo.'}
+                    {modoVisao === 'AGENDA'
+                      ? 'Lista de agendas neste grupo.'
+                      : cardDialogId === 1
+                        ? 'Selecione CT-es do mesmo destinatário para solicitar agendamento.'
+                        : 'Lista de CT-es neste grupo.'}
                   </DialogDescription>
                 </div>
-                {ctes.length > 0 && (
-                  <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => exportarCSV(ctes, `${cardDialogNome.replace(/\s+/g, '_')}.csv`)}>
+                {((modoVisao === 'AGENDA' ? agendas.length : ctes.length) > 0) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-2"
+                    onClick={() =>
+                      modoVisao === 'AGENDA'
+                        ? exportarCSVAgendas(agendas, `${cardDialogNome.replace(/\s+/g, '_')}.csv`)
+                        : exportarCSV(ctes, `${cardDialogNome.replace(/\s+/g, '_')}.csv`)
+                    }
+                  >
                     <Download className="h-4 w-4" />
                     Exportar CSV
                   </Button>
@@ -1000,7 +1154,7 @@ export function CentralAgendamento() {
             </DialogHeader>
 
             <div className={`grid h-full min-h-0 gap-3 overflow-hidden ${cardDialogId === 1 ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-rows-[minmax(0,1fr)]'}`}>
-              {cardDialogId === 1 && (
+              {cardDialogId === 1 && modoVisao === 'CTE' && (
                 <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 dark:border-indigo-800 dark:bg-indigo-950">
                   <p className="text-xs text-indigo-700 dark:text-indigo-300">
                     Selecione CT-es de <strong>um único destinatário</strong> por vez para solicitar agendamento.
@@ -1019,61 +1173,142 @@ export function CentralAgendamento() {
                   </Button>
                 </div>
               )}
+              {cardDialogId === 1 && modoVisao === 'AGENDA' && (
+                <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 dark:border-indigo-800 dark:bg-indigo-950">
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                    Para solicitar agendamento, utilize a visão <strong>Por CT-e</strong>.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="shrink-0 gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={() => setModoVisao('CTE')}
+                  >
+                    Por CT-e
+                  </Button>
+                </div>
+              )}
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
-                  {cardDialogId === 1 && <span></span>}
-                  <span>CTRC</span>
-                  <span>NF</span>
-                  <span>Pagador</span>
-                  <span>Destinatário</span>
-                  <span>CNPJ</span>
-                  <span>Emissão</span>
-                  <span>Prev. Entrega</span>
-                  <span>Últ. Ocorrência</span>
-                </div>
+                {modoVisao === 'AGENDA' ? (
+                  <div className="grid grid-cols-[32px_90px_90px_80px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <span></span>
+                    <span>CTRC</span>
+                    <span>NF</span>
+                    <span className="text-right">Entregas</span>
+                    <span>Destinatário</span>
+                    <span>Endereço</span>
+                    <span>Prev. Entrega</span>
+                  </div>
+                ) : (
+                  <div className={`grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'}`}>
+                    {cardDialogId === 1 && <span></span>}
+                    <span>CTRC</span>
+                    <span>NF</span>
+                    <span>Pagador</span>
+                    <span>Destinatário</span>
+                    <span>CNPJ</span>
+                    <span>Emissão</span>
+                    <span>Prev. Entrega</span>
+                    <span>Últ. Ocorrência</span>
+                  </div>
+                )}
 
                 <div className="min-h-0 overflow-y-auto">
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {isLoadingCtes ? (
                       <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando CT-es...
+                        Carregando...
                       </div>
-                    ) : ctes.length === 0 ? (
+                    ) : (modoVisao === 'AGENDA' ? agendas.length === 0 : ctes.length === 0) ? (
                       <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
                         <CheckCircle className="h-6 w-6" />
-                        Nenhum CT-e encontrado neste grupo.
+                        {modoVisao === 'AGENDA' ? 'Nenhuma agenda encontrada neste grupo.' : 'Nenhum CT-e encontrado neste grupo.'}
                       </div>
                     ) : (
-                      ctes.map((cte) => {
-                        const isSelected = selectedCtes.has(cte.nro_cte);
-                        const isDisabled = cardDialogId === 1 && !!selectedCnpjDest && selectedCnpjDest !== cte.cnpj_dest;
-                        return (
-                          <div
-                            key={`${cte.ser_cte}-${cte.nro_cte}`}
-                            className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
-                          >
-                            {cardDialogId === 1 && (
-                              <div className="flex items-center">
-                                <Checkbox
-                                  checked={isSelected}
-                                  disabled={isDisabled}
-                                  onCheckedChange={(checked) => handleToggleCte(cte, !!checked)}
-                                />
+                      modoVisao === 'AGENDA'
+                        ? agendas.map((agenda) => {
+                            const isExpanded = expandedAgendas.has(agenda.agenda_id);
+                            return (
+                              <div key={agenda.agenda_id}>
+                                <div className="grid grid-cols-[32px_90px_90px_80px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                                  <button
+                                    type="button"
+                                    className="flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                                    onClick={() => toggleExpandedAgenda(agenda.agenda_id)}
+                                  >
+                                    <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                    {agenda.ser_cte}{String(agenda.nro_cte).padStart(6, '0')}
+                                  </span>
+                                  <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
+                                    {agenda.nfs ? agenda.nfs.split(',')[0].trim() : '-'}
+                                  </span>
+                                  <span className="self-center text-right tabular-nums text-slate-700 dark:text-slate-300">
+                                    {agenda.qtde_entregas}
+                                  </span>
+                                  <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">
+                                    {agenda.nome_dest || '-'}
+                                  </span>
+                                  <span className="truncate self-center text-slate-700 dark:text-slate-300">
+                                    {agenda.endereco_entrega || '-'}
+                                  </span>
+                                  <span className="self-center text-slate-500 dark:text-slate-400">
+                                    {agenda.data_prev_ent || '-'}
+                                  </span>
+                                </div>
+                                {isExpanded && (
+                                  <div className="bg-slate-50/60 dark:bg-slate-900/40">
+                                    {agenda.ctes.map((cte) => (
+                                      <div
+                                        key={`${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
+                                        className="grid grid-cols-[90px_110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                      >
+                                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                          {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                                        </span>
+                                        <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
+                                          {cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}
+                                        </span>
+                                        <span className="truncate self-center">{cte.nome_pag || '-'}</span>
+                                        <span className="self-center">{cte.data_prev_ent || '-'}</span>
+                                        <span className="truncate self-center">{cte.ult_ocor || '-'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
-                            <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
-                            <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
-                            <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
-                            <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
-                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
-                            <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
-                            <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
-                          </div>
-                        );
-                      })
+                            );
+                          })
+                        : ctes.map((cte) => {
+                            const isSelected = selectedCtes.has(cte.nro_cte);
+                            const isDisabled = cardDialogId === 1 && !!selectedCnpjDest && selectedCnpjDest !== cte.cnpj_dest;
+                            return (
+                              <div
+                                key={`${cte.ser_cte}-${cte.nro_cte}`}
+                                className={`grid gap-2 px-4 py-2 text-sm ${cardDialogId === 1 ? 'grid-cols-[32px_90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]' : 'grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)]'} ${isDisabled ? 'opacity-40' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'} ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/40' : ''}`}
+                              >
+                                {cardDialogId === 1 && (
+                                  <div className="flex items-center">
+                                    <Checkbox
+                                      checked={isSelected}
+                                      disabled={isDisabled}
+                                      onCheckedChange={(checked) => handleToggleCte(cte, !!checked)}
+                                    />
+                                  </div>
+                                )}
+                                <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                                <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
+                                <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
+                                <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
+                                <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
+                                <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                                <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
+                                <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
+                              </div>
+                            );
+                          })
                     )}
                   </div>
                 </div>
@@ -1154,10 +1389,21 @@ export function CentralAgendamento() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <DialogTitle>{calendarioDialogNome}</DialogTitle>
-                  <DialogDescription>Lista de CT-es neste grupo.</DialogDescription>
+                  <DialogDescription>
+                    {modoVisao === 'AGENDA' ? 'Lista de agendas neste grupo.' : 'Lista de CT-es neste grupo.'}
+                  </DialogDescription>
                 </div>
-                {ctesCalendario.length > 0 && (
-                  <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => exportarCSV(ctesCalendario, `${calendarioDialogNome.replace(/\s+/g, '_')}.csv`)}>
+                {((modoVisao === 'AGENDA' ? agendasCalendario.length : ctesCalendario.length) > 0) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-2"
+                    onClick={() =>
+                      modoVisao === 'AGENDA'
+                        ? exportarCSVAgendas(agendasCalendario, `${calendarioDialogNome.replace(/\s+/g, '_')}.csv`)
+                        : exportarCSV(ctesCalendario, `${calendarioDialogNome.replace(/\s+/g, '_')}.csv`)
+                    }
+                  >
                     <Download className="h-4 w-4" />
                     Exportar CSV
                   </Button>
@@ -1167,45 +1413,112 @@ export function CentralAgendamento() {
 
             <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden">
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-                <div className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                  <span>CTRC</span>
-                  <span>NF</span>
-                  <span>Pagador</span>
-                  <span>Destinatário</span>
-                  <span>CNPJ</span>
-                  <span>Emissão</span>
-                  <span>Prev. Entrega</span>
-                  <span>Últ. Ocorrência</span>
-                </div>
+                {modoVisao === 'AGENDA' ? (
+                  <div className="grid grid-cols-[32px_90px_90px_80px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <span></span>
+                    <span>CTRC</span>
+                    <span>NF</span>
+                    <span className="text-right">Entregas</span>
+                    <span>Destinatário</span>
+                    <span>Endereço</span>
+                    <span>Prev. Entrega</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <span>CTRC</span>
+                    <span>NF</span>
+                    <span>Pagador</span>
+                    <span>Destinatário</span>
+                    <span>CNPJ</span>
+                    <span>Emissão</span>
+                    <span>Prev. Entrega</span>
+                    <span>Últ. Ocorrência</span>
+                  </div>
+                )}
 
                 <div className="min-h-0 overflow-y-auto">
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {isLoadingCtesCalendario ? (
                       <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando CT-es...
+                        Carregando...
                       </div>
-                    ) : ctesCalendario.length === 0 ? (
+                    ) : (modoVisao === 'AGENDA' ? agendasCalendario.length === 0 : ctesCalendario.length === 0) ? (
                       <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-slate-500">
                         <CheckCircle className="h-6 w-6" />
-                        Nenhum CT-e encontrado neste grupo.
+                        {modoVisao === 'AGENDA' ? 'Nenhuma agenda encontrada neste grupo.' : 'Nenhum CT-e encontrado neste grupo.'}
                       </div>
                     ) : (
-                      ctesCalendario.map((cte) => (
-                        <div
-                          key={`cal-${cte.ser_cte}-${cte.nro_cte}`}
-                          className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
-                        >
-                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
-                          <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
-                          <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
-                          <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
-                          <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
-                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
-                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
-                          <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
-                        </div>
-                      ))
+                      modoVisao === 'AGENDA'
+                        ? agendasCalendario.map((agenda) => {
+                            const isExpanded = expandedAgendasCalendario.has(agenda.agenda_id);
+                            return (
+                              <div key={`cal-ag-${agenda.agenda_id}`}>
+                                <div className="grid grid-cols-[32px_90px_90px_80px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                                  <button
+                                    type="button"
+                                    className="flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                                    onClick={() => toggleExpandedAgendaCalendario(agenda.agenda_id)}
+                                  >
+                                    <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                    {agenda.ser_cte}{String(agenda.nro_cte).padStart(6, '0')}
+                                  </span>
+                                  <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
+                                    {agenda.nfs ? agenda.nfs.split(',')[0].trim() : '-'}
+                                  </span>
+                                  <span className="self-center text-right tabular-nums text-slate-700 dark:text-slate-300">
+                                    {agenda.qtde_entregas}
+                                  </span>
+                                  <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">
+                                    {agenda.nome_dest || '-'}
+                                  </span>
+                                  <span className="truncate self-center text-slate-700 dark:text-slate-300">
+                                    {agenda.endereco_entrega || '-'}
+                                  </span>
+                                  <span className="self-center text-slate-500 dark:text-slate-400">
+                                    {agenda.data_prev_ent || '-'}
+                                  </span>
+                                </div>
+                                {isExpanded && (
+                                  <div className="bg-slate-50/60 dark:bg-slate-900/40">
+                                    {agenda.ctes.map((cte) => (
+                                      <div
+                                        key={`cal-ag-${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
+                                        className="grid grid-cols-[90px_110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                      >
+                                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                          {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                                        </span>
+                                        <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
+                                          {cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}
+                                        </span>
+                                        <span className="truncate self-center">{cte.nome_pag || '-'}</span>
+                                        <span className="self-center">{cte.data_prev_ent || '-'}</span>
+                                        <span className="truncate self-center">{cte.ult_ocor || '-'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        : ctesCalendario.map((cte) => (
+                            <div
+                              key={`cal-${cte.ser_cte}-${cte.nro_cte}`}
+                              className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                            >
+                              <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                              <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
+                              <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
+                              <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
+                              <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.cnpj_dest || '-'}</span>
+                              <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
+                              <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent}</span>
+                              <span className="truncate self-center text-slate-500 dark:text-slate-400">{cte.ult_ocor || '-'}</span>
+                            </div>
+                          ))
                     )}
                   </div>
                 </div>

@@ -10,6 +10,10 @@ $domain = $auth['domain'];
 $input   = getRequestInput();
 $periodo = (int)($input['periodo'] ?? 7);
 $filters = $input['filters'] ?? [];
+$modo = strtoupper(trim((string)($input['modo'] ?? 'CTE')));
+if (!in_array($modo, ['CTE', 'AGENDA'])) {
+    $modo = 'CTE';
+}
 
 if (!in_array($periodo, [7, 15, 30])) {
     respondJson(['success' => false, 'message' => 'Período inválido. Use 7, 15 ou 30.']);
@@ -60,6 +64,9 @@ if (!empty($filters['cnpjDestinatario'])) {
 
 $whereClause = implode(' AND ', $whereConditions);
 
+$agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit,'') || '|' || COALESCE(cte.cep_entrega,'') || '|' || COALESCE(cte.endereco_entrega,''))";
+$countExpr = ($modo === 'AGENDA') ? "COUNT(DISTINCT {$agendaKeyExpr})" : "COUNT(*)";
+
 $query = "
     WITH dias AS (
         SELECT generate_series(
@@ -71,7 +78,7 @@ $query = "
     agendados AS (
         SELECT
             cte.data_prev_ent::date AS dia,
-            COUNT(*) AS total
+            {$countExpr} AS total
         FROM {$domain}_cte cte
         WHERE {$whereClause}
           AND cte.data_prev_ent IS NOT NULL
@@ -80,7 +87,7 @@ $query = "
     entregues AS (
         SELECT
             cte.data_prev_ent::date AS dia,
-            COUNT(*) AS total
+            {$countExpr} AS total
         FROM {$domain}_cte cte
         LEFT JOIN (
             SELECT codigo::text as codigo, MAX(tipo) as tipo
