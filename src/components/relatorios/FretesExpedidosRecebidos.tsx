@@ -1056,48 +1056,49 @@ export function FretesExpedidosRecebidos() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-xs text-muted-foreground">Filtro:</div>
-                <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <button
-                    type="button"
-                    className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      filtroRecebidos === 'todos'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                    onClick={() => setFiltroRecebidos('todos')}
-                    disabled={loading}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                      filtroRecebidos === 'fracionados'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                    onClick={() => setFiltroRecebidos('fracionados')}
-                    disabled={loading}
-                  >
-                    Apenas Fracionados
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                      filtroRecebidos === 'fec'
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`}
-                    onClick={() => setFiltroRecebidos('fec')}
-                    disabled={loading}
-                  >
-                    Apenas FEC
-                  </button>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-muted-foreground">Filtro:</div>
+                  <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        filtroRecebidos === 'todos'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroRecebidos('todos')}
+                      disabled={loading}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        filtroRecebidos === 'fracionados'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroRecebidos('fracionados')}
+                      disabled={loading}
+                    >
+                      Apenas Fracionados
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        filtroRecebidos === 'fec'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroRecebidos('fec')}
+                      disabled={loading}
+                    >
+                      Apenas FEC
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 auto-rows-fr content-start">
                   <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
                     <DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
@@ -1254,6 +1255,7 @@ export function FretesExpedidosRecebidos() {
                     </CardContent>
                   </Card>
                 </div>
+              </div>
               </div>
             )}
               </div>
