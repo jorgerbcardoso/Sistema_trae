@@ -377,6 +377,46 @@ export function FretesExpedidosRecebidos() {
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
   const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
 
+  const dataRecView = useMemo<ApiData | null>(() => {
+    if (!dataRec) return null;
+    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().toUpperCase() === 'FEC';
+    const rowsBase = dataRec.rows || [];
+    const rows =
+      filtroRecebidos === 'todos'
+        ? rowsBase
+        : filtroRecebidos === 'fec'
+          ? rowsBase.filter(isFec)
+          : rowsBase.filter((r) => !isFec(r));
+
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.quant_vol += Number(r.quant_vol) || 0;
+        acc.quant_ctrc += Number(r.quant_ctrc) || 0;
+        acc.peso_ton += Number(r.peso_ton) || 0;
+        acc.val_merc += Number(r.val_merc) || 0;
+        acc.frete_tot += Number(r.frete_tot) || 0;
+        acc.frete_cif += Number(r.frete_cif) || 0;
+        acc.frete_fob += Number(r.frete_fob) || 0;
+        acc.frete_ter += Number(r.frete_ter) || 0;
+        acc.frete_sub += Number(r.frete_sub) || 0;
+        return acc;
+      },
+      {
+        quant_vol: 0,
+        quant_ctrc: 0,
+        peso_ton: 0,
+        val_merc: 0,
+        frete_tot: 0,
+        frete_cif: 0,
+        frete_fob: 0,
+        frete_ter: 0,
+        frete_sub: 0,
+      }
+    );
+
+    return { totals, rows };
+  }, [dataRec, filtroRecebidos]);
+
   const rowsExpSorted = useMemo(() => {
     const rows = [...(dataExp?.rows || [])];
     const { key, dir } = sortExp;
@@ -588,46 +628,6 @@ export function FretesExpedidosRecebidos() {
   };
 
   const donutExp = useMemo(() => (dataExp ? buildDonut(dataExp.rows) : []), [dataExp]);
-  const dataRecView = useMemo<ApiData | null>(() => {
-    if (!dataRec) return null;
-    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().toUpperCase() === 'FEC';
-    const rowsBase = dataRec.rows || [];
-    const rows =
-      filtroRecebidos === 'todos'
-        ? rowsBase
-        : filtroRecebidos === 'fec'
-        ? rowsBase.filter(isFec)
-        : rowsBase.filter((r) => !isFec(r));
-
-    const totals = rows.reduce(
-      (acc, r) => {
-        acc.quant_vol += Number(r.quant_vol) || 0;
-        acc.quant_ctrc += Number(r.quant_ctrc) || 0;
-        acc.peso_ton += Number(r.peso_ton) || 0;
-        acc.val_merc += Number(r.val_merc) || 0;
-        acc.frete_tot += Number(r.frete_tot) || 0;
-        acc.frete_cif += Number(r.frete_cif) || 0;
-        acc.frete_fob += Number(r.frete_fob) || 0;
-        acc.frete_ter += Number(r.frete_ter) || 0;
-        acc.frete_sub += Number(r.frete_sub) || 0;
-        return acc;
-      },
-      {
-        quant_vol: 0,
-        quant_ctrc: 0,
-        peso_ton: 0,
-        val_merc: 0,
-        frete_tot: 0,
-        frete_cif: 0,
-        frete_fob: 0,
-        frete_ter: 0,
-        frete_sub: 0,
-      }
-    );
-
-    return { totals, rows };
-  }, [dataRec, filtroRecebidos]);
-
   const donutRec = useMemo(() => (dataRecView ? buildDonut(dataRecView.rows) : []), [dataRecView]);
 
   return (
