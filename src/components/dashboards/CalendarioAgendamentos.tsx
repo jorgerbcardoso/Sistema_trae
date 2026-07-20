@@ -11,6 +11,7 @@ export interface DiaAgendamento {
   diaSemana: string;
   agendados: number;
   entregues: number;
+  atrasados?: number;
 }
 
 interface CalendarioAgendamentosProps {
@@ -86,7 +87,8 @@ export function CalendarioAgendamentos({
                 : 0;
               const isFromTodayOn = dia.data >= todayISO;
               const isFuture = dia.data > todayISO;
-              const atrasados = isFromTodayOn ? 0 : Math.max(0, dia.agendados - dia.entregues);
+              const atrasadosRaw = Number.isFinite(dia.atrasados as number) ? (dia.atrasados as number) : Math.max(0, dia.agendados - dia.entregues);
+              const atrasados = isFromTodayOn ? 0 : Math.max(0, atrasadosRaw);
 
               const isToday = dia.data === todayISO;
 
