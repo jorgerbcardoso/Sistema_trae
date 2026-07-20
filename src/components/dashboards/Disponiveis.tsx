@@ -159,6 +159,7 @@ interface GrupoSetor {
   totalVol: number;
   totalPeso: number;
   totalCubagem: number;
+  totalFrete: number;
 }
 
 interface GrupoDestino {
@@ -1063,11 +1064,86 @@ function GrupoSetorCard({
 
   const temAgendObrig = [...grupo.armazem, ...grupo.transito].some(c => c.agendObrig);
 
+  const exportarSetorCSV = (ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    const lista = [...grupo.armazem, ...grupo.transito];
+    if (!lista.length) return;
+
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
+    const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+
+    const header = [
+      'Setor',
+      'CTRC',
+      'NF',
+      'Situação',
+      'Pagador',
+      'Destinatário',
+      'CNPJ Dest.',
+      'Cidade',
+      'Bairro',
+      'CEP',
+      'Endereço',
+      'Prev. Ent.',
+      'Agendamento',
+      'Vlr. Merc.',
+      'Frete (R$)',
+      'Peso (kg)',
+      'Cubagem (m³)',
+      'Volumes',
+      'Últ. Ocorrência',
+      'Data Últ. Ocorrência',
+      'Prev. Chegada',
+      'Manifesto',
+      'Dias atraso',
+    ];
+
+    const rows = lista.map((c) => {
+      const situacao = c.emTransito ? 'A CAMINHO' : 'NO ARMAZÉM';
+      const ultOcor = [c.codUltOcor, c.descUltOcor].filter(Boolean).join(' - ');
+      return [
+        esc(grupo.setor),
+        esc(c.ctrc),
+        esc(c.nfiscal || ''),
+        esc(situacao),
+        esc(c.pagador || ''),
+        esc(c.destinatario || ''),
+        esc(c.cnpjDest || ''),
+        esc(c.cidade || ''),
+        esc(c.bairro || ''),
+        esc(c.cep || ''),
+        esc(c.endereco || ''),
+        esc(c.prevEnt || ''),
+        esc(c.agendamento || ''),
+        fmtMoeda(parseMoeda(c.vlrMerc)),
+        fmtMoeda(parseMoeda(c.frete)),
+        fmtNum(parsePeso(c.peso), 2),
+        fmtNum(parseCubagem(c.cubagem), 3),
+        esc(c.qtdeVol || ''),
+        esc(ultOcor),
+        esc(c.dataUltOcor || ''),
+        esc(c.prevChegada || ''),
+        esc(c.manifesto || ''),
+        esc(c.diasAtraso ?? 0),
+      ];
+    });
+
+    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ctes_entrega_${String(grupo.setor || 'setor').replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}
+        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -1108,6 +1184,14 @@ function GrupoSetorCard({
               </div>
             );
           })()}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="flex items-center justify-center pl-1">
+          <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={exportarSetorCSV}>
+            <FileDown className="w-3.5 h-3.5 mr-1" />CSV
+          </Button>
         </span>
       </button>
 
@@ -1159,6 +1243,9 @@ interface CarregamentoAreaProps {
   sigla: string;
   carregamentos: Carregamento[];
   loadingCarregamentos: boolean;
+  linhasOrigem: LinhaCarregamento[];
+  loadingLinhasOrigem: boolean;
+  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
   modoApontamento: string | null;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
@@ -1174,9 +1261,10 @@ interface CarregamentoAreaProps {
   importandoCarregamentos: boolean;
   importacaoAutomatica: boolean;
   onToggleImportacaoAutomatica: (ativo: boolean) => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
+    message?: string;
     resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
     resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
   }>;
@@ -1654,8 +1742,34 @@ function CardCarregamento({
 
   const paradasArray = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
   const todasUnidades = [...paradasArray, destino].filter(Boolean) as string[];
-  const unidadesDestinoTexto = todasUnidades.length > 0
-    ? todasUnidades.map((u, i) => i === todasUnidades.length - 1 ? <span key={i} className="font-bold">{u}</span> : <span key={i}>{u}{i < todasUnidades.length - 1 ? ', ' : ''}</span>)
+
+  const unidadesComCtes = new Set<string>(
+    carregamento.ctes
+      .map((c) => {
+        const d = (c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
+        if (d) return d;
+        const cidade = (c.cidade ?? '').trim().toUpperCase();
+        if (cidade && /^[A-Z0-9]{2,5}$/.test(cidade)) return cidade;
+        return '';
+      })
+      .filter(Boolean)
+  );
+
+  const unidadesReais = (() => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const u of todasUnidades) {
+      if (!u) continue;
+      if (seen.has(u)) continue;
+      seen.add(u);
+      if (!unidadesComCtes.has(u)) continue;
+      out.push(u);
+    }
+    return out;
+  })();
+
+  const unidadesDestinoTexto = unidadesReais.length > 0
+    ? unidadesReais.map((u, i) => i === unidadesReais.length - 1 ? <span key={i} className="font-bold">{u}</span> : <span key={i}>{u}{i < unidadesReais.length - 1 ? ', ' : ''}</span>)
     : null;
 
   const origemTag = (() => {
@@ -2011,51 +2125,138 @@ type LinhaHojeStatus = {
   freteTotalDestino: number;
   pesoKgDestino: number;
   cubagemDestino: number;
+  atingiuMinFrete: boolean;
 };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
-  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number) => Promise<{
+type ResumoMassaLinha = {
+  nro_linha: number;
+  placa: string;
+  destino: string;
+  intermediarias: string;
+  status: 'criado' | 'erro';
+  msg: string;
+};
+
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
+  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
+    message?: string;
     resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
     resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
   }>;
   onFechar: () => void;
+  linhasOrigem: LinhaCarregamento[];
+  loadingLinhasOrigem: boolean;
+  carregamentos: Carregamento[];
+  siglaUnidade: string;
+  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
 }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
   const [paradasStr, setParadasStr] = useState('');
   const [loading, setLoading] = useState(false);
-  const [linhas, setLinhas] = useState<LinhaCarregamento[]>([]);
-  const [nroLinha, setNroLinha] = useState('');
+  const [linhasSelecionadas, setLinhasSelecionadas] = useState<Set<number>>(new Set());
   const [buscaLinha, setBuscaLinha] = useState('');
   const [ordemLinhas, setOrdemLinhas] = useState<'destino' | 'intermediarias'>('destino');
   const [ordemDirLinhas, setOrdemDirLinhas] = useState<'asc' | 'desc'>('asc');
-  const [loadingLinhas, setLoadingLinhas] = useState(false);
 
-  useEffect(() => {
-    let ativo = true;
-    (async () => {
-      try {
-        setLoadingLinhas(true);
-        const res = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-          { method: 'POST', body: JSON.stringify({ acao: 'listar_linhas' }) },
-          true
-        );
-        if (!ativo) return;
-        if (res.success) setLinhas(res.linhas ?? []);
-        else toast.error(res.message || 'Erro ao carregar linhas.');
-      } catch (e: any) {
-        if (!ativo) return;
-        toast.error(e.message || 'Erro ao carregar linhas.');
-      } finally {
-        if (ativo) setLoadingLinhas(false);
-      }
-    })();
-    return () => { ativo = false; };
+  const diaCarregaKey = React.useMemo(() => {
+    const d = new Date().getDay();
+    if (d === 0) return 'carrega_dom' as const;
+    if (d === 1) return 'carrega_seg' as const;
+    if (d === 2) return 'carrega_ter' as const;
+    if (d === 3) return 'carrega_qua' as const;
+    if (d === 4) return 'carrega_qui' as const;
+    if (d === 5) return 'carrega_sex' as const;
+    return 'carrega_sab' as const;
   }, []);
+
+  const linhasHoje = React.useMemo(() => {
+    return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
+  }, [linhasOrigem, diaCarregaKey]);
+
+  const statusPorLinha = React.useMemo(() => {
+    const MIN_TON = 27;
+    const MIN_M3 = 67;
+
+    const placasExistentes = new Set((carregamentos ?? []).map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+
+    const hasDiretaPorDestino = new Set<string>();
+    for (const l of linhasHoje) {
+      const unidades = (l.unidades ?? '').trim();
+      const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+      if (!dest) continue;
+      if (!unidades) hasDiretaPorDestino.add(dest);
+    }
+
+    const diretaLotaPorDestino = new Set<string>();
+    for (const dest of hasDiretaPorDestino) {
+      const t = totalsPorUnidadeParaLinhas[dest] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+      const ton = t.pesoKg / 1000;
+      if (ton >= MIN_TON || t.cubagem >= MIN_M3) diretaLotaPorDestino.add(dest);
+    }
+
+    const out: Record<number, { podeCarregar: boolean; motivoBloqueio: string | null }> = {};
+    for (const l of linhasHoje) {
+      const nro = l.nro_linha ?? 0;
+      const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+      const unidades = (l.unidades ?? '').trim();
+      const intermediarias = unidades
+        ? unidades.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean)
+        : [];
+      const unidadesRota = Array.from(new Set([dest, ...intermediarias].filter(Boolean)));
+
+      const totals = unidadesRota.reduce(
+        (acc, u) => {
+          const t = totalsPorUnidadeParaLinhas[u] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+          acc.pesoKg += t.pesoKg;
+          acc.cubagem += t.cubagem;
+          acc.frete += t.frete;
+          return acc;
+        },
+        { pesoKg: 0, cubagem: 0, frete: 0 }
+      );
+
+      const minFreteRaw = (l.vlr_min_frete ?? 0);
+      const minFrete = Number.isFinite(minFreteRaw as number) && (minFreteRaw as number) > 0 ? (minFreteRaw as number) : 0;
+      const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
+
+      const placaAuto = dest ? `${siglaUnidade}-${dest}` : '';
+      const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
+      const bloqueadaPorDireta = !!unidades && diretaLotaPorDestino.has(dest);
+
+      const motivos: string[] = [];
+      if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
+      if (!atingiuMinFrete) {
+        motivos.push(`Frete atual (${totals.frete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) abaixo do mínimo da linha (${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`);
+      }
+      if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
+
+      const bloqueada = jaExiste || !atingiuMinFrete || bloqueadaPorDireta;
+      out[nro] = {
+        podeCarregar: !bloqueada,
+        motivoBloqueio: bloqueada ? motivos.join(' ') : null,
+      };
+    }
+
+    return out;
+  }, [carregamentos, linhasHoje, siglaUnidade, totalsPorUnidadeParaLinhas]);
+
+  const placasExistentes = React.useMemo(() => {
+    return new Set((carregamentos ?? []).map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+  }, [carregamentos]);
+
+  const linhasHojeSemCriadas = React.useMemo(() => {
+    const orig = (siglaUnidade ?? '').trim().toUpperCase();
+    return linhasHoje.filter((l) => {
+      const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+      const placaAuto = dest ? `${orig}-${dest}` : '';
+      if (!placaAuto) return true;
+      return !placasExistentes.has(placaAuto);
+    });
+  }, [linhasHoje, placasExistentes, siglaUnidade]);
 
   const handleConfirmarManual = async () => {
     if (loading) return;
@@ -2084,22 +2285,63 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
   const [resumoPlaca, setResumoPlaca] = useState('');
   const [resumoUnidades, setResumoUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
   const [resumoDestinos, setResumoDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
+  const [resumoMassaDialogOpen, setResumoMassaDialogOpen] = useState(false);
+  const [resumoMassaItens, setResumoMassaItens] = useState<ResumoMassaLinha[]>([]);
 
   const handleConfirmarAutomatico = async () => {
     if (loading) return;
-    if (!nroLinha) { toast.error('Selecione uma linha.'); return; }
+    const selecionadas = Array.from(linhasSelecionadas.values()).filter((n) => Number.isFinite(n) && n > 0);
+    if (selecionadas.length === 0) { toast.error('Selecione ao menos uma linha.'); return; }
+    const invalidas = selecionadas.filter((n) => !(statusPorLinha[n]?.podeCarregar ?? false));
+    if (invalidas.length > 0) { toast.error('Há linhas selecionadas indisponíveis para carregamento.'); return; }
     try {
       setLoading(true);
-      const result = await onConfirmar('', '', [], Number(nroLinha));
-      if (result.ok) {
-        if (result.placa && (result.resumo?.length || result.resumoDestinos?.length)) {
-          setResumoPlaca(result.placa);
-          setResumoUnidades(result.resumo ?? []);
-          setResumoDestinos(result.resumoDestinos ?? []);
-          setResumoDialogOpen(true);
+      const multi = selecionadas.length > 1;
+      const ordenadas = selecionadas.slice().sort((a, b) => a - b);
+      const porNro = new Map<number, LinhaCarregamento>();
+      for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
+      const orig = (siglaUnidade ?? '').trim().toUpperCase();
+      const itens: ResumoMassaLinha[] = [];
+      let lastOk: { placa?: string; resumo?: any[]; resumoDestinos?: any[] } | null = null;
+      let okCount = 0;
+      let failCount = 0;
+      for (let i = 0; i < ordenadas.length; i++) {
+        const nro = ordenadas[i];
+        const isLast = i === ordenadas.length - 1;
+        const result = await onConfirmar('', '', [], nro, { recarregar: isLast, silent: true });
+        if (result.ok) {
+          okCount++;
+          lastOk = result;
         } else {
-          onFechar();
+          failCount++;
         }
+        const linha = porNro.get(nro);
+        const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
+        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
+        const placaAuto = destino ? `${orig}-${destino}` : '';
+        itens.push({
+          nro_linha: nro,
+          placa: (result.placa ?? placaAuto) || placaAuto || '-',
+          destino: destino || '-',
+          intermediarias: intermediarias || '-',
+          status: result.ok ? 'criado' : 'erro',
+          msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
+        });
+      }
+      if (multi) {
+        setResumoMassaItens(itens);
+        setResumoMassaDialogOpen(true);
+        if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
+        if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
+        return;
+      }
+      if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
+        setResumoPlaca(lastOk.placa);
+        setResumoUnidades((lastOk.resumo as any) ?? []);
+        setResumoDestinos((lastOk.resumoDestinos as any) ?? []);
+        setResumoDialogOpen(true);
+      } else {
+        onFechar();
       }
     } finally {
       setLoading(false);
@@ -2111,6 +2353,11 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
     onFechar();
   };
 
+  const handleFecharResumoMassa = () => {
+    setResumoMassaDialogOpen(false);
+    onFechar();
+  };
+
   const toggleOrdemLinhas = (col: 'destino' | 'intermediarias') => {
     if (ordemLinhas === col) setOrdemDirLinhas(d => d === 'asc' ? 'desc' : 'asc');
     else { setOrdemLinhas(col); setOrdemDirLinhas('asc'); }
@@ -2119,8 +2366,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
   const linhasVisiveis = React.useMemo(() => {
     const q = buscaLinha.trim().toUpperCase();
     const filtradas = q
-      ? linhas.filter(l => (l.sigla_dest ?? '').toUpperCase().includes(q) || (l.unidades ?? '').toUpperCase().includes(q))
-      : linhas.slice();
+      ? linhasHojeSemCriadas.filter(l => (l.sigla_dest ?? '').toUpperCase().includes(q) || (l.unidades ?? '').toUpperCase().includes(q))
+      : linhasHojeSemCriadas.slice();
 
     const dir = ordemDirLinhas === 'asc' ? 1 : -1;
     filtradas.sort((a, b) => {
@@ -2131,11 +2378,84 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
       return ((a.nro_linha ?? 0) - (b.nro_linha ?? 0)) * dir;
     });
     return filtradas;
-  }, [linhas, buscaLinha, ordemLinhas, ordemDirLinhas]);
+  }, [linhasHojeSemCriadas, buscaLinha, ordemLinhas, ordemDirLinhas]);
 
   const podeIniciar = modo === 'automatico'
-    ? !!nroLinha && !loadingLinhas
+    ? (() => {
+        const selecionadas = Array.from(linhasSelecionadas.values());
+        if (selecionadas.length === 0) return false;
+        if (loadingLinhasOrigem) return false;
+        return selecionadas.every((n) => !!statusPorLinha[n]?.podeCarregar);
+      })()
     : !!unidadeDestino.trim();
+
+  const toggleLinha = (nro: number) => {
+    setLinhasSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(nro)) next.delete(nro);
+      else next.add(nro);
+      return next;
+    });
+  };
+
+  const handleCarregarTodasPossiveis = async () => {
+    if (loading) return;
+    const possiveis = linhasHojeSemCriadas
+      .map((l) => l.nro_linha ?? 0)
+      .filter((n) => n > 0 && (statusPorLinha[n]?.podeCarregar ?? false));
+    if (possiveis.length === 0) { toast.error('Nenhuma linha disponível para carregar.'); return; }
+    try {
+      setLoading(true);
+      setLinhasSelecionadas(new Set(possiveis));
+      let okCount = 0;
+      let failCount = 0;
+      const porNro = new Map<number, LinhaCarregamento>();
+      for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
+      const orig = (siglaUnidade ?? '').trim().toUpperCase();
+      const itens: ResumoMassaLinha[] = [];
+      let lastOk: any = null;
+      for (let i = 0; i < possiveis.length; i++) {
+        const nro = possiveis[i];
+        const isLast = i === possiveis.length - 1;
+        const result = await onConfirmar('', '', [], nro, { recarregar: isLast, silent: true });
+        if (result.ok) {
+          okCount++;
+          lastOk = result;
+        } else {
+          failCount++;
+        }
+        const linha = porNro.get(nro);
+        const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
+        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
+        const placaAuto = destino ? `${orig}-${destino}` : '';
+        itens.push({
+          nro_linha: nro,
+          placa: (result.placa ?? placaAuto) || placaAuto || '-',
+          destino: destino || '-',
+          intermediarias: intermediarias || '-',
+          status: result.ok ? 'criado' : 'erro',
+          msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
+        });
+      }
+      if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
+      if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
+      if (possiveis.length > 1) {
+        setResumoMassaItens(itens);
+        setResumoMassaDialogOpen(true);
+        return;
+      }
+      if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
+        setResumoPlaca(lastOk.placa);
+        setResumoUnidades((lastOk.resumo as any) ?? []);
+        setResumoDestinos((lastOk.resumoDestinos as any) ?? []);
+        setResumoDialogOpen(true);
+      } else {
+        onFechar();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -2182,7 +2502,12 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                     Linha <span className="text-red-500">*</span>
                   </label>
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {loadingLinhas ? 'Carregando...' : `${linhasVisiveis.length} linha(s)`}
+                    {loadingLinhasOrigem ? 'Carregando...' : `${linhasVisiveis.length} linha(s)`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {linhasSelecionadas.size} selecionada(s)
                   </span>
                 </div>
 
@@ -2191,7 +2516,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                   placeholder="Buscar sigla (destino ou intermediárias)..."
                   value={buscaLinha}
                   onChange={e => setBuscaLinha(e.target.value.toUpperCase())}
-                  disabled={loading || loadingLinhas}
+                  disabled={loading || loadingLinhasOrigem}
                 />
 
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
@@ -2200,7 +2525,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                       type="button"
                       className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
                       onClick={() => toggleOrdemLinhas('destino')}
-                      disabled={loading || loadingLinhas}
+                      disabled={loading || loadingLinhasOrigem}
                     >
                       Destino
                       {ordemLinhas === 'destino' && (
@@ -2213,7 +2538,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                       type="button"
                       className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 text-left"
                       onClick={() => toggleOrdemLinhas('intermediarias')}
-                      disabled={loading || loadingLinhas}
+                      disabled={loading || loadingLinhasOrigem}
                     >
                       Unidades intermediárias
                       {ordemLinhas === 'intermediarias' && (
@@ -2224,7 +2549,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                     </button>
                   </div>
                   <div className="max-h-28 overflow-y-auto">
-                    {loadingLinhas ? (
+                    {loadingLinhasOrigem ? (
                       <div className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         Carregando linhas...
@@ -2235,19 +2560,32 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                       </div>
                     ) : (
                       linhasVisiveis.map(l => {
-                        const selecionada = String(l.nro_linha) === nroLinha;
+                        const nro = l.nro_linha ?? 0;
+                        const selecionada = nro > 0 && linhasSelecionadas.has(nro);
                         const destino = (l.sigla_dest ?? '').trim().toUpperCase() || '-';
                         const inter = (l.unidades ?? '').trim().toUpperCase() || '-';
                         const nome = (l.nome ?? '').trim();
+                        const st = statusPorLinha[nro];
+                        const podeLinha = st?.podeCarregar ?? false;
+                        const motivo = st?.motivoBloqueio ?? '';
                         return (
-                          <button
+                          <div
                             key={l.nro_linha}
-                            type="button"
-                            onClick={() => setNroLinha(String(l.nro_linha))}
-                            className={`w-full text-left px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-800 transition-colors ${selecionada ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
-                            disabled={loading}
+                            title={!podeLinha ? motivo : undefined}
+                            className={`w-full text-left px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-800 transition-colors ${selecionada ? 'bg-indigo-50 dark:bg-indigo-950/30' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'} ${!podeLinha ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => { if (!loading && podeLinha && nro > 0) toggleLinha(nro); }}
                           >
-                            <div className="grid grid-cols-[84px_1fr] items-start gap-2">
+                            <div className="grid grid-cols-[18px_84px_1fr] items-start gap-2">
+                              <div className="pt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={selecionada}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={() => { if (!loading && podeLinha && nro > 0) toggleLinha(nro); }}
+                                  disabled={loading || !podeLinha || nro <= 0}
+                                  className="h-3.5 w-3.5 accent-indigo-600"
+                                />
+                              </div>
                               <div className="leading-tight">
                                 <div className={`font-mono font-bold text-xs ${selecionada ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-slate-100'}`}>
                                   {destino}
@@ -2267,11 +2605,22 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
                                 )}
                               </div>
                             </div>
-                          </button>
+                          </div>
                         );
                       })
                     )}
                   </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading || loadingLinhasOrigem || linhasHojeSemCriadas.filter(l => (statusPorLinha[l.nro_linha ?? 0]?.podeCarregar ?? false)).length === 0}
+                    onClick={handleCarregarTodasPossiveis}
+                  >
+                    {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
+                    Carregar todas as possíveis
+                  </Button>
                 </div>
               </div>
             </div>
@@ -2315,7 +2664,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
           <Button variant="outline" size="sm" onClick={onFechar} disabled={loading}>Cancelar</Button>
           <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={modo === 'automatico' ? handleConfirmarAutomatico : handleConfirmarManual} disabled={loading || !podeIniciar}>
             {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
-            {loading ? 'Processando...' : 'Iniciar'}
+            {loading ? 'Processando...' : (modo === 'automatico' ? 'Carregar selecionadas' : 'Iniciar')}
           </Button>
         </div>
       </div>
@@ -2359,6 +2708,48 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar }: {
           </div>
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={handleFecharResumo}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={resumoMassaDialogOpen} onOpenChange={(v) => { if (!v) handleFecharResumoMassa(); else setResumoMassaDialogOpen(true); }}>
+        <DialogContent className="sm:max-w-[900px]">
+          <DialogHeader>
+            <DialogTitle>Resumo · Carregamentos em massa</DialogTitle>
+            <DialogDescription>Resultados por linha selecionada</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+            <div className="grid grid-cols-[70px_120px_60px_minmax(0,1fr)_90px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <span>Linha</span>
+              <span>Placa</span>
+              <span>Dest.</span>
+              <span>Intermediárias</span>
+              <span>Status</span>
+              <span>Mensagem</span>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {resumoMassaItens.length === 0 ? (
+                <div className="px-3 py-4 text-xs text-slate-400 text-center">—</div>
+              ) : resumoMassaItens.map((r) => (
+                <div key={r.nro_linha} className="grid grid-cols-[70px_120px_60px_minmax(0,1fr)_90px_minmax(0,1fr)] gap-2 px-3 py-2 text-xs items-center">
+                  <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">{String(r.nro_linha).padStart(3, '0')}</span>
+                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.placa}</span>
+                  <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{r.destino}</span>
+                  <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300 truncate">{r.intermediarias}</span>
+                  <span className={`text-[11px] font-bold ${r.status === 'criado' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {r.status === 'criado' ? 'CRIADO' : 'ERRO'}
+                  </span>
+                  <span className="text-[11px] text-slate-600 dark:text-slate-300 truncate">{r.msg}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between gap-3">
+              <span className="font-semibold">
+                Total: {resumoMassaItens.length} · Criados: {resumoMassaItens.filter(i => i.status === 'criado').length} · Erros: {resumoMassaItens.filter(i => i.status === 'erro').length}
+              </span>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleFecharResumoMassa}>Fechar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2566,6 +2957,9 @@ function CarregamentoArea({
   sigla,
   carregamentos,
   loadingCarregamentos,
+  linhasOrigem,
+  loadingLinhasOrigem,
+  totalsPorUnidadeParaLinhas,
   modoApontamento,
   onIniciarApontamento,
   onCancelarApontamento,
@@ -2728,6 +3122,11 @@ function CarregamentoArea({
         <ModalCarregamentoAutomatico
           onConfirmar={onCarregamentoAutomatico}
           onFechar={() => setModalAutomaticoAberto(false)}
+          linhasOrigem={linhasOrigem}
+          loadingLinhasOrigem={loadingLinhasOrigem}
+          carregamentos={carregamentos}
+          siglaUnidade={sigla}
+          totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
         />
       )}
       {modalImportarAberto && (
@@ -2791,6 +3190,7 @@ export function Disponiveis() {
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
   const [carregandoNroLinhaHoje, setCarregandoNroLinhaHoje] = useState<number | null>(null);
+  const [carregandoTodasLinhasHoje, setCarregandoTodasLinhasHoje] = useState(false);
   const [linhasHojeSortKey, setLinhasHojeSortKey] = useState<'nro' | 'nome' | 'dest' | 'inter' | 'km'>('nro');
   const [linhasHojeSortDir, setLinhasHojeSortDir] = useState<'asc' | 'desc'>('asc');
   const [linhasHojeStatus, setLinhasHojeStatus] = useState<Record<number, LinhaHojeStatus>>({});
@@ -2800,6 +3200,8 @@ export function Disponiveis() {
   const [resumoHojePlaca, setResumoHojePlaca] = useState('');
   const [resumoHojeUnidades, setResumoHojeUnidades] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
   const [resumoHojeDestinos, setResumoHojeDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
+  const [resumoHojeMassaDialogOpen, setResumoHojeMassaDialogOpen] = useState(false);
+  const [resumoHojeMassaItens, setResumoHojeMassaItens] = useState<ResumoMassaLinha[]>([]);
 
   const [dados, setDados] = useState<DadosTransferencia | null>(null);
   const [loading, setLoading] = useState(false);
@@ -3134,7 +3536,9 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number): Promise<{ ok: boolean; placa?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }): Promise<{ ok: boolean; placa?: string; message?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
+    const recarregar = opts?.recarregar ?? true;
+    const silent = opts?.silent ?? false;
     try {
       // Envia os CT-es disponíveis (do relatório 019) para o backend filtrar e inserir
       const ctesDisponiveis = (dados?.ctes ?? []).map(c => {
@@ -3168,16 +3572,16 @@ export function Disponiveis() {
         true
       );
       if (res.success) {
-        toast.success(res.message || 'Carregamento automático iniciado!');
-        await carregarCarregamentos();
-        return { ok: true, placa: res.placa, resumo: res.resumo_unidades, resumoDestinos: res.resumo_destinos };
+        if (!silent) toast.success(res.message || 'Carregamento automático iniciado!');
+        if (recarregar) await carregarCarregamentos();
+        return { ok: true, placa: res.placa, message: res.message, resumo: res.resumo_unidades, resumoDestinos: res.resumo_destinos };
       } else {
-        toast.error(res.message || 'Erro ao iniciar carregamento automático');
-        return { ok: false };
+        if (!silent) toast.error(res.message || 'Erro ao iniciar carregamento automático');
+        return { ok: false, message: res.message };
       }
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao iniciar carregamento automático');
-      return { ok: false };
+      if (!silent) toast.error(e.message || 'Erro ao iniciar carregamento automático');
+      return { ok: false, message: e?.message || 'Erro ao iniciar carregamento automático' };
     }
   }, [carregarCarregamentos, dados]);
 
@@ -3197,6 +3601,69 @@ export function Disponiveis() {
       setCarregandoNroLinhaHoje(null);
     }
   }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico]);
+
+  const placasExistentes = React.useMemo(() => {
+    return new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+  }, [carregamentos]);
+
+  const linhasCarregamHojeVisiveis = React.useMemo(() => {
+    const orig = (unidadeAtual ?? '').trim().toUpperCase();
+    return linhasCarregamHojeOrdenadas.filter((l) => {
+      const dest = (l.sigla_dest ?? '').trim().toUpperCase();
+      const placaAuto = dest ? `${orig}-${dest}` : '';
+      if (!placaAuto) return true;
+      return !placasExistentes.has(placaAuto);
+    });
+  }, [linhasCarregamHojeOrdenadas, placasExistentes, unidadeAtual]);
+
+  const handleCarregarTodasLinhasHoje = useCallback(async () => {
+    if (carregandoNroLinhaHoje !== null || carregandoTodasLinhasHoje) return;
+    const possiveis = linhasCarregamHojeVisiveis
+      .map((l) => l.nro_linha ?? 0)
+      .filter((n) => n > 0 && (linhasHojeStatus[n]?.podeCarregar ?? false));
+    if (possiveis.length === 0) {
+      toast.error('Nenhuma linha disponível para carregar.');
+      return;
+    }
+    try {
+      setCarregandoTodasLinhasHoje(true);
+      let okCount = 0;
+      let failCount = 0;
+      const porNro = new Map<number, LinhaCarregamento>();
+      for (const l of linhasCarregamHojeVisiveis) porNro.set(l.nro_linha ?? 0, l);
+      const orig = (unidadeAtual ?? '').trim().toUpperCase();
+      const itens: ResumoMassaLinha[] = [];
+      for (let i = 0; i < possiveis.length; i++) {
+        const nro = possiveis[i];
+        const isLast = i === possiveis.length - 1;
+        const result = await handleCarregamentoAutomatico('', '', [], nro, { recarregar: isLast, silent: true });
+        if (result.ok) {
+          okCount++;
+        } else {
+          failCount++;
+        }
+        const linha = porNro.get(nro);
+        const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
+        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
+        const placaAuto = destino ? `${orig}-${destino}` : '';
+        itens.push({
+          nro_linha: nro,
+          placa: (result.placa ?? placaAuto) || placaAuto || '-',
+          destino: destino || '-',
+          intermediarias: intermediarias || '-',
+          status: result.ok ? 'criado' : 'erro',
+          msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
+        });
+      }
+      if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
+      if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
+      setResumoHojeMassaItens(itens);
+      setResumoHojeMassaDialogOpen(true);
+      setLinhasHojeDialogOpen(false);
+    } finally {
+      setCarregandoTodasLinhasHoje(false);
+    }
+  }, [carregandoNroLinhaHoje, carregandoTodasLinhasHoje, handleCarregamentoAutomatico, linhasCarregamHojeVisiveis, linhasHojeStatus]);
 
   const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
     try {
@@ -3659,6 +4126,20 @@ export function Disponiveis() {
     });
   }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
 
+  const totalsPorUnidadeParaLinhas = React.useMemo(() => {
+    const totals: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
+    for (const cte of ctesTransferFiltrados) {
+      if (cte.emTransito) continue;
+      const dest = (cte.unidadeDest ?? '').trim().toUpperCase();
+      if (!dest) continue;
+      if (!totals[dest]) totals[dest] = { pesoKg: 0, cubagem: 0, frete: 0 };
+      totals[dest].pesoKg += parsePeso(cte.peso);
+      totals[dest].cubagem += parseCubagem(cte.cubagem);
+      totals[dest].frete += parseMoeda(cte.frete);
+    }
+    return totals;
+  }, [ctesTransferFiltrados]);
+
   useEffect(() => {
     let ativo = true;
     setLoadingLinhasHojeStatus(true);
@@ -3675,37 +4156,71 @@ export function Disponiveis() {
         if (!unidades) hasDiretaPorDestino.add(dest);
       }
 
-      const totalsPorDestino: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
+      const totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
       for (const cte of ctesTransferFiltrados) {
         if (cte.emTransito) continue;
         const dest = (cte.unidadeDest ?? '').trim().toUpperCase();
         if (!dest) continue;
-        if (!totalsPorDestino[dest]) totalsPorDestino[dest] = { pesoKg: 0, cubagem: 0, frete: 0 };
-        totalsPorDestino[dest].pesoKg += parsePeso(cte.peso);
-        totalsPorDestino[dest].cubagem += parseCubagem(cte.cubagem);
-        totalsPorDestino[dest].frete += parseMoeda(cte.frete);
+        if (!totalsPorUnidade[dest]) totalsPorUnidade[dest] = { pesoKg: 0, cubagem: 0, frete: 0 };
+        totalsPorUnidade[dest].pesoKg += parsePeso(cte.peso);
+        totalsPorUnidade[dest].cubagem += parseCubagem(cte.cubagem);
+        totalsPorUnidade[dest].frete += parseMoeda(cte.frete);
       }
 
       const diretaLotaPorDestino = new Set<string>();
       for (const dest of hasDiretaPorDestino) {
-        const t = totalsPorDestino[dest] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+        const t = totalsPorUnidade[dest] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
         const ton = t.pesoKg / 1000;
         if (ton >= MIN_TON || t.cubagem >= MIN_M3) diretaLotaPorDestino.add(dest);
       }
+
+      const placasExistentes = new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
 
       const status: Record<number, LinhaHojeStatus> = {};
       for (const l of linhasCarregamHoje) {
         const nro = l.nro_linha ?? 0;
         const dest = (l.sigla_dest ?? '').trim().toUpperCase();
         const unidades = (l.unidades ?? '').trim();
-        const totals = (dest && totalsPorDestino[dest]) ? totalsPorDestino[dest] : { pesoKg: 0, cubagem: 0, frete: 0 };
-        const bloqueada = !!unidades && diretaLotaPorDestino.has(dest);
+        const intermediarias = unidades
+          ? unidades.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean)
+          : [];
+        const unidadesRota = Array.from(new Set([dest, ...intermediarias].filter(Boolean)));
+
+        const totals = unidadesRota.reduce(
+          (acc, u) => {
+            const t = totalsPorUnidade[u] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+            acc.pesoKg += t.pesoKg;
+            acc.cubagem += t.cubagem;
+            acc.frete += t.frete;
+            return acc;
+          },
+          { pesoKg: 0, cubagem: 0, frete: 0 }
+        );
+
+        const minFreteRaw = (l.vlr_min_frete ?? 0);
+        const minFrete = Number.isFinite(minFreteRaw as number) && (minFreteRaw as number) > 0 ? (minFreteRaw as number) : 0;
+        const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
+
+        const placaAuto = dest ? `${unidadeAtual}-${dest}` : '';
+        const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
+
+        const bloqueadaPorDireta = !!unidades && diretaLotaPorDestino.has(dest);
+
+        const motivos: string[] = [];
+        if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
+        if (!atingiuMinFrete) {
+          motivos.push(`Frete atual (${totals.frete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) abaixo do mínimo da linha (${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`);
+        }
+        if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
+        const bloqueada = jaExiste || !atingiuMinFrete || bloqueadaPorDireta;
+
         status[nro] = {
           podeCarregar: !bloqueada,
-          motivoBloqueio: bloqueada ? 'Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.' : null,
+          motivoBloqueio: bloqueada ? motivos.join(' ') : null,
           freteTotalDestino: totals.frete,
           pesoKgDestino: totals.pesoKg,
           cubagemDestino: totals.cubagem,
+          atingiuMinFrete,
         };
       }
 
@@ -3717,7 +4232,7 @@ export function Disponiveis() {
       ativo = false;
       window.clearTimeout(t);
     };
-  }, [ctesTransferFiltrados, linhasCarregamHoje]);
+  }, [carregamentos, ctesTransferFiltrados, linhasCarregamHoje, unidadeAtual]);
 
   const coletasTransferFiltradas = React.useMemo(() => {
     const list = dados?.coletas ? [...dados.coletas] : [];
@@ -3825,7 +4340,7 @@ export function Disponiveis() {
     for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
-        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
+        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -3836,6 +4351,7 @@ export function Disponiveis() {
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+      map[key].totalFrete   += parseMoeda(cte.frete);
     }
     return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
   }, [dadosEntrega, ctesEntregaFiltrados]);
@@ -4317,17 +4833,21 @@ export function Disponiveis() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Carregando linhas...
                     </div>
-                  ) : linhasCarregamHojeOrdenadas.length === 0 ? (
+                  ) : linhasCarregamHojeVisiveis.length === 0 ? (
                     <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
-                      Nenhuma linha está configurada para carregar hoje.
+                      {linhasCarregamHoje.length === 0
+                        ? 'Nenhuma linha está configurada para carregar hoje.'
+                        : 'Todas as linhas de hoje já possuem carregamento criado.'}
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {linhasCarregamHojeOrdenadas.map((l) => {
-                        const s = linhasHojeStatus[l.nro_linha];
+                      {linhasCarregamHojeVisiveis.map((l) => {
+                        const nro = l.nro_linha ?? 0;
+                        const s = linhasHojeStatus[nro];
                         const pode = s?.podeCarregar ?? true;
                         const minFrete = (l.vlr_min_frete ?? 0);
                         const freteAtual = s?.freteTotalDestino ?? 0;
+                        const atingiuMin = s?.atingiuMinFrete ?? (minFrete ? freteAtual >= minFrete : true);
                         const motivo = s?.motivoBloqueio ?? '';
                         return (
                           <div
@@ -4343,23 +4863,20 @@ export function Disponiveis() {
                             <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
                               {minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
-                            <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
+                            <span className={`text-right font-mono text-xs tabular-nums ${atingiuMin ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
                               {freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                             <div className="flex justify-end">
-                              {pode ? (
-                                <Button
-                                  size="sm"
-                                  className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white"
-                                  onClick={() => handleCarregarLinhaHoje(l.nro_linha)}
-                                  disabled={carregandoNroLinhaHoje !== null}
-                                >
-                                  {carregandoNroLinhaHoje === l.nro_linha ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-                                  Carregar
-                                </Button>
-                              ) : (
-                                <span className="text-xs text-slate-500 dark:text-slate-400">Indisponível</span>
-                              )}
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => handleCarregarLinhaHoje(nro)}
+                                disabled={!pode || carregandoNroLinhaHoje !== null || carregandoTodasLinhasHoje}
+                                title={!pode ? motivo : undefined}
+                              >
+                                {carregandoNroLinhaHoje === nro ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                                Carregar
+                              </Button>
                             </div>
                           </div>
                         );
@@ -4369,6 +4886,24 @@ export function Disponiveis() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <Button
+                  size="sm"
+                  className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleCarregarTodasLinhasHoje}
+                  disabled={
+                    loadingLinhasOrigem
+                    || loadingLinhasHojeStatus
+                    || carregandoNroLinhaHoje !== null
+                    || carregandoTodasLinhasHoje
+                    || linhasCarregamHojeVisiveis.filter((l) => {
+                      const nro = l.nro_linha ?? 0;
+                      return nro > 0 && (linhasHojeStatus[nro]?.podeCarregar ?? true);
+                    }).length === 0
+                  }
+                >
+                  {carregandoTodasLinhasHoje ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
+                  {carregandoTodasLinhasHoje ? 'Carregando...' : 'Carregar todas as possíveis'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setLinhasHojeDialogOpen(false)}>Fechar</Button>
               </div>
             </DialogContent>
@@ -4416,10 +4951,56 @@ export function Disponiveis() {
             </DialogContent>
           </Dialog>
 
+          <Dialog open={resumoHojeMassaDialogOpen} onOpenChange={setResumoHojeMassaDialogOpen}>
+            <DialogContent className="sm:max-w-[900px]">
+              <DialogHeader>
+                <DialogTitle>Resumo · Carregamentos em massa</DialogTitle>
+                <DialogDescription>Resultados por linha</DialogDescription>
+              </DialogHeader>
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+                <div className="grid grid-cols-[70px_120px_60px_minmax(0,1fr)_90px_minmax(0,1fr)] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                  <span>Linha</span>
+                  <span>Placa</span>
+                  <span>Dest.</span>
+                  <span>Intermediárias</span>
+                  <span>Status</span>
+                  <span>Mensagem</span>
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                  {resumoHojeMassaItens.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-slate-400 text-center">—</div>
+                  ) : resumoHojeMassaItens.map((r) => (
+                    <div key={r.nro_linha} className="grid grid-cols-[70px_120px_60px_minmax(0,1fr)_90px_minmax(0,1fr)] gap-2 px-3 py-2 text-xs items-center">
+                      <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">{String(r.nro_linha).padStart(3, '0')}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{r.placa}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{r.destino}</span>
+                      <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300 truncate">{r.intermediarias}</span>
+                      <span className={`text-[11px] font-bold ${r.status === 'criado' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                        {r.status === 'criado' ? 'CRIADO' : 'ERRO'}
+                      </span>
+                      <span className="text-[11px] text-slate-600 dark:text-slate-300 truncate">{r.msg}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between gap-3">
+                  <span className="font-semibold">
+                    Total: {resumoHojeMassaItens.length} · Criados: {resumoHojeMassaItens.filter(i => i.status === 'criado').length} · Erros: {resumoHojeMassaItens.filter(i => i.status === 'erro').length}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setResumoHojeMassaDialogOpen(false)}>Fechar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <CarregamentoArea
             sigla={sigla}
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
+            linhasOrigem={linhasOrigem}
+            loadingLinhasOrigem={loadingLinhasOrigem}
+            totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
             modoApontamento={modoApontamento}
             onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
             onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
@@ -4677,7 +5258,7 @@ export function Disponiveis() {
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}>
                       <span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span>
                       <span />
@@ -4687,6 +5268,8 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {
@@ -4791,7 +5374,7 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr)' }}>
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
@@ -4799,6 +5382,8 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {

@@ -429,6 +429,15 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
+        $checkOutro = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND nro_cte = {$nroCte}
+               AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
+             LIMIT 1"
+        );
+        if ($checkOutro && pg_num_rows($checkOutro) > 0) continue;
+
         $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
         $unidCarRaw = strtoupper(trim(
@@ -512,13 +521,17 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Linha não informada.']);
     }
 
-    $resLinha = null;
-    try {
-        $resLinha = sql(
-            "SELECT sigla_dest, unidades FROM {$tabelaLinha} WHERE sigla_emit = \$1 AND nro_linha = \$2 LIMIT 1",
-            [$unidade, $nroLinha], $conn
-        );
-    } catch (Exception $e) {}
+        $resLinha = null;
+        try {
+            $resLinha = sql(
+                "SELECT sigla_dest, unidades, vlr_min_frete,
+                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                 FROM {$tabelaLinha}
+                 WHERE sigla_emit = \$1 AND nro_linha = \$2
+                 LIMIT 1",
+                [$unidade, $nroLinha], $conn
+            );
+        } catch (Exception $e) {}
 
     if (!$resLinha || pg_num_rows($resLinha) === 0) {
         respondJson(['success' => false, 'message' => 'Linha não encontrada para a unidade atual.']);
@@ -533,6 +546,23 @@ if ($modoAutomatico) {
     $paradasLinha         = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
     $placaAuto            = $unidade . '-' . $dest;
     $paradasCsv           = implode(',', $paradasLinha);
+    $minFreteLinha        = ($linha['vlr_min_frete'] !== null && $linha['vlr_min_frete'] !== '') ? (float)$linha['vlr_min_frete'] : 0.0;
+
+    $diaSemana = (int)date('w');
+    $diaKeyByW = [
+        0 => 'carrega_dom',
+        1 => 'carrega_seg',
+        2 => 'carrega_ter',
+        3 => 'carrega_qua',
+        4 => 'carrega_qui',
+        5 => 'carrega_sex',
+        6 => 'carrega_sab',
+    ];
+    $diaKey = $diaKeyByW[$diaSemana] ?? 'carrega_seg';
+    $carregaHoje = ((string)($linha[$diaKey] ?? '') === 't');
+    if (!$carregaHoje) {
+        respondJson(['success' => false, 'message' => 'Esta linha não está configurada para carregar hoje.']);
+    }
 
     $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaAuto], $conn);
     if ($check && pg_num_rows($check) > 0) {
@@ -553,6 +583,92 @@ if ($modoAutomatico) {
         if (!isset($ctesUnicos[$k])) $ctesUnicos[$k] = $cte;
     }
     $ctesDisponiveis = array_values($ctesUnicos);
+
+    $temIntermediarias = trim((string)($linha['unidades'] ?? '')) !== '';
+    if ($temIntermediarias) {
+        $resDireta = null;
+        try {
+            $resDireta = sql(
+                "SELECT carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                 FROM {$tabelaLinha}
+                 WHERE sigla_emit = \$1
+                   AND sigla_dest = \$2
+                   AND COALESCE(TRIM(unidades), '') = ''
+                 LIMIT 1",
+                [$unidade, $dest], $conn
+            );
+        } catch (Exception $e) {}
+
+        $diretaCarregaHoje = false;
+        if ($resDireta && pg_num_rows($resDireta) > 0) {
+            $rowDireta = pg_fetch_assoc($resDireta);
+            $diretaCarregaHoje = ((string)($rowDireta[$diaKey] ?? '') === 't');
+        }
+
+        if ($diretaCarregaHoje) {
+            $pesoKg = 0.0;
+            $cubM3  = 0.0;
+            foreach ($ctesDisponiveis as $cte) {
+                $unidRel019 = strtoupper(trim((string)($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? '')));
+                if ($unidRel019 === '' || $unidRel019 !== $unidade) continue;
+
+                if (!empty($cte['emTransito'])) continue;
+
+                $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
+                if ($unidDest === '' || $unidDest !== $dest) continue;
+
+                $domainUpper = '';
+                if (isset($GLOBALS['domain'])) $domainUpper = strtoupper(trim((string)$GLOBALS['domain']));
+                if ($domainUpper === 'RVE') {
+                    if (in_array($unidDest, ['SAL', 'DK4', 'TNE', 'DEV'], true)) continue;
+                    if ($unidade === 'SAO' && $unidDest === 'CAM') continue;
+                    if ($unidade === 'CAM' && $unidDest === 'SAO') continue;
+                }
+
+                $pesoKg += (float)parseNumero($cte['peso'] ?? 0);
+                $cubM3  += (float)parseNumero($cte['cubagem'] ?? 0);
+            }
+
+            $ton = $pesoKg / 1000.0;
+            if ($ton >= 27.0 || $cubM3 >= 67.0) {
+                respondJson(['success' => false, 'message' => 'Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.']);
+            }
+        }
+    }
+
+    if ($minFreteLinha > 0) {
+        $rota = array_values(array_filter(array_unique(array_merge([$dest], $paradasLinha))));
+        $rotaIdx = array_flip($rota);
+        $freteAtual = 0.0;
+        foreach ($ctesDisponiveis as $cte) {
+            $unidRel019 = strtoupper(trim((string)($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? '')));
+            if ($unidRel019 === '' || $unidRel019 !== $unidade) continue;
+
+            if (!empty($cte['emTransito'])) continue;
+
+            $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
+            if ($unidDest === '' || !isset($rotaIdx[$unidDest])) continue;
+
+            $domainUpper = '';
+            if (isset($GLOBALS['domain'])) $domainUpper = strtoupper(trim((string)$GLOBALS['domain']));
+            if ($domainUpper === 'RVE') {
+                if (in_array($unidDest, ['SAL', 'DK4', 'TNE', 'DEV'], true)) continue;
+                if ($unidade === 'SAO' && $unidDest === 'CAM') continue;
+                if ($unidade === 'CAM' && $unidDest === 'SAO') continue;
+            }
+
+            $freteAtual += (float)parseNumero($cte['frete'] ?? 0);
+        }
+
+        if ($freteAtual < $minFreteLinha) {
+            respondJson([
+                'success' => false,
+                'message' => 'Frete atual abaixo do mínimo da linha.',
+                'frete_atual' => $freteAtual,
+                'min_frete' => $minFreteLinha,
+            ]);
+        }
+    }
 
     list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
     $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $dest, $paradasLinha, $limitePeso, $limiteVol);

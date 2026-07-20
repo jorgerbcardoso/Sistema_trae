@@ -113,6 +113,15 @@ if ($acao === 'adicionar_ctes') {
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
+        $checkOutro = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND nro_cte = {$nroCte}
+               AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
+             LIMIT 1"
+        );
+        if ($checkOutro && pg_num_rows($checkOutro) > 0) continue;
+
         $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
         $unidCarRaw = strtoupper(trim(
