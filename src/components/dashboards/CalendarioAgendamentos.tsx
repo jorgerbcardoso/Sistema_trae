@@ -82,7 +82,7 @@ export function CalendarioAgendamentos({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
             {diasData.map((dia, index) => {
               const performance = dia.agendados > 0
                 ? (dia.entregues / dia.agendados) * 100
@@ -166,7 +166,7 @@ export function CalendarioAgendamentos({
                       className={`flex justify-between items-center px-2 py-1 rounded ${atrasadosSemEntrega > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
                       onClick={atrasadosSemEntrega > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados_sem_entrega') : undefined}
                     >
-                      <span className="text-slate-600 dark:text-slate-400">Atraso (sem entrega):</span>
+                      <span className="text-slate-600 dark:text-slate-400" title="Atraso (sem entrega)">Atraso s/ ent.:</span>
                       <span className={`font-semibold text-red-600 dark:text-red-400 ${atrasadosSemEntrega > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {atrasadosSemEntrega}
                       </span>
@@ -176,7 +176,7 @@ export function CalendarioAgendamentos({
                       className={`flex justify-between items-center px-2 py-1 rounded ${entreguesComAtraso > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
                       onClick={entreguesComAtraso > 0 && onClickDia ? () => onClickDia(dia.data, 'entregues_com_atraso') : undefined}
                     >
-                      <span className="text-slate-600 dark:text-slate-400">Entregues c/ atraso:</span>
+                      <span className="text-slate-600 dark:text-slate-400" title="Entregues com atraso">Ent. c/ atraso:</span>
                       <span className={`font-semibold text-red-600 dark:text-red-400 ${entreguesComAtraso > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {entreguesComAtraso}
                       </span>
@@ -208,7 +208,7 @@ export function CalendarioAgendamentos({
                       className={`px-2 py-1 text-center rounded ${atrasadosSemEntrega > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
                       onClick={atrasadosSemEntrega > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados_sem_entrega') : undefined}
                     >
-                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atraso (sem entrega)</p>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5" title="Atraso (sem entrega)">Atraso s/ ent.</p>
                       <p className={`font-semibold text-red-600 dark:text-red-400 ${atrasadosSemEntrega > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {atrasadosSemEntrega}
                       </p>
@@ -217,7 +217,7 @@ export function CalendarioAgendamentos({
                       className={`px-2 py-1 text-center rounded ${entreguesComAtraso > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
                       onClick={entreguesComAtraso > 0 && onClickDia ? () => onClickDia(dia.data, 'entregues_com_atraso') : undefined}
                     >
-                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Entregues c/ atraso</p>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5" title="Entregues com atraso">Ent. c/ atraso</p>
                       <p className={`font-semibold text-red-600 dark:text-red-400 ${entreguesComAtraso > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {entreguesComAtraso}
                       </p>
