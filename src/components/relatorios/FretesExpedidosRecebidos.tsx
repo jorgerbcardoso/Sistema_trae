@@ -371,15 +371,56 @@ export function FretesExpedidosRecebidos() {
   const [tab, setTab] = useState<'expedidos' | 'recebidos'>('expedidos');
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
+  const [filtroExpedidos, setFiltroExpedidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
   const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
   const runRef = useRef(0);
 
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
   const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
 
+  const dataExpView = useMemo<ApiData | null>(() => {
+    if (!dataExp) return null;
+    const isFec = (r: RowAgg) => String(r.unidade ?? r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
+    const rowsBase = dataExp.rows || [];
+    const rows =
+      filtroExpedidos === 'todos'
+        ? rowsBase
+        : filtroExpedidos === 'fec'
+          ? rowsBase.filter(isFec)
+          : rowsBase.filter((r) => !isFec(r));
+
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.quant_vol += Number(r.quant_vol) || 0;
+        acc.quant_ctrc += Number(r.quant_ctrc) || 0;
+        acc.peso_ton += Number(r.peso_ton) || 0;
+        acc.val_merc += Number(r.val_merc) || 0;
+        acc.frete_tot += Number(r.frete_tot) || 0;
+        acc.frete_cif += Number(r.frete_cif) || 0;
+        acc.frete_fob += Number(r.frete_fob) || 0;
+        acc.frete_ter += Number(r.frete_ter) || 0;
+        acc.frete_sub += Number(r.frete_sub) || 0;
+        return acc;
+      },
+      {
+        quant_vol: 0,
+        quant_ctrc: 0,
+        peso_ton: 0,
+        val_merc: 0,
+        frete_tot: 0,
+        frete_cif: 0,
+        frete_fob: 0,
+        frete_ter: 0,
+        frete_sub: 0,
+      }
+    );
+
+    return { totals, rows };
+  }, [dataExp, filtroExpedidos]);
+
   const dataRecView = useMemo<ApiData | null>(() => {
     if (!dataRec) return null;
-    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().toUpperCase() === 'FEC';
+    const isFec = (r: RowAgg) => String(r.unidade ?? r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
     const rowsBase = dataRec.rows || [];
     const rows =
       filtroRecebidos === 'todos'
@@ -418,7 +459,7 @@ export function FretesExpedidosRecebidos() {
   }, [dataRec, filtroRecebidos]);
 
   const rowsExpSorted = useMemo(() => {
-    const rows = [...(dataExp?.rows || [])];
+    const rows = [...(dataExpView?.rows || [])];
     const { key, dir } = sortExp;
     rows.sort((a, b) => {
       const av: any = (a as any)[key];
@@ -429,7 +470,7 @@ export function FretesExpedidosRecebidos() {
       return dir === 'asc' ? cmp : -cmp;
     });
     return rows;
-  }, [dataExp, sortExp]);
+  }, [dataExpView, sortExp]);
 
   const rowsRecSorted = useMemo(() => {
     const rows = [...(dataRecView?.rows || [])];
@@ -627,7 +668,7 @@ export function FretesExpedidosRecebidos() {
     }
   };
 
-  const donutExp = useMemo(() => (dataExp ? buildDonut(dataExp.rows) : []), [dataExp]);
+  const donutExp = useMemo(() => (dataExpView ? buildDonut(dataExpView.rows) : []), [dataExpView]);
   const donutRec = useMemo(() => (dataRecView ? buildDonut(dataRecView.rows) : []), [dataRecView]);
 
   return (
@@ -813,7 +854,7 @@ export function FretesExpedidosRecebidos() {
                 Expedidos
                 {dataExp ? (
                   <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs">
-                    {formatNumber(dataExp.totals.quant_ctrc)}
+                    {formatNumber((dataExpView?.totals.quant_ctrc ?? dataExp.totals.quant_ctrc) || 0)}
                   </Badge>
                 ) : (
                   <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
@@ -855,7 +896,7 @@ export function FretesExpedidosRecebidos() {
                   disabled={loading}
                   onClick={() => {
                     const isExp = tab === 'expedidos';
-                    const data = isExp ? dataExp : dataRecView;
+                    const data = isExp ? dataExpView : dataRecView;
                     if (!data) {
                       toast.info('Nenhum dado carregado para exportar.');
                       return;
@@ -866,7 +907,13 @@ export function FretesExpedidosRecebidos() {
                     const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
                     const pad = (n: number) => String(n).padStart(2, '0');
-                    const suf = !isExp && filtroRecebidos !== 'todos' ? `_${filtroRecebidos}` : '';
+                    const suf = isExp
+                      ? filtroExpedidos !== 'todos'
+                        ? `_${filtroExpedidos}`
+                        : ''
+                      : filtroRecebidos !== 'todos'
+                        ? `_${filtroRecebidos}`
+                        : '';
                     const name = `fretes_${kind.toLowerCase()}${suf}_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(
                       stamp.getMinutes()
                     )}.csv`;
@@ -880,34 +927,77 @@ export function FretesExpedidosRecebidos() {
 
             {tab === 'expedidos' ? (
               <div>
-            {!dataExp ? (
+            {!dataExpView ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
                   Nenhum dado de Expedidos carregado.
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-muted-foreground">Filtro:</div>
+                  <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        filtroExpedidos === 'todos'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroExpedidos('todos')}
+                      disabled={loading}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        filtroExpedidos === 'fracionados'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroExpedidos('fracionados')}
+                      disabled={loading}
+                    >
+                      Apenas Fracionados
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        filtroExpedidos === 'fec'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroExpedidos('fec')}
+                      disabled={loading}
+                    >
+                      Apenas FEC
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
                 <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 auto-rows-fr content-start">
                   <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
                     <DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete CIF</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_cif)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExpView.totals.frete_cif)}</div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-start gap-3">
                     <Route className="w-5 h-5 text-sky-700 dark:text-sky-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-sky-800 dark:text-sky-200">Frete FOB</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_fob)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExpView.totals.frete_fob)}</div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-fuchsia-200 dark:border-fuchsia-800 bg-fuchsia-50 dark:bg-fuchsia-950/30 p-4 flex items-start gap-3">
                     <Users className="w-5 h-5 text-fuchsia-700 dark:text-fuchsia-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-fuchsia-800 dark:text-fuchsia-200">Frete Terceiro</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.frete_ter)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExpView.totals.frete_ter)}</div>
                     </div>
                   </div>
 
@@ -915,14 +1005,14 @@ export function FretesExpedidosRecebidos() {
                     <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-cyan-700 dark:text-cyan-200">CT-es</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_ctrc)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExpView.totals.quant_ctrc)}</div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4 flex items-start gap-3">
                     <Package className="w-5 h-5 text-teal-700 dark:text-teal-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-teal-800 dark:text-teal-200">Quantidade de Volumes</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExp.totals.quant_vol)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataExpView.totals.quant_vol)}</div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
@@ -930,7 +1020,7 @@ export function FretesExpedidosRecebidos() {
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatNumber(Math.round(Number(dataExp.totals.peso_ton) || 0))}
+                        {formatNumber(Math.round(Number(dataExpView.totals.peso_ton) || 0))}
                       </div>
                     </div>
                   </div>
@@ -938,7 +1028,7 @@ export function FretesExpedidosRecebidos() {
                     <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor de Mercadoria</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExp.totals.val_merc)}</div>
+                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataExpView.totals.val_merc)}</div>
                     </div>
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-4 flex items-start gap-3">
@@ -946,7 +1036,7 @@ export function FretesExpedidosRecebidos() {
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Frete Total (R$)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatCurrency((Number(dataExp.totals.frete_cif) || 0) + (Number(dataExp.totals.frete_fob) || 0) + (Number(dataExp.totals.frete_ter) || 0))}
+                        {formatCurrency((Number(dataExpView.totals.frete_cif) || 0) + (Number(dataExpView.totals.frete_fob) || 0) + (Number(dataExpView.totals.frete_ter) || 0))}
                       </div>
                     </div>
                   </div>
@@ -956,9 +1046,11 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete por Peso (R$/Kg)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
                         {(() => {
-                          const pesoKg = Math.round(Number(dataExp.totals.peso_ton) || 0);
+                          const pesoKg = Math.round(Number(dataExpView.totals.peso_ton) || 0);
                           const freteTotal =
-                            (Number(dataExp.totals.frete_cif) || 0) + (Number(dataExp.totals.frete_fob) || 0) + (Number(dataExp.totals.frete_ter) || 0);
+                            (Number(dataExpView.totals.frete_cif) || 0) +
+                            (Number(dataExpView.totals.frete_fob) || 0) +
+                            (Number(dataExpView.totals.frete_ter) || 0);
                           return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
                         })()}
                       </div>
@@ -1044,6 +1136,7 @@ export function FretesExpedidosRecebidos() {
                     </CardContent>
                   </Card>
                 </div>
+              </div>
               </div>
             )}
               </div>
