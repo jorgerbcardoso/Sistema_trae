@@ -221,7 +221,7 @@ export function CentralAgendamento() {
 
   const [calendarioDialogOpen, setCalendarioDialogOpen] = useState(false);
   const [calendarioDialogData, setCalendarioDialogData] = useState('');
-  const [calendarioDialogTipo, setCalendarioDialogTipo] = useState<'agendados' | 'no_prazo' | 'atrasados'>('agendados');
+  const [calendarioDialogTipo, setCalendarioDialogTipo] = useState<'agendados' | 'no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso'>('agendados');
   const [calendarioDialogNome, setCalendarioDialogNome] = useState('');
   const [ctesCalendario, setCtesCalendario] = useState<Cte[]>([]);
   const [agendasCalendario, setAgendasCalendario] = useState<Agenda[]>([]);
@@ -489,13 +489,19 @@ export function CentralAgendamento() {
     }
   };
 
-  const abrirCalendarioDialog = async (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados') => {
+  const abrirCalendarioDialog = async (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => {
     const [ano, mes, dia] = data.split('-');
     const dataFormatada = `${dia}/${mes}/${ano}`;
-    const nomesTipo = { agendados: 'Agendados', no_prazo: 'No Prazo', atrasados: 'Atrasados' };
+    const nomesTipo = {
+      agendados: 'Agendados',
+      no_prazo: 'No Prazo',
+      atrasados: 'Atrasados',
+      atrasados_sem_entrega: 'Atraso (sem entrega)',
+      entregues_com_atraso: 'Entregues com atraso',
+    };
     setCalendarioDialogData(data);
     setCalendarioDialogTipo(tipo);
-    setCalendarioDialogNome(`${nomesTipo[tipo]} — ${dataFormatada}`);
+    setCalendarioDialogNome(`${(nomesTipo as any)[tipo]} — ${dataFormatada}`);
     setCtesCalendario([]);
     setAgendasCalendario([]);
     setExpandedAgendasCalendario(new Set());

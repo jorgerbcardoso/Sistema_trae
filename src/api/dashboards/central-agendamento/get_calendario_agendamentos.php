@@ -100,7 +100,7 @@ $query = "
           AND (data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR oc.tipo = 'C')
         GROUP BY dia
     ),
-    atrasados AS (
+    atrasados_sem_entrega AS (
         SELECT
             cte.data_prev_ent::date AS dia,
             {$countExpr} AS total
@@ -113,7 +113,25 @@ $query = "
         WHERE {$whereClause}
           AND cte.data_prev_ent IS NOT NULL
           AND cte.data_prev_ent::date < CURRENT_DATE
-          AND (cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)
+          AND cte.data_entrega IS NULL
+          AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C'))
+        GROUP BY dia
+    ),
+    entregues_com_atraso AS (
+        SELECT
+            cte.data_prev_ent::date AS dia,
+            {$countExpr} AS total
+        FROM {$domain}_cte cte
+        LEFT JOIN (
+            SELECT codigo::text as codigo, MAX(tipo) as tipo
+            FROM {$domain}_ocorrencia
+            GROUP BY codigo::text
+        ) oc ON oc.codigo = cte.ult_ocor::text
+        WHERE {$whereClause}
+          AND cte.data_prev_ent IS NOT NULL
+          AND cte.data_prev_ent::date < CURRENT_DATE
+          AND cte.data_entrega IS NOT NULL
+          AND cte.data_entrega > cte.data_prev_ent
           AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C'))
         GROUP BY dia
     )
@@ -121,11 +139,14 @@ $query = "
         dias.dia,
         COALESCE(agendados.total, 0) AS agendados,
         COALESCE(entregues.total, 0) AS entregues,
-        COALESCE(atrasados.total, 0) AS atrasados
+        COALESCE(atrasados_sem_entrega.total, 0) AS atrasados_sem_entrega,
+        COALESCE(entregues_com_atraso.total, 0) AS entregues_com_atraso,
+        (COALESCE(atrasados_sem_entrega.total, 0) + COALESCE(entregues_com_atraso.total, 0)) AS atrasados
     FROM dias
     LEFT JOIN agendados ON agendados.dia = dias.dia
     LEFT JOIN entregues ON entregues.dia  = dias.dia
-    LEFT JOIN atrasados ON atrasados.dia  = dias.dia
+    LEFT JOIN atrasados_sem_entrega ON atrasados_sem_entrega.dia = dias.dia
+    LEFT JOIN entregues_com_atraso ON entregues_com_atraso.dia = dias.dia
     ORDER BY dias.dia ASC
 ";
 
@@ -149,7 +170,9 @@ while ($row = pg_fetch_assoc($result)) {
     $ts        = strtotime($row['dia']);
     $agendados = (int)$row['agendados'];
     $entregues = (int)$row['entregues'];
-    $atrasados = (int)($row['atrasados'] ?? 0);
+    $atrasadosSemEntrega = (int)($row['atrasados_sem_entrega'] ?? 0);
+    $entreguesComAtraso  = (int)($row['entregues_com_atraso'] ?? 0);
+    $atrasados = (int)($row['atrasados'] ?? ($atrasadosSemEntrega + $entreguesComAtraso));
     $diasData[] = [
         'data'       => $row['dia'],
         'dia'        => date('d', $ts),
@@ -158,6 +181,8 @@ while ($row = pg_fetch_assoc($result)) {
         'diaSemana'  => $diasSemana[(int)date('w', $ts)] ?? '',
         'agendados'  => $agendados,
         'entregues'  => $entregues,
+        'atrasados_sem_entrega' => $atrasadosSemEntrega,
+        'entregues_com_atraso'  => $entreguesComAtraso,
         'atrasados'  => $atrasados,
     ];
 }

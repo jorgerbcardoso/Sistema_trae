@@ -12,6 +12,8 @@ export interface DiaAgendamento {
   agendados: number;
   entregues: number;
   atrasados?: number;
+  atrasados_sem_entrega?: number;
+  entregues_com_atraso?: number;
 }
 
 interface CalendarioAgendamentosProps {
@@ -19,7 +21,7 @@ interface CalendarioAgendamentosProps {
   setPeriodo: (periodo: 7 | 15 | 30) => void;
   diasData: DiaAgendamento[];
   loading: boolean;
-  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados') => void;
+  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => void;
   modoVisao?: 'CTE' | 'AGENDA';
 }
 
@@ -87,8 +89,14 @@ export function CalendarioAgendamentos({
                 : 0;
               const isFromTodayOn = dia.data >= todayISO;
               const isFuture = dia.data > todayISO;
-              const atrasadosRaw = Number.isFinite(dia.atrasados as number) ? (dia.atrasados as number) : Math.max(0, dia.agendados - dia.entregues);
-              const atrasados = isFromTodayOn ? 0 : Math.max(0, atrasadosRaw);
+              const atrasSemEntregaRaw = Number.isFinite(dia.atrasados_sem_entrega as number) ? (dia.atrasados_sem_entrega as number) : 0;
+              const entreguesAtrasoRaw = Number.isFinite(dia.entregues_com_atraso as number) ? (dia.entregues_com_atraso as number) : 0;
+              const atrasadosTotalRaw = Number.isFinite(dia.atrasados as number)
+                ? (dia.atrasados as number)
+                : Math.max(0, dia.agendados - dia.entregues);
+              const atrasadosSemEntrega = isFromTodayOn ? 0 : Math.max(0, atrasSemEntregaRaw);
+              const entreguesComAtraso = isFromTodayOn ? 0 : Math.max(0, entreguesAtrasoRaw);
+              const atrasados = isFromTodayOn ? 0 : Math.max(0, atrasadosTotalRaw);
 
               const isToday = dia.data === todayISO;
 
@@ -155,12 +163,22 @@ export function CalendarioAgendamentos({
                     </div>
 
                     <div
-                      className={`flex justify-between items-center px-2 py-1 rounded ${atrasados > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
-                      onClick={atrasados > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados') : undefined}
+                      className={`flex justify-between items-center px-2 py-1 rounded ${atrasadosSemEntrega > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={atrasadosSemEntrega > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados_sem_entrega') : undefined}
                     >
-                      <span className="text-slate-600 dark:text-slate-400">Atrasados:</span>
-                      <span className={`font-semibold text-red-600 dark:text-red-400 ${atrasados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
-                        {atrasados}
+                      <span className="text-slate-600 dark:text-slate-400">Atraso (sem entrega):</span>
+                      <span className={`font-semibold text-red-600 dark:text-red-400 ${atrasadosSemEntrega > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {atrasadosSemEntrega}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`flex justify-between items-center px-2 py-1 rounded ${entreguesComAtraso > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={entreguesComAtraso > 0 && onClickDia ? () => onClickDia(dia.data, 'entregues_com_atraso') : undefined}
+                    >
+                      <span className="text-slate-600 dark:text-slate-400">Entregues c/ atraso:</span>
+                      <span className={`font-semibold text-red-600 dark:text-red-400 ${entreguesComAtraso > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {entreguesComAtraso}
                       </span>
                     </div>
 
@@ -187,12 +205,21 @@ export function CalendarioAgendamentos({
                       </p>
                     </div>
                     <div
-                      className={`px-2 py-1 text-center rounded ${atrasados > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
-                      onClick={atrasados > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados') : undefined}
+                      className={`px-2 py-1 text-center rounded ${atrasadosSemEntrega > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={atrasadosSemEntrega > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados_sem_entrega') : undefined}
                     >
-                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atrasados</p>
-                      <p className={`font-semibold text-red-600 dark:text-red-400 ${atrasados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
-                        {atrasados}
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atraso (sem entrega)</p>
+                      <p className={`font-semibold text-red-600 dark:text-red-400 ${atrasadosSemEntrega > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {atrasadosSemEntrega}
+                      </p>
+                    </div>
+                    <div
+                      className={`px-2 py-1 text-center rounded ${entreguesComAtraso > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
+                      onClick={entreguesComAtraso > 0 && onClickDia ? () => onClickDia(dia.data, 'entregues_com_atraso') : undefined}
+                    >
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Entregues c/ atraso</p>
+                      <p className={`font-semibold text-red-600 dark:text-red-400 ${entreguesComAtraso > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {entreguesComAtraso}
                       </p>
                     </div>
                     {dia.agendados > 0 && !isFuture && (

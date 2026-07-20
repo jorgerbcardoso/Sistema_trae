@@ -20,8 +20,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
     respondJson(['success' => false, 'message' => 'Data inválida']);
 }
 
-if (!in_array($tipo, ['agendados', 'no_prazo', 'atrasados'])) {
-    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados, no_prazo ou atrasados']);
+if (!in_array($tipo, ['agendados', 'no_prazo', 'atrasados', 'atrasados_sem_entrega', 'entregues_com_atraso'])) {
+    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados, no_prazo, atrasados, atrasados_sem_entrega ou entregues_com_atraso']);
 }
 
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
@@ -57,7 +57,19 @@ if ($tipo === 'no_prazo') {
     $whereConditions[] = "(cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR ocor.tipo = 'C')";
 }
 if ($tipo === 'atrasados') {
+    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
     $whereConditions[] = "(cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
+}
+if ($tipo === 'atrasados_sem_entrega') {
+    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
+    $whereConditions[] = "cte.data_entrega IS NULL";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
+}
+if ($tipo === 'entregues_com_atraso') {
+    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
+    $whereConditions[] = "cte.data_entrega IS NOT NULL";
+    $whereConditions[] = "cte.data_entrega > cte.data_prev_ent";
     $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
 }
 
