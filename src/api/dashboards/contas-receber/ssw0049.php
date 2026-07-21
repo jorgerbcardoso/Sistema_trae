@@ -428,7 +428,7 @@ try {
         'rel_ana_fg_fat_desc' => 'I',
         'rel_ana_fg_lista_ocor' => 'N',
         'rel_ana_fg_ctrc_fob_dir' => 'N',
-        'tp_cobranca' => 'T',
+        'tp_cobranca' => 'A',
         'rel_ana_vlr_max_fat' => '9.999.999,99',
         'rel_ana_periodicidade' => 'T',
         'rel_ana_arq_excel' => 'S',
@@ -469,6 +469,7 @@ try {
         $html = (string)$sswFetch($buildUrl($params), 3);
         $t1 = microtime(true);
         $html = urldecode((string)$html);
+        $html = html_entity_decode((string)$html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         if ($html === '' || stripos($html, '504 Gateway Time-out') !== false) {
             return [
@@ -486,10 +487,25 @@ try {
             ];
         }
 
+        $queuedSignals = [
+            'Solicitação enviada para processamento',
+            'Solicita&ccedil;&atilde;o enviada para processamento',
+            'enviada para processamento',
+        ];
+        foreach ($queuedSignals as $sig) {
+            if (stripos($html, $sig) !== false) {
+                return [
+                    'kind' => 'queued',
+                    'timing_ms' => ['ssw0049' => (int)round(($t1 - $t0) * 1000)],
+                    'size_bytes' => ['ssw0049_html' => strlen($html)],
+                ];
+            }
+        }
+
         [$act, $arq] = $getActArq($html);
         if ($act !== '' && $arq !== '') {
             $t2 = microtime(true);
-            $csvRaw = (string)$sswFetch("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0", 3);
+            $csvRaw = (string)$sswFetch("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1", 3);
             $t3 = microtime(true);
             if ($csvRaw === '' || strlen($csvRaw) < 50) {
                 return [
@@ -523,40 +539,57 @@ try {
             ];
         }
 
-        if (preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/i", $html, $mArq)) {
+        $tryDownloadByAbrir = static function(string $body) use ($sswFetch, $parseSsw0049Csv, $t0, $t1): ?array {
+            if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/i", $body, $mArq)) {
+                return null;
+            }
             $filename = trim((string)$mArq[1]);
             $path = trim((string)$mArq[2]);
-            if ($filename !== '' && $path !== '') {
-                $t2 = microtime(true);
-                $csvRaw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
-                $t3 = microtime(true);
-                if ($csvRaw !== '' && strlen($csvRaw) >= 50) {
-                    $parsed = $parseSsw0049Csv($csvRaw);
-                    return [
-                        'kind' => 'ready',
-                        'data' => $parsed,
-                        'meta' => [
-                            'act' => $filename,
-                            'filename' => $filename,
-                            'path' => $path,
-                        ],
-                        'timing_ms' => [
-                            'ssw0049' => (int)round(($t1 - $t0) * 1000),
-                            'download' => (int)round(($t3 - $t2) * 1000),
-                        ],
-                        'size_bytes' => [
-                            'ssw0049_html' => strlen($html),
-                            'csv' => strlen($csvRaw),
-                        ],
-                    ];
-                }
-            }
+            if ($filename === '' || $path === '') return null;
+
+            $t2 = microtime(true);
+            $csvRaw = (string)$sswFetch(
+                'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1',
+                3
+            );
+            $t3 = microtime(true);
+            if ($csvRaw === '' || strlen($csvRaw) < 50) return null;
+
+            $parsed = $parseSsw0049Csv($csvRaw);
+            return [
+                'kind' => 'ready',
+                'data' => $parsed,
+                'meta' => [
+                    'act' => $filename,
+                    'filename' => $filename,
+                    'path' => $path,
+                ],
+                'timing_ms' => [
+                    'ssw0049' => (int)round(($t1 - $t0) * 1000),
+                    'download' => (int)round(($t3 - $t2) * 1000),
+                ],
+                'size_bytes' => [
+                    'ssw0049_html' => strlen($body),
+                    'csv' => strlen($csvRaw),
+                ],
+            ];
+        };
+
+        $byAbrir = $tryDownloadByAbrir($html);
+        if ($byAbrir) return $byAbrir;
+
+        if (preg_match('/id=web_body[^>]*value="([^"]+)"/i', $html, $mVal) || preg_match('/name=web_body[^>]*value="([^"]+)"/i', $html, $mVal)) {
+            $webBody = urldecode((string)($mVal[1] ?? ''));
+            $webBody = html_entity_decode((string)$webBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $byAbrir2 = $tryDownloadByAbrir($webBody);
+            if ($byAbrir2) return $byAbrir2;
         }
 
         return [
-            'kind' => 'queued',
+            'kind' => 'error',
+            'message' => 'Resposta inesperada do SSW0049: sem download imediato e sem indicação de fila.',
+            'http_status' => 502,
             'timing_ms' => ['ssw0049' => (int)round(($t1 - $t0) * 1000)],
-            'size_bytes' => ['ssw0049_html' => strlen($html)],
         ];
     };
 
