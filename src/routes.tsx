@@ -232,6 +232,26 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         )
       },
+      {
+        path: 'dashboards/contas_receber',
+        element: <Navigate to="/dashboards/contas-receber" replace />
+      },
+      {
+        path: 'dashboards/contasreceber',
+        element: <Navigate to="/dashboards/contas-receber" replace />
+      },
+      {
+        path: 'dashboards/contas-a-receber',
+        element: <Navigate to="/dashboards/contas-receber" replace />
+      },
+      {
+        path: 'dashboards/*',
+        element: (
+          <ProtectedRoute>
+            <DynamicMenuRoute />
+          </ProtectedRoute>
+        )
+      },
       
       // Cadastros (protegidos)
       {
