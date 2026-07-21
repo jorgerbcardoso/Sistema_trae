@@ -211,10 +211,32 @@ const agingVencDefs = [
 
 function normTextKey(v: any): string {
   return String(v ?? '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/\u00A0/g, ' ')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toUpperCase();
+}
+
+function normSituacaoLabel(v: any): 'ATRASADA' | 'LIQUIDADO' | 'PENDENTE' {
+  const s = normTextKey(v);
+  if (s.includes('ATRAS')) return 'ATRASADA';
+  if (s.includes('LIQUID')) return 'LIQUIDADO';
+  return 'PENDENTE';
+}
+
+function unitSigla3(v: any): string {
+  const s = normTextKey(v);
+  if (!s) return '—';
+  return s.slice(0, 3) || '—';
+}
+
+function SituacaoBadge({ value }: { value: any }) {
+  const s = normSituacaoLabel(value);
+  if (s === 'ATRASADA') return <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">ATRASADA</Badge>;
+  if (s === 'LIQUIDADO') return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">LIQUIDADO</Badge>;
+  return <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">PENDENTE</Badge>;
 }
 
 function CrChartTooltip({
@@ -274,7 +296,6 @@ export function ContasReceber() {
   const [clientePagador, setClientePagador] = useState<ClienteSel>({ cnpj: '', nome: '' });
   const [clienteGrupo, setClienteGrupo] = useState<ClienteSel>({ cnpj: '', nome: '' });
   const [tableSearch, setTableSearch] = useState('');
-  const [quickView, setQuickView] = useState<'todas' | 'abertas' | 'vencidas' | 'vence3d'>('todas');
   const [showFilters, setShowFilters] = useState(false);
   const defaultFilters = useMemo(
     () => ({
@@ -308,6 +329,8 @@ export function ContasReceber() {
   const [drillTitle, setDrillTitle] = useState('');
   const [drillKind, setDrillKind] = useState<'faturas' | 'ctes0103'>('faturas');
   const [drillRows, setDrillRows] = useState<any[]>([]);
+  const [drillSortKey, setDrillSortKey] = useState<string>('saldo');
+  const [drillSortDir, setDrillSortDir] = useState<'asc' | 'desc'>('desc');
 
   const [rankGroupBy, setRankGroupBy] = useState<'grupos' | 'clientes'>('grupos');
   const [grupoMap, setGrupoMap] = useState<Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }>>({});
@@ -317,6 +340,8 @@ export function ContasReceber() {
     setDrillTitle(title);
     setDrillRows(rows);
     setDrillKind(kind);
+    setDrillSortKey(kind === 'ctes0103' ? 'frete' : 'saldo');
+    setDrillSortDir('desc');
     setDrillOpen(true);
   }, []);
 
@@ -357,7 +382,7 @@ export function ContasReceber() {
           r.emissao,
           r.vencimento,
           r.pagamento,
-          r.situacao,
+          normSituacaoLabel(r.situacao),
           formatCurrency(r.vlr_fatur),
           formatCurrency(r.vlr_pago),
           formatCurrency(r.saldo),
@@ -366,6 +391,32 @@ export function ContasReceber() {
           r.ultima_ocorrencia,
           r.unidade_responsavel,
           r.vendedor,
+        ]
+          .map(csvEscape)
+          .join(';')
+      );
+    }
+    return lines.join('\n');
+  }, []);
+
+  const buildCsv0103 = useCallback((rows: Ssw0103Row[]) => {
+    const header = ['CTRC', 'CT-e', 'Pagador', 'CNPJ Pagador', 'Dest', 'Frete', 'Emissão', 'Prev. Entrega', 'Chave CT-e', 'Últ. Ocorrência', 'Observação'];
+    const lines: string[] = [];
+    lines.push(header.map(csvEscape).join(';'));
+    for (const r of rows) {
+      lines.push(
+        [
+          r.ctrc,
+          r.numero_cte,
+          r.pagador,
+          r.cnpj_pagador,
+          r.dest,
+          formatCurrency(Number(r.frete) || 0),
+          r.emissao,
+          r.prev_entrega,
+          r.chave_cte,
+          r.ult_ocor,
+          r.observacao,
         ]
           .map(csvEscape)
           .join(';')
@@ -609,10 +660,7 @@ export function ContasReceber() {
   }, [normalizedFaturas]);
 
   const filteredFaturas = useMemo(() => {
-    let baseList: any[] = normalizedFaturas as any[];
-    if (quickView === 'abertas') baseList = baseList.filter((f) => (Number(f._saldo) || 0) > 0);
-    if (quickView === 'vencidas') baseList = baseList.filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
-    if (quickView === 'vence3d') baseList = baseList.filter((f) => f._dueSoon && (Number(f._saldo) || 0) > 0);
+    const baseList: any[] = normalizedFaturas as any[];
     const q = tableSearch.trim().toUpperCase();
     if (!q) return baseList;
     return baseList.filter((f: any) => {
@@ -636,7 +684,7 @@ export function ContasReceber() {
         .toUpperCase();
       return hay.includes(q);
     });
-  }, [normalizedFaturas, quickView, tableSearch]);
+  }, [normalizedFaturas, tableSearch]);
 
   const kpis = useMemo(() => {
     const base = {
@@ -818,7 +866,7 @@ export function ContasReceber() {
         sub: `Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`,
         tone: 'rose',
         icon: AlertTriangle,
-        onClick: () => abrirDrill('Atrasadas (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas'),
+        onClick: () => abrirDrill('Atrasadas', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas'),
       },
       {
         label: 'Vence em 3 dias',
@@ -862,8 +910,7 @@ export function ContasReceber() {
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
-      const keyRaw = f.fil || f.unidade_responsavel || '—';
-      const key = normTextKey(keyRaw) || '—';
+      const key = unitSigla3(f.fil || f.unidade_responsavel || '—');
       if (!by[key]) by[key] = { key, name: key, value: 0 };
       by[key].value += saldo;
     }
@@ -1136,6 +1183,68 @@ export function ContasReceber() {
     tempSitFatura,
   ]);
 
+  const toggleDrillSort = useCallback((key: string) => {
+    setDrillSortKey((prevKey) => {
+      if (prevKey !== key) {
+        setDrillSortDir('desc');
+        return key;
+      }
+      setDrillSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+      return prevKey;
+    });
+  }, []);
+
+  const drillSortedRows = useMemo(() => {
+    const rows = Array.isArray(drillRows) ? [...drillRows] : [];
+    const dir = drillSortDir === 'asc' ? 1 : -1;
+    const key = String(drillSortKey || '').trim();
+    const cmp = (a: any, b: any) => {
+      if (drillKind === 'ctes0103') {
+        const get = (x: any) => {
+          if (key === 'frete') return Number(x?.frete) || 0;
+          if (key === 'ctrc') return normTextKey(x?.ctrc);
+          if (key === 'cte') return normTextKey(x?.numero_cte);
+          if (key === 'pagador') return normTextKey(x?.pagador);
+          if (key === 'dest') return normTextKey(x?.dest);
+          if (key === 'emissao') return parseDateBr(String(x?.emissao || '')) ?? 0;
+          if (key === 'prev') return parseDateBr(String(x?.prev_entrega || '')) ?? 0;
+          return normTextKey(x?.ctrc);
+        };
+        const va = get(a);
+        const vb = get(b);
+        if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), 'pt-BR') * dir;
+      }
+
+      const get = (x: any) => {
+        if (key === 'saldo') return Number(x?.saldo) || 0;
+        if (key === 'valor') return Number(x?.vlr_fatur) || 0;
+        if (key === 'ctes') return Array.isArray(x?.ctes) ? x.ctes.length : 0;
+        if (key === 'venc') return parseDateBr(String(x?.vencimento || '')) ?? 0;
+        if (key === 'situacao') return normSituacaoLabel(x?.situacao);
+        if (key === 'cliente') return normTextKey(x?.cliente);
+        if (key === 'fatura') return normTextKey(x?.fatura);
+        return Number(x?.saldo) || 0;
+      };
+      const va = get(a);
+      const vb = get(b);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), 'pt-BR') * dir;
+    };
+    rows.sort(cmp);
+    return rows;
+  }, [drillKind, drillRows, drillSortDir, drillSortKey]);
+
+  const drillTotals = useMemo(() => {
+    if (drillKind === 'ctes0103') {
+      const totalFrete = (drillSortedRows as any[]).reduce((acc, r) => acc + (Number(r?.frete) || 0), 0);
+      return { totalFrete };
+    }
+    const totalSaldo = (drillSortedRows as any[]).reduce((acc, r) => acc + (Number(r?.saldo) || 0), 0);
+    const totalValor = (drillSortedRows as any[]).reduce((acc, r) => acc + (Number(r?.vlr_fatur) || 0), 0);
+    return { totalSaldo, totalValor };
+  }, [drillKind, drillSortedRows]);
+
   return (
     <DashboardLayout
       title="CONTAS A RECEBER"
@@ -1303,59 +1412,6 @@ export function ContasReceber() {
         </div>
 
         <TabsContent value="visao_geral" className="mt-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
-            <div className="text-xs text-muted-foreground">Visão rápida:</div>
-            <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <button
-                type="button"
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  quickView === 'todas'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-                onClick={() => setQuickView('todas')}
-                disabled={loading0049}
-              >
-                Todas
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                  quickView === 'abertas'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-                onClick={() => setQuickView('abertas')}
-                disabled={loading0049}
-              >
-                Abertas
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                  quickView === 'vencidas'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-                onClick={() => setQuickView('vencidas')}
-                disabled={loading0049}
-              >
-                Vencidas
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                  quickView === 'vence3d'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-                onClick={() => setQuickView('vence3d')}
-                disabled={loading0049}
-              >
-                Vence 3d
-              </button>
-            </div>
-          </div>
           {!data0049 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento e ver os indicadores.</CardContent>
@@ -1501,7 +1557,7 @@ export function ContasReceber() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <YAxis type="category" dataKey="name" width={50} />
+                          <YAxis type="category" dataKey="key" width={60} />
                           <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                           <Bar
                             dataKey="value"
@@ -1509,13 +1565,12 @@ export function ContasReceber() {
                             fill="url(#cr_unid)"
                             radius={[8, 8, 8, 8]}
                             onClick={(d: any) => {
-                              const key = normTextKey(d?.key ?? d?.name ?? '');
+                              const key = unitSigla3(d?.key ?? d?.name ?? '');
                               if (!key) return;
                               const rows = (filteredFaturas as any[]).filter((f) => {
                                 const saldo = Number((f as any)._saldo) || 0;
                                 if (saldo <= 0) return false;
-                                const unit = normTextKey((f as any).fil || (f as any).unidade_responsavel || '');
-                                return unit === key;
+                                return unitSigla3((f as any).fil || (f as any).unidade_responsavel || '') === key;
                               });
                               abrirDrill(`A receber · Unidade ${key}`, rows, 'faturas');
                             }}
@@ -1750,7 +1805,7 @@ export function ContasReceber() {
                                   return;
                                 }
                                 if (name === 'Atrasado') {
-                                  abrirDrill('Atrasadas (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas');
+                                  abrirDrill('Atrasadas', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas');
                                   return;
                                 }
                                 if (name === 'A faturar') {
@@ -2165,25 +2220,86 @@ export function ContasReceber() {
       <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
         <DialogContent className="sm:max-w-[1050px] h-[calc(100vh-120px)] overflow-hidden flex flex-col">
           <DialogHeader className="shrink-0">
-            <DialogTitle>{drillTitle}</DialogTitle>
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle>{drillTitle}</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2"
+                onClick={() => {
+                  const stamp = new Date();
+                  const pad = (n: number) => String(n).padStart(2, '0');
+                  const filename = `contas_receber_drill_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`;
+                  if (drillKind === 'ctes0103') {
+                    const csv = buildCsv0103(drillSortedRows as any);
+                    downloadCsv(filename, csv);
+                    return;
+                  }
+                  const csv = buildCsvFaturas(drillSortedRows as any);
+                  downloadCsv(filename, csv);
+                }}
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span>{`Registros: ${formatNumber(drillSortedRows.length || 0)}`}</span>
+              {drillKind === 'ctes0103' ? (
+                <span>{`· Frete total: ${formatCurrency((drillTotals as any)?.totalFrete || 0)}`}</span>
+              ) : (
+                <>
+                  <span>{`· Saldo total: ${formatCurrency((drillTotals as any)?.totalSaldo || 0)}`}</span>
+                  <span>{`· Valor total: ${formatCurrency((drillTotals as any)?.totalValor || 0)}`}</span>
+                </>
+              )}
+            </div>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
             <div className="overflow-x-auto">
               {drillKind === 'ctes0103' ? (
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
                     <tr className="text-left border-b">
-                      <th className="py-2 pr-3">CTRC</th>
-                      <th className="py-2 pr-3">CT-e</th>
-                      <th className="py-2 pr-3">Pagador</th>
-                      <th className="py-2 pr-3">Dest</th>
-                      <th className="py-2 pr-3 text-right">Frete</th>
-                      <th className="py-2 pr-3">Emissão</th>
-                      <th className="py-2 pr-3">Prev. Entrega</th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('ctrc')}>
+                          {`CTRC${drillSortKey === 'ctrc' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('cte')}>
+                          {`CT-e${drillSortKey === 'cte' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('pagador')}>
+                          {`Pagador${drillSortKey === 'pagador' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('dest')}>
+                          {`Dest${drillSortKey === 'dest' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3 text-right">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('frete')}>
+                          {`Frete${drillSortKey === 'frete' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('emissao')}>
+                          {`Emissão${drillSortKey === 'emissao' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('prev')}>
+                          {`Prev. Entrega${drillSortKey === 'prev' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {drillRows.slice(0, 800).map((r: any, i: number) => (
+                    {(drillSortedRows as any[]).slice(0, 1200).map((r: any, i: number) => (
                       <tr key={`${r?.ctrc || ''}-${r?.numero_cte || ''}-${i}`} className="border-b last:border-0">
                         <td className="py-2 pr-3 font-mono">{r.ctrc}</td>
                         <td className="py-2 pr-3 font-mono">{r.numero_cte}</td>
@@ -2198,22 +2314,59 @@ export function ContasReceber() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t">
+                      <td className="py-2 pr-3 font-semibold" colSpan={4}>
+                        Total
+                      </td>
+                      <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency((drillTotals as any)?.totalFrete || 0)}</td>
+                      <td className="py-2 pr-3" colSpan={2} />
+                    </tr>
+                  </tfoot>
                 </table>
               ) : (
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
                     <tr className="text-left border-b">
-                      <th className="py-2 pr-3">Fatura</th>
-                      <th className="py-2 pr-3">Cliente</th>
-                      <th className="py-2 pr-3">Vencimento</th>
-                      <th className="py-2 pr-3 text-right">Saldo</th>
-                      <th className="py-2 pr-3 text-right">Valor</th>
-                      <th className="py-2 pr-3">Situação</th>
-                      <th className="py-2 pr-3 text-right">CT-es</th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('fatura')}>
+                          {`Fatura${drillSortKey === 'fatura' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('cliente')}>
+                          {`Cliente${drillSortKey === 'cliente' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('venc')}>
+                          {`Vencimento${drillSortKey === 'venc' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3 text-right">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('saldo')}>
+                          {`Saldo${drillSortKey === 'saldo' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3 text-right">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('valor')}>
+                          {`Valor${drillSortKey === 'valor' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('situacao')}>
+                          {`Situação${drillSortKey === 'situacao' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
+                      <th className="py-2 pr-3 text-right">
+                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('ctes')}>
+                          {`CT-es${drillSortKey === 'ctes' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        </button>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {drillRows.slice(0, 600).map((f: any) => (
+                    {(drillSortedRows as any[]).slice(0, 800).map((f: any) => (
                       <tr key={f.fatura} className="border-b last:border-0">
                         <td className="py-2 pr-3 font-mono">{f.fatura}</td>
                         <td className="py-2 pr-3">
@@ -2223,11 +2376,23 @@ export function ContasReceber() {
                         <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
                         <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.saldo)}</td>
                         <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.vlr_fatur)}</td>
-                        <td className="py-2 pr-3">{f.situacao || '-'}</td>
+                        <td className="py-2 pr-3">
+                          <SituacaoBadge value={f.situacao} />
+                        </td>
                         <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t">
+                      <td className="py-2 pr-3 font-semibold" colSpan={3}>
+                        Total
+                      </td>
+                      <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency((drillTotals as any)?.totalSaldo || 0)}</td>
+                      <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency((drillTotals as any)?.totalValor || 0)}</td>
+                      <td className="py-2 pr-3" colSpan={2} />
+                    </tr>
+                  </tfoot>
                 </table>
               )}
             </div>
