@@ -24,7 +24,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { AlertTriangle, Download, Filter, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, BadgeDollarSign, CalendarClock, Download, Filter, HandCoins, Loader2, PieChart as PieChartIcon, RefreshCw, Search, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -224,7 +224,9 @@ export function ContasReceber() {
   const initialLoadRef = useRef(false);
 
   const [loading0103, setLoading0103] = useState(false);
+  const [status0103, setStatus0103] = useState<string>('');
   const [data0103, setData0103] = useState<Ssw0103Data | null>(null);
+  const initialLoad0103Ref = useRef(false);
   const [drillOpen, setDrillOpen] = useState(false);
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<FatFatura[]>([]);
@@ -420,20 +422,118 @@ export function ContasReceber() {
     void carregar0049();
   }, [carregar0049]);
 
-
-  const carregar0103 = async () => {
-    setLoading0103(true);
-    try {
-      const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`, { method: 'GET' }, true);
-      if (!res?.success) {
-        toast.error(res?.message || 'Falha ao ler disponíveis para faturar.');
-        return;
+  const carregar0103 = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      setLoading0103(true);
+      setStatus0103('Lendo disponíveis para faturar...');
+      try {
+        const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`, { method: 'GET' }, true);
+        if (!res?.success) {
+          setStatus0103('');
+          if (!opts?.silent) toast.error(res?.message || 'Falha ao ler disponíveis para faturar.');
+          return;
+        }
+        setData0103(res);
+        setStatus0103('Concluído');
+        if (!opts?.silent) toast.success(`Disponíveis para faturar: ${Number(res?.totals?.ctes || 0)} CT-e(s).`);
+      } finally {
+        setLoading0103(false);
       }
-      setData0103(res);
-      toast.success(`Disponíveis para faturar: ${Number(res?.totals?.ctes || 0)} CT-e(s).`);
-    } finally {
-      setLoading0103(false);
-    }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (initialLoad0103Ref.current) return;
+    initialLoad0103Ref.current = true;
+    const t = window.setTimeout(() => {
+      void carregar0103({ silent: true });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [carregar0103]);
+
+  const kpiTiles = useMemo(() => {
+    const tiles = [
+      {
+        label: 'Valor faturado',
+        value: formatCurrency(kpis.valorFaturado),
+        sub: `${formatNumber(kpis.faturas)} fatura(s)`,
+        tone: 'indigo',
+        icon: TrendingUp,
+      },
+      {
+        label: 'Recebido',
+        value: formatCurrency(kpis.pago),
+        sub: `${formatNumber(kpis.ctes)} CT-e(s)`,
+        tone: 'emerald',
+        icon: HandCoins,
+      },
+      {
+        label: 'A receber',
+        value: formatCurrency(kpis.aReceber),
+        sub: `No prazo: ${formatCurrency(kpis.noPrazo)}`,
+        tone: 'blue',
+        icon: BadgeDollarSign,
+      },
+      {
+        label: 'Atrasado',
+        value: formatCurrency(kpis.atrasado),
+        sub: `Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`,
+        tone: 'rose',
+        icon: AlertTriangle,
+      },
+      {
+        label: 'Vence em 3 dias',
+        value: formatCurrency(kpis.dueSoon),
+        sub: 'Radar de risco',
+        tone: 'amber',
+        icon: CalendarClock,
+      },
+      {
+        label: 'Disponíveis para faturar',
+        value: formatCurrency(data0103?.totals?.frete_total || 0),
+        sub: `${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`,
+        tone: 'orange',
+        icon: PieChartIcon,
+      },
+    ] as const;
+    return tiles;
+  }, [data0103?.totals?.ctes, data0103?.totals?.frete_total, kpis]);
+
+  const Tile = ({
+    label,
+    value,
+    sub,
+    tone,
+    Icon,
+  }: {
+    label: string;
+    value: string;
+    sub: string;
+    tone: 'indigo' | 'emerald' | 'blue' | 'rose' | 'amber' | 'orange';
+    Icon: any;
+  }) => {
+    const toneMap: Record<string, { border: string; bg: string; icon: string }> = {
+      indigo: { border: 'border-indigo-200 dark:border-indigo-900/70', bg: 'bg-indigo-50 dark:bg-indigo-950/25', icon: 'text-indigo-700 dark:text-indigo-300' },
+      emerald: { border: 'border-emerald-200 dark:border-emerald-900/70', bg: 'bg-emerald-50 dark:bg-emerald-950/25', icon: 'text-emerald-700 dark:text-emerald-300' },
+      blue: { border: 'border-blue-200 dark:border-blue-900/70', bg: 'bg-blue-50 dark:bg-blue-950/25', icon: 'text-blue-700 dark:text-blue-300' },
+      rose: { border: 'border-rose-200 dark:border-rose-900/70', bg: 'bg-rose-50 dark:bg-rose-950/25', icon: 'text-rose-700 dark:text-rose-300' },
+      amber: { border: 'border-amber-200 dark:border-amber-900/70', bg: 'bg-amber-50 dark:bg-amber-950/25', icon: 'text-amber-700 dark:text-amber-300' },
+      orange: { border: 'border-orange-200 dark:border-orange-900/70', bg: 'bg-orange-50 dark:bg-orange-950/25', icon: 'text-orange-700 dark:text-orange-300' },
+    };
+    const t = toneMap[tone];
+    return (
+      <div className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3`}>
+        <div className={`rounded-lg p-2 bg-white/70 dark:bg-slate-900/40 border border-white/60 dark:border-slate-800 ${t.icon}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-bold leading-tight">{value}</div>
+          <div className="text-xs text-muted-foreground truncate">{sub}</div>
+        </div>
+      </div>
+    );
   };
 
   const normalizedFaturas = useMemo(() => {
@@ -868,11 +968,19 @@ export function ContasReceber() {
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{status0049}</Badge>
           ) : null}
 
+          {loading0103 ? (
+            <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200 flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {status0103 || 'Atualizando...'}
+            </Badge>
+          ) : null}
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
               void carregar0049();
+              void carregar0103({ silent: true });
             }}
             disabled={loading0049}
             className="dark:border-slate-600"
@@ -885,14 +993,16 @@ export function ContasReceber() {
     >
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
         <div className="flex items-center justify-between gap-3">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
-            <TabsTrigger value="visao_geral">Visão geral</TabsTrigger>
-            <TabsTrigger value="a_receber">A receber</TabsTrigger>
-            <TabsTrigger value="aging_a_receber">Aging · A receber</TabsTrigger>
-            <TabsTrigger value="faturas_vencidas">Faturas vencidas</TabsTrigger>
-            <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
-            <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
-          </TabsList>
+          <div className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-950/30 backdrop-blur px-2 py-2">
+            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full bg-transparent">
+              <TabsTrigger value="visao_geral">Visão geral</TabsTrigger>
+              <TabsTrigger value="a_receber">A receber</TabsTrigger>
+              <TabsTrigger value="aging_a_receber">Aging · A receber</TabsTrigger>
+              <TabsTrigger value="faturas_vencidas">Faturas vencidas</TabsTrigger>
+              <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
+              <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
+            </TabsList>
+          </div>
         </div>
 
         <TabsContent value="visao_geral" className="mt-4">
@@ -956,48 +1066,9 @@ export function ContasReceber() {
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Valor faturado</div>
-                    <div className="text-2xl font-bold">{formatCurrency(kpis.valorFaturado)}</div>
-                    <div className="text-xs text-muted-foreground">{`${formatNumber(kpis.faturas)} fatura(s)`}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Recebido</div>
-                    <div className="text-2xl font-bold">{formatCurrency(kpis.pago)}</div>
-                    <div className="text-xs text-muted-foreground">{`${formatNumber(kpis.ctes)} CT-e(s)`}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">A receber</div>
-                    <div className="text-2xl font-bold">{formatCurrency(kpis.aReceber)}</div>
-                    <div className="text-xs text-muted-foreground">{`No prazo: ${formatCurrency(kpis.noPrazo)}`}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Atrasado</div>
-                    <div className="text-2xl font-bold">{formatCurrency(kpis.atrasado)}</div>
-                    <div className="text-xs text-muted-foreground">{`Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Vence em 3 dias</div>
-                    <div className="text-2xl font-bold">{formatCurrency(kpis.dueSoon)}</div>
-                    <div className="text-xs text-muted-foreground">Radar de risco</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">Disponíveis para faturar</div>
-                    <div className="text-2xl font-bold">{formatCurrency(data0103?.totals?.frete_total || 0)}</div>
-                    <div className="text-xs text-muted-foreground">{`${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`}</div>
-                  </CardContent>
-                </Card>
+                {kpiTiles.map((t) => (
+                  <Tile key={t.label} label={t.label} value={t.value} sub={t.sub} tone={t.tone} Icon={t.icon} />
+                ))}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -1449,7 +1520,7 @@ export function ContasReceber() {
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-base">Disponíveis para faturar</CardTitle>
-                  <Button onClick={carregar0103} disabled={loading0103} className="gap-2">
+                  <Button onClick={() => void carregar0103()} disabled={loading0103} className="gap-2">
                     {loading0103 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     Atualizar agora
                   </Button>
