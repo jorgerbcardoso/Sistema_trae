@@ -628,6 +628,12 @@ export function ContasReceber() {
       const overdue = saldo > 0 && (overdueByDate || overdueBySignals);
 
       const dueSoon = saldo > 0 && venc0 !== null && venc0 >= today0 && venc0 <= today0 + 3 * 86400000;
+      const diasAtraso =
+        Number.isFinite(diasAtrasoNum) && diasAtrasoNum > 0
+          ? diasAtrasoNum
+          : overdueByDate && venc0 !== null
+          ? Math.max(1, Math.floor((today0 - venc0) / 86400000))
+          : 0;
       return {
         ...f,
         _vencTs0: venc0,
@@ -636,6 +642,7 @@ export function ContasReceber() {
         _pago: pago,
         _overdue: overdue,
         _dueSoon: dueSoon,
+        _diasAtraso: diasAtraso,
       };
     });
   }, [data0049, today0]);
@@ -711,6 +718,14 @@ export function ContasReceber() {
     });
   }, [normalizedFaturas, tableSearch]);
 
+  const aReceberBaseRows = useMemo(() => {
+    return (filteredFaturas as any[]).filter((f) => {
+      const saldo = Number((f as any)?._saldo) || 0;
+      if (saldo <= 0) return false;
+      return normSituacaoLabel((f as any)?.situacao) !== 'LIQUIDADO';
+    });
+  }, [filteredFaturas]);
+
   useEffect(() => {
     setArPage(1);
   }, [tableSearch, arSortKey, arSortDir]);
@@ -767,11 +782,13 @@ export function ContasReceber() {
       totalReceber: 0,
       totalVencer: 0,
       totalAtrasado: 0,
+      totalAtrasado10: 0,
       countReceber: 0,
       countVencer: 0,
       countAtrasado: 0,
+      countAtrasado10: 0,
     };
-    for (const f of filteredFaturas as any[]) {
+    for (const f of aReceberBaseRows as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
       base.totalReceber += saldo;
@@ -779,13 +796,17 @@ export function ContasReceber() {
       if (f._overdue) {
         base.totalAtrasado += saldo;
         base.countAtrasado += 1;
+        if ((Number(f._diasAtraso) || 0) > 10) {
+          base.totalAtrasado10 += saldo;
+          base.countAtrasado10 += 1;
+        }
       } else {
         base.totalVencer += saldo;
         base.countVencer += 1;
       }
     }
     return base;
-  }, [filteredFaturas]);
+  }, [aReceberBaseRows]);
 
   const toggleArSort = useCallback((key: typeof arSortKey) => {
     setArSortKey((prevKey) => {
@@ -799,7 +820,7 @@ export function ContasReceber() {
   }, []);
 
   const arSortedRows = useMemo(() => {
-    const rows = Array.isArray(filteredFaturas) ? [...(filteredFaturas as any[])] : [];
+    const rows = Array.isArray(aReceberBaseRows) ? [...(aReceberBaseRows as any[])] : [];
     const dir = arSortDir === 'asc' ? 1 : -1;
     const cmpText = (a: any, b: any) => String(a).localeCompare(String(b), 'pt-BR') * dir;
     rows.sort((a, b) => {
@@ -814,7 +835,7 @@ export function ContasReceber() {
       return ((Number(a?._saldo) || 0) - (Number(b?._saldo) || 0)) * dir;
     });
     return rows;
-  }, [arSortDir, arSortKey, filteredFaturas]);
+  }, [aReceberBaseRows, arSortDir, arSortKey]);
 
   const arTotals = useMemo(() => {
     const totalValor = (arSortedRows as any[]).reduce((acc, r) => acc + (Number(r?._vlrFatur) || 0), 0);
@@ -1943,7 +1964,7 @@ export function ContasReceber() {
                   sub={`${formatNumber(arCards.countReceber)} fatura(s)`}
                   tone="blue"
                   Icon={BadgeDollarSign}
-                  onClick={() => abrirDrill('A receber', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas')}
+                  onClick={() => abrirDrill('A receber', arSortedRows as any[], 'faturas')}
                 />
                 <Tile
                   label="Total a vencer"
@@ -1954,7 +1975,7 @@ export function ContasReceber() {
                   onClick={() =>
                     abrirDrill(
                       'A vencer',
-                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && !(f as any)._overdue),
+                      (arSortedRows as any[]).filter((f) => !(f as any)._overdue),
                       'faturas'
                     )
                   }
@@ -1963,12 +1984,26 @@ export function ContasReceber() {
                   label="Total atrasado"
                   value={formatCurrency(arCards.totalAtrasado)}
                   sub={`${formatNumber(arCards.countAtrasado)} fatura(s)`}
-                  tone="rose"
+                  tone="amber"
                   Icon={AlertTriangle}
                   onClick={() =>
                     abrirDrill(
                       'Atrasadas',
-                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue),
+                      (arSortedRows as any[]).filter((f) => (f as any)._overdue),
+                      'faturas'
+                    )
+                  }
+                />
+                <Tile
+                  label="Atrasado há +10 dias"
+                  value={formatCurrency(arCards.totalAtrasado10)}
+                  sub={`${formatNumber(arCards.countAtrasado10)} fatura(s)`}
+                  tone="rose"
+                  Icon={AlertTriangle}
+                  onClick={() =>
+                    abrirDrill(
+                      'Atrasadas (+10 dias)',
+                      (arSortedRows as any[]).filter((f) => (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 10),
                       'faturas'
                     )
                   }
@@ -1984,7 +2019,7 @@ export function ContasReceber() {
                       size="sm"
                       className="h-9 gap-2"
                       onClick={() => {
-                        const csv = buildCsvFaturas(filteredFaturas as any);
+                        const csv = buildCsvFaturas(arSortedRows as any);
                         const stamp = new Date();
                         const pad = (n: number) => String(n).padStart(2, '0');
                         downloadCsv(
@@ -2009,7 +2044,7 @@ export function ContasReceber() {
                         onChange={(e) => setTableSearch(e.target.value)}
                       />
                     </div>
-                    <div className="text-sm text-muted-foreground">{`${formatNumber(filteredFaturas.length)} fatura(s)`}</div>
+                    <div className="text-sm text-muted-foreground">{`${formatNumber(arSortedRows.length)} fatura(s)`}</div>
                   </div>
                 </CardContent>
               </Card>
