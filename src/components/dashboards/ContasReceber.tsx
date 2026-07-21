@@ -259,6 +259,25 @@ function SortIndicator({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }
   return dir === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" />;
 }
 
+function overdueBucketKey(dias: number): 'd01_07' | 'd08_15' | 'd16_30' | 'd31_60' | 'd61_90' | 'd91_plus' {
+  if (dias <= 7) return 'd01_07';
+  if (dias <= 15) return 'd08_15';
+  if (dias <= 30) return 'd16_30';
+  if (dias <= 60) return 'd31_60';
+  if (dias <= 90) return 'd61_90';
+  return 'd91_plus';
+}
+
+function overdueBucketLabel(k: string): string {
+  if (k === 'd01_07') return '1–7d';
+  if (k === 'd08_15') return '8–15d';
+  if (k === 'd16_30') return '16–30d';
+  if (k === 'd31_60') return '31–60d';
+  if (k === 'd61_90') return '61–90d';
+  if (k === 'd91_plus') return '91+d';
+  return k;
+}
+
 function CrChartTooltip({
   active,
   payload,
@@ -854,6 +873,107 @@ export function ContasReceber() {
     const start = (arPage - 1) * arPageSize;
     return (arSortedRows as any[]).slice(start, start + arPageSize);
   }, [arPage, arSortedRows]);
+
+  const mgmt = useMemo(() => {
+    const total = { aReceber: 0, aVencer: 0, atrasado: 0, atrasado10: 0 };
+    const counts = { aReceber: 0, aVencer: 0, atrasado: 0, atrasado10: 0 };
+
+    const byCliente: Record<string, { key: string; name: string; value: number; overdue: number }> = {};
+    const byUnit: Record<string, { key: string; name: string; value: number; overdue: number; b: Record<string, number> }> = {};
+
+    const alerts: any[] = [];
+
+    for (const f of aReceberBaseRows as any[]) {
+      const saldo = Number(f?._saldo) || 0;
+      if (saldo <= 0) continue;
+      total.aReceber += saldo;
+      counts.aReceber += 1;
+
+      const isOverdue = !!f?._overdue;
+      const dias = Number(f?._diasAtraso) || 0;
+      if (isOverdue) {
+        total.atrasado += saldo;
+        counts.atrasado += 1;
+        if (dias > 10) {
+          total.atrasado10 += saldo;
+          counts.atrasado10 += 1;
+        }
+        alerts.push(f);
+      } else {
+        total.aVencer += saldo;
+        counts.aVencer += 1;
+      }
+
+      const clienteKey = normTextKey(f?.cliente) || '—';
+      if (!byCliente[clienteKey]) byCliente[clienteKey] = { key: clienteKey, name: String(f?.cliente || '—').trim() || '—', value: 0, overdue: 0 };
+      byCliente[clienteKey].value += saldo;
+      if (isOverdue) byCliente[clienteKey].overdue += saldo;
+
+      const unitKey = unitSigla3(f?.fil || f?.unidade_responsavel || '—');
+      if (!byUnit[unitKey]) byUnit[unitKey] = { key: unitKey, name: unitKey, value: 0, overdue: 0, b: {} };
+      byUnit[unitKey].value += saldo;
+      if (isOverdue) {
+        byUnit[unitKey].overdue += saldo;
+        const bk = overdueBucketKey(Math.max(1, dias));
+        byUnit[unitKey].b[bk] = (byUnit[unitKey].b[bk] || 0) + saldo;
+      }
+    }
+
+    const clientesSorted = Object.values(byCliente).sort((a, b) => b.value - a.value);
+    const unidadesSorted = Object.values(byUnit).sort((a, b) => b.value - a.value);
+    const unidadesOverdueSorted = Object.values(byUnit).sort((a, b) => b.overdue - a.overdue);
+
+    const topCliente = clientesSorted[0] || null;
+    const topUnit = unidadesSorted[0] || null;
+
+    const concentracaoCliente = (() => {
+      const top = clientesSorted.slice(0, 6);
+      const other = clientesSorted.slice(6).reduce((acc, it) => acc + it.value, 0);
+      const items = top.map((it) => ({ name: it.name, value: it.value }));
+      if (other > 0) items.push({ name: 'Outros', value: other });
+      return items;
+    })();
+
+    const colorsClientes = ['#6366f1', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#64748b'];
+
+    const unitOverdueStack = (() => {
+      const keys = ['d01_07', 'd08_15', 'd16_30', 'd31_60', 'd61_90', 'd91_plus'] as const;
+      const rows = unidadesOverdueSorted
+        .filter((u) => u.overdue > 0)
+        .slice(0, 12)
+        .map((u) => {
+          const row: any = { unit: u.key, total: u.overdue };
+          for (const k of keys) row[k] = Number(u.b[k] || 0);
+          return row;
+        })
+        .sort((a, b) => b.total - a.total);
+      return rows;
+    })();
+
+    const alertsTop = alerts
+      .slice()
+      .sort((a, b) => (Number(b?._diasAtraso) || 0) - (Number(a?._diasAtraso) || 0) || (Number(b?._saldo) || 0) - (Number(a?._saldo) || 0))
+      .slice(0, 40);
+
+    return {
+      total,
+      counts,
+      topCliente,
+      topUnit,
+      concentracaoCliente,
+      colorsClientes,
+      unitOverdueStack,
+      clientesTopOverdue: clientesSorted
+        .filter((c) => c.overdue > 0)
+        .slice(0, 10)
+        .map((c) => ({ name: c.name, value: c.overdue })),
+      unidadesTopOverdue: unidadesOverdueSorted
+        .filter((u) => u.overdue > 0)
+        .slice(0, 10)
+        .map((u) => ({ name: u.name, value: u.overdue })),
+      alertsTop,
+    };
+  }, [aReceberBaseRows]);
 
   const previsaoSerie30d = useMemo(() => {
     const sums = new Array(31).fill(0) as number[];
@@ -1525,7 +1645,7 @@ export function ContasReceber() {
             <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full bg-transparent">
               <TabsTrigger value="visao_geral">Visão geral</TabsTrigger>
               <TabsTrigger value="a_receber">A receber</TabsTrigger>
-              <TabsTrigger value="aging_a_receber">Aging · A receber</TabsTrigger>
+              <TabsTrigger value="aging_a_receber">Gestão</TabsTrigger>
               <TabsTrigger value="faturas_vencidas">Faturas vencidas</TabsTrigger>
               <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
               <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
@@ -2178,31 +2298,228 @@ export function ContasReceber() {
               <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Aging · A receber (por vencimento)</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agingBuckets.aReceber} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                    <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
-                    <Bar
-                      dataKey="value"
-                      name="A receber"
-                      fill="#16a34a"
-                      onClick={(d: any) => {
-                        const key = String(d?.name ?? '');
-                        const rows = getAgingDrillRows(key, 'a_receber');
-                        abrirDrill(`A receber · Faixa ${key}`, rows, 'faturas');
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Tile
+                  label="A receber"
+                  value={formatCurrency(mgmt.total.aReceber)}
+                  sub={`${formatNumber(mgmt.counts.aReceber)} fatura(s)`}
+                  tone="blue"
+                  Icon={BadgeDollarSign}
+                  onClick={() => abrirDrill('A receber', aReceberBaseRows as any[], 'faturas')}
+                />
+                <Tile
+                  label="A vencer"
+                  value={formatCurrency(mgmt.total.aVencer)}
+                  sub={`${formatNumber(mgmt.counts.aVencer)} fatura(s)`}
+                  tone="indigo"
+                  Icon={CalendarClock}
+                  onClick={() => abrirDrill('A vencer', (aReceberBaseRows as any[]).filter((f) => !(f as any)._overdue), 'faturas')}
+                />
+                <Tile
+                  label="Atrasado"
+                  value={formatCurrency(mgmt.total.atrasado)}
+                  sub={`${formatNumber(mgmt.counts.atrasado)} fatura(s)`}
+                  tone="amber"
+                  Icon={AlertTriangle}
+                  onClick={() => abrirDrill('Atrasadas', (aReceberBaseRows as any[]).filter((f) => (f as any)._overdue), 'faturas')}
+                />
+                <Tile
+                  label="Atrasado +10 dias"
+                  value={formatCurrency(mgmt.total.atrasado10)}
+                  sub={`${formatNumber(mgmt.counts.atrasado10)} fatura(s)`}
+                  tone="rose"
+                  Icon={AlertTriangle}
+                  onClick={() =>
+                    abrirDrill(
+                      'Atrasadas (+10 dias)',
+                      (aReceberBaseRows as any[]).filter((f) => (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 10),
+                      'faturas'
+                    )
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card className="lg:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Risco por unidade (atrasos por faixa)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[360px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mgmt.unitOverdueStack} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                        <YAxis type="category" dataKey="unit" width={60} interval={0} tick={{ fontSize: 10 }} />
+                        <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                        <Legend formatter={(v: any) => overdueBucketLabel(String(v))} />
+                        <Bar
+                          dataKey="d01_07"
+                          name="d01_07"
+                          stackId="a"
+                          fill="#fbbf24"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 1–7d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) <= 7), 'faturas');
+                          }}
+                        />
+                        <Bar
+                          dataKey="d08_15"
+                          name="d08_15"
+                          stackId="a"
+                          fill="#fb923c"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 8–15d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 7 && (Number((f as any)._diasAtraso) || 0) <= 15), 'faturas');
+                          }}
+                        />
+                        <Bar
+                          dataKey="d16_30"
+                          name="d16_30"
+                          stackId="a"
+                          fill="#f97316"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 16–30d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 15 && (Number((f as any)._diasAtraso) || 0) <= 30), 'faturas');
+                          }}
+                        />
+                        <Bar
+                          dataKey="d31_60"
+                          name="d31_60"
+                          stackId="a"
+                          fill="#ef4444"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 31–60d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 30 && (Number((f as any)._diasAtraso) || 0) <= 60), 'faturas');
+                          }}
+                        />
+                        <Bar
+                          dataKey="d61_90"
+                          name="d61_90"
+                          stackId="a"
+                          fill="#dc2626"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 61–90d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 60 && (Number((f as any)._diasAtraso) || 0) <= 90), 'faturas');
+                          }}
+                        />
+                        <Bar
+                          dataKey="d91_plus"
+                          name="d91_plus"
+                          stackId="a"
+                          fill="#991b1b"
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.unitOverdueStack as any[])[idx];
+                            const unit = String(row?.unit || '');
+                            if (!unit) return;
+                            abrirDrill(`Atrasadas · Unidade ${unit} · 91+d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 90), 'faturas');
+                          }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Concentração por cliente</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[360px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                        <Legend />
+                        <Pie data={mgmt.concentracaoCliente} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2}>
+                          {(mgmt.concentracaoCliente as any[]).map((_: any, i: number) => (
+                            <Cell key={i} fill={(mgmt.colorsClientes as any[])[i % (mgmt.colorsClientes as any[]).length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top clientes em atraso</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={mgmt.clientesTopOverdue} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" hide />
+                        <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                        <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                        <Bar
+                          dataKey="value"
+                          name="Atrasado"
+                          fill="#f59e0b"
+                          radius={[8, 8, 8, 8]}
+                          onClick={(_: any, idx: number) => {
+                            const row = (mgmt.clientesTopOverdue as any[])[idx];
+                            const name = String(row?.name || '').trim();
+                            if (!name) return;
+                            abrirDrill(`Atrasadas · Cliente ${name}`, (aReceberBaseRows as any[]).filter((f) => (f as any)._overdue && normTextKey((f as any).cliente) === normTextKey(name)), 'faturas');
+                          }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Alertas · faturas mais antigas em atraso</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="max-h-[320px] overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
+                          <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            <th className="py-2 pr-3 pl-4">Fatura</th>
+                            <th className="py-2 pr-3">Cliente</th>
+                            <th className="py-2 pr-3">Unid</th>
+                            <th className="py-2 pr-3 text-right">Dias</th>
+                            <th className="py-2 pr-3">Venc.</th>
+                            <th className="py-2 pr-3 text-right">Saldo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(mgmt.alertsTop as any[]).map((f: any) => (
+                            <tr
+                              key={String(f?.fatura || '')}
+                              className="border-b last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                              onClick={() => abrirDrill(`Fatura ${f.fatura}`, [f], 'faturas')}
+                            >
+                              <td className="py-2 pr-3 pl-4 font-mono">{f.fatura}</td>
+                              <td className="py-2 pr-3">
+                                <div className="font-medium">{f.cliente}</div>
+                              </td>
+                              <td className="py-2 pr-3 font-mono">{unitSigla3(f.fil || f.unidade_responsavel)}</td>
+                              <td className="py-2 pr-3 text-right font-mono text-rose-600 dark:text-rose-300 font-semibold">{formatNumber(Number(f._diasAtraso) || 0)}</td>
+                              <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
+                              <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(Number(f._saldo) || 0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           )}
         </TabsContent>
 
