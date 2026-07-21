@@ -24,7 +24,22 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { AlertTriangle, BadgeDollarSign, CalendarClock, Download, Filter, HandCoins, Loader2, PieChart as PieChartIcon, RefreshCw, Search, TrendingUp } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  BadgeDollarSign,
+  CalendarClock,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Filter,
+  HandCoins,
+  Loader2,
+  PieChart as PieChartIcon,
+  RefreshCw,
+  Search,
+  TrendingUp,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -237,6 +252,11 @@ function SituacaoBadge({ value }: { value: any }) {
   if (s === 'ATRASADA') return <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">ATRASADA</Badge>;
   if (s === 'LIQUIDADO') return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">LIQUIDADO</Badge>;
   return <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">PENDENTE</Badge>;
+}
+
+function SortIndicator({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
+  if (!active) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />;
+  return dir === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" />;
 }
 
 function CrChartTooltip({
@@ -842,7 +862,7 @@ export function ContasReceber() {
         sub: `${formatNumber(kpis.faturas)} fatura(s)`,
         tone: 'indigo',
         icon: TrendingUp,
-        onClick: () => abrirDrill('Faturas (visão atual)', filteredFaturas as any[], 'faturas'),
+        onClick: () => abrirDrill('Faturas', filteredFaturas as any[], 'faturas'),
       },
       {
         label: 'Recebido',
@@ -850,7 +870,7 @@ export function ContasReceber() {
         sub: `${formatNumber(kpisAll.pagoFaturas)} fatura(s) · ${formatNumber(kpisAll.ctesPago)} CT-e(s)`,
         tone: 'emerald',
         icon: HandCoins,
-        onClick: () => abrirDrill('Faturas com recebimento (vlr_pago > 0)', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas'),
+        onClick: () => abrirDrill('Recebidas', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas'),
       },
       {
         label: 'A receber',
@@ -858,7 +878,7 @@ export function ContasReceber() {
         sub: `No prazo: ${formatCurrency(kpis.noPrazo)}`,
         tone: 'blue',
         icon: BadgeDollarSign,
-        onClick: () => abrirDrill('A receber (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas'),
+        onClick: () => abrirDrill('A receber', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas'),
       },
       {
         label: 'Atrasado',
@@ -874,7 +894,7 @@ export function ContasReceber() {
         sub: 'Radar de risco',
         tone: 'amber',
         icon: CalendarClock,
-        onClick: () => abrirDrill('Vencendo em 3 dias (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._dueSoon), 'faturas'),
+        onClick: () => abrirDrill('Vencendo em 3 dias', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._dueSoon), 'faturas'),
       },
       {
         label: 'Disponíveis para faturar',
@@ -1557,7 +1577,7 @@ export function ContasReceber() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <YAxis type="category" dataKey="key" width={60} />
+                          <YAxis type="category" dataKey="key" width={60} interval={0} tick={{ fontSize: 10 }} />
                           <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                           <Bar
                             dataKey="value"
@@ -1797,11 +1817,11 @@ export function ContasReceber() {
                                 const name = String(d?.name ?? '').trim();
                                 if (!name) return;
                                 if (name === 'Recebido') {
-                                  abrirDrill('Faturas com recebimento (vlr_pago > 0)', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas');
+                                  abrirDrill('Recebidas', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas');
                                   return;
                                 }
                                 if (name === 'A receber') {
-                                  abrirDrill('A receber (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas');
+                                  abrirDrill('A receber', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas');
                                   return;
                                 }
                                 if (name === 'Atrasado') {
@@ -1960,7 +1980,7 @@ export function ContasReceber() {
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-base">Faturas vencidas (saldo &gt; 0)</CardTitle>
+                  <CardTitle className="text-base">Faturas vencidas</CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
@@ -2225,7 +2245,7 @@ export function ContasReceber() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 gap-2"
+                className="h-9 gap-2 mr-[25px]"
                 onClick={() => {
                   const stamp = new Date();
                   const pad = (n: number) => String(n).padStart(2, '0');
@@ -2259,41 +2279,48 @@ export function ContasReceber() {
             <div className="overflow-x-auto">
               {drillKind === 'ctes0103' ? (
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
-                    <tr className="text-left border-b">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                    <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('ctrc')}>
-                          {`CTRC${drillSortKey === 'ctrc' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('ctrc')}>
+                          <span>CTRC</span>
+                          <SortIndicator active={drillSortKey === 'ctrc'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('cte')}>
-                          {`CT-e${drillSortKey === 'cte' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('cte')}>
+                          <span>CT-e</span>
+                          <SortIndicator active={drillSortKey === 'cte'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('pagador')}>
-                          {`Pagador${drillSortKey === 'pagador' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('pagador')}>
+                          <span>Pagador</span>
+                          <SortIndicator active={drillSortKey === 'pagador'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('dest')}>
-                          {`Dest${drillSortKey === 'dest' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('dest')}>
+                          <span>Dest</span>
+                          <SortIndicator active={drillSortKey === 'dest'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3 text-right">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('frete')}>
-                          {`Frete${drillSortKey === 'frete' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('frete')}>
+                          <span>Frete</span>
+                          <SortIndicator active={drillSortKey === 'frete'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('emissao')}>
-                          {`Emissão${drillSortKey === 'emissao' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('emissao')}>
+                          <span>Emissão</span>
+                          <SortIndicator active={drillSortKey === 'emissao'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('prev')}>
-                          {`Prev. Entrega${drillSortKey === 'prev' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('prev')}>
+                          <span>Prev. Entrega</span>
+                          <SortIndicator active={drillSortKey === 'prev'} dir={drillSortDir} />
                         </button>
                       </th>
                     </tr>
@@ -2314,8 +2341,8 @@ export function ContasReceber() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-t">
+                  <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                    <tr className="border-t border-slate-200 dark:border-slate-800">
                       <td className="py-2 pr-3 font-semibold" colSpan={4}>
                         Total
                       </td>
@@ -2326,41 +2353,48 @@ export function ContasReceber() {
                 </table>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
-                    <tr className="text-left border-b">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                    <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('fatura')}>
-                          {`Fatura${drillSortKey === 'fatura' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('fatura')}>
+                          <span>Fatura</span>
+                          <SortIndicator active={drillSortKey === 'fatura'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('cliente')}>
-                          {`Cliente${drillSortKey === 'cliente' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('cliente')}>
+                          <span>Cliente</span>
+                          <SortIndicator active={drillSortKey === 'cliente'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('venc')}>
-                          {`Vencimento${drillSortKey === 'venc' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('venc')}>
+                          <span>Vencimento</span>
+                          <SortIndicator active={drillSortKey === 'venc'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3 text-right">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('saldo')}>
-                          {`Saldo${drillSortKey === 'saldo' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('saldo')}>
+                          <span>Saldo</span>
+                          <SortIndicator active={drillSortKey === 'saldo'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3 text-right">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('valor')}>
-                          {`Valor${drillSortKey === 'valor' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('valor')}>
+                          <span>Valor</span>
+                          <SortIndicator active={drillSortKey === 'valor'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('situacao')}>
-                          {`Situação${drillSortKey === 'situacao' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('situacao')}>
+                          <span>Situação</span>
+                          <SortIndicator active={drillSortKey === 'situacao'} dir={drillSortDir} />
                         </button>
                       </th>
                       <th className="py-2 pr-3 text-right">
-                        <button type="button" className="font-semibold" onClick={() => toggleDrillSort('ctes')}>
-                          {`CT-es${drillSortKey === 'ctes' ? (drillSortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}
+                        <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('ctes')}>
+                          <span>CT-es</span>
+                          <SortIndicator active={drillSortKey === 'ctes'} dir={drillSortDir} />
                         </button>
                       </th>
                     </tr>
@@ -2371,7 +2405,6 @@ export function ContasReceber() {
                         <td className="py-2 pr-3 font-mono">{f.fatura}</td>
                         <td className="py-2 pr-3">
                           <div className="font-medium">{f.cliente}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
                         </td>
                         <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
                         <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.saldo)}</td>
@@ -2383,8 +2416,8 @@ export function ContasReceber() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-t">
+                  <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                    <tr className="border-t border-slate-200 dark:border-slate-800">
                       <td className="py-2 pr-3 font-semibold" colSpan={3}>
                         Total
                       </td>
