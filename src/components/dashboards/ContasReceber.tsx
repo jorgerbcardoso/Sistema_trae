@@ -231,6 +231,10 @@ export function ContasReceber() {
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<FatFatura[]>([]);
 
+  const [rankGroupBy, setRankGroupBy] = useState<'grupos' | 'clientes'>('grupos');
+  const [grupoMap, setGrupoMap] = useState<Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }>>({});
+  const lastGrupoFetchKeyRef = useRef<string>('');
+
   const abrirDrill = useCallback((title: string, rows: FatFatura[]) => {
     setDrillTitle(title);
     setDrillRows(rows);
@@ -466,6 +470,50 @@ export function ContasReceber() {
     });
   }, [data0049, today0]);
 
+  useEffect(() => {
+    const cnpjs = Array.from(
+      new Set(
+        (normalizedFaturas as any[])
+          .map((f) => String(f?.cnpj || '').replace(/\D+/g, ''))
+          .filter((x) => x.length === 14)
+      )
+    );
+    const key = cnpjs.sort().join(',');
+    if (!key) {
+      if (lastGrupoFetchKeyRef.current !== '') {
+        lastGrupoFetchKeyRef.current = '';
+        setGrupoMap({});
+      }
+      return;
+    }
+    if (key === lastGrupoFetchKeyRef.current) return;
+    lastGrupoFetchKeyRef.current = key;
+    void (async () => {
+      try {
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/grupos_pagadores.php`,
+          { method: 'POST', body: JSON.stringify({ cnpjs }) },
+          true
+        );
+        if (res?.success && res?.data?.items) {
+          const map: Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }> = {};
+          for (const it of res.data.items as any[]) {
+            const cnpj = String(it?.cnpj || '').replace(/\D+/g, '');
+            if (!cnpj) continue;
+            map[cnpj] = {
+              cnpj_principal: String(it?.cnpj_principal || cnpj).replace(/\D+/g, ''),
+              nome_principal: String(it?.nome_principal || '').trim(),
+              is_grupo: !!it?.is_grupo,
+            };
+          }
+          setGrupoMap(map);
+        }
+      } catch {
+        setGrupoMap({});
+      }
+    })();
+  }, [normalizedFaturas]);
+
   const filteredFaturas = useMemo(() => {
     let baseList: any[] = normalizedFaturas as any[];
     if (quickView === 'abertas') baseList = baseList.filter((f) => (Number(f._saldo) || 0) > 0);
@@ -521,6 +569,29 @@ export function ContasReceber() {
     return { ...base, inadimplenciaPct: inad };
   }, [filteredFaturas]);
 
+  const previsaoSerie30d = useMemo(() => {
+    const sums = new Array(31).fill(0) as number[];
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      if (saldo <= 0 || f._overdue) continue;
+      const ts = Number(f._vencTs0);
+      if (!Number.isFinite(ts)) continue;
+      const dayIndex = Math.floor((ts - today0) / 86400000);
+      if (dayIndex < 0 || dayIndex > 30) continue;
+      sums[dayIndex] += saldo;
+    }
+    const series = [];
+    let has = false;
+    for (let i = 0; i <= 30; i += 1) {
+      const dt = new Date(today0 + i * 86400000);
+      const label = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      const v = Math.round((Number(sums[i]) || 0) * 100) / 100;
+      if (v > 0) has = true;
+      series.push({ name: label, value: v });
+    }
+    return { has, series };
+  }, [filteredFaturas, today0]);
+
   const Tile = ({
     label,
     value,
@@ -534,23 +605,59 @@ export function ContasReceber() {
     tone: 'indigo' | 'emerald' | 'blue' | 'rose' | 'amber' | 'orange';
     Icon: any;
   }) => {
-    const toneMap: Record<string, { border: string; bg: string; icon: string }> = {
-      indigo: { border: 'border-indigo-200 dark:border-indigo-900/70', bg: 'bg-indigo-50 dark:bg-indigo-950/25', icon: 'text-indigo-700 dark:text-indigo-300' },
-      emerald: { border: 'border-emerald-200 dark:border-emerald-900/70', bg: 'bg-emerald-50 dark:bg-emerald-950/25', icon: 'text-emerald-700 dark:text-emerald-300' },
-      blue: { border: 'border-blue-200 dark:border-blue-900/70', bg: 'bg-blue-50 dark:bg-blue-950/25', icon: 'text-blue-700 dark:text-blue-300' },
-      rose: { border: 'border-rose-200 dark:border-rose-900/70', bg: 'bg-rose-50 dark:bg-rose-950/25', icon: 'text-rose-700 dark:text-rose-300' },
-      amber: { border: 'border-amber-200 dark:border-amber-900/70', bg: 'bg-amber-50 dark:bg-amber-950/25', icon: 'text-amber-700 dark:text-amber-300' },
-      orange: { border: 'border-orange-200 dark:border-orange-900/70', bg: 'bg-orange-50 dark:bg-orange-950/25', icon: 'text-orange-700 dark:text-orange-300' },
+    const toneMap: Record<string, { border: string; bg: string; icon: string; iconBg: string; iconBorder: string }> = {
+      indigo: {
+        border: 'border-indigo-200 dark:border-indigo-900/70',
+        bg: 'bg-indigo-50 dark:bg-indigo-950/25',
+        icon: 'text-indigo-700 dark:text-indigo-300',
+        iconBg: 'bg-indigo-100/70 dark:bg-indigo-950/45',
+        iconBorder: 'border-indigo-200 dark:border-indigo-900/60',
+      },
+      emerald: {
+        border: 'border-emerald-200 dark:border-emerald-900/70',
+        bg: 'bg-emerald-50 dark:bg-emerald-950/25',
+        icon: 'text-emerald-700 dark:text-emerald-300',
+        iconBg: 'bg-emerald-100/70 dark:bg-emerald-950/45',
+        iconBorder: 'border-emerald-200 dark:border-emerald-900/60',
+      },
+      blue: {
+        border: 'border-blue-200 dark:border-blue-900/70',
+        bg: 'bg-blue-50 dark:bg-blue-950/25',
+        icon: 'text-blue-700 dark:text-blue-300',
+        iconBg: 'bg-blue-100/70 dark:bg-blue-950/45',
+        iconBorder: 'border-blue-200 dark:border-blue-900/60',
+      },
+      rose: {
+        border: 'border-rose-200 dark:border-rose-900/70',
+        bg: 'bg-rose-50 dark:bg-rose-950/25',
+        icon: 'text-rose-700 dark:text-rose-300',
+        iconBg: 'bg-rose-100/70 dark:bg-rose-950/45',
+        iconBorder: 'border-rose-200 dark:border-rose-900/60',
+      },
+      amber: {
+        border: 'border-amber-200 dark:border-amber-900/70',
+        bg: 'bg-amber-50 dark:bg-amber-950/25',
+        icon: 'text-amber-700 dark:text-amber-300',
+        iconBg: 'bg-amber-100/70 dark:bg-amber-950/45',
+        iconBorder: 'border-amber-200 dark:border-amber-900/60',
+      },
+      orange: {
+        border: 'border-orange-200 dark:border-orange-900/70',
+        bg: 'bg-orange-50 dark:bg-orange-950/25',
+        icon: 'text-orange-700 dark:text-orange-300',
+        iconBg: 'bg-orange-100/70 dark:bg-orange-950/45',
+        iconBorder: 'border-orange-200 dark:border-orange-900/60',
+      },
     };
     const t = toneMap[tone];
     return (
       <div className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3`}>
-        <div className={`rounded-lg p-2 bg-white/70 dark:bg-slate-900/40 border border-white/60 dark:border-slate-800 ${t.icon}`}>
+        <div className={`rounded-lg p-2 ${t.iconBg} border ${t.iconBorder} ${t.icon}`}>
           <Icon className="w-5 h-5" />
         </div>
         <div className="min-w-0">
           <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-bold leading-tight">{value}</div>
+          <div className="text-xl font-bold leading-tight">{value}</div>
           <div className="text-xs text-muted-foreground truncate">{sub}</div>
         </div>
       </div>
@@ -640,26 +747,65 @@ export function ContasReceber() {
     return Object.values(by).sort((a, b) => b.value - a.value);
   }, [filteredFaturas]);
 
-  const topPagadoresAReceber = useMemo(() => {
-    const by: Record<string, { name: string; cnpj: string; value: number; count: number; vencidas: number; vence3d: number }> = {};
+  const rankingAReceber = useMemo(() => {
+    const by: Record<
+      string,
+      { key: string; name: string; cnpj: string; is_grupo: boolean; value: number; count: number; vencidas: number; vence3d: number }
+    > = {};
+    const groupAgg: Record<string, { is_grupo: boolean; name: string }> = {};
+
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
-      const cnpj = String(f.cnpj || '').trim();
-      const nome = String(f.cliente || '').trim() || cnpj || '—';
-      const key = cnpj ? `${cnpj}|${nome}` : nome;
-      if (!by[key]) by[key] = { name: nome, cnpj, value: 0, count: 0, vencidas: 0, vence3d: 0 };
+      const cnpj = String(f.cnpj || '').replace(/\D+/g, '');
+      const nomeBase = String(f.cliente || '').trim() || cnpj || '—';
+
+      let key = cnpj || nomeBase;
+      let name = nomeBase;
+      let isGrupo = false;
+
+      if (rankGroupBy === 'grupos') {
+        const gm = cnpj ? grupoMap[cnpj] : null;
+        const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+        const nomePrincipal = (gm?.nome_principal || '').trim();
+        key = principal || cnpj || nomeBase;
+        name = nomePrincipal || nomeBase;
+        isGrupo = !!(gm?.is_grupo);
+
+        if (!groupAgg[key]) groupAgg[key] = { is_grupo: false, name };
+        groupAgg[key].is_grupo = groupAgg[key].is_grupo || isGrupo || (principal !== '' && principal !== cnpj);
+        if (!groupAgg[key].name && name) groupAgg[key].name = name;
+      }
+
+      if (!by[key]) {
+        by[key] = { key, name, cnpj: key, is_grupo: isGrupo, value: 0, count: 0, vencidas: 0, vence3d: 0 };
+      }
       by[key].value += saldo;
       by[key].count += 1;
       if (f._overdue) by[key].vencidas += saldo;
       if (f._dueSoon) by[key].vence3d += saldo;
     }
-    return Object.values(by).sort((a, b) => b.value - a.value).slice(0, 12);
-  }, [filteredFaturas]);
 
-  const topPagadoresVencidos = useMemo(() => {
-    return [...topPagadoresAReceber].sort((a, b) => (b.vencidas || 0) - (a.vencidas || 0)).slice(0, 12);
-  }, [topPagadoresAReceber]);
+    const list = Object.values(by).map((it) => {
+      if (rankGroupBy !== 'grupos') return it;
+      const ga = groupAgg[it.key];
+      return {
+        ...it,
+        name: ga?.name || it.name,
+        is_grupo: ga?.is_grupo || it.is_grupo,
+      };
+    });
+
+    list.sort((a, b) => b.value - a.value);
+    return list.slice(0, 20);
+  }, [filteredFaturas, grupoMap, rankGroupBy]);
+
+  const radarRisco = useMemo(() => {
+    const base = [...rankingAReceber];
+    const riskScore = (x: any) => (Number(x.vencidas) || 0) * 2 + (Number(x.vence3d) || 0) * 1 + (Math.max(0, (Number(x.value) || 0) - (Number(x.vencidas) || 0)) * 0.15);
+    base.sort((a, b) => riskScore(b) - riskScore(a));
+    return base.slice(0, 6);
+  }, [rankingAReceber]);
 
   const funilValores = useMemo(() => {
     const aFaturar = Number(data0103?.totals?.frete_total) || 0;
@@ -1076,7 +1222,7 @@ export function ContasReceber() {
             </Card>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {kpiTiles.map((t) => (
                   <Tile key={t.label} label={t.label} value={t.value} sub={t.sub} tone={t.tone} Icon={t.icon} />
                 ))}
@@ -1108,18 +1254,31 @@ export function ContasReceber() {
                     </div>
                   </CardHeader>
                   <CardContent className="h-[320px]">
-                    {previsaoRecebimento30d.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados no horizonte de 30 dias</div>
+                    {!previsaoSerie30d.has ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem valores no horizonte de 30 dias</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={previsaoRecebimento30d} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                        <AreaChart data={previsaoSerie30d.series} margin={{ top: 12, right: 10, bottom: 0, left: 0 }}>
+                          <defs>
+                            <linearGradient id="cr_previsao" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#2563eb" stopOpacity={0.35} />
+                              <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
+                          <XAxis dataKey="name" interval={4} />
                           <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                           <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                          <Area type="monotone" dataKey="value" name="Saldo no dia" stroke="#16a34a" fill="#16a34a" fillOpacity={0.18} />
-                          <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#2563eb" strokeWidth={2} dot={false} />
-                          <Legend />
+                          <Area
+                            type="monotone"
+                            dataKey="value"
+                            name="Previsão"
+                            stroke="#2563eb"
+                            strokeWidth={2}
+                            fill="url(#cr_previsao)"
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                          />
                         </AreaChart>
                       </ResponsiveContainer>
                     )}
@@ -1177,6 +1336,12 @@ export function ContasReceber() {
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={aReceberPorUnidade} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                          <defs>
+                            <linearGradient id="cr_unid" x1="0" y1="0" x2="1" y2="0">
+                              <stop offset="0%" stopColor="#2563eb" stopOpacity={0.95} />
+                              <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.95} />
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                           <YAxis type="category" dataKey="name" width={50} />
@@ -1184,7 +1349,8 @@ export function ContasReceber() {
                           <Bar
                             dataKey="value"
                             name="A receber"
-                            fill="#2563eb"
+                            fill="url(#cr_unid)"
+                            radius={[8, 8, 8, 8]}
                             onClick={(d: any) => {
                               const key = String(d?.name ?? '').trim();
                               if (!key) return;
@@ -1221,33 +1387,106 @@ export function ContasReceber() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <Card className="lg:col-span-2">
+                <Card className="lg:col-span-2 overflow-hidden">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Top pagadores · A receber</CardTitle>
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-base">Top pagadores · A receber</CardTitle>
+                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                        <button
+                          onClick={() => setRankGroupBy('grupos')}
+                          className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                            rankGroupBy === 'grupos'
+                              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Grupos
+                        </button>
+                        <button
+                          onClick={() => setRankGroupBy('clientes')}
+                          className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                            rankGroupBy === 'clientes'
+                              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Clientes
+                        </button>
+                      </div>
+                    </div>
                   </CardHeader>
-                  <CardContent className="h-[360px]">
-                    {topPagadoresAReceber.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                  <CardContent className="p-0">
+                    {rankingAReceber.length === 0 ? (
+                      <div className="py-12 text-center text-sm text-muted-foreground">Sem dados</div>
                     ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={topPagadoresAReceber} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                          <Bar
-                            dataKey="value"
-                            name="A receber"
-                            fill="#2563eb"
-                            onClick={(d: any) => {
-                              const cnpj = String(d?.cnpj ?? '').trim();
-                              const nome = String(d?.name ?? '').trim();
-                              const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && (cnpj ? String(f.cnpj || '').trim() === cnpj : String(f.cliente || '').trim() === nome));
-                              abrirDrill(`A receber · ${nome}`, rows);
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {rankingAReceber.slice(0, 12).map((c, i) => {
+                          const pct = kpis.aReceber > 0 ? (c.value / kpis.aReceber) * 100 : 0;
+                          const color = COLORS[i % COLORS.length];
+                          return (
+                            <div
+                              key={c.key}
+                              className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                              onClick={() => {
+                                const rows = (filteredFaturas as any[]).filter((f) => {
+                                  const saldo = Number(f._saldo) || 0;
+                                  if (saldo <= 0) return false;
+                                  const cnpj = String(f.cnpj || '').replace(/\D+/g, '');
+                                  if (rankGroupBy === 'clientes') return cnpj === c.cnpj;
+                                  const gm = cnpj ? grupoMap[cnpj] : null;
+                                  const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+                                  const key = principal || cnpj || String(f.cliente || '').trim() || '—';
+                                  return key === c.key;
+                                });
+                                abrirDrill(`A receber · ${c.name}`, rows);
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                                  style={{ backgroundColor: color }}
+                                >
+                                  {i + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
+                                      {c.name}
+                                      {c.is_grupo && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400"
+                                        >
+                                          Grupo
+                                        </Badge>
+                                      )}
+                                    </p>
+                                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{formatCurrency(c.value)}</p>
+                                  </div>
+                                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
+                                    <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                                    <span>{c.count} fatura(s)</span>
+                                    <span>·</span>
+                                    <span>{pct.toFixed(1)}% do total</span>
+                                    {c.vencidas > 0 && (
+                                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-rose-300 text-rose-600 dark:border-rose-700 dark:text-rose-300">
+                                        Vencidas {formatCurrency(c.vencidas)}
+                                      </Badge>
+                                    )}
+                                    {c.vence3d > 0 && (
+                                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-200">
+                                        Vence 3d {formatCurrency(c.vence3d)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -1257,21 +1496,52 @@ export function ContasReceber() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                      <div className="text-xs text-muted-foreground">Top vencidos (clientes)</div>
+                      <div className="text-xs text-muted-foreground">Top risco (aberto)</div>
                       <div className="mt-2 space-y-2">
-                        {topPagadoresVencidos.slice(0, 5).map((x) => (
-                          <button
-                            key={`${x.cnpj}-${x.name}`}
-                            className="w-full flex items-center justify-between text-left text-sm"
-                            onClick={() => {
-                              const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && f._overdue && (x.cnpj ? String(f.cnpj || '').trim() === x.cnpj : String(f.cliente || '').trim() === x.name));
-                              abrirDrill(`Vencidos · ${x.name}`, rows);
-                            }}
-                          >
-                            <span className="truncate pr-3">{x.name}</span>
-                            <span className="font-mono text-rose-600 dark:text-rose-400">{formatCurrency(x.vencidas || 0)}</span>
-                          </button>
-                        ))}
+                        {radarRisco.length === 0 ? (
+                          <div className="text-sm text-muted-foreground">Sem dados</div>
+                        ) : (
+                          radarRisco.slice(0, 5).map((x) => {
+                            const total = Number(x.value) || 0;
+                            const venc = Number(x.vencidas) || 0;
+                            const soon = Number(x.vence3d) || 0;
+                            const pctV = total > 0 ? (venc / total) * 100 : 0;
+                            const pctS = total > 0 ? (soon / total) * 100 : 0;
+                            return (
+                              <button
+                                key={`${x.key}`}
+                                className="w-full text-left"
+                                onClick={() => {
+                                  const rows = (filteredFaturas as any[]).filter((f) => {
+                                    const saldo = Number(f._saldo) || 0;
+                                    if (saldo <= 0) return false;
+                                    const cnpj = String(f.cnpj || '').replace(/\D+/g, '');
+                                    if (rankGroupBy === 'clientes') return cnpj === String(x.cnpj || '').replace(/\D+/g, '');
+                                    const gm = cnpj ? grupoMap[cnpj] : null;
+                                    const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+                                    const key = principal || cnpj || String(f.cliente || '').trim() || '—';
+                                    return key === x.key;
+                                  });
+                                  abrirDrill(`A receber · ${x.name}`, rows);
+                                }}
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="truncate text-sm">{x.name}</span>
+                                  <span className="font-mono text-sm">{formatCurrency(total)}</span>
+                                </div>
+                                <div className="mt-1 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                  <div className="h-1.5 bg-rose-500" style={{ width: `${pctV}%` }} />
+                                  <div className="h-1.5 bg-amber-500 -mt-1.5" style={{ width: `${Math.min(100, pctV + pctS)}%` }} />
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span>Vencidas: {formatCurrency(venc)}</span>
+                                  <span>·</span>
+                                  <span>Vence 3d: {formatCurrency(soon)}</span>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
 
