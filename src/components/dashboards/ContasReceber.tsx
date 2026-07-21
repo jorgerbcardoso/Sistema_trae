@@ -189,6 +189,71 @@ function downloadCsv(filename: string, csv: string) {
 
 const COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
+const agingReceberDefs = [
+  { key: 'Hoje', min: 0, max: 0 },
+  { key: '1-2', min: 1, max: 2 },
+  { key: '3-5', min: 3, max: 5 },
+  { key: '6-10', min: 6, max: 10 },
+  { key: '11-15', min: 11, max: 15 },
+  { key: '16-20', min: 16, max: 20 },
+  { key: '21-30', min: 21, max: 30 },
+  { key: '31+', min: 31, max: 9999 },
+] as const;
+
+const agingVencDefs = [
+  { key: '1-15', min: 1, max: 15 },
+  { key: '16-30', min: 16, max: 30 },
+  { key: '31-60', min: 31, max: 60 },
+  { key: '61-90', min: 61, max: 90 },
+  { key: '91-180', min: 91, max: 180 },
+  { key: '181+', min: 181, max: 9999 },
+] as const;
+
+function normTextKey(v: any): string {
+  return String(v ?? '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function CrChartTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
+  valueFormatter?: (v: number) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm px-3 py-2 text-xs">
+      {label !== undefined && label !== null && String(label).trim() !== '' ? <div className="font-semibold mb-1">{String(label)}</div> : null}
+      <div className="space-y-1">
+        {payload.map((p: any, idx: number) => {
+          const rawName = p?.name ?? p?.dataKey ?? '';
+          const name = String(rawName || '').trim();
+          const rawVal = Number(p?.value ?? p?.payload?.value ?? 0) || 0;
+          const val = valueFormatter ? valueFormatter(rawVal) : String(rawVal);
+          const color = String(p?.color || p?.fill || '#64748b');
+          return (
+            <div key={`${name}-${idx}`} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                <span className="truncate">{name || '—'}</span>
+              </div>
+              <span className="font-mono">{val}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ContasReceber() {
   const today0 = useMemo(() => {
     const n = new Date();
@@ -198,8 +263,9 @@ export function ContasReceber() {
   const [tab, setTab] = useState<TabKey>('visao_geral');
   const [periodoTipo, setPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>('V');
   const defaultPeriodo = useMemo(() => {
-    const start = new Date();
-    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
     return { ini: dateToInput(start), fim: dateToInput(end) };
   }, []);
   const [periodoIni, setPeriodoIni] = useState<string>(defaultPeriodo.ini);
@@ -240,15 +306,17 @@ export function ContasReceber() {
   const initialLoad0103Ref = useRef(false);
   const [drillOpen, setDrillOpen] = useState(false);
   const [drillTitle, setDrillTitle] = useState('');
-  const [drillRows, setDrillRows] = useState<FatFatura[]>([]);
+  const [drillKind, setDrillKind] = useState<'faturas' | 'ctes0103'>('faturas');
+  const [drillRows, setDrillRows] = useState<any[]>([]);
 
   const [rankGroupBy, setRankGroupBy] = useState<'grupos' | 'clientes'>('grupos');
   const [grupoMap, setGrupoMap] = useState<Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }>>({});
   const lastGrupoFetchKeyRef = useRef<string>('');
 
-  const abrirDrill = useCallback((title: string, rows: FatFatura[]) => {
+  const abrirDrill = useCallback((title: string, rows: any[], kind: 'faturas' | 'ctes0103' = 'faturas') => {
     setDrillTitle(title);
     setDrillRows(rows);
+    setDrillKind(kind);
     setDrillOpen(true);
   }, []);
 
@@ -595,6 +663,28 @@ export function ContasReceber() {
     return { ...base, inadimplenciaPct: inad };
   }, [filteredFaturas]);
 
+  const kpisAll = useMemo(() => {
+    const base = {
+      faturas: normalizedFaturas.length,
+      ctes: 0,
+      valorFaturado: 0,
+      pago: 0,
+      pagoFaturas: 0,
+      ctesPago: 0,
+    };
+    for (const f of normalizedFaturas as any[]) {
+      base.valorFaturado += Number(f._vlrFatur) || 0;
+      const pago = Number(f._pago) || 0;
+      if (pago > 0) {
+        base.pago += pago;
+        base.pagoFaturas += 1;
+        base.ctesPago += Array.isArray(f.ctes) ? f.ctes.length : 0;
+      }
+      base.ctes += Array.isArray(f.ctes) ? f.ctes.length : 0;
+    }
+    return base;
+  }, [normalizedFaturas]);
+
   const previsaoSerie30d = useMemo(() => {
     const sums = new Array(31).fill(0) as number[];
     for (const f of filteredFaturas as any[]) {
@@ -624,12 +714,14 @@ export function ContasReceber() {
     sub,
     tone,
     Icon,
+    onClick,
   }: {
     label: string;
     value: string;
     sub: string;
     tone: 'indigo' | 'emerald' | 'blue' | 'rose' | 'amber' | 'orange';
     Icon: any;
+    onClick?: () => void;
   }) => {
     const toneMap: Record<string, { border: string; bg: string; icon: string; iconBg: string; iconBorder: string }> = {
       indigo: {
@@ -677,7 +769,11 @@ export function ContasReceber() {
     };
     const t = toneMap[tone];
     return (
-      <div className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3 text-left ${onClick ? 'hover:brightness-[.98] dark:hover:brightness-110 cursor-pointer' : 'cursor-default'}`}
+      >
         <div className={`rounded-lg p-2 ${t.iconBg} border ${t.iconBorder} ${t.icon}`}>
           <Icon className="w-5 h-5" />
         </div>
@@ -686,7 +782,7 @@ export function ContasReceber() {
           <div className="text-xl font-bold leading-tight">{value}</div>
           <div className="text-xs text-muted-foreground truncate">{sub}</div>
         </div>
-      </div>
+      </button>
     );
   };
 
@@ -698,13 +794,15 @@ export function ContasReceber() {
         sub: `${formatNumber(kpis.faturas)} fatura(s)`,
         tone: 'indigo',
         icon: TrendingUp,
+        onClick: () => abrirDrill('Faturas (visão atual)', filteredFaturas as any[], 'faturas'),
       },
       {
         label: 'Recebido',
-        value: formatCurrency(kpis.pago),
-        sub: `${formatNumber(kpis.ctes)} CT-e(s)`,
+        value: formatCurrency(kpisAll.pago),
+        sub: `${formatNumber(kpisAll.pagoFaturas)} fatura(s) · ${formatNumber(kpisAll.ctesPago)} CT-e(s)`,
         tone: 'emerald',
         icon: HandCoins,
+        onClick: () => abrirDrill('Faturas com recebimento (vlr_pago > 0)', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas'),
       },
       {
         label: 'A receber',
@@ -712,6 +810,7 @@ export function ContasReceber() {
         sub: `No prazo: ${formatCurrency(kpis.noPrazo)}`,
         tone: 'blue',
         icon: BadgeDollarSign,
+        onClick: () => abrirDrill('A receber (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas'),
       },
       {
         label: 'Atrasado',
@@ -719,6 +818,7 @@ export function ContasReceber() {
         sub: `Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`,
         tone: 'rose',
         icon: AlertTriangle,
+        onClick: () => abrirDrill('Atrasadas (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas'),
       },
       {
         label: 'Vence em 3 dias',
@@ -726,6 +826,7 @@ export function ContasReceber() {
         sub: 'Radar de risco',
         tone: 'amber',
         icon: CalendarClock,
+        onClick: () => abrirDrill('Vencendo em 3 dias (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._dueSoon), 'faturas'),
       },
       {
         label: 'Disponíveis para faturar',
@@ -733,11 +834,14 @@ export function ContasReceber() {
         sub: `${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`,
         tone: 'orange',
         icon: PieChartIcon,
+        onClick: () => abrirDrill('CT-es disponíveis para faturar', (data0103?.rows || []) as any[], 'ctes0103'),
       },
-    ] as const;
+    ];
   }, [
+    abrirDrill,
     data0103?.totals?.ctes,
     data0103?.totals?.frete_total,
+    data0103?.rows,
     kpis.aReceber,
     kpis.atrasado,
     kpis.ctes,
@@ -745,29 +849,34 @@ export function ContasReceber() {
     kpis.faturas,
     kpis.inadimplenciaPct,
     kpis.noPrazo,
-    kpis.pago,
     kpis.valorFaturado,
+    kpisAll.ctesPago,
+    kpisAll.pago,
+    kpisAll.pagoFaturas,
+    filteredFaturas,
+    normalizedFaturas,
   ]);
 
   const aReceberPorUnidade = useMemo(() => {
-    const by: Record<string, { name: string; value: number }> = {};
+    const by: Record<string, { key: string; name: string; value: number }> = {};
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
-      const key = String(f.fil || f.unidade_responsavel || '—').trim() || '—';
-      if (!by[key]) by[key] = { name: key, value: 0 };
+      const keyRaw = f.fil || f.unidade_responsavel || '—';
+      const key = normTextKey(keyRaw) || '—';
+      if (!by[key]) by[key] = { key, name: key, value: 0 };
       by[key].value += saldo;
     }
     return Object.values(by).sort((a, b) => b.value - a.value).slice(0, 12);
   }, [filteredFaturas]);
 
   const aReceberPorTipoCobranca = useMemo(() => {
-    const by: Record<string, { name: string; value: number }> = {};
+    const by: Record<string, { key: string; name: string; value: number }> = {};
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
-      const key = String(f.tipo_cobranca || '—').trim() || '—';
-      if (!by[key]) by[key] = { name: key, value: 0 };
+      const key = normTextKey(f.tipo_cobranca || '—') || '—';
+      if (!by[key]) by[key] = { key, name: key, value: 0 };
       by[key].value += saldo;
     }
     return Object.values(by).sort((a, b) => b.value - a.value);
@@ -835,7 +944,7 @@ export function ContasReceber() {
 
   const funilValores = useMemo(() => {
     const aFaturar = Number(data0103?.totals?.frete_total) || 0;
-    const recebido = Number(kpis.pago) || 0;
+    const recebido = Number(kpisAll.pago) || 0;
     const aberto = Number(kpis.aReceber) || 0;
     const atrasado = Number(kpis.atrasado) || 0;
     return [
@@ -844,7 +953,7 @@ export function ContasReceber() {
       { name: 'Atrasado', value: atrasado, fill: '#ef4444' },
       { name: 'A faturar', value: aFaturar, fill: '#f97316' },
     ];
-  }, [data0103, kpis]);
+  }, [data0103, kpis.aReceber, kpis.atrasado, kpisAll.pago]);
 
   const aFaturarByDestino = useMemo(() => {
     const rows = data0103?.rows || [];
@@ -908,28 +1017,10 @@ export function ContasReceber() {
   }, [filteredFaturas, today0]);
 
   const agingBuckets = useMemo(() => {
-    const bucketsReceber = [
-      { key: 'Hoje', min: 0, max: 0 },
-      { key: '1-2', min: 1, max: 2 },
-      { key: '3-5', min: 3, max: 5 },
-      { key: '6-10', min: 6, max: 10 },
-      { key: '11-15', min: 11, max: 15 },
-      { key: '16-20', min: 16, max: 20 },
-      { key: '21-30', min: 21, max: 30 },
-      { key: '31+', min: 31, max: 9999 },
-    ];
-    const bucketsVenc = [
-      { key: '1-15', min: 1, max: 15 },
-      { key: '16-30', min: 16, max: 30 },
-      { key: '31-60', min: 31, max: 60 },
-      { key: '61-90', min: 61, max: 90 },
-      { key: '91-180', min: 91, max: 180 },
-      { key: '181+', min: 181, max: 9999 },
-    ];
     const rec: Record<string, number> = {};
     const venc: Record<string, number> = {};
-    for (const b of bucketsReceber) rec[b.key] = 0;
-    for (const b of bucketsVenc) venc[b.key] = 0;
+    for (const b of agingReceberDefs) rec[b.key] = 0;
+    for (const b of agingVencDefs) venc[b.key] = 0;
 
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
@@ -937,20 +1028,43 @@ export function ContasReceber() {
       if (!ts || saldo <= 0) continue;
       const days = Math.floor((ts - today0) / 86400000);
       if (days >= 0) {
-        const b = bucketsReceber.find((x) => days >= x.min && days <= x.max);
+        const b = agingReceberDefs.find((x) => days >= x.min && days <= x.max);
         if (b) rec[b.key] += saldo;
       } else {
         const od = Math.abs(days);
-        const b = bucketsVenc.find((x) => od >= x.min && od <= x.max);
+        const b = agingVencDefs.find((x) => od >= x.min && od <= x.max);
         if (b) venc[b.key] += saldo;
       }
     }
 
     return {
-      aReceber: bucketsReceber.map((b) => ({ name: b.key, value: rec[b.key] || 0 })),
-      vencidos: bucketsVenc.map((b) => ({ name: b.key, value: venc[b.key] || 0 })),
+      aReceber: agingReceberDefs.map((b) => ({ name: b.key, value: rec[b.key] || 0 })),
+      vencidos: agingVencDefs.map((b) => ({ name: b.key, value: venc[b.key] || 0 })),
     };
   }, [filteredFaturas, today0]);
+
+  const getAgingDrillRows = useCallback(
+    (bucketKey: string, mode: 'a_receber' | 'vencidos') => {
+      const key = String(bucketKey || '').trim();
+      const defs = mode === 'a_receber' ? agingReceberDefs : agingVencDefs;
+      const def = defs.find((d) => d.key === key);
+      if (!def) return [];
+      return (filteredFaturas as any[]).filter((f) => {
+        const saldo = Number((f as any)._saldo) || 0;
+        const ts = Number((f as any)._vencTs0);
+        if (saldo <= 0 || !Number.isFinite(ts)) return false;
+        const days = Math.floor((ts - today0) / 86400000);
+        if (mode === 'a_receber') {
+          if (days < 0) return false;
+          return days >= def.min && days <= def.max;
+        }
+        if (days >= 0) return false;
+        const od = Math.abs(days);
+        return od >= def.min && od <= def.max;
+      });
+    },
+    [filteredFaturas, today0]
+  );
 
   const hasFiltrosAtivos = useMemo(() => {
     if (periodoTipo !== defaultFilters.periodoTipo) return true;
@@ -1250,7 +1364,7 @@ export function ContasReceber() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {kpiTiles.map((t) => (
-                  <Tile key={t.label} label={t.label} value={t.value} sub={t.sub} tone={t.tone} Icon={t.icon} />
+                  <Tile key={t.label} label={t.label} value={t.value} sub={t.sub} tone={t.tone} Icon={t.icon} onClick={t.onClick} />
                 ))}
               </div>
 
@@ -1284,7 +1398,24 @@ export function ContasReceber() {
                       <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem valores no horizonte de 30 dias</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={previsaoSerie30d.series} margin={{ top: 12, right: 10, bottom: 0, left: 0 }}>
+                        <AreaChart
+                          data={previsaoSerie30d.series}
+                          margin={{ top: 12, right: 10, bottom: 0, left: 0 }}
+                          onClick={(e: any) => {
+                            const label = String(e?.activeLabel ?? '').trim();
+                            if (!label) return;
+                            const idx = (previsaoSerie30d.series as any[]).findIndex((x) => String(x?.name ?? '').trim() === label);
+                            if (idx < 0) return;
+                            const ts = today0 + idx * 86400000;
+                            const rows = (filteredFaturas as any[]).filter((f) => {
+                              const saldo = Number((f as any)._saldo) || 0;
+                              if (saldo <= 0) return false;
+                              if ((f as any)._overdue) return false;
+                              return Number((f as any)._vencTs0) === ts;
+                            });
+                            abrirDrill(`Previsão · ${label}`, rows, 'faturas');
+                          }}
+                        >
                           <defs>
                             <linearGradient id="cr_previsao" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#2563eb" stopOpacity={0.35} />
@@ -1294,7 +1425,7 @@ export function ContasReceber() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" interval={4} />
                           <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                           <Area
                             type="monotone"
                             dataKey="value"
@@ -1371,16 +1502,22 @@ export function ContasReceber() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                           <YAxis type="category" dataKey="name" width={50} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                           <Bar
                             dataKey="value"
                             name="A receber"
                             fill="url(#cr_unid)"
                             radius={[8, 8, 8, 8]}
                             onClick={(d: any) => {
-                              const key = String(d?.name ?? '').trim();
+                              const key = normTextKey(d?.key ?? d?.name ?? '');
                               if (!key) return;
-                              abrirDrill(`A receber · Unidade ${key}`, (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && (f.fil || f.unidade_responsavel) === key));
+                              const rows = (filteredFaturas as any[]).filter((f) => {
+                                const saldo = Number((f as any)._saldo) || 0;
+                                if (saldo <= 0) return false;
+                                const unit = normTextKey((f as any).fil || (f as any).unidade_responsavel || '');
+                                return unit === key;
+                              });
+                              abrirDrill(`A receber · Unidade ${key}`, rows, 'faturas');
                             }}
                           />
                         </BarChart>
@@ -1398,9 +1535,26 @@ export function ContasReceber() {
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                           <Legend verticalAlign="bottom" height={36} />
-                          <Pie data={aReceberPorTipoCobranca.slice(0, 8)} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} stroke="none">
+                          <Pie
+                            data={aReceberPorTipoCobranca.slice(0, 8)}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={58}
+                            outerRadius={90}
+                            stroke="none"
+                            onClick={(d: any) => {
+                              const key = normTextKey(d?.name ?? '');
+                              if (!key) return;
+                              const rows = (filteredFaturas as any[]).filter((f) => {
+                                const saldo = Number((f as any)._saldo) || 0;
+                                if (saldo <= 0) return false;
+                                return normTextKey((f as any).tipo_cobranca) === key;
+                              });
+                              abrirDrill(`A receber · Cobrança ${key}`, rows, 'faturas');
+                            }}
+                          >
                             {aReceberPorTipoCobranca.slice(0, 8).map((_, i) => (
                               <Cell key={i} fill={COLORS[i % COLORS.length]} />
                             ))}
@@ -1579,8 +1733,31 @@ export function ContasReceber() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                             <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                            <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                            <Bar dataKey="value" name="Valor" stroke="none">
+                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <Bar
+                              dataKey="value"
+                              name="Valor"
+                              stroke="none"
+                              onClick={(d: any) => {
+                                const name = String(d?.name ?? '').trim();
+                                if (!name) return;
+                                if (name === 'Recebido') {
+                                  abrirDrill('Faturas com recebimento (vlr_pago > 0)', (normalizedFaturas as any[]).filter((f) => (Number((f as any)._pago) || 0) > 0), 'faturas');
+                                  return;
+                                }
+                                if (name === 'A receber') {
+                                  abrirDrill('A receber (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas');
+                                  return;
+                                }
+                                if (name === 'Atrasado') {
+                                  abrirDrill('Atrasadas (saldo > 0)', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue), 'faturas');
+                                  return;
+                                }
+                                if (name === 'A faturar') {
+                                  abrirDrill('CT-es disponíveis para faturar', (data0103?.rows || []) as any[], 'ctes0103');
+                                }
+                              }}
+                            >
                               {funilValores.map((p, i) => (
                                 <Cell key={i} fill={(p as any).fill} />
                               ))}
@@ -1701,15 +1878,15 @@ export function ContasReceber() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                    <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                    <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                     <Bar
                       dataKey="value"
                       name="A receber"
                       fill="#16a34a"
                       onClick={(d: any) => {
                         const key = String(d?.name ?? '');
-                        const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && !f._overdue);
-                        abrirDrill(`A receber · Faixa ${key}`, rows);
+                        const rows = getAgingDrillRows(key, 'a_receber');
+                        abrirDrill(`A receber · Faixa ${key}`, rows, 'faturas');
                       }}
                     />
                   </BarChart>
@@ -1803,15 +1980,15 @@ export function ContasReceber() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                    <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                    <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                     <Bar
                       dataKey="value"
                       name="Vencidos"
                       fill="#ef4444"
                       onClick={(d: any) => {
                         const key = String(d?.name ?? '');
-                        const rows = (filteredFaturas as any[]).filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
-                        abrirDrill(`Vencidos · Faixa ${key}`, rows);
+                        const rows = getAgingDrillRows(key, 'vencidos');
+                        abrirDrill(`Vencidos · Faixa ${key}`, rows, 'faturas');
                       }}
                     />
                   </BarChart>
@@ -1890,8 +2067,18 @@ export function ContasReceber() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                           <YAxis type="category" dataKey="name" width={55} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                          <Bar dataKey="value" name="Frete" fill="#f97316" />
+                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                          <Bar
+                            dataKey="value"
+                            name="Frete"
+                            fill="#f97316"
+                            onClick={(d: any) => {
+                              const key = String(d?.name ?? '').trim();
+                              if (!key) return;
+                              const rows = (data0103?.rows || []).filter((r) => String((r as any).dest || '').trim() === key);
+                              abrirDrill(`A faturar · Destino ${key}`, rows as any[], 'ctes0103');
+                            }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1913,8 +2100,18 @@ export function ContasReceber() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                           <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
-                          <Bar dataKey="value" name="Frete" fill="#f97316" />
+                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                          <Bar
+                            dataKey="value"
+                            name="Frete"
+                            fill="#f97316"
+                            onClick={(d: any) => {
+                              const key = String(d?.name ?? '').trim();
+                              if (!key) return;
+                              const rows = (data0103?.rows || []).filter((r) => String((r as any).pagador || '').trim() === key);
+                              abrirDrill(`A faturar · Pagador ${key}`, rows as any[], 'ctes0103');
+                            }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1972,35 +2169,67 @@ export function ContasReceber() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2 pr-3">Fatura</th>
-                    <th className="py-2 pr-3">Cliente</th>
-                    <th className="py-2 pr-3">Vencimento</th>
-                    <th className="py-2 pr-3 text-right">Saldo</th>
-                    <th className="py-2 pr-3 text-right">Valor</th>
-                    <th className="py-2 pr-3">Situação</th>
-                    <th className="py-2 pr-3 text-right">CT-es</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {drillRows.slice(0, 600).map((f: any) => (
-                    <tr key={f.fatura} className="border-b last:border-0">
-                      <td className="py-2 pr-3 font-mono">{f.fatura}</td>
-                      <td className="py-2 pr-3">
-                        <div className="font-medium">{f.cliente}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
-                      </td>
-                      <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
-                      <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.saldo)}</td>
-                      <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.vlr_fatur)}</td>
-                      <td className="py-2 pr-3">{f.situacao || '-'}</td>
-                      <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+              {drillKind === 'ctes0103' ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-3">CTRC</th>
+                      <th className="py-2 pr-3">CT-e</th>
+                      <th className="py-2 pr-3">Pagador</th>
+                      <th className="py-2 pr-3">Dest</th>
+                      <th className="py-2 pr-3 text-right">Frete</th>
+                      <th className="py-2 pr-3">Emissão</th>
+                      <th className="py-2 pr-3">Prev. Entrega</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {drillRows.slice(0, 800).map((r: any, i: number) => (
+                      <tr key={`${r?.ctrc || ''}-${r?.numero_cte || ''}-${i}`} className="border-b last:border-0">
+                        <td className="py-2 pr-3 font-mono">{r.ctrc}</td>
+                        <td className="py-2 pr-3 font-mono">{r.numero_cte}</td>
+                        <td className="py-2 pr-3">
+                          <div className="font-medium">{r.pagador}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{r.cnpj_pagador}</div>
+                        </td>
+                        <td className="py-2 pr-3 font-mono">{r.dest}</td>
+                        <td className="py-2 pr-3 text-right font-mono">{formatCurrency(Number(r.frete) || 0)}</td>
+                        <td className="py-2 pr-3 font-mono">{r.emissao}</td>
+                        <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-3">Fatura</th>
+                      <th className="py-2 pr-3">Cliente</th>
+                      <th className="py-2 pr-3">Vencimento</th>
+                      <th className="py-2 pr-3 text-right">Saldo</th>
+                      <th className="py-2 pr-3 text-right">Valor</th>
+                      <th className="py-2 pr-3">Situação</th>
+                      <th className="py-2 pr-3 text-right">CT-es</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillRows.slice(0, 600).map((f: any) => (
+                      <tr key={f.fatura} className="border-b last:border-0">
+                        <td className="py-2 pr-3 font-mono">{f.fatura}</td>
+                        <td className="py-2 pr-3">
+                          <div className="font-medium">{f.cliente}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
+                        </td>
+                        <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
+                        <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.saldo)}</td>
+                        <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.vlr_fatur)}</td>
+                        <td className="py-2 pr-3">{f.situacao || '-'}</td>
+                        <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </DialogContent>
