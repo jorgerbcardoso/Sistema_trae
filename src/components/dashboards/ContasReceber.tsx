@@ -137,11 +137,22 @@ function dateToInput(d: Date): string {
 
 function parseDateBr(dmy: string): number | null {
   const s = String(dmy ?? '').trim();
-  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return null;
-  const dd = parseInt(m[1], 10);
-  const mm = parseInt(m[2], 10);
-  const yyyy = parseInt(m[3], 10);
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  let dd: number;
+  let mm: number;
+  let yyyy: number;
+  if (m) {
+    dd = parseInt(m[1], 10);
+    mm = parseInt(m[2], 10);
+    yyyy = parseInt(m[3], 10);
+  } else {
+    m = s.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (!m) return null;
+    dd = parseInt(m[1], 10);
+    mm = parseInt(m[2], 10);
+    const yy = parseInt(m[3], 10);
+    yyyy = yy >= 80 ? 1900 + yy : 2000 + yy;
+  }
   if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
   const dt = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
   const ts = dt.getTime();
@@ -464,9 +475,24 @@ export function ContasReceber() {
       const vlrFatur = Number(f.vlr_fatur) || 0;
       const pago = Number(f.vlr_pago) || 0;
       const venc0 = vencTs !== null ? new Date(vencTs).setHours(0, 0, 0, 0) : null;
-      const overdue = saldo > 0 && venc0 !== null && venc0 < today0;
+      const diasAtrasoRaw = String((f as any)?.dias_atraso ?? '').trim();
+      const diasAtrasoNum = Number.parseInt(diasAtrasoRaw.replace(/[^\d-]+/g, ''), 10);
+      const situacaoUp = String((f as any)?.situacao ?? '').trim().toUpperCase();
+
+      const overdueBySignals = (Number.isFinite(diasAtrasoNum) && diasAtrasoNum > 0) || situacaoUp.includes('ATRAS');
+      const overdueByDate = venc0 !== null && venc0 < today0;
+      const overdue = saldo > 0 && (overdueByDate || overdueBySignals);
+
       const dueSoon = saldo > 0 && venc0 !== null && venc0 >= today0 && venc0 <= today0 + 3 * 86400000;
-      return { ...f, _vencTs0: venc0, _saldo: saldo, _vlrFatur: vlrFatur, _pago: pago, _overdue: overdue, _dueSoon: dueSoon };
+      return {
+        ...f,
+        _vencTs0: venc0,
+        _saldo: saldo,
+        _vlrFatur: vlrFatur,
+        _pago: pago,
+        _overdue: overdue,
+        _dueSoon: dueSoon,
+      };
     });
   }, [data0049, today0]);
 

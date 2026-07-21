@@ -181,7 +181,14 @@ $parseCnpj = static function(string $v): string {
 };
 
 $normKey = static function(string $s): string {
-    return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($s)));
+    $s = trim((string)$s);
+    if ($s === '') return '';
+    $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (function_exists('iconv')) {
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+        if (is_string($ascii) && $ascii !== '') $s = $ascii;
+    }
+    return preg_replace('/[^A-Z0-9]/', '', strtoupper($s));
 };
 
 $parseSsw0049Csv = static function(string $content) use ($parseMoney, $parseCnpj, $normKey): array {
@@ -416,7 +423,7 @@ try {
         'rel_ana_fg_fat_desc' => 'I',
         'rel_ana_fg_lista_ocor' => 'N',
         'rel_ana_fg_ctrc_fob_dir' => 'N',
-        'tp_cobranca' => 'A',
+        'tp_cobranca' => 'T',
         'rel_ana_vlr_max_fat' => '9.999.999,99',
         'rel_ana_periodicidade' => 'T',
         'rel_ana_arq_excel' => 'S',
