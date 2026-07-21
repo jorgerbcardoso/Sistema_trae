@@ -33,10 +33,15 @@ if (!is_array($input)) $input = [];
 $step = strtoupper(trim((string)($input['step'] ?? 'RUN')));
 if (!in_array($step, ['RUN', 'START', 'POLL', 'DOWNLOAD'], true)) $step = 'RUN';
 
-$allowedSswUsers = ['presto', 'damasce1', 'claraj'];
-$normSswUser = static function(string $s): string {
+$normSswStatus = static function(string $s): string {
     $s = html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    return strtolower(trim($s));
+    if (function_exists('iconv')) {
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+        if (is_string($ascii) && $ascii !== '') $s = $ascii;
+    }
+    $s = strtolower(trim($s));
+    $s = preg_replace('/[^a-z]/', '', $s);
+    return (string)$s;
 };
 
 $sswFetch = static function(string $url, int $tries = 3): string {
@@ -518,6 +523,36 @@ try {
             ];
         }
 
+        if (preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/i", $html, $mArq)) {
+            $filename = trim((string)$mArq[1]);
+            $path = trim((string)$mArq[2]);
+            if ($filename !== '' && $path !== '') {
+                $t2 = microtime(true);
+                $csvRaw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
+                $t3 = microtime(true);
+                if ($csvRaw !== '' && strlen($csvRaw) >= 50) {
+                    $parsed = $parseSsw0049Csv($csvRaw);
+                    return [
+                        'kind' => 'ready',
+                        'data' => $parsed,
+                        'meta' => [
+                            'act' => $filename,
+                            'filename' => $filename,
+                            'path' => $path,
+                        ],
+                        'timing_ms' => [
+                            'ssw0049' => (int)round(($t1 - $t0) * 1000),
+                            'download' => (int)round(($t3 - $t2) * 1000),
+                        ],
+                        'size_bytes' => [
+                            'ssw0049_html' => strlen($html),
+                            'csv' => strlen($csvRaw),
+                        ],
+                    ];
+                }
+            }
+        }
+
         return [
             'kind' => 'queued',
             'timing_ms' => ['ssw0049' => (int)round(($t1 - $t0) * 1000)],
@@ -582,11 +617,8 @@ try {
             $opcStr = (string)($r['opc'] ?? '');
             if (substr(trim($opcStr), 0, 3) !== '441') continue;
 
-            $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
-            if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
-
             $sitStr = (string)($r['sit'] ?? '');
-            if ($sitStr !== 'Conclu&iacute;do') continue;
+            if ($normSswStatus($sitStr) !== 'concluido') continue;
 
             $f8raw = (string)($r['f8'] ?? '');
             if ($f8raw === '') continue;
@@ -748,10 +780,8 @@ try {
                 if ($seqVal <= 0) continue;
                 $opcStr = (string)($r['opc'] ?? '');
                 if (substr(trim($opcStr), 0, 3) !== '441') continue;
-                $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
-                if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
                 $sitStr = (string)($r['sit'] ?? '');
-                if ($sitStr !== 'Conclu&iacute;do') continue;
+                if ($normSswStatus($sitStr) !== 'concluido') continue;
                 $f8raw = (string)($r['f8'] ?? '');
                 if ($f8raw === '') continue;
                 $okBySeq = ($seqVal > $baselineSeq);
