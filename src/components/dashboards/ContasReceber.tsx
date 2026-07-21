@@ -452,90 +452,6 @@ export function ContasReceber() {
     return () => window.clearTimeout(t);
   }, [carregar0103]);
 
-  const kpiTiles = useMemo(() => {
-    const tiles = [
-      {
-        label: 'Valor faturado',
-        value: formatCurrency(kpis.valorFaturado),
-        sub: `${formatNumber(kpis.faturas)} fatura(s)`,
-        tone: 'indigo',
-        icon: TrendingUp,
-      },
-      {
-        label: 'Recebido',
-        value: formatCurrency(kpis.pago),
-        sub: `${formatNumber(kpis.ctes)} CT-e(s)`,
-        tone: 'emerald',
-        icon: HandCoins,
-      },
-      {
-        label: 'A receber',
-        value: formatCurrency(kpis.aReceber),
-        sub: `No prazo: ${formatCurrency(kpis.noPrazo)}`,
-        tone: 'blue',
-        icon: BadgeDollarSign,
-      },
-      {
-        label: 'Atrasado',
-        value: formatCurrency(kpis.atrasado),
-        sub: `Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`,
-        tone: 'rose',
-        icon: AlertTriangle,
-      },
-      {
-        label: 'Vence em 3 dias',
-        value: formatCurrency(kpis.dueSoon),
-        sub: 'Radar de risco',
-        tone: 'amber',
-        icon: CalendarClock,
-      },
-      {
-        label: 'Disponíveis para faturar',
-        value: formatCurrency(data0103?.totals?.frete_total || 0),
-        sub: `${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`,
-        tone: 'orange',
-        icon: PieChartIcon,
-      },
-    ] as const;
-    return tiles;
-  }, [data0103?.totals?.ctes, data0103?.totals?.frete_total, kpis]);
-
-  const Tile = ({
-    label,
-    value,
-    sub,
-    tone,
-    Icon,
-  }: {
-    label: string;
-    value: string;
-    sub: string;
-    tone: 'indigo' | 'emerald' | 'blue' | 'rose' | 'amber' | 'orange';
-    Icon: any;
-  }) => {
-    const toneMap: Record<string, { border: string; bg: string; icon: string }> = {
-      indigo: { border: 'border-indigo-200 dark:border-indigo-900/70', bg: 'bg-indigo-50 dark:bg-indigo-950/25', icon: 'text-indigo-700 dark:text-indigo-300' },
-      emerald: { border: 'border-emerald-200 dark:border-emerald-900/70', bg: 'bg-emerald-50 dark:bg-emerald-950/25', icon: 'text-emerald-700 dark:text-emerald-300' },
-      blue: { border: 'border-blue-200 dark:border-blue-900/70', bg: 'bg-blue-50 dark:bg-blue-950/25', icon: 'text-blue-700 dark:text-blue-300' },
-      rose: { border: 'border-rose-200 dark:border-rose-900/70', bg: 'bg-rose-50 dark:bg-rose-950/25', icon: 'text-rose-700 dark:text-rose-300' },
-      amber: { border: 'border-amber-200 dark:border-amber-900/70', bg: 'bg-amber-50 dark:bg-amber-950/25', icon: 'text-amber-700 dark:text-amber-300' },
-      orange: { border: 'border-orange-200 dark:border-orange-900/70', bg: 'bg-orange-50 dark:bg-orange-950/25', icon: 'text-orange-700 dark:text-orange-300' },
-    };
-    const t = toneMap[tone];
-    return (
-      <div className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3`}>
-        <div className={`rounded-lg p-2 bg-white/70 dark:bg-slate-900/40 border border-white/60 dark:border-slate-800 ${t.icon}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className="text-2xl font-bold leading-tight">{value}</div>
-          <div className="text-xs text-muted-foreground truncate">{sub}</div>
-        </div>
-      </div>
-    );
-  };
-
   const normalizedFaturas = useMemo(() => {
     const base = data0049?.faturas || [];
     return base.map((f) => {
@@ -604,6 +520,101 @@ export function ContasReceber() {
     const inad = base.aReceber > 0 ? (base.atrasado / base.aReceber) * 100 : 0;
     return { ...base, inadimplenciaPct: inad };
   }, [filteredFaturas]);
+
+  const Tile = ({
+    label,
+    value,
+    sub,
+    tone,
+    Icon,
+  }: {
+    label: string;
+    value: string;
+    sub: string;
+    tone: 'indigo' | 'emerald' | 'blue' | 'rose' | 'amber' | 'orange';
+    Icon: any;
+  }) => {
+    const toneMap: Record<string, { border: string; bg: string; icon: string }> = {
+      indigo: { border: 'border-indigo-200 dark:border-indigo-900/70', bg: 'bg-indigo-50 dark:bg-indigo-950/25', icon: 'text-indigo-700 dark:text-indigo-300' },
+      emerald: { border: 'border-emerald-200 dark:border-emerald-900/70', bg: 'bg-emerald-50 dark:bg-emerald-950/25', icon: 'text-emerald-700 dark:text-emerald-300' },
+      blue: { border: 'border-blue-200 dark:border-blue-900/70', bg: 'bg-blue-50 dark:bg-blue-950/25', icon: 'text-blue-700 dark:text-blue-300' },
+      rose: { border: 'border-rose-200 dark:border-rose-900/70', bg: 'bg-rose-50 dark:bg-rose-950/25', icon: 'text-rose-700 dark:text-rose-300' },
+      amber: { border: 'border-amber-200 dark:border-amber-900/70', bg: 'bg-amber-50 dark:bg-amber-950/25', icon: 'text-amber-700 dark:text-amber-300' },
+      orange: { border: 'border-orange-200 dark:border-orange-900/70', bg: 'bg-orange-50 dark:bg-orange-950/25', icon: 'text-orange-700 dark:text-orange-300' },
+    };
+    const t = toneMap[tone];
+    return (
+      <div className={`rounded-xl border ${t.border} ${t.bg} p-4 flex items-start gap-3`}>
+        <div className={`rounded-lg p-2 bg-white/70 dark:bg-slate-900/40 border border-white/60 dark:border-slate-800 ${t.icon}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-bold leading-tight">{value}</div>
+          <div className="text-xs text-muted-foreground truncate">{sub}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const kpiTiles = useMemo(() => {
+    return [
+      {
+        label: 'Valor faturado',
+        value: formatCurrency(kpis.valorFaturado),
+        sub: `${formatNumber(kpis.faturas)} fatura(s)`,
+        tone: 'indigo',
+        icon: TrendingUp,
+      },
+      {
+        label: 'Recebido',
+        value: formatCurrency(kpis.pago),
+        sub: `${formatNumber(kpis.ctes)} CT-e(s)`,
+        tone: 'emerald',
+        icon: HandCoins,
+      },
+      {
+        label: 'A receber',
+        value: formatCurrency(kpis.aReceber),
+        sub: `No prazo: ${formatCurrency(kpis.noPrazo)}`,
+        tone: 'blue',
+        icon: BadgeDollarSign,
+      },
+      {
+        label: 'Atrasado',
+        value: formatCurrency(kpis.atrasado),
+        sub: `Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`,
+        tone: 'rose',
+        icon: AlertTriangle,
+      },
+      {
+        label: 'Vence em 3 dias',
+        value: formatCurrency(kpis.dueSoon),
+        sub: 'Radar de risco',
+        tone: 'amber',
+        icon: CalendarClock,
+      },
+      {
+        label: 'Disponíveis para faturar',
+        value: formatCurrency(data0103?.totals?.frete_total || 0),
+        sub: `${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`,
+        tone: 'orange',
+        icon: PieChartIcon,
+      },
+    ] as const;
+  }, [
+    data0103?.totals?.ctes,
+    data0103?.totals?.frete_total,
+    kpis.aReceber,
+    kpis.atrasado,
+    kpis.ctes,
+    kpis.dueSoon,
+    kpis.faturas,
+    kpis.inadimplenciaPct,
+    kpis.noPrazo,
+    kpis.pago,
+    kpis.valorFaturado,
+  ]);
 
   const aReceberPorUnidade = useMemo(() => {
     const by: Record<string, { name: string; value: number }> = {};
