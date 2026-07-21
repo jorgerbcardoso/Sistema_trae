@@ -45,7 +45,7 @@ import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { BuscadorClientes } from '../cadastros/BuscadorClientes';
 
-type TabKey = 'visao_geral' | 'a_receber' | 'aging_a_receber' | 'faturas_vencidas' | 'aging_vencidos' | 'a_faturar';
+type TabKey = 'visao_geral' | 'a_receber' | 'aging_a_receber' | 'a_faturar';
 
 type Ssw0103Row = {
   em: string;
@@ -73,6 +73,7 @@ type Ssw0103Data = {
   meta: {
     programa: string;
     ontem_dmy: string;
+    ref_fim_dmy?: string;
     act: string;
     filename: string;
     updated_at: string | null;
@@ -203,26 +204,6 @@ function downloadCsv(filename: string, csv: string) {
 }
 
 const COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
-
-const agingReceberDefs = [
-  { key: 'Hoje', min: 0, max: 0 },
-  { key: '1-2', min: 1, max: 2 },
-  { key: '3-5', min: 3, max: 5 },
-  { key: '6-10', min: 6, max: 10 },
-  { key: '11-15', min: 11, max: 15 },
-  { key: '16-20', min: 16, max: 20 },
-  { key: '21-30', min: 21, max: 30 },
-  { key: '31+', min: 31, max: 9999 },
-] as const;
-
-const agingVencDefs = [
-  { key: '1-15', min: 1, max: 15 },
-  { key: '16-30', min: 16, max: 30 },
-  { key: '31-60', min: 31, max: 60 },
-  { key: '61-90', min: 61, max: 90 },
-  { key: '91-180', min: 91, max: 180 },
-  { key: '181+', min: 181, max: 9999 },
-] as const;
 
 function normTextKey(v: any): string {
   return String(v ?? '')
@@ -382,6 +363,10 @@ export function ContasReceber() {
   >('saldo');
   const [arSortDir, setArSortDir] = useState<'asc' | 'desc'>('desc');
   const [arPage, setArPage] = useState(1);
+  const [afSearch, setAfSearch] = useState('');
+  const [afSortKey, setAfSortKey] = useState<'ctrc' | 'cte' | 'pagador' | 'dest' | 'frete' | 'emissao' | 'prev'>('frete');
+  const [afSortDir, setAfSortDir] = useState<'asc' | 'desc'>('desc');
+  const [afPage, setAfPage] = useState(1);
 
   const [rankGroupBy, setRankGroupBy] = useState<'grupos' | 'clientes'>('grupos');
   const [grupoMap, setGrupoMap] = useState<Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }>>({});
@@ -1285,6 +1270,147 @@ export function ContasReceber() {
     return total > 0 ? (top5 / total) * 100 : 0;
   }, [aFaturarByPagador, data0103]);
 
+  const aFaturarByCob = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const by: Record<string, number> = {};
+    for (const r of rows) {
+      const key = String((r as any).cob || '—').trim() || '—';
+      by[key] = (by[key] || 0) + (Number((r as any).frete) || 0);
+    }
+    return Object.entries(by)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [data0103]);
+
+  const aFaturarByEm = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const by: Record<string, number> = {};
+    for (const r of rows) {
+      const key = unitSigla3((r as any).em || '—');
+      by[key] = (by[key] || 0) + (Number((r as any).frete) || 0);
+    }
+    return Object.entries(by)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12);
+  }, [data0103]);
+
+  const aFaturarTrendEmissao = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const by: Record<string, number> = {};
+    for (const r of rows) {
+      const ts = parseDateBr(String((r as any).emissao || ''));
+      if (!ts) continue;
+      const dt = new Date(ts);
+      const key = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      by[key] = (by[key] || 0) + (Number((r as any).frete) || 0);
+    }
+    const parseKey = (k: string) => {
+      const m = k.match(/^(\d{2})\/(\d{2})$/);
+      if (!m) return 0;
+      const dd = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      const dt = new Date(new Date().getFullYear(), mm - 1, dd, 12, 0, 0, 0);
+      return dt.getTime();
+    };
+    return Object.entries(by)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => parseKey(a.name) - parseKey(b.name))
+      .slice(-14);
+  }, [data0103]);
+
+  const aFaturarKpis = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const totalFrete = Number(data0103?.totals?.frete_total) || rows.reduce((acc, r) => acc + (Number((r as any).frete) || 0), 0);
+    const totalCtes = Number(data0103?.totals?.ctes) || rows.length;
+    const pagadores = new Set<string>();
+    const destinos = new Set<string>();
+    const emissores = new Set<string>();
+    for (const r of rows) {
+      pagadores.add(normTextKey((r as any).pagador || '—'));
+      destinos.add(normTextKey((r as any).dest || '—'));
+      emissores.add(unitSigla3((r as any).em || '—'));
+    }
+    const topPagador = aFaturarByPagador[0] || null;
+    const topDestino = aFaturarByDestino[0] || null;
+    const topEm = aFaturarByEm[0] || null;
+    return {
+      totalFrete,
+      totalCtes,
+      totalPagadores: pagadores.size,
+      totalDestinos: destinos.size,
+      totalEm: emissores.size,
+      topPagador,
+      topDestino,
+      topEm,
+    };
+  }, [aFaturarByDestino, aFaturarByEm, aFaturarByPagador, data0103]);
+
+  const toggleAfSort = useCallback((key: typeof afSortKey) => {
+    setAfSortKey((prevKey) => {
+      if (prevKey !== key) {
+        setAfSortDir('desc');
+        return key;
+      }
+      setAfSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+      return prevKey;
+    });
+  }, []);
+
+  const aFaturarFilteredSorted = useMemo(() => {
+    const rows = (data0103?.rows || []) as any[];
+    const q = normTextKey(afSearch);
+    const filtered = !q
+      ? rows
+      : rows.filter((r) => {
+          const hay = [
+            r?.ctrc,
+            r?.numero_cte,
+            r?.pagador,
+            r?.cnpj_pagador,
+            r?.dest,
+            r?.emissao,
+            r?.prev_entrega,
+            r?.chave_cte,
+          ]
+            .map((x) => normTextKey(x))
+            .join(' ');
+          return hay.includes(q);
+        });
+
+    const dir = afSortDir === 'asc' ? 1 : -1;
+    const cmpText = (a: any, b: any) => String(a).localeCompare(String(b), 'pt-BR') * dir;
+    const sorted = [...filtered].sort((a, b) => {
+      if (afSortKey === 'ctrc') return cmpText(normTextKey(a?.ctrc), normTextKey(b?.ctrc));
+      if (afSortKey === 'cte') return cmpText(normTextKey(a?.numero_cte), normTextKey(b?.numero_cte));
+      if (afSortKey === 'pagador') return cmpText(normTextKey(a?.pagador), normTextKey(b?.pagador));
+      if (afSortKey === 'dest') return cmpText(normTextKey(a?.dest), normTextKey(b?.dest));
+      if (afSortKey === 'emissao') return ((parseDateBr(String(a?.emissao || '')) ?? 0) - (parseDateBr(String(b?.emissao || '')) ?? 0)) * dir;
+      if (afSortKey === 'prev') return ((parseDateBr(String(a?.prev_entrega || '')) ?? 0) - (parseDateBr(String(b?.prev_entrega || '')) ?? 0)) * dir;
+      return ((Number(a?.frete) || 0) - (Number(b?.frete) || 0)) * dir;
+    });
+    return sorted;
+  }, [afSearch, afSortDir, afSortKey, data0103]);
+
+  const aFaturarTotals = useMemo(() => {
+    const totalFrete = (aFaturarFilteredSorted as any[]).reduce((acc, r) => acc + (Number(r?.frete) || 0), 0);
+    return { totalFrete, totalCtes: aFaturarFilteredSorted.length };
+  }, [aFaturarFilteredSorted]);
+
+  const afPageSize = 80;
+  const afTotalPages = useMemo(() => Math.max(1, Math.ceil(aFaturarFilteredSorted.length / afPageSize)), [aFaturarFilteredSorted.length]);
+  useEffect(() => {
+    setAfPage(1);
+  }, [afSearch, afSortKey, afSortDir]);
+  useEffect(() => {
+    setAfPage((p) => Math.min(Math.max(1, p), afTotalPages));
+  }, [afTotalPages]);
+
+  const aFaturarPageRows = useMemo(() => {
+    const start = (afPage - 1) * afPageSize;
+    return (aFaturarFilteredSorted as any[]).slice(start, start + afPageSize);
+  }, [aFaturarFilteredSorted, afPage]);
+
   const previsaoRecebimento30d = useMemo(() => {
     const byDay: Record<string, number> = {};
     for (const f of filteredFaturas as any[]) {
@@ -1312,56 +1438,6 @@ export function ContasReceber() {
       return { ...p, acumulado: acc };
     });
   }, [filteredFaturas, today0]);
-
-  const agingBuckets = useMemo(() => {
-    const rec: Record<string, number> = {};
-    const venc: Record<string, number> = {};
-    for (const b of agingReceberDefs) rec[b.key] = 0;
-    for (const b of agingVencDefs) venc[b.key] = 0;
-
-    for (const f of filteredFaturas as any[]) {
-      const saldo = Number(f._saldo) || 0;
-      const ts = f._vencTs0;
-      if (!ts || saldo <= 0) continue;
-      const days = Math.floor((ts - today0) / 86400000);
-      if (days >= 0) {
-        const b = agingReceberDefs.find((x) => days >= x.min && days <= x.max);
-        if (b) rec[b.key] += saldo;
-      } else {
-        const od = Math.abs(days);
-        const b = agingVencDefs.find((x) => od >= x.min && od <= x.max);
-        if (b) venc[b.key] += saldo;
-      }
-    }
-
-    return {
-      aReceber: agingReceberDefs.map((b) => ({ name: b.key, value: rec[b.key] || 0 })),
-      vencidos: agingVencDefs.map((b) => ({ name: b.key, value: venc[b.key] || 0 })),
-    };
-  }, [filteredFaturas, today0]);
-
-  const getAgingDrillRows = useCallback(
-    (bucketKey: string, mode: 'a_receber' | 'vencidos') => {
-      const key = String(bucketKey || '').trim();
-      const defs = mode === 'a_receber' ? agingReceberDefs : agingVencDefs;
-      const def = defs.find((d) => d.key === key);
-      if (!def) return [];
-      return (filteredFaturas as any[]).filter((f) => {
-        const saldo = Number((f as any)._saldo) || 0;
-        const ts = Number((f as any)._vencTs0);
-        if (saldo <= 0 || !Number.isFinite(ts)) return false;
-        const days = Math.floor((ts - today0) / 86400000);
-        if (mode === 'a_receber') {
-          if (days < 0) return false;
-          return days >= def.min && days <= def.max;
-        }
-        if (days >= 0) return false;
-        const od = Math.abs(days);
-        return od >= def.min && od <= def.max;
-      });
-    },
-    [filteredFaturas, today0]
-  );
 
   const hasFiltrosAtivos = useMemo(() => {
     if (periodoTipo !== defaultFilters.periodoTipo) return true;
@@ -1650,12 +1726,10 @@ export function ContasReceber() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
         <div className="flex items-center justify-between gap-3">
           <div className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-950/30 backdrop-blur px-2 py-2">
-            <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full bg-transparent">
+            <TabsList className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 w-full bg-transparent">
               <TabsTrigger value="visao_geral">Visão geral</TabsTrigger>
               <TabsTrigger value="a_receber">A receber</TabsTrigger>
               <TabsTrigger value="aging_a_receber">Gestão</TabsTrigger>
-              <TabsTrigger value="faturas_vencidas">Faturas vencidas</TabsTrigger>
-              <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
               <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
             </TabsList>
           </div>
@@ -2591,267 +2665,311 @@ export function ContasReceber() {
           )}
         </TabsContent>
 
-        <TabsContent value="faturas_vencidas" className="mt-4">
-          {!data0049 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-base">Faturas vencidas</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-2"
-                    onClick={() => {
-                      const rows = (filteredFaturas as any[]).filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
-                      const csv = buildCsvFaturas(rows as any);
-                      const stamp = new Date();
-                      const pad = (n: number) => String(n).padStart(2, '0');
-                      downloadCsv(
-                        `contas_receber_vencidas_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`,
-                        csv
-                      );
-                    }}
-                  >
-                    <Download className="w-4 h-4" />
-                    CSV
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left border-b">
-                      <th className="py-2 pr-3">Fatura</th>
-                      <th className="py-2 pr-3">Cliente</th>
-                      <th className="py-2 pr-3">Unid</th>
-                      <th className="py-2 pr-3">Vencimento</th>
-                      <th className="py-2 pr-3 text-right">Saldo</th>
-                      <th className="py-2 pr-3">Ocorrência</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(filteredFaturas as any[])
-                      .filter((f) => f._overdue && (Number(f._saldo) || 0) > 0)
-                      .slice(0, 400)
-                      .map((f) => (
-                        <tr key={f.fatura} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-mono">{f.fatura}</td>
-                          <td className="py-2 pr-3">
-                            <div className="font-medium">{f.cliente}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
-                          </td>
-                          <td className="py-2 pr-3 font-mono">{f.fil || f.unidade_responsavel}</td>
-                          <td className="py-2 pr-3 font-mono text-rose-600 dark:text-rose-400 font-semibold">{f.vencimento}</td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._saldo)}</td>
-                          <td className="py-2 pr-3 max-w-[520px] truncate" title={f.ultima_ocorrencia || ''}>
-                            {f.ultima_ocorrencia || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="aging_vencidos" className="mt-4">
-          {!data0049 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Aging · Vencidos</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agingBuckets.vencidos} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                    <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
-                    <Bar
-                      dataKey="value"
-                      name="Vencidos"
-                      fill="#ef4444"
-                      onClick={(d: any) => {
-                        const key = String(d?.name ?? '');
-                        const rows = getAgingDrillRows(key, 'vencidos');
-                        abrirDrill(`Vencidos · Faixa ${key}`, rows, 'faturas');
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
         <TabsContent value="a_faturar" className="mt-4">
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-base">Disponíveis para faturar</CardTitle>
-                  <Button onClick={() => void carregar0103()} disabled={loading0103} className="gap-2">
-                    {loading0103 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                    Atualizar agora
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Lista de CT-es a prazo que ainda não entraram em fatura. A consulta é em tempo real e usa sempre a data de ontem como referência.
-                </div>
-              </CardContent>
-            </Card>
-
-            {!data0103 ? null : (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                <Card className="lg:col-span-3">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Resumo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                        <div className="text-xs text-muted-foreground">CT-es</div>
-                        <div className="text-2xl font-bold">{Number(data0103.totals.ctes || 0).toLocaleString('pt-BR')}</div>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                        <div className="text-xs text-muted-foreground">Frete total</div>
-                        <div className="text-2xl font-bold">{formatCurrency(data0103.totals.frete_total || 0)}</div>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                        <div className="text-xs text-muted-foreground">Atualização</div>
-                        <div className="text-sm font-semibold">{data0103.meta.updated_at || data0103.meta.gerado_em}</div>
-                        <div className="text-xs text-muted-foreground">{`Ref. fim (ontem): ${data0103.meta.ontem_dmy}`}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="lg:col-span-1">
-                  <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Fonte</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-xs text-muted-foreground space-y-1">
-                    <div>Relatório gerado em {data0103.meta.updated_at || data0103.meta.gerado_em}</div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {!data0103 ? null : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">A faturar · Top destinos</CardTitle>
-                  </CardHeader>
-                  <CardContent className="h-[320px]">
-                    {aFaturarByDestino.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={aFaturarByDestino} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <YAxis type="category" dataKey="name" width={55} />
-                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
-                          <Bar
-                            dataKey="value"
-                            name="Frete"
-                            fill="#f97316"
-                            onClick={(d: any) => {
-                              const key = String(d?.name ?? '').trim();
-                              if (!key) return;
-                              const rows = (data0103?.rows || []).filter((r) => String((r as any).dest || '').trim() === key);
-                              abrirDrill(`A faturar · Destino ${key}`, rows as any[], 'ctes0103');
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-base">A faturar · Top pagadores</CardTitle>
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{`Top 5 = ${formatNumber(aFaturarConcentracaoTop5, 2)}%`}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="h-[320px]">
-                    {aFaturarByPagador.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
-                          <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
-                          <Bar
-                            dataKey="value"
-                            name="Frete"
-                            fill="#f97316"
-                            onClick={(d: any) => {
-                              const key = String(d?.name ?? '').trim();
-                              if (!key) return;
-                              const rows = (data0103?.rows || []).filter((r) => String((r as any).pagador || '').trim() === key);
-                              abrirDrill(`A faturar · Pagador ${key}`, rows as any[], 'ctes0103');
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {!data0103 ? null : (
+            {!data0103 ? (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Lista (CT-es)</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-3">CTRC</th>
-                        <th className="py-2 pr-3">CT-e</th>
-                        <th className="py-2 pr-3">Pagador</th>
-                        <th className="py-2 pr-3">Dest</th>
-                        <th className="py-2 pr-3 text-right">Frete</th>
-                        <th className="py-2 pr-3">Emissão</th>
-                        <th className="py-2 pr-3">Prev. Entrega</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data0103.rows.slice(0, 300).map((r, i) => (
-                        <tr key={`${r.ctrc}-${r.numero_cte}-${i}`} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-mono">{r.ctrc}</td>
-                          <td className="py-2 pr-3 font-mono">{r.numero_cte}</td>
-                          <td className="py-2 pr-3">
-                            <div className="font-medium">{r.pagador}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{r.cnpj_pagador}</div>
-                          </td>
-                          <td className="py-2 pr-3 font-mono">{r.dest}</td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete)}</td>
-                          <td className="py-2 pr-3 font-mono">{r.emissao}</td>
-                          <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">Use o botão Atualizar no topo para ler os CT-es a faturar.</CardContent>
               </Card>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Tile
+                    label="CT-es"
+                    value={formatNumber(aFaturarKpis.totalCtes)}
+                    sub={`Atualização: ${data0103.meta.updated_at || data0103.meta.gerado_em}`}
+                    tone="orange"
+                    Icon={RefreshCw}
+                    onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
+                  />
+                  <Tile
+                    label="Frete total"
+                    value={formatCurrency(aFaturarKpis.totalFrete)}
+                    sub={`Ref. fim: ${data0103.meta.ref_fim_dmy || data0103.meta.ontem_dmy}`}
+                    tone="indigo"
+                    Icon={TrendingUp}
+                    onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
+                  />
+                  <Tile
+                    label="Pagadores"
+                    value={formatNumber(aFaturarKpis.totalPagadores)}
+                    sub={aFaturarKpis.topPagador ? `Top: ${shortLabel(aFaturarKpis.topPagador.name, 22)}` : '—'}
+                    tone="blue"
+                    Icon={PieChartIcon}
+                    onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
+                  />
+                  <Tile
+                    label="Destinos"
+                    value={formatNumber(aFaturarKpis.totalDestinos)}
+                    sub={aFaturarKpis.topDestino ? `Top: ${shortLabel(aFaturarKpis.topDestino.name, 22)}` : '—'}
+                    tone="emerald"
+                    Icon={BadgeDollarSign}
+                    onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Top destinos (frete)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      {aFaturarByDestino.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={aFaturarByDestino} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={10}>
+                            <defs>
+                              <linearGradient id="cr_af_dest" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#fed7aa" />
+                                <stop offset="100%" stopColor="#f97316" />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                            <YAxis type="category" dataKey="name" width={70} tickFormatter={(v) => shortLabel(v, 10)} tick={{ fontSize: 10 }} interval={0} />
+                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <Bar
+                              dataKey="value"
+                              name="Frete"
+                              fill="url(#cr_af_dest)"
+                              radius={[10, 10, 10, 10]}
+                              onClick={(d: any) => {
+                                const key = String(d?.name ?? '').trim();
+                                if (!key) return;
+                                const rows = (data0103?.rows || []).filter((r) => String((r as any).dest || '').trim() === key);
+                                abrirDrill(`A faturar · Destino ${key}`, rows as any[], 'ctes0103');
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <CardTitle className="text-base">Concentração por cobrança</CardTitle>
+                        <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{`Top 5 pagadores = ${formatNumber(
+                          aFaturarConcentracaoTop5,
+                          2
+                        )}%`}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      {aFaturarByCob.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <Legend formatter={(v: any) => shortLabel(v, 10)} />
+                            <Pie data={aFaturarByCob} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2} stroke="none" strokeWidth={0}>
+                              {(aFaturarByCob as any[]).map((_: any, i: number) => (
+                                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Top pagadores (frete)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      {aFaturarByPagador.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={10}>
+                            <defs>
+                              <linearGradient id="cr_af_pag" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#dbeafe" />
+                                <stop offset="100%" stopColor="#2563eb" />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                            <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 18)} interval={0} />
+                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <Bar
+                              dataKey="value"
+                              name="Frete"
+                              fill="url(#cr_af_pag)"
+                              radius={[10, 10, 10, 10]}
+                              onClick={(d: any) => {
+                                const key = String(d?.name ?? '').trim();
+                                if (!key) return;
+                                const rows = (data0103?.rows || []).filter((r) => String((r as any).pagador || '').trim() === key);
+                                abrirDrill(`A faturar · Pagador ${key}`, rows as any[], 'ctes0103');
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Tendência por emissão (frete)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[320px]">
+                      {aFaturarTrendEmissao.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={aFaturarTrendEmissao} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                            <defs>
+                              <linearGradient id="cr_af_trend" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.6} />
+                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                            <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <Area type="monotone" dataKey="value" name="Frete" stroke="#f97316" fill="url(#cr_af_trend)" strokeWidth={2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <CardTitle className="text-base">Lista (CT-es)</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground">{`Página ${afPage} de ${afTotalPages}`}</div>
+                        <Button variant="outline" size="sm" className="h-9" onClick={() => setAfPage((p) => Math.max(1, p - 1))} disabled={afPage <= 1}>
+                          Anterior
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-9" onClick={() => setAfPage((p) => Math.min(afTotalPages, p + 1))} disabled={afPage >= afTotalPages}>
+                          Próxima
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 gap-2"
+                          onClick={() => {
+                            const csv = buildCsv0103(aFaturarFilteredSorted as any);
+                            const stamp = new Date();
+                            const pad = (n: number) => String(n).padStart(2, '0');
+                            downloadCsv(
+                              `contas_receber_a_faturar_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`,
+                              csv
+                            );
+                          }}
+                        >
+                          <Download className="w-4 h-4" />
+                          CSV
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Input className="pl-9" placeholder="Buscar: CTRC, CT-e, pagador, CNPJ, destino, chave..." value={afSearch} onChange={(e) => setAfSearch(e.target.value)} />
+                      </div>
+                      <div className="text-sm text-muted-foreground">{`${formatNumber(aFaturarTotals.totalCtes)} CT-e(s) · ${formatCurrency(
+                        aFaturarTotals.totalFrete
+                      )}`}</div>
+                    </div>
+
+                    <div className="p-0">
+                      <div className="max-h-[140vh] overflow-auto">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
+                            <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              <th className="py-2 pr-3 pl-4">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('ctrc')}>
+                                  <span>CTRC</span>
+                                  <SortIndicator active={afSortKey === 'ctrc'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('cte')}>
+                                  <span>CT-e</span>
+                                  <SortIndicator active={afSortKey === 'cte'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('pagador')}>
+                                  <span>Pagador</span>
+                                  <SortIndicator active={afSortKey === 'pagador'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('dest')}>
+                                  <span>Dest</span>
+                                  <SortIndicator active={afSortKey === 'dest'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3 text-right">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('frete')}>
+                                  <span>Frete</span>
+                                  <SortIndicator active={afSortKey === 'frete'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('emissao')}>
+                                  <span>Emissão</span>
+                                  <SortIndicator active={afSortKey === 'emissao'} dir={afSortDir} />
+                                </button>
+                              </th>
+                              <th className="py-2 pr-3">
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('prev')}>
+                                  <span>Prev. Entrega</span>
+                                  <SortIndicator active={afSortKey === 'prev'} dir={afSortDir} />
+                                </button>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {aFaturarPageRows.map((r: any, i: number) => (
+                              <tr
+                                key={`${r.ctrc}-${r.numero_cte}-${i}`}
+                                className="border-b last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                                onClick={() => abrirDrill(`CT-e ${r.numero_cte}`, [r], 'ctes0103')}
+                              >
+                                <td className="py-2 pr-3 pl-4 font-mono">{r.ctrc}</td>
+                                <td className="py-2 pr-3 font-mono">{r.numero_cte}</td>
+                                <td className="py-2 pr-3">
+                                  <div className="font-medium">{r.pagador}</div>
+                                </td>
+                                <td className="py-2 pr-3 font-mono">{r.dest}</td>
+                                <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete)}</td>
+                                <td className="py-2 pr-3 font-mono">{r.emissao}</td>
+                                <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900">
+                            <tr className="border-t border-slate-200 dark:border-slate-800">
+                              <td className="py-2 pr-3 pl-4 font-semibold" colSpan={4}>
+                                Total
+                              </td>
+                              <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(aFaturarTotals.totalFrete)}</td>
+                              <td className="py-2 pr-3" colSpan={2} />
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </div>
         </TabsContent>

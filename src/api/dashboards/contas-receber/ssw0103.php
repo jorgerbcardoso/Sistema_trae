@@ -32,12 +32,12 @@ try {
     $dominio = strtoupper((string)$domain);
     ssw_login($dominio);
 
-    $ontemDmy = date('dmy', strtotime('-1 day'));
+    $refFimDmy = date('dmy');
 
     $url = 'https://sistema.ssw.inf.br/bin/ssw0103?act=PES'
         . '&cod_emp_ctb=01'
         . '&t_data_ref_ini=010101'
-        . '&t_data_ref_fim=' . urlencode($ontemDmy)
+        . '&t_data_ref_fim=' . urlencode($refFimDmy)
         . '&t_tp_fil=C'
         . '&t_tp_cliente=C'
         . '&t_tp_cli_fat=T'
@@ -82,7 +82,7 @@ try {
             'success' => false,
             'message' => 'Não foi possível localizar o arquivo gerado pelo SSW0103 (act/filename).',
             'debug' => [
-                'ontem_dmy' => $ontemDmy,
+                'ref_fim_dmy' => $refFimDmy,
                 'preview' => $preview,
             ],
         ], 500);
@@ -197,7 +197,8 @@ try {
         'success' => true,
         'meta' => [
             'programa' => 'ssw0103',
-            'ontem_dmy' => $ontemDmy,
+            'ref_fim_dmy' => $refFimDmy,
+            'ontem_dmy' => $refFimDmy,
             'act' => $act,
             'filename' => $arq,
             'updated_at' => $updatedAt,
@@ -218,4 +219,3 @@ try {
 } catch (Throwable $e) {
     $respondJson(['success' => false, 'message' => $e->getMessage()], 500);
 }
-
