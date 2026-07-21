@@ -109,6 +109,21 @@ try {
         if (strpos($l, ',') !== false) { $delimiter = ','; break; }
     }
 
+    $normKey = static function(string $s): string {
+        $s = strtoupper(trim($s));
+        $s = strtr($s, [
+            'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A',
+            'É' => 'E', 'Ê' => 'E',
+            'Í' => 'I',
+            'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O',
+            'Ú' => 'U',
+            'Ç' => 'C',
+        ]);
+        $s = preg_replace('/[^A-Z0-9]+/', ' ', $s);
+        $s = preg_replace('/\s+/', ' ', $s);
+        return trim($s);
+    };
+
     $header = [];
     $idx = [];
     foreach ($lines as $l) {
@@ -119,7 +134,10 @@ try {
         $header = $row;
         foreach ($header as $i => $h) {
             $k = trim((string)$h);
-            if ($k !== '') $idx[$k] = $i;
+            if ($k !== '') {
+                $idx[$k] = $i;
+                $idx[$normKey($k)] = $i;
+            }
         }
         break;
     }
@@ -131,9 +149,12 @@ try {
         ], 500);
     }
 
-    $getCell = static function(array $row, array $idx, string $col): string {
-        if (!isset($idx[$col])) return '';
-        return trim((string)($row[$idx[$col]] ?? ''));
+    $getCell = static function(array $row, array $idx, string $col) use ($normKey): string {
+        $k = trim((string)$col);
+        $kn = $normKey($k);
+        if (!isset($idx[$k]) && !isset($idx[$kn])) return '';
+        $pos = isset($idx[$k]) ? $idx[$k] : $idx[$kn];
+        return trim((string)($row[$pos] ?? ''));
     };
 
     $toMoney = static function(string $v): float {
@@ -178,6 +199,9 @@ try {
             'cnpj_pagador' => $getCell($row, $idx, 'CNPJ PAGADOR'),
             'cob' => $getCell($row, $idx, 'COB'),
             'dest' => $getCell($row, $idx, 'DEST'),
+            'unidade_responsavel' => $getCell($row, $idx, 'UNIDADE RESPONSAVEL'),
+            'filial_cobranca' => $getCell($row, $idx, 'FILIAL COBRANCA'),
+            'unidade_cobranca' => mb_substr(trim((string)$getCell($row, $idx, 'FILIAL COBRANCA')), 0, 3, 'UTF-8'),
             'banco' => $getCell($row, $idx, 'BANCO'),
             'frete' => $frete,
             'emissao' => $getCell($row, $idx, 'EMISSAO'),

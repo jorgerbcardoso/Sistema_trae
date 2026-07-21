@@ -55,6 +55,9 @@ type Ssw0103Row = {
   cnpj_pagador: string;
   cob: string;
   dest: string;
+  unidade_responsavel: string;
+  filial_cobranca: string;
+  unidade_cobranca: string;
   banco: string;
   frete: number;
   emissao: string;
@@ -266,6 +269,37 @@ function shortLabel(v: any, n: number): string {
   return s.slice(0, n) + '…';
 }
 
+function formatDateTimeBr(v: any): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '—';
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const dd = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
+    const yy = parseInt(m[3], 10);
+    const yyyy = m[3].length === 2 ? (yy >= 80 ? 1900 + yy : 2000 + yy) : yy;
+    const hh = m[4] ? parseInt(m[4], 10) : 0;
+    const mi = m[5] ? parseInt(m[5], 10) : 0;
+    const ss = m[6] ? parseInt(m[6], 10) : 0;
+    const dt = new Date(yyyy, mm - 1, dd, hh, mi, ss, 0);
+    if (Number.isFinite(dt.getTime())) {
+      return dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  const dt = new Date(s);
+  if (Number.isFinite(dt.getTime())) {
+    return dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  return s;
+}
+
+function formatDmyToBrShort(v: any): string {
+  const s = String(v ?? '').trim();
+  const m = s.match(/^(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return s || '—';
+  return `${m[1]}/${m[2]}/${m[3]}`;
+}
+
 function CrChartTooltip({
   active,
   payload,
@@ -436,7 +470,21 @@ export function ContasReceber() {
   }, []);
 
   const buildCsv0103 = useCallback((rows: Ssw0103Row[]) => {
-    const header = ['CTRC', 'CT-e', 'Pagador', 'CNPJ Pagador', 'Dest', 'Frete', 'Emissão', 'Prev. Entrega', 'Chave CT-e', 'Últ. Ocorrência', 'Observação'];
+    const header = [
+      'CTRC',
+      'CT-e',
+      'Pagador',
+      'CNPJ Pagador',
+      'Filial cobrança',
+      'Unid cobrança',
+      'Dest',
+      'Frete',
+      'Emissão',
+      'Prev. Entrega',
+      'Chave CT-e',
+      'Últ. Ocorrência',
+      'Observação',
+    ];
     const lines: string[] = [];
     lines.push(header.map(csvEscape).join(';'));
     for (const r of rows) {
@@ -446,6 +494,8 @@ export function ContasReceber() {
           r.numero_cte,
           r.pagador,
           r.cnpj_pagador,
+          r.filial_cobranca,
+          r.unidade_cobranca,
           r.dest,
           formatCurrency(Number(r.frete) || 0),
           r.emissao,
@@ -659,13 +709,16 @@ export function ContasReceber() {
   }, [data0049, today0]);
 
   useEffect(() => {
-    const cnpjs = Array.from(
-      new Set(
-        (normalizedFaturas as any[])
-          .map((f) => String(f?.cnpj || '').replace(/\D+/g, ''))
-          .filter((x) => x.length === 14)
-      )
-    );
+    const set = new Set<string>();
+    for (const f of normalizedFaturas as any[]) {
+      const cnpj = String(f?.cnpj || '').replace(/\D+/g, '');
+      if (cnpj.length === 14) set.add(cnpj);
+    }
+    for (const r of (data0103?.rows || []) as any[]) {
+      const cnpj = String(r?.cnpj_pagador || '').replace(/\D+/g, '');
+      if (cnpj.length === 14) set.add(cnpj);
+    }
+    const cnpjs = Array.from(set);
     const key = cnpjs.sort().join(',');
     if (!key) {
       if (lastGrupoFetchKeyRef.current !== '') {
@@ -700,7 +753,7 @@ export function ContasReceber() {
         setGrupoMap({});
       }
     })();
-  }, [normalizedFaturas]);
+  }, [data0103, normalizedFaturas]);
 
   const filteredFaturas = useMemo(() => {
     const baseList: any[] = normalizedFaturas as any[];
@@ -837,7 +890,7 @@ export function ContasReceber() {
     rows.sort((a, b) => {
       if (arSortKey === 'fatura') return cmpText(normTextKey(a?.fatura), normTextKey(b?.fatura));
       if (arSortKey === 'cliente') return cmpText(normTextKey(a?.cliente), normTextKey(b?.cliente));
-      if (arSortKey === 'unid') return cmpText(unitSigla3(a?.fil || a?.unidade_responsavel), unitSigla3(b?.fil || b?.unidade_responsavel));
+      if (arSortKey === 'unid') return cmpText(unitSigla3(a?.unidade_responsavel || a?.fil), unitSigla3(b?.unidade_responsavel || b?.fil));
       if (arSortKey === 'situacao') return cmpText(normSituacaoLabel(a?.situacao), normSituacaoLabel(b?.situacao));
       if (arSortKey === 'ctes') return ((Array.isArray(a?.ctes) ? a.ctes.length : 0) - (Array.isArray(b?.ctes) ? b.ctes.length : 0)) * dir;
       if (arSortKey === 'venc') return (((parseDateBr(String(a?.vencimento || '')) ?? 0) - (parseDateBr(String(b?.vencimento || '')) ?? 0)) || 0) * dir;
@@ -901,7 +954,7 @@ export function ContasReceber() {
       byCliente[clienteKey].value += saldo;
       if (isOverdue) byCliente[clienteKey].overdue += saldo;
 
-      const unitKey = unitSigla3(f?.fil || f?.unidade_responsavel || '—');
+      const unitKey = unitSigla3(f?.unidade_responsavel || f?.fil || '—');
       if (!byUnit[unitKey]) byUnit[unitKey] = { key: unitKey, name: unitKey, value: 0, overdue: 0, b: {} };
       byUnit[unitKey].value += saldo;
       if (isOverdue) {
@@ -1145,7 +1198,7 @@ export function ContasReceber() {
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
       if (saldo <= 0) continue;
-      const key = unitSigla3(f.fil || f.unidade_responsavel || '—');
+      const key = unitSigla3(f.unidade_responsavel || f.fil || '—');
       if (!by[key]) by[key] = { key, name: key, value: 0 };
       by[key].value += saldo;
     }
@@ -1252,10 +1305,46 @@ export function ContasReceber() {
 
   const aFaturarByPagador = useMemo(() => {
     const rows = data0103?.rows || [];
+    const by: Record<string, { key: string; name: string; cnpj: string; is_grupo: boolean; value: number }> = {};
+    const groupAgg: Record<string, { is_grupo: boolean; name: string }> = {};
+    for (const r of rows as any[]) {
+      const cnpj = String(r?.cnpj_pagador || '').replace(/\D+/g, '');
+      const nomeBase = String(r?.pagador || '').trim() || cnpj || '—';
+      let key = cnpj || nomeBase;
+      let name = nomeBase;
+      let isGrupo = false;
+
+      if (rankGroupBy === 'grupos') {
+        const gm = cnpj ? grupoMap[cnpj] : null;
+        const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+        const nomePrincipal = (gm?.nome_principal || '').trim();
+        key = principal || cnpj || nomeBase;
+        name = nomePrincipal || nomeBase;
+        isGrupo = !!gm?.is_grupo;
+
+        if (!groupAgg[key]) groupAgg[key] = { is_grupo: false, name };
+        groupAgg[key].is_grupo = groupAgg[key].is_grupo || isGrupo || (principal !== '' && principal !== cnpj);
+        if (!groupAgg[key].name && name) groupAgg[key].name = name;
+      }
+
+      if (!by[key]) by[key] = { key, name, cnpj: key, is_grupo: isGrupo, value: 0 };
+      by[key].value += Number(r?.frete) || 0;
+    }
+    const list = Object.values(by).map((it) => {
+      if (rankGroupBy !== 'grupos') return it;
+      const ga = groupAgg[it.key];
+      return { ...it, name: ga?.name || it.name, is_grupo: ga?.is_grupo || it.is_grupo };
+    });
+    list.sort((a, b) => b.value - a.value);
+    return list.slice(0, 12);
+  }, [data0103, grupoMap, rankGroupBy]);
+
+  const aFaturarByUnidadeResponsavel = useMemo(() => {
     const by: Record<string, number> = {};
-    for (const r of rows) {
-      const key = String(r.pagador || '—').trim() || '—';
-      by[key] = (by[key] || 0) + (Number(r.frete) || 0);
+    const rows = data0103?.rows || [];
+    for (const r of rows as any[]) {
+      const k = unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—');
+      by[k] = (by[k] || 0) + (Number((r as any).frete) || 0);
     }
     return Object.entries(by)
       .map(([name, value]) => ({ name, value }))
@@ -1324,27 +1413,27 @@ export function ContasReceber() {
     const totalFrete = Number(data0103?.totals?.frete_total) || rows.reduce((acc, r) => acc + (Number((r as any).frete) || 0), 0);
     const totalCtes = Number(data0103?.totals?.ctes) || rows.length;
     const pagadores = new Set<string>();
-    const destinos = new Set<string>();
+    const unidades = new Set<string>();
     const emissores = new Set<string>();
     for (const r of rows) {
       pagadores.add(normTextKey((r as any).pagador || '—'));
-      destinos.add(normTextKey((r as any).dest || '—'));
+      unidades.add(unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—'));
       emissores.add(unitSigla3((r as any).em || '—'));
     }
     const topPagador = aFaturarByPagador[0] || null;
-    const topDestino = aFaturarByDestino[0] || null;
+    const topUnidade = aFaturarByUnidadeResponsavel[0] || null;
     const topEm = aFaturarByEm[0] || null;
     return {
       totalFrete,
       totalCtes,
       totalPagadores: pagadores.size,
-      totalDestinos: destinos.size,
+      totalUnidades: unidades.size,
       totalEm: emissores.size,
       topPagador,
-      topDestino,
+      topUnidade,
       topEm,
     };
-  }, [aFaturarByDestino, aFaturarByEm, aFaturarByPagador, data0103]);
+  }, [aFaturarByEm, aFaturarByPagador, aFaturarByUnidadeResponsavel, data0103]);
 
   const toggleAfSort = useCallback((key: typeof afSortKey) => {
     setAfSortKey((prevKey) => {
@@ -1369,6 +1458,9 @@ export function ContasReceber() {
             r?.pagador,
             r?.cnpj_pagador,
             r?.dest,
+            r?.filial_cobranca,
+            r?.unidade_cobranca,
+            r?.unidade_responsavel,
             r?.emissao,
             r?.prev_entrega,
             r?.chave_cte,
@@ -1894,7 +1986,7 @@ export function ContasReceber() {
                               const rows = (filteredFaturas as any[]).filter((f) => {
                                 const saldo = Number((f as any)._saldo) || 0;
                                 if (saldo <= 0) return false;
-                                return unitSigla3((f as any).fil || (f as any).unidade_responsavel || '') === key;
+                                return unitSigla3((f as any).unidade_responsavel || (f as any).fil || '') === key;
                               });
                               abrirDrill(`A receber · Unidade ${key}`, rows, 'faturas');
                             }}
@@ -2341,7 +2433,7 @@ export function ContasReceber() {
                               <div className="font-medium">{f.cliente}</div>
                               <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
                             </td>
-                            <td className="py-2 pr-3 font-mono">{unitSigla3(f.fil || f.unidade_responsavel)}</td>
+                            <td className="py-2 pr-3 font-mono">{unitSigla3(f.unidade_responsavel || f.fil)}</td>
                             <td className="py-2 pr-3 font-mono">
                               <span className={f._overdue ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}>{f.vencimento}</span>
                             </td>
@@ -2476,7 +2568,13 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 1–7d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) <= 7), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 1–7d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) => unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) <= 7
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                         <Bar
@@ -2489,7 +2587,17 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 8–15d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 7 && (Number((f as any)._diasAtraso) || 0) <= 15), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 8–15d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) =>
+                                  unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit &&
+                                  (f as any)._overdue &&
+                                  (Number((f as any)._diasAtraso) || 0) > 7 &&
+                                  (Number((f as any)._diasAtraso) || 0) <= 15
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                         <Bar
@@ -2502,7 +2610,17 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 16–30d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 15 && (Number((f as any)._diasAtraso) || 0) <= 30), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 16–30d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) =>
+                                  unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit &&
+                                  (f as any)._overdue &&
+                                  (Number((f as any)._diasAtraso) || 0) > 15 &&
+                                  (Number((f as any)._diasAtraso) || 0) <= 30
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                         <Bar
@@ -2515,7 +2633,17 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 31–60d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 30 && (Number((f as any)._diasAtraso) || 0) <= 60), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 31–60d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) =>
+                                  unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit &&
+                                  (f as any)._overdue &&
+                                  (Number((f as any)._diasAtraso) || 0) > 30 &&
+                                  (Number((f as any)._diasAtraso) || 0) <= 60
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                         <Bar
@@ -2528,7 +2656,17 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 61–90d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 60 && (Number((f as any)._diasAtraso) || 0) <= 90), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 61–90d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) =>
+                                  unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit &&
+                                  (f as any)._overdue &&
+                                  (Number((f as any)._diasAtraso) || 0) > 60 &&
+                                  (Number((f as any)._diasAtraso) || 0) <= 90
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                         <Bar
@@ -2541,7 +2679,13 @@ export function ContasReceber() {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
                             if (!unit) return;
-                            abrirDrill(`Atrasadas · Unidade ${unit} · 91+d`, (aReceberBaseRows as any[]).filter((f) => unitSigla3((f as any).fil || (f as any).unidade_responsavel) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 90), 'faturas');
+                            abrirDrill(
+                              `Atrasadas · Unidade ${unit} · 91+d`,
+                              (aReceberBaseRows as any[]).filter(
+                                (f) => unitSigla3((f as any).unidade_responsavel || (f as any).fil) === unit && (f as any)._overdue && (Number((f as any)._diasAtraso) || 0) > 90
+                              ),
+                              'faturas'
+                            );
                           }}
                         />
                       </BarChart>
@@ -2649,7 +2793,7 @@ export function ContasReceber() {
                               <td className="py-2 pr-3">
                                 <div className="font-medium">{f.cliente}</div>
                               </td>
-                              <td className="py-2 pr-3 font-mono">{unitSigla3(f.fil || f.unidade_responsavel)}</td>
+                              <td className="py-2 pr-3 font-mono">{unitSigla3(f.unidade_responsavel || f.fil)}</td>
                               <td className="py-2 pr-3 text-right font-mono text-rose-600 dark:text-rose-300 font-semibold">{formatNumber(Number(f._diasAtraso) || 0)}</td>
                               <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
                               <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(Number(f._saldo) || 0)}</td>
@@ -2677,7 +2821,7 @@ export function ContasReceber() {
                   <Tile
                     label="CT-es"
                     value={formatNumber(aFaturarKpis.totalCtes)}
-                    sub={`Atualização: ${data0103.meta.updated_at || data0103.meta.gerado_em}`}
+                    sub={`Atualização: ${formatDateTimeBr(data0103.meta.updated_at || data0103.meta.gerado_em)}`}
                     tone="orange"
                     Icon={RefreshCw}
                     onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
@@ -2685,7 +2829,7 @@ export function ContasReceber() {
                   <Tile
                     label="Frete total"
                     value={formatCurrency(aFaturarKpis.totalFrete)}
-                    sub={`Ref. fim: ${data0103.meta.ref_fim_dmy || data0103.meta.ontem_dmy}`}
+                    sub={`Ref. fim: ${formatDmyToBrShort(data0103.meta.ref_fim_dmy || data0103.meta.ontem_dmy)}`}
                     tone="indigo"
                     Icon={TrendingUp}
                     onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
@@ -2699,9 +2843,9 @@ export function ContasReceber() {
                     onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
                   />
                   <Tile
-                    label="Destinos"
-                    value={formatNumber(aFaturarKpis.totalDestinos)}
-                    sub={aFaturarKpis.topDestino ? `Top: ${shortLabel(aFaturarKpis.topDestino.name, 22)}` : '—'}
+                    label="Unidades"
+                    value={formatNumber(aFaturarKpis.totalUnidades)}
+                    sub={aFaturarKpis.topUnidade ? `Top: ${shortLabel(aFaturarKpis.topUnidade.name, 22)}` : '—'}
                     tone="emerald"
                     Icon={BadgeDollarSign}
                     onClick={() => abrirDrill('CT-es disponíveis para faturar', aFaturarFilteredSorted as any[], 'ctes0103')}
@@ -2711,34 +2855,42 @@ export function ContasReceber() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <Card className="lg:col-span-2">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Top destinos (frete)</CardTitle>
+                      <CardTitle className="text-base">Top unidades</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[320px]">
-                      {aFaturarByDestino.length === 0 ? (
+                      {aFaturarByUnidadeResponsavel.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={aFaturarByDestino} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={10}>
+                          <BarChart
+                            data={aFaturarByUnidadeResponsavel}
+                            layout="vertical"
+                            margin={{ top: 10, right: 10, bottom: 0, left: 10 }}
+                            barCategoryGap={6}
+                          >
                             <defs>
-                              <linearGradient id="cr_af_dest" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stopColor="#fed7aa" />
-                                <stop offset="100%" stopColor="#f97316" />
+                              <linearGradient id="cr_af_unit" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#dbeafe" />
+                                <stop offset="100%" stopColor="#2563eb" />
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                            <YAxis type="category" dataKey="name" width={70} tickFormatter={(v) => shortLabel(v, 10)} tick={{ fontSize: 10 }} interval={0} />
+                            <YAxis type="category" dataKey="name" width={60} interval={0} tick={{ fontSize: 10 }} />
                             <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                             <Bar
                               dataKey="value"
                               name="Frete"
-                              fill="url(#cr_af_dest)"
+                              fill="url(#cr_af_unit)"
                               radius={[10, 10, 10, 10]}
+                              barSize={26}
                               onClick={(d: any) => {
                                 const key = String(d?.name ?? '').trim();
                                 if (!key) return;
-                                const rows = (data0103?.rows || []).filter((r) => String((r as any).dest || '').trim() === key);
-                                abrirDrill(`A faturar · Destino ${key}`, rows as any[], 'ctes0103');
+                                const rows = (data0103?.rows || []).filter((r) =>
+                                  unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—') === key
+                                );
+                                abrirDrill(`A faturar · Unidade ${key}`, rows as any[], 'ctes0103');
                               }}
                             />
                           </BarChart>
@@ -2780,14 +2932,38 @@ export function ContasReceber() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Top pagadores (frete)</CardTitle>
+                      <div className="flex items-center justify-between gap-3">
+                        <CardTitle className="text-base">Top pagadores (frete)</CardTitle>
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                          <button
+                            onClick={() => setRankGroupBy('grupos')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              rankGroupBy === 'grupos'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            Grupos
+                          </button>
+                          <button
+                            onClick={() => setRankGroupBy('clientes')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              rankGroupBy === 'clientes'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            Clientes
+                          </button>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent className="h-[320px]">
                       {aFaturarByPagador.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={10}>
+                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={6}>
                             <defs>
                               <linearGradient id="cr_af_pag" x1="0" y1="0" x2="1" y2="0">
                                 <stop offset="0%" stopColor="#dbeafe" />
@@ -2796,18 +2972,29 @@ export function ContasReceber() {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                            <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 18)} interval={0} />
+                            <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 12)} interval={0} />
                             <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                             <Bar
                               dataKey="value"
                               name="Frete"
                               fill="url(#cr_af_pag)"
                               radius={[10, 10, 10, 10]}
+                              barSize={26}
                               onClick={(d: any) => {
-                                const key = String(d?.name ?? '').trim();
+                                const key = String(d?.payload?.key ?? d?.key ?? d?.name ?? '').trim();
                                 if (!key) return;
-                                const rows = (data0103?.rows || []).filter((r) => String((r as any).pagador || '').trim() === key);
-                                abrirDrill(`A faturar · Pagador ${key}`, rows as any[], 'ctes0103');
+                                const rows = (data0103?.rows || []).filter((r) => {
+                                  const cnpj = String((r as any)?.cnpj_pagador || '').replace(/\D+/g, '');
+                                  if (rankGroupBy === 'clientes') {
+                                    return cnpj !== '' ? cnpj === key : normTextKey((r as any)?.pagador) === normTextKey(key);
+                                  }
+                                  const gm = cnpj ? grupoMap[cnpj] : null;
+                                  const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+                                  const gKey = principal || cnpj || String((r as any)?.pagador || '').trim() || '—';
+                                  return gKey === key;
+                                });
+                                const titleName = String(d?.payload?.name ?? d?.name ?? key).trim();
+                                abrirDrill(`A faturar · Pagador ${titleName}`, rows as any[], 'ctes0103');
                               }}
                             />
                           </BarChart>
