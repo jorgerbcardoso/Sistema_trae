@@ -278,6 +278,13 @@ function overdueBucketLabel(k: string): string {
   return k;
 }
 
+function shortLabel(v: any, n: number): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '—';
+  if (s.length <= n) return s;
+  return s.slice(0, n) + '…';
+}
+
 function CrChartTooltip({
   active,
   payload,
@@ -927,8 +934,9 @@ export function ContasReceber() {
     const topUnit = unidadesSorted[0] || null;
 
     const concentracaoCliente = (() => {
-      const top = clientesSorted.slice(0, 6);
-      const other = clientesSorted.slice(6).reduce((acc, it) => acc + it.value, 0);
+      const base = clientesSorted.filter((c) => normTextKey(c.name) !== 'OUTROS');
+      const top = base.slice(0, 6);
+      const other = base.slice(6).reduce((acc, it) => acc + it.value, 0);
       const items = top.map((it) => ({ name: it.name, value: it.value }));
       if (other > 0) items.push({ name: 'Outros', value: other });
       return items;
@@ -2347,7 +2355,38 @@ export function ContasReceber() {
                   </CardHeader>
                   <CardContent className="h-[360px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={mgmt.unitOverdueStack} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                      <BarChart
+                        data={mgmt.unitOverdueStack}
+                        layout="vertical"
+                        margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
+                        barCategoryGap={12}
+                      >
+                        <defs>
+                          <linearGradient id="cr_risk_01" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#fde68a" />
+                            <stop offset="100%" stopColor="#f59e0b" />
+                          </linearGradient>
+                          <linearGradient id="cr_risk_02" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#fed7aa" />
+                            <stop offset="100%" stopColor="#fb923c" />
+                          </linearGradient>
+                          <linearGradient id="cr_risk_03" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#fdba74" />
+                            <stop offset="100%" stopColor="#f97316" />
+                          </linearGradient>
+                          <linearGradient id="cr_risk_04" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#fca5a5" />
+                            <stop offset="100%" stopColor="#ef4444" />
+                          </linearGradient>
+                          <linearGradient id="cr_risk_05" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#f87171" />
+                            <stop offset="100%" stopColor="#dc2626" />
+                          </linearGradient>
+                          <linearGradient id="cr_risk_06" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#ef4444" />
+                            <stop offset="100%" stopColor="#7f1d1d" />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                         <YAxis type="category" dataKey="unit" width={60} interval={0} tick={{ fontSize: 10 }} />
@@ -2357,7 +2396,8 @@ export function ContasReceber() {
                           dataKey="d01_07"
                           name="d01_07"
                           stackId="a"
-                          fill="#fbbf24"
+                          fill="url(#cr_risk_01)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2369,7 +2409,8 @@ export function ContasReceber() {
                           dataKey="d08_15"
                           name="d08_15"
                           stackId="a"
-                          fill="#fb923c"
+                          fill="url(#cr_risk_02)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2381,7 +2422,8 @@ export function ContasReceber() {
                           dataKey="d16_30"
                           name="d16_30"
                           stackId="a"
-                          fill="#f97316"
+                          fill="url(#cr_risk_03)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2393,7 +2435,8 @@ export function ContasReceber() {
                           dataKey="d31_60"
                           name="d31_60"
                           stackId="a"
-                          fill="#ef4444"
+                          fill="url(#cr_risk_04)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2405,7 +2448,8 @@ export function ContasReceber() {
                           dataKey="d61_90"
                           name="d61_90"
                           stackId="a"
-                          fill="#dc2626"
+                          fill="url(#cr_risk_05)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2417,7 +2461,8 @@ export function ContasReceber() {
                           dataKey="d91_plus"
                           name="d91_plus"
                           stackId="a"
-                          fill="#991b1b"
+                          fill="url(#cr_risk_06)"
+                          radius={[10, 10, 10, 10]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2438,8 +2483,17 @@ export function ContasReceber() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
-                        <Legend />
-                        <Pie data={mgmt.concentracaoCliente} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={2}>
+                        <Legend formatter={(v: any) => shortLabel(v, 10)} />
+                        <Pie
+                          data={mgmt.concentracaoCliente}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={70}
+                          outerRadius={110}
+                          paddingAngle={2}
+                          stroke="none"
+                          strokeWidth={0}
+                        >
                           {(mgmt.concentracaoCliente as any[]).map((_: any, i: number) => (
                             <Cell key={i} fill={(mgmt.colorsClientes as any[])[i % (mgmt.colorsClientes as any[]).length]} />
                           ))}
@@ -2457,15 +2511,29 @@ export function ContasReceber() {
                   </CardHeader>
                   <CardContent className="h-[320px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={mgmt.clientesTopOverdue} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                      <BarChart data={mgmt.clientesTopOverdue} margin={{ top: 10, right: 10, bottom: 70, left: 0 }}>
+                        <defs>
+                          <linearGradient id="cr_top_overdue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#fbbf24" />
+                            <stop offset="100%" stopColor="#f97316" />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" hide />
+                        <XAxis
+                          dataKey="name"
+                          interval={0}
+                          tickFormatter={(v) => shortLabel(v, 10)}
+                          tick={{ fontSize: 10 }}
+                          angle={-35}
+                          textAnchor="end"
+                          height={60}
+                        />
                         <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                         <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                         <Bar
                           dataKey="value"
                           name="Atrasado"
-                          fill="#f59e0b"
+                          fill="url(#cr_top_overdue)"
                           radius={[8, 8, 8, 8]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.clientesTopOverdue as any[])[idx];
