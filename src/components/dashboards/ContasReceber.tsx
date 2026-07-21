@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer,
   Bar,
@@ -17,14 +17,14 @@ import {
 } from 'recharts';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { AlertTriangle, Download, Loader2, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, Download, Filter, Loader2, RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -70,7 +70,7 @@ type Ssw0103Data = {
   rows: Ssw0103Row[];
 };
 
-type Ssw0049Cte = {
+type FatCte = {
   fatura: string;
   emissao_fatura: string;
   ctrc: string;
@@ -82,7 +82,7 @@ type Ssw0049Cte = {
   valor_contabil: number;
 };
 
-type Ssw0049Fatura = {
+type FatFatura = {
   fatura: string;
   cnpj: string;
   cliente: string;
@@ -101,12 +101,12 @@ type Ssw0049Fatura = {
   ultima_ocorrencia: string;
   unidade_responsavel: string;
   vendedor: string;
-  ctes: Ssw0049Cte[];
+  ctes: FatCte[];
   ctes_total_frete: number;
   ctes_total_contabil: number;
 };
 
-type Ssw0049Data = {
+type FatData = {
   totals: {
     faturas: number;
     ctes: number;
@@ -114,13 +114,13 @@ type Ssw0049Data = {
     saldo_total: number;
     frete_ctes_total: number;
   };
-  faturas: Ssw0049Fatura[];
+  faturas: FatFatura[];
   updated_at: string | null;
 };
 
-type Ssw0049Response =
-  | { success: true; status: 'ready'; result: 'data'; data: Ssw0049Data; meta?: any }
-  | { success: true; status: 'ready'; result: 'empty'; data: Ssw0049Data; meta?: any }
+type FatResponse =
+  | { success: true; status: 'ready'; result: 'data'; data: FatData; meta?: any }
+  | { success: true; status: 'ready'; result: 'empty'; data: FatData; meta?: any }
   | { success: true; status: 'started'; baseline_seq: number; request_start_ts: number; meta?: any }
   | { success: true; status: 'pending' }
   | { success: true; status: 'ready'; result: 'links'; acts: string[]; ssw_seq?: number }
@@ -206,25 +206,46 @@ export function ContasReceber() {
   const [clienteGrupo, setClienteGrupo] = useState<ClienteSel>({ cnpj: '', nome: '' });
   const [tableSearch, setTableSearch] = useState('');
   const [quickView, setQuickView] = useState<'todas' | 'abertas' | 'vencidas' | 'vence3d'>('todas');
+  const [showFilters, setShowFilters] = useState(false);
+  const defaultFilters = useMemo(
+    () => ({
+      anoVencimento: String(currentYear),
+      periodoTipo: 'V' as const,
+      periodoIni: defaultPeriodo.ini,
+      periodoFim: defaultPeriodo.fim,
+      sitFatura: 'T' as const,
+      clientePagador: { cnpj: '', nome: '' } as ClienteSel,
+      clienteGrupo: { cnpj: '', nome: '' } as ClienteSel,
+    }),
+    [currentYear, defaultPeriodo.fim, defaultPeriodo.ini]
+  );
+  const [tempAnoVencimento, setTempAnoVencimento] = useState<string>(defaultFilters.anoVencimento);
+  const [tempPeriodoTipo, setTempPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>(defaultFilters.periodoTipo);
+  const [tempPeriodoIni, setTempPeriodoIni] = useState<string>(defaultFilters.periodoIni);
+  const [tempPeriodoFim, setTempPeriodoFim] = useState<string>(defaultFilters.periodoFim);
+  const [tempSitFatura, setTempSitFatura] = useState<'P' | 'L' | 'E' | 'C' | 'T'>(defaultFilters.sitFatura);
+  const [tempClientePagador, setTempClientePagador] = useState<ClienteSel>(defaultFilters.clientePagador);
+  const [tempClienteGrupo, setTempClienteGrupo] = useState<ClienteSel>(defaultFilters.clienteGrupo);
 
   const [loading0049, setLoading0049] = useState(false);
   const [status0049, setStatus0049] = useState<string>('');
-  const [data0049, setData0049] = useState<Ssw0049Data | null>(null);
+  const [data0049, setData0049] = useState<FatData | null>(null);
   const req0049Ref = useRef(0);
+  const initialLoadRef = useRef(false);
 
   const [loading0103, setLoading0103] = useState(false);
   const [data0103, setData0103] = useState<Ssw0103Data | null>(null);
   const [drillOpen, setDrillOpen] = useState(false);
   const [drillTitle, setDrillTitle] = useState('');
-  const [drillRows, setDrillRows] = useState<Ssw0049Fatura[]>([]);
+  const [drillRows, setDrillRows] = useState<FatFatura[]>([]);
 
-  const abrirDrill = useCallback((title: string, rows: Ssw0049Fatura[]) => {
+  const abrirDrill = useCallback((title: string, rows: FatFatura[]) => {
     setDrillTitle(title);
     setDrillRows(rows);
     setDrillOpen(true);
   }, []);
 
-  const buildCsvFaturas = useCallback((rows: Ssw0049Fatura[]) => {
+  const buildCsvFaturas = useCallback((rows: FatFatura[]) => {
     const header = [
       'Fatura',
       'CNPJ',
@@ -278,28 +299,43 @@ export function ContasReceber() {
     return lines.join('\n');
   }, []);
 
-  const carregar0049 = useCallback(async () => {
+  const carregar0049 = useCallback(async (override?: {
+    periodoTipo: 'E' | 'V' | 'L' | 'X';
+    periodoIni: string;
+    periodoFim: string;
+    sitFatura: 'P' | 'L' | 'E' | 'C' | 'T';
+    clientePagadorCnpj: string;
+    clienteGrupoCnpj: string;
+  }) => {
     const reqId = (req0049Ref.current += 1);
     setLoading0049(true);
-    setStatus0049('Executando SSW0049...');
+    setStatus0049('Lendo faturamento...');
     try {
+      const f = override || {
+        periodoTipo,
+        periodoIni,
+        periodoFim,
+        sitFatura,
+        clientePagadorCnpj: clientePagador.cnpj,
+        clienteGrupoCnpj: clienteGrupo.cnpj,
+      };
       const payload = {
         step: 'START',
-        rel_ana_fg_data: periodoTipo,
-        rel_ana_per_pesq_ini: periodoIni,
-        rel_ana_per_pesq_fin: periodoFim,
-        rel_ana_cgc: clientePagador.cnpj,
-        rel_ana_cgc_grupo: clienteGrupo.cnpj,
-        rel_ana_sit_fat: sitFatura,
+        rel_ana_fg_data: f.periodoTipo,
+        rel_ana_per_pesq_ini: f.periodoIni,
+        rel_ana_per_pesq_fin: f.periodoFim,
+        rel_ana_cgc: f.clientePagadorCnpj,
+        rel_ana_cgc_grupo: f.clienteGrupoCnpj,
+        rel_ana_sit_fat: f.sitFatura,
       };
       const start = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
         method: 'POST',
         body: JSON.stringify(payload),
-      }, true)) as Ssw0049Response;
+      }, true)) as FatResponse;
       if (reqId !== req0049Ref.current) return;
 
       if (!start?.success) {
-        toast.error(start?.message || 'Falha ao iniciar o SSW0049.');
+        toast.error(start?.message || 'Falha ao ler faturamento.');
         return;
       }
 
@@ -316,7 +352,7 @@ export function ContasReceber() {
       }
 
       if ((start as any).status !== 'started') {
-        toast.error('Resposta inesperada ao iniciar o SSW0049.');
+        toast.error('Resposta inesperada ao ler faturamento.');
         return;
       }
 
@@ -324,18 +360,18 @@ export function ContasReceber() {
       const requestStartTs = Number((start as any).request_start_ts) || 0;
       const deadline = Date.now() + 70000;
 
-      setStatus0049('Aguardando fila SSW (1440)...');
+      setStatus0049('Processando relatório...');
 
       while (Date.now() < deadline) {
         if (reqId !== req0049Ref.current) return;
         const poll = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
           method: 'POST',
           body: JSON.stringify({ ...payload, step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }),
-        }, true)) as Ssw0049Response;
+        }, true)) as FatResponse;
 
         if (reqId !== req0049Ref.current) return;
         if (!poll?.success) {
-          toast.error(poll?.message || 'Falha ao consultar a fila do SSW.');
+          toast.error(poll?.message || 'Falha ao processar relatório.');
           return;
         }
 
@@ -357,19 +393,19 @@ export function ContasReceber() {
         if ((poll as any).status === 'ready' && (poll as any).result === 'links') {
           const acts = (poll as any).acts || [];
           if (!Array.isArray(acts) || acts.length === 0) {
-            toast.error('Fila SSW concluiu, mas sem links de download.');
+            toast.error('Relatório concluído, mas sem links de download.');
             return;
           }
 
-          setStatus0049('Baixando CSV...');
+          setStatus0049('Baixando relatório...');
           const dl = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
             method: 'POST',
             body: JSON.stringify({ step: 'DOWNLOAD', act: acts[0] }),
-          }, true)) as Ssw0049Response;
+          }, true)) as FatResponse;
 
           if (reqId !== req0049Ref.current) return;
           if (!dl?.success || (dl as any).result !== 'data') {
-            toast.error((dl as any)?.message || 'Falha ao baixar/processar o SSW0049.');
+            toast.error((dl as any)?.message || 'Falha ao baixar/processar relatório.');
             return;
           }
 
@@ -378,15 +414,21 @@ export function ContasReceber() {
           return;
         }
 
-        toast.error('Resposta inesperada no POLL do SSW0049.');
+        toast.error('Resposta inesperada ao processar relatório.');
         return;
       }
 
-      toast.error('Timeout aguardando o SSW0049.');
+      toast.error('Timeout ao processar relatório.');
     } finally {
       if (reqId === req0049Ref.current) setLoading0049(false);
     }
   }, [clienteGrupo.cnpj, clientePagador.cnpj, periodoFim, periodoIni, periodoTipo, sitFatura]);
+
+  useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    void carregar0049();
+  }, [carregar0049]);
 
 
   const carregar0103 = async () => {
@@ -394,11 +436,11 @@ export function ContasReceber() {
     try {
       const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`, { method: 'GET' }, true);
       if (!res?.success) {
-        toast.error(res?.message || 'Falha ao carregar SSW0103.');
+        toast.error(res?.message || 'Falha ao ler disponíveis para faturar.');
         return;
       }
       setData0103(res);
-      toast.success(`SSW0103 carregado: ${Number(res?.totals?.ctes || 0)} CT-es.`);
+      toast.success(`Disponíveis para faturar: ${Number(res?.totals?.ctes || 0)} CT-e(s).`);
     } finally {
       setLoading0103(false);
     }
@@ -637,103 +679,240 @@ export function ContasReceber() {
     };
   }, [filteredFaturas, today0]);
 
+  const hasFiltrosAtivos = useMemo(() => {
+    if (anoVencimento !== defaultFilters.anoVencimento) return true;
+    if (periodoTipo !== defaultFilters.periodoTipo) return true;
+    if (periodoIni !== defaultFilters.periodoIni) return true;
+    if (periodoFim !== defaultFilters.periodoFim) return true;
+    if (sitFatura !== defaultFilters.sitFatura) return true;
+    if ((clientePagador.cnpj || '').trim() !== '') return true;
+    if ((clienteGrupo.cnpj || '').trim() !== '') return true;
+    return false;
+  }, [
+    anoVencimento,
+    clienteGrupo.cnpj,
+    clientePagador.cnpj,
+    defaultFilters.anoVencimento,
+    defaultFilters.periodoFim,
+    defaultFilters.periodoIni,
+    defaultFilters.periodoTipo,
+    defaultFilters.sitFatura,
+    periodoFim,
+    periodoIni,
+    periodoTipo,
+    sitFatura,
+  ]);
+
+  const syncTempFromApplied = useCallback(() => {
+    setTempAnoVencimento(anoVencimento);
+    setTempPeriodoTipo(periodoTipo);
+    setTempPeriodoIni(periodoIni);
+    setTempPeriodoFim(periodoFim);
+    setTempSitFatura(sitFatura);
+    setTempClientePagador(clientePagador);
+    setTempClienteGrupo(clienteGrupo);
+  }, [anoVencimento, clienteGrupo, clientePagador, periodoFim, periodoIni, periodoTipo, sitFatura]);
+
+  const clearTempFilters = useCallback(() => {
+    setTempAnoVencimento(defaultFilters.anoVencimento);
+    setTempPeriodoTipo(defaultFilters.periodoTipo);
+    setTempPeriodoIni(defaultFilters.periodoIni);
+    setTempPeriodoFim(defaultFilters.periodoFim);
+    setTempSitFatura(defaultFilters.sitFatura);
+    setTempClientePagador(defaultFilters.clientePagador);
+    setTempClienteGrupo(defaultFilters.clienteGrupo);
+  }, [defaultFilters]);
+
+  const cancelFilters = useCallback(() => {
+    syncTempFromApplied();
+    setShowFilters(false);
+  }, [syncTempFromApplied]);
+
+  const applyFilters = useCallback(() => {
+    setAnoVencimento(tempAnoVencimento);
+    setPeriodoTipo(tempPeriodoTipo);
+    setPeriodoIni(tempPeriodoIni);
+    setPeriodoFim(tempPeriodoFim);
+    setSitFatura(tempSitFatura);
+    setClientePagador(tempClientePagador);
+    setClienteGrupo(tempClienteGrupo);
+    setShowFilters(false);
+    void carregar0049({
+      periodoTipo: tempPeriodoTipo,
+      periodoIni: tempPeriodoIni,
+      periodoFim: tempPeriodoFim,
+      sitFatura: tempSitFatura,
+      clientePagadorCnpj: tempClientePagador.cnpj,
+      clienteGrupoCnpj: tempClienteGrupo.cnpj,
+    });
+  }, [
+    carregar0049,
+    tempAnoVencimento,
+    tempClienteGrupo,
+    tempClientePagador,
+    tempPeriodoFim,
+    tempPeriodoIni,
+    tempPeriodoTipo,
+    tempSitFatura,
+  ]);
+
   return (
     <DashboardLayout
       title="CONTAS A RECEBER"
-      description="Painel em tempo real a partir do SSW (ssw0103 e ssw0049)"
+      description="Painel em tempo real (faturamento e disponíveis para faturar)"
       headerActions={
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="w-full sm:w-[170px]">
-            <div className="text-xs text-muted-foreground mb-1">Período de vencimento</div>
-            <Select value={anoVencimento} onValueChange={setAnoVencimento}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Ano" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-              <div className="w-full sm:w-[170px]">
-                <div className="text-xs text-muted-foreground mb-1">Período (0049)</div>
-                <Select value={periodoTipo} onValueChange={(v) => setPeriodoTipo(v as any)}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="V">Vencimento</SelectItem>
-                    <SelectItem value="E">Emissão</SelectItem>
-                    <SelectItem value="L">Liquidação</SelectItem>
-                    <SelectItem value="X">Cancelamento</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="w-full sm:w-[150px]">
-                <div className="text-xs text-muted-foreground mb-1">Início</div>
-                <Input className="h-9" type="date" value={periodoIni} onChange={(e) => setPeriodoIni(e.target.value)} />
-              </div>
-              <div className="w-full sm:w-[150px]">
-                <div className="text-xs text-muted-foreground mb-1">Fim</div>
-                <Input className="h-9" type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} />
-              </div>
-
-              <div className="w-full sm:w-[230px]">
-                <div className="text-xs text-muted-foreground mb-1">Situação (0049)</div>
-                <Select value={sitFatura} onValueChange={(v) => setSitFatura(v as any)}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Situação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="T">Todas menos canceladas</SelectItem>
-                    <SelectItem value="P">Pendentes</SelectItem>
-                    <SelectItem value="L">Liquidadas</SelectItem>
-                    <SelectItem value="E">Perdidas</SelectItem>
-                    <SelectItem value="C">Canceladas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex items-end gap-2">
-              {loading0049 ? (
-                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200 flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  {status0049 || 'Processando...'}
-                </Badge>
-              ) : status0049 ? (
-                <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{status0049}</Badge>
-              ) : null}
-              <Button onClick={carregar0049} disabled={loading0049} className="h-9 gap-2">
-                {loading0049 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Atualizar 0049
+        <div className="flex items-center gap-2 md:gap-3">
+          <Dialog
+            open={showFilters}
+            onOpenChange={(open) => {
+              setShowFilters(open);
+              if (open) syncTempFromApplied();
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="relative dark:border-slate-600 dark:hover:bg-slate-800">
+                <Filter className="w-4 h-4" />
+                {hasFiltrosAtivos && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-600" />}
               </Button>
-            </div>
-          </div>
+            </DialogTrigger>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Pagador (CNPJ)</Label>
-              <BuscadorClientes
-                selectedNome={clientePagador.nome}
-                onSelect={(c) => setClientePagador({ cnpj: c.cnpj || '', nome: c.nome || '' })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Grupo (CNPJ principal)</Label>
-              <BuscadorClientes
-                selectedNome={clienteGrupo.nome}
-                onSelect={(c) => setClienteGrupo({ cnpj: c.cnpj || '', nome: c.nome || '' })}
-              />
-            </div>
-          </div>
+            <DialogContent className="sm:max-w-[760px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-400">
+                  Defina o período e filtros do faturamento. Ao aplicar, o painel atualiza automaticamente.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Ano (legenda)</Label>
+                      <Select value={tempAnoVencimento} onValueChange={setTempAnoVencimento}>
+                        <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
+                          <SelectValue placeholder="Ano" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {years.map((y) => (
+                            <SelectItem key={y} value={String(y)}>
+                              {y}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Situação da fatura</Label>
+                      <Select value={tempSitFatura} onValueChange={(v) => setTempSitFatura(v as any)}>
+                        <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
+                          <SelectValue placeholder="Situação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="T">Todas menos canceladas</SelectItem>
+                          <SelectItem value="P">Pendentes</SelectItem>
+                          <SelectItem value="L">Liquidadas</SelectItem>
+                          <SelectItem value="E">Perdidas</SelectItem>
+                          <SelectItem value="C">Canceladas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Tipo de período</Label>
+                      <Select value={tempPeriodoTipo} onValueChange={(v) => setTempPeriodoTipo(v as any)}>
+                        <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
+                          <SelectValue placeholder="Tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="V">Vencimento</SelectItem>
+                          <SelectItem value="E">Emissão</SelectItem>
+                          <SelectItem value="L">Liquidação</SelectItem>
+                          <SelectItem value="X">Cancelamento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Data início</Label>
+                      <Input
+                        type="date"
+                        value={tempPeriodoIni}
+                        onChange={(e) => setTempPeriodoIni(e.target.value)}
+                        className="h-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Data fim</Label>
+                      <Input
+                        type="date"
+                        value={tempPeriodoFim}
+                        onChange={(e) => setTempPeriodoFim(e.target.value)}
+                        className="h-9 dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Pagador (CNPJ)</Label>
+                      <BuscadorClientes
+                        selectedNome={tempClientePagador.nome}
+                        onSelect={(c) => setTempClientePagador({ cnpj: c.cnpj || '', nome: c.nome || '' })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-slate-600 dark:text-slate-400">Grupo (CNPJ principal)</Label>
+                      <BuscadorClientes
+                        selectedNome={tempClienteGrupo.nome}
+                        onSelect={(c) => setTempClienteGrupo({ cnpj: c.cnpj || '', nome: c.nome || '' })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="shrink-0 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <Button variant="outline" onClick={clearTempFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
+                  Limpar tudo
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={cancelFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
+                    Cancelar
+                  </Button>
+                  <Button onClick={applyFilters} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                    Aplicar filtros
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {loading0049 ? (
+            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200 flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {status0049 || 'Processando...'}
+            </Badge>
+          ) : status0049 ? (
+            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{status0049}</Badge>
+          ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void carregar0049();
+            }}
+            disabled={loading0049}
+            className="dark:border-slate-600"
+          >
+            {loading0049 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            <span className="ml-1.5">Atualizar</span>
+          </Button>
         </div>
       }
     >
@@ -808,7 +987,7 @@ export function ContasReceber() {
           </div>
           {!data0049 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver os indicadores.</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento e ver os indicadores.</CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
@@ -850,7 +1029,7 @@ export function ContasReceber() {
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">A faturar (0103)</div>
+                    <div className="text-xs text-muted-foreground">Disponíveis para faturar</div>
                     <div className="text-2xl font-bold">{formatCurrency(data0103?.totals?.frete_total || 0)}</div>
                     <div className="text-xs text-muted-foreground">{`${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`}</div>
                   </CardContent>
@@ -1078,7 +1257,7 @@ export function ContasReceber() {
         <TabsContent value="a_receber" className="mt-4">
           {!data0049 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
@@ -1167,7 +1346,7 @@ export function ContasReceber() {
         <TabsContent value="aging_a_receber" className="mt-4">
           {!data0049 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
             </Card>
           ) : (
             <Card>
@@ -1201,7 +1380,7 @@ export function ContasReceber() {
         <TabsContent value="faturas_vencidas" className="mt-4">
           {!data0049 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
             </Card>
           ) : (
             <Card>
@@ -1269,7 +1448,7 @@ export function ContasReceber() {
         <TabsContent value="aging_vencidos" className="mt-4">
           {!data0049 ? (
             <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Clique em Atualizar para ler o faturamento.</CardContent>
             </Card>
           ) : (
             <Card>
@@ -1305,16 +1484,16 @@ export function ContasReceber() {
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-base">CT-es disponíveis para faturamento</CardTitle>
+                  <CardTitle className="text-base">Disponíveis para faturar</CardTitle>
                   <Button onClick={carregar0103} disabled={loading0103} className="gap-2">
                     {loading0103 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                    Atualizar agora (SSW0103)
+                    Atualizar agora
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-muted-foreground">
-                  Base: ssw0103 (CT-es a prazo não faturados). A consulta é em tempo real e usa sempre a data de ontem como referência.
+                  Lista de CT-es a prazo que ainda não entraram em fatura. A consulta é em tempo real e usa sempre a data de ontem como referência.
                 </div>
               </CardContent>
             </Card>
@@ -1345,11 +1524,10 @@ export function ContasReceber() {
                 </Card>
                 <Card className="lg:col-span-1">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Arquivo</CardTitle>
+                  <CardTitle className="text-base">Fonte</CardTitle>
                   </CardHeader>
                   <CardContent className="text-xs text-muted-foreground space-y-1">
-                    <div>{data0103.meta.filename}</div>
-                    <div>{data0103.meta.act}</div>
+                    <div>Relatório gerado em {data0103.meta.updated_at || data0103.meta.gerado_em}</div>
                   </CardContent>
                 </Card>
               </div>
