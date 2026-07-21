@@ -351,6 +351,11 @@ export function ContasReceber() {
   const [drillRows, setDrillRows] = useState<any[]>([]);
   const [drillSortKey, setDrillSortKey] = useState<string>('saldo');
   const [drillSortDir, setDrillSortDir] = useState<'asc' | 'desc'>('desc');
+  const [arSortKey, setArSortKey] = useState<
+    'fatura' | 'cliente' | 'unid' | 'venc' | 'valor' | 'pago' | 'saldo' | 'situacao' | 'ctes'
+  >('saldo');
+  const [arSortDir, setArSortDir] = useState<'asc' | 'desc'>('desc');
+  const [arPage, setArPage] = useState(1);
 
   const [rankGroupBy, setRankGroupBy] = useState<'grupos' | 'clientes'>('grupos');
   const [grupoMap, setGrupoMap] = useState<Record<string, { cnpj_principal: string; nome_principal: string; is_grupo: boolean }>>({});
@@ -706,6 +711,10 @@ export function ContasReceber() {
     });
   }, [normalizedFaturas, tableSearch]);
 
+  useEffect(() => {
+    setArPage(1);
+  }, [tableSearch, arSortKey, arSortDir]);
+
   const kpis = useMemo(() => {
     const base = {
       faturas: filteredFaturas.length,
@@ -752,6 +761,85 @@ export function ContasReceber() {
     }
     return base;
   }, [normalizedFaturas]);
+
+  const arCards = useMemo(() => {
+    const base = {
+      totalReceber: 0,
+      totalVencer: 0,
+      totalAtrasado: 0,
+      totalParcial: 0,
+      countReceber: 0,
+      countVencer: 0,
+      countAtrasado: 0,
+      countParcial: 0,
+    };
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      const pago = Number(f._pago) || 0;
+      if (saldo <= 0) continue;
+      base.totalReceber += saldo;
+      base.countReceber += 1;
+      if (f._overdue) {
+        base.totalAtrasado += saldo;
+        base.countAtrasado += 1;
+      } else {
+        base.totalVencer += saldo;
+        base.countVencer += 1;
+      }
+      if (pago > 0) {
+        base.totalParcial += saldo;
+        base.countParcial += 1;
+      }
+    }
+    return base;
+  }, [filteredFaturas]);
+
+  const toggleArSort = useCallback((key: typeof arSortKey) => {
+    setArSortKey((prevKey) => {
+      if (prevKey !== key) {
+        setArSortDir('desc');
+        return key;
+      }
+      setArSortDir((prevDir) => (prevDir === 'asc' ? 'desc' : 'asc'));
+      return prevKey;
+    });
+  }, []);
+
+  const arSortedRows = useMemo(() => {
+    const rows = Array.isArray(filteredFaturas) ? [...(filteredFaturas as any[])] : [];
+    const dir = arSortDir === 'asc' ? 1 : -1;
+    const cmpText = (a: any, b: any) => String(a).localeCompare(String(b), 'pt-BR') * dir;
+    rows.sort((a, b) => {
+      if (arSortKey === 'fatura') return cmpText(normTextKey(a?.fatura), normTextKey(b?.fatura));
+      if (arSortKey === 'cliente') return cmpText(normTextKey(a?.cliente), normTextKey(b?.cliente));
+      if (arSortKey === 'unid') return cmpText(unitSigla3(a?.fil || a?.unidade_responsavel), unitSigla3(b?.fil || b?.unidade_responsavel));
+      if (arSortKey === 'situacao') return cmpText(normSituacaoLabel(a?.situacao), normSituacaoLabel(b?.situacao));
+      if (arSortKey === 'ctes') return ((Array.isArray(a?.ctes) ? a.ctes.length : 0) - (Array.isArray(b?.ctes) ? b.ctes.length : 0)) * dir;
+      if (arSortKey === 'venc') return (((parseDateBr(String(a?.vencimento || '')) ?? 0) - (parseDateBr(String(b?.vencimento || '')) ?? 0)) || 0) * dir;
+      if (arSortKey === 'valor') return ((Number(a?._vlrFatur) || 0) - (Number(b?._vlrFatur) || 0)) * dir;
+      if (arSortKey === 'pago') return ((Number(a?._pago) || 0) - (Number(b?._pago) || 0)) * dir;
+      return ((Number(a?._saldo) || 0) - (Number(b?._saldo) || 0)) * dir;
+    });
+    return rows;
+  }, [arSortDir, arSortKey, filteredFaturas]);
+
+  const arTotals = useMemo(() => {
+    const totalValor = (arSortedRows as any[]).reduce((acc, r) => acc + (Number(r?._vlrFatur) || 0), 0);
+    const totalPago = (arSortedRows as any[]).reduce((acc, r) => acc + (Number(r?._pago) || 0), 0);
+    const totalSaldo = (arSortedRows as any[]).reduce((acc, r) => acc + (Number(r?._saldo) || 0), 0);
+    return { totalValor, totalPago, totalSaldo };
+  }, [arSortedRows]);
+
+  const arPageSize = 80;
+  const arTotalPages = useMemo(() => Math.max(1, Math.ceil(arSortedRows.length / arPageSize)), [arSortedRows.length]);
+  useEffect(() => {
+    setArPage((p) => Math.min(Math.max(1, p), arTotalPages));
+  }, [arTotalPages]);
+
+  const arPageRows = useMemo(() => {
+    const start = (arPage - 1) * arPageSize;
+    return (arSortedRows as any[]).slice(start, start + arPageSize);
+  }, [arPage, arSortedRows]);
 
   const previsaoSerie30d = useMemo(() => {
     const sums = new Array(31).fill(0) as number[];
@@ -1855,6 +1943,59 @@ export function ContasReceber() {
             </Card>
           ) : (
             <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Tile
+                  label="Total a receber"
+                  value={formatCurrency(arCards.totalReceber)}
+                  sub={`${formatNumber(arCards.countReceber)} fatura(s)`}
+                  tone="blue"
+                  Icon={BadgeDollarSign}
+                  onClick={() => abrirDrill('A receber', (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0), 'faturas')}
+                />
+                <Tile
+                  label="Total a vencer"
+                  value={formatCurrency(arCards.totalVencer)}
+                  sub={`${formatNumber(arCards.countVencer)} fatura(s)`}
+                  tone="indigo"
+                  Icon={CalendarClock}
+                  onClick={() =>
+                    abrirDrill(
+                      'A vencer',
+                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && !(f as any)._overdue),
+                      'faturas'
+                    )
+                  }
+                />
+                <Tile
+                  label="Total atrasado"
+                  value={formatCurrency(arCards.totalAtrasado)}
+                  sub={`${formatNumber(arCards.countAtrasado)} fatura(s)`}
+                  tone="rose"
+                  Icon={AlertTriangle}
+                  onClick={() =>
+                    abrirDrill(
+                      'Atrasadas',
+                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (f as any)._overdue),
+                      'faturas'
+                    )
+                  }
+                />
+                <Tile
+                  label="Saldos parciais"
+                  value={formatCurrency(arCards.totalParcial)}
+                  sub={`${formatNumber(arCards.countParcial)} fatura(s)`}
+                  tone="emerald"
+                  Icon={HandCoins}
+                  onClick={() =>
+                    abrirDrill(
+                      'Saldos parciais',
+                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (Number((f as any)._pago) || 0) > 0),
+                      'faturas'
+                    )
+                  }
+                />
+              </div>
+
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-3">
@@ -1895,42 +2036,122 @@ export function ContasReceber() {
               </Card>
 
               <Card>
-                <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b">
-                        <th className="py-2 pr-3">Fatura</th>
-                        <th className="py-2 pr-3">Cliente</th>
-                        <th className="py-2 pr-3">Unid</th>
-                        <th className="py-2 pr-3">Vencimento</th>
-                        <th className="py-2 pr-3 text-right">Valor</th>
-                        <th className="py-2 pr-3 text-right">Pago</th>
-                        <th className="py-2 pr-3 text-right">Saldo</th>
-                        <th className="py-2 pr-3">Situação</th>
-                        <th className="py-2 pr-3 text-right">CT-es</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(filteredFaturas as any[]).slice(0, 300).map((f) => (
-                        <tr key={f.fatura} className="border-b last:border-0">
-                          <td className="py-2 pr-3 font-mono">{f.fatura}</td>
-                          <td className="py-2 pr-3">
-                            <div className="font-medium">{f.cliente}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
-                          </td>
-                          <td className="py-2 pr-3 font-mono">{f.fil || f.unidade_responsavel}</td>
-                          <td className="py-2 pr-3 font-mono">
-                            <span className={f._overdue ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}>{f.vencimento}</span>
-                          </td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._vlrFatur)}</td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._pago)}</td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._saldo)}</td>
-                          <td className="py-2 pr-3">{f.situacao || '-'}</td>
-                          <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+                <CardHeader className="pb-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <CardTitle className="text-base">Lista</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground">{`Página ${arPage} de ${arTotalPages}`}</div>
+                      <Button variant="outline" size="sm" className="h-9" onClick={() => setArPage((p) => Math.max(1, p - 1))} disabled={arPage <= 1}>
+                        Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9"
+                        onClick={() => setArPage((p) => Math.min(arTotalPages, p + 1))}
+                        disabled={arPage >= arTotalPages}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-[70vh] overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                        <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          <th className="py-2 pr-3 pl-4">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('fatura')}>
+                              <span>Fatura</span>
+                              <SortIndicator active={arSortKey === 'fatura'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('cliente')}>
+                              <span>Cliente</span>
+                              <SortIndicator active={arSortKey === 'cliente'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('unid')}>
+                              <span>Unid</span>
+                              <SortIndicator active={arSortKey === 'unid'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('venc')}>
+                              <span>Vencimento</span>
+                              <SortIndicator active={arSortKey === 'venc'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3 text-right">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('valor')}>
+                              <span>Valor</span>
+                              <SortIndicator active={arSortKey === 'valor'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3 text-right">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('pago')}>
+                              <span>Pago</span>
+                              <SortIndicator active={arSortKey === 'pago'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3 text-right">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('saldo')}>
+                              <span>Saldo</span>
+                              <SortIndicator active={arSortKey === 'saldo'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('situacao')}>
+                              <span>Situação</span>
+                              <SortIndicator active={arSortKey === 'situacao'} dir={arSortDir} />
+                            </button>
+                          </th>
+                          <th className="py-2 pr-3 text-right">
+                            <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('ctes')}>
+                              <span>CT-es</span>
+                              <SortIndicator active={arSortKey === 'ctes'} dir={arSortDir} />
+                            </button>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {arPageRows.map((f: any) => (
+                          <tr key={f.fatura} className="border-b last:border-0">
+                            <td className="py-2 pr-3 pl-4 font-mono">{f.fatura}</td>
+                            <td className="py-2 pr-3">
+                              <div className="font-medium">{f.cliente}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
+                            </td>
+                            <td className="py-2 pr-3 font-mono">{unitSigla3(f.fil || f.unidade_responsavel)}</td>
+                            <td className="py-2 pr-3 font-mono">
+                              <span className={f._overdue ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}>{f.vencimento}</span>
+                            </td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._vlrFatur)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._pago)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._saldo)}</td>
+                            <td className="py-2 pr-3">
+                              <SituacaoBadge value={f.situacao} />
+                            </td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                        <tr className="border-t border-slate-200 dark:border-slate-800">
+                          <td className="py-2 pr-3 pl-4 font-semibold" colSpan={4}>
+                            Total
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(arTotals.totalValor)}</td>
+                          <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(arTotals.totalPago)}</td>
+                          <td className="py-2 pr-3 text-right font-mono font-semibold">{formatCurrency(arTotals.totalSaldo)}</td>
+                          <td className="py-2 pr-3" colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </CardContent>
               </Card>
             </div>
