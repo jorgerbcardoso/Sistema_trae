@@ -384,17 +384,21 @@ try {
     $sitFat = strtoupper(trim((string)($input['rel_ana_sit_fat'] ?? 'T')));
     if (!in_array($sitFat, ['P', 'L', 'E', 'C', 'T'], true)) $sitFat = 'T';
 
-    $iniIso = trim((string)($input['rel_ana_per_pesq_ini'] ?? ''));
-    $fimIso = trim((string)($input['rel_ana_per_pesq_fin'] ?? ''));
-    if ($iniIso === '' || $fimIso === '') {
-        $respondJson(['success' => false, 'message' => 'Informe data inicial e final (rel_ana_per_pesq_ini/rel_ana_per_pesq_fin).'], 400);
-    }
+    $iniDmy = '';
+    $fimDmy = '';
+    if (in_array($step, ['RUN', 'START'], true)) {
+        $iniIso = trim((string)($input['rel_ana_per_pesq_ini'] ?? ''));
+        $fimIso = trim((string)($input['rel_ana_per_pesq_fin'] ?? ''));
+        if ($iniIso === '' || $fimIso === '') {
+            $respondJson(['success' => false, 'message' => 'Informe data inicial e final (rel_ana_per_pesq_ini/rel_ana_per_pesq_fin).'], 400);
+        }
 
-    $iniDmy = date('dmy', strtotime($iniIso));
-    $fimDmy = date('dmy', strtotime($fimIso));
+        $iniDmy = date('dmy', strtotime($iniIso));
+        $fimDmy = date('dmy', strtotime($fimIso));
 
-    if (!preg_match('/^\d{6}$/', $iniDmy) || !preg_match('/^\d{6}$/', $fimDmy)) {
-        $respondJson(['success' => false, 'message' => 'Período inválido para o SSW (datas).'], 400);
+        if (!preg_match('/^\d{6}$/', $iniDmy) || !preg_match('/^\d{6}$/', $fimDmy)) {
+            $respondJson(['success' => false, 'message' => 'Período inválido para o SSW (datas).'], 400);
+        }
     }
 
     $cnpjPag = $parseCnpj((string)($input['rel_ana_cgc'] ?? ''));

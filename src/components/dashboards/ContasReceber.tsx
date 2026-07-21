@@ -179,24 +179,16 @@ function downloadCsv(filename: string, csv: string) {
 const COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
 export function ContasReceber() {
-  const currentYear = new Date().getFullYear();
-  const years = useMemo(() => {
-    const list: number[] = [];
-    for (let y = currentYear - 3; y <= currentYear; y += 1) list.push(y);
-    return list;
-  }, [currentYear]);
-
   const today0 = useMemo(() => {
     const n = new Date();
     return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 0, 0, 0, 0).getTime();
   }, []);
 
   const [tab, setTab] = useState<TabKey>('visao_geral');
-  const [anoVencimento, setAnoVencimento] = useState(String(currentYear));
   const [periodoTipo, setPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>('V');
   const defaultPeriodo = useMemo(() => {
-    const end = new Date();
-    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 30);
+    const start = new Date();
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
     return { ini: dateToInput(start), fim: dateToInput(end) };
   }, []);
   const [periodoIni, setPeriodoIni] = useState<string>(defaultPeriodo.ini);
@@ -209,7 +201,6 @@ export function ContasReceber() {
   const [showFilters, setShowFilters] = useState(false);
   const defaultFilters = useMemo(
     () => ({
-      anoVencimento: String(currentYear),
       periodoTipo: 'V' as const,
       periodoIni: defaultPeriodo.ini,
       periodoFim: defaultPeriodo.fim,
@@ -217,9 +208,8 @@ export function ContasReceber() {
       clientePagador: { cnpj: '', nome: '' } as ClienteSel,
       clienteGrupo: { cnpj: '', nome: '' } as ClienteSel,
     }),
-    [currentYear, defaultPeriodo.fim, defaultPeriodo.ini]
+    [defaultPeriodo.fim, defaultPeriodo.ini]
   );
-  const [tempAnoVencimento, setTempAnoVencimento] = useState<string>(defaultFilters.anoVencimento);
   const [tempPeriodoTipo, setTempPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>(defaultFilters.periodoTipo);
   const [tempPeriodoIni, setTempPeriodoIni] = useState<string>(defaultFilters.periodoIni);
   const [tempPeriodoFim, setTempPeriodoFim] = useState<string>(defaultFilters.periodoFim);
@@ -680,7 +670,6 @@ export function ContasReceber() {
   }, [filteredFaturas, today0]);
 
   const hasFiltrosAtivos = useMemo(() => {
-    if (anoVencimento !== defaultFilters.anoVencimento) return true;
     if (periodoTipo !== defaultFilters.periodoTipo) return true;
     if (periodoIni !== defaultFilters.periodoIni) return true;
     if (periodoFim !== defaultFilters.periodoFim) return true;
@@ -689,10 +678,8 @@ export function ContasReceber() {
     if ((clienteGrupo.cnpj || '').trim() !== '') return true;
     return false;
   }, [
-    anoVencimento,
     clienteGrupo.cnpj,
     clientePagador.cnpj,
-    defaultFilters.anoVencimento,
     defaultFilters.periodoFim,
     defaultFilters.periodoIni,
     defaultFilters.periodoTipo,
@@ -704,17 +691,15 @@ export function ContasReceber() {
   ]);
 
   const syncTempFromApplied = useCallback(() => {
-    setTempAnoVencimento(anoVencimento);
     setTempPeriodoTipo(periodoTipo);
     setTempPeriodoIni(periodoIni);
     setTempPeriodoFim(periodoFim);
     setTempSitFatura(sitFatura);
     setTempClientePagador(clientePagador);
     setTempClienteGrupo(clienteGrupo);
-  }, [anoVencimento, clienteGrupo, clientePagador, periodoFim, periodoIni, periodoTipo, sitFatura]);
+  }, [clienteGrupo, clientePagador, periodoFim, periodoIni, periodoTipo, sitFatura]);
 
   const clearTempFilters = useCallback(() => {
-    setTempAnoVencimento(defaultFilters.anoVencimento);
     setTempPeriodoTipo(defaultFilters.periodoTipo);
     setTempPeriodoIni(defaultFilters.periodoIni);
     setTempPeriodoFim(defaultFilters.periodoFim);
@@ -729,7 +714,6 @@ export function ContasReceber() {
   }, [syncTempFromApplied]);
 
   const applyFilters = useCallback(() => {
-    setAnoVencimento(tempAnoVencimento);
     setPeriodoTipo(tempPeriodoTipo);
     setPeriodoIni(tempPeriodoIni);
     setPeriodoFim(tempPeriodoFim);
@@ -747,7 +731,6 @@ export function ContasReceber() {
     });
   }, [
     carregar0049,
-    tempAnoVencimento,
     tempClienteGrupo,
     tempClientePagador,
     tempPeriodoFim,
@@ -786,23 +769,7 @@ export function ContasReceber() {
 
               <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
                 <div className="space-y-6 py-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm text-slate-600 dark:text-slate-400">Ano (legenda)</Label>
-                      <Select value={tempAnoVencimento} onValueChange={setTempAnoVencimento}>
-                        <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
-                          <SelectValue placeholder="Ano" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {years.map((y) => (
-                            <SelectItem key={y} value={String(y)}>
-                              {y}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-slate-600 dark:text-slate-400">Situação da fatura</Label>
                       <Select value={tempSitFatura} onValueChange={(v) => setTempSitFatura(v as any)}>
@@ -926,9 +893,6 @@ export function ContasReceber() {
             <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
             <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
           </TabsList>
-          <Badge className="hidden lg:inline-flex bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            {`Ano ${anoVencimento}`}
-          </Badge>
         </div>
 
         <TabsContent value="visao_geral" className="mt-4">
