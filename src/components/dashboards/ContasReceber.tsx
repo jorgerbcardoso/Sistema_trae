@@ -1,0 +1,1490 @@
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  ResponsiveContainer,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  Pie,
+  PieChart,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+  Area,
+  AreaChart,
+} from 'recharts';
+import { DashboardLayout } from '../layouts/DashboardLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { AlertTriangle, Download, Loader2, RefreshCw, Search } from 'lucide-react';
+import { toast } from 'sonner';
+import { ENVIRONMENT } from '../../config/environment';
+import { apiFetch } from '../../utils/apiUtils';
+import { BuscadorClientes } from '../cadastros/BuscadorClientes';
+
+type TabKey = 'visao_geral' | 'a_receber' | 'aging_a_receber' | 'faturas_vencidas' | 'aging_vencidos' | 'a_faturar';
+
+type Ssw0103Row = {
+  em: string;
+  ctrc: string;
+  numero_cte: string;
+  pagador: string;
+  cnpj_pagador: string;
+  cob: string;
+  dest: string;
+  banco: string;
+  frete: number;
+  emissao: string;
+  nfiscal: string;
+  tip: string;
+  pre_fatu: string;
+  ult_ocor: string;
+  chave_cte: string;
+  data_entrega: string;
+  prev_entrega: string;
+  comp_entrega_escaneado: string;
+  observacao: string;
+};
+
+type Ssw0103Data = {
+  meta: {
+    programa: string;
+    ontem_dmy: string;
+    act: string;
+    filename: string;
+    updated_at: string | null;
+    gerado_em: string;
+  };
+  totals: {
+    ctes: number;
+    frete_total: number;
+  };
+  rows: Ssw0103Row[];
+};
+
+type Ssw0049Cte = {
+  fatura: string;
+  emissao_fatura: string;
+  ctrc: string;
+  cte: string;
+  data_emissao: string;
+  data_autorizacao: string;
+  valor_frete: number;
+  lote_contabil: string;
+  valor_contabil: number;
+};
+
+type Ssw0049Fatura = {
+  fatura: string;
+  cnpj: string;
+  cliente: string;
+  tipo_cobranca: string;
+  banco_carteira: string;
+  periodicidade: string;
+  fil: string;
+  emissao: string;
+  vencimento: string;
+  pagamento: string;
+  dias_atraso: string;
+  situacao: string;
+  vlr_fatur: number;
+  vlr_pago: number;
+  saldo: number;
+  ultima_ocorrencia: string;
+  unidade_responsavel: string;
+  vendedor: string;
+  ctes: Ssw0049Cte[];
+  ctes_total_frete: number;
+  ctes_total_contabil: number;
+};
+
+type Ssw0049Data = {
+  totals: {
+    faturas: number;
+    ctes: number;
+    vlr_fatur_total: number;
+    saldo_total: number;
+    frete_ctes_total: number;
+  };
+  faturas: Ssw0049Fatura[];
+  updated_at: string | null;
+};
+
+type Ssw0049Response =
+  | { success: true; status: 'ready'; result: 'data'; data: Ssw0049Data; meta?: any }
+  | { success: true; status: 'ready'; result: 'empty'; data: Ssw0049Data; meta?: any }
+  | { success: true; status: 'started'; baseline_seq: number; request_start_ts: number; meta?: any }
+  | { success: true; status: 'pending' }
+  | { success: true; status: 'ready'; result: 'links'; acts: string[]; ssw_seq?: number }
+  | { success: false; message?: string; debug?: any };
+
+type ClienteSel = { cnpj: string; nome: string };
+
+function dateToInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseDateBr(dmy: string): number | null {
+  const s = String(dmy ?? '').trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const dd = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const yyyy = parseInt(m[3], 10);
+  if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
+  const dt = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0);
+  const ts = dt.getTime();
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function formatCurrency(v: number): string {
+  return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatNumber(v: number, digits = 0): string {
+  return (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function csvEscape(v: any): string {
+  const s = String(v ?? '');
+  if (s.includes('"') || s.includes(';') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
+
+export function ContasReceber() {
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(() => {
+    const list: number[] = [];
+    for (let y = currentYear - 3; y <= currentYear; y += 1) list.push(y);
+    return list;
+  }, [currentYear]);
+
+  const today0 = useMemo(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 0, 0, 0, 0).getTime();
+  }, []);
+
+  const [tab, setTab] = useState<TabKey>('visao_geral');
+  const [anoVencimento, setAnoVencimento] = useState(String(currentYear));
+  const [periodoTipo, setPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>('V');
+  const defaultPeriodo = useMemo(() => {
+    const end = new Date();
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 30);
+    return { ini: dateToInput(start), fim: dateToInput(end) };
+  }, []);
+  const [periodoIni, setPeriodoIni] = useState<string>(defaultPeriodo.ini);
+  const [periodoFim, setPeriodoFim] = useState<string>(defaultPeriodo.fim);
+  const [sitFatura, setSitFatura] = useState<'P' | 'L' | 'E' | 'C' | 'T'>('T');
+  const [clientePagador, setClientePagador] = useState<ClienteSel>({ cnpj: '', nome: '' });
+  const [clienteGrupo, setClienteGrupo] = useState<ClienteSel>({ cnpj: '', nome: '' });
+  const [tableSearch, setTableSearch] = useState('');
+  const [quickView, setQuickView] = useState<'todas' | 'abertas' | 'vencidas' | 'vence3d'>('todas');
+
+  const [loading0049, setLoading0049] = useState(false);
+  const [status0049, setStatus0049] = useState<string>('');
+  const [data0049, setData0049] = useState<Ssw0049Data | null>(null);
+  const req0049Ref = useRef(0);
+
+  const [loading0103, setLoading0103] = useState(false);
+  const [data0103, setData0103] = useState<Ssw0103Data | null>(null);
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<Ssw0049Fatura[]>([]);
+
+  const abrirDrill = useCallback((title: string, rows: Ssw0049Fatura[]) => {
+    setDrillTitle(title);
+    setDrillRows(rows);
+    setDrillOpen(true);
+  }, []);
+
+  const buildCsvFaturas = useCallback((rows: Ssw0049Fatura[]) => {
+    const header = [
+      'Fatura',
+      'CNPJ',
+      'Cliente',
+      'Tipo cobrança',
+      'Banco/Carteira',
+      'Periodicidade',
+      'Unidade (FIL)',
+      'Emissão',
+      'Vencimento',
+      'Pagamento',
+      'Situação',
+      'Valor Faturado',
+      'Valor Pago',
+      'Saldo',
+      'CT-es',
+      'Frete CT-es',
+      'Última ocorrência',
+      'Unidade responsável',
+      'Vendedor',
+    ];
+    const lines: string[] = [];
+    lines.push(header.map(csvEscape).join(';'));
+    for (const r of rows) {
+      lines.push(
+        [
+          r.fatura,
+          r.cnpj,
+          r.cliente,
+          r.tipo_cobranca,
+          r.banco_carteira,
+          r.periodicidade,
+          r.fil,
+          r.emissao,
+          r.vencimento,
+          r.pagamento,
+          r.situacao,
+          formatCurrency(r.vlr_fatur),
+          formatCurrency(r.vlr_pago),
+          formatCurrency(r.saldo),
+          formatNumber(r.ctes?.length || 0),
+          formatCurrency(r.ctes_total_frete || 0),
+          r.ultima_ocorrencia,
+          r.unidade_responsavel,
+          r.vendedor,
+        ]
+          .map(csvEscape)
+          .join(';')
+      );
+    }
+    return lines.join('\n');
+  }, []);
+
+  const carregar0049 = useCallback(async () => {
+    const reqId = (req0049Ref.current += 1);
+    setLoading0049(true);
+    setStatus0049('Executando SSW0049...');
+    try {
+      const payload = {
+        step: 'START',
+        rel_ana_fg_data: periodoTipo,
+        rel_ana_per_pesq_ini: periodoIni,
+        rel_ana_per_pesq_fin: periodoFim,
+        rel_ana_cgc: clientePagador.cnpj,
+        rel_ana_cgc_grupo: clienteGrupo.cnpj,
+        rel_ana_sit_fat: sitFatura,
+      };
+      const start = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }, true)) as Ssw0049Response;
+      if (reqId !== req0049Ref.current) return;
+
+      if (!start?.success) {
+        toast.error(start?.message || 'Falha ao iniciar o SSW0049.');
+        return;
+      }
+
+      if ((start as any).status === 'ready' && (start as any).result === 'data') {
+        setData0049((start as any).data || null);
+        setStatus0049('Concluído');
+        return;
+      }
+
+      if ((start as any).status === 'ready' && (start as any).result === 'empty') {
+        setData0049((start as any).data || null);
+        setStatus0049('Sem registros');
+        return;
+      }
+
+      if ((start as any).status !== 'started') {
+        toast.error('Resposta inesperada ao iniciar o SSW0049.');
+        return;
+      }
+
+      const baselineSeq = Number((start as any).baseline_seq) || 0;
+      const requestStartTs = Number((start as any).request_start_ts) || 0;
+      const deadline = Date.now() + 70000;
+
+      setStatus0049('Aguardando fila SSW (1440)...');
+
+      while (Date.now() < deadline) {
+        if (reqId !== req0049Ref.current) return;
+        const poll = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }),
+        }, true)) as Ssw0049Response;
+
+        if (reqId !== req0049Ref.current) return;
+        if (!poll?.success) {
+          toast.error(poll?.message || 'Falha ao consultar a fila do SSW.');
+          return;
+        }
+
+        if ((poll as any).status === 'pending') {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        if ((poll as any).status === 'ready' && (poll as any).result === 'empty') {
+          setData0049({
+            totals: { faturas: 0, ctes: 0, vlr_fatur_total: 0, saldo_total: 0, frete_ctes_total: 0 },
+            faturas: [],
+            updated_at: null,
+          });
+          setStatus0049('Sem registros');
+          return;
+        }
+
+        if ((poll as any).status === 'ready' && (poll as any).result === 'links') {
+          const acts = (poll as any).acts || [];
+          if (!Array.isArray(acts) || acts.length === 0) {
+            toast.error('Fila SSW concluiu, mas sem links de download.');
+            return;
+          }
+
+          setStatus0049('Baixando CSV...');
+          const dl = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0049.php`, {
+            method: 'POST',
+            body: JSON.stringify({ step: 'DOWNLOAD', act: acts[0] }),
+          }, true)) as Ssw0049Response;
+
+          if (reqId !== req0049Ref.current) return;
+          if (!dl?.success || (dl as any).result !== 'data') {
+            toast.error((dl as any)?.message || 'Falha ao baixar/processar o SSW0049.');
+            return;
+          }
+
+          setData0049((dl as any).data || null);
+          setStatus0049('Concluído');
+          return;
+        }
+
+        toast.error('Resposta inesperada no POLL do SSW0049.');
+        return;
+      }
+
+      toast.error('Timeout aguardando o SSW0049.');
+    } finally {
+      if (reqId === req0049Ref.current) setLoading0049(false);
+    }
+  }, [clienteGrupo.cnpj, clientePagador.cnpj, periodoFim, periodoIni, periodoTipo, sitFatura]);
+
+
+  const carregar0103 = async () => {
+    setLoading0103(true);
+    try {
+      const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`, { method: 'GET' }, true);
+      if (!res?.success) {
+        toast.error(res?.message || 'Falha ao carregar SSW0103.');
+        return;
+      }
+      setData0103(res);
+      toast.success(`SSW0103 carregado: ${Number(res?.totals?.ctes || 0)} CT-es.`);
+    } finally {
+      setLoading0103(false);
+    }
+  };
+
+  const normalizedFaturas = useMemo(() => {
+    const base = data0049?.faturas || [];
+    return base.map((f) => {
+      const vencTs = parseDateBr(f.vencimento);
+      const saldo = Number(f.saldo) || 0;
+      const vlrFatur = Number(f.vlr_fatur) || 0;
+      const pago = Number(f.vlr_pago) || 0;
+      const venc0 = vencTs !== null ? new Date(vencTs).setHours(0, 0, 0, 0) : null;
+      const overdue = saldo > 0 && venc0 !== null && venc0 < today0;
+      const dueSoon = saldo > 0 && venc0 !== null && venc0 >= today0 && venc0 <= today0 + 3 * 86400000;
+      return { ...f, _vencTs0: venc0, _saldo: saldo, _vlrFatur: vlrFatur, _pago: pago, _overdue: overdue, _dueSoon: dueSoon };
+    });
+  }, [data0049, today0]);
+
+  const filteredFaturas = useMemo(() => {
+    let baseList: any[] = normalizedFaturas as any[];
+    if (quickView === 'abertas') baseList = baseList.filter((f) => (Number(f._saldo) || 0) > 0);
+    if (quickView === 'vencidas') baseList = baseList.filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
+    if (quickView === 'vence3d') baseList = baseList.filter((f) => f._dueSoon && (Number(f._saldo) || 0) > 0);
+    const q = tableSearch.trim().toUpperCase();
+    if (!q) return baseList;
+    return baseList.filter((f: any) => {
+      const hay = [
+        f.fatura,
+        f.cnpj,
+        f.cliente,
+        f.tipo_cobranca,
+        f.banco_carteira,
+        f.periodicidade,
+        f.fil,
+        f.emissao,
+        f.vencimento,
+        f.pagamento,
+        f.situacao,
+        f.unidade_responsavel,
+        f.vendedor,
+        f.ultima_ocorrencia,
+      ]
+        .join(' ')
+        .toUpperCase();
+      return hay.includes(q);
+    });
+  }, [normalizedFaturas, quickView, tableSearch]);
+
+  const kpis = useMemo(() => {
+    const base = {
+      faturas: filteredFaturas.length,
+      ctes: 0,
+      valorFaturado: 0,
+      pago: 0,
+      aReceber: 0,
+      atrasado: 0,
+      noPrazo: 0,
+      dueSoon: 0,
+    };
+    for (const f of filteredFaturas as any[]) {
+      base.valorFaturado += Number(f._vlrFatur) || 0;
+      base.pago += Number(f._pago) || 0;
+      const saldo = Number(f._saldo) || 0;
+      if (saldo > 0) base.aReceber += saldo;
+      if (saldo > 0 && f._overdue) base.atrasado += saldo;
+      if (saldo > 0 && !f._overdue) base.noPrazo += saldo;
+      if (saldo > 0 && f._dueSoon) base.dueSoon += saldo;
+      base.ctes += Array.isArray(f.ctes) ? f.ctes.length : 0;
+    }
+    const inad = base.aReceber > 0 ? (base.atrasado / base.aReceber) * 100 : 0;
+    return { ...base, inadimplenciaPct: inad };
+  }, [filteredFaturas]);
+
+  const aReceberPorUnidade = useMemo(() => {
+    const by: Record<string, { name: string; value: number }> = {};
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      if (saldo <= 0) continue;
+      const key = String(f.fil || f.unidade_responsavel || '—').trim() || '—';
+      if (!by[key]) by[key] = { name: key, value: 0 };
+      by[key].value += saldo;
+    }
+    return Object.values(by).sort((a, b) => b.value - a.value).slice(0, 12);
+  }, [filteredFaturas]);
+
+  const aReceberPorTipoCobranca = useMemo(() => {
+    const by: Record<string, { name: string; value: number }> = {};
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      if (saldo <= 0) continue;
+      const key = String(f.tipo_cobranca || '—').trim() || '—';
+      if (!by[key]) by[key] = { name: key, value: 0 };
+      by[key].value += saldo;
+    }
+    return Object.values(by).sort((a, b) => b.value - a.value);
+  }, [filteredFaturas]);
+
+  const topPagadoresAReceber = useMemo(() => {
+    const by: Record<string, { name: string; cnpj: string; value: number; count: number; vencidas: number; vence3d: number }> = {};
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      if (saldo <= 0) continue;
+      const cnpj = String(f.cnpj || '').trim();
+      const nome = String(f.cliente || '').trim() || cnpj || '—';
+      const key = cnpj ? `${cnpj}|${nome}` : nome;
+      if (!by[key]) by[key] = { name: nome, cnpj, value: 0, count: 0, vencidas: 0, vence3d: 0 };
+      by[key].value += saldo;
+      by[key].count += 1;
+      if (f._overdue) by[key].vencidas += saldo;
+      if (f._dueSoon) by[key].vence3d += saldo;
+    }
+    return Object.values(by).sort((a, b) => b.value - a.value).slice(0, 12);
+  }, [filteredFaturas]);
+
+  const topPagadoresVencidos = useMemo(() => {
+    return [...topPagadoresAReceber].sort((a, b) => (b.vencidas || 0) - (a.vencidas || 0)).slice(0, 12);
+  }, [topPagadoresAReceber]);
+
+  const funilValores = useMemo(() => {
+    const aFaturar = Number(data0103?.totals?.frete_total) || 0;
+    const recebido = Number(kpis.pago) || 0;
+    const aberto = Number(kpis.aReceber) || 0;
+    const atrasado = Number(kpis.atrasado) || 0;
+    return [
+      { name: 'Recebido', value: recebido, fill: '#16a34a' },
+      { name: 'A receber', value: aberto, fill: '#2563eb' },
+      { name: 'Atrasado', value: atrasado, fill: '#ef4444' },
+      { name: 'A faturar', value: aFaturar, fill: '#f97316' },
+    ];
+  }, [data0103, kpis]);
+
+  const aFaturarByDestino = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const by: Record<string, number> = {};
+    for (const r of rows) {
+      const key = String(r.dest || '—').trim() || '—';
+      by[key] = (by[key] || 0) + (Number(r.frete) || 0);
+    }
+    return Object.entries(by)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12);
+  }, [data0103]);
+
+  const aFaturarByPagador = useMemo(() => {
+    const rows = data0103?.rows || [];
+    const by: Record<string, number> = {};
+    for (const r of rows) {
+      const key = String(r.pagador || '—').trim() || '—';
+      by[key] = (by[key] || 0) + (Number(r.frete) || 0);
+    }
+    return Object.entries(by)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12);
+  }, [data0103]);
+
+  const aFaturarConcentracaoTop5 = useMemo(() => {
+    const rows = aFaturarByPagador.slice(0, 5);
+    const top5 = rows.reduce((acc, r) => acc + (Number(r.value) || 0), 0);
+    const total = Number(data0103?.totals?.frete_total) || 0;
+    return total > 0 ? (top5 / total) * 100 : 0;
+  }, [aFaturarByPagador, data0103]);
+
+  const previsaoRecebimento30d = useMemo(() => {
+    const byDay: Record<string, number> = {};
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      if (saldo <= 0) continue;
+      const ts = f._vencTs0;
+      if (!ts || ts < today0 || ts > today0 + 30 * 86400000) continue;
+      const dt = new Date(ts);
+      const key = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+      byDay[key] = (byDay[key] || 0) + saldo;
+    }
+    const points = Object.entries(byDay).map(([name, value]) => ({ name, value }));
+    const parseKey = (k: string) => {
+      const m = k.match(/^(\d{2})\/(\d{2})$/);
+      if (!m) return 0;
+      const dd = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      const dt = new Date(new Date().getFullYear(), mm - 1, dd, 12, 0, 0, 0);
+      return dt.getTime();
+    };
+    points.sort((a, b) => parseKey(a.name) - parseKey(b.name));
+    let acc = 0;
+    return points.map((p) => {
+      acc += p.value;
+      return { ...p, acumulado: acc };
+    });
+  }, [filteredFaturas, today0]);
+
+  const agingBuckets = useMemo(() => {
+    const bucketsReceber = [
+      { key: 'Hoje', min: 0, max: 0 },
+      { key: '1-2', min: 1, max: 2 },
+      { key: '3-5', min: 3, max: 5 },
+      { key: '6-10', min: 6, max: 10 },
+      { key: '11-15', min: 11, max: 15 },
+      { key: '16-20', min: 16, max: 20 },
+      { key: '21-30', min: 21, max: 30 },
+      { key: '31+', min: 31, max: 9999 },
+    ];
+    const bucketsVenc = [
+      { key: '1-15', min: 1, max: 15 },
+      { key: '16-30', min: 16, max: 30 },
+      { key: '31-60', min: 31, max: 60 },
+      { key: '61-90', min: 61, max: 90 },
+      { key: '91-180', min: 91, max: 180 },
+      { key: '181+', min: 181, max: 9999 },
+    ];
+    const rec: Record<string, number> = {};
+    const venc: Record<string, number> = {};
+    for (const b of bucketsReceber) rec[b.key] = 0;
+    for (const b of bucketsVenc) venc[b.key] = 0;
+
+    for (const f of filteredFaturas as any[]) {
+      const saldo = Number(f._saldo) || 0;
+      const ts = f._vencTs0;
+      if (!ts || saldo <= 0) continue;
+      const days = Math.floor((ts - today0) / 86400000);
+      if (days >= 0) {
+        const b = bucketsReceber.find((x) => days >= x.min && days <= x.max);
+        if (b) rec[b.key] += saldo;
+      } else {
+        const od = Math.abs(days);
+        const b = bucketsVenc.find((x) => od >= x.min && od <= x.max);
+        if (b) venc[b.key] += saldo;
+      }
+    }
+
+    return {
+      aReceber: bucketsReceber.map((b) => ({ name: b.key, value: rec[b.key] || 0 })),
+      vencidos: bucketsVenc.map((b) => ({ name: b.key, value: venc[b.key] || 0 })),
+    };
+  }, [filteredFaturas, today0]);
+
+  return (
+    <DashboardLayout
+      title="CONTAS A RECEBER"
+      description="Painel em tempo real a partir do SSW (ssw0103 e ssw0049)"
+      headerActions={
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="w-full sm:w-[170px]">
+            <div className="text-xs text-muted-foreground mb-1">Período de vencimento</div>
+            <Select value={anoVencimento} onValueChange={setAnoVencimento}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+              <div className="w-full sm:w-[170px]">
+                <div className="text-xs text-muted-foreground mb-1">Período (0049)</div>
+                <Select value={periodoTipo} onValueChange={(v) => setPeriodoTipo(v as any)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="V">Vencimento</SelectItem>
+                    <SelectItem value="E">Emissão</SelectItem>
+                    <SelectItem value="L">Liquidação</SelectItem>
+                    <SelectItem value="X">Cancelamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full sm:w-[150px]">
+                <div className="text-xs text-muted-foreground mb-1">Início</div>
+                <Input className="h-9" type="date" value={periodoIni} onChange={(e) => setPeriodoIni(e.target.value)} />
+              </div>
+              <div className="w-full sm:w-[150px]">
+                <div className="text-xs text-muted-foreground mb-1">Fim</div>
+                <Input className="h-9" type="date" value={periodoFim} onChange={(e) => setPeriodoFim(e.target.value)} />
+              </div>
+
+              <div className="w-full sm:w-[230px]">
+                <div className="text-xs text-muted-foreground mb-1">Situação (0049)</div>
+                <Select value={sitFatura} onValueChange={(v) => setSitFatura(v as any)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Situação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="T">Todas menos canceladas</SelectItem>
+                    <SelectItem value="P">Pendentes</SelectItem>
+                    <SelectItem value="L">Liquidadas</SelectItem>
+                    <SelectItem value="E">Perdidas</SelectItem>
+                    <SelectItem value="C">Canceladas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-end gap-2">
+              {loading0049 ? (
+                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {status0049 || 'Processando...'}
+                </Badge>
+              ) : status0049 ? (
+                <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{status0049}</Badge>
+              ) : null}
+              <Button onClick={carregar0049} disabled={loading0049} className="h-9 gap-2">
+                {loading0049 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Atualizar 0049
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Pagador (CNPJ)</Label>
+              <BuscadorClientes
+                selectedNome={clientePagador.nome}
+                onSelect={(c) => setClientePagador({ cnpj: c.cnpj || '', nome: c.nome || '' })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Grupo (CNPJ principal)</Label>
+              <BuscadorClientes
+                selectedNome={clienteGrupo.nome}
+                onSelect={(c) => setClienteGrupo({ cnpj: c.cnpj || '', nome: c.nome || '' })}
+              />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+        <div className="flex items-center justify-between gap-3">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
+            <TabsTrigger value="visao_geral">Visão geral</TabsTrigger>
+            <TabsTrigger value="a_receber">A receber</TabsTrigger>
+            <TabsTrigger value="aging_a_receber">Aging · A receber</TabsTrigger>
+            <TabsTrigger value="faturas_vencidas">Faturas vencidas</TabsTrigger>
+            <TabsTrigger value="aging_vencidos">Aging · Vencidos</TabsTrigger>
+            <TabsTrigger value="a_faturar">A faturar</TabsTrigger>
+          </TabsList>
+          <Badge className="hidden lg:inline-flex bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {`Ano ${anoVencimento}`}
+          </Badge>
+        </div>
+
+        <TabsContent value="visao_geral" className="mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+            <div className="text-xs text-muted-foreground">Visão rápida:</div>
+            <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  quickView === 'todas'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => setQuickView('todas')}
+                disabled={loading0049}
+              >
+                Todas
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                  quickView === 'abertas'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => setQuickView('abertas')}
+                disabled={loading0049}
+              >
+                Abertas
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                  quickView === 'vencidas'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => setQuickView('vencidas')}
+                disabled={loading0049}
+              >
+                Vencidas
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                  quickView === 'vence3d'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => setQuickView('vence3d')}
+                disabled={loading0049}
+              >
+                Vence 3d
+              </button>
+            </div>
+          </div>
+          {!data0049 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver os indicadores.</CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Valor faturado</div>
+                    <div className="text-2xl font-bold">{formatCurrency(kpis.valorFaturado)}</div>
+                    <div className="text-xs text-muted-foreground">{`${formatNumber(kpis.faturas)} fatura(s)`}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Recebido</div>
+                    <div className="text-2xl font-bold">{formatCurrency(kpis.pago)}</div>
+                    <div className="text-xs text-muted-foreground">{`${formatNumber(kpis.ctes)} CT-e(s)`}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">A receber</div>
+                    <div className="text-2xl font-bold">{formatCurrency(kpis.aReceber)}</div>
+                    <div className="text-xs text-muted-foreground">{`No prazo: ${formatCurrency(kpis.noPrazo)}`}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Atrasado</div>
+                    <div className="text-2xl font-bold">{formatCurrency(kpis.atrasado)}</div>
+                    <div className="text-xs text-muted-foreground">{`Inadimplência: ${formatNumber(kpis.inadimplenciaPct, 2)}%`}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">Vence em 3 dias</div>
+                    <div className="text-2xl font-bold">{formatCurrency(kpis.dueSoon)}</div>
+                    <div className="text-xs text-muted-foreground">Radar de risco</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-xs text-muted-foreground">A faturar (0103)</div>
+                    <div className="text-2xl font-bold">{formatCurrency(data0103?.totals?.frete_total || 0)}</div>
+                    <div className="text-xs text-muted-foreground">{`${formatNumber(data0103?.totals?.ctes || 0)} CT-e(s)`}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card className="lg:col-span-3">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-base">Previsão de recebimento (30 dias)</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 gap-2"
+                        onClick={() => {
+                          const base = filteredFaturas.filter((f: any) => (Number(f._saldo) || 0) > 0 && !f._overdue);
+                          const csv = buildCsvFaturas(base as any);
+                          const stamp = new Date();
+                          const pad = (n: number) => String(n).padStart(2, '0');
+                          downloadCsv(
+                            `contas_receber_faturas_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`,
+                            csv
+                          );
+                        }}
+                      >
+                        <Download className="w-4 h-4" />
+                        CSV
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    {previsaoRecebimento30d.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados no horizonte de 30 dias</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={previsaoRecebimento30d} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Area type="monotone" dataKey="value" name="Saldo no dia" stroke="#16a34a" fill="#16a34a" fillOpacity={0.18} />
+                          <Line type="monotone" dataKey="acumulado" name="Acumulado" stroke="#2563eb" strokeWidth={2} dot={false} />
+                          <Legend />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Alertas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {kpis.dueSoon > 0 ? (
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-300 mt-0.5" />
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">Vencendo em 3 dias</div>
+                            <div className="text-xs text-amber-800/80 dark:text-amber-200/80">{formatCurrency(kpis.dueSoon)}</div>
+                            <button
+                              className="text-xs underline text-amber-800 dark:text-amber-200 mt-1"
+                              onClick={() => abrirDrill('Vencendo em 3 dias', (filteredFaturas as any[]).filter((f) => f._dueSoon))}
+                            >
+                              Ver faturas
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">Nenhum alerta ativo.</div>
+                    )}
+
+                    {kpis.atrasado > 0 ? (
+                      <div className="rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3">
+                        <div className="text-sm font-semibold text-rose-900 dark:text-rose-100">Atrasado</div>
+                        <div className="text-xs text-rose-800/80 dark:text-rose-200/80">{formatCurrency(kpis.atrasado)}</div>
+                        <button
+                          className="text-xs underline text-rose-800 dark:text-rose-200 mt-1"
+                          onClick={() => abrirDrill('Atrasadas', (filteredFaturas as any[]).filter((f) => f._overdue))}
+                        >
+                          Ver faturas
+                        </button>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">A receber por unidade (Top)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    {aReceberPorUnidade.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={aReceberPorUnidade} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                          <YAxis type="category" dataKey="name" width={50} />
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Bar
+                            dataKey="value"
+                            name="A receber"
+                            fill="#2563eb"
+                            onClick={(d: any) => {
+                              const key = String(d?.name ?? '').trim();
+                              if (!key) return;
+                              abrirDrill(`A receber · Unidade ${key}`, (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && (f.fil || f.unidade_responsavel) === key));
+                            }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">A receber por tipo de cobrança</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    {aReceberPorTipoCobranca.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Legend verticalAlign="bottom" height={36} />
+                          <Pie data={aReceberPorTipoCobranca.slice(0, 8)} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} stroke="none">
+                            {aReceberPorTipoCobranca.slice(0, 8).map((_, i) => (
+                              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card className="lg:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top pagadores · A receber</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[360px]">
+                    {topPagadoresAReceber.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={topPagadoresAReceber} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Bar
+                            dataKey="value"
+                            name="A receber"
+                            fill="#2563eb"
+                            onClick={(d: any) => {
+                              const cnpj = String(d?.cnpj ?? '').trim();
+                              const nome = String(d?.name ?? '').trim();
+                              const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && (cnpj ? String(f.cnpj || '').trim() === cnpj : String(f.cliente || '').trim() === nome));
+                              abrirDrill(`A receber · ${nome}`, rows);
+                            }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Radar de risco</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                      <div className="text-xs text-muted-foreground">Top vencidos (clientes)</div>
+                      <div className="mt-2 space-y-2">
+                        {topPagadoresVencidos.slice(0, 5).map((x) => (
+                          <button
+                            key={`${x.cnpj}-${x.name}`}
+                            className="w-full flex items-center justify-between text-left text-sm"
+                            onClick={() => {
+                              const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && f._overdue && (x.cnpj ? String(f.cnpj || '').trim() === x.cnpj : String(f.cliente || '').trim() === x.name));
+                              abrirDrill(`Vencidos · ${x.name}`, rows);
+                            }}
+                          >
+                            <span className="truncate pr-3">{x.name}</span>
+                            <span className="font-mono text-rose-600 dark:text-rose-400">{formatCurrency(x.vencidas || 0)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                      <div className="text-xs text-muted-foreground">Funil (visão dinâmica)</div>
+                      <div className="h-[180px] mt-2">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={funilValores} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                            <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                            <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                            <Bar dataKey="value" name="Valor" stroke="none">
+                              {funilValores.map((p, i) => (
+                                <Cell key={i} fill={(p as any).fill} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="a_receber" className="mt-4">
+          {!data0049 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-base">Faturas (busca e exportação)</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-2"
+                      onClick={() => {
+                        const csv = buildCsvFaturas(filteredFaturas as any);
+                        const stamp = new Date();
+                        const pad = (n: number) => String(n).padStart(2, '0');
+                        downloadCsv(
+                          `contas_receber_faturas_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`,
+                          csv
+                        );
+                      }}
+                    >
+                      <Download className="w-4 h-4" />
+                      CSV
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        className="pl-9"
+                        placeholder="Buscar: fatura, CNPJ, cliente, unidade, situação, ocorrência..."
+                        value={tableSearch}
+                        onChange={(e) => setTableSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">{`${formatNumber(filteredFaturas.length)} fatura(s)`}</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left border-b">
+                        <th className="py-2 pr-3">Fatura</th>
+                        <th className="py-2 pr-3">Cliente</th>
+                        <th className="py-2 pr-3">Unid</th>
+                        <th className="py-2 pr-3">Vencimento</th>
+                        <th className="py-2 pr-3 text-right">Valor</th>
+                        <th className="py-2 pr-3 text-right">Pago</th>
+                        <th className="py-2 pr-3 text-right">Saldo</th>
+                        <th className="py-2 pr-3">Situação</th>
+                        <th className="py-2 pr-3 text-right">CT-es</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(filteredFaturas as any[]).slice(0, 300).map((f) => (
+                        <tr key={f.fatura} className="border-b last:border-0">
+                          <td className="py-2 pr-3 font-mono">{f.fatura}</td>
+                          <td className="py-2 pr-3">
+                            <div className="font-medium">{f.cliente}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
+                          </td>
+                          <td className="py-2 pr-3 font-mono">{f.fil || f.unidade_responsavel}</td>
+                          <td className="py-2 pr-3 font-mono">
+                            <span className={f._overdue ? 'text-rose-600 dark:text-rose-400 font-semibold' : ''}>{f.vencimento}</span>
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._vlrFatur)}</td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._pago)}</td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._saldo)}</td>
+                          <td className="py-2 pr-3">{f.situacao || '-'}</td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="aging_a_receber" className="mt-4">
+          {!data0049 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Aging · A receber (por vencimento)</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={agingBuckets.aReceber} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                    <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                    <Bar
+                      dataKey="value"
+                      name="A receber"
+                      fill="#16a34a"
+                      onClick={(d: any) => {
+                        const key = String(d?.name ?? '');
+                        const rows = (filteredFaturas as any[]).filter((f) => (Number(f._saldo) || 0) > 0 && !f._overdue);
+                        abrirDrill(`A receber · Faixa ${key}`, rows);
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="faturas_vencidas" className="mt-4">
+          {!data0049 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-base">Faturas vencidas (saldo &gt; 0)</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-2"
+                    onClick={() => {
+                      const rows = (filteredFaturas as any[]).filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
+                      const csv = buildCsvFaturas(rows as any);
+                      const stamp = new Date();
+                      const pad = (n: number) => String(n).padStart(2, '0');
+                      downloadCsv(
+                        `contas_receber_vencidas_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(stamp.getMinutes())}.csv`,
+                        csv
+                      );
+                    }}
+                  >
+                    <Download className="w-4 h-4" />
+                    CSV
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-3">Fatura</th>
+                      <th className="py-2 pr-3">Cliente</th>
+                      <th className="py-2 pr-3">Unid</th>
+                      <th className="py-2 pr-3">Vencimento</th>
+                      <th className="py-2 pr-3 text-right">Saldo</th>
+                      <th className="py-2 pr-3">Ocorrência</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(filteredFaturas as any[])
+                      .filter((f) => f._overdue && (Number(f._saldo) || 0) > 0)
+                      .slice(0, 400)
+                      .map((f) => (
+                        <tr key={f.fatura} className="border-b last:border-0">
+                          <td className="py-2 pr-3 font-mono">{f.fatura}</td>
+                          <td className="py-2 pr-3">
+                            <div className="font-medium">{f.cliente}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
+                          </td>
+                          <td className="py-2 pr-3 font-mono">{f.fil || f.unidade_responsavel}</td>
+                          <td className="py-2 pr-3 font-mono text-rose-600 dark:text-rose-400 font-semibold">{f.vencimento}</td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f._saldo)}</td>
+                          <td className="py-2 pr-3 max-w-[520px] truncate" title={f.ultima_ocorrencia || ''}>
+                            {f.ultima_ocorrencia || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="aging_vencidos" className="mt-4">
+          {!data0049 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">Carregue o SSW0049 para ver esta visão.</CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Aging · Vencidos</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[340px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={agingBuckets.vencidos} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                    <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                    <Bar
+                      dataKey="value"
+                      name="Vencidos"
+                      fill="#ef4444"
+                      onClick={(d: any) => {
+                        const key = String(d?.name ?? '');
+                        const rows = (filteredFaturas as any[]).filter((f) => f._overdue && (Number(f._saldo) || 0) > 0);
+                        abrirDrill(`Vencidos · Faixa ${key}`, rows);
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="a_faturar" className="mt-4">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-base">CT-es disponíveis para faturamento</CardTitle>
+                  <Button onClick={carregar0103} disabled={loading0103} className="gap-2">
+                    {loading0103 ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Atualizar agora (SSW0103)
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  Base: ssw0103 (CT-es a prazo não faturados). A consulta é em tempo real e usa sempre a data de ontem como referência.
+                </div>
+              </CardContent>
+            </Card>
+
+            {!data0103 ? null : (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card className="lg:col-span-3">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Resumo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                        <div className="text-xs text-muted-foreground">CT-es</div>
+                        <div className="text-2xl font-bold">{Number(data0103.totals.ctes || 0).toLocaleString('pt-BR')}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                        <div className="text-xs text-muted-foreground">Frete total</div>
+                        <div className="text-2xl font-bold">{formatCurrency(data0103.totals.frete_total || 0)}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                        <div className="text-xs text-muted-foreground">Atualização</div>
+                        <div className="text-sm font-semibold">{data0103.meta.updated_at || data0103.meta.gerado_em}</div>
+                        <div className="text-xs text-muted-foreground">{`Ref. fim (ontem): ${data0103.meta.ontem_dmy}`}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Arquivo</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground space-y-1">
+                    <div>{data0103.meta.filename}</div>
+                    <div>{data0103.meta.act}</div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {!data0103 ? null : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">A faturar · Top destinos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    {aFaturarByDestino.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={aFaturarByDestino} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                          <YAxis type="category" dataKey="name" width={55} />
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Bar dataKey="value" name="Frete" fill="#f97316" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle className="text-base">A faturar · Top pagadores</CardTitle>
+                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{`Top 5 = ${formatNumber(aFaturarConcentracaoTop5, 2)}%`}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[320px]">
+                    {aFaturarByPagador.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                          <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 11 }} />
+                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v) || 0)} />
+                          <Bar dataKey="value" name="Frete" fill="#f97316" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {!data0103 ? null : (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Lista (CT-es)</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left border-b">
+                        <th className="py-2 pr-3">CTRC</th>
+                        <th className="py-2 pr-3">CT-e</th>
+                        <th className="py-2 pr-3">Pagador</th>
+                        <th className="py-2 pr-3">Dest</th>
+                        <th className="py-2 pr-3 text-right">Frete</th>
+                        <th className="py-2 pr-3">Emissão</th>
+                        <th className="py-2 pr-3">Prev. Entrega</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data0103.rows.slice(0, 300).map((r, i) => (
+                        <tr key={`${r.ctrc}-${r.numero_cte}-${i}`} className="border-b last:border-0">
+                          <td className="py-2 pr-3 font-mono">{r.ctrc}</td>
+                          <td className="py-2 pr-3 font-mono">{r.numero_cte}</td>
+                          <td className="py-2 pr-3">
+                            <div className="font-medium">{r.pagador}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{r.cnpj_pagador}</div>
+                          </td>
+                          <td className="py-2 pr-3 font-mono">{r.dest}</td>
+                          <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete)}</td>
+                          <td className="py-2 pr-3 font-mono">{r.emissao}</td>
+                          <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="sm:max-w-[1050px] h-[calc(100vh-120px)] overflow-hidden flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>{drillTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b">
+                    <th className="py-2 pr-3">Fatura</th>
+                    <th className="py-2 pr-3">Cliente</th>
+                    <th className="py-2 pr-3">Vencimento</th>
+                    <th className="py-2 pr-3 text-right">Saldo</th>
+                    <th className="py-2 pr-3 text-right">Valor</th>
+                    <th className="py-2 pr-3">Situação</th>
+                    <th className="py-2 pr-3 text-right">CT-es</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drillRows.slice(0, 600).map((f: any) => (
+                    <tr key={f.fatura} className="border-b last:border-0">
+                      <td className="py-2 pr-3 font-mono">{f.fatura}</td>
+                      <td className="py-2 pr-3">
+                        <div className="font-medium">{f.cliente}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{f.cnpj}</div>
+                      </td>
+                      <td className="py-2 pr-3 font-mono">{f.vencimento}</td>
+                      <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.saldo)}</td>
+                      <td className="py-2 pr-3 text-right font-mono">{formatCurrency(f.vlr_fatur)}</td>
+                      <td className="py-2 pr-3">{f.situacao || '-'}</td>
+                      <td className="py-2 pr-3 text-right font-mono">{formatNumber(f.ctes?.length || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}
