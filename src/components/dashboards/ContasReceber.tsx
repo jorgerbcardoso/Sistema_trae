@@ -767,15 +767,12 @@ export function ContasReceber() {
       totalReceber: 0,
       totalVencer: 0,
       totalAtrasado: 0,
-      totalParcial: 0,
       countReceber: 0,
       countVencer: 0,
       countAtrasado: 0,
-      countParcial: 0,
     };
     for (const f of filteredFaturas as any[]) {
       const saldo = Number(f._saldo) || 0;
-      const pago = Number(f._pago) || 0;
       if (saldo <= 0) continue;
       base.totalReceber += saldo;
       base.countReceber += 1;
@@ -785,10 +782,6 @@ export function ContasReceber() {
       } else {
         base.totalVencer += saldo;
         base.countVencer += 1;
-      }
-      if (pago > 0) {
-        base.totalParcial += saldo;
-        base.countParcial += 1;
       }
     }
     return base;
@@ -1980,20 +1973,6 @@ export function ContasReceber() {
                     )
                   }
                 />
-                <Tile
-                  label="Saldos parciais"
-                  value={formatCurrency(arCards.totalParcial)}
-                  sub={`${formatNumber(arCards.countParcial)} fatura(s)`}
-                  tone="emerald"
-                  Icon={HandCoins}
-                  onClick={() =>
-                    abrirDrill(
-                      'Saldos parciais',
-                      (filteredFaturas as any[]).filter((f) => (Number((f as any)._saldo) || 0) > 0 && (Number((f as any)._pago) || 0) > 0),
-                      'faturas'
-                    )
-                  }
-                />
               </div>
 
               <Card>
@@ -2057,9 +2036,9 @@ export function ContasReceber() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="max-h-[70vh] overflow-auto">
+                  <div className="max-h-[140vh] overflow-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                      <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
                         <tr className="text-left border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           <th className="py-2 pr-3 pl-4">
                             <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleArSort('fatura')}>
@@ -2139,7 +2118,7 @@ export function ContasReceber() {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900/60">
+                      <tfoot className="sticky bottom-0 z-10 bg-slate-50 dark:bg-slate-900">
                         <tr className="border-t border-slate-200 dark:border-slate-800">
                           <td className="py-2 pr-3 pl-4 font-semibold" colSpan={4}>
                             Total
