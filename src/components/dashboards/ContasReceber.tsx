@@ -231,6 +231,20 @@ function unitSigla3(v: any): string {
   return s.slice(0, 3) || '—';
 }
 
+function afUnitSigla3(row: any): string {
+  const candidates = [row?.cob, row?.unidade_cobranca, row?.filial_cobranca, row?.unidade_responsavel, row?.em];
+  for (const c of candidates) {
+    const raw = String(c ?? '').trim();
+    if (!raw) continue;
+    const up = raw.toUpperCase();
+    const sig = up.slice(0, 3);
+    if (/^[A-Z]{3}$/.test(sig)) return sig;
+    const norm = unitSigla3(raw);
+    if (norm !== '—' && /^[A-Z0-9]{3}$/.test(norm)) return norm;
+  }
+  return '—';
+}
+
 function SituacaoBadge({ value }: { value: any }) {
   const s = normSituacaoLabel(value);
   if (s === 'ATRASADA') return <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">ATRASADA</Badge>;
@@ -398,7 +412,7 @@ export function ContasReceber() {
   const [arSortDir, setArSortDir] = useState<'asc' | 'desc'>('desc');
   const [arPage, setArPage] = useState(1);
   const [afSearch, setAfSearch] = useState('');
-  const [afSortKey, setAfSortKey] = useState<'ctrc' | 'cte' | 'pagador' | 'dest' | 'frete' | 'emissao' | 'prev'>('frete');
+  const [afSortKey, setAfSortKey] = useState<'ctrc' | 'cte' | 'pagador' | 'unid' | 'frete' | 'emissao' | 'prev'>('frete');
   const [afSortDir, setAfSortDir] = useState<'asc' | 'desc'>('desc');
   const [afPage, setAfPage] = useState(1);
 
@@ -477,6 +491,8 @@ export function ContasReceber() {
       'CNPJ Pagador',
       'Filial cobrança',
       'Unid cobrança',
+      'COB',
+      'Unid (3)',
       'Dest',
       'Frete',
       'Emissão',
@@ -496,6 +512,8 @@ export function ContasReceber() {
           r.cnpj_pagador,
           r.filial_cobranca,
           r.unidade_cobranca,
+          r.cob,
+          afUnitSigla3(r),
           r.dest,
           formatCurrency(Number(r.frete) || 0),
           r.emissao,
@@ -1343,7 +1361,7 @@ export function ContasReceber() {
     const by: Record<string, number> = {};
     const rows = data0103?.rows || [];
     for (const r of rows as any[]) {
-      const k = unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—');
+      const k = afUnitSigla3(r);
       by[k] = (by[k] || 0) + (Number((r as any).frete) || 0);
     }
     return Object.entries(by)
@@ -1417,7 +1435,7 @@ export function ContasReceber() {
     const emissores = new Set<string>();
     for (const r of rows) {
       pagadores.add(normTextKey((r as any).pagador || '—'));
-      unidades.add(unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—'));
+      unidades.add(afUnitSigla3(r));
       emissores.add(unitSigla3((r as any).em || '—'));
     }
     const topPagador = aFaturarByPagador[0] || null;
@@ -1457,9 +1475,7 @@ export function ContasReceber() {
             r?.numero_cte,
             r?.pagador,
             r?.cnpj_pagador,
-            r?.dest,
-            r?.filial_cobranca,
-            r?.unidade_cobranca,
+            r?.cob,
             r?.unidade_responsavel,
             r?.emissao,
             r?.prev_entrega,
@@ -1476,7 +1492,7 @@ export function ContasReceber() {
       if (afSortKey === 'ctrc') return cmpText(normTextKey(a?.ctrc), normTextKey(b?.ctrc));
       if (afSortKey === 'cte') return cmpText(normTextKey(a?.numero_cte), normTextKey(b?.numero_cte));
       if (afSortKey === 'pagador') return cmpText(normTextKey(a?.pagador), normTextKey(b?.pagador));
-      if (afSortKey === 'dest') return cmpText(normTextKey(a?.dest), normTextKey(b?.dest));
+      if (afSortKey === 'unid') return cmpText(afUnitSigla3(a), afUnitSigla3(b));
       if (afSortKey === 'emissao') return ((parseDateBr(String(a?.emissao || '')) ?? 0) - (parseDateBr(String(b?.emissao || '')) ?? 0)) * dir;
       if (afSortKey === 'prev') return ((parseDateBr(String(a?.prev_entrega || '')) ?? 0) - (parseDateBr(String(b?.prev_entrega || '')) ?? 0)) * dir;
       return ((Number(a?.frete) || 0) - (Number(b?.frete) || 0)) * dir;
@@ -1623,7 +1639,7 @@ export function ContasReceber() {
           if (key === 'ctrc') return normTextKey(x?.ctrc);
           if (key === 'cte') return normTextKey(x?.numero_cte);
           if (key === 'pagador') return normTextKey(x?.pagador);
-          if (key === 'dest') return normTextKey(x?.dest);
+          if (key === 'dest') return afUnitSigla3(x);
           if (key === 'emissao') return parseDateBr(String(x?.emissao || '')) ?? 0;
           if (key === 'prev') return parseDateBr(String(x?.prev_entrega || '')) ?? 0;
           return normTextKey(x?.ctrc);
@@ -2887,9 +2903,7 @@ export function ContasReceber() {
                               onClick={(d: any) => {
                                 const key = String(d?.name ?? '').trim();
                                 if (!key) return;
-                                const rows = (data0103?.rows || []).filter((r) =>
-                                  unitSigla3((r as any).unidade_cobranca || (r as any).filial_cobranca || '—') === key
-                                );
+                                const rows = (data0103?.rows || []).filter((r) => afUnitSigla3(r) === key);
                                 abrirDrill(`A faturar · Unidade ${key}`, rows as any[], 'ctes0103');
                               }}
                             />
@@ -2963,7 +2977,7 @@ export function ContasReceber() {
                         <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 10 }} barCategoryGap={6}>
+                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }} barCategoryGap={6}>
                             <defs>
                               <linearGradient id="cr_af_pag" x1="0" y1="0" x2="1" y2="0">
                                 <stop offset="0%" stopColor="#dbeafe" />
@@ -2972,7 +2986,7 @@ export function ContasReceber() {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                            <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 12)} interval={0} />
+                            <YAxis type="category" dataKey="name" width={118} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 12)} interval={0} tickMargin={4} />
                             <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
                             <Bar
                               dataKey="value"
@@ -3067,7 +3081,7 @@ export function ContasReceber() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="relative flex-1">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input className="pl-9" placeholder="Buscar: CTRC, CT-e, pagador, CNPJ, destino, chave..." value={afSearch} onChange={(e) => setAfSearch(e.target.value)} />
+                        <Input className="pl-9" placeholder="Buscar: CTRC, CT-e, pagador, CNPJ, COB, chave..." value={afSearch} onChange={(e) => setAfSearch(e.target.value)} />
                       </div>
                       <div className="text-sm text-muted-foreground">{`${formatNumber(aFaturarTotals.totalCtes)} CT-e(s) · ${formatCurrency(
                         aFaturarTotals.totalFrete
@@ -3098,9 +3112,9 @@ export function ContasReceber() {
                                 </button>
                               </th>
                               <th className="py-2 pr-3">
-                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('dest')}>
-                                  <span>Dest</span>
-                                  <SortIndicator active={afSortKey === 'dest'} dir={afSortDir} />
+                                <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleAfSort('unid')}>
+                                  <span>Unid</span>
+                                  <SortIndicator active={afSortKey === 'unid'} dir={afSortDir} />
                                 </button>
                               </th>
                               <th className="py-2 pr-3 text-right">
@@ -3135,7 +3149,7 @@ export function ContasReceber() {
                                 <td className="py-2 pr-3">
                                   <div className="font-medium">{r.pagador}</div>
                                 </td>
-                                <td className="py-2 pr-3 font-mono">{r.dest}</td>
+                                <td className="py-2 pr-3 font-mono">{afUnitSigla3(r)}</td>
                                 <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete)}</td>
                                 <td className="py-2 pr-3 font-mono">{r.emissao}</td>
                                 <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
@@ -3226,7 +3240,7 @@ export function ContasReceber() {
                       </th>
                       <th className="py-2 pr-3">
                         <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleDrillSort('dest')}>
-                          <span>Dest</span>
+                          <span>Unid</span>
                           <SortIndicator active={drillSortKey === 'dest'} dir={drillSortDir} />
                         </button>
                       </th>
@@ -3259,7 +3273,7 @@ export function ContasReceber() {
                           <div className="font-medium">{r.pagador}</div>
                           <div className="text-xs text-muted-foreground font-mono">{r.cnpj_pagador}</div>
                         </td>
-                        <td className="py-2 pr-3 font-mono">{r.dest}</td>
+                        <td className="py-2 pr-3 font-mono">{afUnitSigla3(r)}</td>
                         <td className="py-2 pr-3 text-right font-mono">{formatCurrency(Number(r.frete) || 0)}</td>
                         <td className="py-2 pr-3 font-mono">{r.emissao}</td>
                         <td className="py-2 pr-3 font-mono">{r.prev_entrega}</td>
