@@ -19,12 +19,14 @@ $domain = $auth['domain'];
 // RECEBER PARÂMETROS
 $seq_item = $_GET['seq_item'] ?? null;
 $unidade = $_GET['unidade'] ?? null;
+$all = $_GET['all_estoques'] ?? null;
+$all = is_string($all) ? strtoupper(trim($all)) : $all;
 
 if (!$seq_item) {
     msg('Item não informado', 'error');
 }
 
-if (!$unidade) {
+if (!$unidade && !($all === 'S' || $all === '1' || $all === true)) {
     msg('Unidade não informada', 'error');
 }
 
@@ -45,13 +47,18 @@ $conn = connect();
 $prefix = strtolower($domain) . '_';
 
 // Somar saldo de todas as posições de estoque da unidade
+$params = [$seq_item];
 $query = "SELECT COALESCE(SUM(p.saldo), 0) AS saldo_total
           FROM {$prefix}posicao p
           INNER JOIN {$prefix}estoque e ON p.seq_estoque = e.seq_estoque
-          WHERE p.seq_item = $1
-          AND e.unidade = $2";
+          WHERE p.seq_item = $1";
 
-$result = pg_query_params($conn, $query, [$seq_item, $unidade]);
+if (!($all === 'S' || $all === '1' || $all === true)) {
+    $query .= " AND e.unidade = $2";
+    $params[] = $unidade;
+}
+
+$result = pg_query_params($conn, $query, $params);
 
 if (!$result) {
     msg('Erro ao buscar saldo: ' . pg_last_error($conn), 'error');

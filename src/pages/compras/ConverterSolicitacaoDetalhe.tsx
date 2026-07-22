@@ -23,6 +23,13 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
+import {
   ArrowLeft,
   Loader2,
   CheckCircle,
@@ -86,6 +93,35 @@ interface SaldoEstoque {
   saldo_total: number;
 }
 
+interface EstoqueOption {
+  seq_estoque: number;
+  descricao: string;
+  unidade: string;
+  nro_estoque: string;
+  ativo?: string;
+}
+
+interface PosicaoOption {
+  seq_posicao: number;
+  seq_estoque: number;
+  seq_item: number | null;
+  rua: string;
+  altura: string;
+  coluna: string;
+  saldo: number;
+  localizacao?: string;
+  ativa?: string;
+}
+
+interface AlocacaoSaida {
+  seq_estoque: number;
+  estoque_label: string;
+  seq_posicao: number;
+  posicao_label: string;
+  saldo_posicao: number;
+  quantidade: number;
+}
+
 export default function ConverterSolicitacaoDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -98,6 +134,32 @@ export default function ConverterSolicitacaoDetalhe() {
   const [solicitacao, setSolicitacao] = useState<SolicitacaoCompra | null>(null);
   const [itens, setItens] = useState<ItemSolicitacao[]>([]);
   const [saldosEstoque, setSaldosEstoque] = useState<Map<number, number>>(new Map());
+
+  const [estoquesSaida, setEstoquesSaida] = useState<EstoqueOption[]>([]);
+  const [loadingEstoquesSaida, setLoadingEstoquesSaida] = useState(false);
+  const [posicoesSaida, setPosicoesSaida] = useState<PosicaoOption[]>([]);
+  const [loadingPosicoesSaida, setLoadingPosicoesSaida] = useState(false);
+  const [modalSaidaOpen, setModalSaidaOpen] = useState(false);
+  const [alocItemIndex, setAlocItemIndex] = useState<number | null>(null);
+  const [alocSeqEstoque, setAlocSeqEstoque] = useState('');
+  const [alocSeqPosicao, setAlocSeqPosicao] = useState('');
+  const [alocQuantidade, setAlocQuantidade] = useState('');
+  const [alocacoesByIndex, setAlocacoesByIndex] = useState<Record<number, AlocacaoSaida[]>>({});
+
+  const [resumoOpen, setResumoOpen] = useState(false);
+  const [resumoData, setResumoData] = useState<{
+    seq_solicitacao_compra: number;
+    nro_solicitacao_formatado: string;
+    ordem?: { seq_ordem_compra: number; nro_ordem_compra?: string | number | null } | null;
+    requisicoes: Array<{ seq_requisicao: number; seq_estoque: number; estoque_label: string }>;
+    itens: Array<{
+      descricao: string;
+      qtde_solicitada: number;
+      qtde_comprada: number;
+      qtde_estoque: number;
+      alocacoes: AlocacaoSaida[];
+    }>;
+  } | null>(null);
 
   // ✅ NOVO: Dialog de criação rápida de item
   const [mostrarNovoItemDialog, setMostrarNovoItemDialog] = useState(false);
@@ -159,6 +221,16 @@ export default function ConverterSolicitacaoDetalhe() {
   const [pedidoGerado, setPedidoGerado] = useState<any>(null);
   const [gerandoPedido, setGerandoPedido] = useState(false);
   const [solicitandoAprovacao, setSolicitandoAprovacao] = useState(false);
+
+  const alocItemAtual = useMemo(() => {
+    if (alocItemIndex === null) return null;
+    return itens[alocItemIndex] || null;
+  }, [alocItemIndex, itens]);
+
+  const alocacoesItemAtual = useMemo(() => {
+    if (alocItemIndex === null) return [];
+    return alocacoesByIndex[alocItemIndex] || [];
+  }, [alocItemIndex, alocacoesByIndex]);
 
   useEffect(() => {
     if (id) {
@@ -265,10 +337,8 @@ export default function ConverterSolicitacaoDetalhe() {
         setSaldosEstoque(prev => new Map(prev).set(seqItem, saldoMock));
       } else {
         // BACKEND
-        const unidade = solicitacao?.unidade || user?.unidade_atual || user?.unidade || 'MTZ';
-        
         const data = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/estoque/saldo_item.php?seq_item=${seqItem}&unidade=${unidade}`,
+          `${ENVIRONMENT.apiBaseUrl}/estoque/saldo_item.php?seq_item=${seqItem}&all_estoques=S`,
           { method: 'GET' }
         );
 
@@ -292,6 +362,171 @@ export default function ConverterSolicitacaoDetalhe() {
     }
   };
 
+  const getQtdeEstoqueAlocada = (index: number) => {
+    const alocs = alocacoesByIndex[index] || [];
+    return alocs.reduce((acc, a) => acc + (Number(a.quantidade) || 0), 0);
+  };
+
+  const carregarEstoquesSaida = async () => {
+    if (ENVIRONMENT.isFigmaMake) {
+      setEstoquesSaida([
+        { seq_estoque: 1, descricao: 'ESTOQUE MTZ', unidade: 'MTZ', nro_estoque: '1' },
+        { seq_estoque: 2, descricao: 'ESTOQUE OFICINA', unidade: 'MTZ', nro_estoque: '2' },
+      ]);
+      return;
+    }
+
+    setLoadingEstoquesSaida(true);
+    try {
+      const data = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/estoque/estoques.php?ativo=S`, { method: 'GET' });
+      if (data.success) {
+        setEstoquesSaida((data.data || []).map((e: any) => ({
+          seq_estoque: Number(e.seq_estoque),
+          descricao: String(e.descricao || ''),
+          unidade: String(e.unidade || ''),
+          nro_estoque: String(e.nro_estoque || ''),
+          ativo: e.ativo,
+        })));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar estoques:', error);
+    } finally {
+      setLoadingEstoquesSaida(false);
+    }
+  };
+
+  const carregarPosicoesSaida = async (seqEstoque: number, seqItem: number) => {
+    if (ENVIRONMENT.isFigmaMake) {
+      setPosicoesSaida([
+        {
+          seq_posicao: 101,
+          seq_estoque: seqEstoque,
+          seq_item: seqItem,
+          rua: 'A',
+          altura: '1',
+          coluna: '1',
+          saldo: 10,
+          localizacao: 'RUA A - ALT 1 - COL 1',
+          ativa: 'S',
+        },
+      ]);
+      return;
+    }
+
+    setLoadingPosicoesSaida(true);
+    try {
+      const data = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/estoque/posicoes.php?seq_estoque=${seqEstoque}&seq_item=${seqItem}`,
+        { method: 'GET' }
+      );
+      if (data.success) {
+        const all = (data.data || []).map((p: any) => ({
+          seq_posicao: Number(p.seq_posicao),
+          seq_estoque: Number(p.seq_estoque),
+          seq_item: p.seq_item === null || p.seq_item === undefined ? null : Number(p.seq_item),
+          rua: String(p.rua || ''),
+          altura: String(p.altura || ''),
+          coluna: String(p.coluna || ''),
+          saldo: Number(p.saldo || 0),
+          localizacao: String(p.localizacao || `RUA ${String(p.rua || '').toUpperCase()} - ALT ${String(p.altura || '')} - COL ${String(p.coluna || '')}`),
+          ativa: p.ativa,
+        })) as PosicaoOption[];
+
+        const filtradas = all
+          .filter((p) => p.seq_item === seqItem && (p.ativa ?? 'S') === 'S' && (Number(p.saldo) || 0) > 0)
+          .sort((a, b) => (Number(b.saldo) || 0) - (Number(a.saldo) || 0));
+
+        setPosicoesSaida(filtradas);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar posições:', error);
+    } finally {
+      setLoadingPosicoesSaida(false);
+    }
+  };
+
+  const abrirDialogSaida = async (index: number) => {
+    const item = itens[index];
+    if (!item?.seq_item_selecionado) {
+      toast.error('Selecione o item real antes de usar estoque');
+      return;
+    }
+
+    setAlocItemIndex(index);
+    setAlocSeqEstoque('');
+    setAlocSeqPosicao('');
+    setAlocQuantidade('');
+    setPosicoesSaida([]);
+
+    if (estoquesSaida.length === 0 && !loadingEstoquesSaida) {
+      await carregarEstoquesSaida();
+    }
+
+    setModalSaidaOpen(true);
+  };
+
+  const adicionarAlocacao = async () => {
+    if (alocItemIndex === null) return;
+    const item = itens[alocItemIndex];
+    if (!item?.seq_item_selecionado) {
+      toast.error('Selecione o item real');
+      return;
+    }
+
+    const seqEstoque = parseInt(alocSeqEstoque);
+    const seqPosicao = parseInt(alocSeqPosicao);
+    const quantidade = parseFloat(alocQuantidade);
+
+    if (!seqEstoque || !seqPosicao || !Number.isFinite(quantidade) || quantidade <= 0) {
+      toast.error('Informe estoque, posição e quantidade');
+      return;
+    }
+
+    const pos = posicoesSaida.find((p) => p.seq_posicao === seqPosicao);
+    if (!pos) {
+      toast.error('Posição inválida');
+      return;
+    }
+
+    if (quantidade > (Number(pos.saldo) || 0)) {
+      toast.error('Quantidade excede o saldo da posição');
+      return;
+    }
+
+    const est = estoquesSaida.find((e) => e.seq_estoque === seqEstoque);
+    const estoqueLabel = est ? `${est.unidade}${String(est.nro_estoque).padStart(2, '0')} - ${est.descricao}` : `Estoque ${seqEstoque}`;
+
+    const nova: AlocacaoSaida = {
+      seq_estoque: seqEstoque,
+      estoque_label: estoqueLabel,
+      seq_posicao: seqPosicao,
+      posicao_label: pos.localizacao || `RUA ${pos.rua} - ALT ${pos.altura} - COL ${pos.coluna}`,
+      saldo_posicao: Number(pos.saldo) || 0,
+      quantidade,
+    };
+
+    setAlocacoesByIndex((prev) => {
+      const next = { ...prev };
+      const current = next[alocItemIndex] ? [...next[alocItemIndex]] : [];
+      current.push(nova);
+      next[alocItemIndex] = current;
+      return next;
+    });
+
+    setAlocSeqPosicao('');
+    setAlocQuantidade('');
+  };
+
+  const removerAlocacao = (index: number, idxAloc: number) => {
+    setAlocacoesByIndex((prev) => {
+      const next = { ...prev };
+      const current = next[index] ? [...next[index]] : [];
+      current.splice(idxAloc, 1);
+      next[index] = current;
+      return next;
+    });
+  };
+
   const converterEmOrdemCompra = async () => {
     // Verificar se já foi atendida
     if (solicitacao?.ja_atendida || solicitacao?.status === 'A') {
@@ -309,8 +544,27 @@ export default function ConverterSolicitacaoDetalhe() {
 
     if (!solicitacao) return;
 
-    // Filtrar itens com quantidade a comprar > 0
-    const itensComprar = itens.filter(item => item.qtde_a_comprar > 0);
+    // Validar cobertura: comprado + estoque >= solicitado
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      const qtdeComprada = Number(it.qtde_a_comprar) || 0;
+      const qtdeEstoque = getQtdeEstoqueAlocada(i);
+      if (qtdeComprada < 0) {
+        toast.error(`Quantidade a comprar inválida para: ${it.item}`);
+        return;
+      }
+      if (qtdeEstoque < 0) {
+        toast.error(`Quantidade em estoque inválida para: ${it.item}`);
+        return;
+      }
+      if (qtdeComprada + qtdeEstoque < (Number(it.qtde_item) || 0)) {
+        toast.error(`A soma Comprada + Estoque deve ser >= Solicitada para: ${it.item}`);
+        return;
+      }
+    }
+
+    // Itens para comprar (ordem de compra)
+    const itensComprar = itens.filter((item) => (Number(item.qtde_a_comprar) || 0) > 0);
 
     try {
       setConvertendo(true);
@@ -318,127 +572,119 @@ export default function ConverterSolicitacaoDetalhe() {
       if (ENVIRONMENT.isFigmaMake) {
         // MOCK
         await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        if (itensComprar.length > 0) {
-          // ✅ FLUXO RÁPIDO: Criar ordem mock e navegar para lista
-          const nroOrdemMock = Math.floor(Math.random() * 1000) + 100; // Número entre 100-1099
-          const ordemMock = {
-            seq_ordem_compra: Date.now(),
-            nro_ordem_compra: nroOrdemMock,
-            unidade: solicitacao.unidade,
-            seq_centro_custo: solicitacao.seq_centro_custo,
-            aprovada: 'N',
-            orcar: 'N'
-          };
-          
-          // Preparar itens com valores zerados
-          const itensParaPreenchimento = itensComprar.map(item => ({
-            seq_item: item.seq_item_selecionado!,
-            codigo: '', // Será buscado na tabela
-            descricao: item.item,
-            unidade_medida: '',
-            qtde_item: item.qtde_a_comprar,
-            vlr_unitario: 0
-          }));
-          
-          // ✅ Navegar para ordens de compra e abrir dialog automaticamente
-          console.log('🟢 MOCK - NAVEGANDO para ordens de compra com state:', {
-            ordemRecemCriada: ordemMock,
-            itensComValor: itensParaPreenchimento,
-            abrirFluxoRapido: true
-          });
-          
-          // ✅ CORREÇÃO: Resetar loading ANTES de navegar
-          setConvertendo(false);
-          
-          navigate('/compras/ordens-compra', {
-            state: {
-              ordemRecemCriada: ordemMock,
-              itensComValor: itensParaPreenchimento,
-              abrirFluxoRapido: true
-            }
-          });
-        } else {
-          toast.success('Solicitação marcada como atendida (nenhum item para comprar)');
-          setConvertendo(false);
-          navigate('/compras/ordens-compra');
-        }
+
+        const requisicoesCriadas = Object.values(alocacoesByIndex).flat().length > 0 ? [{ seq_requisicao: 999, seq_estoque: 1, estoque_label: 'ESTOQUE (MOCK)' }] : [];
+        const ordemMock = itensComprar.length > 0 ? { seq_ordem_compra: Date.now(), nro_ordem_compra: Math.floor(Math.random() * 1000) + 100 } : null;
+
+        setResumoData({
+          seq_solicitacao_compra: solicitacao.seq_solicitacao_compra,
+          nro_solicitacao_formatado: formatarNumeroSolicitacao(solicitacao.unidade, solicitacao.seq_solicitacao_compra),
+          ordem: ordemMock,
+          requisicoes: requisicoesCriadas,
+          itens: itens.map((it, idx) => ({
+            descricao: it.item,
+            qtde_solicitada: Number(it.qtde_item) || 0,
+            qtde_comprada: Number(it.qtde_a_comprar) || 0,
+            qtde_estoque: getQtdeEstoqueAlocada(idx),
+            alocacoes: alocacoesByIndex[idx] || [],
+          })),
+        });
+        setResumoOpen(true);
+        setConvertendo(false);
       } else {
         // BACKEND
-        const payload = {
+        const nroSolic = formatarNumeroSolicitacao(solicitacao.unidade, solicitacao.seq_solicitacao_compra);
+
+        const requisicoesCriadas: Array<{ seq_requisicao: number; seq_estoque: number; estoque_label: string }> = [];
+        const alocsAll = Object.entries(alocacoesByIndex).flatMap(([idx, alocs]) => (alocs || []).map((a) => ({ idx: Number(idx), a })));
+
+        if (alocsAll.length > 0) {
+          const porEstoque = new Map<number, { seq_estoque: number; estoque_label: string; itens: Array<{ seq_item: number; seq_posicao: number; quantidade: number }> }>();
+
+          for (const entry of alocsAll) {
+            const item = itens[entry.idx];
+            if (!item?.seq_item_selecionado) {
+              toast.error('Há alocações de estoque sem item real selecionado');
+              setConvertendo(false);
+              return;
+            }
+
+            const seqEstoque = entry.a.seq_estoque;
+            const current = porEstoque.get(seqEstoque) || { seq_estoque: seqEstoque, estoque_label: entry.a.estoque_label, itens: [] };
+            current.itens.push({
+              seq_item: item.seq_item_selecionado,
+              seq_posicao: entry.a.seq_posicao,
+              quantidade: entry.a.quantidade,
+            });
+            porEstoque.set(seqEstoque, current);
+          }
+
+          for (const grp of porEstoque.values()) {
+            const payloadReq = {
+              seq_estoque: grp.seq_estoque,
+              seq_cc: Number(solicitacao.seq_centro_custo),
+              solicitante: String(solicitacao.login_inclusao || user?.username || 'SISTEMA').toUpperCase(),
+              placa: solicitacao.placa ? String(solicitacao.placa).toUpperCase() : null,
+              observacao: `SAÍDA AUTOMÁTICA - SOLICITAÇÃO ${nroSolic}`,
+              itens: grp.itens,
+            };
+
+            const respReq = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/estoque/requisicoes.php`, {
+              method: 'POST',
+              body: JSON.stringify(payloadReq),
+            });
+
+            if (!respReq.success) {
+              throw new Error(respReq.message || 'Erro ao criar requisição de saída');
+            }
+
+            const seqReq = Number(respReq.data?.seq_requisicao || respReq.seq_requisicao);
+            requisicoesCriadas.push({ seq_requisicao: seqReq, seq_estoque: grp.seq_estoque, estoque_label: grp.estoque_label });
+          }
+        }
+
+        const payloadOc = {
           seq_solicitacao_compra: solicitacao.seq_solicitacao_compra,
-          itens: itensComprar.map(item => ({
+          itens: itensComprar.map((item) => ({
             seq_item: item.seq_item_selecionado,
-            qtde_item: item.qtde_a_comprar,
+            qtde_item: Number(item.qtde_a_comprar) || 0,
           })),
         };
 
         const response = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/compras/solicitacoes_compra_converter.php`, {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payloadOc),
         });
 
-        console.log('🔍 [BACKEND] Resposta da conversão:', response);
-
-        if (response.success) {
-          if (itensComprar.length > 0) {
-            // ✅ BACKEND - Verificar se retornou seq_ordem_compra
-            if (response.data && response.data.seq_ordem_compra) {
-              console.log('🟢 BACKEND - seq_ordem_compra retornado:', response.data.seq_ordem_compra);
-              
-              // ✅ FLUXO RÁPIDO HABILITADO - Backend retornou ordem criada
-              const ordemCriada = {
-                seq_ordem_compra: parseInt(response.data.seq_ordem_compra),
-                nro_ordem_compra: response.data.nro_ordem_compra || null,
-                unidade: solicitacao.unidade,
-                seq_centro_custo: solicitacao.seq_centro_custo,
-                aprovada: 'N',
-                orcar: 'N'
-              };
-              
-              // Preparar itens com valores zerados
-              const itensParaPreenchimento = itensComprar.map(item => ({
-                seq_item: item.seq_item_selecionado!,
-                codigo: '', // Será buscado na API
-                descricao: item.item,
-                unidade_medida: '',
-                qtde_item: item.qtde_a_comprar,
-                vlr_unitario: 0
-              }));
-              
-              console.log('🟢 BACKEND - NAVEGANDO para ordens de compra com state:', {
-                ordemRecemCriada: ordemCriada,
-                itensComValor: itensParaPreenchimento,
-                abrirFluxoRapido: true
-              });
-              
-              setConvertendo(false);
-              
-              navigate('/compras/ordens-compra', {
-                state: {
-                  ordemRecemCriada: ordemCriada,
-                  itensComValor: itensParaPreenchimento,
-                  abrirFluxoRapido: true
-                }
-              });
-            } else {
-              // Backend não retornou seq_ordem_compra - fluxo normal
-              console.log('⚠️ BACKEND - seq_ordem_compra NÃO retornado, navegando sem fluxo rápido');
-              setConvertendo(false);
-              toast.success('Solicitação convertida em ordem de compra com sucesso!');
-              navigate('/compras/ordens-compra');
-            }
-          } else {
-            toast.success('Solicitação marcada como atendida (nenhum item para comprar)');
-            setConvertendo(false);
-            navigate('/compras/ordens-compra');
-          }
-        } else {
-          setConvertendo(false);
+        if (!response.success) {
+          throw new Error(response.message || 'Erro ao converter solicitação');
         }
+
+        const ordemCriada =
+          response.data && response.data.seq_ordem_compra
+            ? { seq_ordem_compra: parseInt(response.data.seq_ordem_compra), nro_ordem_compra: response.data.nro_ordem_compra || null }
+            : null;
+
+        setResumoData({
+          seq_solicitacao_compra: solicitacao.seq_solicitacao_compra,
+          nro_solicitacao_formatado: nroSolic,
+          ordem: ordemCriada,
+          requisicoes: requisicoesCriadas,
+          itens: itens.map((it, idx) => ({
+            descricao: it.item,
+            qtde_solicitada: Number(it.qtde_item) || 0,
+            qtde_comprada: Number(it.qtde_a_comprar) || 0,
+            qtde_estoque: getQtdeEstoqueAlocada(idx),
+            alocacoes: alocacoesByIndex[idx] || [],
+          })),
+        });
+        setResumoOpen(true);
+        toast.success('Processo concluído com sucesso!');
+        setConvertendo(false);
       }
     } catch (error) {
       console.error('Erro ao converter solicitação:', error);
+      toast.error('Erro ao processar: verifique saldos e tente novamente');
       setConvertendo(false);
     }
   };
@@ -953,6 +1199,7 @@ export default function ConverterSolicitacaoDetalhe() {
               <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1.5">
                 <li>• Selecione o <strong>item real</strong> correspondente a cada descrição solicitada</li>
                 <li>• O sistema verificará o <strong>saldo em estoque</strong> automaticamente</li>
+                <li>• Defina a <strong>quantidade em estoque</strong> clicando no campo (escolha estoque, posição e quantidade)</li>
                 <li>• A <strong>quantidade a comprar</strong> será sugerida (quantidade solicitada - saldo em estoque)</li>
                 <li>• Você pode ajustar manualmente a quantidade a comprar para cada item</li>
                 <li>• Itens com quantidade <strong>zerada não serão incluídos</strong> na ordem de compra</li>
@@ -968,7 +1215,8 @@ export default function ConverterSolicitacaoDetalhe() {
                     <TableHead className="w-[10%] text-center">Quantidade</TableHead>
                     <TableHead className="w-[25%]">Item Real</TableHead>
                     <TableHead className="w-[10%] text-center">Saldo</TableHead>
-                    <TableHead className="w-[15%] text-center">Qtd. a Comprar</TableHead>
+                    <TableHead className="w-[12%] text-center">Qtd. em Estoque</TableHead>
+                    <TableHead className="w-[13%] text-center">Qtd. a Comprar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1023,6 +1271,16 @@ export default function ConverterSolicitacaoDetalhe() {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={getQtdeEstoqueAlocada(index)}
+                          readOnly
+                          onClick={() => abrirDialogSaida(index)}
+                          className="w-24 text-center mx-auto cursor-pointer"
+                        />
                       </TableCell>
                       <TableCell className="text-center">
                         <Input
@@ -1114,6 +1372,307 @@ export default function ConverterSolicitacaoDetalhe() {
           }
         }}
       />
+
+      <Dialog open={modalSaidaOpen} onOpenChange={setModalSaidaOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quantidade em Estoque</DialogTitle>
+            <DialogDescription>
+              Selecione o estoque, a posição de saída e a quantidade que será baixada do estoque.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Estoque de Saída</Label>
+                <Select
+                  value={alocSeqEstoque}
+                  onValueChange={(value) => {
+                    setAlocSeqEstoque(value);
+                    setAlocSeqPosicao('');
+                    setAlocQuantidade('');
+                    setPosicoesSaida([]);
+
+                    const seqEstoque = Number(value);
+                    const seqItem = alocItemAtual?.seq_item_selecionado;
+                    if (seqEstoque && seqItem) {
+                      void carregarPosicoesSaida(seqEstoque, seqItem);
+                    }
+                  }}
+                  disabled={loadingEstoquesSaida}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingEstoquesSaida ? 'Carregando...' : 'Selecione...'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {estoquesSaida.map((e) => (
+                      <SelectItem key={e.seq_estoque} value={String(e.seq_estoque)}>
+                        {`${e.unidade}${String(e.nro_estoque).padStart(2, '0')} - ${e.descricao}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Posição de Saída</Label>
+                <Select
+                  value={alocSeqPosicao}
+                  onValueChange={setAlocSeqPosicao}
+                  disabled={!alocSeqEstoque || loadingPosicoesSaida}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingPosicoesSaida ? 'Carregando...' : 'Selecione...'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {posicoesSaida.map((p) => (
+                      <SelectItem key={p.seq_posicao} value={String(p.seq_posicao)}>
+                        {`${p.localizacao || `RUA ${p.rua} - ALT ${p.altura} - COL ${p.coluna}`} (${Number(p.saldo || 0).toLocaleString('pt-BR')})`}
+                      </SelectItem>
+                    ))}
+                    {posicoesSaida.length === 0 && !loadingPosicoesSaida && (
+                      <SelectItem value="__no_positions__" disabled>
+                        Nenhuma posição com saldo
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Quantidade</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={alocQuantidade}
+                    onChange={(e) => setAlocQuantidade(e.target.value)}
+                    placeholder="0"
+                  />
+                  <Button
+                    onClick={() => void adicionarAlocacao()}
+                    disabled={!alocSeqEstoque || !alocSeqPosicao || !alocQuantidade}
+                    className="shrink-0 gap-2"
+                  >
+                    <Plus className="size-4" />
+                    Adicionar
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Estoque</TableHead>
+                    <TableHead>Posição</TableHead>
+                    <TableHead className="text-right">Quantidade</TableHead>
+                    <TableHead className="text-right w-[100px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {alocacoesItemAtual.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                        Nenhuma alocação adicionada
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    alocacoesItemAtual.map((a, idxAloc) => (
+                      <TableRow key={`${a.seq_estoque}-${a.seq_posicao}-${idxAloc}`}>
+                        <TableCell className="font-medium">{a.estoque_label}</TableCell>
+                        <TableCell>{a.posicao_label}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {Number(a.quantidade || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              if (alocItemIndex === null) return;
+                              removerAlocacao(alocItemIndex, idxAloc);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {alocItemAtual ? (
+                  <>
+                    <span className="font-medium text-foreground">{alocItemAtual.item}</span>
+                    <span>{` • Solicitada: ${Number(alocItemAtual.qtde_item || 0).toLocaleString('pt-BR')}`}</span>
+                    <span>{` • Em estoque: ${getQtdeEstoqueAlocada(alocItemIndex ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}`}</span>
+                  </>
+                ) : (
+                  <span>Selecione um item</span>
+                )}
+              </div>
+              <Button variant="outline" onClick={() => setModalSaidaOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resumoOpen} onOpenChange={setResumoOpen}>
+        <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Resumo</DialogTitle>
+            <DialogDescription>Resumo do processamento da solicitação.</DialogDescription>
+          </DialogHeader>
+
+          {resumoData && (
+            <div className="grid gap-4 py-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card>
+                  <CardContent className="pt-4 space-y-1">
+                    <div className="text-sm text-muted-foreground">Solicitação</div>
+                    <div className="font-mono font-semibold">{resumoData.nro_solicitacao_formatado}</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-4 space-y-1">
+                    <div className="text-sm text-muted-foreground">Ordem de Compra</div>
+                    <div className="font-mono font-semibold">
+                      {resumoData.ordem ? (
+                        resumoData.ordem.nro_ordem_compra !== null &&
+                        resumoData.ordem.nro_ordem_compra !== undefined &&
+                        String(resumoData.ordem.nro_ordem_compra).trim() !== '' ? (
+                          `${solicitacao?.unidade || ''}${String(resumoData.ordem.nro_ordem_compra).padStart(6, '0')}`.trim()
+                        ) : (
+                          `#${resumoData.ordem.seq_ordem_compra}`
+                        )
+                      ) : (
+                        'Nenhuma'
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-4 space-y-1">
+                    <div className="text-sm text-muted-foreground">Requisições de Saída</div>
+                    <div className="font-mono font-semibold">{resumoData.requisicoes.length}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {resumoData.requisicoes.length > 0 && (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[140px]">Requisição</TableHead>
+                        <TableHead>Estoque</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resumoData.requisicoes.map((r) => (
+                        <TableRow key={`${r.seq_estoque}-${r.seq_requisicao}`}>
+                          <TableCell className="font-mono">{String(r.seq_requisicao).padStart(6, '0')}</TableCell>
+                          <TableCell className="font-medium">{r.estoque_label}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Solicitada</TableHead>
+                      <TableHead className="text-right">Em Estoque</TableHead>
+                      <TableHead className="text-right">Comprada</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resumoData.itens.map((it, idx) => (
+                      <TableRow key={`${it.descricao}-${idx}`}>
+                        <TableCell className="font-medium">{it.descricao}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {Number(it.qtde_solicitada || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {Number(it.qtde_estoque || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {Number(it.qtde_comprada || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {resumoData.itens.some((it) => (it.alocacoes || []).length > 0) && (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Estoque</TableHead>
+                        <TableHead>Posição</TableHead>
+                        <TableHead className="text-right">Quantidade</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resumoData.itens.flatMap((it) =>
+                        (it.alocacoes || []).map((a, idx) => (
+                          <TableRow key={`${it.descricao}-${a.seq_estoque}-${a.seq_posicao}-${idx}`}>
+                            <TableCell className="font-medium">{it.descricao}</TableCell>
+                            <TableCell>{a.estoque_label}</TableCell>
+                            <TableCell>{a.posicao_label}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {Number(a.quantidade || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResumoOpen(false);
+              }}
+            >
+              Fechar
+            </Button>
+            <Button
+              onClick={() => {
+                setResumoOpen(false);
+                navigate('/compras/ordens-compra');
+              }}
+            >
+              Ir para Ordens de Compra
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ Modal de Reprovação */}
       <Dialog open={mostrarReprovarModal} onOpenChange={setMostrarReprovarModal}>
