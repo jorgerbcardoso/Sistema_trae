@@ -23,6 +23,8 @@ $unidadeDestino = strtoupper(trim($input['unidadeDestino'] ?? ''));
 $paradas        = array_values(array_filter(array_map('strtoupper', array_map('trim', (array)($input['paradas'] ?? [])))));
 $nroLinha       = (int)($input['nroLinha'] ?? 0);
 $ctesDisponiveis = $input['ctesDisponiveis'] ?? [];   // array de objetos enviados pelo frontend
+$forcarMinFreteRaw = $input['forcar_min_frete'] ?? false;
+$forcarMinFrete = ($forcarMinFreteRaw === true || $forcarMinFreteRaw === 1 || $forcarMinFreteRaw === '1' || strtoupper(trim((string)$forcarMinFreteRaw)) === 'S');
 
 $conn        = connect();
 $tabela      = "{$domain}_carregamento";
@@ -32,7 +34,7 @@ $tabelaCap   = "{$domain}_carregamento_capacidade";
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 
-$modoAutomatico = empty($placa) && empty($unidadeDestino);
+$modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 
 // ─── Listar linhas ────────────────────────────────────────────────────────────
 if ($acao === 'listar_linhas') {
@@ -85,6 +87,62 @@ function parseNumero($value) {
     }
     $s = str_replace(',', '', $s);
     return (float)$s;
+}
+
+function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
+    $unidade = strtoupper(trim((string)$unidade));
+    $usadas = [];
+    $set = [];
+    try {
+        $res = sql(
+            "SELECT DISTINCT unidades
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND unidades IS NOT NULL
+               AND TRIM(unidades) <> ''",
+            [$unidade],
+            $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $csv = strtoupper(trim((string)($r['unidades'] ?? '')));
+            if ($csv === '') continue;
+            $arr = array_values(array_filter(array_map('trim', explode(',', $csv)), function($p) { return $p !== ''; }));
+            foreach ($arr as $u) {
+                $u = strtoupper(trim((string)$u));
+                if ($u === '') continue;
+                $set[$u] = true;
+            }
+        }
+    } catch (Exception $e) {}
+    foreach ($set as $k => $_) $usadas[] = $k;
+    return $usadas;
+}
+
+function calcularTotaisPorDestino($ctesDisponiveis, $unidadeOrigem) {
+    $unidadeOrigem = strtoupper(trim((string)$unidadeOrigem));
+    $totals = [];
+    foreach ((array)$ctesDisponiveis as $cte) {
+        $unidRel019 = strtoupper(trim((string)($cte['unidadeCarregamento'] ?? $cte['unidade_carregamento'] ?? $cte['unidadeRelatorio'] ?? '')));
+        if ($unidRel019 === '' || $unidRel019 !== $unidadeOrigem) continue;
+        if (!empty($cte['emTransito'])) continue;
+
+        $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
+        if ($unidDest === '' || $unidDest === '0') continue;
+
+        $domainUpper = '';
+        if (isset($GLOBALS['domain'])) $domainUpper = strtoupper(trim((string)$GLOBALS['domain']));
+        if ($domainUpper === 'RVE') {
+            if (in_array($unidDest, ['SAL', 'DK4', 'TNE', 'DEV'], true)) continue;
+            if ($unidadeOrigem === 'SAO' && $unidDest === 'CAM') continue;
+            if ($unidadeOrigem === 'CAM' && $unidDest === 'SAO') continue;
+        }
+
+        if (!isset($totals[$unidDest])) $totals[$unidDest] = ['pesoKg' => 0.0, 'cubagem' => 0.0, 'frete' => 0.0];
+        $totals[$unidDest]['pesoKg'] += (float)parseNumero($cte['peso'] ?? 0);
+        $totals[$unidDest]['cubagem'] += (float)parseNumero($cte['cubagem'] ?? 0);
+        $totals[$unidDest]['frete'] += (float)parseNumero($cte['frete'] ?? 0);
+    }
+    return $totals;
 }
 
 function fetchCtes019Csv($domain, $g_sql, $siglaUnidade, $agora) {
@@ -419,26 +477,32 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         $nroCte = (int)($cteData['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
 
-        // Evita duplicata
+        $serCteRaw = strtoupper(trim((string)($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
+        if ($serCteRaw === '') continue;
+        $serCte = pg_escape_string($conn, $serCteRaw);
+
+        // Evita duplicata (mesmo carregamento)
         $check = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
              LIMIT 1"
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
+        // Garante que o mesmo CT-e não esteja em outro carregamento
         $checkOutro = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
                AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
              LIMIT 1"
         );
         if ($checkOutro && pg_num_rows($checkOutro) > 0) continue;
 
-        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte']      ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']
@@ -543,9 +607,7 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Linha inválida: destino não informado.']);
     }
 
-    $paradasLinha         = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
-    $placaAuto            = $unidade . '-' . $dest;
-    $paradasCsv           = implode(',', $paradasLinha);
+    $placaAuto            = !empty($placa) ? $placa : ($unidade . '-' . $dest);
     $minFreteLinha        = ($linha['vlr_min_frete'] !== null && $linha['vlr_min_frete'] !== '') ? (float)$linha['vlr_min_frete'] : 0.0;
 
     $diaSemana = (int)date('w');
@@ -584,7 +646,31 @@ if ($modoAutomatico) {
     }
     $ctesDisponiveis = array_values($ctesUnicos);
 
-    $temIntermediarias = trim((string)($linha['unidades'] ?? '')) !== '';
+    $paradasLinhaBase = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
+    $usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
+    $usadasSet = [];
+    foreach ($usadasArr as $u) $usadasSet[$u] = true;
+
+    $paradasLinha = array_values(array_filter($paradasLinhaBase, function($u) use ($usadasSet, $dest) {
+        $u = strtoupper(trim((string)$u));
+        if ($u === '') return false;
+        if ($u === $dest) return false;
+        if (isset($usadasSet[$u])) return false;
+        return true;
+    }));
+    $paradasLinha = array_values(array_unique($paradasLinha));
+
+    $totaisPorDestino = calcularTotaisPorDestino($ctesDisponiveis, $unidade);
+    usort($paradasLinha, function($a, $b) use ($totaisPorDestino) {
+        $pa = (float)($totaisPorDestino[$a]['pesoKg'] ?? 0);
+        $pb = (float)($totaisPorDestino[$b]['pesoKg'] ?? 0);
+        if ($pa === $pb) return strcmp($a, $b);
+        return ($pb <=> $pa);
+    });
+    $paradasLinha = array_slice($paradasLinha, 0, 2);
+    $paradasCsv = implode(',', $paradasLinha);
+
+    $temIntermediarias = count($paradasLinha) > 0;
     if ($temIntermediarias) {
         $resDireta = null;
         try {
@@ -660,9 +746,10 @@ if ($modoAutomatico) {
             $freteAtual += (float)parseNumero($cte['frete'] ?? 0);
         }
 
-        if ($freteAtual < $minFreteLinha) {
+        if ($freteAtual < $minFreteLinha && !$forcarMinFrete) {
             respondJson([
                 'success' => false,
+                'code' => 'MIN_FRETE',
                 'message' => 'Frete atual abaixo do mínimo da linha.',
                 'frete_atual' => $freteAtual,
                 'min_frete' => $minFreteLinha,

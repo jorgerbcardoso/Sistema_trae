@@ -1261,7 +1261,7 @@ interface CarregamentoAreaProps {
   importandoCarregamentos: boolean;
   importacaoAutomatica: boolean;
   onToggleImportacaoAutomatica: (ativo: boolean) => void;
-  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }) => Promise<{
+  onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
     message?: string;
@@ -1493,6 +1493,31 @@ function formatData(d: string): string {
   const p = d.split('-');
   if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
   return d;
+}
+
+function parseUnidadesCsv(csv?: string | null): string[] {
+  const s = (csv ?? '').trim();
+  if (!s) return [];
+  return s.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean);
+}
+
+function escolherIntermediariasLinha(
+  unidadesCsv: string | null | undefined,
+  destino: string | null | undefined,
+  intermediariasUsadas: Set<string>,
+  totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number }>,
+  limite: number
+): string[] {
+  const dest = (destino ?? '').trim().toUpperCase();
+  const base = parseUnidadesCsv(unidadesCsv).filter((u) => u !== dest && !intermediariasUsadas.has(u));
+  const unicas = Array.from(new Set(base));
+  unicas.sort((a, b) => {
+    const pa = totalsPorUnidade[a]?.pesoKg ?? 0;
+    const pb = totalsPorUnidade[b]?.pesoKg ?? 0;
+    if (pa === pb) return a.localeCompare(b);
+    return pb - pa;
+  });
+  return unicas.slice(0, Math.max(0, limite));
 }
 
 function CardCarregamento({
@@ -2138,7 +2163,7 @@ type ResumoMassaLinha = {
 };
 
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
-  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }) => Promise<{
+  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
     message?: string;
@@ -2177,6 +2202,18 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
   }, [linhasOrigem, diaCarregaKey]);
 
+  const intermediariasUsadas = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const c of (carregamentos ?? [])) {
+      for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
+    }
+    return set;
+  }, [carregamentos]);
+
+  const getIntermediariasEfetivas = React.useCallback((l: LinhaCarregamento): string[] => {
+    return escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
+  }, [intermediariasUsadas, totalsPorUnidadeParaLinhas]);
+
   const statusPorLinha = React.useMemo(() => {
     const MIN_TON = 27;
     const MIN_M3 = 67;
@@ -2198,14 +2235,11 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       if (ton >= MIN_TON || t.cubagem >= MIN_M3) diretaLotaPorDestino.add(dest);
     }
 
-    const out: Record<number, { podeCarregar: boolean; motivoBloqueio: string | null }> = {};
+    const out: Record<number, LinhaHojeStatus> = {};
     for (const l of linhasHoje) {
       const nro = l.nro_linha ?? 0;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
-      const unidades = (l.unidades ?? '').trim();
-      const intermediarias = unidades
-        ? unidades.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean)
-        : [];
+      const intermediarias = getIntermediariasEfetivas(l);
       const unidadesRota = Array.from(new Set([dest, ...intermediarias].filter(Boolean)));
 
       const totals = unidadesRota.reduce(
@@ -2225,24 +2259,25 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
 
       const placaAuto = dest ? `${siglaUnidade}-${dest}` : '';
       const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
-      const bloqueadaPorDireta = !!unidades && diretaLotaPorDestino.has(dest);
+      const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
       const motivos: string[] = [];
       if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
-      if (!atingiuMinFrete) {
-        motivos.push(`Frete atual (${totals.frete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) abaixo do mínimo da linha (${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`);
-      }
       if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
 
-      const bloqueada = jaExiste || !atingiuMinFrete || bloqueadaPorDireta;
+      const bloqueada = jaExiste || bloqueadaPorDireta;
       out[nro] = {
         podeCarregar: !bloqueada,
         motivoBloqueio: bloqueada ? motivos.join(' ') : null,
+        freteTotalDestino: totals.frete,
+        pesoKgDestino: totals.pesoKg,
+        cubagemDestino: totals.cubagem,
+        atingiuMinFrete,
       };
     }
 
     return out;
-  }, [carregamentos, linhasHoje, siglaUnidade, totalsPorUnidadeParaLinhas]);
+  }, [carregamentos, getIntermediariasEfetivas, linhasHoje, siglaUnidade, totalsPorUnidadeParaLinhas]);
 
   const placasExistentes = React.useMemo(() => {
     return new Set((carregamentos ?? []).map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
@@ -2288,46 +2323,98 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const [resumoMassaDialogOpen, setResumoMassaDialogOpen] = useState(false);
   const [resumoMassaItens, setResumoMassaItens] = useState<ResumoMassaLinha[]>([]);
 
-  const handleConfirmarAutomatico = async () => {
+  const [placasDialogOpen, setPlacasDialogOpen] = useState(false);
+  const [placasDialogLinhas, setPlacasDialogLinhas] = useState<Array<{ nro: number; nome: string; destino: string; intermediarias: string }>>([]);
+  const [placasDialogValues, setPlacasDialogValues] = useState<Record<number, string>>({});
+  const [placasDialogOrdem, setPlacasDialogOrdem] = useState<number[]>([]);
+  const [placasDialogMinFreteAbaixo, setPlacasDialogMinFreteAbaixo] = useState<number[]>([]);
+
+  const iniciarPlacasDialog = (linhas: number[]) => {
+    const porNro = new Map<number, LinhaCarregamento>();
+    for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
+    const ordenadas = linhas.slice().sort((a, b) => a - b);
+    const rows = ordenadas.map((nro) => {
+      const l = porNro.get(nro);
+      const interEfetivas = l ? getIntermediariasEfetivas(l) : [];
+      return {
+        nro,
+        nome: (l?.nome ?? '').trim() || '-',
+        destino: (l?.sigla_dest ?? '').trim().toUpperCase() || '-',
+        intermediarias: interEfetivas.length ? interEfetivas.join(', ') : '-',
+      };
+    });
+    const abaixoMin = ordenadas.filter((nro) => !(statusPorLinha[nro]?.atingiuMinFrete ?? true));
+    setPlacasDialogOrdem(ordenadas);
+    setPlacasDialogLinhas(rows);
+    setPlacasDialogMinFreteAbaixo(abaixoMin);
+    setPlacasDialogValues((prev) => {
+      const next: Record<number, string> = { ...(prev || {}) };
+      for (const nro of ordenadas) {
+        if (!next[nro]) next[nro] = '';
+      }
+      return next;
+    });
+    setPlacasDialogOpen(true);
+  };
+
+  const executarAutomaticoComPlacas = async () => {
     if (loading) return;
-    const selecionadas = Array.from(linhasSelecionadas.values()).filter((n) => Number.isFinite(n) && n > 0);
-    if (selecionadas.length === 0) { toast.error('Selecione ao menos uma linha.'); return; }
-    const invalidas = selecionadas.filter((n) => !(statusPorLinha[n]?.podeCarregar ?? false));
-    if (invalidas.length > 0) { toast.error('Há linhas selecionadas indisponíveis para carregamento.'); return; }
+    if (placasDialogOrdem.length === 0) return;
+
+    const faltando = placasDialogOrdem.filter((nro) => !(placasDialogValues[nro] ?? '').trim());
+    if (faltando.length > 0) {
+      toast.error('Informe a placa REAL para todas as linhas selecionadas.');
+      return;
+    }
+
+    const multi = placasDialogOrdem.length > 1;
+
+    if (placasDialogMinFreteAbaixo.length > 0) {
+      const msg = multi
+        ? 'Atenção: um ou mais carregamentos não atingem o frete mínimo. Continuar?'
+        : `Atenção: as cargas disponíveis para a linha ${String(placasDialogOrdem[0]).padStart(3, '0')} não atingem o frete mínimo! Continuar?`;
+      if (!confirm(msg)) return;
+    }
+
     try {
       setLoading(true);
-      const multi = selecionadas.length > 1;
-      const ordenadas = selecionadas.slice().sort((a, b) => a - b);
-      const porNro = new Map<number, LinhaCarregamento>();
-      for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
-      const orig = (siglaUnidade ?? '').trim().toUpperCase();
       const itens: ResumoMassaLinha[] = [];
       let lastOk: { placa?: string; resumo?: any[]; resumoDestinos?: any[] } | null = null;
       let okCount = 0;
       let failCount = 0;
-      for (let i = 0; i < ordenadas.length; i++) {
-        const nro = ordenadas[i];
-        const isLast = i === ordenadas.length - 1;
-        const result = await onConfirmar('', '', [], nro, { recarregar: isLast, silent: true });
+
+      const porNro = new Map<number, LinhaCarregamento>();
+      for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
+
+      for (let i = 0; i < placasDialogOrdem.length; i++) {
+        const nro = placasDialogOrdem[i];
+        const isLast = i === placasDialogOrdem.length - 1;
+        const placaReal = (placasDialogValues[nro] ?? '').trim().toUpperCase();
+        const forcarMinFrete = placasDialogMinFreteAbaixo.includes(nro);
+
+        const result = await onConfirmar(placaReal, '', [], nro, { recarregar: isLast, silent: true, forcarMinFrete });
         if (result.ok) {
           okCount++;
           lastOk = result;
         } else {
           failCount++;
         }
+
         const linha = porNro.get(nro);
         const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
-        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
-        const placaAuto = destino ? `${orig}-${destino}` : '';
+        const intermediarias = linha ? getIntermediariasEfetivas(linha).join(', ') : '';
         itens.push({
           nro_linha: nro,
-          placa: (result.placa ?? placaAuto) || placaAuto || '-',
+          placa: result.placa ?? placaReal,
           destino: destino || '-',
           intermediarias: intermediarias || '-',
           status: result.ok ? 'criado' : 'erro',
           msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
         });
       }
+
+      setPlacasDialogOpen(false);
+
       if (multi) {
         setResumoMassaItens(itens);
         setResumoMassaDialogOpen(true);
@@ -2335,6 +2422,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
         return;
       }
+
       if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
         setResumoPlaca(lastOk.placa);
         setResumoUnidades((lastOk.resumo as any) ?? []);
@@ -2346,6 +2434,15 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmarAutomatico = async () => {
+    if (loading) return;
+    const selecionadas = Array.from(linhasSelecionadas.values()).filter((n) => Number.isFinite(n) && n > 0);
+    if (selecionadas.length === 0) { toast.error('Selecione ao menos uma linha.'); return; }
+    const invalidas = selecionadas.filter((n) => !(statusPorLinha[n]?.podeCarregar ?? false));
+    if (invalidas.length > 0) { toast.error('Há linhas selecionadas indisponíveis para carregamento.'); return; }
+    iniciarPlacasDialog(selecionadas);
   };
 
   const handleFecharResumo = () => {
@@ -2404,57 +2501,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       .map((l) => l.nro_linha ?? 0)
       .filter((n) => n > 0 && (statusPorLinha[n]?.podeCarregar ?? false));
     if (possiveis.length === 0) { toast.error('Nenhuma linha disponível para carregar.'); return; }
-    try {
-      setLoading(true);
-      setLinhasSelecionadas(new Set(possiveis));
-      let okCount = 0;
-      let failCount = 0;
-      const porNro = new Map<number, LinhaCarregamento>();
-      for (const l of linhasHojeSemCriadas) porNro.set(l.nro_linha ?? 0, l);
-      const orig = (siglaUnidade ?? '').trim().toUpperCase();
-      const itens: ResumoMassaLinha[] = [];
-      let lastOk: any = null;
-      for (let i = 0; i < possiveis.length; i++) {
-        const nro = possiveis[i];
-        const isLast = i === possiveis.length - 1;
-        const result = await onConfirmar('', '', [], nro, { recarregar: isLast, silent: true });
-        if (result.ok) {
-          okCount++;
-          lastOk = result;
-        } else {
-          failCount++;
-        }
-        const linha = porNro.get(nro);
-        const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
-        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
-        const placaAuto = destino ? `${orig}-${destino}` : '';
-        itens.push({
-          nro_linha: nro,
-          placa: (result.placa ?? placaAuto) || placaAuto || '-',
-          destino: destino || '-',
-          intermediarias: intermediarias || '-',
-          status: result.ok ? 'criado' : 'erro',
-          msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
-        });
-      }
-      if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
-      if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
-      if (possiveis.length > 1) {
-        setResumoMassaItens(itens);
-        setResumoMassaDialogOpen(true);
-        return;
-      }
-      if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
-        setResumoPlaca(lastOk.placa);
-        setResumoUnidades((lastOk.resumo as any) ?? []);
-        setResumoDestinos((lastOk.resumoDestinos as any) ?? []);
-        setResumoDialogOpen(true);
-      } else {
-        onFechar();
-      }
-    } finally {
-      setLoading(false);
-    }
+    setLinhasSelecionadas(new Set(possiveis));
+    iniciarPlacasDialog(possiveis);
   };
 
   return (
@@ -2563,7 +2611,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
                         const nro = l.nro_linha ?? 0;
                         const selecionada = nro > 0 && linhasSelecionadas.has(nro);
                         const destino = (l.sigla_dest ?? '').trim().toUpperCase() || '-';
-                        const inter = (l.unidades ?? '').trim().toUpperCase() || '-';
+                        const interEfetivas = getIntermediariasEfetivas(l);
+                        const inter = interEfetivas.length ? interEfetivas.join(', ') : '-';
                         const nome = (l.nome ?? '').trim();
                         const st = statusPorLinha[nro];
                         const podeLinha = st?.podeCarregar ?? false;
@@ -2836,6 +2885,68 @@ function ModalHub({
           </Button>
         </div>
       </div>
+
+      {placasDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Informe a placa REAL</h3>
+              </div>
+              <button
+                onClick={() => setPlacasDialogOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                disabled={loading}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="grid grid-cols-[70px_minmax(0,1fr)_80px_minmax(0,1fr)_170px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  <span>Linha</span>
+                  <span>Nome</span>
+                  <span>Dest.</span>
+                  <span>Intermediárias</span>
+                  <span>Placa real</span>
+                </div>
+                <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                  {placasDialogLinhas.map((l) => (
+                    <div key={l.nro} className="grid grid-cols-[70px_minmax(0,1fr)_80px_minmax(0,1fr)_170px] gap-2 px-3 py-2 text-sm items-center">
+                      <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro).padStart(3, '0')}</span>
+                      <span className="truncate text-slate-800 dark:text-slate-200">{l.nome}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{l.destino}</span>
+                      <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{l.intermediarias}</span>
+                      <input
+                        value={placasDialogValues[l.nro] ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value.toUpperCase();
+                          setPlacasDialogValues((prev) => ({ ...(prev || {}), [l.nro]: v }));
+                        }}
+                        placeholder="Ex: ABC1D23"
+                        className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 font-mono"
+                        disabled={loading}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={() => setPlacasDialogOpen(false)} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white" onClick={executarAutomaticoComPlacas} disabled={loading}>
+                {loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                Continuar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3536,9 +3647,10 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean }): Promise<{ ok: boolean; placa?: string; message?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{ ok: boolean; placa?: string; message?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
     const recarregar = opts?.recarregar ?? true;
     const silent = opts?.silent ?? false;
+    const forcarMinFrete = opts?.forcarMinFrete ?? false;
     try {
       // Envia os CT-es disponíveis (do relatório 019) para o backend filtrar e inserir
       const ctesDisponiveis = (dados?.ctes ?? []).map(c => {
@@ -3568,7 +3680,7 @@ export function Disponiveis() {
       });
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis }) },
+        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis, forcar_min_frete: forcarMinFrete }) },
         true
       );
       if (res.success) {
@@ -3588,8 +3700,19 @@ export function Disponiveis() {
   const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
     if (carregandoNroLinhaHoje) return;
     try {
+      const placaInformada = prompt(`Informe a placa REAL do veículo para a linha ${String(nroLinha).padStart(3, '0')}:`, '');
+      const placaReal = (placaInformada ?? '').trim().toUpperCase();
+      if (!placaReal) return;
+
+      const atingiuMin = (linhasHojeStatus[nroLinha]?.atingiuMinFrete ?? true);
+      if (!atingiuMin) {
+        if (!confirm(`Atenção: as cargas disponíveis para a linha ${String(nroLinha).padStart(3, '0')} não atingem o frete mínimo! Continuar?`)) {
+          return;
+        }
+      }
+
       setCarregandoNroLinhaHoje(nroLinha);
-      const result = await handleCarregamentoAutomatico('', '', [], nroLinha);
+      const result = await handleCarregamentoAutomatico(placaReal, '', [], nroLinha, { forcarMinFrete: !atingiuMin });
       if (result.ok && result.placa && ((result.resumo?.length ?? 0) > 0 || (result.resumoDestinos?.length ?? 0) > 0)) {
         setResumoHojePlaca(result.placa);
         setResumoHojeUnidades((result.resumo as any) ?? []);
@@ -3600,7 +3723,7 @@ export function Disponiveis() {
     } finally {
       setCarregandoNroLinhaHoje(null);
     }
-  }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico]);
+  }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico, linhasHojeStatus]);
 
   const placasExistentes = React.useMemo(() => {
     return new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
@@ -3626,17 +3749,32 @@ export function Disponiveis() {
       return;
     }
     try {
+      const abaixoMin = possiveis.filter((n) => !(linhasHojeStatus[n]?.atingiuMinFrete ?? true));
+      if (abaixoMin.length > 0) {
+        if (!confirm('Atenção: um ou mais carregamentos não atingem o frete mínimo. Continuar?')) {
+          return;
+        }
+      }
+
+      const placasPorLinha: Record<number, string> = {};
+      for (const nro of possiveis) {
+        const placaInformada = prompt(`Informe a placa REAL do veículo para a linha ${String(nro).padStart(3, '0')}:`, '');
+        const placaReal = (placaInformada ?? '').trim().toUpperCase();
+        if (!placaReal) return;
+        placasPorLinha[nro] = placaReal;
+      }
+
       setCarregandoTodasLinhasHoje(true);
       let okCount = 0;
       let failCount = 0;
       const porNro = new Map<number, LinhaCarregamento>();
       for (const l of linhasCarregamHojeVisiveis) porNro.set(l.nro_linha ?? 0, l);
-      const orig = (unidadeAtual ?? '').trim().toUpperCase();
       const itens: ResumoMassaLinha[] = [];
       for (let i = 0; i < possiveis.length; i++) {
         const nro = possiveis[i];
         const isLast = i === possiveis.length - 1;
-        const result = await handleCarregamentoAutomatico('', '', [], nro, { recarregar: isLast, silent: true });
+        const placaReal = placasPorLinha[nro];
+        const result = await handleCarregamentoAutomatico(placaReal, '', [], nro, { recarregar: isLast, silent: true, forcarMinFrete: abaixoMin.includes(nro) });
         if (result.ok) {
           okCount++;
         } else {
@@ -3644,11 +3782,10 @@ export function Disponiveis() {
         }
         const linha = porNro.get(nro);
         const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
-        const intermediarias = (linha?.unidades ?? '').trim().toUpperCase();
-        const placaAuto = destino ? `${orig}-${destino}` : '';
+        const intermediarias = linha ? escolherIntermediariasLinha(linha.unidades, linha.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2).join(', ') : '';
         itens.push({
           nro_linha: nro,
-          placa: (result.placa ?? placaAuto) || placaAuto || '-',
+          placa: result.placa ?? placaReal,
           destino: destino || '-',
           intermediarias: intermediarias || '-',
           status: result.ok ? 'criado' : 'erro',
@@ -4140,6 +4277,14 @@ export function Disponiveis() {
     return totals;
   }, [ctesTransferFiltrados]);
 
+  const intermediariasUsadas = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const c of (carregamentos ?? [])) {
+      for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
+    }
+    return set;
+  }, [carregamentos]);
+
   useEffect(() => {
     let ativo = true;
     setLoadingLinhasHojeStatus(true);
@@ -4181,9 +4326,7 @@ export function Disponiveis() {
         const nro = l.nro_linha ?? 0;
         const dest = (l.sigla_dest ?? '').trim().toUpperCase();
         const unidades = (l.unidades ?? '').trim();
-        const intermediarias = unidades
-          ? unidades.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean)
-          : [];
+        const intermediarias = escolherIntermediariasLinha(unidades, dest, intermediariasUsadas, totalsPorUnidade, 2);
         const unidadesRota = Array.from(new Set([dest, ...intermediarias].filter(Boolean)));
 
         const totals = unidadesRota.reduce(
@@ -4204,15 +4347,12 @@ export function Disponiveis() {
         const placaAuto = dest ? `${unidadeAtual}-${dest}` : '';
         const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
 
-        const bloqueadaPorDireta = !!unidades && diretaLotaPorDestino.has(dest);
+        const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
         const motivos: string[] = [];
         if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
-        if (!atingiuMinFrete) {
-          motivos.push(`Frete atual (${totals.frete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) abaixo do mínimo da linha (${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`);
-        }
         if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
-        const bloqueada = jaExiste || !atingiuMinFrete || bloqueadaPorDireta;
+        const bloqueada = jaExiste || bloqueadaPorDireta;
 
         status[nro] = {
           podeCarregar: !bloqueada,
@@ -4232,7 +4372,7 @@ export function Disponiveis() {
       ativo = false;
       window.clearTimeout(t);
     };
-  }, [carregamentos, ctesTransferFiltrados, linhasCarregamHoje, unidadeAtual]);
+  }, [carregamentos, ctesTransferFiltrados, intermediariasUsadas, linhasCarregamHoje, unidadeAtual]);
 
   const coletasTransferFiltradas = React.useMemo(() => {
     const list = dados?.coletas ? [...dados.coletas] : [];
@@ -4849,6 +4989,7 @@ export function Disponiveis() {
                         const freteAtual = s?.freteTotalDestino ?? 0;
                         const atingiuMin = s?.atingiuMinFrete ?? (minFrete ? freteAtual >= minFrete : true);
                         const motivo = s?.motivoBloqueio ?? '';
+                        const interEfetivas = escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
                         return (
                           <div
                             key={l.nro_linha}
@@ -4858,7 +4999,7 @@ export function Disponiveis() {
                             <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
                             <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
                             <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
-                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{(l.unidades ?? '').toUpperCase() || '-'}</span>
+                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{interEfetivas.length ? interEfetivas.join(', ') : '-'}</span>
                             <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
                             <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
                               {minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

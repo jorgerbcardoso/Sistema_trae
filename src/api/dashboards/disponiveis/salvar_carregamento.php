@@ -103,26 +103,36 @@ if ($acao === 'adicionar_ctes') {
         $nroCte = (int)($cteData['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
 
-        // Evita duplicata
+        $serCteRaw = strtoupper(trim((string)($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
+        if ($serCteRaw === '') continue;
+        $serCte = pg_escape_string($conn, $serCteRaw);
+
+        // Evita duplicata (mesmo carregamento)
         $check = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
              LIMIT 1"
         );
         if ($check && pg_num_rows($check) > 0) continue;
 
         $checkOutro = pg_query($conn,
-            "SELECT 1 FROM {$tabela}
+            "SELECT placa_provisoria FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
                AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
              LIMIT 1"
         );
-        if ($checkOutro && pg_num_rows($checkOutro) > 0) continue;
+        if ($checkOutro && pg_num_rows($checkOutro) > 0) {
+            $rowOutro = pg_fetch_assoc($checkOutro);
+            $placaOutro = (string)($rowOutro['placa_provisoria'] ?? '');
+            pg_query($conn, 'ROLLBACK');
+            respondJson(['success' => false, 'message' => "CT-e {$serCteRaw}{$nroCte} já está no carregamento {$placaOutro}."]);
+        }
 
-        $serCte   = pg_escape_string($conn, strtoupper(trim($cteData['serCte'] ?? $cteData['ser_cte'] ?? '')));
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']

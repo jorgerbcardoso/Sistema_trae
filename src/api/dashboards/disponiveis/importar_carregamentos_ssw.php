@@ -341,6 +341,7 @@ foreach ($placas_ssw as $placa) {
         if ($resDel === false) throw new Exception(pg_last_error($conn));
 
         $inseridos = 0;
+        $ignoradosEmOutro = 0;
         if (empty($ctes)) {
             $resInsSent = pg_query(
                 $conn,
@@ -360,6 +361,9 @@ foreach ($placas_ssw as $placa) {
 
                 $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaProvEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
                 if ($check_dup && pg_num_rows($check_dup) > 0) continue;
+
+                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND placa_provisoria <> '{$placaProvEsc}' LIMIT 1");
+                if ($check_outro && pg_num_rows($check_outro) > 0) { $ignoradosEmOutro++; continue; }
 
                 $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
                 $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
@@ -416,6 +420,9 @@ foreach ($placas_ssw as $placa) {
         $msg = ($placaProvisoriaSalvar !== $placa)
             ? "{$inseridos} CT-e(s) importado(s). Agrupado em {$placaProvisoriaSalvar}."
             : "{$inseridos} CT-e(s) importado(s).";
+        if ($ignoradosEmOutro > 0) {
+            $msg .= " {$ignoradosEmOutro} CT-e(s) ignorado(s) por já estarem em outro carregamento.";
+        }
         $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => $msg];
     } catch (Exception $e) {
         pg_query($conn, 'ROLLBACK');
