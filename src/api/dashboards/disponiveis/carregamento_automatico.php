@@ -94,6 +94,21 @@ function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
     $usadas = [];
     $set = [];
     try {
+        $resDest = sql(
+            "SELECT DISTINCT destino
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND destino IS NOT NULL
+               AND TRIM(destino) <> ''",
+            [$unidade],
+            $conn
+        );
+        while ($resDest && ($r = pg_fetch_assoc($resDest))) {
+            $d = strtoupper(trim((string)($r['destino'] ?? '')));
+            if ($d === '') continue;
+            $set[$d] = true;
+        }
+
         $res = sql(
             "SELECT DISTINCT unidades
              FROM {$tabela}
@@ -792,6 +807,22 @@ if (empty($unidadeDestino)) {
 }
 
 $placaFinal = !empty($placa) ? $placa : ($unidade . '-' . $unidadeDestino);
+
+$usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
+$usadasSet = [];
+foreach ($usadasArr as $u) $usadasSet[$u] = true;
+
+$invalid = [];
+foreach ($paradas as $p) {
+    $p = strtoupper(trim((string)$p));
+    if ($p === '') continue;
+    if (isset($usadasSet[$p])) $invalid[] = $p;
+}
+$invalid = array_values(array_unique($invalid));
+if (!empty($invalid)) {
+    respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $invalid) . '. Já utilizada(s) em outro carregamento (destino ou intermediária).']);
+}
+
 $paradasCsv = implode(',', $paradas);
 
 $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaFinal], $conn);

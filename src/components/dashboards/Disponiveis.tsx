@@ -1501,6 +1501,12 @@ function parseUnidadesCsv(csv?: string | null): string[] {
   return s.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean);
 }
 
+function parseDestinoFromPlaca(placa?: string | null): string | null {
+  const p = (placa ?? '').trim().toUpperCase();
+  const m = p.match(/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/);
+  return m?.[1] ? m[1] : null;
+}
+
 function escolherIntermediariasLinha(
   unidadesCsv: string | null | undefined,
   destino: string | null | undefined,
@@ -2205,6 +2211,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const intermediariasUsadas = React.useMemo(() => {
     const set = new Set<string>();
     for (const c of (carregamentos ?? [])) {
+      const d = (c.destino ?? parseDestinoFromPlaca(c.placa_provisoria) ?? '').trim().toUpperCase();
+      if (d) set.add(d);
       for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
     }
     return set;
@@ -4280,6 +4288,8 @@ export function Disponiveis() {
   const intermediariasUsadas = React.useMemo(() => {
     const set = new Set<string>();
     for (const c of (carregamentos ?? [])) {
+      const d = (c.destino ?? parseDestinoFromPlaca(c.placa_provisoria) ?? '').trim().toUpperCase();
+      if (d) set.add(d);
       for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
     }
     return set;

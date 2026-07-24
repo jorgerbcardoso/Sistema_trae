@@ -35,6 +35,56 @@ $conn = connect();
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 
+function parseCsvSiglas($csv) {
+    $s = strtoupper(trim((string)$csv));
+    if ($s === '') return [];
+    $parts = array_map('trim', explode(',', $s));
+    $out = [];
+    foreach ($parts as $p) {
+        $p = strtoupper(trim((string)$p));
+        if ($p === '') continue;
+        if (!in_array($p, $out, true)) $out[] = $p;
+    }
+    return $out;
+}
+
+function getUnidadesOcupadasCarregamentos($conn, $tabela, $unidade) {
+    $unidade = strtoupper(trim((string)$unidade));
+    $set = [];
+    try {
+        $resDest = sql(
+            "SELECT DISTINCT destino
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND destino IS NOT NULL
+               AND TRIM(destino) <> ''",
+            [$unidade],
+            $conn
+        );
+        while ($resDest && ($r = pg_fetch_assoc($resDest))) {
+            $d = strtoupper(trim((string)($r['destino'] ?? '')));
+            if ($d === '') continue;
+            $set[$d] = true;
+        }
+
+        $res = sql(
+            "SELECT DISTINCT unidades
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND unidades IS NOT NULL
+               AND TRIM(unidades) <> ''",
+            [$unidade],
+            $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $csv = strtoupper(trim((string)($r['unidades'] ?? '')));
+            if ($csv === '') continue;
+            foreach (parseCsvSiglas($csv) as $u) $set[$u] = true;
+        }
+    } catch (Exception $e) {}
+    return $set;
+}
+
 // ─── Ação: criar carregamento manual (linha sentinela com nro_cte = 0) ────────
 if ($acao === 'criar') {
     $placa   = strtoupper(trim($input['placa'] ?? ''));
@@ -51,6 +101,15 @@ if ($acao === 'criar') {
     );
     if ($check && pg_num_rows($check) > 0) {
         respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
+    }
+
+    $ocupadas = getUnidadesOcupadasCarregamentos($conn, $tabela, $unidade);
+    $invalid = [];
+    foreach (parseCsvSiglas($paradas) as $p) {
+        if (isset($ocupadas[$p])) $invalid[] = $p;
+    }
+    if (!empty($invalid)) {
+        respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $invalid) . '. Já utilizada(s) em outro carregamento (destino ou intermediária).']);
     }
 
     // Linha sentinela: nro_cte = 0 indica carregamento sem CT-es ainda
