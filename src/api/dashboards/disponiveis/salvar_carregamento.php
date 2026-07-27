@@ -50,39 +50,37 @@ function parseCsvSiglas($csv) {
 
 function getUnidadesOcupadasCarregamentos($conn, $tabela, $unidade) {
     $unidade = strtoupper(trim((string)$unidade));
-    $set = [];
+    $map = [];
     try {
-        $resDest = sql(
-            "SELECT DISTINCT destino
-             FROM {$tabela}
-             WHERE unidade = \$1
-               AND destino IS NOT NULL
-               AND TRIM(destino) <> ''",
-            [$unidade],
-            $conn
-        );
-        while ($resDest && ($r = pg_fetch_assoc($resDest))) {
-            $d = strtoupper(trim((string)($r['destino'] ?? '')));
-            if ($d === '') continue;
-            $set[$d] = true;
-        }
-
         $res = sql(
-            "SELECT DISTINCT unidades
+            "SELECT placa_provisoria, destino, unidades
              FROM {$tabela}
-             WHERE unidade = \$1
-               AND unidades IS NOT NULL
-               AND TRIM(unidades) <> ''",
+             WHERE unidade = \$1",
             [$unidade],
             $conn
         );
         while ($res && ($r = pg_fetch_assoc($res))) {
+            $placa = strtoupper(trim((string)($r['placa_provisoria'] ?? '')));
+            if ($placa === '') continue;
+
+            $dest = strtoupper(trim((string)($r['destino'] ?? '')));
+            if ($dest !== '') {
+                if (!isset($map[$dest])) $map[$dest] = [];
+                $k = 'DESTINO|' . $placa;
+                $map[$dest][$k] = ['placa' => $placa, 'tipo' => 'DESTINO'];
+            }
+
             $csv = strtoupper(trim((string)($r['unidades'] ?? '')));
-            if ($csv === '') continue;
-            foreach (parseCsvSiglas($csv) as $u) $set[$u] = true;
+            if ($csv !== '') {
+                foreach (parseCsvSiglas($csv) as $u) {
+                    if (!isset($map[$u])) $map[$u] = [];
+                    $k = 'INTERMEDIARIA|' . $placa;
+                    if (!isset($map[$u][$k])) $map[$u][$k] = ['placa' => $placa, 'tipo' => 'INTERMEDIARIA'];
+                }
+            }
         }
     } catch (Exception $e) {}
-    return $set;
+    return $map;
 }
 
 // ─── Ação: criar carregamento manual (linha sentinela com nro_cte = 0) ────────
@@ -109,7 +107,28 @@ if ($acao === 'criar') {
         if (isset($ocupadas[$p])) $invalid[] = $p;
     }
     if (!empty($invalid)) {
-        respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $invalid) . '. Já utilizada(s) em outro carregamento (destino ou intermediária).']);
+        $det = [];
+        foreach ($invalid as $u) {
+            $occsMap = $ocupadas[$u] ?? null;
+            if (!$occsMap || !is_array($occsMap) || count($occsMap) === 0) { $det[] = $u; continue; }
+            $occs = array_values($occsMap);
+            $destPlacas = [];
+            $interPlacas = [];
+            foreach ($occs as $o) {
+                $tp = strtoupper(trim((string)($o['tipo'] ?? '')));
+                $pl = strtoupper(trim((string)($o['placa'] ?? '')));
+                if ($pl === '') continue;
+                if ($tp === 'DESTINO') $destPlacas[] = $pl;
+                else $interPlacas[] = $pl;
+            }
+            $destPlacas = array_values(array_unique($destPlacas));
+            $interPlacas = array_values(array_unique($interPlacas));
+            $parts = [];
+            if (!empty($destPlacas)) $parts[] = 'destino: ' . implode(', ', $destPlacas);
+            if (!empty($interPlacas)) $parts[] = 'intermediária: ' . implode(', ', $interPlacas);
+            $det[] = $u . (empty($parts) ? '' : ' (' . implode('; ', $parts) . ')');
+        }
+        respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $det) . '.']);
     }
 
     // Linha sentinela: nro_cte = 0 indica carregamento sem CT-es ainda

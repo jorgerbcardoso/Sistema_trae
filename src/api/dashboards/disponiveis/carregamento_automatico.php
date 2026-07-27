@@ -133,6 +133,44 @@ function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
     return $usadas;
 }
 
+function getOcupacaoPorUnidade($conn, $tabela, $unidade) {
+    $unidade = strtoupper(trim((string)$unidade));
+    $map = [];
+    try {
+        $res = sql(
+            "SELECT placa_provisoria, destino, unidades
+             FROM {$tabela}
+             WHERE unidade = \$1",
+            [$unidade],
+            $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $placa = strtoupper(trim((string)($r['placa_provisoria'] ?? '')));
+            if ($placa === '') continue;
+
+            $dest = strtoupper(trim((string)($r['destino'] ?? '')));
+            if ($dest !== '') {
+                if (!isset($map[$dest])) $map[$dest] = [];
+                $k = 'DESTINO|' . $placa;
+                $map[$dest][$k] = ['placa' => $placa, 'tipo' => 'DESTINO'];
+            }
+
+            $csv = strtoupper(trim((string)($r['unidades'] ?? '')));
+            if ($csv !== '') {
+                $arr = array_values(array_filter(array_map('trim', explode(',', $csv)), function($p) { return $p !== ''; }));
+                foreach ($arr as $u) {
+                    $u = strtoupper(trim((string)$u));
+                    if ($u === '') continue;
+                    if (!isset($map[$u])) $map[$u] = [];
+                    $k = 'INTERMEDIARIA|' . $placa;
+                    if (!isset($map[$u][$k])) $map[$u][$k] = ['placa' => $placa, 'tipo' => 'INTERMEDIARIA'];
+                }
+            }
+        }
+    } catch (Exception $e) {}
+    return $map;
+}
+
 function calcularTotaisPorDestino($ctesDisponiveis, $unidadeOrigem) {
     $unidadeOrigem = strtoupper(trim((string)$unidadeOrigem));
     $totals = [];
@@ -808,9 +846,9 @@ if (empty($unidadeDestino)) {
 
 $placaFinal = !empty($placa) ? $placa : ($unidade . '-' . $unidadeDestino);
 
-$usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
+$ocupacao = getOcupacaoPorUnidade($conn, $tabela, $unidade);
 $usadasSet = [];
-foreach ($usadasArr as $u) $usadasSet[$u] = true;
+foreach ($ocupacao as $u => $_v) $usadasSet[$u] = true;
 
 $invalid = [];
 foreach ($paradas as $p) {
@@ -820,7 +858,28 @@ foreach ($paradas as $p) {
 }
 $invalid = array_values(array_unique($invalid));
 if (!empty($invalid)) {
-    respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $invalid) . '. Já utilizada(s) em outro carregamento (destino ou intermediária).']);
+    $det = [];
+    foreach ($invalid as $u) {
+        $occsMap = $ocupacao[$u] ?? null;
+        if (!$occsMap || !is_array($occsMap) || count($occsMap) === 0) { $det[] = $u; continue; }
+        $occs = array_values($occsMap);
+        $destPlacas = [];
+        $interPlacas = [];
+        foreach ($occs as $o) {
+            $tp = strtoupper(trim((string)($o['tipo'] ?? '')));
+            $pl = strtoupper(trim((string)($o['placa'] ?? '')));
+            if ($pl === '') continue;
+            if ($tp === 'DESTINO') $destPlacas[] = $pl;
+            else $interPlacas[] = $pl;
+        }
+        $destPlacas = array_values(array_unique($destPlacas));
+        $interPlacas = array_values(array_unique($interPlacas));
+        $parts = [];
+        if (!empty($destPlacas)) $parts[] = 'destino: ' . implode(', ', $destPlacas);
+        if (!empty($interPlacas)) $parts[] = 'intermediária: ' . implode(', ', $interPlacas);
+        $det[] = $u . (empty($parts) ? '' : ' (' . implode('; ', $parts) . ')');
+    }
+    respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $det) . '.']);
 }
 
 $paradasCsv = implode(',', $paradas);
