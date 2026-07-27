@@ -283,6 +283,95 @@ function shortLabel(v: any, n: number): string {
   return s.slice(0, n) + '…';
 }
 
+function noWrapLabel(v: any): string {
+  return String(v ?? '').replace(/\s+/g, '\u00A0');
+}
+
+function CrSingleValueTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
+  valueFormatter?: (v: number) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p0 = payload[0] ?? {};
+  const seriesName = String(p0?.name ?? p0?.dataKey ?? '').trim();
+  const rawVal = Number(p0?.value ?? p0?.payload?.value ?? 0) || 0;
+  const val = valueFormatter ? valueFormatter(rawVal) : String(rawVal);
+  const color = String(p0?.color || p0?.fill || '#64748b');
+  const title = label !== undefined && label !== null && String(label).trim() !== '' ? String(label) : '';
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm px-3 py-2 text-xs min-w-[220px]">
+      {title ? <div className="font-semibold mb-1.5">{title}</div> : null}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+          <span className="truncate">{seriesName || 'Valor'}</span>
+        </div>
+        <span className="font-mono">{val}</span>
+      </div>
+    </div>
+  );
+}
+
+function CrRiskTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: any;
+  valueFormatter?: (v: number) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const order: Record<string, number> = { d01_07: 1, d08_15: 2, d16_30: 3, d31_60: 4, d61_90: 5, d91_plus: 6 };
+  const title = label !== undefined && label !== null && String(label).trim() !== '' ? String(label) : '';
+  const lines = payload
+    .map((p: any) => {
+      const rawKey = String(p?.name ?? p?.dataKey ?? '').trim();
+      const rawVal = Number(p?.value ?? 0) || 0;
+      const color = String(p?.color || p?.fill || '#64748b');
+      return { rawKey, label: overdueBucketLabel(rawKey), value: rawVal, color };
+    })
+    .filter((l) => l.value > 0)
+    .sort((a, b) => (order[a.rawKey] ?? 999) - (order[b.rawKey] ?? 999));
+
+  const total = lines.reduce((s, l) => s + l.value, 0);
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm px-3 py-2 text-xs min-w-[220px]">
+      {title ? <div className="font-semibold mb-1.5">{title}</div> : null}
+      {lines.length === 0 ? (
+        <div className="text-slate-500 dark:text-slate-400">Sem atraso nesta unidade.</div>
+      ) : (
+        <>
+          <div className="space-y-1">
+            {lines.map((l, idx) => (
+              <div key={`${l.rawKey}-${idx}`} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: l.color }} />
+                  <span className="truncate">{l.label}</span>
+                </div>
+                <span className="font-mono">{valueFormatter ? valueFormatter(l.value) : String(l.value)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+            <span className="text-slate-600 dark:text-slate-300 font-semibold">Total</span>
+            <span className="font-mono font-semibold">{valueFormatter ? valueFormatter(total) : String(total)}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function formatDateTimeBr(v: any): string {
   const s = String(v ?? '').trim();
   if (!s) return '—';
@@ -1354,8 +1443,33 @@ export function ContasReceber() {
       return { ...it, name: ga?.name || it.name, is_grupo: ga?.is_grupo || it.is_grupo };
     });
     list.sort((a, b) => b.value - a.value);
-    return list.slice(0, 12);
+    return list;
   }, [data0103, grupoMap, rankGroupBy]);
+
+  const aFaturarByPagadorChart = useMemo(() => {
+    const base = aFaturarByPagador.slice().sort((a, b) => b.value - a.value);
+    const top = base.slice(0, 7);
+    const othersTotal = base.slice(7).reduce((acc, it) => acc + (Number(it.value) || 0), 0);
+    const out: Array<{ key: string; name: string; cnpj: string; is_grupo: boolean; value: number; _agg?: 'OUTROS' }> = top.map((t) => ({
+      key: t.key,
+      name: t.name,
+      cnpj: t.cnpj,
+      is_grupo: t.is_grupo,
+      value: t.value,
+    }));
+    if (othersTotal > 0) {
+      out.push({ key: '__OUTROS__', name: 'Demais clientes', cnpj: '__OUTROS__', is_grupo: false, value: othersTotal, _agg: 'OUTROS' });
+    }
+    return out;
+  }, [aFaturarByPagador]);
+
+  const aFaturarByPagadorTopKeys = useMemo(() => {
+    return aFaturarByPagador
+      .slice()
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7)
+      .map((x) => x.key);
+  }, [aFaturarByPagador]);
 
   const aFaturarByUnidadeResponsavel = useMemo(() => {
     const by: Record<string, number> = {};
@@ -2572,14 +2686,15 @@ export function ContasReceber() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
                         <YAxis type="category" dataKey="unit" width={60} interval={0} tick={{ fontSize: 10 }} />
-                        <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                        <RechartsTooltip content={(p: any) => <CrRiskTooltip {...p} valueFormatter={formatCurrency} />} />
                         <Legend formatter={(v: any) => overdueBucketLabel(String(v))} />
                         <Bar
                           dataKey="d01_07"
                           name="d01_07"
                           stackId="a"
                           fill="url(#cr_risk_01)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[6, 0, 0, 6]}
+                          barSize={18}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2598,7 +2713,7 @@ export function ContasReceber() {
                           name="d08_15"
                           stackId="a"
                           fill="url(#cr_risk_02)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[0, 0, 0, 0]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2621,7 +2736,7 @@ export function ContasReceber() {
                           name="d16_30"
                           stackId="a"
                           fill="url(#cr_risk_03)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[0, 0, 0, 0]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2644,7 +2759,7 @@ export function ContasReceber() {
                           name="d31_60"
                           stackId="a"
                           fill="url(#cr_risk_04)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[0, 0, 0, 0]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2667,7 +2782,7 @@ export function ContasReceber() {
                           name="d61_90"
                           stackId="a"
                           fill="url(#cr_risk_05)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[0, 0, 0, 0]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2690,7 +2805,7 @@ export function ContasReceber() {
                           name="d91_plus"
                           stackId="a"
                           fill="url(#cr_risk_06)"
-                          radius={[10, 10, 10, 10]}
+                          radius={[0, 6, 6, 0]}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.unitOverdueStack as any[])[idx];
                             const unit = String(row?.unit || '');
@@ -2745,7 +2860,7 @@ export function ContasReceber() {
                   </CardHeader>
                   <CardContent className="h-[320px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={mgmt.clientesTopOverdue} margin={{ top: 10, right: 10, bottom: 70, left: 0 }}>
+                      <BarChart data={mgmt.clientesTopOverdue} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }} barCategoryGap={12}>
                         <defs>
                           <linearGradient id="cr_top_overdue" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="#fbbf24" />
@@ -2753,22 +2868,15 @@ export function ContasReceber() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="name"
-                          interval={0}
-                          tickFormatter={(v) => shortLabel(v, 10)}
-                          tick={{ fontSize: 10 }}
-                          angle={-35}
-                          textAnchor="end"
-                          height={60}
-                        />
-                        <YAxis tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                        <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                        <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
+                        <YAxis type="category" dataKey="name" width={210} interval={0} tick={{ fontSize: 10 }} tickFormatter={(v) => noWrapLabel(shortLabel(v, 28))} />
+                        <RechartsTooltip content={(p: any) => <CrSingleValueTooltip {...p} valueFormatter={formatCurrency} />} />
                         <Bar
                           dataKey="value"
                           name="Atrasado"
                           fill="url(#cr_top_overdue)"
-                          radius={[8, 8, 8, 8]}
+                          radius={[10, 10, 10, 10]}
+                          barSize={20}
                           onClick={(_: any, idx: number) => {
                             const row = (mgmt.clientesTopOverdue as any[])[idx];
                             const name = String(row?.name || '').trim();
@@ -2977,7 +3085,7 @@ export function ContasReceber() {
                         <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={aFaturarByPagador} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }} barCategoryGap={6}>
+                          <BarChart data={aFaturarByPagadorChart} layout="vertical" margin={{ top: 10, right: 10, bottom: 0, left: 0 }} barCategoryGap={12}>
                             <defs>
                               <linearGradient id="cr_af_pag" x1="0" y1="0" x2="1" y2="0">
                                 <stop offset="0%" stopColor="#dbeafe" />
@@ -2986,26 +3094,30 @@ export function ContasReceber() {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis type="number" tickFormatter={(v) => formatNumber(Number(v) / 1000, 0) + 'k'} />
-                            <YAxis type="category" dataKey="name" width={118} tick={{ fontSize: 10 }} tickFormatter={(v) => shortLabel(v, 12)} interval={0} tickMargin={4} />
-                            <RechartsTooltip content={(p: any) => <CrChartTooltip {...p} valueFormatter={formatCurrency} />} />
+                            <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 10 }} tickFormatter={(v) => noWrapLabel(shortLabel(v, 18))} interval={0} tickMargin={4} />
+                            <RechartsTooltip content={(p: any) => <CrSingleValueTooltip {...p} valueFormatter={formatCurrency} />} />
                             <Bar
                               dataKey="value"
                               name="Frete"
                               fill="url(#cr_af_pag)"
                               radius={[10, 10, 10, 10]}
-                              barSize={26}
+                              barSize={22}
                               onClick={(d: any) => {
                                 const key = String(d?.payload?.key ?? d?.key ?? d?.name ?? '').trim();
                                 if (!key) return;
+                                const isOutros = key === '__OUTROS__' || (d?.payload?._agg ?? '') === 'OUTROS';
+                                const topKeys = new Set(aFaturarByPagadorTopKeys);
                                 const rows = (data0103?.rows || []).filter((r) => {
                                   const cnpj = String((r as any)?.cnpj_pagador || '').replace(/\D+/g, '');
+                                  let rKey = '';
                                   if (rankGroupBy === 'clientes') {
-                                    return cnpj !== '' ? cnpj === key : normTextKey((r as any)?.pagador) === normTextKey(key);
+                                    rKey = cnpj !== '' ? cnpj : (String((r as any)?.pagador || '').trim() || '—');
+                                  } else {
+                                    const gm = cnpj ? grupoMap[cnpj] : null;
+                                    const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
+                                    rKey = principal || cnpj || (String((r as any)?.pagador || '').trim() || '—');
                                   }
-                                  const gm = cnpj ? grupoMap[cnpj] : null;
-                                  const principal = gm?.cnpj_principal ? String(gm.cnpj_principal).replace(/\D+/g, '') : '';
-                                  const gKey = principal || cnpj || String((r as any)?.pagador || '').trim() || '—';
-                                  return gKey === key;
+                                  return isOutros ? !topKeys.has(rKey) : rKey === key;
                                 });
                                 const titleName = String(d?.payload?.name ?? d?.name ?? key).trim();
                                 abrirDrill(`A faturar · Pagador ${titleName}`, rows as any[], 'ctes0103');
