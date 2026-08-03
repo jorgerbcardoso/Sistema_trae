@@ -120,6 +120,7 @@ if ($modo === 'AGENDA') {
                 TO_CHAR(cte.data_emissao,  'DD/MM/YYYY') AS data_emissao,
                 TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
                 TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
+                TO_CHAR(cte.data_ult_ocor, 'DD/MM/YYYY') AS data_ult_ocor,
                 cte.data_entrega AS data_entrega,
                 (CASE
                     WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE
@@ -216,6 +217,7 @@ if ($modo === 'AGENDA') {
                     'endereco_entrega', endereco_entrega,
                     'bairro_entrega', bairro_entrega,
                     'ult_ocor', ult_ocor,
+                    'data_ult_ocor', data_ult_ocor,
                     'vlr_frete', vlr_frete,
                     'vlr_merc', vlr_merc,
                     'peso_real', peso_real,
@@ -236,6 +238,7 @@ if ($modo === 'AGENDA') {
             TO_CHAR(cte.data_emissao,  'DD/MM/YYYY') AS data_emissao,
             TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
             TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
+            TO_CHAR(cte.data_ult_ocor, 'DD/MM/YYYY') AS data_ult_ocor,
             cte.nome_pag,
             cte.nome_dest,
             cte.cnpj_dest,
@@ -311,6 +314,7 @@ if ($modo === 'AGENDA') {
             'data_emissao'      => $row['data_emissao'],
             'data_prev_ent'     => $row['data_prev_ent'],
             'data_prev_ent_iso' => $row['data_prev_ent_iso'],
+            'data_ult_ocor'     => $row['data_ult_ocor'],
             'nome_pag'          => $row['nome_pag'],
             'nome_dest'         => $row['nome_dest'],
             'cnpj_dest'         => $row['cnpj_dest'],
