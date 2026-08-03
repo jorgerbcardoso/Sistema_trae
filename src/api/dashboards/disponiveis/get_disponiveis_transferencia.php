@@ -685,7 +685,7 @@ if (!empty($ctes)) {
             $q = "SELECT cte.ser_cte, cte.nro_cte, cte.placa_coleta
                   FROM {$tableCte} cte
                   JOIN (VALUES " . implode(',', $values) . ") v(ser_cte, nro_cte)
-                    ON v.ser_cte = cte.ser_cte AND v.nro_cte = cte.nro_cte";
+                    ON v.ser_cte = cte.ser_cte AND v.nro_cte = (cte.nro_cte::text)";
             $resPc = sql($q, $params, $g_sql);
             if ($resPc && pg_num_rows($resPc) > 0) {
                 while ($r = pg_fetch_assoc($resPc)) {
