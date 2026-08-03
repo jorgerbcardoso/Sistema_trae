@@ -283,6 +283,11 @@ export function ContasPagar() {
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<RowDespesa[]>([]);
   const [drillSearch, setDrillSearch] = useState('');
+  const [drillSort, setDrillSort] = useState<{ key: 'prioridade' | 'lancto' | 'parcela' | 'nf' | 'inclusao' | 'evento' | 'fornecedor' | 'historico' | 'valor' | 'venc' | 'pgto' | 'status'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
+  const [selectedDespesa, setSelectedDespesa] = useState<RowDespesa | null>(null);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoTitle, setHistoricoTitle] = useState('');
+  const [historicoText, setHistoricoText] = useState('');
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
@@ -948,12 +953,14 @@ export function ContasPagar() {
     setDrillTitle(title);
     setDrillRows(list);
     setDrillSearch('');
+    setDrillSort({ key: 'prioridade', dir: 'asc' });
     setDrillOpen(true);
   }, []);
 
   const drillRowsFiltradas = useMemo(() => {
     const q = drillSearch.trim().toUpperCase();
     const safeTs = (t: number | null) => (t === null ? 9e15 : t);
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
     const statusRank = (s: string) => {
       const st = (s ?? '').toString().trim().toUpperCase();
       if (st === 'LIQU') return 2;
@@ -961,42 +968,82 @@ export function ContasPagar() {
       return 1;
     };
 
-    const arr = drillRows.slice();
-    arr.sort((a, b) => {
-      const ra = statusRank(a.sit_des);
-      const rb = statusRank(b.sit_des);
-      if (ra !== rb) return ra - rb;
-      const va = safeTs(parseDateBR(a.data_vencimento)?.getTime() ?? null);
-      const vb = safeTs(parseDateBR(b.data_vencimento)?.getTime() ?? null);
-      if (va !== vb) return va - vb;
-      const pa = safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null);
-      const pb = safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null);
-      if (pa !== pb) return pa - pb;
-      const xa = moedaToNumber(a.vlr_parcela);
-      const xb = moedaToNumber(b.vlr_parcela);
-      if (xa !== xb) return xb - xa;
-      return 0;
-    });
+    const formatDateShort = (s: string) => {
+      const v = (s ?? '').toString().trim();
+      const m = v.match(/^(\d{2})\/(\d{2})\/\d{4}$/);
+      if (m) return `${m[1]}/${m[2]}`;
+      if (v.length >= 5 && v.includes('/')) return v.slice(0, 5);
+      return v;
+    };
 
-    if (!q) return arr;
-    return arr.filter((r) => {
+    const base = drillRows.slice();
+    const arr = !q ? base : base.filter((r) => {
       const ev = `${String(r.evento ?? '')} ${String(r.evento_descricao ?? '')}`.trim();
       const hay = [
-        `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}`,
+        `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}-${String(r.parcela ?? '')}`,
         String(r.parcela ?? ''),
         String(r.nf ?? ''),
         ev,
         String(r.fornecedor_nome ?? ''),
         String(r.historico ?? ''),
         String(r.vlr_parcela ?? ''),
-        String(r.data_inclusao ?? ''),
-        String(r.data_vencimento ?? ''),
-        String(r.data_programacao_pgto ?? ''),
+        formatDateShort(String(r.data_inclusao ?? '')),
+        formatDateShort(String(r.data_vencimento ?? '')),
+        formatDateShort(String(r.data_programacao_pgto ?? '')),
         String(r.sit_des ?? ''),
       ].join(' ').toUpperCase();
       return hay.includes(q);
     });
-  }, [drillRows, drillSearch]);
+
+    const sortKey = drillSort.key;
+    const dir = drillSort.dir === 'desc' ? -1 : 1;
+    const statusLabel = (s: string) => {
+      const st = (s ?? '').toString().trim().toUpperCase();
+      if (st === 'LIQU') return 'LIQUIDADA';
+      if (st === 'CANC') return 'CANCELADA';
+      return 'PENDENTE';
+    };
+
+    arr.sort((a, b) => {
+      if (sortKey === 'prioridade') {
+        const ra = statusRank(a.sit_des);
+        const rb = statusRank(b.sit_des);
+        if (ra !== rb) return ra - rb;
+        const va = safeTs(parseDateBR(a.data_vencimento)?.getTime() ?? null);
+        const vb = safeTs(parseDateBR(b.data_vencimento)?.getTime() ?? null);
+        if (va !== vb) return va - vb;
+        const pa = safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null);
+        const pb = safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null);
+        if (pa !== pb) return pa - pb;
+        const xa = moedaToNumber(a.vlr_parcela);
+        const xb = moedaToNumber(b.vlr_parcela);
+        if (xa !== xb) return xb - xa;
+        return 0;
+      }
+
+      const lanA = `${String(a.unidade ?? '').trim().toUpperCase()} ${String(a.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+      const lanB = `${String(b.unidade ?? '').trim().toUpperCase()} ${String(b.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+
+      if (sortKey === 'lancto') return dir * cmpStr(lanA, lanB);
+      if (sortKey === 'parcela') return dir * (((Number(a.parcela) || 0) - (Number(b.parcela) || 0)));
+      if (sortKey === 'nf') return dir * cmpStr(String(a.nf ?? ''), String(b.nf ?? ''));
+      if (sortKey === 'inclusao') return dir * (safeTs(parseDateBR(a.data_inclusao)?.getTime() ?? null) - safeTs(parseDateBR(b.data_inclusao)?.getTime() ?? null));
+      if (sortKey === 'evento') {
+        const ea = `${String(a.evento ?? '').trim()} ${String(a.evento_descricao ?? '').trim()}`.trim();
+        const eb = `${String(b.evento ?? '').trim()} ${String(b.evento_descricao ?? '').trim()}`.trim();
+        return dir * cmpStr(ea, eb);
+      }
+      if (sortKey === 'fornecedor') return dir * cmpStr(String(a.fornecedor_nome ?? ''), String(b.fornecedor_nome ?? ''));
+      if (sortKey === 'historico') return dir * cmpStr(String(a.historico ?? ''), String(b.historico ?? ''));
+      if (sortKey === 'valor') return dir * (moedaToNumber(String(a.vlr_parcela ?? '')) - moedaToNumber(String(b.vlr_parcela ?? '')));
+      if (sortKey === 'venc') return dir * (safeTs(parseDateBR(a.data_vencimento)?.getTime() ?? null) - safeTs(parseDateBR(b.data_vencimento)?.getTime() ?? null));
+      if (sortKey === 'pgto') return dir * (safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null) - safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null));
+      if (sortKey === 'status') return dir * cmpStr(statusLabel(String(a.sit_des ?? '')), statusLabel(String(b.sit_des ?? '')));
+      return 0;
+    });
+
+    return arr;
+  }, [drillRows, drillSearch, drillSort]);
 
   const drillTotals = useMemo(() => {
     let total = 0;
@@ -1038,6 +1085,24 @@ export function ContasPagar() {
     });
     baixarCsv('contas_pagar_despesas', header, rowsCsv);
   }, [baixarCsv, drillRowsFiltradas]);
+
+  const toggleDrillSort = useCallback((key: 'prioridade' | 'lancto' | 'parcela' | 'nf' | 'inclusao' | 'evento' | 'fornecedor' | 'historico' | 'valor' | 'venc' | 'pgto' | 'status') => {
+    setDrillSort((s) => {
+      if (s.key === key) return { key, dir: s.dir === 'asc' ? 'desc' : 'asc' };
+      const defaultDir: 'asc' | 'desc' =
+        key === 'valor' ? 'desc' :
+        key === 'prioridade' ? 'asc' :
+        'asc';
+      return { key, dir: defaultDir };
+    });
+  }, []);
+
+  const openHistorico = useCallback((r: RowDespesa) => {
+    const lancto = `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}-${String(r.parcela ?? '')}`.trim();
+    setHistoricoTitle(`Histórico · ${lancto}`);
+    setHistoricoText(String(r.historico ?? '').toString().trim());
+    setHistoricoOpen(true);
+  }, []);
 
   const ProgramacaoTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -2261,7 +2326,7 @@ export function ContasPagar() {
                         return (
                           <button
                             key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
-                            onClick={() => abrirDrilldown(`Despesa ${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')} · Parcela ${String(r.parcela ?? '')}`, [n])}
+                            onClick={() => setSelectedDespesa(r)}
                             className="w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
                             <div className="col-span-2 font-mono">{lanc}</div>
@@ -2504,7 +2569,7 @@ export function ContasPagar() {
                           <button
                             type="button"
                             key={key}
-                            onClick={() => abrirDrilldown(`Despesa ${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')} · Parcela ${String(r.parcela ?? '')}`, [n])}
+                            onClick={() => setSelectedDespesa(r)}
                             className={`w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
                             title="Detalhes"
                           >
@@ -2566,25 +2631,51 @@ export function ContasPagar() {
           </div>
 
           <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="sticky top-0 z-20 grid grid-cols-[150px_70px_120px_110px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_120px_110px_110px_110px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
-              <div>Número Lanç.</div>
-              <div>Parc.</div>
-              <div>NF</div>
-              <div>Inclusão</div>
-              <div>Evento</div>
-              <div>Fornecedor</div>
-              <div>Histórico</div>
-              <div className="text-right pr-2">Valor</div>
-              <div>Venc.</div>
-              <div>Pgto</div>
-              <div>Status</div>
+            <div className="sticky top-0 z-20 grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('lancto')}>
+                Número Lanç.{drillSort.key === 'lancto' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('nf')}>
+                NF{drillSort.key === 'nf' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('inclusao')}>
+                Inclusão{drillSort.key === 'inclusao' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('evento')}>
+                Evento{drillSort.key === 'evento' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('fornecedor')}>
+                Fornecedor{drillSort.key === 'fornecedor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('historico')}>
+                Histórico{drillSort.key === 'historico' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-right pr-2 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('valor')}>
+                Valor{drillSort.key === 'valor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('venc')}>
+                Venc.{drillSort.key === 'venc' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('pgto')}>
+                Pgto{drillSort.key === 'pgto' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
+              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('status')}>
+                Status{drillSort.key === 'status' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              </button>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {drillRowsFiltradas.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Nenhuma despesa encontrada.</div>
               ) : (
                 drillRowsFiltradas.map((r) => {
-                  const lancto = `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+                  const dateShort = (s: string) => {
+                    const v = (s ?? '').toString().trim();
+                    const m = v.match(/^(\d{2})\/(\d{2})\/\d{4}$/);
+                    if (m) return `${m[1]}/${m[2]}`;
+                    if (v.length >= 5 && v.includes('/')) return v.slice(0, 5);
+                    return v;
+                  };
+                  const lancto = `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}-${String(r.parcela ?? '')}`.trim();
                   const evento = `${String(r.evento ?? '')} ${String(r.evento_descricao ?? '')}`.trim() || '—';
                   const sit = String(r.sit_des ?? '').toString().trim().toUpperCase();
                   const isLiqu = sit === 'LIQU';
@@ -2597,19 +2688,29 @@ export function ContasPagar() {
                       : 'bg-amber-100 text-amber-950 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900';
                   return (
                     <div
+                      role="button"
+                      tabIndex={0}
                       key={`${lancto}-${String(r.parcela ?? '')}-${String(r.evento ?? '')}-${String(r.fornecedor_cnpj ?? '')}-${String(r.nf ?? '')}`}
-                      className="grid grid-cols-[150px_70px_120px_110px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_120px_110px_110px_110px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      onClick={() => setSelectedDespesa(r)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedDespesa(r); }}
+                      className="grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left cursor-pointer"
                     >
                       <div className="font-mono">{lancto}</div>
-                      <div className="font-mono">{String(r.parcela ?? '') || '-'}</div>
                       <div className="font-mono truncate">{String(r.nf ?? '') || '-'}</div>
-                      <div className="font-mono">{String(r.data_inclusao ?? '') || '-'}</div>
+                      <div className="font-mono">{dateShort(String(r.data_inclusao ?? '')) || '-'}</div>
                       <div className="truncate">{evento}</div>
                       <div className="truncate">{String(r.fornecedor_nome ?? '') || '—'}</div>
-                      <div className="truncate">{String(r.historico ?? '') || '—'}</div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openHistorico(r); }}
+                        className="truncate text-left underline-offset-2 hover:underline text-slate-700 dark:text-slate-200"
+                        title="Ver histórico"
+                      >
+                        {String(r.historico ?? '') || '—'}
+                      </button>
                       <div className="text-right font-mono pr-2">{formatCurrency(moedaToNumber(r.vlr_parcela))}</div>
-                      <div className="font-mono">{String(r.data_vencimento ?? '') || '-'}</div>
-                      <div className="font-mono">{String(r.data_programacao_pgto ?? '') || '-'}</div>
+                      <div className="font-mono">{dateShort(String(r.data_vencimento ?? '')) || '-'}</div>
+                      <div className="font-mono">{dateShort(String(r.data_programacao_pgto ?? '')) || '-'}</div>
                       <div>
                         <Badge className={statusClass}>{statusLabel}</Badge>
                       </div>
@@ -2618,8 +2719,7 @@ export function ContasPagar() {
                 })
               )}
             </div>
-            <div className="sticky bottom-0 z-20 grid grid-cols-[150px_70px_120px_110px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_120px_110px_110px_110px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
-              <div />
+            <div className="sticky bottom-0 z-20 grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
               <div />
               <div />
               <div />
@@ -2632,6 +2732,93 @@ export function ContasPagar() {
               <div />
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historicoOpen} onOpenChange={setHistoricoOpen}>
+        <DialogContent className="sm:max-w-[760px] bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">{historicoTitle || 'Histórico'}</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">Histórico completo da despesa.</DialogDescription>
+          </DialogHeader>
+          <div className="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+            {historicoText || '—'}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedDespesa} onOpenChange={(o) => { if (!o) setSelectedDespesa(null); }}>
+        <DialogContent className="sm:max-w-[860px] bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">
+              {selectedDespesa
+                ? `Despesa ${String(selectedDespesa.unidade ?? '').trim().toUpperCase()} ${String(selectedDespesa.nro_lancto ?? 0).padStart(6, '0')}-${String(selectedDespesa.parcela ?? '')}`
+                : 'Despesa'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {selectedDespesa ? `${selectedDespesa.evento} · ${selectedDespesa.evento_descricao || '—'}` : '—'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDespesa && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Fornecedor</div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">{selectedDespesa.fornecedor_nome || '—'}</div>
+                <div className="text-xs font-mono text-slate-600 dark:text-slate-300">{selectedDespesa.fornecedor_cnpj || '—'}</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">NF</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.nf || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Situação</div>
+                  <div className="text-slate-900 dark:text-slate-100">
+                    {(selectedDespesa.sit_des || '').toString().toUpperCase() === 'LIQU'
+                      ? 'Liquidada'
+                      : (selectedDespesa.sit_des || '').toString().toUpperCase() === 'CANC'
+                        ? 'Cancelada'
+                        : 'Pendente'}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Valor</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{formatCurrency(moedaToNumber(selectedDespesa.vlr_parcela))}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Competência</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.mes_competencia || '—'}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Inclusão</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_inclusao || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Vencimento</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_vencimento || '—'}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Pagamento</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_programacao_pgto || '—'}</div>
+                </div>
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Grupo de evento</div>
+                <div className="text-slate-900 dark:text-slate-100">{selectedDespesa.grupo_evento || '—'}</div>
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <div className="text-xs text-slate-500 dark:text-slate-400">Histórico</div>
+                <div className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">{selectedDespesa.historico || '—'}</div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>
