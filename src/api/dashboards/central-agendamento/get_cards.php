@@ -94,11 +94,11 @@ $query = "
 
         " . $countExpr("cte.ult_ocor_agend = {$ocorAguardando} AND cte.data_entrega IS NULL") . " AS aguardando_agendamento,
 
-        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_prev_ent >= '{$data_hoje}' AND cte.data_entrega IS NULL") . " AS agendados_no_prazo,
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= '{$data_hoje}' AND cte.data_entrega IS NULL") . " AS agendados_no_prazo,
 
-        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_entrega IS NOT NULL AND (cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR oc.tipo = 'C')") . " AS agendamentos_cumpridos,
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_entrega IS NOT NULL AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)") . " AS agendamentos_cumpridos,
 
-        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND ((cte.data_entrega IS NULL AND cte.data_prev_ent < '{$data_hoje}') OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > cte.data_prev_ent)) AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C'))") . " AS agendamentos_perdidos
+        " . $countExpr("cte.ult_ocor_agend = {$ocorAgendamento} AND ((cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < '{$data_hoje}') OR (cte.data_entrega IS NOT NULL AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END))) AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')") . " AS agendamentos_perdidos
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text
     LEFT JOIN {$domain}_cliente c ON cte.cnpj_dest = c.cnpj

@@ -97,7 +97,7 @@ $query = "
         WHERE {$whereClause}
           AND cte.data_prev_ent IS NOT NULL
           AND data_entrega IS NOT NULL
-          AND (data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR oc.tipo = 'C')
+          AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
         GROUP BY dia
     )
     SELECT

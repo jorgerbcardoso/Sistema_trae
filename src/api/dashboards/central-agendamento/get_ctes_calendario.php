@@ -54,23 +54,23 @@ $params[] = $data;
 
 if ($tipo === 'no_prazo') {
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "(cte.data_entrega <= cte.data_prev_ent OR COALESCE(cte.entrega_abonada, false) = TRUE OR ocor.tipo = 'C')";
+    $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
 }
 if ($tipo === 'atrasados') {
     $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
     $whereConditions[] = "(cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
 }
 if ($tipo === 'atrasados_sem_entrega') {
     $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
     $whereConditions[] = "cte.data_entrega IS NULL";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
 }
 if ($tipo === 'entregues_com_atraso') {
     $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
     $whereConditions[] = "cte.data_entrega IS NOT NULL";
     $whereConditions[] = "cte.data_entrega > cte.data_prev_ent";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C'))";
+    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
