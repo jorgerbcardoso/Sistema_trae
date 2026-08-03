@@ -63,6 +63,7 @@ interface Cte {
   serCte: string;
   nroCte: number;
   seqCte?: number;
+  placaColeta?: string;
   tipo: string;
   emissao: string;
   prevEnt: string;
@@ -296,6 +297,34 @@ function TabelaCtes({
 }) {
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
+  const { user } = useAuth();
+  const unidadeLogada = (user?.unidade_atual || user?.unidade || '').trim().toUpperCase();
+  const siglaUsuario3 = (unidadeLogada || '').slice(0, 3);
+  const [coletaFiltro, setColetaFiltro] = useState<'todos' | 'minha' | 'outra' | 'sem'>('todos');
+
+  const getGrupoColeta = (cte: Cte): { tipo: 'minha' | 'outra' | 'sem'; title: string } => {
+    const placaColeta = String(cte.placaColeta ?? '').trim().toUpperCase();
+    if (placaColeta === 'ARMAZEM') return { tipo: 'sem', title: 'Sem coleta (cliente trouxe ao armazém)' };
+    const ser = String(cte.serCte ?? '').trim().toUpperCase().slice(0, 3);
+    if (ser && siglaUsuario3 && ser === siglaUsuario3) return { tipo: 'minha', title: `Coletado pela unidade ${siglaUsuario3}` };
+    return { tipo: 'outra', title: 'Coletado por outra unidade' };
+  };
+
+  const contagemColeta = React.useMemo(() => {
+    const acc = { minha: 0, outra: 0, sem: 0 };
+    for (const c of ctes) {
+      const g = getGrupoColeta(c);
+      if (g.tipo === 'minha') acc.minha += 1;
+      else if (g.tipo === 'sem') acc.sem += 1;
+      else acc.outra += 1;
+    }
+    return acc;
+  }, [ctes, siglaUsuario3]);
+
+  const ctesFiltrados = React.useMemo(() => {
+    if (coletaFiltro === 'todos') return ctes;
+    return ctes.filter((c) => getGrupoColeta(c).tipo === coletaFiltro);
+  }, [ctes, coletaFiltro, siglaUsuario3]);
 
   type SortCol =
     | 'ctrc'
@@ -347,7 +376,7 @@ function TabelaCtes({
 
   const ctesOrdenados = React.useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
-    const copy = [...ctes];
+    const copy = [...ctesFiltrados];
     const getStr = (v: any) => String(v ?? '').toUpperCase().trim();
     const getNum = (cte: Cte): number => {
       switch (sortCol) {
@@ -387,7 +416,7 @@ function TabelaCtes({
     };
     copy.sort((a, b) => dir * getCmp(a, b));
     return copy;
-  }, [ctes, sortCol, sortDir]);
+  }, [ctesFiltrados, sortCol, sortDir]);
 
   const ThBtn = ({ col, children, align }: { col: SortCol; children: React.ReactNode; align?: 'left' | 'right' | 'center' }) => {
     const base =
@@ -407,7 +436,7 @@ function TabelaCtes({
     );
   };
 
-  const selecionaveis = ctes.filter(c => {
+  const selecionaveis = ctesFiltrados.filter(c => {
     if (ctesNoCarregamento?.has(cteId(c))) return false;
     if (ctesJaCarregados?.has(cteId(c))) return false;
     return true;
@@ -428,6 +457,51 @@ function TabelaCtes({
           Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
         </div>
       )}
+      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 overflow-x-auto">
+        <Button
+          type="button"
+          size="sm"
+          variant={coletaFiltro === 'todos' ? 'default' : 'outline'}
+          className={coletaFiltro === 'todos' ? 'h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900' : 'h-8 text-xs'}
+          onClick={() => setColetaFiltro('todos')}
+        >
+          Todos
+          <Badge className="ml-2 bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">{ctes.length}</Badge>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={coletaFiltro === 'minha' ? 'default' : 'outline'}
+          className={coletaFiltro === 'minha' ? 'h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white' : 'h-8 text-xs'}
+          onClick={() => setColetaFiltro('minha')}
+        >
+          <Truck className="w-3.5 h-3.5 mr-1" />
+          Minha coleta
+          <Badge className="ml-2 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 text-[10px]">{contagemColeta.minha}</Badge>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={coletaFiltro === 'outra' ? 'default' : 'outline'}
+          className={coletaFiltro === 'outra' ? 'h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white' : 'h-8 text-xs'}
+          onClick={() => setColetaFiltro('outra')}
+        >
+          <Share2 className="w-3.5 h-3.5 mr-1" />
+          Outra unidade
+          <Badge className="ml-2 bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200 text-[10px]">{contagemColeta.outra}</Badge>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={coletaFiltro === 'sem' ? 'default' : 'outline'}
+          className={coletaFiltro === 'sem' ? 'h-8 text-xs bg-slate-600 hover:bg-slate-700 text-white' : 'h-8 text-xs'}
+          onClick={() => setColetaFiltro('sem')}
+        >
+          <Warehouse className="w-3.5 h-3.5 mr-1" />
+          Sem coleta
+          <Badge className="ml-2 bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">{contagemColeta.sem}</Badge>
+        </Button>
+      </div>
       <table className="w-full text-xs">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
@@ -447,6 +521,7 @@ function TabelaCtes({
               </th>
             )}
             <th className="px-3 py-2 text-left"><ThBtn col="ctrc">CTRC</ThBtn></th>
+            <th className="px-3 py-2 text-center w-[68px] font-semibold">Coleta</th>
             <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
@@ -502,6 +577,31 @@ function TabelaCtes({
                     {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {(() => {
+                    const g = getGrupoColeta(cte);
+                    const icon =
+                      g.tipo === 'sem' ? <Warehouse className="w-4 h-4 text-slate-500 mx-auto" /> :
+                      g.tipo === 'minha' ? <Truck className="w-4 h-4 text-emerald-600 mx-auto" /> :
+                      <Share2 className="w-4 h-4 text-indigo-600 mx-auto" />;
+                    const placa = String(cte.placaColeta ?? '').trim();
+                    return (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center justify-center w-full">{icon}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[260px]">
+                            <div className="text-xs">
+                              <div className="font-semibold">{g.title}</div>
+                              {placa !== '' && <div className="opacity-80 mt-1">Placa coleta: {placa}</div>}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })()}
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap" title={cte.nfiscal || ''}>
                   {cte.nfiscal || '-'}
@@ -2168,6 +2268,16 @@ type ResumoMassaLinha = {
   msg: string;
 };
 
+type SobrasCarregamento = {
+  placa: string;
+  destino: string;
+  paradas: string[];
+  nro_linha?: number;
+  sobras: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
+  capacidade?: { peso_kg?: number; cubagem?: number };
+  uso?: { peso_kg?: number; cubagem?: number; frete?: number };
+};
+
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
   onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
     ok: boolean;
@@ -2175,6 +2285,12 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     message?: string;
     resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
     resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    destino?: string;
+    paradas?: string[];
+    nro_linha?: number;
+    sobras?: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
+    capacidade?: { peso_kg?: number; cubagem?: number };
+    uso?: { peso_kg?: number; cubagem?: number; frete?: number };
   }>;
   onFechar: () => void;
   linhasOrigem: LinhaCarregamento[];
@@ -2314,7 +2430,23 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
           setResumoPlaca(result.placa);
           setResumoUnidades(result.resumo ?? []);
           setResumoDestinos(result.resumoDestinos ?? []);
-          setResumoDialogOpen(true);
+          if ((result.sobras?.qtd ?? 0) > 0) {
+            setSobrasItens([
+              {
+                placa: String(result.placa).trim().toUpperCase(),
+                destino: String(result.destino ?? unidadeDestino).trim().toUpperCase(),
+                paradas: Array.isArray(result.paradas) ? result.paradas : paradas,
+                nro_linha: result.nro_linha ?? 0,
+                sobras: result.sobras ?? { qtd: 0 },
+                capacidade: result.capacidade,
+                uso: result.uso,
+              },
+            ]);
+            setSobrasNext('resumo');
+            setSobrasDialogOpen(true);
+          } else {
+            setResumoDialogOpen(true);
+          }
         } else {
           onFechar();
         }
@@ -2330,6 +2462,10 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const [resumoDestinos, setResumoDestinos] = useState<{ unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[]>([]);
   const [resumoMassaDialogOpen, setResumoMassaDialogOpen] = useState(false);
   const [resumoMassaItens, setResumoMassaItens] = useState<ResumoMassaLinha[]>([]);
+
+  const [sobrasDialogOpen, setSobrasDialogOpen] = useState(false);
+  const [sobrasItens, setSobrasItens] = useState<SobrasCarregamento[]>([]);
+  const [sobrasNext, setSobrasNext] = useState<'fechar' | 'resumo' | 'resumo_massa'>('fechar');
 
   const [placasDialogOpen, setPlacasDialogOpen] = useState(false);
   const [placasDialogLinhas, setPlacasDialogLinhas] = useState<Array<{ nro: number; nome: string; destino: string; intermediarias: string }>>([]);
@@ -2387,6 +2523,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     try {
       setLoading(true);
       const itens: ResumoMassaLinha[] = [];
+      const sobras: SobrasCarregamento[] = [];
       let lastOk: { placa?: string; resumo?: any[]; resumoDestinos?: any[] } | null = null;
       let okCount = 0;
       let failCount = 0;
@@ -2400,21 +2537,33 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         const placaReal = (placasDialogValues[nro] ?? '').trim().toUpperCase();
         const forcarMinFrete = placasDialogMinFreteAbaixo.includes(nro);
 
+        const linha = porNro.get(nro);
+        const destinoLinha = (linha?.sigla_dest ?? '').trim().toUpperCase();
+        const intermediarias = linha ? getIntermediariasEfetivas(linha).join(', ') : '';
+
         const result = await onConfirmar(placaReal, '', [], nro, { recarregar: isLast, silent: true, forcarMinFrete });
         if (result.ok) {
           okCount++;
           lastOk = result;
+          if ((result.sobras?.qtd ?? 0) > 0) {
+            const destinoEf = String(result.destino ?? '').trim().toUpperCase() || destinoLinha || '-';
+            sobras.push({
+              placa: String(result.placa ?? placaReal).trim().toUpperCase(),
+              destino: destinoEf,
+              paradas: Array.isArray(result.paradas) ? result.paradas : [],
+              nro_linha: nro,
+              sobras: result.sobras ?? { qtd: 0 },
+              capacidade: result.capacidade,
+              uso: result.uso,
+            });
+          }
         } else {
           failCount++;
         }
-
-        const linha = porNro.get(nro);
-        const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
-        const intermediarias = linha ? getIntermediariasEfetivas(linha).join(', ') : '';
         itens.push({
           nro_linha: nro,
           placa: result.placa ?? placaReal,
-          destino: destino || '-',
+          destino: destinoLinha || '-',
           intermediarias: intermediarias || '-',
           status: result.ok ? 'criado' : 'erro',
           msg: (result.message ?? '').trim() || (result.ok ? 'Criado' : 'Falha ao carregar'),
@@ -2425,7 +2574,13 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
 
       if (multi) {
         setResumoMassaItens(itens);
-        setResumoMassaDialogOpen(true);
+        if (sobras.length > 0) {
+          setSobrasItens(sobras);
+          setSobrasNext('resumo_massa');
+          setSobrasDialogOpen(true);
+        } else {
+          setResumoMassaDialogOpen(true);
+        }
         if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
         if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
         return;
@@ -2435,7 +2590,13 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         setResumoPlaca(lastOk.placa);
         setResumoUnidades((lastOk.resumo as any) ?? []);
         setResumoDestinos((lastOk.resumoDestinos as any) ?? []);
-        setResumoDialogOpen(true);
+        if (sobras.length > 0) {
+          setSobrasItens(sobras);
+          setSobrasNext('resumo');
+          setSobrasDialogOpen(true);
+        } else {
+          setResumoDialogOpen(true);
+        }
       } else {
         onFechar();
       }
@@ -2456,6 +2617,96 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const handleFecharResumo = () => {
     setResumoDialogOpen(false);
     onFechar();
+  };
+
+  const handleFecharSobras = () => {
+    setSobrasDialogOpen(false);
+    const next = sobrasNext;
+    setSobrasNext('fechar');
+    if (next === 'resumo') setResumoDialogOpen(true);
+    else if (next === 'resumo_massa') setResumoMassaDialogOpen(true);
+    else onFechar();
+  };
+
+  const criarAdicionalComPlaca = async (
+    item: SobrasCarregamento,
+    placaReal: string,
+    currentItems: SobrasCarregamento[],
+    opts?: { recarregar?: boolean; silent?: boolean }
+  ) => {
+    const isLinha = (item.nro_linha ?? 0) > 0;
+    const result = await onConfirmar(
+      placaReal,
+      isLinha ? '' : item.destino,
+      isLinha ? [] : (item.paradas ?? []),
+      isLinha ? (item.nro_linha ?? 0) : undefined,
+      { recarregar: opts?.recarregar ?? true, silent: opts?.silent ?? false }
+    );
+    if (!result.ok) return { ok: false, result, nextItems: currentItems };
+    const nextItems = currentItems.filter((s) => s !== item);
+    if ((result.sobras?.qtd ?? 0) > 0) {
+      nextItems.push({
+        placa: String(result.placa ?? placaReal).trim().toUpperCase(),
+        destino: String(result.destino ?? item.destino).trim().toUpperCase(),
+        paradas: Array.isArray(result.paradas) ? result.paradas : (item.paradas ?? []),
+        nro_linha: (result.nro_linha ?? item.nro_linha) || 0,
+        sobras: result.sobras ?? { qtd: 0 },
+        capacidade: result.capacidade,
+        uso: result.uso,
+      });
+    }
+    return { ok: true, result, nextItems };
+  };
+
+  const handleCriarAdicional = async (item: SobrasCarregamento) => {
+    if (loading) return;
+    const hint = item.nro_linha ? ` para a linha ${String(item.nro_linha).padStart(3, '0')}` : ` para o destino ${item.destino}`;
+    const placaInformada = prompt(`Informe a placa REAL do veículo${hint}:`, '');
+    const placaReal = (placaInformada ?? '').trim().toUpperCase();
+    if (!placaReal) return;
+    try {
+      setLoading(true);
+      const r = await criarAdicionalComPlaca(item, placaReal, sobrasItens, { recarregar: true });
+      if (r.ok) {
+        setSobrasItens(r.nextItems);
+        if (r.nextItems.length === 0) handleFecharSobras();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCriarAdicionaisTodos = async () => {
+    if (loading) return;
+    if (sobrasItens.length === 0) return;
+    try {
+      setLoading(true);
+      let okCount = 0;
+      let failCount = 0;
+      const snapshot = sobrasItens.slice();
+      let current = sobrasItens.slice();
+      for (let i = 0; i < snapshot.length; i++) {
+        const item = snapshot[i];
+        if (!current.includes(item)) continue;
+        const hint = item.nro_linha ? `linha ${String(item.nro_linha).padStart(3, '0')}` : `destino ${item.destino}`;
+        const placaInformada = prompt(`Informe a placa REAL do veículo para ${hint}:`, '');
+        const placaReal = (placaInformada ?? '').trim().toUpperCase();
+        if (!placaReal) break;
+        const r = await criarAdicionalComPlaca(item, placaReal, current, { recarregar: true, silent: true });
+        if (r.ok) {
+          okCount++;
+          current = r.nextItems;
+          setSobrasItens(current);
+        } else {
+          failCount++;
+        }
+      }
+      if (okCount > 0) toast.success(`${okCount} carregamento(s) adicional(is) criado(s).`);
+      if (failCount > 0) toast.error(`${failCount} item(ns) falharam ao criar adicional.`);
+      if (current.length === 0) handleFecharSobras();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFecharResumoMassa = () => {
@@ -2765,6 +3016,64 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
           </div>
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={handleFecharResumo}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={sobrasDialogOpen} onOpenChange={(v) => { if (!v) handleFecharSobras(); else setSobrasDialogOpen(true); }}>
+        <DialogContent className="sm:max-w-[900px]">
+          <DialogHeader>
+            <DialogTitle>Sobras no armazém</DialogTitle>
+            <DialogDescription>Há mercadoria além do que coube no(s) veículo(s). Criar carregamento adicional?</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden min-w-0">
+            <div className="grid grid-cols-[140px_70px_minmax(0,1fr)_100px_110px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <span>Carregamento</span>
+              <span>Dest.</span>
+              <span>Sobras</span>
+              <span className="text-right">Uso</span>
+              <span className="text-right">Ação</span>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {sobrasItens.length === 0 ? (
+                <div className="px-3 py-4 text-xs text-slate-400 text-center">—</div>
+              ) : sobrasItens.map((s, idx) => {
+                const sob = s.sobras ?? { qtd: 0 };
+                const cap = s.capacidade ?? {};
+                const uso = s.uso ?? {};
+                const usoStr = (cap.peso_kg && cap.peso_kg > 0)
+                  ? `${Math.min(999, Math.round(((uso.peso_kg ?? 0) / cap.peso_kg) * 100))}%`
+                  : (cap.cubagem && cap.cubagem > 0)
+                    ? `${Math.min(999, Math.round(((uso.cubagem ?? 0) / cap.cubagem) * 100))}%`
+                    : '—';
+                const detalhe = [
+                  `${sob.qtd || 0} CT-e(s)`,
+                  `${(sob.peso_kg ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`,
+                  `${(sob.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} m³`,
+                  `${(sob.frete ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+                  s.paradas?.length ? `Paradas: ${s.paradas.join(', ')}` : '',
+                  (s.nro_linha ?? 0) > 0 ? `Linha: ${String(s.nro_linha).padStart(3, '0')}` : '',
+                ].filter(Boolean).join(' · ');
+                return (
+                  <div key={`${s.placa}-${idx}`} className="grid grid-cols-[140px_70px_minmax(0,1fr)_100px_110px] gap-2 px-3 py-2 text-xs items-center">
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{s.placa}</span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{s.destino || '-'}</span>
+                    <span className="text-[11px] text-slate-600 dark:text-slate-300 truncate" title={detalhe}>{detalhe}</span>
+                    <span className="text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">{usoStr}</span>
+                    <div className="flex justify-end">
+                      <Button size="sm" className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white" onClick={() => handleCriarAdicional(s)} disabled={loading}>
+                        Criar adicional
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleCriarAdicionaisTodos} disabled={loading || sobrasItens.length === 0}>
+              Criar adicionais (todos)
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleFecharSobras} disabled={loading}>Agora não</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -3655,7 +3964,19 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento]);
 
-  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{ ok: boolean; placa?: string; message?: string; resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[]; resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number }[] }> => {
+  const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{
+    ok: boolean;
+    placa?: string;
+    message?: string;
+    resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    destino?: string;
+    paradas?: string[];
+    nro_linha?: number;
+    sobras?: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
+    capacidade?: { peso_kg?: number; cubagem?: number };
+    uso?: { peso_kg?: number; cubagem?: number; frete?: number };
+  }> => {
     const recarregar = opts?.recarregar ?? true;
     const silent = opts?.silent ?? false;
     const forcarMinFrete = opts?.forcarMinFrete ?? false;
@@ -3694,8 +4015,27 @@ export function Disponiveis() {
       if (res.success) {
         if (!silent) toast.success(res.message || 'Carregamento automático iniciado!');
         if (recarregar) await carregarCarregamentos();
-        return { ok: true, placa: res.placa, message: res.message, resumo: res.resumo_unidades, resumoDestinos: res.resumo_destinos };
+        return {
+          ok: true,
+          placa: res.placa,
+          message: res.message,
+          resumo: res.resumo_unidades,
+          resumoDestinos: res.resumo_destinos,
+          destino: res.destino,
+          paradas: res.paradas,
+          nro_linha: res.nro_linha,
+          sobras: res.sobras,
+          capacidade: res.capacidade,
+          uso: res.uso,
+        };
       } else {
+        if (!silent && !forcarMinFrete && String(res?.code ?? '') === 'MIN_FRETE') {
+          const freteAtual = Number(res?.frete_atual ?? 0) || 0;
+          const minFrete = Number(res?.min_frete ?? 0) || 0;
+          if (confirm(`Frete atual abaixo do mínimo da linha.\n\nFrete: ${freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\nMínimo: ${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\nContinuar mesmo assim?`)) {
+            return await handleCarregamentoAutomatico(placa, unidadeDestino, paradas, nroLinha, { ...opts, forcarMinFrete: true });
+          }
+        }
         if (!silent) toast.error(res.message || 'Erro ao iniciar carregamento automático');
         return { ok: false, message: res.message };
       }

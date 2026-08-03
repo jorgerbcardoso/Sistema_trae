@@ -89,6 +89,28 @@ function parseNumero($value) {
     return (float)$s;
 }
 
+function getCtesJaUsadosEmCarregamentos($conn, $tabela, $unidade) {
+    $unidade = strtoupper(trim((string)$unidade));
+    $set = [];
+    try {
+        $res = sql(
+            "SELECT ser_cte, nro_cte
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
+            [$unidade],
+            $conn
+        );
+        while ($res && ($r = pg_fetch_assoc($res))) {
+            $ser = strtoupper(trim((string)($r['ser_cte'] ?? '')));
+            $nro = (int)($r['nro_cte'] ?? 0);
+            if ($ser === '' || $nro <= 0) continue;
+            $set[$ser . '|' . $nro] = true;
+        }
+    } catch (Exception $e) {}
+    return $set;
+}
+
 function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
     $unidade = strtoupper(trim((string)$unidade));
     $usadas = [];
@@ -442,12 +464,17 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
  * respeitando a capacidade do veículo.
  * Retorna array de objetos CT-e prontos para inserção.
  */
-function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFinal, $intermediarias, $limitePesoKg, $limiteVolM3) {
+function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFinal, $intermediarias, $limitePesoKg, $limiteVolM3, &$meta = null) {
     $unidadeOrigem = strtoupper(trim((string)$unidadeOrigem));
     $destinoFinal  = strtoupper(trim((string)$destinoFinal));
     $intermediarias = array_values(array_filter(array_map(function($u) {
         return strtoupper(trim((string)$u));
     }, (array)$intermediarias)));
+
+    $ctesOcupados = [];
+    if (isset($GLOBALS['ctesOcupados']) && is_array($GLOBALS['ctesOcupados'])) {
+        $ctesOcupados = $GLOBALS['ctesOcupados'];
+    }
 
     $prioridade = [];
     $addUnique = static function(array &$arr, string $v): void {
@@ -470,6 +497,9 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
     };
 
     $filtrados = [];
+    $totPeso = 0.0;
+    $totVol  = 0.0;
+    $totFrete = 0.0;
     foreach ($ctesDisponiveis as $cte) {
         $nroCte = (int)($cte['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
@@ -479,6 +509,12 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
 
         $unidDest = strtoupper(trim((string)($cte['unidadeDest'] ?? $cte['destinoCte'] ?? $cte['destino_cte'] ?? $cte['destino'] ?? '')));
         if ($unidDest === '' || !isset($idxDestino[$unidDest])) continue;
+
+        $serCte = strtoupper(trim((string)($cte['serCte'] ?? $cte['ser_cte'] ?? '')));
+        if ($serCte !== '') {
+            $kUsed = $serCte . '|' . $nroCte;
+            if (isset($ctesOcupados[$kUsed])) continue;
+        }
 
         $domainUpper = '';
         if (isset($GLOBALS['domain'])) $domainUpper = strtoupper(trim((string)$GLOBALS['domain']));
@@ -506,17 +542,48 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
     $selecionados = [];
     $somaPeso     = 0.0;
     $somaVol      = 0.0;
+    $somaFrete    = 0.0;
+    $skippedByCap = 0;
 
     foreach ($filtrados as $cte) {
         $peso = parseNumero($cte['peso']    ?? 0);
         $cub  = parseNumero($cte['cubagem'] ?? 0);
+        $frete = parseNumero($cte['frete'] ?? 0);
 
-        if ($somaPeso + $peso > $limitePesoKg || $somaVol + $cub > $limiteVolM3) continue;
+        $totPeso += $peso;
+        $totVol  += $cub;
+        $totFrete += $frete;
+
+        if ($somaPeso + $peso > $limitePesoKg || $somaVol + $cub > $limiteVolM3) { $skippedByCap++; continue; }
 
         $somaPeso += $peso;
         $somaVol  += $cub;
+        $somaFrete += $frete;
         $selecionados[] = $cte;
     }
+
+    $qtdTotal = count($filtrados);
+    $qtdSel = count($selecionados);
+    $qtdSobra = max(0, $qtdTotal - $qtdSel);
+
+    $meta = [
+        'limite_peso_kg' => (float)$limitePesoKg,
+        'limite_vol_m3'  => (float)$limiteVolM3,
+        'usado_peso_kg'  => (float)$somaPeso,
+        'usado_vol_m3'   => (float)$somaVol,
+        'usado_frete'    => (float)$somaFrete,
+        'total_peso_kg'  => (float)$totPeso,
+        'total_vol_m3'   => (float)$totVol,
+        'total_frete'    => (float)$totFrete,
+        'qtd_total'      => (int)$qtdTotal,
+        'qtd_sel'        => (int)$qtdSel,
+        'qtd_sobra'      => (int)$qtdSobra,
+        'peso_sobra_kg'  => max(0.0, (float)$totPeso - (float)$somaPeso),
+        'vol_sobra_m3'   => max(0.0, (float)$totVol - (float)$somaVol),
+        'frete_sobra'    => max(0.0, (float)$totFrete - (float)$somaFrete),
+        'skipped_by_cap' => (int)$skippedByCap,
+        'tem_sobra'      => ($qtdSobra > 0),
+    ];
 
     return $selecionados;
 }
@@ -688,6 +755,8 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
     }
 
+    $GLOBALS['ctesOcupados'] = getCtesJaUsadosEmCarregamentos($conn, $tabela, $unidade);
+
     set_time_limit(180);
     $ctesUnicos = [];
     foreach ($ctesDisponiveis as $cte) {
@@ -811,7 +880,8 @@ if ($modoAutomatico) {
     }
 
     list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaAuto);
-    $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $dest, $paradasLinha, $limitePeso, $limiteVol);
+    $metaSel = null;
+    $ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $dest, $paradasLinha, $limitePeso, $limiteVol, $metaSel);
 
     if (empty($ctesSelecionados)) {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos desta linha.']);
@@ -834,6 +904,24 @@ if ($modoAutomatico) {
         'message'         => "{$inseridos} CT-e(s) adicionados ao carregamento {$placaAuto}.",
         'resultados'      => [['placa' => $placaAuto, 'status' => 'criado', 'msg' => "{$inseridos} CT-e(s) adicionados."]],
         'placa'           => $placaAuto,
+        'nro_linha'       => $nroLinha,
+        'destino'         => $dest,
+        'paradas'         => $paradasLinha,
+        'sobras'          => [
+            'qtd' => (int)($metaSel['qtd_sobra'] ?? 0),
+            'peso_kg' => round((float)($metaSel['peso_sobra_kg'] ?? 0.0), 2),
+            'cubagem' => round((float)($metaSel['vol_sobra_m3'] ?? 0.0), 3),
+            'frete' => round((float)($metaSel['frete_sobra'] ?? 0.0), 2),
+        ],
+        'capacidade'      => [
+            'peso_kg' => round((float)($metaSel['limite_peso_kg'] ?? 0.0), 2),
+            'cubagem' => round((float)($metaSel['limite_vol_m3'] ?? 0.0), 3),
+        ],
+        'uso'             => [
+            'peso_kg' => round((float)($metaSel['usado_peso_kg'] ?? 0.0), 2),
+            'cubagem' => round((float)($metaSel['usado_vol_m3'] ?? 0.0), 3),
+            'frete' => round((float)($metaSel['usado_frete'] ?? 0.0), 2),
+        ],
         'resumo_unidades' => $resumoUnidades,
         'resumo_destinos' => $resumoDestinos,
     ]);
@@ -893,6 +981,8 @@ if (empty($ctesDisponiveis)) {
     respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível enviado pelo painel. Recarregue os dados e tente novamente.']);
 }
 
+$GLOBALS['ctesOcupados'] = getCtesJaUsadosEmCarregamentos($conn, $tabela, $unidade);
+
 set_time_limit(180);
 $ctesUnicos = [];
 foreach ($ctesDisponiveis as $cte) {
@@ -905,7 +995,8 @@ foreach ($ctesDisponiveis as $cte) {
 $ctesDisponiveis = array_values($ctesUnicos);
 
 list($limitePeso, $limiteVol) = getCapacidadeVeiculo($conn, $tabelaVeiculo, $placaFinal);
-$ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $unidadeDestino, $paradas, $limitePeso, $limiteVol);
+$metaSel = null;
+$ctesSelecionados = filtrarCtesPorCapacidade($ctesDisponiveis, $unidade, $unidadeDestino, $paradas, $limitePeso, $limiteVol, $metaSel);
 
 if (empty($ctesSelecionados)) {
     respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos informados.']);
@@ -927,6 +1018,24 @@ respondJson([
     'success'         => true,
     'message'         => "{$inseridos} CT-e(s) adicionados ao carregamento {$placaFinal}.",
     'placa'           => $placaFinal,
+    'nro_linha'       => 0,
+    'destino'         => $unidadeDestino,
+    'paradas'         => $paradas,
+    'sobras'          => [
+        'qtd' => (int)($metaSel['qtd_sobra'] ?? 0),
+        'peso_kg' => round((float)($metaSel['peso_sobra_kg'] ?? 0.0), 2),
+        'cubagem' => round((float)($metaSel['vol_sobra_m3'] ?? 0.0), 3),
+        'frete' => round((float)($metaSel['frete_sobra'] ?? 0.0), 2),
+    ],
+    'capacidade'      => [
+        'peso_kg' => round((float)($metaSel['limite_peso_kg'] ?? 0.0), 2),
+        'cubagem' => round((float)($metaSel['limite_vol_m3'] ?? 0.0), 3),
+    ],
+    'uso'             => [
+        'peso_kg' => round((float)($metaSel['usado_peso_kg'] ?? 0.0), 2),
+        'cubagem' => round((float)($metaSel['usado_vol_m3'] ?? 0.0), 3),
+        'frete' => round((float)($metaSel['usado_frete'] ?? 0.0), 2),
+    ],
     'resumo_unidades' => $resumoUnidades,
     'resumo_destinos' => $resumoDestinos,
 ]);

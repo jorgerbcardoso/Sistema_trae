@@ -652,6 +652,61 @@ if (
     }
 }
 
+$placaColetaMap = [];
+if (!empty($ctes)) {
+    $tableCte = strtolower($domain) . '_cte';
+    $tableOk = false;
+    $check = sql("SELECT to_regclass('public.' || $1) AS reg", [$tableCte], $g_sql);
+    if ($check && pg_num_rows($check) > 0) {
+        $reg = pg_fetch_result($check, 0, 0);
+        $tableOk = !empty($reg);
+    }
+
+    if ($tableOk) {
+        $pares = [];
+        foreach ($ctes as $c) {
+            $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
+            $nro = (int)($c['nroCte'] ?? 0);
+            if ($ser === '' || $nro <= 0) continue;
+            $pares[$ser . '|' . $nro] = [$ser, $nro];
+        }
+
+        if (!empty($pares)) {
+            $values = [];
+            $params = [];
+            $i = 1;
+            foreach ($pares as $p) {
+                $values[] = '($' . $i . ', $' . ($i + 1) . ')';
+                $params[] = $p[0];
+                $params[] = $p[1];
+                $i += 2;
+            }
+
+            $q = "SELECT cte.ser_cte, cte.nro_cte, cte.placa_coleta
+                  FROM {$tableCte} cte
+                  JOIN (VALUES " . implode(',', $values) . ") v(ser_cte, nro_cte)
+                    ON v.ser_cte = cte.ser_cte AND v.nro_cte = cte.nro_cte";
+            $resPc = sql($q, $params, $g_sql);
+            if ($resPc && pg_num_rows($resPc) > 0) {
+                while ($r = pg_fetch_assoc($resPc)) {
+                    $ser = strtoupper(trim((string)($r['ser_cte'] ?? '')));
+                    $nro = (int)($r['nro_cte'] ?? 0);
+                    if ($ser === '' || $nro <= 0) continue;
+                    $pc = trim((string)($r['placa_coleta'] ?? ''));
+                    $placaColetaMap[$ser . '|' . $nro] = $pc;
+                }
+            }
+        }
+    }
+
+    foreach ($ctes as $i => $c) {
+        $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
+        $nro = (int)($c['nroCte'] ?? 0);
+        if ($ser === '' || $nro <= 0) continue;
+        $ctes[$i]['placaColeta'] = $placaColetaMap[$ser . '|' . $nro] ?? '';
+    }
+}
+
 respondJson([
     'success' => true,
     'data'    => [

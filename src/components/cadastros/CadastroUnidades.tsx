@@ -560,7 +560,7 @@ export function CadastroUnidades() {
                         {getSortIcon('longitude')}
                       </TableHead>
                       <TableHead className="cursor-pointer" onClick={() => handleSort('unidades_compart')}>
-                        Unidades do Hubby
+                        Unidades Compartilhadas
                         {getSortIcon('unidades_compart')}
                       </TableHead>
                       <TableHead className="w-[140px] cursor-pointer text-center" onClick={() => handleSort('efetua_carregamento')}>
@@ -730,7 +730,7 @@ export function CadastroUnidades() {
                   value={formData.unidadesHubby}
                   onChange={(value) => setFormData((p) => ({ ...p, unidadesHubby: value }))}
                   domain={user?.domain}
-                  label="Unidades do Hubby"
+                  label="Unidades Compartilhadas"
                 />
               </div>
             </div>
