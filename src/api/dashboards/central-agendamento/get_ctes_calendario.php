@@ -52,25 +52,27 @@ $whereConditions = [
 ];
 $params[] = $data;
 
-if ($tipo === 'no_prazo') {
-    $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
-}
-if ($tipo === 'atrasados') {
-    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
-    $whereConditions[] = "(cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
-}
-if ($tipo === 'atrasados_sem_entrega') {
-    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
-    $whereConditions[] = "cte.data_entrega IS NULL";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
-}
-if ($tipo === 'entregues_com_atraso') {
-    $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
-    $whereConditions[] = "cte.data_entrega IS NOT NULL";
-    $whereConditions[] = "cte.data_entrega > cte.data_prev_ent";
-    $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
+if ($modo !== 'AGENDA') {
+    if ($tipo === 'no_prazo') {
+        $whereConditions[] = "cte.data_entrega IS NOT NULL";
+        $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+    }
+    if ($tipo === 'atrasados') {
+        $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
+        $whereConditions[] = "(cte.data_entrega IS NULL OR cte.data_entrega > cte.data_prev_ent)";
+        $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
+    }
+    if ($tipo === 'atrasados_sem_entrega') {
+        $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
+        $whereConditions[] = "cte.data_entrega IS NULL";
+        $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
+    }
+    if ($tipo === 'entregues_com_atraso') {
+        $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
+        $whereConditions[] = "cte.data_entrega IS NOT NULL";
+        $whereConditions[] = "cte.data_entrega > cte.data_prev_ent";
+        $whereConditions[] = "(COALESCE(cte.entrega_abonada, false) = FALSE AND (ocor.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')";
+    }
 }
 
 if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
@@ -101,9 +103,16 @@ $ocorrenciaJoin = "
 ";
 
 if ($modo === 'AGENDA') {
+    $agendaFilterSql = 'TRUE';
+    if ($tipo === 'no_prazo') $agendaFilterSql = 'all_delivered AND NOT any_late';
+    elseif ($tipo === 'entregues_com_atraso') $agendaFilterSql = 'all_delivered AND any_late';
+    elseif ($tipo === 'atrasados_sem_entrega') $agendaFilterSql = '(NOT all_delivered) AND any_pending_late';
+    elseif ($tipo === 'atrasados') $agendaFilterSql = '((NOT all_delivered) AND any_pending_late) OR (all_delivered AND any_late)';
+
     $query = "
         WITH base AS (
             SELECT
+                md5(COALESCE(cte.cnpj_emit::text,'') || '|' || COALESCE(cte.cep_entrega::text,'') || '|' || COALESCE(cte.endereco_entrega::text,'')) AS agenda_id,
                 cte.ser_cte,
                 cte.nro_cte,
                 cte.data_emissao::date AS data_emissao_dt,
@@ -111,6 +120,12 @@ if ($modo === 'AGENDA') {
                 TO_CHAR(cte.data_emissao,  'DD/MM/YYYY') AS data_emissao,
                 TO_CHAR(cte.data_prev_ent, 'DD/MM/YYYY') AS data_prev_ent,
                 TO_CHAR(cte.data_prev_ent, 'YYYY-MM-DD') AS data_prev_ent_iso,
+                cte.data_entrega AS data_entrega,
+                (CASE
+                    WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE
+                    WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE
+                    ELSE cte.data_prev_ent
+                END) AS prev_eff,
                 cte.nome_pag,
                 cte.nome_dest,
                 cte.cnpj_dest,
@@ -142,9 +157,28 @@ if ($modo === 'AGENDA') {
             LEFT JOIN cidade cid_entr ON cte.seq_cidade_entr = cid_entr.seq_cidade
             {$ocorrenciaJoin}
             {$whereClause}
+        ),
+        agenda_stats AS (
+            SELECT
+                agenda_id,
+                BOOL_AND(data_entrega IS NOT NULL) AS all_delivered,
+                BOOL_OR((data_entrega IS NOT NULL) AND (data_entrega > prev_eff)) AS any_late,
+                BOOL_OR((data_entrega IS NULL) AND (prev_eff::date < CURRENT_DATE)) AS any_pending_late
+            FROM base
+            GROUP BY agenda_id
+        ),
+        agendas_filtradas AS (
+            SELECT agenda_id
+            FROM agenda_stats
+            WHERE {$agendaFilterSql}
+        ),
+        base_sel AS (
+            SELECT b.*
+            FROM base b
+            JOIN agendas_filtradas f ON f.agenda_id = b.agenda_id
         )
         SELECT
-            md5(COALESCE(cnpj_emit::text,'') || '|' || COALESCE(cep_entrega::text,'') || '|' || COALESCE(endereco_entrega::text,'')) AS agenda_id,
+            agenda_id,
             MAX(cnpj_emit) AS cnpj_emit,
             MAX(cep_entrega) AS cep_entrega,
             MAX(endereco_entrega) AS endereco_entrega,
@@ -190,7 +224,7 @@ if ($modo === 'AGENDA') {
                 )
                 ORDER BY data_emissao_dt DESC, nro_cte DESC
             ) AS ctes
-        FROM base
+        FROM base_sel
         GROUP BY agenda_id
         ORDER BY MAX(nome_dest), MAX(endereco_entrega), agenda_id
     ";

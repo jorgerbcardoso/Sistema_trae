@@ -83,7 +83,7 @@ if (!$tableExists) {
 }
 
 // ================================================================
-// CONSTRUIR QUERY - IGNORAR FILTRO DE UNIDADES DE DESTINO
+// CONSTRUIR QUERY COM TODOS OS FILTROS
 // ================================================================
 $params = [];
 $paramIndex = 1;
@@ -119,7 +119,16 @@ if (!empty($filters['periodoPrevisaoFim'])) {
     $paramIndex++;
 }
 
-// ❌ NÃO APLICAR: Unidade de Destino
+// Filtro: Unidade de Destino (✅ SUPORTA MÚLTIPLAS UNIDADES)
+if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) && count($filters['unidadeDestino']) > 0) {
+    $placeholders = [];
+    foreach ($filters['unidadeDestino'] as $sigla) {
+        $placeholders[] = '$' . $paramIndex;
+        $params[] = $sigla;
+        $paramIndex++;
+    }
+    $whereConditions[] = 'cte.sigla_dest IN (' . implode(', ', $placeholders) . ')';
+}
 
 // Filtro: CNPJ Pagador
 if (!empty($filters['cnpjPagador'])) {

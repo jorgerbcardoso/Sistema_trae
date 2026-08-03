@@ -67,88 +67,150 @@ $whereClause = implode(' AND ', $whereConditions);
 $agendaKeyExpr = "md5(COALESCE(cte.cnpj_emit::text,'') || '|' || COALESCE(cte.cep_entrega::text,'') || '|' || COALESCE(cte.endereco_entrega::text,''))";
 $countExpr = ($modo === 'AGENDA') ? "COUNT(DISTINCT {$agendaKeyExpr})" : "COUNT(*)";
 
-$query = "
-    WITH dias AS (
-        SELECT generate_series(
-            CURRENT_DATE - INTERVAL '{$periodo} days',
-            CURRENT_DATE + INTERVAL '7 days',
-            '1 day'::interval
-        )::date AS dia
-    ),
-    agendados AS (
+$query = '';
+if ($modo === 'AGENDA') {
+    $query = "
+        WITH dias AS (
+            SELECT generate_series(
+                CURRENT_DATE - INTERVAL '{$periodo} days',
+                CURRENT_DATE + INTERVAL '7 days',
+                '1 day'::interval
+            )::date AS dia
+        ),
+        base AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$agendaKeyExpr} AS agenda_id,
+                cte.data_entrega AS data_entrega,
+                (CASE
+                    WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE
+                    WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE
+                    ELSE cte.data_prev_ent
+                END) AS prev_eff
+            FROM {$domain}_cte cte
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo
+                FROM {$domain}_ocorrencia
+                GROUP BY codigo::text
+            ) oc ON oc.codigo = cte.ult_ocor::text
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+        ),
+        agenda_stats AS (
+            SELECT
+                dia,
+                agenda_id,
+                BOOL_AND(data_entrega IS NOT NULL) AS all_delivered,
+                BOOL_OR((data_entrega IS NOT NULL) AND (data_entrega > prev_eff)) AS any_late,
+                BOOL_OR((data_entrega IS NULL) AND (prev_eff::date < CURRENT_DATE)) AS any_pending_late
+            FROM base
+            GROUP BY dia, agenda_id
+        ),
+        agg AS (
+            SELECT
+                dia,
+                COUNT(*) AS agendados,
+                COUNT(*) FILTER (WHERE all_delivered AND NOT any_late) AS entregues,
+                COUNT(*) FILTER (WHERE (NOT all_delivered) AND any_pending_late) AS atrasados_sem_entrega,
+                COUNT(*) FILTER (WHERE all_delivered AND any_late) AS entregues_com_atraso
+            FROM agenda_stats
+            GROUP BY dia
+        )
         SELECT
-            cte.data_prev_ent::date AS dia,
-            {$countExpr} AS total
-        FROM {$domain}_cte cte
-        WHERE {$whereClause}
-          AND cte.data_prev_ent IS NOT NULL
-        GROUP BY dia
-    ),
-    entregues AS (
+            dias.dia,
+            COALESCE(agg.agendados, 0) AS agendados,
+            COALESCE(agg.entregues, 0) AS entregues,
+            COALESCE(agg.atrasados_sem_entrega, 0) AS atrasados_sem_entrega,
+            COALESCE(agg.entregues_com_atraso, 0) AS entregues_com_atraso,
+            (COALESCE(agg.atrasados_sem_entrega, 0) + COALESCE(agg.entregues_com_atraso, 0)) AS atrasados
+        FROM dias
+        LEFT JOIN agg ON agg.dia = dias.dia
+        ORDER BY dias.dia ASC
+    ";
+} else {
+    $query = "
+        WITH dias AS (
+            SELECT generate_series(
+                CURRENT_DATE - INTERVAL '{$periodo} days',
+                CURRENT_DATE + INTERVAL '7 days',
+                '1 day'::interval
+            )::date AS dia
+        ),
+        agendados AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$countExpr} AS total
+            FROM {$domain}_cte cte
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+            GROUP BY dia
+        ),
+        entregues AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$countExpr} AS total
+            FROM {$domain}_cte cte
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo
+                FROM {$domain}_ocorrencia
+                GROUP BY codigo::text
+            ) oc ON oc.codigo = cte.ult_ocor::text
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+              AND data_entrega IS NOT NULL
+              AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+            GROUP BY dia
+        ),
+        atrasados_sem_entrega AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$countExpr} AS total
+            FROM {$domain}_cte cte
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo
+                FROM {$domain}_ocorrencia
+                GROUP BY codigo::text
+            ) oc ON oc.codigo = cte.ult_ocor::text
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+              AND cte.data_prev_ent::date < CURRENT_DATE
+              AND cte.data_entrega IS NULL
+              AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')
+            GROUP BY dia
+        ),
+        entregues_com_atraso AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$countExpr} AS total
+            FROM {$domain}_cte cte
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo
+                FROM {$domain}_ocorrencia
+                GROUP BY codigo::text
+            ) oc ON oc.codigo = cte.ult_ocor::text
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+              AND cte.data_prev_ent::date < CURRENT_DATE
+              AND cte.data_entrega IS NOT NULL
+              AND cte.data_entrega > cte.data_prev_ent
+              AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')
+            GROUP BY dia
+        )
         SELECT
-            cte.data_prev_ent::date AS dia,
-            {$countExpr} AS total
-        FROM {$domain}_cte cte
-        LEFT JOIN (
-            SELECT codigo::text as codigo, MAX(tipo) as tipo
-            FROM {$domain}_ocorrencia
-            GROUP BY codigo::text
-        ) oc ON oc.codigo = cte.ult_ocor::text
-        WHERE {$whereClause}
-          AND cte.data_prev_ent IS NOT NULL
-          AND data_entrega IS NOT NULL
-          AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
-        GROUP BY dia
-    ),
-    atrasados_sem_entrega AS (
-        SELECT
-            cte.data_prev_ent::date AS dia,
-            {$countExpr} AS total
-        FROM {$domain}_cte cte
-        LEFT JOIN (
-            SELECT codigo::text as codigo, MAX(tipo) as tipo
-            FROM {$domain}_ocorrencia
-            GROUP BY codigo::text
-        ) oc ON oc.codigo = cte.ult_ocor::text
-        WHERE {$whereClause}
-          AND cte.data_prev_ent IS NOT NULL
-          AND cte.data_prev_ent::date < CURRENT_DATE
-          AND cte.data_entrega IS NULL
-          AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')
-        GROUP BY dia
-    ),
-    entregues_com_atraso AS (
-        SELECT
-            cte.data_prev_ent::date AS dia,
-            {$countExpr} AS total
-        FROM {$domain}_cte cte
-        LEFT JOIN (
-            SELECT codigo::text as codigo, MAX(tipo) as tipo
-            FROM {$domain}_ocorrencia
-            GROUP BY codigo::text
-        ) oc ON oc.codigo = cte.ult_ocor::text
-        WHERE {$whereClause}
-          AND cte.data_prev_ent IS NOT NULL
-          AND cte.data_prev_ent::date < CURRENT_DATE
-          AND cte.data_entrega IS NOT NULL
-          AND cte.data_entrega > cte.data_prev_ent
-          AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')
-        GROUP BY dia
-    )
-    SELECT
-        dias.dia,
-        COALESCE(agendados.total, 0) AS agendados,
-        COALESCE(entregues.total, 0) AS entregues,
-        COALESCE(atrasados_sem_entrega.total, 0) AS atrasados_sem_entrega,
-        COALESCE(entregues_com_atraso.total, 0) AS entregues_com_atraso,
-        (COALESCE(atrasados_sem_entrega.total, 0) + COALESCE(entregues_com_atraso.total, 0)) AS atrasados
-    FROM dias
-    LEFT JOIN agendados ON agendados.dia = dias.dia
-    LEFT JOIN entregues ON entregues.dia  = dias.dia
-    LEFT JOIN atrasados_sem_entrega ON atrasados_sem_entrega.dia = dias.dia
-    LEFT JOIN entregues_com_atraso ON entregues_com_atraso.dia = dias.dia
-    ORDER BY dias.dia ASC
-";
+            dias.dia,
+            COALESCE(agendados.total, 0) AS agendados,
+            COALESCE(entregues.total, 0) AS entregues,
+            COALESCE(atrasados_sem_entrega.total, 0) AS atrasados_sem_entrega,
+            COALESCE(entregues_com_atraso.total, 0) AS entregues_com_atraso,
+            (COALESCE(atrasados_sem_entrega.total, 0) + COALESCE(entregues_com_atraso.total, 0)) AS atrasados
+        FROM dias
+        LEFT JOIN agendados ON agendados.dia = dias.dia
+        LEFT JOIN entregues ON entregues.dia  = dias.dia
+        LEFT JOIN atrasados_sem_entrega ON atrasados_sem_entrega.dia = dias.dia
+        LEFT JOIN entregues_com_atraso ON entregues_com_atraso.dia = dias.dia
+        ORDER BY dias.dia ASC
+    ";
+}
 
 $result = count($params) > 0
     ? pg_query_params($g_sql, $query, $params)
