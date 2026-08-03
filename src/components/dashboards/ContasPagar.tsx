@@ -18,7 +18,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, Filter, Loader2, Search, Wallet, X, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, ClipboardList, Clock, Download, FileText, Filter, Loader2, Search, Wallet, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTooltipStyle } from './CustomTooltip';
 
@@ -1021,8 +1021,8 @@ export function ContasPagar() {
         return 0;
       }
 
-      const lanA = `${String(a.unidade ?? '').trim().toUpperCase()} ${String(a.nro_lancto ?? 0).padStart(6, '0')}`.trim();
-      const lanB = `${String(b.unidade ?? '').trim().toUpperCase()} ${String(b.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+      const lanA = `${String(a.unidade ?? '').trim().toUpperCase()} ${String(a.nro_lancto ?? 0).padStart(6, '0')}-${String(a.parcela ?? '')}`.trim();
+      const lanB = `${String(b.unidade ?? '').trim().toUpperCase()} ${String(b.nro_lancto ?? 0).padStart(6, '0')}-${String(b.parcela ?? '')}`.trim();
 
       if (sortKey === 'lancto') return dir * cmpStr(lanA, lanB);
       if (sortKey === 'parcela') return dir * (((Number(a.parcela) || 0) - (Number(b.parcela) || 0)));
@@ -2631,7 +2631,7 @@ export function ContasPagar() {
           </div>
 
           <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="sticky top-0 z-20 grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
+            <div className="sticky top-0 z-20 grid gap-x-2 grid-cols-[140px_60px_55px_minmax(0,2.1fr)_minmax(0,2.2fr)_44px_120px_55px_55px_110px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
               <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('lancto')}>
                 Número Lanç.{drillSort.key === 'lancto' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
               </button>
@@ -2647,8 +2647,8 @@ export function ContasPagar() {
               <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('fornecedor')}>
                 Fornecedor{drillSort.key === 'fornecedor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
               </button>
-              <button type="button" className="w-full text-left hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('historico')}>
-                Histórico{drillSort.key === 'historico' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+              <button type="button" className="w-full text-center hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('historico')}>
+                Hist.{drillSort.key === 'historico' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
               </button>
               <button type="button" className="w-full text-right pr-2 hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleDrillSort('valor')}>
                 Valor{drillSort.key === 'valor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -2693,7 +2693,7 @@ export function ContasPagar() {
                       key={`${lancto}-${String(r.parcela ?? '')}-${String(r.evento ?? '')}-${String(r.fornecedor_cnpj ?? '')}-${String(r.nf ?? '')}`}
                       onClick={() => setSelectedDespesa(r)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedDespesa(r); }}
-                      className="grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left cursor-pointer"
+                      className="grid gap-x-2 grid-cols-[140px_60px_55px_minmax(0,2.1fr)_minmax(0,2.2fr)_44px_120px_55px_55px_110px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left cursor-pointer"
                     >
                       <div className="font-mono">{lancto}</div>
                       <div className="font-mono truncate">{String(r.nf ?? '') || '-'}</div>
@@ -2703,10 +2703,11 @@ export function ContasPagar() {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); openHistorico(r); }}
-                        className="truncate text-left underline-offset-2 hover:underline text-slate-700 dark:text-slate-200"
-                        title="Ver histórico"
+                        className="h-7 w-7 justify-self-center inline-flex items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                        title="Histórico"
+                        aria-label="Histórico"
                       >
-                        {String(r.historico ?? '') || '—'}
+                        <FileText className="w-4 h-4" />
                       </button>
                       <div className="text-right font-mono pr-2">{formatCurrency(moedaToNumber(r.vlr_parcela))}</div>
                       <div className="font-mono">{dateShort(String(r.data_vencimento ?? '')) || '-'}</div>
@@ -2719,7 +2720,7 @@ export function ContasPagar() {
                 })
               )}
             </div>
-            <div className="sticky bottom-0 z-20 grid grid-cols-[175px_70px_70px_minmax(0,1.8fr)_minmax(0,2fr)_minmax(0,1.4fr)_120px_70px_70px_110px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
+            <div className="sticky bottom-0 z-20 grid gap-x-2 grid-cols-[140px_60px_55px_minmax(0,2.1fr)_minmax(0,2.2fr)_44px_120px_55px_55px_110px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
               <div />
               <div />
               <div />
