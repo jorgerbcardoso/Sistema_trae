@@ -1516,13 +1516,14 @@ export function CentralAgendamento() {
                                 </div>
                                 {isExpanded && (
                                   <div className="bg-slate-50/60 dark:bg-slate-900/40">
-                                    <div className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200/70 dark:border-slate-800">
+                                    <div className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200/70 dark:border-slate-800">
                                       <span>CTRC</span>
                                       <span>NF</span>
                                       <span>Cidade/UF</span>
                                       <span>Endereço</span>
                                       <span>Pagador</span>
                                       <span>Prev. Entrega</span>
+                                      <span>Dt. Últ. Ocor.</span>
                                       <span>Últ. Ocorrência</span>
                                     </div>
                                     {agenda.ctes.map((cte) => {
@@ -1532,7 +1533,7 @@ export function CentralAgendamento() {
                                       return (
                                         <div
                                           key={`cal-ag-${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
-                                          className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
+                                          className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
                                         >
                                           <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
                                             {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
@@ -1544,6 +1545,7 @@ export function CentralAgendamento() {
                                           <span className="truncate self-center">{enderecoEntrega ? enderecoEntrega : '-'}</span>
                                           <span className="truncate self-center">{cte.nome_pag || '-'}</span>
                                           <span className="self-center">{cte.data_prev_ent || '-'}</span>
+                                          <span className="self-center font-mono text-xs text-slate-500 dark:text-slate-400">{cte.data_ult_ocor || '-'}</span>
                                           <span className="truncate self-center">{cte.ult_ocor || '-'}</span>
                                         </div>
                                       );
