@@ -209,6 +209,20 @@ if ($rEv && pg_num_rows($rEv) > 0) {
     }
 }
 
+$eventosDescricao = [];
+$rEvDesc = sql(
+    "SELECT evento, descricao FROM {$prefix}_evento",
+    [],
+    $g_sql
+);
+if ($rEvDesc && pg_num_rows($rEvDesc) > 0) {
+    while ($rowEv = pg_fetch_assoc($rEvDesc)) {
+        $ev = preg_replace('/\D+/', '', (string)($rowEv['evento'] ?? ''));
+        $desc = trim((string)($rowEv['descricao'] ?? ''));
+        if ($ev !== '') $eventosDescricao[(int)$ev] = $desc;
+    }
+}
+
 $grupoEventoNum = (int)preg_replace('/\D+/', '', (string)$grupoEvento);
 if ($grupoEventoNum > 0) {
     $r = sql(
@@ -547,6 +561,19 @@ $get = static function(array $row, array $idx, string $key, int $fallbackIndex):
     return trim((string)($row[$i] ?? ''));
 };
 
+$getAny = static function(array $row, array $idx, array $keys, int $fallbackIndex = -1): string {
+    foreach ($keys as $key) {
+        $k = strtoupper(trim((string)$key));
+        if ($k === '') continue;
+        if (!isset($idx[$k])) continue;
+        $i = (int)$idx[$k];
+        $v = trim((string)($row[$i] ?? ''));
+        if ($v !== '') return $v;
+    }
+    if ($fallbackIndex >= 0) return trim((string)($row[$fallbackIndex] ?? ''));
+    return '';
+};
+
 $rows = [];
 $sumTotal = 0.0;
 $sumLiqu = 0.0;
@@ -563,7 +590,14 @@ foreach ($lines as $l) {
     $codEvento = $get($arr, $headerIdx, 'EVENTO', 4);
     $codEventoDigits = preg_replace('/\D+/', '', (string)$codEvento);
     $descEvento = $get($arr, $headerIdx, 'DESCR EVENTO', 5);
+    if ($codEventoDigits !== '') {
+        $evNum = (int)$codEventoDigits;
+        if (isset($eventosDescricao[$evNum]) && trim((string)$eventosDescricao[$evNum]) !== '') {
+            $descEvento = (string)$eventosDescricao[$evNum];
+        }
+    }
     $historico = $get($arr, $headerIdx, 'HISTORICO DA DESPESA', 6);
+    $nf = $getAny($arr, $headerIdx, ['NF', 'NOTA FISCAL', 'NOTAFISCAL', 'NFISCAL', 'N.FISCAL', 'NRO NF', 'NUM NF']);
     $cnpj = $normalizeDigits($get($arr, $headerIdx, 'CNPJ FORNECEDOR', 7));
     $nomeFornecedor = $get($arr, $headerIdx, 'NOME FORNECEDOR', 8);
     $valorParcela = $get($arr, $headerIdx, 'VLR PARCELA', 23);
@@ -620,6 +654,7 @@ foreach ($lines as $l) {
             'parcela' => (int)$parcela,
             'evento' => (int)$codEvento,
             'evento_descricao' => $descEvento,
+            'nf' => $nf,
             'historico' => $historico,
             'fornecedor_cnpj' => $cnpj,
             'fornecedor_nome' => $nomeFornecedor,

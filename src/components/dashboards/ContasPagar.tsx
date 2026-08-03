@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, LineChart, Line, CartesianGrid, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Input } from '../ui/input';
@@ -28,6 +29,7 @@ type RowDespesa = {
   parcela: number;
   evento: number;
   evento_descricao: string;
+  nf: string;
   historico: string;
   fornecedor_cnpj: string;
   fornecedor_nome: string;
@@ -277,7 +279,10 @@ export function ContasPagar() {
   const [topSort, setTopSort] = useState<{ key: 'venc' | 'valor' | 'fornecedor' | 'evento' | 'unidade'; dir: 'asc' | 'desc' }>(() => ({ key: 'valor', dir: 'desc' }));
   const [listSort, setListSort] = useState<{ key: 'prioridade' | 'sit' | 'pgto' | 'evento' | 'valor' | 'venc' | 'fornecedor' | 'unidade' | 'lancto'; dir: 'asc' | 'desc' }>(() => ({ key: 'prioridade', dir: 'asc' }));
   const [unidadeEmLinhas, setUnidadeEmLinhas] = useState(false);
-  const [selectedDespesa, setSelectedDespesa] = useState<RowDespesa | null>(null);
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<RowDespesa[]>([]);
+  const [drillSearch, setDrillSearch] = useState('');
   const [focusUnidade, setFocusUnidade] = useState('');
   const [focusGrupoLabel, setFocusGrupoLabel] = useState('');
   const [focusCompetenciaKey, setFocusCompetenciaKey] = useState('');
@@ -375,6 +380,7 @@ export function ContasPagar() {
       const hay = [
         String(r.nro_lancto ?? ''),
         String(r.parcela ?? ''),
+        String(r.nf ?? ''),
         String(r.evento ?? ''),
         (r.evento_descricao ?? ''),
         (r.fornecedor_nome ?? ''),
@@ -935,161 +941,103 @@ export function ContasPagar() {
     []
   );
 
-  const headerCsvDespesas = useMemo(
-    () => [
-      'NUMLANCTO',
+  const abrirDrilldown = useCallback((title: string, items: any[]) => {
+    const list = (items ?? [])
+      .map((x) => (x && typeof x === 'object' && 'raw' in x ? (x as any).raw : x))
+      .filter(Boolean) as RowDespesa[];
+    setDrillTitle(title);
+    setDrillRows(list);
+    setDrillSearch('');
+    setDrillOpen(true);
+  }, []);
+
+  const drillRowsFiltradas = useMemo(() => {
+    const q = drillSearch.trim().toUpperCase();
+    const safeTs = (t: number | null) => (t === null ? 9e15 : t);
+    const statusRank = (s: string) => {
+      const st = (s ?? '').toString().trim().toUpperCase();
+      if (st === 'LIQU') return 2;
+      if (st === 'CANC') return 3;
+      return 1;
+    };
+
+    const arr = drillRows.slice();
+    arr.sort((a, b) => {
+      const ra = statusRank(a.sit_des);
+      const rb = statusRank(b.sit_des);
+      if (ra !== rb) return ra - rb;
+      const va = safeTs(parseDateBR(a.data_vencimento)?.getTime() ?? null);
+      const vb = safeTs(parseDateBR(b.data_vencimento)?.getTime() ?? null);
+      if (va !== vb) return va - vb;
+      const pa = safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null);
+      const pb = safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null);
+      if (pa !== pb) return pa - pb;
+      const xa = moedaToNumber(a.vlr_parcela);
+      const xb = moedaToNumber(b.vlr_parcela);
+      if (xa !== xb) return xb - xa;
+      return 0;
+    });
+
+    if (!q) return arr;
+    return arr.filter((r) => {
+      const ev = `${String(r.evento ?? '')} ${String(r.evento_descricao ?? '')}`.trim();
+      const hay = [
+        `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}`,
+        String(r.parcela ?? ''),
+        String(r.nf ?? ''),
+        ev,
+        String(r.fornecedor_nome ?? ''),
+        String(r.historico ?? ''),
+        String(r.vlr_parcela ?? ''),
+        String(r.data_inclusao ?? ''),
+        String(r.data_vencimento ?? ''),
+        String(r.data_programacao_pgto ?? ''),
+        String(r.sit_des ?? ''),
+      ].join(' ').toUpperCase();
+      return hay.includes(q);
+    });
+  }, [drillRows, drillSearch]);
+
+  const drillTotals = useMemo(() => {
+    let total = 0;
+    for (const r of drillRowsFiltradas) total += moedaToNumber(r.vlr_parcela);
+    return { total, rows: drillRowsFiltradas.length };
+  }, [drillRowsFiltradas]);
+
+  const exportarDrilldownCsv = useCallback(() => {
+    const header = [
+      'NUMERO LANCAMENTO',
       'PARCELA',
+      'NF',
+      'DATA INCLUSAO',
       'EVENTO',
-      'DESCR EVENTO',
-      'CNPJ FORNECEDOR',
-      'NOME FORNECEDOR',
-      'VLR PARCELA',
-      'INCLUSAO',
-      'EMISSAO NF',
-      'VENCIMENTO',
-      'DATA PGTO',
-      'UNI',
-      'SIT DES',
-      'GRUPO EVENTO',
-      'MES COMPETENCIA',
+      'FORNECEDOR',
       'HISTORICO',
-    ],
-    []
-  );
-
-  const exportarCsv = useCallback(() => {
-    const rowsCsv = filtered.map((n) => {
-      const r = n.raw;
+      'VALOR PARCELA',
+      'VENCIMENTO',
+      'PAGAMENTO',
+      'STATUS',
+    ];
+    const rowsCsv = drillRowsFiltradas.map((r) => {
+      const lancto = `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+      const evento = `${String(r.evento ?? '')} ${String(r.evento_descricao ?? '')}`.trim();
+      const status = String(r.sit_des ?? '').toString().trim().toUpperCase() === 'LIQU' ? 'L' : 'P';
       return [
-        String(r.nro_lancto ?? ''),
+        lancto,
         String(r.parcela ?? ''),
-        String(r.evento ?? ''),
-        String(r.evento_descricao ?? ''),
-        String(r.fornecedor_cnpj ?? ''),
-        String(r.fornecedor_nome ?? ''),
-        String(r.vlr_parcela ?? ''),
+        String(r.nf ?? ''),
         String(r.data_inclusao ?? ''),
-        String(r.data_emissao_nf ?? ''),
+        evento,
+        String(r.fornecedor_nome ?? ''),
+        String(r.historico ?? ''),
+        String(r.vlr_parcela ?? ''),
         String(r.data_vencimento ?? ''),
         String(r.data_programacao_pgto ?? ''),
-        String(r.unidade ?? ''),
-        String(r.sit_des ?? ''),
-        String(r.grupo_evento ?? ''),
-        String(r.mes_competencia ?? ''),
-        String(r.historico ?? ''),
+        status,
       ];
     });
-    baixarCsv('contas_pagar', headerCsvDespesas, rowsCsv);
-  }, [baixarCsv, filtered, headerCsvDespesas]);
-
-  const exportarCsvLista = useCallback(
-    (filenameBase: string, items: any[]) => {
-      const rowsCsv = items.map((n) => {
-        const r: RowDespesa = n.raw;
-        return [
-          String(r.nro_lancto ?? ''),
-          String(r.parcela ?? ''),
-          String(r.evento ?? ''),
-          String(r.evento_descricao ?? ''),
-          String(r.fornecedor_cnpj ?? ''),
-          String(r.fornecedor_nome ?? ''),
-          String(r.vlr_parcela ?? ''),
-          String(r.data_inclusao ?? ''),
-          String(r.data_emissao_nf ?? ''),
-          String(r.data_vencimento ?? ''),
-          String(r.data_programacao_pgto ?? ''),
-          String(r.unidade ?? ''),
-          String(r.sit_des ?? ''),
-          String(r.grupo_evento ?? ''),
-          String(r.mes_competencia ?? ''),
-          String(r.historico ?? ''),
-        ];
-      });
-      baixarCsv(filenameBase, headerCsvDespesas, rowsCsv);
-    },
-    [baixarCsv, headerCsvDespesas]
-  );
-
-  const exportarCsvLinha = useCallback(
-    (r: RowDespesa) => {
-      const row = [
-        String(r.nro_lancto ?? ''),
-        String(r.parcela ?? ''),
-        String(r.evento ?? ''),
-        String(r.evento_descricao ?? ''),
-        String(r.fornecedor_cnpj ?? ''),
-        String(r.fornecedor_nome ?? ''),
-        String(r.vlr_parcela ?? ''),
-        String(r.data_inclusao ?? ''),
-        String(r.data_emissao_nf ?? ''),
-        String(r.data_vencimento ?? ''),
-        String(r.data_programacao_pgto ?? ''),
-        String(r.unidade ?? ''),
-        String(r.sit_des ?? ''),
-        String(r.grupo_evento ?? ''),
-        String(r.mes_competencia ?? ''),
-        String(r.historico ?? ''),
-      ];
-      baixarCsv('contas_pagar_linha', headerCsvDespesas, [row]);
-    },
-    [baixarCsv, headerCsvDespesas]
-  );
-
-  const exportarSerieProgramacao = useCallback(
-    (serieKey: 'total' | 'liqu') => {
-      const labelCol = serieKey === 'total' ? 'TOTAL' : 'LIQUIDADAS';
-      const rowsCsv = serieProgramacaoComparativo.map((p) => {
-        const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
-        return [dateLabel, Number((p as any)[serieKey]) || 0];
-      });
-      baixarCsv(`evolucao_programacao_${labelCol.toLowerCase()}`, ['DATA', labelCol], rowsCsv);
-    },
-    [baixarCsv, serieProgramacaoComparativo]
-  );
-
-  const exportarSerieProgramacaoCompleta = useCallback(() => {
-    const rowsCsv = serieProgramacaoComparativo.map((p) => {
-      const dateLabel = `${p.key.slice(8, 10)}/${p.key.slice(5, 7)}/${p.key.slice(0, 4)}`;
-      return [dateLabel, Number(p.total) || 0, Number(p.liqu) || 0];
-    });
-    baixarCsv('evolucao_programacao', ['DATA', 'TOTAL', 'LIQUIDADAS'], rowsCsv);
-  }, [baixarCsv, serieProgramacaoComparativo]);
-
-  const exportarSerieProgramacaoUnidade = useCallback(
-    (unidadeKey: string) => {
-      const rowsCsv = serieProgramacaoPorUnidade.map((p: any) => {
-        const dateLabel = `${String(p.key).slice(8, 10)}/${String(p.key).slice(5, 7)}/${String(p.key).slice(0, 4)}`;
-        return [dateLabel, Number(p[unidadeKey]) || 0];
-      });
-      baixarCsv(`evolucao_unidade_${unidadeKey.toLowerCase()}`, ['DATA', 'TOTAL'], rowsCsv);
-    },
-    [baixarCsv, serieProgramacaoPorUnidade]
-  );
-
-  const exportarSerieProgramacaoUnidades = useCallback(() => {
-    const keys = [...unidadesTop3, ...(byUnidade.length > 3 ? ['Demais'] : [])];
-    const header = ['DATA', ...keys.map(k => String(k).toUpperCase())];
-    const rowsCsv = serieProgramacaoPorUnidade.map((p: any) => {
-      const dateLabel = `${String(p.key).slice(8, 10)}/${String(p.key).slice(5, 7)}/${String(p.key).slice(0, 4)}`;
-      return [dateLabel, ...keys.map(k => Number(p[k]) || 0)];
-    });
-    baixarCsv('evolucao_unidades', header, rowsCsv);
-  }, [baixarCsv, byUnidade.length, serieProgramacaoPorUnidade, unidadesTop3]);
-
-  const exportarSlice = useCallback(
-    (filenameBase: string, item: string, value: number, total: number) => {
-      const pct = total > 0 ? (value / total) * 100 : 0;
-      baixarCsv(filenameBase, ['ITEM', 'VALOR', '%'], [[item, value, pct.toFixed(2)]]);
-    },
-    [baixarCsv]
-  );
-
-  const exportarBucket = useCallback(
-    (filenameBase: string, item: string, value: number) => {
-      baixarCsv(filenameBase, ['ITEM', 'VALOR'], [[item, value]]);
-    },
-    [baixarCsv]
-  );
+    baixarCsv('contas_pagar_despesas', header, rowsCsv);
+  }, [baixarCsv, drillRowsFiltradas]);
 
   const ProgramacaoTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -1558,7 +1506,7 @@ export function ContasPagar() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <Card
             className="bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900 cursor-pointer"
-            onClick={() => exportarCsvLista('base', filtered)}
+            onClick={() => abrirDrilldown('Base (recorte atual)', filtered)}
           >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -1572,7 +1520,7 @@ export function ContasPagar() {
 
           <Card
             className="bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900 cursor-pointer"
-            onClick={() => exportarCsvLista('total', filtered)}
+            onClick={() => abrirDrilldown('Total (recorte atual)', filtered)}
           >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -1617,7 +1565,7 @@ export function ContasPagar() {
 
           <Card
             className="bg-amber-50 border-amber-200 dark:bg-amber-950/35 dark:border-amber-900 cursor-pointer"
-            onClick={() => exportarCsvLista('pendentes', filtered.filter((n: any) => n.status !== 'LIQU' && n.status !== 'CANC'))}
+            onClick={() => abrirDrilldown('Pendentes (recorte atual)', filtered.filter((n: any) => n.status !== 'LIQU' && n.status !== 'CANC'))}
           >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -1630,7 +1578,7 @@ export function ContasPagar() {
 
           <Card
             className="bg-rose-50 border-rose-200 dark:bg-rose-950/35 dark:border-rose-900 cursor-pointer"
-            onClick={() => exportarCsvLista('em_atraso', filtered.filter((n: any) => n.overdue))}
+            onClick={() => abrirDrilldown('Em atraso (recorte atual)', filtered.filter((n: any) => n.overdue))}
           >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -1646,7 +1594,7 @@ export function ContasPagar() {
           <CardContent className="py-3">
             <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
               <Download className="w-4 h-4 text-slate-500" />
-              <span>Clique em cards e gráficos para exportar os dados em CSV.</span>
+              <span>Clique em cards e gráficos para ver as despesas e exportar em CSV.</span>
             </div>
           </CardContent>
         </Card>
@@ -1661,10 +1609,10 @@ export function ContasPagar() {
                       <div
                         role="button"
                         tabIndex={0}
-                        onClick={exportarSerieProgramacaoCompleta}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') exportarSerieProgramacaoCompleta(); }}
+                        onClick={() => abrirDrilldown('Evolução por Programação (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null))}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') abrirDrilldown('Evolução por Programação (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null)); }}
                         className="cursor-pointer"
-                        title="Exportar CSV"
+                        title="Detalhar"
                       >
                         <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Programação</div>
                         <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (programação)</div>
@@ -1678,9 +1626,25 @@ export function ContasPagar() {
                           margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                           style={{ cursor: 'pointer' }}
                           onClick={(e: any) => {
-                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                            if (dk === 'total' || dk === 'liqu') exportarSerieProgramacao(dk as any);
-                            else exportarSerieProgramacaoCompleta();
+                            const ap = e?.activePayload?.[0];
+                            const dk = ap?.dataKey ? String(ap.dataKey) : '';
+                            const p = ap?.payload;
+                            const key = p?.key ? String(p.key) : '';
+                            const label = p?.label ? String(p.label) : '';
+                            if (!key) {
+                              abrirDrilldown('Evolução por Programação (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null));
+                              return;
+                            }
+                            const subset = filtered.filter((n: any) => {
+                              if (n.programacaoTs === null) return false;
+                              const d = new Date(n.programacaoTs);
+                              const k = dateToInput(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0));
+                              if (k !== key) return false;
+                              if (dk === 'liqu') return n.status === 'LIQU';
+                              return true;
+                            });
+                            const tipo = dk === 'liqu' ? 'Liquidadas' : 'Total';
+                            abrirDrilldown(`Evolução por Programação — ${label || key} (${tipo})`, subset);
                           }}
                         >
                           <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
@@ -1762,7 +1726,15 @@ export function ContasPagar() {
                             style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
-                              exportarSlice('status', String(p?.name ?? ''), Number(p?.value) || 0, totals.pend + totals.liqu + totals.canc);
+                              const name = String(p?.name ?? '').toUpperCase();
+                              const subset =
+                                name === 'LIQU'
+                                  ? filtered.filter((n: any) => n.status === 'LIQU')
+                                  : name === 'CANC'
+                                    ? filtered.filter((n: any) => n.status === 'CANC')
+                                    : filtered.filter((n: any) => n.status !== 'LIQU' && n.status !== 'CANC');
+                              const label = name === 'LIQU' ? 'Liquidadas' : name === 'CANC' ? 'Canceladas' : 'Pendentes';
+                              abrirDrilldown(`Status — ${label} (recorte atual)`, subset);
                             }}
                           >
                             <Cell fill="#f59e0b" />
@@ -1796,7 +1768,13 @@ export function ContasPagar() {
                             style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
-                              exportarSlice('fornecedores', String(p?.name ?? ''), Number(p?.value) || 0, donutFornecedores.total);
+                              const name = String(p?.name ?? '');
+                              const topNames = new Set(donutFornecedores.top.map((x) => x.label));
+                              const subset =
+                                name === 'Outros'
+                                  ? baseParaResumo.filter((n: any) => !topNames.has(String(n?.raw?.fornecedor_nome ?? '').toString().trim() || '—'))
+                                  : baseParaResumo.filter((n: any) => (String(n?.raw?.fornecedor_nome ?? '').toString().trim() || '—') === name);
+                              abrirDrilldown(`Fornecedor — ${name} (recorte atual)`, subset);
                             }}
                           >
                             {donutFornecedores.data.map((d, idx) => (
@@ -1855,7 +1833,22 @@ export function ContasPagar() {
                             style={{ cursor: 'pointer' }}
                             onClick={(d: any) => {
                               const p = d?.payload ?? d;
-                              exportarBucket('envelhecimento_pendentes', String(p?.label ?? ''), Number(p?.total) || 0);
+                              const label = String(p?.label ?? '');
+                              const today = new Date();
+                              const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0).getTime();
+                              const subset = filtered.filter((n: any) => {
+                                if (n.status === 'LIQU') return false;
+                                const vencTs = n.vencimentoTs as number | null;
+                                if (vencTs === null) return label === 'Sem venc.';
+                                const diffDays = Math.floor((vencTs - today0) / 86400000);
+                                if (diffDays < 0) return label === 'Vencido';
+                                if (diffDays === 0) return label === 'Vence hoje';
+                                if (diffDays <= 7) return label === '1–7 dias';
+                                if (diffDays <= 15) return label === '8–15 dias';
+                                if (diffDays <= 30) return label === '16–30 dias';
+                                return label === '31+ dias';
+                              });
+                              abrirDrilldown(`Envelhecimento (pendentes) — ${label} (recorte atual)`, subset);
                             }}
                           />
                         </BarChart>
@@ -1873,10 +1866,10 @@ export function ContasPagar() {
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={exportarSerieProgramacaoUnidades}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') exportarSerieProgramacaoUnidades(); }}
+                      onClick={() => abrirDrilldown('Evolução por Unidade (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') abrirDrilldown('Evolução por Unidade (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null)); }}
                       className="cursor-pointer"
-                      title="Exportar CSV"
+                      title="Detalhar"
                     >
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">Total por data de pagamento (Top 3 + Demais)</div>
@@ -1895,9 +1888,26 @@ export function ContasPagar() {
                           margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                           style={{ cursor: 'pointer' }}
                           onClick={(e: any) => {
-                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
-                            else exportarSerieProgramacaoUnidades();
+                            const ap = e?.activePayload?.[0];
+                            const dk = ap?.dataKey ? String(ap.dataKey) : '';
+                            const p = ap?.payload;
+                            const key = p?.key ? String(p.key) : '';
+                            const label = p?.label ? String(p.label) : '';
+                            if (!dk || dk === 'key' || dk === 'label' || !key) {
+                              abrirDrilldown('Evolução por Unidade (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null));
+                              return;
+                            }
+                            const topSet = new Set(unidadesTop3.map((u) => String(u).trim().toUpperCase()));
+                            const subset = filtered.filter((n: any) => {
+                              if (n.programacaoTs === null) return false;
+                              const d = new Date(n.programacaoTs);
+                              const k = dateToInput(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0));
+                              if (k !== key) return false;
+                              const u = (n.raw.unidade ?? '').toString().trim().toUpperCase() || '—';
+                              if (dk === 'Demais') return !topSet.has(u);
+                              return u === String(dk).trim().toUpperCase();
+                            });
+                            abrirDrilldown(`Evolução por Unidade — ${dk} em ${label || key} (recorte atual)`, subset);
                           }}
                         >
                           <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
@@ -1930,9 +1940,26 @@ export function ContasPagar() {
                           margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                           style={{ cursor: 'pointer' }}
                           onClick={(e: any) => {
-                            const dk = e?.activePayload?.[0]?.dataKey ? String(e.activePayload[0].dataKey) : '';
-                            if (dk && dk !== 'key' && dk !== 'label') exportarSerieProgramacaoUnidade(dk);
-                            else exportarSerieProgramacaoUnidades();
+                            const ap = e?.activePayload?.[0];
+                            const dk = ap?.dataKey ? String(ap.dataKey) : '';
+                            const p = ap?.payload;
+                            const key = p?.key ? String(p.key) : '';
+                            const label = p?.label ? String(p.label) : '';
+                            if (!dk || dk === 'key' || dk === 'label' || !key) {
+                              abrirDrilldown('Evolução por Unidade (recorte atual)', filtered.filter((n: any) => n.programacaoTs !== null));
+                              return;
+                            }
+                            const topSet = new Set(unidadesTop3.map((u) => String(u).trim().toUpperCase()));
+                            const subset = filtered.filter((n: any) => {
+                              if (n.programacaoTs === null) return false;
+                              const d = new Date(n.programacaoTs);
+                              const k = dateToInput(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0));
+                              if (k !== key) return false;
+                              const u = (n.raw.unidade ?? '').toString().trim().toUpperCase() || '—';
+                              if (dk === 'Demais') return !topSet.has(u);
+                              return u === String(dk).trim().toUpperCase();
+                            });
+                            abrirDrilldown(`Evolução por Unidade — ${dk} em ${label || key} (recorte atual)`, subset);
                           }}
                         >
                           <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
@@ -2000,7 +2027,13 @@ export function ContasPagar() {
                           style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
-                            exportarSlice('unidades', String(p?.name ?? ''), Number(p?.value) || 0, donutUnidades.total);
+                            const name = String(p?.name ?? '');
+                            const topNames = new Set(donutUnidades.top.map((x) => x.label));
+                            const subset =
+                              name === 'Demais'
+                                ? filtered.filter((n: any) => !topNames.has((n.raw.unidade ?? '').toString().trim().toUpperCase() || '—'))
+                                : filtered.filter((n: any) => ((n.raw.unidade ?? '').toString().trim().toUpperCase() || '—') === name);
+                            abrirDrilldown(`Unidade — ${name} (recorte atual)`, subset);
                           }}
                         >
                           {donutUnidades.data.map((d, idx) => (
@@ -2061,7 +2094,19 @@ export function ContasPagar() {
                           style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
-                            exportarSlice('eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutEventos.total);
+                            const name = String(p?.name ?? '');
+                            const topNames = new Set(donutEventos.top.map((x) => x.label));
+                            const subset =
+                              name === 'Outros'
+                                ? filtered.filter((n: any) => {
+                                  const lab = `${String(n.raw.evento ?? '').trim()} ${String(n.raw.evento_descricao ?? '').trim()}`.trim() || '—';
+                                  return !topNames.has(lab);
+                                })
+                                : filtered.filter((n: any) => {
+                                  const lab = `${String(n.raw.evento ?? '').trim()} ${String(n.raw.evento_descricao ?? '').trim()}`.trim() || '—';
+                                  return lab === name;
+                                });
+                            abrirDrilldown(`Evento — ${name} (recorte atual)`, subset);
                           }}
                         >
                           {donutEventos.data.map((d, idx) => (
@@ -2120,7 +2165,13 @@ export function ContasPagar() {
                           style={{ cursor: 'pointer' }}
                           onClick={(d: any) => {
                             const p = d?.payload ?? d;
-                            exportarSlice('grupos_eventos', String(p?.name ?? ''), Number(p?.value) || 0, donutGrupos.total);
+                            const name = String(p?.name ?? '');
+                            const topNames = new Set(donutGrupos.top.map((x) => x.label));
+                            const subset =
+                              name === 'Outros'
+                                ? filtered.filter((n: any) => !topNames.has(String(n.grupoLabel ?? 'Sem grupo')))
+                                : filtered.filter((n: any) => String(n.grupoLabel ?? 'Sem grupo') === name);
+                            abrirDrilldown(`Grupo — ${name} (recorte atual)`, subset);
                           }}
                         >
                           {donutGrupos.data.map((d, idx) => (
@@ -2210,7 +2261,7 @@ export function ContasPagar() {
                         return (
                           <button
                             key={`${r.nro_lancto}-${r.parcela}-${r.evento}-topv`}
-                            onClick={() => setSelectedDespesa(r)}
+                            onClick={() => abrirDrilldown(`Despesa ${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')} · Parcela ${String(r.parcela ?? '')}`, [n])}
                             className="w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                           >
                             <div className="col-span-2 font-mono">{lanc}</div>
@@ -2258,12 +2309,12 @@ export function ContasPagar() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={exportarCsv}
+                          onClick={() => abrirDrilldown('Lista (recorte atual)', filtered)}
                           disabled={filtered.length === 0}
                           className="h-9 dark:border-slate-600"
                         >
                           <Download className="w-4 h-4" />
-                          <span className="ml-1.5">CSV</span>
+                          <span className="ml-1.5">Detalhar</span>
                         </Button>
                         <div className="text-right">
                           <div className="text-xs text-slate-500 dark:text-slate-400">Total filtrado</div>
@@ -2453,7 +2504,7 @@ export function ContasPagar() {
                           <button
                             type="button"
                             key={key}
-                            onClick={() => setSelectedDespesa(r)}
+                            onClick={() => abrirDrilldown(`Despesa ${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')} · Parcela ${String(r.parcela ?? '')}`, [n])}
                             className={`w-full grid grid-cols-12 px-4 py-2 text-left text-xs text-slate-700 dark:text-slate-200 hover:opacity-90 ${rowBg}`}
                             title="Detalhes"
                           >
@@ -2484,74 +2535,86 @@ export function ContasPagar() {
         </div>
       </div>
 
-      <Dialog open={!!selectedDespesa} onOpenChange={(o) => { if (!o) setSelectedDespesa(null); }}>
-        <DialogContent className="sm:max-w-[780px] bg-white dark:bg-slate-900">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-slate-100">
-              {selectedDespesa
-                ? `Despesa ${String(selectedDespesa.nro_lancto ?? 0).padStart(6, '0')}-${String(selectedDespesa.parcela ?? '')}`
-                : 'Despesa'}
-            </DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              {selectedDespesa ? `${selectedDespesa.evento} · ${selectedDespesa.evento_descricao || '—'}` : '—'}
-            </DialogDescription>
-          </DialogHeader>
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="max-w-[1200px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+          <div className="flex items-start justify-between gap-3">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 dark:text-slate-100">{drillTitle || 'Despesas'}</DialogTitle>
+              <DialogDescription className="text-slate-600 dark:text-slate-400">
+                {drillTotals.rows} despesa{drillTotals.rows !== 1 ? 's' : ''} · {formatCurrency(drillTotals.total)}
+              </DialogDescription>
+            </DialogHeader>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarDrilldownCsv}
+              disabled={drillRowsFiltradas.length === 0}
+              className="dark:border-slate-700"
+            >
+              <Download className="w-4 h-4" />
+              <span className="ml-1.5">Exportar CSV</span>
+            </Button>
+          </div>
 
-          {selectedDespesa && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Fornecedor</div>
-                <div className="font-semibold text-slate-900 dark:text-slate-100">{selectedDespesa.fornecedor_nome || '—'}</div>
-                <div className="text-xs font-mono text-slate-600 dark:text-slate-300">{selectedDespesa.fornecedor_cnpj || '—'}</div>
-              </div>
+          <div className="mt-2">
+            <Input
+              value={drillSearch}
+              onChange={(e) => setDrillSearch(e.target.value)}
+              placeholder="Filtrar por lançamento, NF, evento, fornecedor, histórico..."
+              className="dark:bg-slate-800 dark:border-slate-700"
+            />
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Unid</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.unidade || '—'}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Situação</div>
-                  <div className="text-slate-900 dark:text-slate-100">
-                    {(selectedDespesa.sit_des || '').toString().toUpperCase() === 'LIQU' ? 'Liquidada' : 'Pendente'}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Valor</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{formatCurrency(moedaToNumber(selectedDespesa.vlr_parcela))}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Competência</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.mes_competencia || '—'}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 sm:col-span-2">
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Inclusão</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_inclusao || '—'}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Vencimento</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_vencimento || '—'}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Pagamento</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{selectedDespesa.data_programacao_pgto || '—'}</div>
-                </div>
-              </div>
-
-              <div className="space-y-1 sm:col-span-2">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Grupo de evento</div>
-                <div className="text-slate-900 dark:text-slate-100">{selectedDespesa.grupo_evento || '—'}</div>
-              </div>
-
-              <div className="space-y-1 sm:col-span-2">
-                <div className="text-xs text-slate-500 dark:text-slate-400">Histórico</div>
-                <div className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words">{selectedDespesa.historico || '—'}</div>
-              </div>
+          <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="grid grid-cols-[150px_70px_120px_110px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_120px_110px_110px_110px] bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+              <div>Número Lanç.</div>
+              <div>Parc.</div>
+              <div>NF</div>
+              <div>Inclusão</div>
+              <div>Evento</div>
+              <div>Fornecedor</div>
+              <div>Histórico</div>
+              <div className="text-right pr-2">Valor</div>
+              <div>Venc.</div>
+              <div>Pgto</div>
+              <div>Status</div>
             </div>
-          )}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {drillRowsFiltradas.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Nenhuma despesa encontrada.</div>
+              ) : (
+                drillRowsFiltradas.map((r) => {
+                  const lancto = `${String(r.unidade ?? '').trim().toUpperCase()} ${String(r.nro_lancto ?? 0).padStart(6, '0')}`.trim();
+                  const evento = `${String(r.evento ?? '')} ${String(r.evento_descricao ?? '')}`.trim() || '—';
+                  const sit = String(r.sit_des ?? '').toString().trim().toUpperCase();
+                  const isLiqu = sit === 'LIQU';
+                  const isCanc = sit === 'CANC';
+                  const statusLabel = isLiqu ? 'Liquidada' : isCanc ? 'Cancelada' : 'Pendente';
+                  const statusClass = isLiqu ? 'bg-emerald-600 text-white border-emerald-600' : isCanc ? 'bg-slate-500 text-white border-slate-500' : 'bg-amber-500 text-white border-amber-500';
+                  return (
+                    <div
+                      key={`${lancto}-${String(r.parcela ?? '')}-${String(r.evento ?? '')}-${String(r.fornecedor_cnpj ?? '')}-${String(r.nf ?? '')}`}
+                      className="grid grid-cols-[150px_70px_120px_110px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.6fr)_120px_110px_110px_110px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    >
+                      <div className="font-mono">{lancto}</div>
+                      <div className="font-mono">{String(r.parcela ?? '') || '-'}</div>
+                      <div className="font-mono truncate">{String(r.nf ?? '') || '-'}</div>
+                      <div className="font-mono">{String(r.data_inclusao ?? '') || '-'}</div>
+                      <div className="truncate">{evento}</div>
+                      <div className="truncate">{String(r.fornecedor_nome ?? '') || '—'}</div>
+                      <div className="truncate">{String(r.historico ?? '') || '—'}</div>
+                      <div className="text-right font-mono pr-2">{formatCurrency(moedaToNumber(r.vlr_parcela))}</div>
+                      <div className="font-mono">{String(r.data_vencimento ?? '') || '-'}</div>
+                      <div className="font-mono">{String(r.data_programacao_pgto ?? '') || '-'}</div>
+                      <div>
+                        <Badge className={statusClass}>{statusLabel}</Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>
