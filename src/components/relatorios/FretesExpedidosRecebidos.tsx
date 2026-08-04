@@ -1036,7 +1036,7 @@ export function FretesExpedidosRecebidos() {
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Frete Total (R$)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatCurrency((Number(dataExpView.totals.frete_cif) || 0) + (Number(dataExpView.totals.frete_fob) || 0) + (Number(dataExpView.totals.frete_ter) || 0))}
+                        {formatCurrency(Number(dataExpView.totals.frete_tot) || 0)}
                       </div>
                     </div>
                   </div>
@@ -1047,10 +1047,7 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
                         {(() => {
                           const pesoKg = Math.round(Number(dataExpView.totals.peso_ton) || 0);
-                          const freteTotal =
-                            (Number(dataExpView.totals.frete_cif) || 0) +
-                            (Number(dataExpView.totals.frete_fob) || 0) +
-                            (Number(dataExpView.totals.frete_ter) || 0);
+                          const freteTotal = Number(dataExpView.totals.frete_tot) || 0;
                           return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
                         })()}
                       </div>
@@ -1250,7 +1247,7 @@ export function FretesExpedidosRecebidos() {
                     <div className="flex flex-col">
                       <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Frete Total (R$)</div>
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatCurrency((Number(dataRecView.totals.frete_cif) || 0) + (Number(dataRecView.totals.frete_fob) || 0) + (Number(dataRecView.totals.frete_ter) || 0))}
+                        {formatCurrency(Number(dataRecView.totals.frete_tot) || 0)}
                       </div>
                     </div>
                   </div>
@@ -1261,8 +1258,7 @@ export function FretesExpedidosRecebidos() {
                       <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
                         {(() => {
                           const pesoKg = Math.round(Number(dataRecView.totals.peso_ton) || 0);
-                          const freteTotal =
-                            (Number(dataRecView.totals.frete_cif) || 0) + (Number(dataRecView.totals.frete_fob) || 0) + (Number(dataRecView.totals.frete_ter) || 0);
+                          const freteTotal = Number(dataRecView.totals.frete_tot) || 0;
                           return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
                         })()}
                       </div>
