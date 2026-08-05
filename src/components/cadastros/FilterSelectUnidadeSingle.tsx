@@ -147,6 +147,8 @@ export function FilterSelectUnidadeSingle({ value, onChange, disabled, respectUs
 
   const clearSelection = () => {
     onChange('');
+    setOpen(false);
+    setSearchValue('');
   };
 
   const selectedUnidade = options.find(u => u.sigla === value);
@@ -193,15 +195,25 @@ export function FilterSelectUnidadeSingle({ value, onChange, disabled, respectUs
             </span>
             <div className="flex items-center gap-1 ml-2 shrink-0">
               {value && !shouldBeDisabled && (
-                <div
-                  onClick={(e) => {
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     clearSelection();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      clearSelection();
+                    }
                   }}
                   className="hover:bg-slate-200 dark:hover:bg-slate-700 rounded p-0.5 cursor-pointer"
                 >
                   <X className="h-3 w-3" />
-                </div>
+                </span>
               )}
               <Search className="h-4 w-4 opacity-50" />
             </div>
