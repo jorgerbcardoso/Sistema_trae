@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Calculator, DollarSign, Inbox, Loader2, Package, Percent, Route, Send, Search, Truck, TrendingUp, Users, Wallet, Weight, X } from 'lucide-react';
+import { Calculator, DollarSign, Inbox, Loader2, Package, Route, Send, Search, Truck, TrendingUp, Users, Wallet, Weight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
@@ -147,7 +147,7 @@ function csvEscape(v: any): string {
   return s;
 }
 
-function buildCsv(kind: 'Expedidos' | 'Recebidos' | 'Total', data: ApiData, unidadeLabel: string): string {
+function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: string): string {
   const header = [
     'Tipo',
     unidadeLabel,
@@ -368,17 +368,15 @@ export function FretesExpedidosRecebidos() {
   const [hasGenerated, setHasGenerated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
-  const [tab, setTab] = useState<'expedidos' | 'recebidos' | 'total'>('expedidos');
+  const [tab, setTab] = useState<'expedidos' | 'recebidos'>('expedidos');
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
   const [filtroExpedidos, setFiltroExpedidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
   const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
-  const [filtroTotal, setFiltroTotal] = useState<'todos' | 'fracionados' | 'fec'>('todos');
   const runRef = useRef(0);
 
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
   const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
-  const [sortTotal, setSortTotal] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
 
   const dataExpView = useMemo<ApiData | null>(() => {
     if (!dataExp) return null;
@@ -460,94 +458,6 @@ export function FretesExpedidosRecebidos() {
     return { totals, rows };
   }, [dataRec, filtroRecebidos]);
 
-  const dataTotalView = useMemo<ApiData | null>(() => {
-    const exp = dataExpView;
-    const rec = dataRecView;
-    if (!exp && !rec) return null;
-
-    const map = new Map<string, RowAgg>();
-    const add = (r: RowAgg) => {
-      const sigla = String(r.sigla || '').trim().substring(0, 3).toUpperCase();
-      if (!sigla) return;
-      const prev = map.get(sigla);
-      if (!prev) {
-        map.set(sigla, {
-          sigla,
-          unidade: String(r.unidade || ''),
-          uf: String(r.uf || ''),
-          quant_vol: Number(r.quant_vol) || 0,
-          quant_ctrc: Number(r.quant_ctrc) || 0,
-          peso_ton: Number(r.peso_ton) || 0,
-          val_merc: Number(r.val_merc) || 0,
-          frete_cif: Number(r.frete_cif) || 0,
-          frete_fob: Number(r.frete_fob) || 0,
-          frete_ter: Number(r.frete_ter) || 0,
-          frete_sub: Number(r.frete_sub) || 0,
-          frete_tot: Number(r.frete_tot) || 0,
-        });
-        return;
-      }
-      const unidadeA = String(prev.unidade || '');
-      const unidadeB = String(r.unidade || '');
-      const chosenUnidade = unidadeB.length > unidadeA.length ? unidadeB : unidadeA;
-      const uf = prev.uf || r.uf || '';
-      map.set(sigla, {
-        ...prev,
-        unidade: chosenUnidade,
-        uf,
-        quant_vol: (Number(prev.quant_vol) || 0) + (Number(r.quant_vol) || 0),
-        quant_ctrc: (Number(prev.quant_ctrc) || 0) + (Number(r.quant_ctrc) || 0),
-        peso_ton: (Number(prev.peso_ton) || 0) + (Number(r.peso_ton) || 0),
-        val_merc: (Number(prev.val_merc) || 0) + (Number(r.val_merc) || 0),
-        frete_cif: (Number(prev.frete_cif) || 0) + (Number(r.frete_cif) || 0),
-        frete_fob: (Number(prev.frete_fob) || 0) + (Number(r.frete_fob) || 0),
-        frete_ter: (Number(prev.frete_ter) || 0) + (Number(r.frete_ter) || 0),
-        frete_sub: (Number(prev.frete_sub) || 0) + (Number(r.frete_sub) || 0),
-        frete_tot: (Number(prev.frete_tot) || 0) + (Number(r.frete_tot) || 0),
-      });
-    };
-
-    for (const r of exp?.rows || []) add(r);
-    for (const r of rec?.rows || []) add(r);
-
-    const isFec = (r: RowAgg) => String(r.sigla ?? r.unidade ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
-    const rowsBase = Array.from(map.values());
-    const rows =
-      filtroTotal === 'todos'
-        ? rowsBase
-        : filtroTotal === 'fec'
-          ? rowsBase.filter(isFec)
-          : rowsBase.filter((r) => !isFec(r));
-
-    const totals = rows.reduce(
-      (acc, r) => {
-        acc.quant_vol += Number(r.quant_vol) || 0;
-        acc.quant_ctrc += Number(r.quant_ctrc) || 0;
-        acc.peso_ton += Number(r.peso_ton) || 0;
-        acc.val_merc += Number(r.val_merc) || 0;
-        acc.frete_tot += Number(r.frete_tot) || 0;
-        acc.frete_cif += Number(r.frete_cif) || 0;
-        acc.frete_fob += Number(r.frete_fob) || 0;
-        acc.frete_ter += Number(r.frete_ter) || 0;
-        acc.frete_sub += Number(r.frete_sub) || 0;
-        return acc;
-      },
-      {
-        quant_vol: 0,
-        quant_ctrc: 0,
-        peso_ton: 0,
-        val_merc: 0,
-        frete_tot: 0,
-        frete_cif: 0,
-        frete_fob: 0,
-        frete_ter: 0,
-        frete_sub: 0,
-      }
-    );
-
-    return { totals, rows };
-  }, [dataExpView, dataRecView, filtroTotal]);
-
   const rowsExpSorted = useMemo(() => {
     const rows = [...(dataExpView?.rows || [])];
     const { key, dir } = sortExp;
@@ -576,32 +486,16 @@ export function FretesExpedidosRecebidos() {
     return rows;
   }, [dataRecView, sortRec]);
 
-  const rowsTotalSorted = useMemo(() => {
-    const rows = [...(dataTotalView?.rows || [])];
-    const { key, dir } = sortTotal;
-    rows.sort((a, b) => {
-      const av: any = (a as any)[key];
-      const bv: any = (b as any)[key];
-      let cmp = 0;
-      if (typeof av === 'string' || typeof bv === 'string') cmp = String(av || '').localeCompare(String(bv || ''), 'pt-BR');
-      else cmp = (Number(av) || 0) - (Number(bv) || 0);
-      return dir === 'asc' ? cmp : -cmp;
-    });
-    return rows;
-  }, [dataTotalView, sortTotal]);
-
-  const toggleSort = (kind: 'expedidos' | 'recebidos' | 'total', key: keyof RowAgg) => {
+  const toggleSort = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
     if (kind === 'expedidos') {
       setSortExp((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
-    } else if (kind === 'recebidos') {
-      setSortRec((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
     } else {
-      setSortTotal((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+      setSortRec((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
     }
   };
 
-  const sortIcon = (kind: 'expedidos' | 'recebidos' | 'total', key: keyof RowAgg) => {
-    const s = kind === 'expedidos' ? sortExp : kind === 'recebidos' ? sortRec : sortTotal;
+  const sortIcon = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
+    const s = kind === 'expedidos' ? sortExp : sortRec;
     if (s.key !== key) return null;
     return <span className="ml-1 text-[10px] opacity-70">{s.dir === 'asc' ? '▲' : '▼'}</span>;
   };
@@ -776,7 +670,6 @@ export function FretesExpedidosRecebidos() {
 
   const donutExp = useMemo(() => (dataExpView ? buildDonut(dataExpView.rows) : []), [dataExpView]);
   const donutRec = useMemo(() => (dataRecView ? buildDonut(dataRecView.rows) : []), [dataRecView]);
-  const donutTotal = useMemo(() => (dataTotalView ? buildDonut(dataTotalView.rows) : []), [dataTotalView]);
 
   return (
     <AdminLayout
@@ -987,25 +880,6 @@ export function FretesExpedidosRecebidos() {
                 )}
               </button>
 
-              <button
-                onClick={() => setTab('total')}
-                className={`flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
-                  tab === 'total'
-                    ? 'border-slate-500 text-slate-700 dark:text-slate-200'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                <Percent className="w-4 h-4" />
-                Total
-                {dataTotalView ? (
-                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-                    {formatNumber(dataTotalView.totals.quant_ctrc || 0)}
-                  </Badge>
-                ) : (
-                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
-                )}
-              </button>
-
               <div className="flex-1" />
 
               <div className="flex items-center gap-2 px-3">
@@ -1022,15 +896,14 @@ export function FretesExpedidosRecebidos() {
                   disabled={loading}
                   onClick={() => {
                     const isExp = tab === 'expedidos';
-                    const isRec = tab === 'recebidos';
-                    const data = isExp ? dataExpView : isRec ? dataRecView : dataTotalView;
+                    const data = isExp ? dataExpView : dataRecView;
                     if (!data) {
                       toast.info('Nenhum dado carregado para exportar.');
                       return;
                     }
-                    const kind = isExp ? 'Expedidos' : isRec ? 'Recebidos' : 'Total';
-                    const unidadeLabel = isExp ? 'Unidade Destino' : isRec ? 'Unidade Origem' : 'Unidade';
-                    const rows = isExp ? rowsExpSorted : isRec ? rowsRecSorted : rowsTotalSorted;
+                    const kind = isExp ? 'Expedidos' : 'Recebidos';
+                    const unidadeLabel = isExp ? 'Unidade Destino' : 'Unidade Origem';
+                    const rows = isExp ? rowsExpSorted : rowsRecSorted;
                     const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
                     const pad = (n: number) => String(n).padStart(2, '0');
@@ -1038,13 +911,9 @@ export function FretesExpedidosRecebidos() {
                       ? filtroExpedidos !== 'todos'
                         ? `_${filtroExpedidos}`
                         : ''
-                      : isRec
-                        ? filtroRecebidos !== 'todos'
-                          ? `_${filtroRecebidos}`
-                          : ''
-                        : filtroTotal !== 'todos'
-                          ? `_${filtroTotal}`
-                          : '';
+                      : filtroRecebidos !== 'todos'
+                        ? `_${filtroRecebidos}`
+                        : '';
                     const name = `fretes_${kind.toLowerCase()}${suf}_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(
                       stamp.getMinutes()
                     )}.csv`;
@@ -1479,219 +1348,6 @@ export function FretesExpedidosRecebidos() {
               </div>
             )}
               </div>
-            ) : (
-              <div>
-            {!dataTotalView ? (
-              <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  Nenhum dado para Total carregado.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-muted-foreground">Filtro:</div>
-                  <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        filtroTotal === 'todos'
-                          ? 'bg-slate-700 text-white'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                      onClick={() => setFiltroTotal('todos')}
-                      disabled={loading}
-                    >
-                      Todos
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                        filtroTotal === 'fracionados'
-                          ? 'bg-slate-700 text-white'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                      onClick={() => setFiltroTotal('fracionados')}
-                      disabled={loading}
-                    >
-                      Apenas Fracionados
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                        filtroTotal === 'fec'
-                          ? 'bg-slate-700 text-white'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                      onClick={() => setFiltroTotal('fec')}
-                      disabled={loading}
-                    >
-                      Apenas FEC
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
-                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 auto-rows-fr content-start">
-                  <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-4 flex items-start gap-3">
-                    <DollarSign className="w-5 h-5 text-indigo-600 dark:text-indigo-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-indigo-700 dark:text-indigo-200">Frete CIF</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataTotalView.totals.frete_cif)}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-start gap-3">
-                    <Route className="w-5 h-5 text-sky-700 dark:text-sky-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-sky-800 dark:text-sky-200">Frete FOB</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataTotalView.totals.frete_fob)}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-fuchsia-200 dark:border-fuchsia-800 bg-fuchsia-50 dark:bg-fuchsia-950/30 p-4 flex items-start gap-3">
-                    <Users className="w-5 h-5 text-fuchsia-700 dark:text-fuchsia-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-fuchsia-800 dark:text-fuchsia-200">Frete Terceiro</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataTotalView.totals.frete_ter)}</div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 p-4 flex items-start gap-3">
-                    <Truck className="w-5 h-5 text-cyan-600 dark:text-cyan-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-cyan-700 dark:text-cyan-200">CT-es</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataTotalView.totals.quant_ctrc)}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 p-4 flex items-start gap-3">
-                    <Package className="w-5 h-5 text-teal-700 dark:text-teal-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-teal-800 dark:text-teal-200">Quantidade de Volumes</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatNumber(dataTotalView.totals.quant_vol)}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 flex items-start gap-3">
-                    <Weight className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-amber-800 dark:text-amber-200">Peso (kg)</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatNumber(Math.round(Number(dataTotalView.totals.peso_ton) || 0))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 flex items-start gap-3">
-                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-emerald-700 dark:text-emerald-200">Valor de Mercadoria</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">{formatCurrency(dataTotalView.totals.val_merc)}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-4 flex items-start gap-3">
-                    <Wallet className="w-5 h-5 text-slate-700 dark:text-slate-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-slate-800 dark:text-slate-200">Frete Total (R$)</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {formatCurrency(Number(dataTotalView.totals.frete_tot) || 0)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 p-4 flex items-start gap-3">
-                    <Calculator className="w-5 h-5 text-rose-700 dark:text-rose-300 mt-0.5 shrink-0" />
-                    <div className="flex flex-col">
-                      <div className="text-xs font-medium text-rose-800 dark:text-rose-200">Frete por Peso (R$/Kg)</div>
-                      <div className="text-xl font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                        {(() => {
-                          const pesoKg = Math.round(Number(dataTotalView.totals.peso_ton) || 0);
-                          const freteTotal = Number(dataTotalView.totals.frete_tot) || 0;
-                          return formatCurrencyPerKg(pesoKg > 0 ? freteTotal / pesoKg : 0);
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Card className="lg:col-span-1 flex flex-col h-full">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Frete por unidade (Top)</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-1 min-h-[260px]">
-                    {donutTotal.length === 0 ? (
-                      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Sem dados</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <RechartsTooltip
-                            formatter={(value: any, name: any) => [formatCurrency(Number(value) || 0), String(name)]}
-                            contentStyle={{
-                              backgroundColor: 'hsl(var(--popover))',
-                              border: '1px solid hsl(var(--border))',
-                              color: 'hsl(var(--popover-foreground))',
-                            }}
-                          />
-                          <Legend verticalAlign="bottom" height={36} />
-                          <Pie data={donutTotal} dataKey="value" nameKey="name" innerRadius={58} outerRadius={90} stroke="none">
-                            {donutTotal.map((_, i) => (
-                              <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <div className="lg:col-span-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Lista (unidades)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left border-b">
-                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('total', 'unidade')}>
-                              Unidade{sortIcon('total', 'unidade')}
-                            </th>
-                            <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('total', 'uf')}>
-                              UF{sortIcon('total', 'uf')}
-                            </th>
-                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('total', 'quant_ctrc')}>
-                              CT-es{sortIcon('total', 'quant_ctrc')}
-                            </th>
-                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('total', 'peso_ton')}>
-                              Peso (Kg){sortIcon('total', 'peso_ton')}
-                            </th>
-                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('total', 'val_merc')}>
-                              Valor Merc.{sortIcon('total', 'val_merc')}
-                            </th>
-                            <th className="py-2 pr-3 text-right cursor-pointer select-none" onClick={() => toggleSort('total', 'frete_tot')}>
-                              Frete Total{sortIcon('total', 'frete_tot')}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rowsTotalSorted.slice(0, 200).map((r) => (
-                            <tr key={`${r.sigla}-${r.uf}`} className="border-b last:border-0">
-                              <td className="py-2 pr-3">
-                                <div className="font-medium">{r.sigla}</div>
-                                <div className="text-xs text-muted-foreground truncate max-w-[340px]">{r.unidade}</div>
-                              </td>
-                              <td className="py-2 pr-3">{r.uf}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(r.quant_ctrc)}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(r.peso_ton) || 0))}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.val_merc)}</td>
-                              <td className="py-2 pr-3 text-right font-mono">{formatCurrency(r.frete_tot)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-              </div>
-            )}
-              </div>
-            )}
           </div>
         )}
       </div>
