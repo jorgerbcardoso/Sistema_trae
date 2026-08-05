@@ -4872,6 +4872,117 @@ export function Disponiveis() {
     (ctesEntregaFiltrados.reduce((s, c) => s + parseMoeda(c.vlrMerc), 0) ?? 0) +
     (coletasTransferFiltradas.reduce((s, c) => s + parseMoeda(c.valMerc), 0) ?? 0);
 
+  const exportarTransferenciaCSVTodasUnidades = () => {
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
+    const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+
+    const downloadCsv = (filename: string, header: string[], rows: string[][]) => {
+      if (!rows.length) return;
+      const csv = [header.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const ctesArmazem = ctesTransferFiltrados.filter((c) => !c.emTransito);
+    const ctesTransito = ctesTransferFiltrados.filter((c) => c.emTransito);
+    const coletas = coletasTransferFiltradas.filter((c) => !c.paraEntrega);
+
+    const headerCtes = [
+      'Destino',
+      'CTRC',
+      'NF',
+      'Situação',
+      'Emissão',
+      'Prev. Ent.',
+      'Pagador',
+      'Destinatário',
+      'Cidade/UF',
+      'Vlr. NF',
+      'Frete (R$)',
+      'Peso (kg)',
+      'Cubagem (m³)',
+      'Volumes',
+      'Manifesto',
+      'Prev. Chegada',
+    ];
+
+    const rowsArmazem = ctesArmazem.map((c) => [
+      esc(c.unidadeDest),
+      esc(c.ctrc),
+      esc(c.nfiscal || ''),
+      esc('NO ARMAZÉM'),
+      esc(c.emissao),
+      esc(c.prevEnt),
+      esc(c.pagador),
+      esc(c.destinatario),
+      esc(`${c.cidade}/${c.uf}`),
+      fmtMoeda(parseMoeda(c.vlrNf)),
+      fmtMoeda(parseMoeda(c.frete)),
+      fmtNum(parsePeso(c.peso), 2),
+      fmtNum(parseCubagem(c.cubagem), 3),
+      esc(c.qtdeVol),
+      esc(c.manifesto || ''),
+      esc(c.prevChegada || ''),
+    ]);
+
+    const rowsTransito = ctesTransito.map((c) => [
+      esc(c.unidadeDest),
+      esc(c.ctrc),
+      esc(c.nfiscal || ''),
+      esc('EM TRÂNSITO'),
+      esc(c.emissao),
+      esc(c.prevEnt),
+      esc(c.pagador),
+      esc(c.destinatario),
+      esc(`${c.cidade}/${c.uf}`),
+      fmtMoeda(parseMoeda(c.vlrNf)),
+      fmtMoeda(parseMoeda(c.frete)),
+      fmtNum(parsePeso(c.peso), 2),
+      fmtNum(parseCubagem(c.cubagem), 3),
+      esc(c.qtdeVol),
+      esc(c.manifesto || ''),
+      esc(c.prevChegada || ''),
+    ]);
+
+    const headerColetas = [
+      'Destino',
+      'Coleta',
+      'Remetente',
+      'Cidade Rem.',
+      'Cidade/UF Dest.',
+      'Limite',
+      'Coletada',
+      'Vlr. Merc.',
+      'Vol.',
+      'Peso (kg)',
+      'Status',
+    ];
+
+    const rowsColetas = coletas.map((c) => [
+      esc(c.unidadeDest || 'SEM DESTINO'),
+      esc(`${c.serColeta} ${c.nroColeta}`.trim()),
+      esc(c.remetente),
+      esc(c.cidadeRem),
+      esc(`${c.cidadeDest || '-'}${c.ufDest ? `/${c.ufDest}` : ''}`),
+      esc(c.dataHoreLim),
+      esc(c.coletada || '-'),
+      fmtMoeda(parseMoeda(c.valMerc)),
+      esc(c.qtdeVol),
+      fmtNum(parsePeso(c.peso), 2),
+      esc(c.statusColeta),
+    ]);
+
+    downloadCsv('ctes_transferencia_armazem.csv', headerCtes, rowsArmazem);
+    downloadCsv('ctes_transferencia_transito.csv', headerCtes, rowsTransito);
+    downloadCsv('coletas_transferencia.csv', headerColetas, rowsColetas);
+  };
+
   const minutos = Math.floor(countdown / 60);
   const segundos = countdown % 60;
 
@@ -5617,6 +5728,10 @@ export function Disponiveis() {
                         </span>
                       </div>
                     </div>
+                    <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={exportarTransferenciaCSVTodasUnidades}>
+                      <FileDown className="w-3.5 h-3.5 mr-1.5" />
+                      CSV (tudo)
+                    </Button>
                   </div>
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">

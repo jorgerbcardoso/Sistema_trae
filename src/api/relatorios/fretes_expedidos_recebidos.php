@@ -5,6 +5,15 @@ require_once '/var/www/html/lib/ssw.php';
 handleOptionsRequest();
 validateRequestMethod('POST');
 
+$noCacheHeaders = static function(): void {
+    if (headers_sent()) return;
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+};
+
+$noCacheHeaders();
+
 $auth = authenticateAndGetUser();
 $domain = $auth['domain'];
 $g_sql = connect();
@@ -431,6 +440,8 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
         $unLabel = trim((string)($cols[0] ?? ''));
         $uf = strtoupper(trim((string)($cols[1] ?? '')));
         if ($unLabel === '' || $uf === '') continue;
+        if ($uf === 'UF') continue;
+        if (stripos($unLabel, 'UNIDADE ') === 0) continue;
 
         $sigla = strtoupper(substr($unLabel, 0, 3));
         if (!preg_match('/^[A-Z0-9]{3}$/', $sigla)) continue;

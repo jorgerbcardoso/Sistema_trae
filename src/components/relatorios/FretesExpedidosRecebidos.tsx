@@ -250,7 +250,8 @@ function ClienteSearchSelect({
     try {
       const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/search_clientes.php`, {
         method: 'POST',
-        body: JSON.stringify({ search: term }),
+        cache: 'no-store',
+        body: JSON.stringify({ search: term, _nonce: Date.now() }),
       });
       if (res?.success) {
         setOptions(res.clientes || []);
@@ -544,6 +545,7 @@ export function FretesExpedidosRecebidos() {
     try {
       const start = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
         method: 'POST',
+        cache: 'no-store',
         body: JSON.stringify({
           step: 'START',
           sigla_unid: f.sigla_unid || '',
@@ -553,6 +555,7 @@ export function FretesExpedidosRecebidos() {
           periodo_emissao_fim: f.periodo_emissao_fim,
           periodo_entrega_ini: f.periodo_entrega_ini || '',
           periodo_entrega_fim: f.periodo_entrega_fim || '',
+          _nonce: Date.now(),
         }),
       })) as StartResponse;
 
@@ -571,10 +574,12 @@ export function FretesExpedidosRecebidos() {
 
         const poll = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
           method: 'POST',
+          cache: 'no-store',
           body: JSON.stringify({
             step: 'POLL',
             baseline_seq: start.baseline_seq,
             request_start_ts: start.request_start_ts,
+            _nonce: Date.now(),
           }),
         })) as PollResponse;
 
@@ -633,9 +638,11 @@ export function FretesExpedidosRecebidos() {
 
         const dl = (await apiFetch(`${ENVIRONMENT.apiBaseUrl}/relatorios/fretes_expedidos_recebidos.php`, {
           method: 'POST',
+          cache: 'no-store',
           body: JSON.stringify({
             step: 'DOWNLOAD',
             act,
+            _nonce: Date.now(),
           }),
         })) as DownloadResponse;
 
@@ -1129,6 +1136,16 @@ export function FretesExpedidosRecebidos() {
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 pr-3">TOTAL</td>
+                            <td className="py-2 pr-3" />
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataExpView.totals.quant_ctrc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataExpView.totals.peso_ton) || 0))}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataExpView.totals.val_merc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataExpView.totals.frete_tot)}</td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </CardContent>
                   </Card>
@@ -1340,6 +1357,16 @@ export function FretesExpedidosRecebidos() {
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 pr-3">TOTAL</td>
+                            <td className="py-2 pr-3" />
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecView.totals.quant_ctrc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecView.totals.peso_ton) || 0))}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.val_merc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.frete_tot)}</td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </CardContent>
                   </Card>
