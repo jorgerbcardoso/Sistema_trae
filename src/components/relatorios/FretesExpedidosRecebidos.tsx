@@ -1348,6 +1348,7 @@ export function FretesExpedidosRecebidos() {
               </div>
             )}
               </div>
+            )}
           </div>
         )}
       </div>
