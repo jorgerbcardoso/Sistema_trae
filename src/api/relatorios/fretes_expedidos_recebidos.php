@@ -434,7 +434,6 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
 
         $sigla = strtoupper(substr($unLabel, 0, 3));
         if (!preg_match('/^[A-Z0-9]{3}$/', $sigla)) continue;
-        if (is_array($knownSiglas) && !isset($knownSiglas[$sigla])) continue;
 
         $current['rows'][] = [
             'sigla' => $sigla,
@@ -528,9 +527,17 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
 
 $inferTipoFromFilename = static function(string $filename): string {
     $fn = strtoupper((string)$filename);
-    if (strpos($fn, '_E.SSWWEB') !== false) return 'R';
-    if (strpos($fn, '_R.SSWWEB') !== false) return 'E';
-    return 'E';
+    if (strpos($fn, '_E.SSWWEB') !== false) return 'E';
+    if (strpos($fn, '_R.SSWWEB') !== false) return 'R';
+    return '';
+};
+
+$inferTipoFromDownload = static function(string $filename, string $content) use ($inferTipoFromFilename): string {
+    $hay = strtoupper((string)$content);
+    if (strpos($hay, 'FRETES EXPEDIDOS') !== false) return 'E';
+    if (strpos($hay, 'FRETES RECEBIDOS') !== false) return 'R';
+    $byName = $inferTipoFromFilename($filename);
+    return $byName !== '' ? $byName : 'E';
 };
 
 if ($step === 'DOWNLOAD') {
@@ -543,7 +550,7 @@ if ($step === 'DOWNLOAD') {
         respondJson(['success' => false, 'message' => 'Não foi possível baixar o arquivo pelo ssw1440/ssw0424.']);
     }
 
-    $tipo = $inferTipoFromFilename((string)$dl['filename']);
+    $tipo = $inferTipoFromDownload((string)$dl['filename'], (string)$dl['content']);
     $t0 = microtime(true);
     $data = $parseTxt((string)$dl['content'], $tipo);
     $t1 = microtime(true);
@@ -856,8 +863,8 @@ if (empty($acts)) {
 
 $rankAct = static function(string $act): int {
     $a = strtoupper($act);
-    if (strpos($a, '_R.SSWWEB') !== false) return 1;
-    if (strpos($a, '_E.SSWWEB') !== false) return 2;
+    if (strpos($a, '_E.SSWWEB') !== false) return 1;
+    if (strpos($a, '_R.SSWWEB') !== false) return 2;
     return 9;
 };
 
@@ -874,7 +881,7 @@ foreach ($acts as $act) {
     if (!$dl) continue;
     $downloads[] = ['act' => $act, 'filename' => $dl['filename']];
 
-    $tipo = $inferTipoFromFilename((string)$dl['filename']);
+    $tipo = $inferTipoFromDownload((string)$dl['filename'], (string)$dl['content']);
     if ($tipo === 'E') {
         $exp = $parseTxt($dl['content'], 'E');
     } elseif ($tipo === 'R') {
