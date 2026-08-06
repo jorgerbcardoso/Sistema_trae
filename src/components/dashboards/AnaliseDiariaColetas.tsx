@@ -14,6 +14,7 @@ interface AnaliseDiariaColetasProps {
   handleExportColetasDia: (data: string) => void;
   handleExportProgramadasDia: (data: string) => void;
   handleExportNoPrazoDia: (data: string) => void;
+  handleExportAtrasadasDia: (data: string) => void;
 }
 
 export function AnaliseDiariaColetas({
@@ -23,7 +24,8 @@ export function AnaliseDiariaColetas({
   loadingAnalise,
   handleExportColetasDia,
   handleExportProgramadasDia,
-  handleExportNoPrazoDia
+  handleExportNoPrazoDia,
+  handleExportAtrasadasDia
 }: AnaliseDiariaColetasProps) {
   return (
     <Card className="dark:bg-slate-900 dark:border-slate-700">
@@ -102,6 +104,13 @@ export function AnaliseDiariaColetas({
                             Das Programadas, quantas foram coletadas (situacao = 2) E efetivadas dentro do prazo limite (data_efetivacao + hora_efetivacao ≤ data_limite + hora_limite).
                           </p>
                         </div>
+
+                        <div>
+                          <span className="font-semibold text-red-600 dark:text-red-400">Atrasadas:</span>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            Das Programadas, quantas não foram feitas no prazo (coletadas após o limite ou ainda pendentes após o limite).
+                          </p>
+                        </div>
                         
                         <div>
                           <span className="font-semibold text-slate-900 dark:text-slate-100">Performance:</span>
@@ -118,7 +127,7 @@ export function AnaliseDiariaColetas({
                         Exportação de Dados
                       </p>
                       <p className="text-xs">
-                        Clique sobre os totais (Coletas, Programadas ou No prazo) para exportar as coletas correspondentes em formato CSV.
+                        Clique sobre os totais (Programadas, Coletadas, No prazo ou Atrasadas) para exportar as coletas correspondentes em formato CSV.
                       </p>
                     </div>
                   </div>
@@ -286,6 +295,29 @@ export function AnaliseDiariaColetas({
                               <span className="text-slate-600 dark:text-slate-400">No prazo:</span>
                               <span className="font-semibold text-green-600 dark:text-green-400">
                                 {dia.coletadasNoPrazo}
+                              </span>
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Clique para exportar</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    {/* Atrasadas */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleExportAtrasadasDia(dia.data)}
+                            disabled={(dia.coletasAtrasadas || 0) === 0}
+                            className="w-full text-left px-2 py-1 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-600 dark:text-slate-400">Atrasadas:</span>
+                              <span className="font-semibold text-red-600 dark:text-red-400">
+                                {dia.coletasAtrasadas || 0}
                               </span>
                             </div>
                           </button>

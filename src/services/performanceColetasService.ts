@@ -59,6 +59,7 @@ export interface DayDataColetas {
   coletasRealizadas: number;
   coletasProgramadas: number;
   coletadasNoPrazo: number;
+  coletasAtrasadas?: number;
   performance: number; // percentual
 }
 

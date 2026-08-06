@@ -349,8 +349,16 @@ export function PerformanceColetas() {
       };
       if (filters.unidadeColeta) analiseFilters.unidadeColeta = filters.unidadeColeta;
       const { analiseDiaria, coletas } = await getAnaliseDiariaCalendario(analiseFilters);
-      setAllDiasData(Array.isArray(analiseDiaria) ? analiseDiaria : []);
-      setColetasRawCalendario(Array.isArray(coletas) ? coletas : []);
+      const coletasArr = Array.isArray(coletas) ? (coletas as ColetaRaw[]) : [];
+      const now = new Date();
+      const diasArr = Array.isArray(analiseDiaria) ? (analiseDiaria as DayDataColetas[]) : [];
+      const diasComAtrasadas = diasArr.map((d) => {
+        const iso = normDate(d.data);
+        const atrasadas = coletasArr.reduce((acc, c) => acc + (isAtrasadaCalendario(c, iso, now) ? 1 : 0), 0);
+        return { ...d, coletasAtrasadas: atrasadas };
+      });
+      setAllDiasData(diasComAtrasadas);
+      setColetasRawCalendario(coletasArr);
     } catch (error) {
       console.error('❌ Erro ao carregar análise diária:', error);
       setAllDiasData([]);
@@ -495,6 +503,21 @@ export function PerformanceColetas() {
     return d;
   };
 
+  const isAtrasadaCalendario = (c: ColetaRaw, iso: string, now: Date) => {
+    if (normDate(c.data_limite) !== iso) return false;
+    if (c.situacao === 'CANCELADA') return false;
+    const limiteHora = (c.hora_limite || '17:00').slice(0, 5);
+    const limiteDt = new Date(`${iso}T${limiteHora}:00`);
+    if (c.situacao === 'COLETADA') {
+      if (!c.data_efetivacao || !c.hora_efetivacao) return false;
+      const efetIso = normDate(c.data_efetivacao);
+      const efetHora = String(c.hora_efetivacao).slice(0, 5);
+      const efetDt = new Date(`${efetIso}T${efetHora}:00`);
+      return efetDt.getTime() > limiteDt.getTime();
+    }
+    return now.getTime() > limiteDt.getTime();
+  };
+
   const handleExportColetasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso);
@@ -551,6 +574,15 @@ export function PerformanceColetas() {
     downloadCSV(filtered, `no_prazo_dia_${iso}.csv`);
     if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
     else toast.warning('Nenhuma coleta no prazo encontrada para este dia');
+  };
+
+  const handleExportCalendarioAtrasadasDia = (data: string) => {
+    const iso = normDate(data);
+    const now = new Date();
+    const filtered = coletasRawCalendario.filter((c) => isAtrasadaCalendario(c, iso, now));
+    downloadCSV(filtered, `atrasadas_dia_${iso}.csv`);
+    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    else toast.warning('Nenhuma coleta atrasada encontrada para este dia');
   };
 
   const handleExportComparativo = (sigla: string, tipo: 'total' | 'programadas' | 'comandadas' | 'coletadas' | 'no_prazo', label: string) => {
@@ -1231,6 +1263,7 @@ export function PerformanceColetas() {
           handleExportColetasDia={handleExportCalendarioColetasDia}
           handleExportProgramadasDia={handleExportCalendarioProgramadasDia}
           handleExportNoPrazoDia={handleExportCalendarioNoPrazoDia}
+          handleExportAtrasadasDia={handleExportCalendarioAtrasadasDia}
         />
 
         {/* Gráfico de Evolução da Performance */}
