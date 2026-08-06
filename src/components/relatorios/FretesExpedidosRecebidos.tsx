@@ -167,7 +167,7 @@ function buildCsv(kind: 'Expedidos' | 'Recebidos', data: ApiData, unidadeLabel: 
   lines.push(header.map(csvEscape).join(';'));
 
   for (const r of data.rows || []) {
-    const unidadeSigla = String(r.unidade ?? (r as any)?.sigla ?? '')
+    const unidadeSigla = String(r.sigla ?? '')
       .trim()
       .substring(0, 3)
       .toUpperCase();
@@ -379,10 +379,13 @@ export function FretesExpedidosRecebidos() {
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
   const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
 
+  const dataAbaExpedidos = dataRec;
+  const dataAbaRecebidos = dataExp;
+
   const dataExpView = useMemo<ApiData | null>(() => {
-    if (!dataExp) return null;
-    const isFec = (r: RowAgg) => String(r.unidade ?? r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
-    const rowsBase = dataExp.rows || [];
+    if (!dataAbaExpedidos) return null;
+    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
+    const rowsBase = dataAbaExpedidos.rows || [];
     const rows =
       filtroExpedidos === 'todos'
         ? rowsBase
@@ -417,12 +420,12 @@ export function FretesExpedidosRecebidos() {
     );
 
     return { totals, rows };
-  }, [dataExp, filtroExpedidos]);
+  }, [dataAbaExpedidos, filtroExpedidos]);
 
   const dataRecView = useMemo<ApiData | null>(() => {
-    if (!dataRec) return null;
-    const isFec = (r: RowAgg) => String(r.unidade ?? r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
-    const rowsBase = dataRec.rows || [];
+    if (!dataAbaRecebidos) return null;
+    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
+    const rowsBase = dataAbaRecebidos.rows || [];
     const rows =
       filtroRecebidos === 'todos'
         ? rowsBase
@@ -457,7 +460,7 @@ export function FretesExpedidosRecebidos() {
     );
 
     return { totals, rows };
-  }, [dataRec, filtroRecebidos]);
+  }, [dataAbaRecebidos, filtroRecebidos]);
 
   const rowsExpSorted = useMemo(() => {
     const rows = [...(dataExpView?.rows || [])];
@@ -664,10 +667,10 @@ export function FretesExpedidosRecebidos() {
       if (!exp && !rec) {
         toast.info('Nenhum dado disponível após o download.');
       } else if (!exp) {
-        setTab('recebidos');
+        setTab('expedidos');
         toast.info('O relatório retornou apenas Recebidos para os parâmetros informados.');
       } else if (!rec) {
-        setTab('expedidos');
+        setTab('recebidos');
         toast.info('O relatório retornou apenas Expedidos para os parâmetros informados.');
       }
     } finally {
@@ -859,9 +862,9 @@ export function FretesExpedidosRecebidos() {
               >
                 <Send className="w-4 h-4" />
                 Expedidos
-                {dataExp ? (
+                {dataExpView ? (
                   <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs">
-                    {formatNumber((dataExpView?.totals.quant_ctrc ?? dataExp.totals.quant_ctrc) || 0)}
+                    {formatNumber(dataExpView.totals.quant_ctrc || 0)}
                   </Badge>
                 ) : (
                   <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
@@ -878,9 +881,9 @@ export function FretesExpedidosRecebidos() {
               >
                 <Inbox className="w-4 h-4" />
                 Recebidos
-                {dataRec ? (
+                {dataRecView ? (
                   <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-                    {formatNumber((dataRecView?.totals.quant_ctrc ?? dataRec.totals.quant_ctrc) || 0)}
+                    {formatNumber(dataRecView.totals.quant_ctrc || 0)}
                   </Badge>
                 ) : (
                   <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs">-</Badge>
@@ -909,7 +912,7 @@ export function FretesExpedidosRecebidos() {
                       return;
                     }
                     const kind = isExp ? 'Expedidos' : 'Recebidos';
-                    const unidadeLabel = isExp ? 'Unidade Destino' : 'Unidade Origem';
+                    const unidadeLabel = isExp ? 'Unidade Origem' : 'Unidade Destino';
                     const rows = isExp ? rowsExpSorted : rowsRecSorted;
                     const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
@@ -1102,7 +1105,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'unidade')}>
-                              Unidade Destino{sortIcon('expedidos', 'unidade')}
+                              Unidade Origem{sortIcon('expedidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'uf')}>
                               UF{sortIcon('expedidos', 'uf')}
@@ -1138,7 +1141,7 @@ export function FretesExpedidosRecebidos() {
                         </tbody>
                         <tfoot>
                           <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
-                            <td className="py-2 pr-3">TOTAL</td>
+                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataExpView.rows.length)} unidades)</td>
                             <td className="py-2 pr-3" />
                             <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataExpView.totals.quant_ctrc)}</td>
                             <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataExpView.totals.peso_ton) || 0))}</td>
@@ -1323,7 +1326,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'unidade')}>
-                              Unidade Origem{sortIcon('recebidos', 'unidade')}
+                              Unidade Destino{sortIcon('recebidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'uf')}>
                               UF{sortIcon('recebidos', 'uf')}
@@ -1359,7 +1362,7 @@ export function FretesExpedidosRecebidos() {
                         </tbody>
                         <tfoot>
                           <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
-                            <td className="py-2 pr-3">TOTAL</td>
+                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataRecView.rows.length)} unidades)</td>
                             <td className="py-2 pr-3" />
                             <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecView.totals.quant_ctrc)}</td>
                             <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecView.totals.peso_ton) || 0))}</td>
