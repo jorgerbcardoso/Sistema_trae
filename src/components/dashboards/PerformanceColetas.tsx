@@ -210,7 +210,39 @@ export function PerformanceColetas() {
 
   // Fatiar allDiasData quando mudar o período do calendário
   useEffect(() => {
-    setDiasData(allDiasData.slice(-analisePeriodo));
+    const byDate = new Map<string, DayDataColetas>();
+    for (const d of allDiasData) {
+      if (d?.data) byDate.set(d.data, d);
+    }
+
+    const end = new Date();
+    end.setDate(end.getDate() + 3);
+    const endMid = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 12, 0, 0, 0);
+    const startMid = new Date(endMid);
+    startMid.setDate(startMid.getDate() - (analisePeriodo - 1));
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (dt: Date) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+
+    const filled: DayDataColetas[] = [];
+    for (let i = 0; i < analisePeriodo; i++) {
+      const d = new Date(startMid);
+      d.setDate(startMid.getDate() + i);
+      const iso = fmt(d);
+      const found = byDate.get(iso);
+      filled.push(
+        found ?? {
+          data: iso,
+          coletasRealizadas: 0,
+          coletasProgramadas: 0,
+          coletadasNoPrazo: 0,
+          coletasAtrasadas: 0,
+          performance: 0,
+        }
+      );
+    }
+
+    setDiasData(filled);
   }, [analisePeriodo, allDiasData]);
 
   // Autoatualizador: countdown de 5 minutos
