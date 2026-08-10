@@ -20,6 +20,7 @@ import { ColetaEntrega } from './components/dashboards/ColetaEntrega';
 import { PainelRetidos } from './components/dashboards/PainelRetidos';
 import { ContasPagar } from './components/dashboards/ContasPagar';
 import { ContasReceber } from './components/dashboards/ContasReceber';
+import { BICotacoes } from './components/dashboards/BICotacoes';
 
 // Cadastros
 import { CadastroEventos } from './components/cadastros/CadastroEventos';
@@ -221,6 +222,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ContasPagar />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'dashboards/bi-cotacoes',
+        element: (
+          <ProtectedRoute>
+            <BICotacoes />
           </ProtectedRoute>
         )
       },
