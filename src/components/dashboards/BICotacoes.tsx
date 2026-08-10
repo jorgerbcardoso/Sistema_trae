@@ -649,44 +649,80 @@ export function BICotacoes() {
               <DialogHeader>
                 <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
                 <DialogDescription className="text-slate-600 dark:text-slate-400">
-                  Define os parâmetros da consulta no SSW (ssw1601).
+                  Refine a busca de cotações por período, tipo, situação e responsáveis.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="flex-1 overflow-y-auto pr-2 space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Período (Inclusão) · Início</Label>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/60 dark:bg-slate-900/40">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de inclusão</div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 6);
+                          setTempFilters((p) => ({ ...p, periodoIni: fmtIso(start), periodoFim: fmtIso(end) }));
+                        }}
+                      >
+                        7 dias
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          const end = new Date();
+                          const start = new Date();
+                          start.setDate(end.getDate() - 29);
+                          setTempFilters((p) => ({ ...p, periodoIni: fmtIso(start), periodoFim: fmtIso(end) }));
+                        }}
+                      >
+                        30 dias
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                        onClick={() => setTempFilters((p) => ({ ...p, periodoIni: todayIso(), periodoFim: todayIso() }))}
+                      >
+                        Hoje
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-700 dark:text-slate-200">Início</Label>
                     <Input
                       type="date"
                       value={tempFilters.periodoIni}
                       onChange={(e) => setTempFilters({ ...tempFilters, periodoIni: e.target.value })}
                       className="dark:border-slate-700 dark:bg-slate-900"
                     />
-                  </div>
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Período (Inclusão) · Fim</Label>
+                    </div>
+                    <div>
+                      <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
                     <Input
                       type="date"
                       value={tempFilters.periodoFim}
                       onChange={(e) => setTempFilters({ ...tempFilters, periodoFim: e.target.value })}
                       className="dark:border-slate-700 dark:bg-slate-900"
                     />
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <Button
-                      variant="outline"
-                      className="w-full dark:border-slate-700 dark:hover:bg-slate-800"
-                      onClick={() => setTempFilters((p) => ({ ...p, periodoIni: todayIso(), periodoFim: todayIso() }))}
-                    >
-                      Hoje
-                    </Button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Tipo de Frete (f7)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
                     <Select value={tempFilters.f7} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f7: v })}>
                       <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
                         <SelectValue placeholder="Selecione" />
@@ -699,8 +735,8 @@ export function BICotacoes() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Situação (f8)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Situação</Label>
                     <Select value={tempFilters.f8} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f8: v })}>
                       <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
                         <SelectValue placeholder="Selecione" />
@@ -716,28 +752,28 @@ export function BICotacoes() {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Usuário SSW (f14)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Usuário</Label>
                     <Input
                       value={tempFilters.f14}
                       onChange={(e) => setTempFilters({ ...tempFilters, f14: e.target.value })}
-                      placeholder="login do SSW"
+                      placeholder="Login do usuário"
                       className="dark:border-slate-700 dark:bg-slate-900"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Unidade Inclusão (f11)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Unidade de inclusão</Label>
                     <FilterSelectUnidadeSingle value={tempFilters.f11} onChange={(v) => setTempFilters({ ...tempFilters, f11: v })} />
                   </div>
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Unidade Origem (f13)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Unidade de origem</Label>
                     <FilterSelectUnidadeSingle value={tempFilters.f13} onChange={(v) => setTempFilters({ ...tempFilters, f13: v })} />
                   </div>
-                  <div>
-                    <Label className="text-slate-900 dark:text-slate-100">Pagador (f16)</Label>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <Label className="text-slate-700 dark:text-slate-200">Pagador</Label>
                     <FilterSelectCliente type="pagador" value={tempFilters.f16} onChange={(v) => setTempFilters({ ...tempFilters, f16: v })} />
                   </div>
                 </div>

@@ -80,8 +80,26 @@ $validIso = static function(string $iso): bool {
     return $iso !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $iso) === 1;
 };
 
+$parseBrDateToIso = static function(string $s): string {
+    $s = trim((string)$s);
+    if ($s === '') return '';
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+        return "{$m[3]}-{$m[2]}-{$m[1]}";
+    }
+    return '';
+};
+
+if (!$validIso($periodoIniIso)) {
+    $try = $parseBrDateToIso($periodoIniIso);
+    if ($try !== '') $periodoIniIso = $try;
+}
+if (!$validIso($periodoFimIso)) {
+    $try = $parseBrDateToIso($periodoFimIso);
+    if ($try !== '') $periodoFimIso = $try;
+}
+
 if (!$validIso($periodoIniIso) || !$validIso($periodoFimIso)) {
-    respondJson(['success' => false, 'message' => 'Informe período de inclusão (início e fim) em formato YYYY-MM-DD.']);
+    respondJson(['success' => false, 'message' => 'Informe período de inclusão (início e fim).']);
 }
 if (strtotime($periodoIniIso) > strtotime($periodoFimIso)) {
     respondJson(['success' => false, 'message' => 'Período inválido (início maior que fim).']);
@@ -131,13 +149,15 @@ foreach ($params as $k => $v) {
 $params['f6'] = 'E';
 
 $url = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($params);
-$extractPlainMessage = static function(string $raw) use ($normStr): string {
+$extractPlainMessage = static function(string $raw): string {
     $s = (string)$raw;
     $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $s = preg_replace('/<br\s*\/?>/i', "\n", $s);
     $s = strip_tags($s);
-    $s = $normStr($s);
-    return $s;
+    $s = str_replace(["\xc2\xa0", "\xa0"], ' ', $s);
+    $s = preg_replace('/[ \t]+/', ' ', $s);
+    $s = preg_replace('/\n{3,}/', "\n\n", $s);
+    return trim((string)$s);
 };
 
 $fetchCsvOrMessage = static function(string $u) use ($extractPlainMessage): array {
