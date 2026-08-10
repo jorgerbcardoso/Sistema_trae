@@ -699,7 +699,7 @@ export function BICotacoes() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-200">Início</Label>
                     <Input
                       type="date"
@@ -708,7 +708,7 @@ export function BICotacoes() {
                       className="dark:border-slate-700 dark:bg-slate-900"
                     />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
                     <Input
                       type="date"
@@ -722,59 +722,71 @@ export function BICotacoes() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
-                    <Select value={tempFilters.f7} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f7: v })}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="T">Todos</SelectItem>
-                        <SelectItem value="C">CIF</SelectItem>
-                        <SelectItem value="F">FOB</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
+                      <Select value={tempFilters.f7} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f7: v })}>
+                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="T">Todos</SelectItem>
+                          <SelectItem value="C">CIF</SelectItem>
+                          <SelectItem value="F">FOB</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Situação</Label>
-                    <Select value={tempFilters.f8} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f8: v })}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="T">Todos</SelectItem>
-                        <SelectItem value="C">Cotada</SelectItem>
-                        <SelectItem value="F">Contratada</SelectItem>
-                        <SelectItem value="E">CTRC emitido</SelectItem>
-                        <SelectItem value="K">Cotada cliente</SelectItem>
-                        <SelectItem value="D">Cancelada</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Situação</Label>
+                      <Select value={tempFilters.f8} onValueChange={(v: any) => setTempFilters({ ...tempFilters, f8: v })}>
+                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="T">Todos</SelectItem>
+                          <SelectItem value="C">Cotada</SelectItem>
+                          <SelectItem value="F">Contratada</SelectItem>
+                          <SelectItem value="E">CTRC emitido</SelectItem>
+                          <SelectItem value="K">Cotada cliente</SelectItem>
+                          <SelectItem value="D">Cancelada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Usuário</Label>
-                    <Input
-                      value={tempFilters.f14}
-                      onChange={(e) => setTempFilters({ ...tempFilters, f14: e.target.value })}
-                      placeholder="Login do usuário"
-                      className="dark:border-slate-700 dark:bg-slate-900"
-                    />
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Usuário</Label>
+                      <Input
+                        value={tempFilters.f14}
+                        onChange={(e) => setTempFilters({ ...tempFilters, f14: e.target.value })}
+                        placeholder="Login do usuário"
+                        className="dark:border-slate-700 dark:bg-slate-900"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Unidade de inclusão</Label>
-                    <FilterSelectUnidadeSingle value={tempFilters.f11} onChange={(v) => setTempFilters({ ...tempFilters, f11: v })} />
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Unidade de inclusão</Label>
+                      <FilterSelectUnidadeSingle value={tempFilters.f11} onChange={(v) => setTempFilters({ ...tempFilters, f11: v })} />
+                    </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Unidade de origem</Label>
-                    <FilterSelectUnidadeSingle value={tempFilters.f13} onChange={(v) => setTempFilters({ ...tempFilters, f13: v })} />
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Unidade de origem</Label>
+                      <FilterSelectUnidadeSingle value={tempFilters.f13} onChange={(v) => setTempFilters({ ...tempFilters, f13: v })} />
+                    </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                    <Label className="text-slate-700 dark:text-slate-200">Pagador</Label>
-                    <FilterSelectCliente type="pagador" value={tempFilters.f16} onChange={(v) => setTempFilters({ ...tempFilters, f16: v })} />
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Pagador</Label>
+                      <FilterSelectCliente type="pagador" value={tempFilters.f16} onChange={(v) => setTempFilters({ ...tempFilters, f16: v })} />
+                    </div>
                   </div>
                 </div>
               </div>

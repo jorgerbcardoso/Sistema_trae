@@ -56,34 +56,27 @@ export function FilterSelectCliente({ type, value, onChange }: FilterSelectClien
 
   const searchClientes = async () => {
     setLoading(true);
-    console.log(`🔍 Buscando clientes com termo:`, searchValue);
-    
     if (ENVIRONMENT.isFigmaMake) {
       const result = await mockSearchClientes(searchValue);
-      console.log(`📦 Resultado do mock:`, result);
       if (result.success) {
-        console.log(`✅ Clientes encontrados:`, result.clientes.length, result.clientes);
         setOptions(result.clientes);
-      } else {
-        console.log(`❌ Mock retornou success=false`);
       }
     } else {
       try {
-        const token = localStorage.getItem('auth_token');
         const result = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/search_clientes.php`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ search: searchValue })
+          body: JSON.stringify({ search: searchValue, _nonce: Date.now() }),
+          cache: 'no-store'
         });
 
         if (result.success) {
           setOptions(result.clientes);
+        } else {
+          setOptions([]);
         }
       } catch (error) {
-        console.error(`❌ Erro ao buscar clientes:`, error);
+        console.error(`Erro ao buscar clientes:`, error);
+        setOptions([]);
       }
     }
     setLoading(false);
