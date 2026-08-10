@@ -234,6 +234,11 @@ export function BICotacoes() {
   const [origemDestinoMode, setOrigemDestinoMode] = useState<'origem' | 'destino'>('origem');
   const tooltipStyle = useTooltipStyle();
 
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<CotacaoRow[]>([]);
+  const [drillSearch, setDrillSearch] = useState('');
+
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
 
@@ -242,9 +247,12 @@ export function BICotacoes() {
     setTempFilters(d);
   };
 
-  const applyFilters = () => {
-    setFilters({ ...tempFilters });
+  const gerar = () => {
+    const next = { ...tempFilters };
+    setFilters(next);
+    setTempFilters(next);
     setShowFilters(false);
+    carregar(next);
   };
 
   const cancelFilters = () => {
@@ -258,7 +266,9 @@ export function BICotacoes() {
     setLoading(true);
     setStatus('Buscando cotações...');
     try {
-      const f = override || filters;
+      const isFilters = (x: any): x is Filters =>
+        !!x && typeof x === 'object' && typeof x.periodoIni === 'string' && typeof x.periodoFim === 'string';
+      const f = isFilters(override) ? override : filters;
       const payload: any = {
         periodo_ini: f.periodoIni,
         periodo_fim: f.periodoFim,
@@ -354,6 +364,136 @@ export function BICotacoes() {
       return bag.includes(q);
     });
   }, [data, quickStatus, search]);
+
+  const rowsSimuladas = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'COTADO'), [rowsFiltered]);
+  const rowsContratadas = useMemo(
+    () => rowsFiltered.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI'),
+    [rowsFiltered]
+  );
+  const rowsCtrecEmit = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'CTRC_EMI'), [rowsFiltered]);
+
+  const openDrill = useCallback((title: string, rows: CotacaoRow[]) => {
+    setDrillTitle(title);
+    setDrillRows(Array.isArray(rows) ? rows : []);
+    setDrillSearch('');
+    setDrillOpen(true);
+  }, []);
+
+  const rowsForDailyIso = useCallback(
+    (iso: string, mode: 'todas' | 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi') => {
+      const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+      const uniq = new Map<string, CotacaoRow>();
+      const add = (r: CotacaoRow) => {
+        const k = `${r.cotacao || ''}||${r.ctrc || ''}||${r.data_inclusao || ''}||${r.data_emissao_ctrc || ''}`;
+        if (!uniq.has(k)) uniq.set(k, r);
+      };
+      if (mode === 'ctrc_emi') {
+        for (const r of rowsFiltered) {
+          if (r.status_kind !== 'CTRC_EMI') continue;
+          const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+          if (d === iso) add(r);
+        }
+        return Array.from(uniq.values());
+      }
+
+      for (const r of rowsFiltered) {
+        const di = datePart(r.data_inclusao);
+        if (di !== iso) continue;
+        if (mode === 'cotacoes') add(r);
+        else if (mode === 'simuladas') {
+          if (r.status_kind === 'COTADO') add(r);
+        } else if (mode === 'contratadas') {
+          if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') add(r);
+        } else if (mode === 'todas') add(r);
+      }
+
+      if (mode === 'todas') {
+        for (const r of rowsFiltered) {
+          if (r.status_kind !== 'CTRC_EMI') continue;
+          const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+          if (d === iso) add(r);
+        }
+      }
+
+      return Array.from(uniq.values());
+    },
+    [rowsFiltered]
+  );
+
+  const rowsForUsersDailyIso = useCallback(
+    (iso: string, mode: 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi') => {
+      const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+      const userSet = new Set(topUsuarios5.map((u) => String(u || '').trim().toLowerCase()).filter(Boolean));
+      const out: CotacaoRow[] = [];
+      for (const r of rowsFiltered) {
+        if (!userSet.has(String(r.usuario_inclusao || '').trim().toLowerCase())) continue;
+        if (mode === 'ctrc_emi') {
+          if (r.status_kind !== 'CTRC_EMI') continue;
+          const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+          if (d === iso) out.push(r);
+          continue;
+        }
+        const di = datePart(r.data_inclusao);
+        if (di !== iso) continue;
+        if (mode === 'cotacoes') out.push(r);
+        else if (mode === 'simuladas') {
+          if (r.status_kind === 'COTADO') out.push(r);
+        } else if (mode === 'contratadas') {
+          if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') out.push(r);
+        }
+      }
+      return out;
+    },
+    [rowsFiltered, topUsuarios5]
+  );
+
+  const rowsForMonthYm = useCallback(
+    (ym: string) => {
+      const key = String(ym || '').trim();
+      if (!key) return [];
+      const toYm = (s: string) => (s && s.length >= 7 ? s.slice(0, 7) : '');
+      return rowsCtrecEmit.filter((r) => toYm(r.data_emissao_ctrc || r.data_inclusao) === key);
+    },
+    [rowsCtrecEmit]
+  );
+
+  const drillRowsFiltradas = useMemo(() => {
+    const q = drillSearch.trim().toLowerCase();
+    if (!q) return drillRows;
+    return drillRows.filter((r) => {
+      const bag = [
+        r.cotacao,
+        funilSituacaoLabel(r.situacao),
+        r.cnpj_pagador,
+        r.nome_pagador,
+        r.origem,
+        r.destino,
+        r.usuario_inclusao,
+        r.unidade_inclusao,
+        r.ctrc,
+        r.data_inclusao,
+        r.validade,
+        r.data_emissao_ctrc,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return bag.includes(q);
+    });
+  }, [drillRows, drillSearch]);
+
+  const drillTotals = useMemo(() => {
+    let potencial = 0;
+    let convertido = 0;
+    let ctrc = 0;
+    for (const r of drillRowsFiltradas) {
+      potencial += toNumber(r.proposta_atual);
+      if (r.status_kind === 'CTRC_EMI') {
+        ctrc += 1;
+        convertido += toNumber(r.frete_ctrc);
+      }
+    }
+    return { rows: drillRowsFiltradas.length, potencial, convertido, ctrc };
+  }, [drillRowsFiltradas]);
 
   const totalsView = useMemo(() => {
     const rows = rowsFiltered;
@@ -667,7 +807,7 @@ export function BICotacoes() {
           r.origem,
           r.destino,
           r.tipo_frete,
-          r.situacao,
+          funilSituacaoLabel(r.situacao),
           r.ctrc,
           r.data_inclusao,
           r.validade,
@@ -682,6 +822,61 @@ export function BICotacoes() {
     }
     downloadTextFile(lines.join('\n'), `bi_cotacoes_${filters.periodoIni}_a_${filters.periodoFim}.csv`);
   };
+
+  const exportDrilldownCsv = useCallback(() => {
+    if (drillRowsFiltradas.length === 0) {
+      toast.info('Nenhum registro para exportar.');
+      return;
+    }
+    const header = [
+      'COTACAO',
+      'UNIDADE_INCLUSAO',
+      'USUARIO_INCLUSAO',
+      'CNPJ_PAGADOR',
+      'NOME_PAGADOR',
+      'VENDEDOR',
+      'ORIGEM',
+      'DESTINO',
+      'TIPO_FRETE',
+      'SITUACAO',
+      'CTRC',
+      'DATA_INCLUSAO',
+      'VALIDADE',
+      'DATA_EMISSAO_CTRC',
+      'PROPOSTA_ATUAL',
+      'FRETE_CTRC',
+      'VALOR_NF',
+      'PESO',
+      'CUBAGEM',
+    ];
+    const lines = [header.map(csvEscape).join(';')];
+    for (const r of drillRowsFiltradas) {
+      lines.push(
+        [
+          r.cotacao,
+          r.unidade_inclusao,
+          r.usuario_inclusao,
+          r.cnpj_pagador,
+          r.nome_pagador,
+          r.vendedor,
+          r.origem,
+          r.destino,
+          r.tipo_frete,
+          funilSituacaoLabel(r.situacao),
+          r.ctrc,
+          r.data_inclusao,
+          r.validade,
+          r.data_emissao_ctrc,
+          toNumber(r.proposta_atual).toFixed(2),
+          toNumber(r.frete_ctrc).toFixed(2),
+          toNumber(r.valor_nf).toFixed(2),
+          toNumber(r.peso).toFixed(2),
+          toNumber(r.cubagem).toFixed(3),
+        ].map(csvEscape).join(';')
+      );
+    }
+    downloadTextFile(lines.join('\n'), `bi_cotacoes_detalhe_${filters.periodoIni}_a_${filters.periodoFim}.csv`);
+  }, [drillRowsFiltradas, filters.periodoFim, filters.periodoIni]);
 
   const hasFiltrosAtivos = useMemo(() => {
     const d = getDefaultFilters();
@@ -865,18 +1060,14 @@ export function BICotacoes() {
                   <Button variant="outline" onClick={cancelFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
                     Cancelar
                   </Button>
-                  <Button onClick={applyFilters} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    Aplicar filtros
+                  <Button onClick={gerar} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Gerar
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
-
-          <Button onClick={carregar} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 print:hidden">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Gerar
-          </Button>
 
           <Button variant="outline" onClick={exportCsv} disabled={!data || loading} className="gap-2 dark:border-slate-600 dark:hover:bg-slate-800 print:hidden">
             <Download className="w-4 h-4" />
@@ -909,7 +1100,13 @@ export function BICotacoes() {
 
         <div className={loading ? 'space-y-6 blur-[1px] opacity-70 pointer-events-none select-none' : 'space-y-6'}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Cotações', rowsFiltered)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Cotações', rowsFiltered); }}
+            className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -921,7 +1118,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Clientes (registros)', rowsFiltered)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Clientes (registros)', rowsFiltered); }}
+            className="bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -933,7 +1136,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Simuladas', rowsSimuladas)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Simuladas', rowsSimuladas); }}
+            className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -945,7 +1154,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Contratadas', rowsContratadas)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Contratadas', rowsContratadas); }}
+            className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -957,7 +1172,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('CTRC emit.', rowsCtrecEmit)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('CTRC emit.', rowsCtrecEmit); }}
+            className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -969,7 +1190,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Conversão (base)', rowsFiltered)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Conversão (base)', rowsFiltered); }}
+            className="bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -981,7 +1208,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-cyan-50 dark:bg-cyan-950/30 border-cyan-200 dark:border-cyan-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Frete cotado (base)', rowsFiltered)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Frete cotado (base)', rowsFiltered); }}
+            className="bg-cyan-50 dark:bg-cyan-950/30 border-cyan-200 dark:border-cyan-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -993,7 +1226,13 @@ export function BICotacoes() {
             </CardContent>
           </Card>
 
-          <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => openDrill('Frete CTRC', rowsCtrecEmit)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Frete CTRC', rowsCtrecEmit); }}
+            className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900 cursor-pointer hover:opacity-95"
+          >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -1095,7 +1334,34 @@ export function BICotacoes() {
           </div>
           <TabsContent value="pipeline" className="mt-0">
             <div className="space-y-4">
-              <Card className="dark:bg-slate-900 dark:border-slate-700">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const rs =
+                    dailyMode === 'simuladas'
+                      ? rowsSimuladas
+                      : dailyMode === 'contratadas'
+                        ? rowsContratadas
+                        : dailyMode === 'ctrc_emi'
+                          ? rowsCtrecEmit
+                          : rowsFiltered;
+                  openDrill(`Volume diário · ${dailyMode === 'todas' ? 'Todas' : dailyMode === 'cotacoes' ? 'Cotações' : dailyMode === 'simuladas' ? 'Simuladas' : dailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'}`, rs);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  const rs =
+                    dailyMode === 'simuladas'
+                      ? rowsSimuladas
+                      : dailyMode === 'contratadas'
+                        ? rowsContratadas
+                        : dailyMode === 'ctrc_emi'
+                          ? rowsCtrecEmit
+                          : rowsFiltered;
+                  openDrill(`Volume diário · ${dailyMode === 'todas' ? 'Todas' : dailyMode === 'cotacoes' ? 'Cotações' : dailyMode === 'simuladas' ? 'Simuladas' : dailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'}`, rs);
+                }}
+                className="dark:bg-slate-900 dark:border-slate-700 cursor-pointer hover:opacity-95"
+              >
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1111,7 +1377,7 @@ export function BICotacoes() {
                             ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
                             : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                         }
-                        onClick={() => setDailyMode('todas')}
+                        onClick={(e) => { e.stopPropagation(); setDailyMode('todas'); }}
                       >
                         Todas
                       </Button>
@@ -1123,7 +1389,7 @@ export function BICotacoes() {
                             ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
                             : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
                         }
-                        onClick={() => setDailyMode('cotacoes')}
+                        onClick={(e) => { e.stopPropagation(); setDailyMode('cotacoes'); }}
                       >
                         Cotações
                       </Button>
@@ -1135,7 +1401,7 @@ export function BICotacoes() {
                             ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
                             : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                         }
-                        onClick={() => setDailyMode('simuladas')}
+                        onClick={(e) => { e.stopPropagation(); setDailyMode('simuladas'); }}
                       >
                         Simuladas
                       </Button>
@@ -1147,7 +1413,7 @@ export function BICotacoes() {
                             ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
                             : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
                         }
-                        onClick={() => setDailyMode('contratadas')}
+                        onClick={(e) => { e.stopPropagation(); setDailyMode('contratadas'); }}
                       >
                         Contratadas
                       </Button>
@@ -1159,7 +1425,7 @@ export function BICotacoes() {
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                             : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
                         }
-                        onClick={() => setDailyMode('ctrc_emi')}
+                        onClick={(e) => { e.stopPropagation(); setDailyMode('ctrc_emi'); }}
                       >
                         CTRC emit.
                       </Button>
@@ -1226,6 +1492,11 @@ export function BICotacoes() {
                                 strokeWidth={2}
                                 fill="url(#bi_ct_line_simuladas)"
                                 dot={false}
+                                onClick={(d: any, _i: any, e: any) => {
+                                  e?.stopPropagation?.();
+                                  const iso = d?.payload?.iso;
+                                  if (iso) openDrill('Volume diário · Todas', rowsForDailyIso(String(iso), 'todas'));
+                                }}
                               />
                               <Area
                                 type="monotone"
@@ -1236,6 +1507,11 @@ export function BICotacoes() {
                                 strokeWidth={2}
                                 fill="url(#bi_ct_line_contratadas)"
                                 dot={false}
+                                onClick={(d: any, _i: any, e: any) => {
+                                  e?.stopPropagation?.();
+                                  const iso = d?.payload?.iso;
+                                  if (iso) openDrill('Volume diário · Todas', rowsForDailyIso(String(iso), 'todas'));
+                                }}
                               />
                               <Area
                                 type="monotone"
@@ -1246,6 +1522,11 @@ export function BICotacoes() {
                                 strokeWidth={2}
                                 fill="url(#bi_ct_line_ctrc)"
                                 dot={false}
+                                onClick={(d: any, _i: any, e: any) => {
+                                  e?.stopPropagation?.();
+                                  const iso = d?.payload?.iso;
+                                  if (iso) openDrill('Volume diário · Todas', rowsForDailyIso(String(iso), 'todas'));
+                                }}
                               />
                             </>
                           ) : (
@@ -1290,6 +1571,23 @@ export function BICotacoes() {
                               }
                               dot={false}
                               activeDot={{ r: 5 }}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const iso = d?.payload?.iso;
+                                if (!iso) return;
+                                openDrill(
+                                  `Volume diário · ${
+                                    dailyMode === 'cotacoes'
+                                      ? 'Cotações'
+                                      : dailyMode === 'simuladas'
+                                        ? 'Simuladas'
+                                        : dailyMode === 'contratadas'
+                                          ? 'Contratadas'
+                                          : 'CTRC emit.'
+                                  }`,
+                                  rowsForDailyIso(String(iso), dailyMode)
+                                );
+                              }}
                             />
                           )}
                         </AreaChart>
@@ -1300,7 +1598,13 @@ export function BICotacoes() {
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <Card className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-1">
+                <Card
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDrill('Funil por Situação', rowsFiltered)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Funil por Situação', rowsFiltered); }}
+                  className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-1 cursor-pointer hover:opacity-95"
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1317,7 +1621,21 @@ export function BICotacoes() {
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={donutData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
+                            <Pie
+                              data={donutData}
+                              dataKey="value"
+                              nameKey="name"
+                              innerRadius={55}
+                              outerRadius={90}
+                              paddingAngle={2}
+                              stroke="none"
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const name = String(d?.name ?? d?.payload?.name ?? '').trim();
+                                if (!name) return;
+                                openDrill(`Funil por Situação: ${name}`, rowsFiltered.filter((r) => funilSituacaoLabel(r.situacao) === name));
+                              }}
+                            >
                               {donutData.map((_, i) => (
                                 <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                               ))}
@@ -1344,7 +1662,13 @@ export function BICotacoes() {
                   </CardContent>
                 </Card>
 
-                <Card className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-2">
+                <Card
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openDrill('Receita · Potencial vs Convertida', rowsFiltered)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Receita · Potencial vs Convertida', rowsFiltered); }}
+                  className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-2 cursor-pointer hover:opacity-95"
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1374,8 +1698,28 @@ export function BICotacoes() {
                             <XAxis dataKey="name" interval={0} angle={-25} textAnchor="end" height={60} />
                             <YAxis tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
                             <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v))} />
-                            <Bar dataKey="potencial" fill="#93c5fd" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="convertido" fill="#34d399" radius={[4, 4, 0, 0]} />
+                            <Bar
+                              dataKey="potencial"
+                              fill="#93c5fd"
+                              radius={[4, 4, 0, 0]}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const usuario = d?.payload?.name;
+                                if (!usuario) return;
+                                openDrill(`Usuário: ${String(usuario)}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === String(usuario).trim().toLowerCase()));
+                              }}
+                            />
+                            <Bar
+                              dataKey="convertido"
+                              fill="#34d399"
+                              radius={[4, 4, 0, 0]}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const usuario = d?.payload?.name;
+                                if (!usuario) return;
+                                openDrill(`Usuário: ${String(usuario)}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === String(usuario).trim().toLowerCase()));
+                              }}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1392,7 +1736,44 @@ export function BICotacoes() {
 
           <TabsContent value="usuarios" className="mt-0">
             <div className="space-y-4">
-              <Card className="dark:bg-slate-900 dark:border-slate-700">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const userSet = new Set(topUsuarios5.map((u) => String(u || '').trim().toLowerCase()).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => userSet.has(String(r.usuario_inclusao || '').trim().toLowerCase()));
+                  const rs =
+                    usersDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : usersDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : usersDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Usuários · Série diária · ${usersDailyMode === 'cotacoes' ? 'Cotações' : usersDailyMode === 'simuladas' ? 'Simuladas' : usersDailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'} (Top ${formatNumber(topUsuarios5.length)})`,
+                    rs
+                  );
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  const userSet = new Set(topUsuarios5.map((u) => String(u || '').trim().toLowerCase()).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => userSet.has(String(r.usuario_inclusao || '').trim().toLowerCase()));
+                  const rs =
+                    usersDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : usersDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : usersDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Usuários · Série diária · ${usersDailyMode === 'cotacoes' ? 'Cotações' : usersDailyMode === 'simuladas' ? 'Simuladas' : usersDailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'} (Top ${formatNumber(topUsuarios5.length)})`,
+                    rs
+                  );
+                }}
+                className="dark:bg-slate-900 dark:border-slate-700 cursor-pointer hover:opacity-95"
+              >
                 <CardContent className="p-4">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1408,7 +1789,7 @@ export function BICotacoes() {
                             ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
                             : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
                         }
-                        onClick={() => setUsersDailyMode('cotacoes')}
+                        onClick={(e) => { e.stopPropagation(); setUsersDailyMode('cotacoes'); }}
                       >
                         Cotações
                       </Button>
@@ -1420,7 +1801,7 @@ export function BICotacoes() {
                             ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
                             : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                         }
-                        onClick={() => setUsersDailyMode('simuladas')}
+                        onClick={(e) => { e.stopPropagation(); setUsersDailyMode('simuladas'); }}
                       >
                         Simuladas
                       </Button>
@@ -1432,7 +1813,7 @@ export function BICotacoes() {
                             ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
                             : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
                         }
-                        onClick={() => setUsersDailyMode('contratadas')}
+                        onClick={(e) => { e.stopPropagation(); setUsersDailyMode('contratadas'); }}
                       >
                         Contratadas
                       </Button>
@@ -1444,7 +1825,7 @@ export function BICotacoes() {
                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                             : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
                         }
-                        onClick={() => setUsersDailyMode('ctrc_emi')}
+                        onClick={(e) => { e.stopPropagation(); setUsersDailyMode('ctrc_emi'); }}
                       >
                         CTRC emit.
                       </Button>
@@ -1474,6 +1855,23 @@ export function BICotacoes() {
                               strokeWidth={2}
                               dot={false}
                               activeDot={{ r: 5 }}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const iso = d?.payload?.iso;
+                                if (!iso) return;
+                                openDrill(
+                                  `Usuários · Série diária · ${
+                                    usersDailyMode === 'cotacoes'
+                                      ? 'Cotações'
+                                      : usersDailyMode === 'simuladas'
+                                        ? 'Simuladas'
+                                        : usersDailyMode === 'contratadas'
+                                          ? 'Contratadas'
+                                          : 'CTRC emit.'
+                                  } · ${String(iso)}`,
+                                  rowsForUsersDailyIso(String(iso), usersDailyMode)
+                                );
+                              }}
                             />
                           ))}
                         </LineChart>
@@ -1518,7 +1916,16 @@ export function BICotacoes() {
                           </tr>
                         ) : (
                           rankingUsuarios.map((u) => (
-                            <tr key={u.usuario} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                            <tr
+                              key={u.usuario}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
+                              }}
+                              className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                            >
                               <td className="py-2 px-3 font-mono">{u.usuario}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.contratadas)}</td>
@@ -1569,7 +1976,31 @@ export function BICotacoes() {
                         </tr>
                       ) : (
                         rankingClientes.map((c) => (
-                          <tr key={c.cnpj || c.nome} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                          <tr
+                            key={c.cnpj || c.nome}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
+                              const rs = rowsFiltered.filter((r) => {
+                                if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
+                                if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
+                                return false;
+                              });
+                              openDrill(title, rs);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key !== 'Enter' && e.key !== ' ') return;
+                              const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
+                              const rs = rowsFiltered.filter((r) => {
+                                if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
+                                if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
+                                return false;
+                              });
+                              openDrill(title, rs);
+                            }}
+                            className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                          >
                             <td className="py-2 px-3">
                               <div className="min-w-0">
                                 <div className="truncate">{c.nome || c.cnpj || '-'}</div>
@@ -1594,7 +2025,15 @@ export function BICotacoes() {
 
           <TabsContent value="origem-destino" className="mt-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-1">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => openDrill(`Origem / Destino · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rowsFiltered)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') openDrill(`Origem / Destino · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rowsFiltered);
+                }}
+                className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-1 cursor-pointer hover:opacity-95"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1610,7 +2049,7 @@ export function BICotacoes() {
                             ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
                             : 'dark:border-slate-700'
                         }
-                        onClick={() => setOrigemDestinoMode('origem')}
+                        onClick={(e) => { e.stopPropagation(); setOrigemDestinoMode('origem'); }}
                       >
                         Origem
                       </Button>
@@ -1622,7 +2061,7 @@ export function BICotacoes() {
                             ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
                             : 'dark:border-slate-700'
                         }
-                        onClick={() => setOrigemDestinoMode('destino')}
+                        onClick={(e) => { e.stopPropagation(); setOrigemDestinoMode('destino'); }}
                       >
                         Destino
                       </Button>
@@ -1653,7 +2092,21 @@ export function BICotacoes() {
                               return [formatNumber(Number(v)), n];
                             }}
                           />
-                          <Bar dataKey="cotacoes" fill="#60a5fa" radius={[4, 4, 4, 4]} />
+                          <Bar
+                            dataKey="cotacoes"
+                            fill="#60a5fa"
+                            radius={[4, 4, 4, 4]}
+                            onClick={(d: any, _i: any, e: any) => {
+                              e?.stopPropagation?.();
+                              const uf = d?.payload?.uf;
+                              if (!uf) return;
+                              const rs = rowsFiltered.filter((x) => {
+                                const u = origemDestinoMode === 'origem' ? ufFromPlace(x.origem) : ufFromPlace(x.destino);
+                                return u === uf;
+                              });
+                              openDrill(`UF ${String(uf)} · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rs);
+                            }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1700,7 +2153,27 @@ export function BICotacoes() {
                           </tr>
                         ) : (
                           origemDestinoUF[origemDestinoMode].map((r) => (
-                            <tr key={r.uf} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                            <tr
+                              key={r.uf}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                const rs = rowsFiltered.filter((x) => {
+                                  const uf = origemDestinoMode === 'origem' ? ufFromPlace(x.origem) : ufFromPlace(x.destino);
+                                  return uf === r.uf;
+                                });
+                                openDrill(`UF ${r.uf} · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rs);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key !== 'Enter' && e.key !== ' ') return;
+                                const rs = rowsFiltered.filter((x) => {
+                                  const uf = origemDestinoMode === 'origem' ? ufFromPlace(x.origem) : ufFromPlace(x.destino);
+                                  return uf === r.uf;
+                                });
+                                openDrill(`UF ${r.uf} · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rs);
+                              }}
+                              className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                            >
                               <td className="py-2 px-3 font-mono">{r.uf}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(r.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(r.ctrc_emi)}</td>
@@ -1720,7 +2193,13 @@ export function BICotacoes() {
 
           <TabsContent value="ranking" className="mt-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-2">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => openDrill('Frete convertido por mês', rowsCtrecEmit)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Frete convertido por mês', rowsCtrecEmit); }}
+                className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-2 cursor-pointer hover:opacity-95"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
@@ -1743,7 +2222,21 @@ export function BICotacoes() {
                           <XAxis dataKey="label" />
                           <YAxis tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
                           <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v))} />
-                          <Area type="monotone" dataKey="convertido" stroke="#10b981" fill="#10b981" fillOpacity={0.18} strokeWidth={2} />
+                          <Area
+                            type="monotone"
+                            dataKey="convertido"
+                            stroke="#10b981"
+                            fill="#10b981"
+                            fillOpacity={0.18}
+                            strokeWidth={2}
+                            onClick={(d: any, _i: any, e: any) => {
+                              e?.stopPropagation?.();
+                              const ym = d?.payload?.ym;
+                              const label = d?.payload?.label;
+                              if (!ym) return;
+                              openDrill(`Frete convertido · ${String(label || ym)}`, rowsForMonthYm(String(ym)));
+                            }}
+                          />
                         </AreaChart>
                       </ResponsiveContainer>
                     )}
@@ -1770,8 +2263,14 @@ export function BICotacoes() {
                       {rankingUsuariosConvertido.slice(0, 3).map((u, i) => (
                         <div
                           key={u.usuario}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
+                          }}
                           className={[
-                            'rounded-lg border p-3 flex items-center justify-between gap-3',
+                            'rounded-lg border p-3 flex items-center justify-between gap-3 cursor-pointer hover:opacity-95',
                             i === 0 ? 'border-amber-300 bg-amber-50/70 dark:bg-amber-950/30 dark:border-amber-900' : 'border-slate-200 dark:border-slate-800',
                           ].join(' ')}
                         >
@@ -1824,7 +2323,16 @@ export function BICotacoes() {
                           </tr>
                         ) : (
                           rankingUsuariosConvertido.map((u) => (
-                            <tr key={u.usuario} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                            <tr
+                              key={u.usuario}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
+                              }}
+                              className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                            >
                               <td className="py-2 px-3 font-mono">{u.usuario}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.ctrc_emi)}</td>
@@ -1846,7 +2354,15 @@ export function BICotacoes() {
             <Card className="dark:bg-slate-900 dark:border-slate-700">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-slate-900 dark:text-slate-100 font-semibold">Lista (CRM)</div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openDrill('Lista (CRM)', rowsFiltered)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Lista (CRM)', rowsFiltered); }}
+                    className="text-slate-900 dark:text-slate-100 font-semibold cursor-pointer hover:opacity-95"
+                  >
+                    Lista (CRM)
+                  </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{formatNumber(rowsFiltered.length)} registros</Badge>
                     <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">Potencial: {formatCurrency(totalsView.potencial)}</Badge>
@@ -1971,6 +2487,97 @@ export function BICotacoes() {
         </div>
       </div>
       </div>
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="max-w-[1200px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+          <div className="flex items-start justify-between gap-3 pr-10">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 dark:text-slate-100">{drillTitle || 'Detalhe'}</DialogTitle>
+              <DialogDescription className="text-slate-600 dark:text-slate-400">
+                {formatNumber(drillTotals.rows)} registro{drillTotals.rows !== 1 ? 's' : ''} · Potencial: {formatCurrency(drillTotals.potencial)} · CTRC: {formatNumber(drillTotals.ctrc)} · Convertido: {formatCurrency(drillTotals.convertido)}
+              </DialogDescription>
+            </DialogHeader>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportDrilldownCsv}
+              disabled={drillRowsFiltradas.length === 0}
+              className="dark:border-slate-700 mr-2"
+            >
+              <Download className="w-4 h-4" />
+              <span className="ml-1.5">Exportar CSV</span>
+            </Button>
+          </div>
+
+          <div className="mt-2">
+            <Input
+              value={drillSearch}
+              onChange={(e) => setDrillSearch(e.target.value)}
+              placeholder="Filtrar por cotação, situação, cliente, origem/destino, usuário, CTRC..."
+              className="dark:bg-slate-800 dark:border-slate-700"
+            />
+          </div>
+
+          <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="sticky top-0 z-20 grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
+              <div className="font-mono">Cotação</div>
+              <div>Situação</div>
+              <div>Cliente</div>
+              <div>Origem</div>
+              <div>Destino</div>
+              <div>Usuário</div>
+              <div>Unid</div>
+              <div className="text-right">Proposta</div>
+              <div className="text-right">Frete CTRC</div>
+              <div>CTRC</div>
+              <div>Incl.</div>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {drillRowsFiltradas.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Nenhum registro encontrado.</div>
+              ) : (
+                drillRowsFiltradas.map((r, idx) => {
+                  const incl = (r.data_inclusao || '').slice(0, 10);
+                  const cliente = r.nome_pagador || r.cnpj_pagador || '-';
+                  return (
+                    <div
+                      key={`${r.cotacao}-${r.ctrc}-${idx}`}
+                      className="grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    >
+                      <div className="font-mono truncate">{r.cotacao || '-'}</div>
+                      <div className="truncate">{r.situacao ? funilSituacaoLabel(r.situacao) : '-'}</div>
+                      <div className="min-w-0">
+                        <div className="truncate">{cliente}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{r.cnpj_pagador || '-'}</div>
+                      </div>
+                      <div className="truncate">{r.origem || '-'}</div>
+                      <div className="truncate">{r.destino || '-'}</div>
+                      <div className="font-mono truncate">{r.usuario_inclusao || '-'}</div>
+                      <div className="font-mono truncate">{r.unidade_inclusao || '-'}</div>
+                      <div className="text-right font-mono">{formatCurrency(r.proposta_atual)}</div>
+                      <div className="text-right font-mono">{formatCurrency(r.frete_ctrc)}</div>
+                      <div className="font-mono truncate">{r.ctrc || '-'}</div>
+                      <div className="font-mono truncate">{incl || '-'}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="sticky bottom-0 z-20 grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+              <div />
+              <div className="text-right">Total</div>
+              <div className="text-right font-mono">{formatCurrency(drillTotals.potencial)}</div>
+              <div className="text-right font-mono">{formatCurrency(drillTotals.convertido)}</div>
+              <div />
+              <div />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
