@@ -229,7 +229,7 @@ export function BICotacoes() {
     const runId = Date.now();
     runRef.current = runId;
     setLoading(true);
-    setStatus('Buscando cotações no SSW...');
+    setStatus('Buscando cotações...');
     try {
       const f = override || filters;
       const payload: any = {
@@ -814,8 +814,23 @@ export function BICotacoes() {
         </div>
       }
     >
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="relative">
+        {loading && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/25 backdrop-blur-sm">
+            <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Gerando relatório...</div>
+              </div>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {status || 'Buscando cotações.'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={loading ? 'space-y-6 blur-[1px] opacity-70 pointer-events-none select-none' : 'space-y-6'}>
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
           <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -930,7 +945,7 @@ export function BICotacoes() {
                 </div>
                 <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-300" />
               </div>
-              <p className="text-xs text-cyan-800/80 dark:text-cyan-200/80 mt-2">Proposta atual (SSW)</p>
+              <p className="text-xs text-cyan-800/80 dark:text-cyan-200/80 mt-2">Proposta atual</p>
               {showComparisons && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Badge className={deltaClass(deltaPct(totalsView.potencial, data?.comparisons?.prev_period?.totals?.potencial || 0))}>
@@ -979,7 +994,7 @@ export function BICotacoes() {
               <p className="text-xs text-red-800/80 dark:text-red-200/80 mt-2">Validade ≤ 2 dias</p>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
         <div className="space-y-3">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
@@ -1653,6 +1668,7 @@ export function BICotacoes() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -173,6 +173,36 @@ $fetchCsvOrMessage = static function(string $u) use ($extractPlainMessage): arra
         return ['ok' => true, 'raw' => substr($t1, $csvStart), 'message' => ''];
     }
 
+    if (preg_match('/(?:id|name)=web_body[^>]*value="([^"]+)"/i', $t1, $mVal)) {
+        $decoded = urldecode((string)($mVal[1] ?? ''));
+        $decoded = html_entity_decode((string)$decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        if (preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'([^']*)'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']*)'\\s*(?:,\\s*(\\d+)\\s*)?\\)/i", $decoded, $mArq)) {
+            $act = trim((string)($mArq[1] ?? ''));
+            $filename = trim((string)($mArq[2] ?? ''));
+            $pathStr = trim((string)($mArq[3] ?? ''));
+            $pathNum = trim((string)($mArq[4] ?? ''));
+            if ($act !== '' && $filename === '') $filename = $act;
+            $pathParam = $pathStr !== '' ? $pathStr : ($pathNum !== '' ? $pathNum : '');
+
+            if ($act !== '') {
+                $dlUrl = 'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($act) . '&filename=' . urlencode($filename) . '&down=1&nw=1';
+                if ($pathParam !== '') $dlUrl .= '&path=' . urlencode($pathParam);
+
+                $raw2 = (string)ssw_go($dlUrl);
+                $t2 = trim((string)$raw2);
+                if ($t2 !== '') {
+                    $t2 = html_entity_decode($t2, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $t2 = str_replace(["\r\n", "\r"], ["\n", "\n"], $t2);
+                    $csvStart2 = stripos($t2, 'COTACAO;');
+                    if ($csvStart2 !== false) {
+                        return ['ok' => true, 'raw' => substr($t2, $csvStart2), 'message' => ''];
+                    }
+                }
+            }
+        }
+    }
+
     $only = trim(preg_replace('/\s+/', ' ', $t1));
     if (preg_match('#^https?://[^\s]+$#i', $only)) {
         $raw2 = (string)ssw_go($only);
@@ -188,7 +218,16 @@ $fetchCsvOrMessage = static function(string $u) use ($extractPlainMessage): arra
     }
 
     $msg = $extractPlainMessage($t1);
-    if ($msg !== '') return ['ok' => false, 'raw' => '', 'message' => $msg];
+    if ($msg !== '') {
+        if (stripos($msg, 'relatório gerado com sucesso') !== false || stripos($msg, 'relatorio gerado com sucesso') !== false) {
+            return [
+                'ok' => false,
+                'raw' => '',
+                'message' => 'SSW gerou o relatório, mas o Presto não conseguiu localizar/baixar o arquivo (ssw0424).',
+            ];
+        }
+        return ['ok' => false, 'raw' => '', 'message' => $msg];
+    }
     return ['ok' => false, 'raw' => '', 'message' => 'SSW retornou uma resposta inesperada.'];
 };
 
@@ -503,19 +542,18 @@ if ($includeComparisons) {
         return $baseParams;
     };
 
-    $fetch = static function(array $p): array {
+    $fetch = static function(array $p) use ($fetchCsvOrMessage): array {
         $u = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($p);
-        $f = $fetchCsvOrMessage($u);
-        return [$u, (string)($f['ok'] ? $f['raw'] : '')];
+        return [$u, $fetchCsvOrMessage($u)];
     };
 
     $pPrev = $mkParams($params, $prevStart, $prevEnd);
-    [$urlPrev, $rawPrev] = $fetch($pPrev);
-    $prevParsed = $parseReport($rawPrev, false);
+    [$urlPrev, $prevFetched] = $fetch($pPrev);
+    $prevParsed = (($prevFetched['ok'] ?? false) === true) ? $parseReport((string)($prevFetched['raw'] ?? ''), false) : ['ok' => false];
 
     $pYear = $mkParams($params, $yearStart, $yearEnd);
-    [$urlYear, $rawYear] = $fetch($pYear);
-    $yearParsed = $parseReport($rawYear, false);
+    [$urlYear, $yearFetched] = $fetch($pYear);
+    $yearParsed = (($yearFetched['ok'] ?? false) === true) ? $parseReport((string)($yearFetched['raw'] ?? ''), false) : ['ok' => false];
 
     $comparisons = [
         'prev_period' => [
