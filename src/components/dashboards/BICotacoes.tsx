@@ -31,6 +31,9 @@ import {
   AlertTriangle,
   BadgePercent,
   FileText,
+  Hourglass,
+  Handshake,
+  Truck,
   Wallet,
   ClipboardList,
 } from 'lucide-react';
@@ -131,6 +134,19 @@ const PALETTE = ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#a855f7', '#94a3b8
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const todayIso = () => fmtIso(new Date());
+
+const funilSituacaoLabel = (raw: string) => {
+  const k = String(raw || '—')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+  if (k === 'COT CLI') return 'Cotado pelo cliente';
+  if (k === 'COTADO') return 'Cotado pelo operador';
+  if (k === 'CTRC EMI') return 'CTRC emitido';
+  if (k === 'COT FIXO') return 'Contratado com valor fixo';
+  if (k === 'CONTRAT') return 'Contratado';
+  return String(raw || '—').trim() || '—';
+};
 
 const toNumber = (v: any) => {
   const n = Number(v);
@@ -483,7 +499,7 @@ export function BICotacoes() {
   const donutData = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of rowsFiltered) {
-      const k = r.situacao || '—';
+      const k = funilSituacaoLabel(r.situacao || '—');
       map.set(k, (map.get(k) || 0) + 1);
     }
     const out = Array.from(map.entries()).map(([name, value]) => ({ name, value }));
@@ -841,7 +857,7 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-blue-700 dark:text-blue-200">Cotações</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.cotacoes)}</p>
                 </div>
-                <Target className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                <FileText className="w-5 h-5 text-blue-600 dark:text-blue-300" />
               </div>
             </CardContent>
           </Card>
@@ -865,7 +881,7 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-slate-700 dark:text-slate-200">Simuladas</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.cotado)}</p>
                 </div>
-                <FileText className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                <Hourglass className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </div>
             </CardContent>
           </Card>
@@ -877,7 +893,7 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-amber-800 dark:text-amber-200">Contratadas</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.contrat)}</p>
                 </div>
-                <TrendingUp className="w-5 h-5 text-amber-500" />
+                <Handshake className="w-5 h-5 text-amber-500" />
               </div>
             </CardContent>
           </Card>
@@ -889,7 +905,7 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-emerald-800 dark:text-emerald-200">CTRC emit.</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.ctrc_emi)}</p>
                 </div>
-                <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+                <Truck className="w-5 h-5 text-emerald-500" />
               </div>
             </CardContent>
           </Card>
@@ -967,7 +983,7 @@ export function BICotacoes() {
                 className={
                   quickStatus === 'ALL'
                     ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900'
-                    : 'dark:border-slate-700'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                 }
                 onClick={() => setQuickStatus('ALL')}
               >
@@ -976,21 +992,33 @@ export function BICotacoes() {
               <Button
                 variant={quickStatus === 'COTADO' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('COTADO')}
-                className={quickStatus === 'COTADO' ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600' : 'dark:border-slate-700'}
+                className={
+                  quickStatus === 'COTADO'
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                    : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
+                }
               >
                 Cotado
               </Button>
               <Button
                 variant={quickStatus === 'CONTRAT' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('CONTRAT')}
-                className={quickStatus === 'CONTRAT' ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600' : 'dark:border-slate-700'}
+                className={
+                  quickStatus === 'CONTRAT'
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                    : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                }
               >
                 Contrat
               </Button>
               <Button
                 variant={quickStatus === 'CTRC_EMI' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('CTRC_EMI')}
-                className={quickStatus === 'CTRC_EMI' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'dark:border-slate-700'}
+                className={
+                  quickStatus === 'CTRC_EMI'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                    : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
+                }
               >
                 CTRC
               </Button>
@@ -1019,7 +1047,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={dailyMode === 'todas' ? 'default' : 'outline'}
-                        className={dailyMode === 'todas' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        className={
+                          dailyMode === 'todas'
+                            ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }
                         onClick={() => setDailyMode('todas')}
                       >
                         Todas
@@ -1027,7 +1059,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={dailyMode === 'cotacoes' ? 'default' : 'outline'}
-                        className={dailyMode === 'cotacoes' ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'dark:border-slate-700'}
+                        className={
+                          dailyMode === 'cotacoes'
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                            : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
+                        }
                         onClick={() => setDailyMode('cotacoes')}
                       >
                         Cotações
@@ -1035,7 +1071,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={dailyMode === 'simuladas' ? 'default' : 'outline'}
-                        className={dailyMode === 'simuladas' ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600' : 'dark:border-slate-700'}
+                        className={
+                          dailyMode === 'simuladas'
+                            ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }
                         onClick={() => setDailyMode('simuladas')}
                       >
                         Simuladas
@@ -1043,7 +1083,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={dailyMode === 'contratadas' ? 'default' : 'outline'}
-                        className={dailyMode === 'contratadas' ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600' : 'dark:border-slate-700'}
+                        className={
+                          dailyMode === 'contratadas'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                            : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                        }
                         onClick={() => setDailyMode('contratadas')}
                       >
                         Contratadas
@@ -1051,7 +1095,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={dailyMode === 'ctrc_emi' ? 'default' : 'outline'}
-                        className={dailyMode === 'ctrc_emi' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'dark:border-slate-700'}
+                        className={
+                          dailyMode === 'ctrc_emi'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                            : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
+                        }
                         onClick={() => setDailyMode('ctrc_emi')}
                       >
                         CTRC emit.
@@ -1215,7 +1263,10 @@ export function BICotacoes() {
                                 <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                               ))}
                             </Pie>
-                            <RechartsTooltip formatter={(v: any, n: any) => [formatNumber(Number(v)), String(n)]} />
+                            <RechartsTooltip
+                              contentStyle={tooltipStyle as any}
+                              formatter={(v: any, n: any) => [formatNumber(Number(v)), String(n)]}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
                       )}
@@ -1263,7 +1314,7 @@ export function BICotacoes() {
                             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                             <XAxis dataKey="name" interval={0} angle={-25} textAnchor="end" height={60} />
                             <YAxis tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
-                            <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v))} />
+                            <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v))} />
                             <Bar dataKey="potencial" fill="#93c5fd" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="convertido" fill="#34d399" radius={[4, 4, 0, 0]} />
                           </BarChart>
@@ -1431,6 +1482,7 @@ export function BICotacoes() {
                           <XAxis type="number" tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
                           <YAxis type="category" dataKey="uf" width={30} />
                           <RechartsTooltip
+                            contentStyle={tooltipStyle as any}
                             formatter={(v: any, name: any) => {
                               const n = String(name);
                               if (n === 'potencial' || n === 'convertido') return [formatCurrency(Number(v)), n];
@@ -1527,7 +1579,7 @@ export function BICotacoes() {
                           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
                           <XAxis dataKey="label" />
                           <YAxis tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
-                          <RechartsTooltip formatter={(v: any) => formatCurrency(Number(v))} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any) => formatCurrency(Number(v))} />
                           <Area type="monotone" dataKey="convertido" stroke="#10b981" fill="#10b981" fillOpacity={0.18} strokeWidth={2} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -1686,7 +1738,7 @@ export function BICotacoes() {
                                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }
                               >
-                                {r.situacao || '-'}
+                                {r.situacao ? funilSituacaoLabel(r.situacao) : '-'}
                               </Badge>
                             </td>
                             <td className="py-2 px-3">
