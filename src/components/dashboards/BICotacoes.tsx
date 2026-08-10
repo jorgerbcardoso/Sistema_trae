@@ -5,13 +5,12 @@ import {
   Pie,
   Cell,
   Tooltip as RechartsTooltip,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   AreaChart,
   Area,
+  Legend,
 } from 'recharts';
 import {
   Filter,
@@ -45,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectCliente } from './FilterSelectCliente';
+import { useTooltipStyle } from './CustomTooltip';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
@@ -208,8 +208,9 @@ export function BICotacoes() {
 
   const [quickStatus, setQuickStatus] = useState<'ALL' | 'COTADO' | 'CONTRAT' | 'CTRC_EMI'>('ALL');
   const [search, setSearch] = useState('');
-  const [dailyMode, setDailyMode] = useState<'cotacoes' | 'ctrc_emi'>('cotacoes');
+  const [dailyMode, setDailyMode] = useState<'todas' | 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [origemDestinoMode, setOrigemDestinoMode] = useState<'origem' | 'destino'>('origem');
+  const tooltipStyle = useTooltipStyle();
 
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
@@ -380,9 +381,12 @@ export function BICotacoes() {
 
   const dailySeries = useMemo(() => {
     const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
-    const byDay = new Map<string, { cotacoes: number; ctrc_emi: number; potencial: number; convertido: number }>();
+    const byDay = new Map<
+      string,
+      { cotacoes: number; simuladas: number; contratadas: number; contratadas_base: number; ctrc_emi: number; potencial: number; convertido: number }
+    >();
     for (const d of periodDays) {
-      byDay.set(d, { cotacoes: 0, ctrc_emi: 0, potencial: 0, convertido: 0 });
+      byDay.set(d, { cotacoes: 0, simuladas: 0, contratadas: 0, contratadas_base: 0, ctrc_emi: 0, potencial: 0, convertido: 0 });
     }
     for (const r of rowsFiltered) {
       const di = datePart(r.data_inclusao);
@@ -390,6 +394,9 @@ export function BICotacoes() {
         const a = byDay.get(di)!;
         a.cotacoes += 1;
         a.potencial += toNumber(r.proposta_atual);
+        if (r.status_kind === 'COTADO') a.simuladas += 1;
+        if (r.status_kind === 'CONTRAT') a.contratadas_base += 1;
+        if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas += 1;
       }
       if (r.status_kind === 'CTRC_EMI') {
         const de = datePart(r.data_emissao_ctrc) || di;
@@ -404,7 +411,8 @@ export function BICotacoes() {
     return periodDays.map((iso) => {
       const dt = new Date(`${iso}T12:00:00`);
       const label = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
-      const v = byDay.get(iso) || { cotacoes: 0, ctrc_emi: 0, potencial: 0, convertido: 0 };
+      const v =
+        byDay.get(iso) || { cotacoes: 0, simuladas: 0, contratadas: 0, contratadas_base: 0, ctrc_emi: 0, potencial: 0, convertido: 0 };
       return { iso, label, ...v };
     });
   }, [periodDays, rowsFiltered]);
@@ -996,9 +1004,7 @@ export function BICotacoes() {
               />
             </div>
           </div>
-        </div>
-
-        <TabsContent value="pipeline" className="mt-0">
+          <TabsContent value="pipeline" className="mt-0">
             <div className="space-y-4">
               <Card className="dark:bg-slate-900 dark:border-slate-700">
                 <CardContent className="p-4">
@@ -1010,19 +1016,43 @@ export function BICotacoes() {
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
+                        variant={dailyMode === 'todas' ? 'default' : 'outline'}
+                        className={dailyMode === 'todas' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        onClick={() => setDailyMode('todas')}
+                      >
+                        Todas
+                      </Button>
+                      <Button
+                        size="sm"
                         variant={dailyMode === 'cotacoes' ? 'default' : 'outline'}
-                        className={dailyMode === 'cotacoes' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        className={dailyMode === 'cotacoes' ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'dark:border-slate-700'}
                         onClick={() => setDailyMode('cotacoes')}
                       >
                         Cotações
                       </Button>
                       <Button
                         size="sm"
+                        variant={dailyMode === 'simuladas' ? 'default' : 'outline'}
+                        className={dailyMode === 'simuladas' ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600' : 'dark:border-slate-700'}
+                        onClick={() => setDailyMode('simuladas')}
+                      >
+                        Simuladas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={dailyMode === 'contratadas' ? 'default' : 'outline'}
+                        className={dailyMode === 'contratadas' ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600' : 'dark:border-slate-700'}
+                        onClick={() => setDailyMode('contratadas')}
+                      >
+                        Contratadas
+                      </Button>
+                      <Button
+                        size="sm"
                         variant={dailyMode === 'ctrc_emi' ? 'default' : 'outline'}
-                        className={dailyMode === 'ctrc_emi' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        className={dailyMode === 'ctrc_emi' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'dark:border-slate-700'}
                         onClick={() => setDailyMode('ctrc_emi')}
                       >
-                        CTRC emitidos
+                        CTRC emit.
                       </Button>
                     </div>
                   </div>
@@ -1033,19 +1063,127 @@ export function BICotacoes() {
                       <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem dados.</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={dailySeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                        <AreaChart data={dailySeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                          <defs>
+                            <linearGradient id="bi_ct_line_cotacoes" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                            </linearGradient>
+                            <linearGradient id="bi_ct_line_simuladas" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#64748b" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#64748b" stopOpacity={0} />
+                            </linearGradient>
+                            <linearGradient id="bi_ct_line_contratadas" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                            </linearGradient>
+                            <linearGradient id="bi_ct_line_ctrc" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
                           <XAxis dataKey="label" interval="preserveStartEnd" />
                           <YAxis allowDecimals={false} />
                           <RechartsTooltip
-                            formatter={(v: any, name: any) => [
-                              formatNumber(Number(v)),
-                              String(name) === 'ctrc_emi' ? 'CTRC emitidos' : 'Cotações',
-                            ]}
+                            contentStyle={tooltipStyle as any}
+                            formatter={(v: any, name: any) => {
+                              const n = String(name);
+                              const label =
+                                n === 'cotacoes'
+                                  ? 'Cotações'
+                                  : n === 'simuladas'
+                                    ? 'Simuladas'
+                                    : n === 'contratadas_base'
+                                      ? 'Contratadas'
+                                      : n === 'contratadas'
+                                        ? 'Contratadas'
+                                        : n === 'ctrc_emi'
+                                          ? 'CTRC emit.'
+                                          : n;
+                              return [formatNumber(Number(v)), label];
+                            }}
                             labelFormatter={(l: any) => String(l)}
                           />
-                          <Bar dataKey={dailyMode} fill={dailyMode === 'cotacoes' ? '#60a5fa' : '#34d399'} radius={[4, 4, 0, 0]} />
-                        </BarChart>
+                          {dailyMode === 'todas' ? (
+                            <>
+                              <Legend wrapperStyle={{ fontSize: 11 }} />
+                              <Area
+                                type="monotone"
+                                dataKey="simuladas"
+                                name="Simuladas"
+                                stackId="1"
+                                stroke="#64748b"
+                                strokeWidth={2}
+                                fill="url(#bi_ct_line_simuladas)"
+                                dot={false}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="contratadas_base"
+                                name="Contratadas"
+                                stackId="1"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                fill="url(#bi_ct_line_contratadas)"
+                                dot={false}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="ctrc_emi"
+                                name="CTRC emit."
+                                stackId="1"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                fill="url(#bi_ct_line_ctrc)"
+                                dot={false}
+                              />
+                            </>
+                          ) : (
+                            <Area
+                              type="monotone"
+                              dataKey={
+                                dailyMode === 'cotacoes'
+                                  ? 'cotacoes'
+                                  : dailyMode === 'simuladas'
+                                    ? 'simuladas'
+                                    : dailyMode === 'contratadas'
+                                      ? 'contratadas'
+                                      : 'ctrc_emi'
+                              }
+                              name={
+                                dailyMode === 'cotacoes'
+                                  ? 'Cotações'
+                                  : dailyMode === 'simuladas'
+                                    ? 'Simuladas'
+                                    : dailyMode === 'contratadas'
+                                      ? 'Contratadas'
+                                      : 'CTRC emit.'
+                              }
+                              stroke={
+                                dailyMode === 'cotacoes'
+                                  ? '#3b82f6'
+                                  : dailyMode === 'simuladas'
+                                    ? '#64748b'
+                                    : dailyMode === 'contratadas'
+                                      ? '#f59e0b'
+                                      : '#10b981'
+                              }
+                              strokeWidth={2}
+                              fill={
+                                dailyMode === 'cotacoes'
+                                  ? 'url(#bi_ct_line_cotacoes)'
+                                  : dailyMode === 'simuladas'
+                                    ? 'url(#bi_ct_line_simuladas)'
+                                    : dailyMode === 'contratadas'
+                                      ? 'url(#bi_ct_line_contratadas)'
+                                      : 'url(#bi_ct_line_ctrc)'
+                              }
+                              dot={false}
+                              activeDot={{ r: 5 }}
+                            />
+                          )}
+                        </AreaChart>
                       </ResponsiveContainer>
                     )}
                   </div>
