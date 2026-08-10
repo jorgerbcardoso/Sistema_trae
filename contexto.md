@@ -43,6 +43,11 @@ PADRÕES DE CÓDIGO CRÍTICOS:
    - O fluxo padrão é:
      a) `ssw_login()`: Para garantir que a sessão está ativa.
      b) `ssw_go($programa, $params)`: Para executar um programa e obter o resultado (seja HTML, XML, ou relatório de texto).
+   - PADRÃO PARA PROGRAMAS QUE GERAM ARQUIVO (PLANILHA/RELATÓRIO):
+     a) O programa SSW (ex.: ssw1601) normalmente NÃO retorna a planilha/relatório diretamente. Ele retorna um HTML contendo a URL do arquivo gerado.
+     b) Após executar o programa com `ssw_go(...)`, extraia do HTML a URL do arquivo (link).
+     c) Baixe o arquivo usando o programa de download do SSW `ssw0424` (padrão do sistema) e só então processe o conteúdo (CSV/TXT).
+     d) Se o SSW retornar uma mensagem/erro (em vez de URL do arquivo), o backend deve devolver essa mensagem ao frontend para exibição no Presto.
 
 3. GRÁFICOS RECHARTS — PADRÕES VISUAIS:
    - Gráfico Donut (PieChart + Pie): SEMPRE usar `stroke="none"` no componente `<Pie>` para eliminar a borda branca entre as seções.
