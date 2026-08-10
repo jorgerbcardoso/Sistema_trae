@@ -12,6 +12,8 @@ import {
   Bar,
   AreaChart,
   Area,
+  LineChart,
+  Line,
   Legend,
 } from 'recharts';
 import {
@@ -130,6 +132,7 @@ interface Filters {
 }
 
 const PALETTE = ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#a855f7', '#94a3b8'];
+const USER_LINE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ef4444'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -227,6 +230,7 @@ export function BICotacoes() {
   const [quickStatus, setQuickStatus] = useState<'ALL' | 'COTADO' | 'CONTRAT' | 'CTRC_EMI'>('ALL');
   const [search, setSearch] = useState('');
   const [dailyMode, setDailyMode] = useState<'todas' | 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
+  const [usersDailyMode, setUsersDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [origemDestinoMode, setOrigemDestinoMode] = useState<'origem' | 'destino'>('origem');
   const tooltipStyle = useTooltipStyle();
 
@@ -434,6 +438,61 @@ export function BICotacoes() {
       return { iso, label, ...v };
     });
   }, [periodDays, rowsFiltered]);
+
+  const topUsuarios5 = useMemo(() => {
+    const map = new Map<string, { display: string; cotacoes: number }>();
+    for (const r of rowsFiltered) {
+      const display = String(r.usuario_inclusao || '').trim();
+      const key = display.toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, { display, cotacoes: 0 });
+      map.get(key)!.cotacoes += 1;
+    }
+    const out = Array.from(map.values());
+    out.sort((a, b) => b.cotacoes - a.cotacoes || a.display.localeCompare(b.display));
+    return out.slice(0, 5).map((x) => x.display);
+  }, [rowsFiltered]);
+
+  const usersDailySeries = useMemo(() => {
+    const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const idxByUser = new Map<string, number>();
+    topUsuarios5.forEach((u, i) => idxByUser.set(String(u || '').trim().toLowerCase(), i));
+    const byDay = new Map<string, Record<string, number>>();
+    for (const d of periodDays) {
+      const rec: Record<string, number> = {};
+      for (let i = 0; i < topUsuarios5.length; i++) rec[`u${i}`] = 0;
+      byDay.set(d, rec);
+    }
+    for (const r of rowsFiltered) {
+      const userKey = String(r.usuario_inclusao || '').trim().toLowerCase();
+      const idx = idxByUser.get(userKey);
+      if (idx === undefined) continue;
+
+      if (usersDailyMode === 'ctrc_emi') {
+        if (r.status_kind !== 'CTRC_EMI') continue;
+        const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+        if (!byDay.has(d)) continue;
+        byDay.get(d)![`u${idx}`] += 1;
+        continue;
+      }
+
+      const di = datePart(r.data_inclusao);
+      if (!byDay.has(di)) continue;
+      if (usersDailyMode === 'cotacoes') {
+        byDay.get(di)![`u${idx}`] += 1;
+      } else if (usersDailyMode === 'simuladas') {
+        if (r.status_kind === 'COTADO') byDay.get(di)![`u${idx}`] += 1;
+      } else if (usersDailyMode === 'contratadas') {
+        if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') byDay.get(di)![`u${idx}`] += 1;
+      }
+    }
+    return periodDays.map((iso) => {
+      const dt = new Date(`${iso}T12:00:00`);
+      const label = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
+      return { iso, label, ...(byDay.get(iso) || {}) };
+    });
+  }, [periodDays, rowsFiltered, topUsuarios5, usersDailyMode]);
 
   const monthlyConvertedSeries = useMemo(() => {
     const toYm = (s: string) => (s && s.length >= 7 ? s.slice(0, 7) : '');
@@ -982,7 +1041,7 @@ export function BICotacoes() {
                 variant={quickStatus === 'ALL' ? 'default' : 'outline'}
                 className={
                   quickStatus === 'ALL'
-                    ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900'
+                    ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
                     : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                 }
                 onClick={() => setQuickStatus('ALL')}
@@ -1049,7 +1108,7 @@ export function BICotacoes() {
                         variant={dailyMode === 'todas' ? 'default' : 'outline'}
                         className={
                           dailyMode === 'todas'
-                            ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900'
+                            ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
                             : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                         }
                         onClick={() => setDailyMode('todas')}
@@ -1332,54 +1391,150 @@ export function BICotacoes() {
           </TabsContent>
 
           <TabsContent value="usuarios" className="mt-0">
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
-                    <UserIcon className="w-4 h-4 text-indigo-500" />
-                    Performance por Usuário
+            <div className="space-y-4">
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <UserIcon className="w-4 h-4 text-indigo-500" />
+                      Volume diário por usuário
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant={usersDailyMode === 'cotacoes' ? 'default' : 'outline'}
+                        className={
+                          usersDailyMode === 'cotacoes'
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                            : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
+                        }
+                        onClick={() => setUsersDailyMode('cotacoes')}
+                      >
+                        Cotações
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={usersDailyMode === 'simuladas' ? 'default' : 'outline'}
+                        className={
+                          usersDailyMode === 'simuladas'
+                            ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }
+                        onClick={() => setUsersDailyMode('simuladas')}
+                      >
+                        Simuladas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={usersDailyMode === 'contratadas' ? 'default' : 'outline'}
+                        className={
+                          usersDailyMode === 'contratadas'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                            : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                        }
+                        onClick={() => setUsersDailyMode('contratadas')}
+                      >
+                        Contratadas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={usersDailyMode === 'ctrc_emi' ? 'default' : 'outline'}
+                        className={
+                          usersDailyMode === 'ctrc_emi'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                            : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
+                        }
+                        onClick={() => setUsersDailyMode('ctrc_emi')}
+                      >
+                        CTRC emit.
+                      </Button>
+                    </div>
                   </div>
-                  <Badge variant="outline">{formatNumber(rankingUsuarios.length)} usuários</Badge>
-                </div>
 
-                <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                  <table className="min-w-[980px] w-full text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-900/50">
-                      <tr className="text-left">
-                        <th className="py-2 px-3">Usuário</th>
-                        <th className="py-2 px-3 text-right">Cotações</th>
-                        <th className="py-2 px-3 text-right">Contratadas</th>
-                        <th className="py-2 px-3 text-right">CTRC</th>
-                        <th className="py-2 px-3 text-right">Conversão</th>
-                        <th className="py-2 px-3 text-right">Potencial</th>
-                        <th className="py-2 px-3 text-right">Convertido</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankingUsuarios.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-10 text-center text-slate-500">
-                            {data ? 'Sem usuários para os filtros atuais.' : 'Gere para visualizar.'}
-                          </td>
+                  <div className="h-[280px]">
+                    {!data ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Gere para visualizar.</div>
+                    ) : topUsuarios5.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem usuários.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={usersDailySeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                          <XAxis dataKey="label" interval="preserveStartEnd" />
+                          <YAxis allowDecimals={false} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatNumber(Number(v)), String(name)]} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          {topUsuarios5.map((u, idx) => (
+                            <Line
+                              key={u}
+                              type="monotone"
+                              dataKey={`u${idx}`}
+                              name={u}
+                              stroke={USER_LINE_COLORS[idx % USER_LINE_COLORS.length]}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 5 }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    Top {formatNumber(topUsuarios5.length)} usuários cotadores · Série diária do período selecionado
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <UserIcon className="w-4 h-4 text-indigo-500" />
+                      Performance por Usuário
+                    </div>
+                    <Badge variant="outline">{formatNumber(rankingUsuarios.length)} usuários</Badge>
+                  </div>
+
+                  <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    <table className="min-w-[980px] w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-900/50">
+                        <tr className="text-left">
+                          <th className="py-2 px-3">Usuário</th>
+                          <th className="py-2 px-3 text-right">Cotações</th>
+                          <th className="py-2 px-3 text-right">Contratadas</th>
+                          <th className="py-2 px-3 text-right">CTRC</th>
+                          <th className="py-2 px-3 text-right">Conversão</th>
+                          <th className="py-2 px-3 text-right">Potencial</th>
+                          <th className="py-2 px-3 text-right">Convertido</th>
                         </tr>
-                      ) : (
-                        rankingUsuarios.map((u) => (
-                          <tr key={u.usuario} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                            <td className="py-2 px-3 font-mono">{u.usuario}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(u.contratadas)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(u.ctrc_emi)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatPercent(u.conversao)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.potencial)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.convertido)}</td>
+                      </thead>
+                      <tbody>
+                        {rankingUsuarios.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center text-slate-500">
+                              {data ? 'Sem usuários para os filtros atuais.' : 'Gere para visualizar.'}
+                            </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                        ) : (
+                          rankingUsuarios.map((u) => (
+                            <tr key={u.usuario} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                              <td className="py-2 px-3 font-mono">{u.usuario}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(u.contratadas)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(u.ctrc_emi)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatPercent(u.conversao)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.potencial)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.convertido)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="clientes" className="mt-0">
@@ -1450,7 +1605,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={origemDestinoMode === 'origem' ? 'default' : 'outline'}
-                        className={origemDestinoMode === 'origem' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        className={
+                          origemDestinoMode === 'origem'
+                            ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
+                            : 'dark:border-slate-700'
+                        }
                         onClick={() => setOrigemDestinoMode('origem')}
                       >
                         Origem
@@ -1458,7 +1617,11 @@ export function BICotacoes() {
                       <Button
                         size="sm"
                         variant={origemDestinoMode === 'destino' ? 'default' : 'outline'}
-                        className={origemDestinoMode === 'destino' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                        className={
+                          origemDestinoMode === 'destino'
+                            ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
+                            : 'dark:border-slate-700'
+                        }
                         onClick={() => setOrigemDestinoMode('destino')}
                       >
                         Destino
