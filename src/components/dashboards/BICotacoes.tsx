@@ -28,6 +28,10 @@ import {
   MapPin,
   CalendarDays,
   AlertTriangle,
+  BadgePercent,
+  FileText,
+  Wallet,
+  ClipboardList,
 } from 'lucide-react';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
@@ -332,54 +336,31 @@ export function BICotacoes() {
     const rows = rowsFiltered;
     const t = {
       cotacoes: rows.length,
+      clientes: 0,
       cotado: 0,
       contrat: 0,
       ctrc_emi: 0,
       potencial: 0,
       convertido: 0,
-      emRisco: 0,
     };
+    const clientes = new Set<string>();
     for (const r of rows) {
       t.potencial += toNumber(r.proposta_atual);
+      const ck = String(r.cnpj_pagador || '').trim() || String(r.nome_pagador || '').trim();
+      if (ck) clientes.add(ck);
       if (r.status_kind === 'COTADO') t.cotado++;
-      if (r.status_kind === 'CONTRAT') t.contrat++;
+      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') t.contrat++;
       if (r.status_kind === 'CTRC_EMI') {
         t.ctrc_emi++;
         t.convertido += toNumber(r.frete_ctrc);
       }
-      if (r.status_kind !== 'CTRC_EMI' && r.status_kind !== 'OUTRO' && isSoon(r.validade, 2)) t.emRisco++;
     }
+    t.clientes = clientes.size;
     return {
       ...t,
       conversao: t.cotacoes > 0 ? t.ctrc_emi / t.cotacoes : 0,
     };
   }, [rowsFiltered]);
-
-  const showComparisons = useMemo(() => {
-    if (!data) return false;
-    if (quickStatus !== 'ALL') return false;
-    if (search.trim() !== '') return false;
-    return Boolean(data.comparisons?.prev_period?.totals || data.comparisons?.year_ago?.totals);
-  }, [data, quickStatus, search]);
-
-  const deltaPct = (cur: number, base: number) => {
-    const b = toNumber(base);
-    if (!Number.isFinite(b) || b === 0) return null;
-    return (toNumber(cur) - b) / b;
-  };
-
-  const fmtDelta = (pct: number | null) => {
-    if (pct === null) return '—';
-    const sign = pct > 0 ? '+' : '';
-    return `${sign}${formatPercent(pct)}`;
-  };
-
-  const deltaClass = (pct: number | null) => {
-    if (pct === null) return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
-    if (pct > 0) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
-    if (pct < 0) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-    return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
-  };
 
   const periodDays = useMemo(() => {
     const start = filters.periodoIni;
@@ -509,7 +490,7 @@ export function BICotacoes() {
       const a = map.get(key)!;
       a.cotacoes++;
       a.potencial += toNumber(r.proposta_atual);
-      if (r.status_kind === 'CONTRAT') a.contratadas++;
+      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas++;
       if (r.status_kind === 'CTRC_EMI') {
         a.ctrc_emi++;
         a.convertido += toNumber(r.frete_ctrc);
@@ -529,7 +510,7 @@ export function BICotacoes() {
       const a = map.get(key)!;
       a.cotacoes++;
       a.potencial += toNumber(r.proposta_atual);
-      if (r.status_kind === 'CONTRAT') a.contratadas++;
+      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas++;
       if (r.status_kind === 'CTRC_EMI') {
         a.ctrc_emi++;
         a.convertido += toNumber(r.frete_ctrc);
@@ -551,7 +532,7 @@ export function BICotacoes() {
       const a = map.get(key)!;
       a.cotacoes++;
       a.potencial += toNumber(r.proposta_atual);
-      if (r.status_kind === 'CONTRAT') a.contratadas++;
+      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas++;
       if (r.status_kind === 'CTRC_EMI') {
         a.ctrc_emi++;
         a.convertido += toNumber(r.frete_ctrc);
@@ -842,7 +823,7 @@ export function BICotacoes() {
         )}
 
         <div className={loading ? 'space-y-6 blur-[1px] opacity-70 pointer-events-none select-none' : 'space-y-6'}>
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -852,17 +833,18 @@ export function BICotacoes() {
                 </div>
                 <Target className="w-5 h-5 text-blue-600 dark:text-blue-300" />
               </div>
-              <p className="text-xs text-blue-700/80 dark:text-blue-200/80 mt-2">No período + filtros</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.cotacoes, data?.comparisons?.prev_period?.totals?.cotacoes || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.cotacoes, data?.comparisons?.prev_period?.totals?.cotacoes || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.cotacoes, data?.comparisons?.year_ago?.totals?.cotacoes || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.cotacoes, data?.comparisons?.year_ago?.totals?.cotacoes || 0))}
-                  </Badge>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-900">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs tracking-wide text-violet-800 dark:text-violet-200">Clientes</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.clientes)}</p>
                 </div>
-              )}
+                <Users className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+              </div>
             </CardContent>
           </Card>
 
@@ -870,12 +852,11 @@ export function BICotacoes() {
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs tracking-wide text-slate-700 dark:text-slate-200">Cotadas</p>
+                  <p className="text-xs tracking-wide text-slate-700 dark:text-slate-200">Simuladas</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.cotado)}</p>
                 </div>
-                <Badge className="bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-200">COTADO</Badge>
+                <FileText className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">Simulação / início</p>
             </CardContent>
           </Card>
 
@@ -888,17 +869,6 @@ export function BICotacoes() {
                 </div>
                 <TrendingUp className="w-5 h-5 text-amber-500" />
               </div>
-              <p className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-2">CONTRAT / COT FIX</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.contrat, data?.comparisons?.prev_period?.totals?.contrat || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.contrat, data?.comparisons?.prev_period?.totals?.contrat || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.contrat, data?.comparisons?.year_ago?.totals?.contrat || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.contrat, data?.comparisons?.year_ago?.totals?.contrat || 0))}
-                  </Badge>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -911,17 +881,6 @@ export function BICotacoes() {
                 </div>
                 <ArrowUpRight className="w-5 h-5 text-emerald-500" />
               </div>
-              <p className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-2">CTRC EMI</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.ctrc_emi, data?.comparisons?.prev_period?.totals?.ctrc_emi || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.ctrc_emi, data?.comparisons?.prev_period?.totals?.ctrc_emi || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.ctrc_emi, data?.comparisons?.year_ago?.totals?.ctrc_emi || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.ctrc_emi, data?.comparisons?.year_ago?.totals?.ctrc_emi || 0))}
-                  </Badge>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -932,19 +891,8 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-indigo-800 dark:text-indigo-200">Conversão</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatPercent(totalsView.conversao)}</p>
                 </div>
-                <Badge className="bg-indigo-200 text-indigo-900 dark:bg-indigo-900 dark:text-indigo-200">%</Badge>
+                <BadgePercent className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
               </div>
-              <p className="text-xs text-indigo-800/80 dark:text-indigo-200/80 mt-2">CTRC / cotações</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.conversao, data?.comparisons?.prev_period?.totals?.conversao || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.conversao, data?.comparisons?.prev_period?.totals?.conversao || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.conversao, data?.comparisons?.year_ago?.totals?.conversao || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.conversao, data?.comparisons?.year_ago?.totals?.conversao || 0))}
-                  </Badge>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -955,19 +903,8 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-cyan-800 dark:text-cyan-200">Frete cotado</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalsView.potencial)}</p>
                 </div>
-                <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-300" />
+                <ClipboardList className="w-5 h-5 text-cyan-600 dark:text-cyan-300" />
               </div>
-              <p className="text-xs text-cyan-800/80 dark:text-cyan-200/80 mt-2">Proposta atual</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.potencial, data?.comparisons?.prev_period?.totals?.potencial || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.potencial, data?.comparisons?.prev_period?.totals?.potencial || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.potencial, data?.comparisons?.year_ago?.totals?.potencial || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.potencial, data?.comparisons?.year_ago?.totals?.potencial || 0))}
-                  </Badge>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -978,53 +915,50 @@ export function BICotacoes() {
                   <p className="text-xs tracking-wide text-green-800 dark:text-green-200">Frete CTRC</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalsView.convertido)}</p>
                 </div>
-                <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+                <Wallet className="w-5 h-5 text-green-700 dark:text-green-300" />
               </div>
-              <p className="text-xs text-green-800/80 dark:text-green-200/80 mt-2">Somente CTRC EMI</p>
-              {showComparisons && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <Badge className={deltaClass(deltaPct(totalsView.convertido, data?.comparisons?.prev_period?.totals?.convertido || 0))}>
-                    Ant.: {fmtDelta(deltaPct(totalsView.convertido, data?.comparisons?.prev_period?.totals?.convertido || 0))}
-                  </Badge>
-                  <Badge className={deltaClass(deltaPct(totalsView.convertido, data?.comparisons?.year_ago?.totals?.convertido || 0))}>
-                    Ano: {fmtDelta(deltaPct(totalsView.convertido, data?.comparisons?.year_ago?.totals?.convertido || 0))}
-                  </Badge>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs tracking-wide text-red-800 dark:text-red-200">Em risco</p>
-                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatNumber(totalsView.emRisco)}</p>
-                </div>
-                <Badge className="bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200">2d</Badge>
-              </div>
-              <p className="text-xs text-red-800/80 dark:text-red-200/80 mt-2">Validade ≤ 2 dias</p>
             </CardContent>
           </Card>
           </div>
 
         <div className="space-y-3">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-            <TabsList className="grid grid-cols-6 w-full md:w-[760px]">
-              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-              <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-              <TabsTrigger value="clientes">Clientes</TabsTrigger>
-              <TabsTrigger value="origem-destino">Origem/Destino</TabsTrigger>
-              <TabsTrigger value="ranking">Ranking</TabsTrigger>
-              <TabsTrigger value="lista">Lista</TabsTrigger>
+            <TabsList className="w-full h-12 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 grid grid-cols-6">
+              <TabsTrigger value="pipeline" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <Target className="w-4 h-4" />
+                <span className="hidden sm:inline">Pipeline</span>
+              </TabsTrigger>
+              <TabsTrigger value="usuarios" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <UserIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Usuários</span>
+              </TabsTrigger>
+              <TabsTrigger value="clientes" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Clientes</span>
+              </TabsTrigger>
+              <TabsTrigger value="origem-destino" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <MapPin className="w-4 h-4" />
+                <span className="hidden sm:inline">Origem/Destino</span>
+              </TabsTrigger>
+              <TabsTrigger value="ranking" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <Trophy className="w-4 h-4" />
+                <span className="hidden sm:inline">Ranking</span>
+              </TabsTrigger>
+              <TabsTrigger value="lista" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">Lista</span>
+              </TabsTrigger>
             </TabsList>
-          </Tabs>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant={quickStatus === 'ALL' ? 'default' : 'outline'}
-                className={quickStatus === 'ALL' ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900' : 'dark:border-slate-700'}
+                className={
+                  quickStatus === 'ALL'
+                    ? 'bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-100 dark:text-slate-900'
+                    : 'dark:border-slate-700'
+                }
                 onClick={() => setQuickStatus('ALL')}
               >
                 Todos
@@ -1032,27 +966,27 @@ export function BICotacoes() {
               <Button
                 variant={quickStatus === 'COTADO' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('COTADO')}
-                className="dark:border-slate-700"
+                className={quickStatus === 'COTADO' ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600' : 'dark:border-slate-700'}
               >
                 Cotado
               </Button>
               <Button
                 variant={quickStatus === 'CONTRAT' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('CONTRAT')}
-                className="dark:border-slate-700"
+                className={quickStatus === 'CONTRAT' ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600' : 'dark:border-slate-700'}
               >
                 Contrat
               </Button>
               <Button
                 variant={quickStatus === 'CTRC_EMI' ? 'default' : 'outline'}
                 onClick={() => setQuickStatus('CTRC_EMI')}
-                className="dark:border-slate-700"
+                className={quickStatus === 'CTRC_EMI' ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600' : 'dark:border-slate-700'}
               >
                 CTRC
               </Button>
             </div>
 
-            <div className="relative w-full md:w-[420px]">
+            <div className="relative flex-1 min-w-[260px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <Input
                 value={search}
@@ -1064,8 +998,7 @@ export function BICotacoes() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-          <TabsContent value="pipeline" className="mt-0">
+        <TabsContent value="pipeline" className="mt-0">
             <div className="space-y-4">
               <Card className="dark:bg-slate-900 dark:border-slate-700">
                 <CardContent className="p-4">
@@ -1678,7 +1611,7 @@ export function BICotacoes() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+        </TabsContent>
         </Tabs>
         </div>
       </div>

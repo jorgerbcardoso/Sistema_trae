@@ -44,10 +44,15 @@ PADRÕES DE CÓDIGO CRÍTICOS:
      a) `ssw_login()`: Para garantir que a sessão está ativa.
      b) `ssw_go($programa, $params)`: Para executar um programa e obter o resultado (seja HTML, XML, ou relatório de texto).
    - PADRÃO PARA PROGRAMAS QUE GERAM ARQUIVO (PLANILHA/RELATÓRIO):
-     a) O programa SSW (ex.: ssw1601) normalmente NÃO retorna a planilha/relatório diretamente. Ele retorna um HTML contendo a URL do arquivo gerado.
-     b) Após executar o programa com `ssw_go(...)`, extraia do HTML a URL do arquivo (link).
-     c) Baixe o arquivo usando o programa de download do SSW `ssw0424` (padrão do sistema) e só então processe o conteúdo (CSV/TXT).
-     d) Se o SSW retornar uma mensagem/erro (em vez de URL do arquivo), o backend deve devolver essa mensagem ao frontend para exibição no Presto.
+     a) O programa SSW (ex.: ssw1601/ssw0166) normalmente NÃO retorna a planilha/relatório diretamente. Ele retorna um HTML com um `<input ... id=web_body ... value="...">` e uma mensagem de sucesso.
+     b) Após executar o programa com `ssw_go(...)`, aplique `urldecode(...)` no HTML e extraia os parâmetros de download do arquivo usando:
+        - `ssw_get_act($html)` e `ssw_get_arq($html)` (padrão já usado em várias telas)
+        - fallback: ler o `web_body` e extrair o `abrir('ARQ.sswweb', ...)`
+     c) Baixe o arquivo via `ssw0424` mantendo o padrão de parâmetros:
+        - `https://sistema.ssw.inf.br/bin/ssw0424?act=<ACT>&filename=<ARQ>&path=&down=1&nw=1`
+        - (ou `nw=0` quando o padrão daquela tela exigir)
+     d) Só depois de baixar é que o backend deve processar o conteúdo (CSV/TXT).
+     e) Se o SSW retornar uma mensagem/erro (ou se o HTML não contiver act/arq), o backend deve devolver essa mensagem ao frontend para exibição no Presto.
 
 3. GRÁFICOS RECHARTS — PADRÕES VISUAIS:
    - Gráfico Donut (PieChart + Pie): SEMPRE usar `stroke="none"` no componente `<Pie>` para eliminar a borda branca entre as seções.

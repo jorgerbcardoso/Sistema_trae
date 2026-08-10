@@ -412,7 +412,7 @@ $parseReport = static function(string $raw, bool $withRows) use ($parseSciToDigi
         }
         $agg[$key]['cotacoes']++;
         $agg[$key]['potencial'] += (float)($row['proposta_atual'] ?? 0.0);
-        if (($row['status_kind'] ?? '') === 'CONTRAT') $agg[$key]['contratadas']++;
+        if (($row['status_kind'] ?? '') === 'CONTRAT' || ($row['status_kind'] ?? '') === 'CTRC_EMI') $agg[$key]['contratadas']++;
         if (($row['status_kind'] ?? '') === 'CTRC_EMI') {
             $agg[$key]['ctrc_emi']++;
             $agg[$key]['convertido'] += (float)($row['frete_ctrc'] ?? 0.0);
