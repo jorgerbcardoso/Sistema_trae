@@ -127,11 +127,56 @@ foreach ($params as $k => $v) {
     if ($v === '' || $v === null) unset($params[$k]);
 }
 
+// Garantir parâmetro fixo exigido pelo SSW (mesmo que o chamador tente omitir/alterar)
+$params['f6'] = 'E';
+
 $url = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($params);
-$raw = (string)ssw_go($url);
-if ($raw === '') {
-    respondJson(['success' => false, 'message' => 'SSW não retornou conteúdo.']);
+$extractPlainMessage = static function(string $raw) use ($normStr): string {
+    $s = (string)$raw;
+    $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $s = preg_replace('/<br\s*\/?>/i', "\n", $s);
+    $s = strip_tags($s);
+    $s = $normStr($s);
+    return $s;
+};
+
+$fetchCsvOrMessage = static function(string $u) use ($extractPlainMessage): array {
+    $raw1 = (string)ssw_go($u);
+    $t1 = trim((string)$raw1);
+    if ($t1 === '') return ['ok' => false, 'raw' => '', 'message' => 'SSW não retornou conteúdo.'];
+
+    $t1 = html_entity_decode($t1, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $t1 = str_replace(["\r\n", "\r"], ["\n", "\n"], $t1);
+
+    $csvStart = stripos($t1, 'COTACAO;');
+    if ($csvStart !== false) {
+        return ['ok' => true, 'raw' => substr($t1, $csvStart), 'message' => ''];
+    }
+
+    $only = trim(preg_replace('/\s+/', ' ', $t1));
+    if (preg_match('#^https?://[^\s]+$#i', $only)) {
+        $raw2 = (string)ssw_go($only);
+        $t2 = trim((string)$raw2);
+        $t2 = html_entity_decode($t2, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $t2 = str_replace(["\r\n", "\r"], ["\n", "\n"], $t2);
+        $csvStart2 = stripos($t2, 'COTACAO;');
+        if ($csvStart2 !== false) {
+            return ['ok' => true, 'raw' => substr($t2, $csvStart2), 'message' => ''];
+        }
+        $msg2 = $extractPlainMessage($t2);
+        if ($msg2 !== '') return ['ok' => false, 'raw' => '', 'message' => $msg2];
+    }
+
+    $msg = $extractPlainMessage($t1);
+    if ($msg !== '') return ['ok' => false, 'raw' => '', 'message' => $msg];
+    return ['ok' => false, 'raw' => '', 'message' => 'SSW retornou uma resposta inesperada.'];
+};
+
+$fetched = $fetchCsvOrMessage($url);
+if (!$fetched['ok']) {
+    respondJson(['success' => false, 'message' => (string)$fetched['message']]);
 }
+$raw = (string)$fetched['raw'];
 
 $raw = html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 $raw = str_replace(["\r\n", "\r"], ["\n", "\n"], $raw);
@@ -440,8 +485,8 @@ if ($includeComparisons) {
 
     $fetch = static function(array $p): array {
         $u = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($p);
-        $r = (string)ssw_go($u);
-        return [$u, $r];
+        $f = $fetchCsvOrMessage($u);
+        return [$u, (string)($f['ok'] ? $f['raw'] : '')];
     };
 
     $pPrev = $mkParams($params, $prevStart, $prevEnd);
