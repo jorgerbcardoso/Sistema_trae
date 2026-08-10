@@ -1753,6 +1753,7 @@ export function BICotacoes() {
         </Tabs>
         </div>
       </div>
+      </div>
     </DashboardLayout>
   );
 }
