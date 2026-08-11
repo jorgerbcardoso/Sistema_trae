@@ -983,7 +983,7 @@ function TabelaEntrega({
     nroCte: c.nroCte,
     seqCte: undefined,
     tipo: '',
-    emissao: '',
+    emissao: c.emissao || '',
     prevEnt: c.prevEnt,
     nfiscal: c.nfiscal,
     pedido: '',
@@ -1046,6 +1046,7 @@ function TabelaEntrega({
               </th>
             )}
             <th className="px-3 py-2 text-left font-semibold">CTRC</th>
+            <th className="px-3 py-2 text-left font-semibold">Emissão</th>
             <th className="px-3 py-2 text-left font-semibold">NF</th>
             <th className="px-3 py-2 text-left font-semibold">Pagador</th>
             <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
@@ -1099,6 +1100,7 @@ function TabelaEntrega({
                   {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                   {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                 </td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.emissao || ''}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
@@ -3844,7 +3846,7 @@ export function Disponiveis() {
       let lastTotal: number | null = null;
       const res = await apiFetchWithProgress(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_disponiveis_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ sigla: s }) },
+        { method: 'POST', cache: 'no-store', body: JSON.stringify({ sigla: s, _nonce: Date.now() }) },
         (p) => {
           setEntregaLoaded(p.loaded);
           setEntregaTotal(p.total);
@@ -3856,7 +3858,11 @@ export function Disponiveis() {
       if (progressoRef.current) clearInterval(progressoRef.current);
       if (res?.success) setProgressoEntrega(100);
       if (res.success) {
-        setDadosEntrega(res.data);
+        const d = res.data;
+        const ctes = Array.isArray(d?.ctes)
+          ? d.ctes.map((c: any) => ({ ...c, emissao: String(c?.emissao ?? '') }))
+          : [];
+        setDadosEntrega({ ...d, ctes });
       } else {
         setErroEntrega(res.message || 'Erro ao carregar disponíveis para entrega');
       }
