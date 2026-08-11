@@ -274,39 +274,40 @@ $tblCte = "{$domain}_cte";
 $emissaoPorCte = [];
 
 if (!empty($ctes)) {
-    $pares = [];
+    $ctrcs = [];
     $seen = [];
     foreach ($ctes as $c) {
-        $ser = (string)($c['serCte'] ?? '');
-        $nro = (int)($c['nroCte'] ?? 0);
-        if ($ser === '' || $nro <= 0) continue;
-        $k = $ser . '|' . $nro;
+        $ctrc = strtoupper(preg_replace('/\s+/', '', (string)($c['ctrc'] ?? '')));
+        if ($ctrc === '') continue;
+        $k = $ctrc;
         if (isset($seen[$k])) continue;
         $seen[$k] = true;
-        $pares[] = [$ser, $nro];
+        $ctrcs[] = $ctrc;
     }
 
-    foreach (array_chunk($pares, 500) as $chunk) {
+    foreach (array_chunk($ctrcs, 500) as $chunk) {
         $params = [];
         $values = [];
         $p = 1;
-        foreach ($chunk as $par) {
-            $values[] = "($" . $p . ", $" . ($p + 1) . ")";
-            $params[] = $par[0];
-            $params[] = $par[1];
-            $p += 2;
+        foreach ($chunk as $ctrc) {
+            $values[] = "($" . $p . ")";
+            $params[] = $ctrc;
+            $p += 1;
         }
         if (empty($values)) continue;
 
         $q = "
-            WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $values) . ")
+            WITH req(ctrc) AS (VALUES " . implode(',', $values) . ")
             SELECT DISTINCT ON (UPPER(BTRIM(c.ser_cte)), c.nro_cte)
                 UPPER(BTRIM(c.ser_cte)) AS ser_cte,
                 c.nro_cte,
                 TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao
             FROM {$tblCte} c
-            JOIN req r ON UPPER(BTRIM(r.ser_cte)) = UPPER(BTRIM(c.ser_cte)) AND r.nro_cte = c.nro_cte
-            ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST, c.seq_cte DESC
+            JOIN req r
+              ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
+             AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
+             AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
+            ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST
         ";
         $resEmi = pg_query_params($g_sql, $q, $params);
         if ($resEmi) {
