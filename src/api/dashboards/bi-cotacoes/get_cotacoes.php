@@ -181,10 +181,10 @@ $sswFetch = static function(string $u, int $tries = 3): string {
 };
 
 $extractXml = static function(string $html): string {
-    $pos = strpos($html, '<xml');
+    $pos = stripos($html, '<xml');
     if ($pos === false) return '';
     $tail = substr($html, $pos);
-    $end = strpos($tail, '</xml>');
+    $end = stripos($tail, '</xml>');
     if ($end === false) return '';
     return substr($tail, 0, $end) . '</xml>';
 };
@@ -197,24 +197,20 @@ $get1440Rows = static function() use ($sswFetch, $extractXml): array {
     $xml = @simplexml_load_string($xmlStr);
     if (!$xml) return [];
 
+    $nodes = $xml->xpath('rs/r');
+    if (!is_array($nodes) || empty($nodes)) return [];
+
     $rows = [];
-    for ($i = 0; $i <= 220; $i++) {
-        $seq = $xml->xpath('rs/r/f0')[$i] ?? null;
-        $opc = $xml->xpath('rs/r/f1')[$i] ?? null;
-        $f2  = $xml->xpath('rs/r/f2')[$i] ?? null;
-        $usr = $xml->xpath('rs/r/f3')[$i] ?? null;
-        $f4  = $xml->xpath('rs/r/f4')[$i] ?? null;
-        $sit = $xml->xpath('rs/r/f6')[$i] ?? null;
-        $f8  = $xml->xpath('rs/r/f8')[$i] ?? null;
-        if ($seq === null) break;
+    foreach ($nodes as $node) {
+        if (!$node) continue;
         $rows[] = [
-            'seq' => (int)$seq,
-            'opc' => (string)$opc,
-            'f2'  => (string)$f2,
-            'usr' => (string)$usr,
-            'f4'  => (string)$f4,
-            'sit' => (string)$sit,
-            'f8'  => (string)$f8,
+            'seq' => (int)($node->f0 ?? 0),
+            'opc' => (string)($node->f1 ?? ''),
+            'f2'  => (string)($node->f2 ?? ''),
+            'usr' => (string)($node->f3 ?? ''),
+            'f4'  => (string)($node->f4 ?? ''),
+            'sit' => (string)($node->f6 ?? ''),
+            'f8'  => (string)($node->f8 ?? ''),
         ];
     }
     return $rows;
@@ -223,14 +219,39 @@ $get1440Rows = static function() use ($sswFetch, $extractXml): array {
 $parseF2Ts = static function(string $f2): ?int {
     $f2 = trim((string)$f2);
     if ($f2 === '') return null;
-    $dt = \DateTime::createFromFormat('d/m/y H:i:s', $f2);
-    if (!$dt) return null;
-    return $dt->getTimestamp();
+    $formats = [
+        'd/m/y H:i:s',
+        'd/m/y H:i',
+        'd/m/Y H:i:s',
+        'd/m/Y H:i',
+    ];
+    foreach ($formats as $fmt) {
+        $dt = \DateTime::createFromFormat($fmt, $f2);
+        if ($dt) return $dt->getTimestamp();
+    }
+    return null;
 };
 
 $normSswStatus = static function(string $s): string {
     $s = trim((string)$s);
     $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (function_exists('iconv')) {
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+        if (is_string($ascii) && $ascii !== '') $s = $ascii;
+    } else {
+        $s = str_replace(['Á','À','Â','Ã','Ä'], 'A', $s);
+        $s = str_replace(['É','È','Ê','Ë'], 'E', $s);
+        $s = str_replace(['Í','Ì','Î','Ï'], 'I', $s);
+        $s = str_replace(['Ó','Ò','Ô','Õ','Ö'], 'O', $s);
+        $s = str_replace(['Ú','Ù','Û','Ü'], 'U', $s);
+        $s = str_replace(['Ç'], 'C', $s);
+        $s = str_replace(['á','à','â','ã','ä'], 'a', $s);
+        $s = str_replace(['é','è','ê','ë'], 'e', $s);
+        $s = str_replace(['í','ì','î','ï'], 'i', $s);
+        $s = str_replace(['ó','ò','ô','õ','ö'], 'o', $s);
+        $s = str_replace(['ú','ù','û','ü'], 'u', $s);
+        $s = str_replace(['ç'], 'c', $s);
+    }
     $s = strtolower($s);
     $s = preg_replace('/[^a-z]/', '', $s);
     return (string)$s;
@@ -239,13 +260,30 @@ $normSswStatus = static function(string $s): string {
 $extractActsFromF8 = static function(string $f8raw): array {
     $f8 = html_entity_decode((string)$f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $acts = [];
-    if (preg_match_all("/ajaxEnvia\\('\\s*([^']+)\\s*'\\)/", $f8, $m)) {
+    if (preg_match_all("/ajaxEnvia\\s*\\(\\s*'\\s*([^']+)\\s*'\\s*\\)/i", $f8, $m)) {
         foreach ($m[1] as $act) {
             $act = trim((string)$act);
             if ($act !== '') $acts[] = $act;
         }
     }
     return array_values(array_unique($acts));
+};
+
+$extractOpcCode = static function(string $opcRaw): string {
+    $opc = html_entity_decode((string)$opcRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $opc = str_replace(["\xc2\xa0", "\xa0"], ' ', $opc);
+    $opc = trim(preg_replace('/\s+/', ' ', $opc));
+    if ($opc === '') return '';
+    if (preg_match('/\d{1,3}/', $opc, $m)) {
+        return str_pad((string)$m[0], 3, '0', STR_PAD_LEFT);
+    }
+    return substr($opc, 0, 3);
+};
+
+$normalizeRequestStartTs = static function(int $v): int {
+    if ($v <= 0) return 0;
+    if ($v > 20000000000) return (int)floor($v / 1000);
+    return $v;
 };
 
 $downloadFrom1440Act = static function(string $act) use ($sswFetch): ?array {
@@ -842,7 +880,7 @@ if ($step === 'DOWNLOAD') {
 
 if ($step === 'POLL') {
     $baselineSeqIn = (int)($input['baseline_seq'] ?? 0);
-    $requestStartTsIn = (int)($input['request_start_ts'] ?? 0);
+    $requestStartTsIn = $normalizeRequestStartTs((int)($input['request_start_ts'] ?? 0));
     if ($baselineSeqIn <= 0 || $requestStartTsIn <= 0) {
         respondJson(['success' => false, 'message' => 'Parâmetros inválidos para consulta de status (baseline_seq/request_start_ts).'], 400);
     }
@@ -856,7 +894,7 @@ if ($step === 'POLL') {
         $seqVal = (int)($r['seq'] ?? 0);
         if ($seqVal <= 0) continue;
         $opcStr = (string)($r['opc'] ?? '');
-        if (substr(trim($opcStr), 0, 3) !== $opcQueue) continue;
+        if ($extractOpcCode($opcStr) !== $opcQueue) continue;
         $sitStr = (string)($r['sit'] ?? '');
         if ($normSswStatus($sitStr) !== 'concluido') continue;
         $f8raw = (string)($r['f8'] ?? '');
@@ -868,7 +906,7 @@ if ($step === 'POLL') {
         if (!$okBySeq && !$okByTime) continue;
 
         $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
+        $hasLinksOrNone = (preg_match('/ajaxEnvia\s*\(/i', $f8dec) === 1) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
         if (!$hasLinksOrNone) continue;
 
         if ($seqVal > $bestSeq) {
@@ -966,7 +1004,7 @@ if ($step === 'RUN') {
             $seqVal = (int)($r['seq'] ?? 0);
             if ($seqVal <= 0) continue;
             $opcStr = (string)($r['opc'] ?? '');
-            if (substr(trim($opcStr), 0, 3) !== $opcQueue) continue;
+            if ($extractOpcCode($opcStr) !== $opcQueue) continue;
             $sitStr = (string)($r['sit'] ?? '');
             if ($normSswStatus($sitStr) !== 'concluido') continue;
             $f8raw = (string)($r['f8'] ?? '');
@@ -976,7 +1014,7 @@ if ($step === 'RUN') {
             $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTs - 120));
             if (!$okBySeq && !$okByTime) continue;
             $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
+            $hasLinksOrNone = (preg_match('/ajaxEnvia\s*\(/i', $f8dec) === 1) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
             if (!$hasLinksOrNone) continue;
             if ($seqVal > $bestSeq) { $bestSeq = $seqVal; $best = $r; }
         }

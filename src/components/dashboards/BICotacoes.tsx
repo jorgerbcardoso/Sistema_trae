@@ -456,6 +456,7 @@ export function BICotacoes() {
       const runId = Date.now();
       rankingBaseRunRef.current = runId;
       rankingBaseKeyRef.current = key;
+      setRankingBaseRows(null);
       setRankingBaseLoading(true);
       try {
         const payload: any = {
@@ -596,7 +597,7 @@ export function BICotacoes() {
   const rowsCtrecEmit = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'CTRC_EMI'), [rowsFiltered]);
 
   const rankingRowsBaseFiltered = useMemo(() => {
-    const base = rankingBaseRows ?? data?.rows ?? [];
+    const base = Array.isArray(rankingBaseRows) ? rankingBaseRows : [];
     const byQuick =
       quickStatus === 'ALL'
         ? base
@@ -625,7 +626,7 @@ export function BICotacoes() {
         .toLowerCase();
       return bag.includes(q);
     });
-  }, [data, quickStatus, rankingBaseRows, search]);
+  }, [quickStatus, rankingBaseRows, search]);
 
   const openDrill = useCallback((title: string, rows: CotacaoRow[]) => {
     setDrillTitle(title);
@@ -2998,6 +2999,13 @@ export function BICotacoes() {
               </div>
             </div>
 
+            {!Array.isArray(rankingBaseRows) ? (
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-8">
+                  <div className="text-center text-sm text-slate-500">Aguardando a base de 90 dias para montar o ranking…</div>
+                </CardContent>
+              </Card>
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Card
                 role="button"
@@ -3212,6 +3220,7 @@ export function BICotacoes() {
                 </CardContent>
               </Card>
             </div>
+            )}
           </TabsContent>
 
           <TabsContent value="lista" className="mt-0">
