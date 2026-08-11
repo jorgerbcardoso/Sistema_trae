@@ -151,6 +151,50 @@ const funilSituacaoLabel = (raw: string) => {
   return String(raw || '—').trim() || '—';
 };
 
+const shortDateLabel = (s: string) => {
+  const v = String(s || '').trim();
+  const mIso = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (mIso) return `${mIso[3]}/${mIso[2]}/${mIso[1].slice(-2)}`;
+  const mBr = v.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (mBr) return `${mBr[1]}/${mBr[2]}/${mBr[3].slice(-2)}`;
+  return v.slice(0, 10);
+};
+
+const cotacaoKeyLabel = (r: { unidade_inclusao: string; cotacao: string }) => {
+  const un = String(r.unidade_inclusao || '').trim().toUpperCase();
+  const raw = String(r.cotacao || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  const num = digits ? digits.slice(-6).padStart(6, '0') : raw.padStart(6, '0').slice(-6);
+  return `${un}${num}`;
+};
+
+const situacaoCompact = (raw: string) => {
+  const k = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+  if (!k) return '-';
+  if (k === 'COT CLI') return 'Cot. cli';
+  if (k === 'COTADO') return 'Cotado';
+  if (k === 'CTRC EMI') return 'CTRC';
+  if (k === 'COT FIXO') return 'Fix.';
+  if (k === 'CONTRAT') return 'Contrat';
+  return k.length > 10 ? `${k.slice(0, 10)}…` : k;
+};
+
+const situacaoBadgeClass = (statusKind: StatusKind, raw: string) => {
+  const k = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+  if (statusKind === 'CTRC_EMI' || k === 'CTRC EMI') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
+  if (statusKind === 'CONTRAT' || k === 'CONTRAT' || k === 'COT FIXO')
+    return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+  if (statusKind === 'COTADO' || k === 'COTADO' || k === 'COT CLI')
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+};
+
 const toNumber = (v: any) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -2931,7 +2975,7 @@ export function BICotacoes() {
             <DialogHeader>
               <DialogTitle className="text-slate-900 dark:text-slate-100">{drillTitle || 'Detalhe'}</DialogTitle>
               <DialogDescription className="text-slate-600 dark:text-slate-400">
-                {formatNumber(drillTotals.rows)} registro{drillTotals.rows !== 1 ? 's' : ''} · Potencial: {formatCurrency(drillTotals.potencial)} · CTRC: {formatNumber(drillTotals.ctrc)} · Convertido: {formatCurrency(drillTotals.convertido)}
+                {formatNumber(drillTotals.rows)} cotaç{drillTotals.rows !== 1 ? 'ões' : 'ão'} · Valor: {formatCurrency(drillTotals.potencial)}
               </DialogDescription>
             </DialogHeader>
             <Button
@@ -2956,62 +3000,49 @@ export function BICotacoes() {
           </div>
 
           <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="sticky top-0 z-20 grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
+            <div className="sticky top-0 z-20 grid gap-x-2 grid-cols-[110px_140px_110px_minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_120px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
               <div className="font-mono">Cotação</div>
+              <div>Inclusão</div>
               <div>Situação</div>
               <div>Cliente</div>
               <div>Origem</div>
               <div>Destino</div>
-              <div>Usuário</div>
-              <div>Unid</div>
-              <div className="text-right">Proposta</div>
-              <div className="text-right">Frete CTRC</div>
-              <div>CTRC</div>
-              <div>Incl.</div>
+              <div className="text-right">Valor</div>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {drillRowsFiltradas.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Nenhum registro encontrado.</div>
               ) : (
                 drillRowsFiltradas.map((r, idx) => {
-                  const incl = (r.data_inclusao || '').slice(0, 10);
+                  const incl = `${shortDateLabel(r.data_inclusao)} ${String(r.usuario_inclusao || '').trim().toLowerCase()}`.trim();
                   const cliente = r.nome_pagador || r.cnpj_pagador || '-';
                   return (
                     <div
                       key={`${r.cotacao}-${r.ctrc}-${idx}`}
-                      className="grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                      className="grid gap-x-2 grid-cols-[110px_140px_110px_minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_120px] px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                     >
-                      <div className="font-mono truncate">{r.cotacao || '-'}</div>
-                      <div className="truncate">{r.situacao ? funilSituacaoLabel(r.situacao) : '-'}</div>
-                      <div className="min-w-0">
-                        <div className="truncate">{cliente}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{r.cnpj_pagador || '-'}</div>
+                      <div className="font-mono truncate">{cotacaoKeyLabel(r)}</div>
+                      <div className="font-mono truncate">{incl || '-'}</div>
+                      <div>
+                        <Badge className={situacaoBadgeClass(r.status_kind, r.situacao)}>{situacaoCompact(r.situacao)}</Badge>
                       </div>
+                      <div className="truncate">{cliente}</div>
                       <div className="truncate">{r.origem || '-'}</div>
                       <div className="truncate">{r.destino || '-'}</div>
-                      <div className="font-mono truncate">{r.usuario_inclusao || '-'}</div>
-                      <div className="font-mono truncate">{r.unidade_inclusao || '-'}</div>
                       <div className="text-right font-mono">{formatCurrency(r.proposta_atual)}</div>
-                      <div className="text-right font-mono">{formatCurrency(r.frete_ctrc)}</div>
-                      <div className="font-mono truncate">{r.ctrc || '-'}</div>
-                      <div className="font-mono truncate">{incl || '-'}</div>
                     </div>
                   );
                 })
               )}
             </div>
-            <div className="sticky bottom-0 z-20 grid gap-x-2 grid-cols-[90px_140px_minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_90px_55px_110px_110px_70px_70px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
-              <div />
-              <div />
-              <div />
+            <div className="sticky bottom-0 z-20 grid gap-x-2 grid-cols-[110px_140px_110px_minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_120px] bg-slate-50 dark:bg-slate-900/90 border-t border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 backdrop-blur">
+              <div className="font-mono">TOTAL</div>
+              <div className="font-mono">{formatNumber(drillTotals.rows)}</div>
               <div />
               <div />
               <div />
               <div className="text-right">Total</div>
               <div className="text-right font-mono">{formatCurrency(drillTotals.potencial)}</div>
-              <div className="text-right font-mono">{formatCurrency(drillTotals.convertido)}</div>
-              <div />
-              <div />
             </div>
           </div>
         </DialogContent>
