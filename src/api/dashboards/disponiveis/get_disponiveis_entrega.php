@@ -270,26 +270,10 @@ foreach ($linhas as $linha) {
     ];
 }
 
-$tblCte = strtolower($domain) . "_cte";
+$tblCte = "{$domain}_cte";
 $emissaoPorCte = [];
-$tblExists = false;
-$tblCteSql = '';
-$chk = pg_query_params(
-    $g_sql,
-    "SELECT table_schema
-     FROM information_schema.tables
-     WHERE table_name = $1
-     ORDER BY CASE WHEN table_schema = 'public' THEN 0 ELSE 1 END
-     LIMIT 1",
-    [$tblCte]
-);
-if ($chk && pg_num_rows($chk) > 0) {
-    $tblExists = true;
-    $schema = (string)pg_fetch_result($chk, 0, 0);
-    $tblCteSql = pg_escape_identifier($g_sql, $schema) . '.' . pg_escape_identifier($g_sql, $tblCte);
-}
 
-if ($tblExists && !empty($ctes)) {
+if (!empty($ctes)) {
     $pares = [];
     $seen = [];
     foreach ($ctes as $c) {
@@ -320,7 +304,7 @@ if ($tblExists && !empty($ctes)) {
                 UPPER(BTRIM(c.ser_cte)) AS ser_cte,
                 c.nro_cte,
                 TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao
-            FROM {$tblCteSql} c
+            FROM {$tblCte} c
             JOIN req r ON UPPER(BTRIM(r.ser_cte)) = UPPER(BTRIM(c.ser_cte)) AND r.nro_cte = c.nro_cte
             ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST, c.seq_cte DESC
         ";
