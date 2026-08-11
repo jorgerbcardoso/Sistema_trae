@@ -219,12 +219,15 @@ const conversaoBarClass = (n: number) => {
 const ConversaoBar = ({ value }: { value: number }) => {
   const pct = Math.max(0, Math.min(1, toNumber(value)));
   const w = Math.max(2, Math.round(pct * 100));
+  const label = formatPercent(pct);
   return (
-    <div className="flex items-center justify-end gap-2">
-      <div className="w-[92px] h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+    <div className="flex items-center justify-end">
+      <div className="relative w-[110px] h-5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
         <div className={`h-full ${conversaoBarClass(pct)}`} style={{ width: `${w}%` }} />
+        <div className="absolute inset-0 flex items-center justify-center px-2">
+          <span className="font-mono text-[11px] font-semibold text-white drop-shadow tabular-nums">{label}</span>
+        </div>
       </div>
-      <span className="font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">{formatPercent(pct)}</span>
     </div>
   );
 };
