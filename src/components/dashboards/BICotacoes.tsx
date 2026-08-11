@@ -1748,6 +1748,17 @@ export function BICotacoes() {
           </Card>
           </div>
 
+          <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
+            <CardContent className="p-3">
+              <div className="flex items-start gap-3">
+                <ArrowUpRight className="w-4 h-4 mt-0.5 text-indigo-600 dark:text-indigo-300" />
+                <div className="text-sm text-slate-700 dark:text-slate-200">
+                  Quase tudo é clicável para análise: cards, gráficos, tabelas e itens de ranking abrem a lista detalhada de cotações.
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
         <div className="space-y-3">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
             <TabsList className="w-full h-12 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 grid grid-cols-6">
@@ -2999,10 +3010,28 @@ export function BICotacoes() {
               </div>
             </div>
 
+            <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 mb-4">
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-300" />
+                  <div className="text-sm text-slate-700 dark:text-slate-200">
+                    Dica: o Ranking respeita os filtros (tipo de frete, situação, unidade, usuário e cliente), mas a base sempre usa 90 dias até a data final do período informado.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {!Array.isArray(rankingBaseRows) ? (
               <Card className="dark:bg-slate-900 dark:border-slate-700">
                 <CardContent className="p-8">
-                  <div className="text-center text-sm text-slate-500">Aguardando a base de 90 dias para montar o ranking…</div>
+                  <div className="flex items-center justify-center gap-3 text-center text-sm text-slate-600 dark:text-slate-300">
+                    {rankingBaseLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span>
+                      {rankingBaseLoading
+                        ? 'Carregando a base de 90 dias para montar o ranking…'
+                        : 'Aguardando a base de 90 dias para montar o ranking…'}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             ) : (
