@@ -455,7 +455,7 @@ export function BICotacoes() {
       }
       return out;
     },
-    [rowsFiltered, topUsuarios5]
+    [rowsFiltered]
   );
 
   const rowsForClientsDailyIso = useCallback(
@@ -485,7 +485,7 @@ export function BICotacoes() {
       }
       return out;
     },
-    [rowsFiltered, topClientes5]
+    [rowsFiltered]
   );
 
   const rowsForMonthYm = useCallback(
