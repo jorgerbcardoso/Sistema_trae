@@ -208,6 +208,27 @@ const formatPercent = (n: number) =>
     Math.max(0, Math.min(1, toNumber(n)))
   );
 
+const conversaoBarClass = (n: number) => {
+  const p = Math.max(0, toNumber(n)) * 100;
+  if (p <= 2) return 'bg-red-500';
+  if (p <= 5) return 'bg-orange-500';
+  if (p <= 10) return 'bg-yellow-500';
+  return 'bg-emerald-500';
+};
+
+const ConversaoBar = ({ value }: { value: number }) => {
+  const pct = Math.max(0, Math.min(1, toNumber(value)));
+  const w = Math.max(2, Math.round(pct * 100));
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <div className="w-[92px] h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+        <div className={`h-full ${conversaoBarClass(pct)}`} style={{ width: `${w}%` }} />
+      </div>
+      <span className="font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">{formatPercent(pct)}</span>
+    </div>
+  );
+};
+
 const parseIso = (s: string) => {
   if (!s) return null;
   const ts = Date.parse(s.includes(' ') ? s.replace(' ', 'T') : s);
@@ -283,6 +304,10 @@ export function BICotacoes() {
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<CotacaoRow[]>([]);
   const [drillSearch, setDrillSearch] = useState('');
+  const [drillSort, setDrillSort] = useState<{
+    key: 'cotacao' | 'inclusao' | 'situacao' | 'cliente' | 'origem' | 'destino' | 'valor';
+    dir: 'asc' | 'desc';
+  }>({ key: 'inclusao', dir: 'desc' });
 
   const [usersSort, setUsersSort] = useState<{ key: 'usuario' | 'cotacoes' | 'contratadas' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido'; dir: 'asc' | 'desc' }>({
     key: 'ctrc_emi',
@@ -292,6 +317,15 @@ export function BICotacoes() {
     key: 'ctrc_emi',
     dir: 'desc',
   });
+  const [rankingConvertidoSort, setRankingConvertidoSort] = useState<{
+    key: 'usuario' | 'cotacoes' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido';
+    dir: 'asc' | 'desc';
+  }>({ key: 'convertido', dir: 'desc' });
+  const [rankingWindowDays, setRankingWindowDays] = useState<15 | 30 | 90 | 180>(90);
+  const [rankingBaseLoading, setRankingBaseLoading] = useState(false);
+  const [rankingBaseRows, setRankingBaseRows] = useState<CotacaoRow[] | null>(null);
+  const rankingBaseRunRef = useRef(0);
+  const rankingBaseKeyRef = useRef('');
   const [clientsPage, setClientsPage] = useState(1);
 
   const runRef = useRef(0);
@@ -314,6 +348,72 @@ export function BICotacoes() {
     setTempFilters({ ...filters });
     setShowFilters(false);
   };
+
+  const addDaysIso = useCallback((iso: string, deltaDays: number) => {
+    const base = Date.parse(`${String(iso || '').slice(0, 10)}T12:00:00`);
+    if (!Number.isFinite(base)) return '';
+    const d = new Date(base);
+    d.setDate(d.getDate() + deltaDays);
+    return fmtIso(d);
+  }, []);
+
+  const fetchRankingBase = useCallback(
+    async (baseFilters: Filters) => {
+      const endIso = String(baseFilters.periodoFim || '').slice(0, 10);
+      if (!endIso) return;
+      const start180 = addDaysIso(endIso, -179);
+      if (!start180) return;
+
+      const key = [
+        endIso,
+        start180,
+        baseFilters.f7,
+        baseFilters.f8,
+        baseFilters.f11,
+        baseFilters.f13,
+        baseFilters.f14,
+        baseFilters.f16,
+      ].join('|');
+      if (rankingBaseKeyRef.current === key && Array.isArray(rankingBaseRows)) return;
+
+      const runId = Date.now();
+      rankingBaseRunRef.current = runId;
+      rankingBaseKeyRef.current = key;
+      setRankingBaseLoading(true);
+      try {
+        const payload: any = {
+          periodo_ini: start180,
+          periodo_fim: endIso,
+          f7: baseFilters.f7,
+          f8: baseFilters.f8,
+          f11: baseFilters.f11,
+          f13: baseFilters.f13,
+          f14: baseFilters.f14,
+          f16: baseFilters.f16,
+          include_comparisons: false,
+          _nonce: Date.now(),
+        };
+        const resp = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/bi-cotacoes/get_cotacoes.php`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          cache: 'no-store',
+        } as any);
+        const json = resp as any;
+        if (rankingBaseRunRef.current !== runId) return;
+        if (!json?.success) {
+          setRankingBaseRows([]);
+          return;
+        }
+        setRankingBaseRows(Array.isArray(json.rows) ? json.rows : []);
+      } catch {
+        if (rankingBaseRunRef.current !== runId) return;
+        setRankingBaseRows([]);
+      } finally {
+        if (rankingBaseRunRef.current === runId) setRankingBaseLoading(false);
+      }
+    },
+    [addDaysIso, rankingBaseRows]
+  );
 
   const carregar = async (override?: Filters) => {
     const runId = Date.now();
@@ -360,6 +460,8 @@ export function BICotacoes() {
         meta: json.meta || {},
       };
       setData(parsed);
+      setRankingWindowDays(90);
+      fetchRankingBase(f);
       if (parsed.meta?.truncated) {
         toast.warning(`Planilha grande: exibindo apenas ${formatNumber(parsed.meta.max_rows || 0)} registros (limite técnico).`);
       } else {
@@ -426,6 +528,38 @@ export function BICotacoes() {
     [rowsFiltered]
   );
   const rowsCtrecEmit = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'CTRC_EMI'), [rowsFiltered]);
+
+  const rankingRowsBaseFiltered = useMemo(() => {
+    const base = rankingBaseRows ?? data?.rows ?? [];
+    const byQuick =
+      quickStatus === 'ALL'
+        ? base
+        : base.filter((r) => {
+            if (quickStatus === 'COTADO') return r.status_kind === 'COTADO';
+            if (quickStatus === 'CONTRAT') return r.status_kind === 'CONTRAT';
+            if (quickStatus === 'CTRC_EMI') return r.status_kind === 'CTRC_EMI';
+            return true;
+          });
+    const q = search.trim().toLowerCase();
+    if (!q) return byQuick;
+    return byQuick.filter((r) => {
+      const bag = [
+        r.cotacao,
+        r.unidade_inclusao,
+        r.usuario_inclusao,
+        r.cnpj_pagador,
+        r.nome_pagador,
+        r.vendedor,
+        r.origem,
+        r.destino,
+        r.situacao,
+        r.ctrc,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return bag.includes(q);
+    });
+  }, [data, quickStatus, rankingBaseRows, search]);
 
   const openDrill = useCallback((title: string, rows: CotacaoRow[]) => {
     setDrillTitle(title);
@@ -532,16 +666,6 @@ export function BICotacoes() {
     [rowsFiltered]
   );
 
-  const rowsForMonthYm = useCallback(
-    (ym: string) => {
-      const key = String(ym || '').trim();
-      if (!key) return [];
-      const toYm = (s: string) => (s && s.length >= 7 ? s.slice(0, 7) : '');
-      return rowsCtrecEmit.filter((r) => toYm(r.data_emissao_ctrc || r.data_inclusao) === key);
-    },
-    [rowsCtrecEmit]
-  );
-
   const drillRowsFiltradas = useMemo(() => {
     const q = drillSearch.trim().toLowerCase();
     if (!q) return drillRows;
@@ -565,6 +689,34 @@ export function BICotacoes() {
       return bag.includes(q);
     });
   }, [drillRows, drillSearch]);
+
+  const drillRowsOrdenadas = useMemo(() => {
+    const dir = drillSort.dir === 'asc' ? 1 : -1;
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    const getCliente = (r: CotacaoRow) => String(r.nome_pagador || r.cnpj_pagador || '').trim();
+    const getSituacao = (r: CotacaoRow) => String(funilSituacaoLabel(r.situacao) || '').trim();
+    const getCot = (r: CotacaoRow) => cotacaoKeyLabel(r as any);
+    const getInclTs = (r: CotacaoRow) => {
+      const d = String(r.data_inclusao || '').slice(0, 10);
+      const t = Date.parse(`${d}T00:00:00`);
+      return Number.isFinite(t) ? t : 0;
+    };
+    const arr = [...drillRowsFiltradas];
+    arr.sort((a, b) => {
+      let c = 0;
+      if (drillSort.key === 'cotacao') c = cmpStr(getCot(a), getCot(b));
+      else if (drillSort.key === 'inclusao') {
+        c = getInclTs(a) - getInclTs(b);
+        if (c === 0) c = cmpStr(String(a.usuario_inclusao || ''), String(b.usuario_inclusao || ''));
+      } else if (drillSort.key === 'situacao') c = cmpStr(getSituacao(a), getSituacao(b));
+      else if (drillSort.key === 'cliente') c = cmpStr(getCliente(a), getCliente(b));
+      else if (drillSort.key === 'origem') c = cmpStr(String(a.origem || ''), String(b.origem || ''));
+      else if (drillSort.key === 'destino') c = cmpStr(String(a.destino || ''), String(b.destino || ''));
+      else if (drillSort.key === 'valor') c = toNumber(a.proposta_atual) - toNumber(b.proposta_atual);
+      return c === 0 ? 0 : c * dir;
+    });
+    return arr;
+  }, [drillRowsFiltradas, drillSort]);
 
   const drillTotals = useMemo(() => {
     let potencial = 0;
@@ -779,33 +931,91 @@ export function BICotacoes() {
     });
   }, [clientsDailyMode, periodDays, rowsFiltered, topClientes5]);
 
-  const monthlyConvertedSeries = useMemo(() => {
-    const toYm = (s: string) => (s && s.length >= 7 ? s.slice(0, 7) : '');
-    const byMonth = new Map<string, number>();
-    for (const r of rowsFiltered) {
-      if (r.status_kind !== 'CTRC_EMI') continue;
-      const ym = toYm(r.data_emissao_ctrc || r.data_inclusao);
-      if (!ym) continue;
-      byMonth.set(ym, (byMonth.get(ym) || 0) + toNumber(r.frete_ctrc));
-    }
-    const months: string[] = [];
-    const s = Date.parse(`${filters.periodoIni}T12:00:00`);
-    const e = Date.parse(`${filters.periodoFim}T12:00:00`);
+  const rankingPeriodDays = useMemo(() => {
+    const end = String(filters.periodoFim || '').slice(0, 10);
+    if (!end) return [];
+    const start = addDaysIso(end, -(rankingWindowDays - 1));
+    if (!start) return [];
+    const s = Date.parse(`${start}T12:00:00`);
+    const e = Date.parse(`${end}T12:00:00`);
     if (!Number.isFinite(s) || !Number.isFinite(e) || s > e) return [];
+    const out: string[] = [];
     const cur = new Date(s);
-    cur.setDate(1);
-    const end = new Date(e);
-    end.setDate(1);
-    while (cur.getTime() <= end.getTime()) {
-      months.push(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}`);
-      cur.setMonth(cur.getMonth() + 1);
+    const endDt = new Date(e);
+    while (cur.getTime() <= endDt.getTime()) {
+      out.push(fmtIso(cur));
+      cur.setDate(cur.getDate() + 1);
     }
-    const label = (ym: string) => {
-      const [y, m] = ym.split('-');
-      return `${m}/${String(y).slice(-2)}`;
-    };
-    return months.map((ym) => ({ ym, label: label(ym), convertido: byMonth.get(ym) || 0 }));
-  }, [filters.periodoIni, filters.periodoFim, rowsFiltered]);
+    return out;
+  }, [addDaysIso, filters.periodoFim, rankingWindowDays]);
+
+  const rankingRowsInWindow = useMemo(() => {
+    const start = rankingPeriodDays[0];
+    const end = rankingPeriodDays[rankingPeriodDays.length - 1];
+    if (!start || !end) return [];
+    const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+    return rankingRowsBaseFiltered.filter((r) => {
+      const di = datePart(r.data_inclusao);
+      return di >= start && di <= end;
+    });
+  }, [rankingPeriodDays, rankingRowsBaseFiltered]);
+
+  const rankingConvertedSeries = useMemo(() => {
+    const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+    const byDay = new Map<string, number>();
+    for (const d of rankingPeriodDays) byDay.set(d, 0);
+    for (const r of rankingRowsInWindow) {
+      if (r.status_kind !== 'CTRC_EMI') continue;
+      const di = datePart(r.data_inclusao);
+      if (!byDay.has(di)) continue;
+      byDay.set(di, (byDay.get(di) || 0) + toNumber(r.frete_ctrc));
+    }
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    return rankingPeriodDays.map((iso) => {
+      const dt = new Date(`${iso}T12:00:00`);
+      const label = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
+      return { iso, label, convertido: byDay.get(iso) || 0 };
+    });
+  }, [rankingPeriodDays, rankingRowsInWindow]);
+
+  const rankingConvertedTotal = useMemo(
+    () => rankingConvertedSeries.reduce((acc, x) => acc + toNumber((x as any).convertido), 0),
+    [rankingConvertedSeries]
+  );
+
+  const rankingUsuariosConvertidoTab = useMemo(() => {
+    const map = new Map<string, { usuario: string; cotacoes: number; ctrc_emi: number; potencial: number; convertido: number }>();
+    for (const r of rankingRowsInWindow) {
+      const key = (r.usuario_inclusao || '').trim().toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, { usuario: key, cotacoes: 0, ctrc_emi: 0, potencial: 0, convertido: 0 });
+      const a = map.get(key)!;
+      a.cotacoes++;
+      a.potencial += toNumber(r.proposta_atual);
+      if (r.status_kind === 'CTRC_EMI') {
+        a.ctrc_emi++;
+        a.convertido += toNumber(r.frete_ctrc);
+      }
+    }
+    const out = Array.from(map.values()).map((x) => ({ ...x, conversao: x.cotacoes > 0 ? x.ctrc_emi / x.cotacoes : 0 }));
+    out.sort((a, b) => b.convertido - a.convertido || b.ctrc_emi - a.ctrc_emi || b.cotacoes - a.cotacoes || a.usuario.localeCompare(b.usuario));
+    return out.slice(0, 25);
+  }, [rankingRowsInWindow]);
+
+  const rankingUsersCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rankingRowsInWindow) {
+      const k = String(r.usuario_inclusao || '').trim().toLowerCase();
+      if (k) set.add(k);
+    }
+    return set.size;
+  }, [rankingRowsInWindow]);
+
+  const rankingPositionByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    rankingUsuariosConvertidoTab.forEach((u, idx) => map.set(u.usuario, idx + 1));
+    return map;
+  }, [rankingUsuariosConvertidoTab]);
 
   const ufFromPlace = (s: string) => {
     const v = String(s || '').trim();
@@ -871,26 +1081,6 @@ export function BICotacoes() {
     return out;
   }, [rowsFiltered]);
 
-  const rankingUsuariosConvertido = useMemo(() => {
-    const map = new Map<string, { usuario: string; cotacoes: number; contratadas: number; ctrc_emi: number; potencial: number; convertido: number }>();
-    for (const r of rowsFiltered) {
-      const key = (r.usuario_inclusao || '').trim().toLowerCase();
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, { usuario: key, cotacoes: 0, contratadas: 0, ctrc_emi: 0, potencial: 0, convertido: 0 });
-      const a = map.get(key)!;
-      a.cotacoes++;
-      a.potencial += toNumber(r.proposta_atual);
-      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas++;
-      if (r.status_kind === 'CTRC_EMI') {
-        a.ctrc_emi++;
-        a.convertido += toNumber(r.frete_ctrc);
-      }
-    }
-    const out = Array.from(map.values()).map((x) => ({ ...x, conversao: x.cotacoes > 0 ? x.ctrc_emi / x.cotacoes : 0 }));
-    out.sort((a, b) => b.convertido - a.convertido || b.ctrc_emi - a.ctrc_emi || b.cotacoes - a.cotacoes || a.usuario.localeCompare(b.usuario));
-    return out.slice(0, 25);
-  }, [rowsFiltered]);
-
   const rankingClientes = useMemo(() => {
     const map = new Map<string, { cnpj: string; nome: string; cotacoes: number; contratadas: number; ctrc_emi: number; potencial: number; convertido: number }>();
     for (const r of rowsFiltered) {
@@ -921,6 +1111,10 @@ export function BICotacoes() {
     setClientsSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
   }, []);
 
+  const toggleRankingConvertidoSort = useCallback((key: typeof rankingConvertidoSort.key) => {
+    setRankingConvertidoSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+  }, []);
+
   const rankingUsuariosSorted = useMemo(() => {
     const rows = [...rankingUsuarios];
     rows.sort((a, b) => {
@@ -931,6 +1125,18 @@ export function BICotacoes() {
     });
     return rows;
   }, [rankingUsuarios, usersSort.dir, usersSort.key]);
+
+  const rankingUsuariosConvertidoSorted = useMemo(() => {
+    const rows = [...rankingUsuariosConvertidoTab];
+    rows.sort((a, b) => {
+      if (rankingConvertidoSort.key === 'usuario')
+        return rankingConvertidoSort.dir === 'asc' ? a.usuario.localeCompare(b.usuario) : b.usuario.localeCompare(a.usuario);
+      const av = toNumber((a as any)[rankingConvertidoSort.key]);
+      const bv = toNumber((b as any)[rankingConvertidoSort.key]);
+      return rankingConvertidoSort.dir === 'asc' ? av - bv : bv - av;
+    });
+    return rows;
+  }, [rankingConvertidoSort.dir, rankingConvertidoSort.key, rankingUsuariosConvertidoTab]);
 
   const rankingClientesSorted = useMemo(() => {
     const rows = [...rankingClientes];
@@ -959,6 +1165,20 @@ export function BICotacoes() {
     }
     return { cotacoes, contratadas, ctrc_emi, conversao: cotacoes > 0 ? ctrc_emi / cotacoes : 0, potencial, convertido };
   }, [rankingUsuariosSorted]);
+
+  const rankingConvertidoTotalsRow = useMemo(() => {
+    let cotacoes = 0;
+    let ctrc_emi = 0;
+    let potencial = 0;
+    let convertido = 0;
+    for (const r of rankingUsuariosConvertidoTab) {
+      cotacoes += toNumber(r.cotacoes);
+      ctrc_emi += toNumber(r.ctrc_emi);
+      potencial += toNumber(r.potencial);
+      convertido += toNumber(r.convertido);
+    }
+    return { cotacoes, ctrc_emi, potencial, convertido, conversao: cotacoes > 0 ? ctrc_emi / cotacoes : 0 };
+  }, [rankingUsuariosConvertidoTab]);
 
   const clientsTotalsRow = useMemo(() => {
     let cotacoes = 0;
@@ -2174,7 +2394,9 @@ export function BICotacoes() {
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.contratadas)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.ctrc_emi)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatPercent(u.conversao)}</td>
+                              <td className="py-2 px-3 text-right">
+                                <ConversaoBar value={u.conversao} />
+                              </td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.potencial)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.convertido)}</td>
                             </tr>
@@ -2188,7 +2410,9 @@ export function BICotacoes() {
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.cotacoes)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.contratadas)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.ctrc_emi)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatPercent(usersTotalsRow.conversao)}</td>
+                            <td className="py-2 px-3 text-right">
+                              <ConversaoBar value={usersTotalsRow.conversao} />
+                            </td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(usersTotalsRow.potencial)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(usersTotalsRow.convertido)}</td>
                           </tr>
@@ -2478,7 +2702,9 @@ export function BICotacoes() {
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(c.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(c.contratadas)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(c.ctrc_emi)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatPercent(c.conversao)}</td>
+                              <td className="py-2 px-3 text-right">
+                                <ConversaoBar value={c.conversao} />
+                              </td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.potencial)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.convertido)}</td>
                             </tr>
@@ -2492,7 +2718,9 @@ export function BICotacoes() {
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.cotacoes)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.contratadas)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.ctrc_emi)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatPercent(clientsTotalsRow.conversao)}</td>
+                            <td className="py-2 px-3 text-right">
+                              <ConversaoBar value={clientsTotalsRow.conversao} />
+                            </td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.potencial)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.convertido)}</td>
                           </tr>
@@ -2557,27 +2785,20 @@ export function BICotacoes() {
                       <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem dados.</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={origemDestinoUF[origemDestinoMode].slice(0, 12)}
-                          layout="vertical"
-                          margin={{ top: 10, right: 20, bottom: 10, left: 10 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
-                          <XAxis type="number" tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
-                          <YAxis type="category" dataKey="uf" width={30} />
+                        <PieChart>
                           <RechartsTooltip
                             contentStyle={tooltipStyle as any}
-                            formatter={(v: any, name: any) => {
-                              const n = String(name);
-                              if (n === 'potencial' || n === 'convertido') return [formatCurrency(Number(v)), n];
-                              if (n === 'conversao') return [formatPercent(Number(v)), 'conversão'];
-                              return [formatNumber(Number(v)), n];
-                            }}
+                            formatter={(v: any) => formatNumber(Number(v))}
+                            labelFormatter={(l: any) => `UF ${String(l || '')}`}
                           />
-                          <Bar
+                          <Pie
+                            data={origemDestinoUF[origemDestinoMode]}
                             dataKey="cotacoes"
-                            fill="#60a5fa"
-                            radius={[4, 4, 4, 4]}
+                            nameKey="uf"
+                            innerRadius="55%"
+                            outerRadius="80%"
+                            paddingAngle={2}
+                            stroke="transparent"
                             onClick={(d: any, _i: any, e: any) => {
                               e?.stopPropagation?.();
                               const uf = d?.payload?.uf;
@@ -2588,14 +2809,18 @@ export function BICotacoes() {
                               });
                               openDrill(`UF ${String(uf)} · ${origemDestinoMode === 'origem' ? 'Origem' : 'Destino'}`, rs);
                             }}
-                          />
-                        </BarChart>
+                          >
+                            {origemDestinoUF[origemDestinoMode].map((_, i) => (
+                              <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                            ))}
+                          </Pie>
+                        </PieChart>
                       </ResponsiveContainer>
                     )}
                   </div>
                   <div className="text-xs text-slate-500 mt-2 flex items-center gap-2">
                     <MapPin className="w-3.5 h-3.5" />
-                    Top 12 UFs por volume de cotações
+                    UFs por volume de cotações
                   </div>
                 </CardContent>
               </Card>
@@ -2609,15 +2834,15 @@ export function BICotacoes() {
                     <Badge variant="outline">{formatNumber(origemDestinoUF[origemDestinoMode].length)} UFs</Badge>
                   </div>
                   <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                    <table className="min-w-[920px] w-full text-sm">
+                    <table className="min-w-[560px] w-full text-xs table-fixed">
                       <thead className="bg-slate-50 dark:bg-slate-900/50">
                         <tr className="text-left">
-                          <th className="py-2 px-3">UF</th>
-                          <th className="py-2 px-3 text-right">Cotações</th>
-                          <th className="py-2 px-3 text-right">CTRC</th>
-                          <th className="py-2 px-3 text-right">Conversão</th>
-                          <th className="py-2 px-3 text-right">Potencial</th>
-                          <th className="py-2 px-3 text-right">Convertido</th>
+                          <th className="py-1.5 px-2 w-[44px] whitespace-nowrap">UF</th>
+                          <th className="py-1.5 px-2 w-[70px] text-right whitespace-nowrap">Cot.</th>
+                          <th className="py-1.5 px-2 w-[70px] text-right whitespace-nowrap">CTRC</th>
+                          <th className="py-1.5 px-2 w-[70px] text-right whitespace-nowrap">%</th>
+                          <th className="py-1.5 px-2 w-[120px] text-right whitespace-nowrap">Pot.</th>
+                          <th className="py-1.5 px-2 w-[120px] text-right whitespace-nowrap">Conv.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2656,12 +2881,12 @@ export function BICotacoes() {
                               }}
                               className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
                             >
-                              <td className="py-2 px-3 font-mono">{r.uf}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatNumber(r.cotacoes)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatNumber(r.ctrc_emi)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatPercent(r.conversao)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(r.potencial)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(r.convertido)}</td>
+                              <td className="py-1.5 px-2 font-mono whitespace-nowrap">{r.uf}</td>
+                              <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{formatNumber(r.cotacoes)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{formatNumber(r.ctrc_emi)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{formatPercent(r.conversao)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{formatCurrency(r.potencial)}</td>
+                              <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{formatCurrency(r.convertido)}</td>
                             </tr>
                           ))
                         )}
@@ -2674,32 +2899,76 @@ export function BICotacoes() {
           </TabsContent>
 
           <TabsContent value="ranking" className="mt-0">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">Base: 180 dias</Badge>
+                {rankingBaseLoading && <Badge variant="outline">Atualizando base…</Badge>}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant={rankingWindowDays === 15 ? 'default' : 'outline'}
+                  className={rankingWindowDays === 15 ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'dark:border-slate-700'}
+                  onClick={() => setRankingWindowDays(15)}
+                >
+                  15 dias
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rankingWindowDays === 30 ? 'default' : 'outline'}
+                  className={rankingWindowDays === 30 ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'dark:border-slate-700'}
+                  onClick={() => setRankingWindowDays(30)}
+                >
+                  30 dias
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rankingWindowDays === 90 ? 'default' : 'outline'}
+                  className={rankingWindowDays === 90 ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'dark:border-slate-700'}
+                  onClick={() => setRankingWindowDays(90)}
+                >
+                  90 dias
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rankingWindowDays === 180 ? 'default' : 'outline'}
+                  className={rankingWindowDays === 180 ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'dark:border-slate-700'}
+                  onClick={() => setRankingWindowDays(180)}
+                >
+                  180 dias
+                </Button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <Card
                 role="button"
                 tabIndex={0}
-                onClick={() => openDrill('Frete convertido por mês', rowsCtrecEmit)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Frete convertido por mês', rowsCtrecEmit); }}
+                onClick={() => openDrill(`Frete convertido no período (${rankingWindowDays}d)`, rankingRowsInWindow.filter((r) => r.status_kind === 'CTRC_EMI'))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ')
+                    openDrill(`Frete convertido no período (${rankingWindowDays}d)`, rankingRowsInWindow.filter((r) => r.status_kind === 'CTRC_EMI'));
+                }}
                 className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-2 cursor-pointer hover:opacity-95"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
                       <TrendingUp className="w-4 h-4 text-emerald-500" />
-                      Frete convertido por mês
+                      Frete convertido no período
                     </div>
                     <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                      Total: {formatCurrency(totalsView.convertido)}
+                      Total: {formatCurrency(rankingConvertedTotal)}
                     </Badge>
                   </div>
                   <div className="h-[300px]">
                     {!data ? (
                       <div className="h-full flex items-center justify-center text-sm text-slate-500">Gere para visualizar.</div>
-                    ) : monthlyConvertedSeries.length === 0 ? (
+                    ) : rankingConvertedSeries.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem dados.</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={monthlyConvertedSeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                        <AreaChart data={rankingConvertedSeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
                           <XAxis dataKey="label" />
                           <YAxis tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
@@ -2713,10 +2982,12 @@ export function BICotacoes() {
                             strokeWidth={2}
                             onClick={(d: any, _i: any, e: any) => {
                               e?.stopPropagation?.();
-                              const ym = d?.payload?.ym;
+                              const iso = d?.payload?.iso;
                               const label = d?.payload?.label;
-                              if (!ym) return;
-                              openDrill(`Frete convertido · ${String(label || ym)}`, rowsForMonthYm(String(ym)));
+                              if (!iso) return;
+                              const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+                              const rs = rankingRowsInWindow.filter((r) => r.status_kind === 'CTRC_EMI' && datePart(r.data_inclusao) === String(iso));
+                              openDrill(`Frete convertido · ${String(label || iso)}`, rs);
                             }}
                           />
                         </AreaChart>
@@ -2733,23 +3004,32 @@ export function BICotacoes() {
                       <Trophy className="w-4 h-4 text-amber-500" />
                       Top 3 usuários
                     </div>
-                    <Badge variant="outline">{formatNumber(rankingUsuariosConvertido.length)} usuários</Badge>
+                    <Badge variant="outline">{formatNumber(rankingUsersCount)} usuários</Badge>
                   </div>
 
-                  {rankingUsuariosConvertido.length === 0 ? (
+                  {rankingUsuariosConvertidoTab.length === 0 ? (
                     <div className="h-[300px] flex items-center justify-center text-sm text-slate-500">
                       {data ? 'Sem dados.' : 'Gere para visualizar.'}
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {rankingUsuariosConvertido.slice(0, 3).map((u, i) => (
+                      {rankingUsuariosConvertidoTab.slice(0, 3).map((u, i) => (
                         <div
                           key={u.usuario}
                           role="button"
                           tabIndex={0}
-                          onClick={() => openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
+                          onClick={() =>
+                            openDrill(
+                              `Usuário: ${u.usuario} · ${rankingWindowDays} dias`,
+                              rankingRowsInWindow.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario)
+                            )
+                          }
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            openDrill(
+                              `Usuário: ${u.usuario} · ${rankingWindowDays} dias`,
+                              rankingRowsInWindow.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario)
+                            );
                           }}
                           className={[
                             'rounded-lg border p-3 flex items-center justify-between gap-3 cursor-pointer hover:opacity-95',
@@ -2781,50 +3061,94 @@ export function BICotacoes() {
               <Card className="dark:bg-slate-900 dark:border-slate-700 lg:col-span-3">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-slate-900 dark:text-slate-100 font-semibold">Ranking por Frete Convertido (usuário)</div>
-                    <Badge variant="outline">Top {formatNumber(rankingUsuariosConvertido.length)}</Badge>
+                    <div className="text-slate-900 dark:text-slate-100 font-semibold">Ranking por Frete Convertido (usuário) · {rankingWindowDays} dias</div>
+                    <Badge variant="outline">Top {formatNumber(rankingUsuariosConvertidoTab.length)}</Badge>
                   </div>
                   <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
                     <table className="min-w-[980px] w-full text-sm">
                       <thead className="bg-slate-50 dark:bg-slate-900/50">
                         <tr className="text-left">
-                          <th className="py-2 px-3">Usuário</th>
-                          <th className="py-2 px-3 text-right">Cotações</th>
-                          <th className="py-2 px-3 text-right">CTRC</th>
-                          <th className="py-2 px-3 text-right">Conversão</th>
-                          <th className="py-2 px-3 text-right">Potencial</th>
-                          <th className="py-2 px-3 text-right">Convertido</th>
+                          <th className="py-2 px-3">Pos.</th>
+                          <th className="py-2 px-3">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('usuario')}>
+                              Usuário{rankingConvertidoSort.key === 'usuario' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('cotacoes')}>
+                              Cotações{rankingConvertidoSort.key === 'cotacoes' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('ctrc_emi')}>
+                              CTRC{rankingConvertidoSort.key === 'ctrc_emi' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('conversao')}>
+                              Conversão{rankingConvertidoSort.key === 'conversao' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('potencial')}>
+                              Potencial{rankingConvertidoSort.key === 'potencial' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleRankingConvertidoSort('convertido')}>
+                              Convertido{rankingConvertidoSort.key === 'convertido' ? (rankingConvertidoSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {rankingUsuariosConvertido.length === 0 ? (
+                        {rankingUsuariosConvertidoTab.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="py-10 text-center text-slate-500">
+                            <td colSpan={7} className="py-10 text-center text-slate-500">
                               {data ? 'Sem dados.' : 'Gere para visualizar.'}
                             </td>
                           </tr>
                         ) : (
-                          rankingUsuariosConvertido.map((u) => (
+                          rankingUsuariosConvertidoSorted.map((u) => (
                             <tr
                               key={u.usuario}
                               role="button"
                               tabIndex={0}
-                              onClick={() => openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
+                              onClick={() => openDrill(`Usuário: ${u.usuario} · ${rankingWindowDays} dias`, rankingRowsInWindow.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario))}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') openDrill(`Usuário: ${u.usuario}`, rowsFiltered.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
+                                if (e.key === 'Enter' || e.key === ' ')
+                                  openDrill(`Usuário: ${u.usuario} · ${rankingWindowDays} dias`, rankingRowsInWindow.filter((r) => String(r.usuario_inclusao || '').trim().toLowerCase() === u.usuario));
                               }}
                               className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
                             >
+                              <td className="py-2 px-3 font-mono">{(rankingPositionByUser.get(u.usuario) || 0) > 0 ? `${rankingPositionByUser.get(u.usuario)}º` : '-'}</td>
                               <td className="py-2 px-3 font-mono">{u.usuario}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.cotacoes)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatNumber(u.ctrc_emi)}</td>
-                              <td className="py-2 px-3 text-right font-mono">{formatPercent(u.conversao)}</td>
+                              <td className="py-2 px-3 text-right">
+                                <ConversaoBar value={u.conversao} />
+                              </td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.potencial)}</td>
                               <td className="py-2 px-3 text-right font-mono">{formatCurrency(u.convertido)}</td>
                             </tr>
                           ))
                         )}
                       </tbody>
+                      {rankingUsuariosConvertidoTab.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 px-3" />
+                            <td className="py-2 px-3">TOTAL ({formatNumber(rankingUsuariosConvertidoTab.length)} usuários)</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(rankingConvertidoTotalsRow.cotacoes)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(rankingConvertidoTotalsRow.ctrc_emi)}</td>
+                            <td className="py-2 px-3 text-right">
+                              <ConversaoBar value={rankingConvertidoTotalsRow.conversao} />
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(rankingConvertidoTotalsRow.potencial)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(rankingConvertidoTotalsRow.convertido)}</td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </CardContent>
@@ -3001,19 +3325,61 @@ export function BICotacoes() {
 
           <div className="mt-3 flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
             <div className="sticky top-0 z-20 grid gap-x-2 grid-cols-[110px_140px_110px_minmax(0,3fr)_minmax(0,2fr)_minmax(0,2fr)_120px] bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300 backdrop-blur">
-              <div className="font-mono">Cotação</div>
-              <div>Inclusão</div>
-              <div>Situação</div>
-              <div>Cliente</div>
-              <div>Origem</div>
-              <div>Destino</div>
-              <div className="text-right">Valor</div>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'cotacao' ? { key: 'cotacao', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'cotacao', dir: 'asc' }))}
+                className="font-mono text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Cotação{drillSort.key === 'cotacao' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'inclusao' ? { key: 'inclusao', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'inclusao', dir: 'desc' }))}
+                className="text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Inclusão{drillSort.key === 'inclusao' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'situacao' ? { key: 'situacao', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'situacao', dir: 'asc' }))}
+                className="text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Situação{drillSort.key === 'situacao' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'cliente' ? { key: 'cliente', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'cliente', dir: 'asc' }))}
+                className="text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Cliente{drillSort.key === 'cliente' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'origem' ? { key: 'origem', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'origem', dir: 'asc' }))}
+                className="text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Origem{drillSort.key === 'origem' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'destino' ? { key: 'destino', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'destino', dir: 'asc' }))}
+                className="text-left hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Destino{drillSort.key === 'destino' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrillSort((p) => (p.key === 'valor' ? { key: 'valor', dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key: 'valor', dir: 'desc' }))}
+                className="text-right hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Valor{drillSort.key === 'valor' ? (drillSort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+              </button>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {drillRowsFiltradas.length === 0 ? (
+              {drillRowsOrdenadas.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Nenhum registro encontrado.</div>
               ) : (
-                drillRowsFiltradas.map((r, idx) => {
+                drillRowsOrdenadas.map((r, idx) => {
                   const incl = `${shortDateLabel(r.data_inclusao)} ${String(r.usuario_inclusao || '').trim().toLowerCase()}`.trim();
                   const cliente = r.nome_pagador || r.cnpj_pagador || '-';
                   return (
