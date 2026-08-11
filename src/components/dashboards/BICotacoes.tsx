@@ -231,6 +231,7 @@ export function BICotacoes() {
   const [search, setSearch] = useState('');
   const [dailyMode, setDailyMode] = useState<'todas' | 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [usersDailyMode, setUsersDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
+  const [clientsDailyMode, setClientsDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [origemDestinoMode, setOrigemDestinoMode] = useState<'origem' | 'destino'>('origem');
   const tooltipStyle = useTooltipStyle();
 
@@ -238,6 +239,16 @@ export function BICotacoes() {
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<CotacaoRow[]>([]);
   const [drillSearch, setDrillSearch] = useState('');
+
+  const [usersSort, setUsersSort] = useState<{ key: 'usuario' | 'cotacoes' | 'contratadas' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido'; dir: 'asc' | 'desc' }>({
+    key: 'ctrc_emi',
+    dir: 'desc',
+  });
+  const [clientsSort, setClientsSort] = useState<{ key: 'cliente' | 'cotacoes' | 'contratadas' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido'; dir: 'asc' | 'desc' }>({
+    key: 'ctrc_emi',
+    dir: 'desc',
+  });
+  const [clientsPage, setClientsPage] = useState(1);
 
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
@@ -447,6 +458,36 @@ export function BICotacoes() {
     [rowsFiltered, topUsuarios5]
   );
 
+  const rowsForClientsDailyIso = useCallback(
+    (iso: string, mode: 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi') => {
+      const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+      const clientSet = new Set(topClientes5.map((c) => c.key).filter(Boolean));
+      const out: CotacaoRow[] = [];
+      for (const r of rowsFiltered) {
+        const cnpj = String(r.cnpj_pagador || '').trim();
+        const nome = String(r.nome_pagador || '').trim();
+        const ck = String((cnpj || nome).trim()).toLowerCase();
+        if (!clientSet.has(ck)) continue;
+        if (mode === 'ctrc_emi') {
+          if (r.status_kind !== 'CTRC_EMI') continue;
+          const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+          if (d === iso) out.push(r);
+          continue;
+        }
+        const di = datePart(r.data_inclusao);
+        if (di !== iso) continue;
+        if (mode === 'cotacoes') out.push(r);
+        else if (mode === 'simuladas') {
+          if (r.status_kind === 'COTADO') out.push(r);
+        } else if (mode === 'contratadas') {
+          if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') out.push(r);
+        }
+      }
+      return out;
+    },
+    [rowsFiltered, topClientes5]
+  );
+
   const rowsForMonthYm = useCallback(
     (ym: string) => {
       const key = String(ym || '').trim();
@@ -593,6 +634,23 @@ export function BICotacoes() {
     return out.slice(0, 5).map((x) => x.display);
   }, [rowsFiltered]);
 
+  const topClientes5 = useMemo(() => {
+    const map = new Map<string, { key: string; display: string; cotacoes: number }>();
+    for (const r of rowsFiltered) {
+      const cnpj = String(r.cnpj_pagador || '').trim();
+      const nome = String(r.nome_pagador || '').trim();
+      const raw = (cnpj || nome).trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      const display = nome || cnpj || raw;
+      if (!map.has(key)) map.set(key, { key, display, cotacoes: 0 });
+      map.get(key)!.cotacoes += 1;
+    }
+    const out = Array.from(map.values());
+    out.sort((a, b) => b.cotacoes - a.cotacoes || a.display.localeCompare(b.display));
+    return out.slice(0, 5);
+  }, [rowsFiltered]);
+
   const usersDailySeries = useMemo(() => {
     const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
     const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -633,6 +691,49 @@ export function BICotacoes() {
       return { iso, label, ...(byDay.get(iso) || {}) };
     });
   }, [periodDays, rowsFiltered, topUsuarios5, usersDailyMode]);
+
+  const clientsDailySeries = useMemo(() => {
+    const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const idxByClient = new Map<string, number>();
+    topClientes5.forEach((c, i) => idxByClient.set(c.key, i));
+    const byDay = new Map<string, Record<string, number>>();
+    for (const d of periodDays) {
+      const rec: Record<string, number> = {};
+      for (let i = 0; i < topClientes5.length; i++) rec[`c${i}`] = 0;
+      byDay.set(d, rec);
+    }
+    for (const r of rowsFiltered) {
+      const cnpj = String(r.cnpj_pagador || '').trim();
+      const nome = String(r.nome_pagador || '').trim();
+      const key = String((cnpj || nome).trim()).toLowerCase();
+      const idx = idxByClient.get(key);
+      if (idx === undefined) continue;
+
+      if (clientsDailyMode === 'ctrc_emi') {
+        if (r.status_kind !== 'CTRC_EMI') continue;
+        const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+        if (!byDay.has(d)) continue;
+        byDay.get(d)![`c${idx}`] += 1;
+        continue;
+      }
+
+      const di = datePart(r.data_inclusao);
+      if (!byDay.has(di)) continue;
+      if (clientsDailyMode === 'cotacoes') {
+        byDay.get(di)![`c${idx}`] += 1;
+      } else if (clientsDailyMode === 'simuladas') {
+        if (r.status_kind === 'COTADO') byDay.get(di)![`c${idx}`] += 1;
+      } else if (clientsDailyMode === 'contratadas') {
+        if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') byDay.get(di)![`c${idx}`] += 1;
+      }
+    }
+    return periodDays.map((iso) => {
+      const dt = new Date(`${iso}T12:00:00`);
+      const label = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
+      return { iso, label, ...(byDay.get(iso) || {}) };
+    });
+  }, [clientsDailyMode, periodDays, rowsFiltered, topClientes5]);
 
   const monthlyConvertedSeries = useMemo(() => {
     const toYm = (s: string) => (s && s.length >= 7 ? s.slice(0, 7) : '');
@@ -723,7 +824,7 @@ export function BICotacoes() {
     }
     const out = Array.from(map.values()).map((x) => ({ ...x, conversao: x.cotacoes > 0 ? x.ctrc_emi / x.cotacoes : 0 }));
     out.sort((a, b) => b.ctrc_emi - a.ctrc_emi || b.cotacoes - a.cotacoes || a.usuario.localeCompare(b.usuario));
-    return out.slice(0, 25);
+    return out;
   }, [rowsFiltered]);
 
   const rankingUsuariosConvertido = useMemo(() => {
@@ -765,8 +866,79 @@ export function BICotacoes() {
     }
     const out = Array.from(map.values()).map((x) => ({ ...x, conversao: x.cotacoes > 0 ? x.ctrc_emi / x.cotacoes : 0 }));
     out.sort((a, b) => b.ctrc_emi - a.ctrc_emi || b.potencial - a.potencial || (a.nome || a.cnpj).localeCompare(b.nome || b.cnpj));
-    return out.slice(0, 25);
+    return out;
   }, [rowsFiltered]);
+
+  const toggleUsersSort = useCallback((key: typeof usersSort.key) => {
+    setUsersSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+  }, []);
+
+  const toggleClientsSort = useCallback((key: typeof clientsSort.key) => {
+    setClientsSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+  }, []);
+
+  const rankingUsuariosSorted = useMemo(() => {
+    const rows = [...rankingUsuarios];
+    rows.sort((a, b) => {
+      if (usersSort.key === 'usuario') return usersSort.dir === 'asc' ? a.usuario.localeCompare(b.usuario) : b.usuario.localeCompare(a.usuario);
+      const av = toNumber(a[usersSort.key]);
+      const bv = toNumber(b[usersSort.key]);
+      return usersSort.dir === 'asc' ? av - bv : bv - av;
+    });
+    return rows;
+  }, [rankingUsuarios, usersSort.dir, usersSort.key]);
+
+  const rankingClientesSorted = useMemo(() => {
+    const rows = [...rankingClientes];
+    rows.sort((a, b) => {
+      if (clientsSort.key === 'cliente')
+        return clientsSort.dir === 'asc' ? (a.nome || a.cnpj).localeCompare(b.nome || b.cnpj) : (b.nome || b.cnpj).localeCompare(a.nome || a.cnpj);
+      const av = toNumber(a[clientsSort.key]);
+      const bv = toNumber(b[clientsSort.key]);
+      return clientsSort.dir === 'asc' ? av - bv : bv - av;
+    });
+    return rows;
+  }, [clientsSort.dir, clientsSort.key, rankingClientes]);
+
+  const usersTotalsRow = useMemo(() => {
+    let cotacoes = 0;
+    let contratadas = 0;
+    let ctrc_emi = 0;
+    let potencial = 0;
+    let convertido = 0;
+    for (const u of rankingUsuariosSorted) {
+      cotacoes += toNumber(u.cotacoes);
+      contratadas += toNumber(u.contratadas);
+      ctrc_emi += toNumber(u.ctrc_emi);
+      potencial += toNumber(u.potencial);
+      convertido += toNumber(u.convertido);
+    }
+    return { cotacoes, contratadas, ctrc_emi, conversao: cotacoes > 0 ? ctrc_emi / cotacoes : 0, potencial, convertido };
+  }, [rankingUsuariosSorted]);
+
+  const clientsTotalsRow = useMemo(() => {
+    let cotacoes = 0;
+    let contratadas = 0;
+    let ctrc_emi = 0;
+    let potencial = 0;
+    let convertido = 0;
+    for (const c of rankingClientesSorted) {
+      cotacoes += toNumber(c.cotacoes);
+      contratadas += toNumber(c.contratadas);
+      ctrc_emi += toNumber(c.ctrc_emi);
+      potencial += toNumber(c.potencial);
+      convertido += toNumber(c.convertido);
+    }
+    return { cotacoes, contratadas, ctrc_emi, conversao: cotacoes > 0 ? ctrc_emi / cotacoes : 0, potencial, convertido };
+  }, [rankingClientesSorted]);
+
+  const clientsPageSize = 40;
+  const clientsTotalPages = Math.max(1, Math.ceil(rankingClientesSorted.length / clientsPageSize));
+  const clientsPageSafe = Math.min(Math.max(1, clientsPage), clientsTotalPages);
+  const rankingClientesPage = useMemo(() => {
+    const start = (clientsPageSafe - 1) * clientsPageSize;
+    return rankingClientesSorted.slice(start, start + clientsPageSize);
+  }, [clientsPageSafe, rankingClientesSorted]);
 
   const exportCsv = () => {
     if (!data) {
@@ -1898,24 +2070,52 @@ export function BICotacoes() {
                     <table className="min-w-[980px] w-full text-sm">
                       <thead className="bg-slate-50 dark:bg-slate-900/50">
                         <tr className="text-left">
-                          <th className="py-2 px-3">Usuário</th>
-                          <th className="py-2 px-3 text-right">Cotações</th>
-                          <th className="py-2 px-3 text-right">Contratadas</th>
-                          <th className="py-2 px-3 text-right">CTRC</th>
-                          <th className="py-2 px-3 text-right">Conversão</th>
-                          <th className="py-2 px-3 text-right">Potencial</th>
-                          <th className="py-2 px-3 text-right">Convertido</th>
+                          <th className="py-2 px-3">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('usuario')}>
+                              Usuário{usersSort.key === 'usuario' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('cotacoes')}>
+                              Cotações{usersSort.key === 'cotacoes' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('contratadas')}>
+                              Contratadas{usersSort.key === 'contratadas' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('ctrc_emi')}>
+                              CTRC{usersSort.key === 'ctrc_emi' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('conversao')}>
+                              Conversão{usersSort.key === 'conversao' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('potencial')}>
+                              Potencial{usersSort.key === 'potencial' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleUsersSort('convertido')}>
+                              Convertido{usersSort.key === 'convertido' ? (usersSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {rankingUsuarios.length === 0 ? (
+                        {rankingUsuariosSorted.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="py-10 text-center text-slate-500">
                               {data ? 'Sem usuários para os filtros atuais.' : 'Gere para visualizar.'}
                             </td>
                           </tr>
                         ) : (
-                          rankingUsuarios.map((u) => (
+                          rankingUsuariosSorted.map((u) => (
                             <tr
                               key={u.usuario}
                               role="button"
@@ -1937,6 +2137,19 @@ export function BICotacoes() {
                           ))
                         )}
                       </tbody>
+                      {rankingUsuariosSorted.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 px-3">TOTAL ({formatNumber(rankingUsuariosSorted.length)} usuários)</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.cotacoes)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.contratadas)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(usersTotalsRow.ctrc_emi)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatPercent(usersTotalsRow.conversao)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(usersTotalsRow.potencial)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(usersTotalsRow.convertido)}</td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 </CardContent>
@@ -1945,82 +2158,307 @@ export function BICotacoes() {
           </TabsContent>
 
           <TabsContent value="clientes" className="mt-0">
-            <Card className="dark:bg-slate-900 dark:border-slate-700">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
-                    <Building2 className="w-4 h-4 text-emerald-500" />
-                    Performance por Cliente (Pagador)
+            <div className="space-y-4">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const clientSet = new Set(topClientes5.map((c) => c.key).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => {
+                    const cnpj = String(r.cnpj_pagador || '').trim();
+                    const nome = String(r.nome_pagador || '').trim();
+                    const ck = String((cnpj || nome).trim()).toLowerCase();
+                    return clientSet.has(ck);
+                  });
+                  const rs =
+                    clientsDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : clientsDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : clientsDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Clientes · Série diária · ${clientsDailyMode === 'cotacoes' ? 'Cotações' : clientsDailyMode === 'simuladas' ? 'Simuladas' : clientsDailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'} (Top ${formatNumber(topClientes5.length)})`,
+                    rs
+                  );
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  const clientSet = new Set(topClientes5.map((c) => c.key).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => {
+                    const cnpj = String(r.cnpj_pagador || '').trim();
+                    const nome = String(r.nome_pagador || '').trim();
+                    const ck = String((cnpj || nome).trim()).toLowerCase();
+                    return clientSet.has(ck);
+                  });
+                  const rs =
+                    clientsDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : clientsDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : clientsDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Clientes · Série diária · ${clientsDailyMode === 'cotacoes' ? 'Cotações' : clientsDailyMode === 'simuladas' ? 'Simuladas' : clientsDailyMode === 'contratadas' ? 'Contratadas' : 'CTRC emit.'} (Top ${formatNumber(topClientes5.length)})`,
+                    rs
+                  );
+                }}
+                className="dark:bg-slate-900 dark:border-slate-700 cursor-pointer hover:opacity-95"
+              >
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <Building2 className="w-4 h-4 text-emerald-500" />
+                      Volume diário por cliente
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant={clientsDailyMode === 'cotacoes' ? 'default' : 'outline'}
+                        className={
+                          clientsDailyMode === 'cotacoes'
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                            : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setClientsDailyMode('cotacoes'); }}
+                      >
+                        Cotações
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={clientsDailyMode === 'simuladas' ? 'default' : 'outline'}
+                        className={
+                          clientsDailyMode === 'simuladas'
+                            ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setClientsDailyMode('simuladas'); }}
+                      >
+                        Simuladas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={clientsDailyMode === 'contratadas' ? 'default' : 'outline'}
+                        className={
+                          clientsDailyMode === 'contratadas'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                            : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setClientsDailyMode('contratadas'); }}
+                      >
+                        Contratadas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={clientsDailyMode === 'ctrc_emi' ? 'default' : 'outline'}
+                        className={
+                          clientsDailyMode === 'ctrc_emi'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                            : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setClientsDailyMode('ctrc_emi'); }}
+                      >
+                        CTRC emit.
+                      </Button>
+                    </div>
                   </div>
-                  <Badge variant="outline">{formatNumber(rankingClientes.length)} clientes</Badge>
-                </div>
-                <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                  <table className="min-w-[1040px] w-full text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-900/50">
-                      <tr className="text-left">
-                        <th className="py-2 px-3">Cliente</th>
-                        <th className="py-2 px-3 text-right">Cotações</th>
-                        <th className="py-2 px-3 text-right">Contratadas</th>
-                        <th className="py-2 px-3 text-right">CTRC</th>
-                        <th className="py-2 px-3 text-right">Conversão</th>
-                        <th className="py-2 px-3 text-right">Potencial</th>
-                        <th className="py-2 px-3 text-right">Convertido</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankingClientes.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-10 text-center text-slate-500">
-                            {data ? 'Sem clientes para os filtros atuais.' : 'Gere para visualizar.'}
-                          </td>
+
+                  <div className="h-[280px]">
+                    {!data ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Gere para visualizar.</div>
+                    ) : topClientes5.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem clientes.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={clientsDailySeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                          <XAxis dataKey="label" interval="preserveStartEnd" />
+                          <YAxis allowDecimals={false} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatNumber(Number(v)), String(name)]} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          {topClientes5.map((c, idx) => (
+                            <Line
+                              key={c.key}
+                              type="monotone"
+                              dataKey={`c${idx}`}
+                              name={c.display}
+                              stroke={USER_LINE_COLORS[idx % USER_LINE_COLORS.length]}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 5 }}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const iso = d?.payload?.iso;
+                                if (!iso) return;
+                                openDrill(
+                                  `Clientes · Série diária · ${
+                                    clientsDailyMode === 'cotacoes'
+                                      ? 'Cotações'
+                                      : clientsDailyMode === 'simuladas'
+                                        ? 'Simuladas'
+                                        : clientsDailyMode === 'contratadas'
+                                          ? 'Contratadas'
+                                          : 'CTRC emit.'
+                                  } · ${String(iso)}`,
+                                  rowsForClientsDailyIso(String(iso), clientsDailyMode)
+                                );
+                              }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    Top {formatNumber(topClientes5.length)} clientes · Série diária do período selecionado
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <Building2 className="w-4 h-4 text-emerald-500" />
+                      Performance por Cliente (Pagador)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{formatNumber(rankingClientesSorted.length)} clientes</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setClientsPage((p) => Math.max(1, p - 1))}
+                        disabled={clientsPageSafe <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Badge variant="outline">
+                        {formatNumber(clientsPageSafe)} / {formatNumber(clientsTotalPages)}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setClientsPage((p) => Math.min(clientsTotalPages, p + 1))}
+                        disabled={clientsPageSafe >= clientsTotalPages}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    <table className="min-w-[1040px] w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-900/50">
+                        <tr className="text-left">
+                          <th className="py-2 px-3">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('cliente')}>
+                              Cliente{clientsSort.key === 'cliente' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('cotacoes')}>
+                              Cotações{clientsSort.key === 'cotacoes' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('contratadas')}>
+                              Contratadas{clientsSort.key === 'contratadas' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('ctrc_emi')}>
+                              CTRC{clientsSort.key === 'ctrc_emi' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('conversao')}>
+                              Conversão{clientsSort.key === 'conversao' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('potencial')}>
+                              Potencial{clientsSort.key === 'potencial' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleClientsSort('convertido')}>
+                              Convertido{clientsSort.key === 'convertido' ? (clientsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
                         </tr>
-                      ) : (
-                        rankingClientes.map((c) => (
-                          <tr
-                            key={c.cnpj || c.nome}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
-                              const rs = rowsFiltered.filter((r) => {
-                                if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
-                                if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
-                                return false;
-                              });
-                              openDrill(title, rs);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key !== 'Enter' && e.key !== ' ') return;
-                              const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
-                              const rs = rowsFiltered.filter((r) => {
-                                if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
-                                if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
-                                return false;
-                              });
-                              openDrill(title, rs);
-                            }}
-                            className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
-                          >
-                            <td className="py-2 px-3">
-                              <div className="min-w-0">
-                                <div className="truncate">{c.nome || c.cnpj || '-'}</div>
-                                <div className="text-xs text-slate-500 font-mono">{c.cnpj || '-'}</div>
-                              </div>
+                      </thead>
+                      <tbody>
+                        {rankingClientesSorted.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center text-slate-500">
+                              {data ? 'Sem clientes para os filtros atuais.' : 'Gere para visualizar.'}
                             </td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(c.cotacoes)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(c.contratadas)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatNumber(c.ctrc_emi)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatPercent(c.conversao)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.potencial)}</td>
-                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.convertido)}</td>
                           </tr>
-                        ))
+                        ) : (
+                          rankingClientesPage.map((c) => (
+                            <tr
+                              key={c.cnpj || c.nome}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
+                                const rs = rowsFiltered.filter((r) => {
+                                  if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
+                                  if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
+                                  return false;
+                                });
+                                openDrill(title, rs);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key !== 'Enter' && e.key !== ' ') return;
+                                const title = c.nome ? `Cliente: ${c.nome}` : `Cliente: ${c.cnpj || '-'}`;
+                                const rs = rowsFiltered.filter((r) => {
+                                  if (c.cnpj) return String(r.cnpj_pagador || '').trim() === String(c.cnpj).trim();
+                                  if (c.nome) return String(r.nome_pagador || '').trim() === String(c.nome).trim();
+                                  return false;
+                                });
+                                openDrill(title, rs);
+                              }}
+                              className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                            >
+                              <td className="py-2 px-3">
+                                <div className="min-w-0">
+                                  <div className="truncate">{c.nome || c.cnpj || '-'}</div>
+                                  <div className="text-xs text-slate-500 font-mono">{c.cnpj || '-'}</div>
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(c.cotacoes)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(c.contratadas)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(c.ctrc_emi)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatPercent(c.conversao)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.potencial)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(c.convertido)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {rankingClientesSorted.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 px-3">TOTAL ({formatNumber(rankingClientesSorted.length)} clientes)</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.cotacoes)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.contratadas)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(clientsTotalsRow.ctrc_emi)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatPercent(clientsTotalsRow.conversao)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.potencial)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.convertido)}</td>
+                          </tr>
+                        </tfoot>
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="origem-destino" className="mt-0">
