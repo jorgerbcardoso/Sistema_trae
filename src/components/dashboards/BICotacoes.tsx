@@ -360,6 +360,80 @@ export function BICotacoes() {
     return fmtIso(d);
   }, []);
 
+  const cotacoesApiUrl = `${ENVIRONMENT.apiBaseUrl}/dashboards/bi-cotacoes/get_cotacoes.php`;
+
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const runGetCotacoes = async (
+    basePayload: any,
+    isAborted: () => boolean,
+    onStatus?: (s: string) => void
+  ): Promise<any> => {
+    const start = (await apiFetch(
+      cotacoesApiUrl,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...basePayload, step: 'START' }),
+        cache: 'no-store',
+      } as any
+    )) as any;
+
+    if (isAborted()) return null;
+    if (!start?.success) return start;
+
+    if (start.status === 'ready' && (start.result === 'data' || start.result === 'empty')) return start;
+
+    if (start.status !== 'started') return start;
+
+    const baselineSeq = Number(start.baseline_seq) || 0;
+    const requestStartTs = Number(start.request_start_ts) || 0;
+    if (!baselineSeq || !requestStartTs) return { success: false, message: 'Resposta inválida ao iniciar processamento.' };
+
+    const deadline = Date.now() + 90000;
+    if (onStatus) onStatus('Processando relatório...');
+
+    while (Date.now() < deadline) {
+      if (isAborted()) return null;
+      const poll = (await apiFetch(
+        cotacoesApiUrl,
+        {
+          method: 'POST',
+          body: JSON.stringify({ ...basePayload, step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }),
+          cache: 'no-store',
+        } as any
+      )) as any;
+
+      if (isAborted()) return null;
+      if (!poll?.success) return poll;
+
+      if (poll.status === 'pending') {
+        await sleep(1000);
+        continue;
+      }
+
+      if (poll.status === 'ready' && poll.result === 'empty') return poll;
+
+      if (poll.status === 'ready' && poll.result === 'links') {
+        const acts = Array.isArray(poll.acts) ? poll.acts : [];
+        if (acts.length === 0) return { success: false, message: 'Relatório concluído, mas sem links de download.' };
+        if (onStatus) onStatus('Baixando relatório...');
+        const dl = (await apiFetch(
+          cotacoesApiUrl,
+          {
+            method: 'POST',
+            body: JSON.stringify({ ...basePayload, step: 'DOWNLOAD', act: String(acts[0]) }),
+            cache: 'no-store',
+          } as any
+        )) as any;
+        return dl;
+      }
+
+      return { success: false, message: 'Resposta inesperada ao processar relatório.' };
+    }
+
+    return { success: false, message: 'Timeout ao aguardar o relatório.' };
+  };
+
   const fetchRankingBase = useCallback(
     async (baseFilters: Filters) => {
       const endIso = String(baseFilters.periodoFim || '').slice(0, 10);
@@ -396,12 +470,7 @@ export function BICotacoes() {
           include_comparisons: false,
           _nonce: Date.now(),
         };
-        const resp = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/bi-cotacoes/get_cotacoes.php`, {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          cache: 'no-store',
-        } as any);
-        const json = resp as any;
+        const json = await runGetCotacoes(payload, () => rankingBaseRunRef.current !== runId);
         if (rankingBaseRunRef.current !== runId) return;
         if (!json?.success) {
           setRankingBaseRows([]);
@@ -439,13 +508,7 @@ export function BICotacoes() {
         include_comparisons: true,
         _nonce: Date.now(),
       };
-      const resp = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/bi-cotacoes/get_cotacoes.php`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-      } as any);
-
-      const json = resp as any;
+      const json = await runGetCotacoes(payload, () => runRef.current !== runId, setStatus);
       if (!json?.success) {
         toast.error(json?.message || 'Falha ao buscar cotações.');
         setData(null);
