@@ -321,7 +321,7 @@ export function BICotacoes() {
     key: 'usuario' | 'cotacoes' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido';
     dir: 'asc' | 'desc';
   }>({ key: 'convertido', dir: 'desc' });
-  const [rankingWindowDays, setRankingWindowDays] = useState<15 | 30 | 90 | 180>(90);
+  const [rankingWindowDays, setRankingWindowDays] = useState<15 | 30 | 90>(90);
   const [rankingBaseLoading, setRankingBaseLoading] = useState(false);
   const [rankingBaseRows, setRankingBaseRows] = useState<CotacaoRow[] | null>(null);
   const rankingBaseRunRef = useRef(0);
@@ -361,12 +361,12 @@ export function BICotacoes() {
     async (baseFilters: Filters) => {
       const endIso = String(baseFilters.periodoFim || '').slice(0, 10);
       if (!endIso) return;
-      const start180 = addDaysIso(endIso, -179);
-      if (!start180) return;
+      const start90 = addDaysIso(endIso, -89);
+      if (!start90) return;
 
       const key = [
         endIso,
-        start180,
+        start90,
         baseFilters.f7,
         baseFilters.f8,
         baseFilters.f11,
@@ -382,7 +382,7 @@ export function BICotacoes() {
       setRankingBaseLoading(true);
       try {
         const payload: any = {
-          periodo_ini: start180,
+          periodo_ini: start90,
           periodo_fim: endIso,
           f7: baseFilters.f7,
           f8: baseFilters.f8,
@@ -2901,7 +2901,7 @@ export function BICotacoes() {
           <TabsContent value="ranking" className="mt-0">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
-                <Badge variant="outline">Base: 180 dias</Badge>
+                <Badge variant="outline">Base: 90 dias</Badge>
                 {rankingBaseLoading && <Badge variant="outline">Atualizando base…</Badge>}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -2928,14 +2928,6 @@ export function BICotacoes() {
                   onClick={() => setRankingWindowDays(90)}
                 >
                   90 dias
-                </Button>
-                <Button
-                  size="sm"
-                  variant={rankingWindowDays === 180 ? 'default' : 'outline'}
-                  className={rankingWindowDays === 180 ? 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'dark:border-slate-700'}
-                  onClick={() => setRankingWindowDays(180)}
-                >
-                  180 dias
                 </Button>
               </div>
             </div>
