@@ -229,8 +229,13 @@ foreach ($linhas as $linha) {
         }
     }
 
-    $serCte = substr($ctrc, 0, 3);
-    $nroCte = (int)substr($ctrc, 3, 6);
+    $ctrcNorm = strtoupper(preg_replace('/\s+/', '', (string)$ctrc));
+    $serCte = '';
+    $nroCte = 0;
+    if (preg_match('/^([A-Z0-9]{3})(\d{6})/', $ctrcNorm, $mCte)) {
+        $serCte = (string)$mCte[1];
+        $nroCte = (int)$mCte[2];
+    }
 
     $ctes[] = [
         'ctrc'         => $ctrc,
