@@ -119,6 +119,7 @@ interface CteEntrega {
   ctrc: string;
   serCte: string;
   nroCte: number;
+  emissao: string;
   setor: string;
   nfiscal: string;
   pagador: string;
@@ -1176,6 +1177,7 @@ function GrupoSetorCard({
     const header = [
       'Setor',
       'CTRC',
+      'Emissão',
       'NF',
       'Situação',
       'Pagador',
@@ -1205,6 +1207,7 @@ function GrupoSetorCard({
       return [
         esc(grupo.setor),
         esc(c.ctrc),
+        esc(c.emissao || ''),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.pagador || ''),
@@ -4983,6 +4986,93 @@ export function Disponiveis() {
     downloadCsv('coletas_transferencia.csv', headerColetas, rowsColetas);
   };
 
+  const exportarEntregaCSVTodosSetores = () => {
+    const list = ctesEntregaFiltrados ? [...ctesEntregaFiltrados] : [];
+    if (!list.length) return;
+
+    list.sort((a, b) => {
+      const sa = String(a.setor || '');
+      const sb = String(b.setor || '');
+      const c = sa.localeCompare(sb);
+      if (c !== 0) return c;
+      const ta = a.emTransito ? 1 : 0;
+      const tb = b.emTransito ? 1 : 0;
+      if (ta !== tb) return ta - tb;
+      return String(a.ctrc || '').localeCompare(String(b.ctrc || ''));
+    });
+
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
+    const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+
+    const header = [
+      'Setor',
+      'CTRC',
+      'Emissão',
+      'NF',
+      'Situação',
+      'Pagador',
+      'Destinatário',
+      'CNPJ Dest.',
+      'Cidade',
+      'Bairro',
+      'CEP',
+      'Endereço',
+      'Prev. Ent.',
+      'Agendamento',
+      'Vlr. Merc.',
+      'Frete (R$)',
+      'Peso (kg)',
+      'Cubagem (m³)',
+      'Volumes',
+      'Últ. Ocorrência',
+      'Data Últ. Ocorrência',
+      'Prev. Chegada',
+      'Manifesto',
+      'Dias atraso',
+    ];
+
+    const rows = list.map((c) => {
+      const situacao = c.emTransito ? 'A CAMINHO' : 'NO ARMAZÉM';
+      const ultOcor = [c.codUltOcor, c.descUltOcor].filter(Boolean).join(' - ');
+      return [
+        esc(c.setor || ''),
+        esc(c.ctrc),
+        esc(c.emissao || ''),
+        esc(c.nfiscal || ''),
+        esc(situacao),
+        esc(c.pagador || ''),
+        esc(c.destinatario || ''),
+        esc(c.cnpjDest || ''),
+        esc(c.cidade || ''),
+        esc(c.bairro || ''),
+        esc(c.cep || ''),
+        esc(c.endereco || ''),
+        esc(c.prevEnt || ''),
+        esc(c.agendamento || ''),
+        fmtMoeda(parseMoeda(c.vlrMerc)),
+        fmtMoeda(parseMoeda(c.frete)),
+        fmtNum(parsePeso(c.peso), 2),
+        fmtNum(parseCubagem(c.cubagem), 3),
+        esc(c.qtdeVol || ''),
+        esc(ultOcor),
+        esc(c.dataUltOcor || ''),
+        esc(c.prevChegada || ''),
+        esc(c.manifesto || ''),
+        esc(c.diasAtraso ?? 0),
+      ];
+    });
+
+    const csv = [header.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ctes_entrega_todos_setores.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const minutos = Math.floor(countdown / 60);
   const segundos = countdown % 60;
 
@@ -5846,7 +5936,11 @@ export function Disponiveis() {
                     <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
                       <ChevronRight className="w-3 h-3" />clique em um setor para expandir
                     </span>
-                    <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={() => carregarEntrega()}>
+                    <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={exportarEntregaCSVTodosSetores}>
+                      <FileDown className="w-3.5 h-3.5 mr-1.5" />
+                      CSV (tudo)
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-xs" onClick={() => carregarEntrega()}>
                       <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Atualizar
                     </Button>
                     <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3 ml-1">

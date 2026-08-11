@@ -265,13 +265,11 @@ foreach ($linhas as $linha) {
     ];
 }
 
-$tblCte = "{$domain}_cte";
+$tblCte = strtolower($domain) . "_cte";
 $emissaoPorCte = [];
 $tblExists = false;
-$chk = pg_query($g_sql, "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{$tblCte}') AS ok");
-if ($chk) {
-    $tblExists = (pg_fetch_result($chk, 0, 0) === 't');
-}
+$chk = pg_query_params($g_sql, "SELECT to_regclass($1) IS NOT NULL AS ok", [$tblCte]);
+if ($chk) $tblExists = (pg_fetch_result($chk, 0, 0) === 't');
 
 if ($tblExists && !empty($ctes)) {
     $pares = [];
