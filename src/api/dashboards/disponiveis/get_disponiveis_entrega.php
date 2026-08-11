@@ -273,8 +273,21 @@ foreach ($linhas as $linha) {
 $tblCte = strtolower($domain) . "_cte";
 $emissaoPorCte = [];
 $tblExists = false;
-$chk = pg_query_params($g_sql, "SELECT to_regclass($1) IS NOT NULL AS ok", [$tblCte]);
-if ($chk) $tblExists = (pg_fetch_result($chk, 0, 0) === 't');
+$tblCteSql = '';
+$chk = pg_query_params(
+    $g_sql,
+    "SELECT table_schema
+     FROM information_schema.tables
+     WHERE table_name = $1
+     ORDER BY CASE WHEN table_schema = 'public' THEN 0 ELSE 1 END
+     LIMIT 1",
+    [$tblCte]
+);
+if ($chk && pg_num_rows($chk) > 0) {
+    $tblExists = true;
+    $schema = (string)pg_fetch_result($chk, 0, 0);
+    $tblCteSql = pg_escape_identifier($g_sql, $schema) . '.' . pg_escape_identifier($g_sql, $tblCte);
+}
 
 if ($tblExists && !empty($ctes)) {
     $pares = [];
@@ -303,13 +316,13 @@ if ($tblExists && !empty($ctes)) {
 
         $q = "
             WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $values) . ")
-            SELECT DISTINCT ON (c.ser_cte, c.nro_cte)
-                c.ser_cte,
+            SELECT DISTINCT ON (UPPER(BTRIM(c.ser_cte)), c.nro_cte)
+                UPPER(BTRIM(c.ser_cte)) AS ser_cte,
                 c.nro_cte,
-                TO_CHAR(c.data_emissao, 'DD/MM/YYYY') AS emissao
-            FROM {$tblCte} c
-            JOIN req r ON r.ser_cte = c.ser_cte AND r.nro_cte = c.nro_cte
-            ORDER BY c.ser_cte, c.nro_cte, c.seq_cte DESC
+                TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao
+            FROM {$tblCteSql} c
+            JOIN req r ON UPPER(BTRIM(r.ser_cte)) = UPPER(BTRIM(c.ser_cte)) AND r.nro_cte = c.nro_cte
+            ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST, c.seq_cte DESC
         ";
         $resEmi = pg_query_params($g_sql, $q, $params);
         if ($resEmi) {
