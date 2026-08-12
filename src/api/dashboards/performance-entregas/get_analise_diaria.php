@@ -170,16 +170,37 @@ $query = "
         AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
         AND $whereClause
         GROUP BY cte.data_prev_ent::date
+    ),
+    atrasadas AS (
+        SELECT 
+            cte.data_prev_ent::date as dia,
+            COUNT(*) as total
+        FROM {$domain}_cte cte
+        LEFT JOIN (
+            SELECT codigo::text as codigo, MAX(tipo) as tipo
+            FROM {$domain}_ocorrencia
+            GROUP BY codigo::text
+        ) oc ON oc.codigo = cte.ult_ocor::text
+        WHERE cte.data_prev_ent IS NOT NULL
+        AND (
+            (data_entrega IS NOT NULL AND data_entrega::date > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date)
+            OR
+            (data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date < CURRENT_DATE)
+        )
+        AND $whereClause
+        GROUP BY cte.data_prev_ent::date
     )
     SELECT
         dias.dia,
         COALESCE(entregas.total, 0) as entregas_dia,
         COALESCE(previstos.total, 0) as previstos_dia,
-        COALESCE(entregues.total, 0) as entregues_dia
+        COALESCE(entregues.total, 0) as entregues_dia,
+        COALESCE(atrasadas.total, 0) as atrasadas_dia
     FROM dias
     LEFT JOIN entregas ON entregas.dia = dias.dia
     LEFT JOIN previstos ON previstos.dia = dias.dia
     LEFT JOIN entregues ON entregues.dia = dias.dia
+    LEFT JOIN atrasadas ON atrasadas.dia = dias.dia
     ORDER BY dias.dia ASC
 ";
 
@@ -204,7 +225,8 @@ while ($row = pg_fetch_assoc($result)) {
         'data' => $row['dia'],
         'entregasDia' => (int)$row['entregas_dia'],
         'previstosDia' => (int)$row['previstos_dia'],
-        'entreguesDia' => (int)$row['entregues_dia']
+        'entreguesDia' => (int)$row['entregues_dia'],
+        'atrasadasDia' => (int)$row['atrasadas_dia']
     ];
 }
 
@@ -237,10 +259,12 @@ function getMockAnaliseDiaria($periodo) {
             $entregasDia = 0;
             $previstosDia = ($diaSemana == 0) ? 0 : rand(5, 35);
             $entreguesDia = 0;
+            $atrasadasDia = 0;
         } else {
             $entregasDia = ($diaSemana == 0) ? 0 : rand(15, 45); // Domingo = 0
             $previstosDia = ($diaSemana == 0) ? 0 : rand(10, 35);
             $entreguesDia = $previstosDia > 0 ? rand((int)($previstosDia * 0.7), $previstosDia) : 0;
+            $atrasadasDia = max(0, $previstosDia - $entreguesDia);
         }
 
         $diasData[] = [
@@ -251,7 +275,8 @@ function getMockAnaliseDiaria($periodo) {
             'data' => $dataCompleta,
             'entregasDia' => $entregasDia,
             'previstosDia' => $previstosDia,
-            'entreguesDia' => $entreguesDia
+            'entreguesDia' => $entreguesDia,
+            'atrasadasDia' => $atrasadasDia
         ];
     }
 

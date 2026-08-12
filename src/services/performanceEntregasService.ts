@@ -65,6 +65,7 @@ export interface DayData {
   entregasDia: number;
   previstosDia: number;
   entreguesDia: number;
+  atrasadasDia: number;
 }
 
 /**

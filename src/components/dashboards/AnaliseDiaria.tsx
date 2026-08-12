@@ -106,6 +106,13 @@ export function AnaliseDiaria({
                             Quantidade de conhecimentos, dentre os Previstos, que foram entregues dentro da previsão de entrega.
                           </p>
                         </div>
+
+                        <div>
+                          <span className="font-semibold text-red-600 dark:text-red-400">Atrasadas:</span>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            Quantidade de conhecimentos, dentre os Previstos, que estão em atraso (entregues após o prazo ou ainda pendentes).
+                          </p>
+                        </div>
                         
                         <div>
                           <span className="font-semibold text-slate-900 dark:text-slate-100">Performance:</span>
@@ -304,6 +311,16 @@ export function AnaliseDiaria({
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+
+                    {/* Atrasadas */}
+                    <div className="w-full text-left px-2 py-1 rounded">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600 dark:text-slate-400">Atrasadas:</span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">
+                          {dia.atrasadasDia}
+                        </span>
+                      </div>
+                    </div>
                     
                     {/* Indicador de Performance */}
                     {(performanceDia > 0 || temEntregasAntecipadas) && (
@@ -329,6 +346,17 @@ export function AnaliseDiaria({
                         </p>
                       </div>
                     </div>
+
+                    {dia.atrasadasDia > 0 && (
+                      <div className="px-2 py-1">
+                        <div className="text-center">
+                          <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atrasadas</p>
+                          <p className="font-semibold text-red-600 dark:text-red-400">
+                            {dia.atrasadasDia}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     
                     {performanceDia > 0 && (
                       <div className="pt-1 border-t border-slate-200 dark:border-slate-700">

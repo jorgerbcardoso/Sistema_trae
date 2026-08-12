@@ -3309,6 +3309,7 @@ export const mockGetAnaliseDiaria = async (periodo: 15 | 30 | 45) => {
     let entregasDia = 0;
     let previstosDia = 0;
     let entreguesDia = 0;
+    let atrasadasDia = 0;
     
     const data0 = new Date(data);
     data0.setHours(0, 0, 0, 0);
@@ -3318,16 +3319,19 @@ export const mockGetAnaliseDiaria = async (periodo: 15 | 30 | 45) => {
       entregasDia = 0;
       previstosDia = (isDomingo) ? 0 : Math.floor(Math.random() * 30) + 5; // 5-35
       entreguesDia = 0;
+      atrasadasDia = 0;
     } else if (isDomingo) {
       // Domingo: sem entregas
       entregasDia = 0;
       previstosDia = 0;
       entreguesDia = 0;
+      atrasadasDia = 0;
     } else if (isSabado) {
       // Sábado: reduzido
       entregasDia = Math.floor(Math.random() * 15) + 5; // 5-20
       previstosDia = Math.floor(Math.random() * 12) + 3; // 3-15
       entreguesDia = Math.floor(previstosDia * (Math.random() * 0.3 + 0.7)); // 70-100% dos previstos
+      atrasadasDia = Math.max(0, previstosDia - entreguesDia);
     } else {
       // Dias úteis: movimento normal
       entregasDia = Math.floor(Math.random() * 40) + 20; // 20-60
@@ -3336,6 +3340,7 @@ export const mockGetAnaliseDiaria = async (periodo: 15 | 30 | 45) => {
       // Performance varia: 60-100%
       const performanceAleatoria = Math.random() * 0.4 + 0.6; // 0.6 a 1.0
       entreguesDia = Math.min(Math.floor(previstosDia * performanceAleatoria), previstosDia);
+      atrasadasDia = Math.max(0, previstosDia - entreguesDia);
     }
     
     diasData.push({
@@ -3346,7 +3351,8 @@ export const mockGetAnaliseDiaria = async (periodo: 15 | 30 | 45) => {
       data: `${ano}-${mes}-${dia}`,
       entregasDia: entregasDia,
       previstosDia: previstosDia,
-      entreguesDia: entreguesDia
+      entreguesDia: entreguesDia,
+      atrasadasDia: atrasadasDia
     });
   }
   
