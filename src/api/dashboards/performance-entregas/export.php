@@ -186,6 +186,18 @@ if ($tipo && $data) {
             $whereConditions[] = "cte.data_entrega IS NOT NULL";
             $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
             break;
+
+        case 'atrasadas_dia':
+            // Atrasadas do dia: data_prev_ent = data AND (entregue após o prazo OU pendente e já passou do prazo)
+            $whereConditions[] = "cte.data_prev_ent::date = $" . $paramIndex;
+            $params[] = $data;
+            $paramIndex++;
+            $whereConditions[] = "(
+                (cte.data_entrega IS NOT NULL AND cte.data_entrega::date > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date)
+                OR
+                (cte.data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date < CURRENT_DATE)
+            )";
+            break;
     }
 }
 

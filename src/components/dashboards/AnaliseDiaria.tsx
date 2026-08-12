@@ -14,6 +14,7 @@ interface AnaliseDiariaProps {
   handleExportEntregasDia: (data: string) => void;
   handleExportPrevistosDia: (data: string) => void;
   handleExportEntreguesDia: (data: string) => void;
+  handleExportAtrasadasDia: (data: string) => void;
 }
 
 export function AnaliseDiaria({
@@ -23,7 +24,8 @@ export function AnaliseDiaria({
   loadingAnalise,
   handleExportEntregasDia,
   handleExportPrevistosDia,
-  handleExportEntreguesDia
+  handleExportEntreguesDia,
+  handleExportAtrasadasDia
 }: AnaliseDiariaProps) {
   const today = new Date();
   const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -313,14 +315,27 @@ export function AnaliseDiaria({
                     </TooltipProvider>
 
                     {/* Atrasadas */}
-                    <div className="w-full text-left px-2 py-1 rounded">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-600 dark:text-slate-400">Atrasadas:</span>
-                        <span className="font-semibold text-red-600 dark:text-red-400">
-                          {dia.atrasadasDia}
-                        </span>
-                      </div>
-                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleExportAtrasadasDia(dia.data)}
+                            disabled={dia.atrasadasDia === 0}
+                            className="w-full text-left px-2 py-1 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-600 dark:text-slate-400">Atrasadas:</span>
+                              <span className="font-semibold text-red-600 dark:text-red-400">
+                                {dia.atrasadasDia}
+                              </span>
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Clique para exportar</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     
                     {/* Indicador de Performance */}
                     {(performanceDia > 0 || temEntregasAntecipadas) && (
@@ -351,9 +366,12 @@ export function AnaliseDiaria({
                       <div className="px-2 py-1">
                         <div className="text-center">
                           <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Atrasadas</p>
-                          <p className="font-semibold text-red-600 dark:text-red-400">
+                          <button
+                            onClick={() => handleExportAtrasadasDia(dia.data)}
+                            className="font-semibold text-red-600 dark:text-red-400 hover:underline"
+                          >
                             {dia.atrasadasDia}
-                          </p>
+                          </button>
                         </div>
                       </div>
                     )}

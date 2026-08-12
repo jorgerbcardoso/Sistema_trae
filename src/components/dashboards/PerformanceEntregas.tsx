@@ -16,6 +16,7 @@ import {
   exportEntregasDia,
   exportPrevistosDia,
   exportEntreguesDia,
+  exportAtrasadasDia,
   DayData,
   PerformanceFilters as ServiceFilters
 } from '../../services/performanceEntregasService';
@@ -699,6 +700,18 @@ export function PerformanceEntregas() {
     }
   };
 
+  const handleExportAtrasadasDia = async (data: string) => {
+    try {
+      await exportAtrasadasDia(data, {
+        unidadeDestino: filters.unidadeDestino,
+        cnpjPagador: filters.cnpjPagador,
+        cnpjDestinatario: filters.cnpjDestinatario
+      });
+    } catch (error) {
+      toast.error('Erro ao gerar planilha');
+    }
+  };
+
   const loadMockData = async () => {
     setLoading(true);
     try {
@@ -1346,6 +1359,7 @@ export function PerformanceEntregas() {
           handleExportEntregasDia={handleExportEntregasDia}
           handleExportPrevistosDia={handleExportPrevistosDia}
           handleExportEntreguesDia={handleExportEntreguesDia}
+          handleExportAtrasadasDia={handleExportAtrasadasDia}
         />
 
         {/* ✅ SEÇÃO: Evolução da Performance */}

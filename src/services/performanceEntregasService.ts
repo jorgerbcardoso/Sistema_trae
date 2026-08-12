@@ -434,3 +434,69 @@ export async function exportEntreguesDia(
     console.error('Erro ao exportar entregues no prazo do dia:', error);
   }
 }
+
+export async function exportAtrasadasDia(
+  data: string,
+  filters?: { unidadeDestino?: string[], cnpjPagador?: string, cnpjDestinatario?: string }
+): Promise<void> {
+  const token = getAuthToken();
+
+  const body: any = {
+    tipo: 'atrasadas_dia',
+    data: data
+  };
+  if (filters?.unidadeDestino && filters.unidadeDestino.length > 0) body.unidadeDestino = filters.unidadeDestino;
+  if (filters?.cnpjPagador) body.cnpjPagador = filters.cnpjPagador;
+  if (filters?.cnpjDestinatario) body.cnpjDestinatario = filters.cnpjDestinatario;
+
+  try {
+    const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/export.php`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body)
+    });
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const errorData = await response.json();
+      if (errorData.toast) {
+        const toastTypes: { [key: string]: any } = {
+          success: toast.success,
+          error: toast.error,
+          warning: toast.warning,
+          info: toast.info
+        };
+        const toastFn = toastTypes[errorData.toast.type] || toast.error;
+        toastFn(errorData.toast.message);
+      }
+      throw new Error(errorData.message || 'Erro ao exportar planilha');
+    }
+
+    if (!response.ok) {
+      throw new Error('Erro ao exportar planilha');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `atrasadas_${data.replace(/-/g, '_')}.csv`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?(.+)"?/i);
+      if (match && match[1]) filename = match[1].replace(/"/g, '');
+    }
+
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error: any) {
+    console.error('Erro ao exportar atrasadas do dia:', error);
+  }
+}
