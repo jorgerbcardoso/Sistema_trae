@@ -4829,9 +4829,10 @@ export function Disponiveis() {
   const { prompt: perguntarTexto, dialog: perguntarTextoDialog } = usePromptDialog();
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
-  const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
+  const sigla = unidadeLogada.trim().toUpperCase();
+  const isMTZ = sigla === 'MTZ' || sigla === '';
   const dominioUsuario = (user?.domain ?? '').trim().toUpperCase();
-  const unidadeAtual = unidadeLogada.trim().toUpperCase();
+  const unidadeAtual = sigla;
 
   const shouldIgnoreDestinoRVE = (destinoRaw: string | null | undefined) => {
     if (dominioUsuario !== 'RVE') return false;
@@ -4842,8 +4843,6 @@ export function Disponiveis() {
     if (unidadeAtual === 'CAM' && destino === 'SAO') return true;
     return false;
   };
-
-  const [sigla] = useState<string>(unidadeLogada);
 
   type FiltrosDisponiveis = {
     unidadeDestino: string[];
@@ -5156,7 +5155,7 @@ export function Disponiveis() {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_carregamentos.php`,
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify({ unidade: sigla }) },
         true
       );
       if (res.success) {
@@ -5169,14 +5168,14 @@ export function Disponiveis() {
       toast.error(e?.message || 'Erro ao buscar carregamentos.');
     }
     finally { setLoadingCarregamentos(false); }
-  }, []);
+  }, [sigla]);
 
   const carregarCarregamentosCalendario = useCallback(async () => {
     setLoadingCarregamentosCalendario(true);
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_carregamentos.php`,
-        { method: 'POST', body: JSON.stringify({ modo: 'calendario', dias: 30 }) },
+        { method: 'POST', body: JSON.stringify({ unidade: sigla, modo: 'calendario', dias: 30 }) },
         true
       );
       if (res.success) {
@@ -5190,7 +5189,7 @@ export function Disponiveis() {
     } finally {
       setLoadingCarregamentosCalendario(false);
     }
-  }, []);
+  }, [sigla]);
 
   useEffect(() => {
     if (!sigla || isMTZ) return;

@@ -4,10 +4,12 @@ import {
   Calendar, 
   CalendarCheck,
   ChevronDown,
+  ChevronUp,
   Check, 
   CheckCircle, 
   Clock, 
   ClockCheck, 
+  ChevronsUpDown,
   Download,
   Filter, 
   Loader2, 
@@ -104,6 +106,9 @@ interface Agenda {
   ctes: Cte[];
 }
 
+type SubCteSortField = 'ctrc' | 'nf' | 'cidadeUf' | 'endereco' | 'pagador' | 'prevEntrega' | 'dtUltOcor' | 'ultOcor';
+type SubCteSortDir = 'asc' | 'desc';
+
 interface Filters {
   periodoEmissaoInicio: string;
   periodoEmissaoFim: string;
@@ -163,6 +168,34 @@ function formatPeriodDisplay(inicio: string, fim: string): string {
   return `${MONTHS[start.month - 1]} ${start.year} - ${MONTHS[end.month - 1]} ${end.year}`;
 }
 
+function parseISODate(s?: string) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+}
+
+function parseDateBR(s?: string) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const dd = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10) - 1;
+  const yyRaw = m[3];
+  const yy = yyRaw.length === 2 ? 2000 + parseInt(yyRaw, 10) : parseInt(yyRaw, 10);
+  return new Date(yy, mm, dd);
+}
+
+function firstNF(nfs?: string) {
+  const raw = String(nfs ?? '').trim();
+  if (!raw) return '';
+  return raw.split(',')[0]?.trim() ?? '';
+}
+
+function enderecoEntregaCte(cte: Cte) {
+  return (cte.endereco_entrega || '') + (cte.bairro_entrega ? ` - ${cte.bairro_entrega}` : '');
+}
+
 /**
  * CENTRAL DE AGENDAMENTO - Dashboard de Agendamento
  *
@@ -210,6 +243,8 @@ export function CentralAgendamento() {
   const [selectedCtes, setSelectedCtes] = useState<Set<string>>(new Set());
   const [selectedCnpjDest, setSelectedCnpjDest] = useState<string | null>(null);
   const [expandedAgendas, setExpandedAgendas] = useState<Set<string>>(new Set());
+  const [subCteSortField, setSubCteSortField] = useState<SubCteSortField>('ctrc');
+  const [subCteSortDir, setSubCteSortDir] = useState<SubCteSortDir>('asc');
 
   const [confirmAllDialogOpen, setConfirmAllDialogOpen] = useState(false);
   const [pendingCte, setPendingCte] = useState<Cte | null>(null);
@@ -684,6 +719,60 @@ export function CentralAgendamento() {
       if (next.has(agendaId)) next.delete(agendaId);
       else next.add(agendaId);
       return next;
+    });
+  };
+
+  const handleSortSubCtes = (field: SubCteSortField) => {
+    if (subCteSortField === field) {
+      setSubCteSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSubCteSortField(field);
+      setSubCteSortDir('asc');
+    }
+  };
+
+  const SortIconSub = ({ field }: { field: SubCteSortField }) => {
+    if (subCteSortField !== field) return <ChevronsUpDown className="h-3 w-3 opacity-40" />;
+    return subCteSortDir === 'asc'
+      ? <ChevronUp className="h-3 w-3" />
+      : <ChevronDown className="h-3 w-3" />;
+  };
+
+  const SubTh = ({ field, label }: { field: SubCteSortField; label: string }) => (
+    <button
+      type="button"
+      className="flex items-center gap-1 text-left hover:text-slate-700 dark:hover:text-slate-200"
+      onClick={() => handleSortSubCtes(field)}
+    >
+      <span>{label}</span>
+      <SortIconSub field={field} />
+    </button>
+  );
+
+  const ordenarSubCtes = (lista: Cte[]) => {
+    const dir = subCteSortDir === 'asc' ? 1 : -1;
+    const cmpStr = (va: string, vb: string) => va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' }) * dir;
+    const cmpNum = (va: number, vb: number) => (va - vb) * dir;
+    const ctrcKey = (c: Cte) => `${String(c.ser_cte ?? '')}${String(c.nro_cte ?? '').padStart(6, '0')}`;
+
+    return [...lista].sort((a, b) => {
+      if (subCteSortField === 'ctrc') return cmpStr(ctrcKey(a), ctrcKey(b));
+      if (subCteSortField === 'nf') return cmpStr(firstNF(a.nfs), firstNF(b.nfs));
+      if (subCteSortField === 'cidadeUf') return cmpStr(String(a.cidade_uf_entrega ?? ''), String(b.cidade_uf_entrega ?? ''));
+      if (subCteSortField === 'endereco') return cmpStr(enderecoEntregaCte(a), enderecoEntregaCte(b));
+      if (subCteSortField === 'pagador') return cmpStr(String(a.nome_pag ?? ''), String(b.nome_pag ?? ''));
+      if (subCteSortField === 'ultOcor') return cmpStr(String(a.ult_ocor ?? ''), String(b.ult_ocor ?? ''));
+      if (subCteSortField === 'prevEntrega') {
+        const da = parseISODate(a.data_prev_ent_iso)?.getTime() ?? parseDateBR(a.data_prev_ent)?.getTime() ?? 0;
+        const db = parseISODate(b.data_prev_ent_iso)?.getTime() ?? parseDateBR(b.data_prev_ent)?.getTime() ?? 0;
+        return cmpNum(da, db);
+      }
+      if (subCteSortField === 'dtUltOcor') {
+        const da = parseDateBR(a.data_ult_ocor)?.getTime() ?? 0;
+        const db = parseDateBR(b.data_ult_ocor)?.getTime() ?? 0;
+        return cmpNum(da, db);
+      }
+      return 0;
     });
   };
 
@@ -1170,6 +1259,14 @@ export function CentralAgendamento() {
             </DialogHeader>
 
             <div className={`grid h-full min-h-0 gap-3 overflow-hidden ${cardDialogId === 1 ? 'grid-rows-[auto_minmax(0,1fr)]' : 'grid-rows-[minmax(0,1fr)]'}`}>
+              {modoVisao === 'AGENDA' && (
+                <div className="flex shrink-0 items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-300 shrink-0" />
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Na listagem principal, exibimos apenas o primeiro <strong>CTRC</strong> e a primeira <strong>NF</strong> de cada agenda. Abra a agenda para ver todos os CT-es e NFs.
+                  </p>
+                </div>
+              )}
               {cardDialogId === 1 && modoVisao === 'CTE' && (
                 <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 dark:border-indigo-800 dark:bg-indigo-950">
                   <p className="text-xs text-indigo-700 dark:text-indigo-300">
@@ -1277,19 +1374,17 @@ export function CentralAgendamento() {
                                 {isExpanded && (
                                   <div className="bg-slate-50/60 dark:bg-slate-900/40">
                                     <div className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200/70 dark:border-slate-800">
-                                      <span>CTRC</span>
-                                      <span>NF</span>
-                                      <span>Cidade/UF</span>
-                                      <span>Endereço</span>
-                                      <span>Pagador</span>
-                                      <span>Prev. Entrega</span>
-                                      <span>Dt. Últ. Ocor.</span>
-                                      <span>Últ. Ocorrência</span>
+                                      <SubTh field="ctrc" label="CTRC" />
+                                      <SubTh field="nf" label="NF" />
+                                      <SubTh field="cidadeUf" label="Cidade/UF" />
+                                      <SubTh field="endereco" label="Endereço" />
+                                      <SubTh field="pagador" label="Pagador" />
+                                      <SubTh field="prevEntrega" label="Prev. Entrega" />
+                                      <SubTh field="dtUltOcor" label="Dt. Últ. Ocor." />
+                                      <SubTh field="ultOcor" label="Últ. Ocorrência" />
                                     </div>
-                                    {agenda.ctes.map((cte) => {
-                                      const enderecoEntrega =
-                                        (cte.endereco_entrega || '') +
-                                        (cte.bairro_entrega ? ` - ${cte.bairro_entrega}` : '');
+                                    {ordenarSubCtes(agenda.ctes).map((cte) => {
+                                      const enderecoEntrega = enderecoEntregaCte(cte);
                                       return (
                                         <div
                                           key={`${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
@@ -1299,7 +1394,7 @@ export function CentralAgendamento() {
                                             {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
                                           </span>
                                           <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
-                                            {cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}
+                                            {cte.nfs ? firstNF(cte.nfs) : '-'}
                                           </span>
                                           <span className="truncate self-center">{cte.cidade_uf_entrega || '-'}</span>
                                           <span className="truncate self-center">{enderecoEntrega ? enderecoEntrega : '-'}</span>
@@ -1445,7 +1540,15 @@ export function CentralAgendamento() {
               </div>
             </DialogHeader>
 
-            <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] gap-3 overflow-hidden">
+            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
+              {modoVisao === 'AGENDA' && (
+                <div className="flex shrink-0 items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-300 shrink-0" />
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Na listagem principal, exibimos apenas o primeiro <strong>CTRC</strong> e a primeira <strong>NF</strong> de cada agenda. Abra a agenda para ver todos os CT-es e NFs.
+                  </p>
+                </div>
+              )}
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
                 {modoVisao === 'AGENDA' ? (
                   <div className="grid grid-cols-[32px_90px_90px_80px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
@@ -1518,19 +1621,17 @@ export function CentralAgendamento() {
                                 {isExpanded && (
                                   <div className="bg-slate-50/60 dark:bg-slate-900/40">
                                     <div className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200/70 dark:border-slate-800">
-                                      <span>CTRC</span>
-                                      <span>NF</span>
-                                      <span>Cidade/UF</span>
-                                      <span>Endereço</span>
-                                      <span>Pagador</span>
-                                      <span>Prev. Entrega</span>
-                                      <span>Dt. Últ. Ocor.</span>
-                                      <span>Últ. Ocorrência</span>
+                                      <SubTh field="ctrc" label="CTRC" />
+                                      <SubTh field="nf" label="NF" />
+                                      <SubTh field="cidadeUf" label="Cidade/UF" />
+                                      <SubTh field="endereco" label="Endereço" />
+                                      <SubTh field="pagador" label="Pagador" />
+                                      <SubTh field="prevEntrega" label="Prev. Entrega" />
+                                      <SubTh field="dtUltOcor" label="Dt. Últ. Ocor." />
+                                      <SubTh field="ultOcor" label="Últ. Ocorrência" />
                                     </div>
-                                    {agenda.ctes.map((cte) => {
-                                      const enderecoEntrega =
-                                        (cte.endereco_entrega || '') +
-                                        (cte.bairro_entrega ? ` - ${cte.bairro_entrega}` : '');
+                                    {ordenarSubCtes(agenda.ctes).map((cte) => {
+                                      const enderecoEntrega = enderecoEntregaCte(cte);
                                       return (
                                         <div
                                           key={`cal-ag-${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
@@ -1540,7 +1641,7 @@ export function CentralAgendamento() {
                                             {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
                                           </span>
                                           <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
-                                            {cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}
+                                            {cte.nfs ? firstNF(cte.nfs) : '-'}
                                           </span>
                                           <span className="truncate self-center">{cte.cidade_uf_entrega || '-'}</span>
                                           <span className="truncate self-center">{enderecoEntrega ? enderecoEntrega : '-'}</span>
