@@ -290,6 +290,8 @@ if ($headerLine !== null) {
             'unidadeOrigem'  => $sigla,
             'tipo'           => $tipo,
             'emissao'        => $autor,
+            'chegadaUnid'    => '',
+            'unidAtual'      => '',
             'prevEnt'        => $previ,
             'nfiscal'        => $nfiscal,
             'pedido'         => $pedido,
@@ -403,6 +405,8 @@ if ($headerLine !== null) {
             'unidadeOrigem'  => $sigla,
             'tipo'           => $tipo,
             'emissao'        => $autor,
+            'chegadaUnid'    => '',
+            'unidAtual'      => '',
             'prevEnt'        => $previ,
             'nfiscal'        => $nfiscal,
             'pedido'         => $pedido,
@@ -425,6 +429,79 @@ if ($headerLine !== null) {
             'atrasoTransf'   => $atrasoTransf,
         ];
     }
+}
+
+$tblCte = "{$domain}_cte";
+$infoPorCte = [];
+
+if (!empty($ctes)) {
+    $pares = [];
+    $seen = [];
+    foreach ($ctes as $c) {
+        $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
+        $nro = (int)($c['nroCte'] ?? 0);
+        if ($ser === '' || $nro <= 0) continue;
+        $k = $ser . '|' . $nro;
+        if (isset($seen[$k])) continue;
+        $seen[$k] = true;
+        $pares[] = [$ser, $nro];
+    }
+
+    foreach (array_chunk($pares, 500) as $chunk) {
+        $params = [];
+        $values = [];
+        $p = 1;
+        foreach ($chunk as $par) {
+            $values[] = "($" . $p . ", $" . ($p + 1) . ")";
+            $params[] = $par[0];
+            $params[] = $par[1];
+            $p += 2;
+        }
+        if (empty($values)) continue;
+
+        $q = "
+            WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $values) . ")
+            SELECT
+                UPPER(BTRIM(c.ser_cte)) AS ser_cte,
+                c.nro_cte,
+                TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
+                COALESCE(c.unid_atual, '') AS unid_atual
+            FROM {$tblCte} c
+            JOIN req r ON UPPER(BTRIM(r.ser_cte)) = UPPER(BTRIM(c.ser_cte)) AND r.nro_cte = c.nro_cte
+        ";
+        $resInfo = @pg_query_params($g_sql, $q, $params);
+        if ($resInfo) {
+            while ($row = pg_fetch_assoc($resInfo)) {
+                $k = ((string)($row['ser_cte'] ?? '')) . '|' . (int)($row['nro_cte'] ?? 0);
+                $infoPorCte[$k] = [
+                    'chegadaUnid' => (string)($row['chegada_unid'] ?? ''),
+                    'unidAtual' => (string)($row['unid_atual'] ?? ''),
+                ];
+            }
+        }
+    }
+
+    $tsHoje = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
+    foreach ($ctes as &$c) {
+        $k = strtoupper(trim((string)($c['serCte'] ?? ''))) . '|' . (int)($c['nroCte'] ?? 0);
+        if (isset($infoPorCte[$k]) && is_array($infoPorCte[$k])) {
+            $c['chegadaUnid'] = $infoPorCte[$k]['chegadaUnid'] ?? '';
+            $c['unidAtual'] = $infoPorCte[$k]['unidAtual'] ?? '';
+        }
+
+        $indic = null;
+        $cheg = trim((string)($c['chegadaUnid'] ?? ''));
+        if ($cheg !== '' && preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $cheg, $m)) {
+            $tsCheg = mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
+            $diffDias = (int)floor(($tsHoje - $tsCheg) / 86400);
+            if ($diffDias <= 1) $indic = 'verde';
+            elseif ($diffDias == 2) $indic = 'amarelo';
+            elseif ($diffDias == 3) $indic = 'laranja';
+            else $indic = 'vermelho';
+        }
+        $c['indicadorSaida'] = $indic;
+    }
+    unset($c);
 }
 
 $ontem = date('dmy', strtotime('yesterday'));

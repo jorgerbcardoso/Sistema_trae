@@ -37,6 +37,12 @@ $tabelaLinha        = "{$domain}_linha";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
+$modo = strtolower(trim((string)($input['modo'] ?? 'ativos')));
+$dias = (int)($input['dias'] ?? 30);
+if ($dias <= 0) $dias = 30;
+if ($dias > 90) $dias = 90;
+$dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
+
 // ─── Busca carregamentos agrupados por placa ──────────────────────────────────
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
@@ -76,12 +82,27 @@ $sqlCarregamentos = "
            ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = \$1
     GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
+";
+
+if ($modo === 'calendario') {
+    $sqlCarregamentos .= "
+    HAVING
+        MAX(c.data_finalizacao) IS NULL
+        OR MIN(c.data_inclusao) >= \$2
+        OR MAX(c.data_finalizacao) >= \$2
+    ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
+";
+} else {
+    $sqlCarregamentos .= "
     HAVING MAX(c.data_finalizacao) IS NULL
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
+}
 
 try {
-    $resCarregamentos = sql($sqlCarregamentos, [$unidade], $conn);
+    $paramsSql = [$unidade];
+    if ($modo === 'calendario') $paramsSql[] = $dataInicio;
+    $resCarregamentos = sql($sqlCarregamentos, $paramsSql, $conn);
 } catch (Exception $e) {
     respondJson(['success' => false, 'message' => 'Erro ao buscar carregamentos.']);
 }
@@ -140,6 +161,10 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
 if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
+}
+
+if ($modo === 'calendario') {
+    respondJson(['success' => true, 'carregamentos' => $carregamentos]);
 }
 
 $rotas = [];

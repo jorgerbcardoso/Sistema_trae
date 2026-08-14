@@ -32,6 +32,7 @@ import {
   Layers,
   Timer,
   Loader2,
+  CalendarDays,
   Home,
   Filter,
   Plus,
@@ -66,6 +67,8 @@ interface Cte {
   placaColeta?: string;
   tipo: string;
   emissao: string;
+  chegadaUnid?: string;
+  unidAtual?: string;
   prevEnt: string;
   nfiscal: string;
   pedido: string;
@@ -120,6 +123,8 @@ interface CteEntrega {
   serCte: string;
   nroCte: number;
   emissao: string;
+  chegadaUnid?: string;
+  unidAtual?: string;
   setor: string;
   nfiscal: string;
   pagador: string;
@@ -335,6 +340,7 @@ function TabelaCtes({
     | 'ctrc'
     | 'nfiscal'
     | 'emissao'
+    | 'chegadaUnid'
     | 'prevEnt'
     | 'remetente'
     | 'destinatario'
@@ -391,6 +397,7 @@ function TabelaCtes({
         case 'cubagem': return parseCubagem(cte.cubagem);
         case 'qtdeVol': return parseInt(String(cte.qtdeVol ?? '').replace(/\D/g, ''), 10) || 0;
         case 'emissao': return toDateVal(cte.emissao);
+        case 'chegadaUnid': return toDateVal(cte.chegadaUnid ?? '');
         case 'prevEnt': return toDateVal(cte.prevEnt);
         case 'prevChegada': return toDateVal(cte.prevChegada);
         case 'indicadorSaida': return ORDEM_IND[cte.indicadorSaida ?? ''] ?? 0;
@@ -406,6 +413,7 @@ function TabelaCtes({
         case 'cidadeUf': return `${getStr(a.cidade)}/${getStr(a.uf)}`.localeCompare(`${getStr(b.cidade)}/${getStr(b.uf)}`);
         case 'manifesto': return getStr(a.manifesto).localeCompare(getStr(b.manifesto));
         case 'emissao':
+        case 'chegadaUnid':
         case 'prevEnt':
         case 'prevChegada':
         case 'vlrNf':
@@ -507,7 +515,7 @@ function TabelaCtes({
           <Badge className="ml-2 bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">{contagemColeta.sem}</Badge>
         </Button>
       </div>
-      <table className="w-full text-xs">
+      <table className="w-full text-[11px]">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
             {emApontamento && (
@@ -529,6 +537,7 @@ function TabelaCtes({
             <th className="px-3 py-2 text-center w-[68px] font-semibold">Coleta</th>
             <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="chegadaUnid">Chegada na Unid.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="destinatario">Destinatário</ThBtn></th>
@@ -612,6 +621,7 @@ function TabelaCtes({
                   {cte.nfiscal || '-'}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.chegadaUnid || ''}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
@@ -695,6 +705,7 @@ function GrupoDestinoCard({
       'NF',
       'Situação',
       'Emissão',
+      'Chegada na Unid.',
       'Prev. Ent.',
       'Pagador',
       'Destinatário',
@@ -716,6 +727,7 @@ function GrupoDestinoCard({
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.emissao),
+        esc(c.chegadaUnid || ''),
         esc(c.prevEnt),
         esc(c.pagador),
         esc(c.destinatario),
@@ -1031,7 +1043,7 @@ function TabelaEntrega({
           Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
         </div>
       )}
-      <table className="w-full text-xs">
+      <table className="w-full text-[11px]">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
             {emApontamento && (
@@ -1051,6 +1063,7 @@ function TabelaEntrega({
             )}
             <th className="px-3 py-2 text-left font-semibold">CTRC</th>
             <th className="px-3 py-2 text-left font-semibold">Emissão</th>
+            <th className="px-3 py-2 text-left font-semibold">Chegada na Unid.</th>
             <th className="px-3 py-2 text-left font-semibold">NF</th>
             <th className="px-3 py-2 text-left font-semibold">Pagador</th>
             <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
@@ -1105,6 +1118,7 @@ function TabelaEntrega({
                   {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.emissao || ''}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.chegadaUnid || ''}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
@@ -1184,6 +1198,7 @@ function GrupoSetorCard({
       'Setor',
       'CTRC',
       'Emissão',
+      'Chegada na Unid.',
       'NF',
       'Situação',
       'Pagador',
@@ -1214,6 +1229,7 @@ function GrupoSetorCard({
         esc(grupo.setor),
         esc(c.ctrc),
         esc(c.emissao || ''),
+        esc(c.chegadaUnid || ''),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.pagador || ''),
@@ -1352,6 +1368,8 @@ interface CarregamentoAreaProps {
   sigla: string;
   carregamentos: Carregamento[];
   loadingCarregamentos: boolean;
+  carregamentosCalendario: Carregamento[];
+  loadingCarregamentosCalendario: boolean;
   linhasOrigem: LinhaCarregamento[];
   loadingLinhasOrigem: boolean;
   totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
@@ -3434,6 +3452,8 @@ function CarregamentoArea({
   sigla,
   carregamentos,
   loadingCarregamentos,
+  carregamentosCalendario,
+  loadingCarregamentosCalendario,
   linhasOrigem,
   loadingLinhasOrigem,
   totalsPorUnidadeParaLinhas,
@@ -3483,69 +3503,440 @@ function CarregamentoArea({
     }
   };
 
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative">
-      <div className={`${importandoCarregamentos ? 'blur-sm pointer-events-none select-none' : ''}`}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-2">
-            <Truck className="w-4 h-4 text-emerald-500" />
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
-            {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-            {carregamentos.length > 0 && (
-              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-                {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
-              </Badge>
-            )}
-            {modoApontamento && (
-              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
-                <CheckSquare className="w-3 h-3" />
-                Apontando para: <strong>{modoApontamento}</strong>
-              </Badge>
-            )}
+  const [calOpen, setCalOpen] = useState(false);
+  const [diaSel, setDiaSel] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  const ultimosDias = React.useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const arr: string[] = [];
+    for (let i = 29; i >= 0; i -= 1) {
+      const x = new Date(d);
+      x.setDate(d.getDate() - i);
+      arr.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`);
+    }
+    return arr;
+  }, []);
+
+  const toKey = (v: any): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    const mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (mIso) return `${mIso[1]}-${mIso[2]}-${mIso[3]}`;
+    const mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (mBr) return `${mBr[3]}-${mBr[2]}-${mBr[1]}`;
+    return '';
+  };
+
+  const toTs = (dateKey: string, timeVal: any): number | null => {
+    const dKey = String(dateKey ?? '').trim();
+    if (!dKey) return null;
+    const m = dKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const time = String(timeVal ?? '').trim();
+    const tm = time.match(/^(\d{2}):(\d{2})(?::(\d{2}))?/);
+    const hh = tm ? parseInt(tm[1], 10) : 0;
+    const mm = tm ? parseInt(tm[2], 10) : 0;
+    const ss = tm && tm[3] ? parseInt(tm[3], 10) : 0;
+    const dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), hh, mm, ss, 0);
+    const t = dt.getTime();
+    return Number.isNaN(t) ? null : t;
+  };
+
+  const fmtHora = (dateKey: string, timeVal: any): string => {
+    const dKey = toKey(dateKey);
+    if (!dKey) return '';
+    const time = String(timeVal ?? '').trim();
+    if (!time) return '';
+    const tm = time.match(/^(\d{2}):(\d{2})/);
+    if (!tm) return time;
+    return `${tm[1]}:${tm[2]}`;
+  };
+
+  const fmtDiaBr = (key: string): string => {
+    const m = String(key ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    return `${m[3]}/${m[2]}`;
+  };
+
+  const fmtDiaBrAno = (key: string): string => {
+    const m = String(key ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
+
+  const fmtDuracao = (mins: number): string => {
+    if (!Number.isFinite(mins) || mins < 0) return '';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h <= 0) return `${m}min`;
+    if (m <= 0) return `${h}h`;
+    return `${h}h${String(m).padStart(2, '0')}`;
+  };
+
+  const linhaCarregaEm = (l: LinhaCarregamento, key: string): boolean => {
+    const m = String(key ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return false;
+    const dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 0, 0, 0, 0);
+    const dow = dt.getDay();
+    if (dow === 0) return !!l.carrega_dom;
+    if (dow === 1) return !!l.carrega_seg;
+    if (dow === 2) return !!l.carrega_ter;
+    if (dow === 3) return !!l.carrega_qua;
+    if (dow === 4) return !!l.carrega_qui;
+    if (dow === 5) return !!l.carrega_sex;
+    return !!l.carrega_sab;
+  };
+
+  const calNorm = React.useMemo(() => {
+    const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
+    return list.map((c) => {
+      const iniKey = toKey((c as any).data_criacao);
+      const fimKey = toKey((c as any).data_finalizacao);
+      return { c, iniKey, fimKey };
+    });
+  }, [carregamentosCalendario]);
+
+  const calIniCount = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const x of calNorm) {
+      if (!x.iniKey) continue;
+      m.set(x.iniKey, (m.get(x.iniKey) ?? 0) + 1);
+    }
+    return m;
+  }, [calNorm]);
+
+  const calFimCount = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const x of calNorm) {
+      if (!x.fimKey) continue;
+      m.set(x.fimKey, (m.get(x.fimKey) ?? 0) + 1);
+    }
+    return m;
+  }, [calNorm]);
+
+  const itensFinalizadosDia = React.useMemo(() => {
+    return calNorm
+      .filter((x) => x.fimKey === diaSel)
+      .sort((a, b) => String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? '')));
+  }, [calNorm, diaSel]);
+
+  const itensIniciadosDiaNaoFinal = React.useMemo(() => {
+    return calNorm
+      .filter((x) => x.iniKey === diaSel && !x.fimKey)
+      .sort((a, b) => String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? '')));
+  }, [calNorm, diaSel]);
+
+  const itensAtivos = React.useMemo(() => {
+    return calNorm
+      .filter((x) => !x.fimKey)
+      .sort((a, b) => {
+        const da = toKey((a.c as any).data_criacao);
+        const db = toKey((b.c as any).data_criacao);
+        if (da !== db) return String(da).localeCompare(String(db));
+        return String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? ''));
+      });
+  }, [calNorm]);
+
+  const itensAtivosParaLista = React.useMemo(() => {
+    if (itensIniciadosDiaNaoFinal.length === 0) return itensAtivos;
+    const startedToday = new Set(itensIniciadosDiaNaoFinal.map((x) => String(x.c.placa_provisoria ?? '')));
+    return itensAtivos.filter((x) => !startedToday.has(String(x.c.placa_provisoria ?? '')));
+  }, [itensAtivos, itensIniciadosDiaNaoFinal]);
+
+  const linhasAgendadasDia = React.useMemo(() => {
+    const list = Array.isArray(linhasOrigem) ? linhasOrigem : [];
+    return list.filter((l) => linhaCarregaEm(l, diaSel));
+  }, [linhasOrigem, diaSel]);
+
+  const linhasAtivas = React.useMemo(() => {
+    const set = new Set<number>();
+    for (const x of itensAtivos) {
+      const n = (x.c as any).nro_linha ?? (x.c as any).nroLinha ?? 0;
+      if (typeof n === 'number' && n > 0) set.add(n);
+    }
+    return set;
+  }, [itensAtivos]);
+
+  const linhasComRegistroNoDia = React.useMemo(() => {
+    const set = new Set<number>();
+    for (const x of calNorm) {
+      const n = (x.c as any).nro_linha ?? (x.c as any).nroLinha ?? 0;
+      if (!(typeof n === 'number' && n > 0)) continue;
+      if (x.iniKey === diaSel || x.fimKey === diaSel) set.add(n);
+    }
+    return set;
+  }, [calNorm, diaSel]);
+
+  const linhasNaoIniciadas = React.useMemo(() => {
+    return linhasAgendadasDia
+      .filter((l) => {
+        const n = l.nro_linha ?? 0;
+        if (n <= 0) return false;
+        if (linhasAtivas.has(n)) return false;
+        if (linhasComRegistroNoDia.has(n)) return false;
+        return true;
+      })
+      .sort((a, b) => (a.nro_linha ?? 0) - (b.nro_linha ?? 0));
+  }, [linhasAgendadasDia, linhasAtivas, linhasComRegistroNoDia]);
+
+  const LinhaBadge = ({ kind }: { kind: 'nao_iniciado' | 'ativo' | 'finalizado' }) => {
+    if (kind === 'nao_iniciado') return <Badge className="bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 text-[10px]">NÃO INICIADO</Badge>;
+    if (kind === 'finalizado') return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 text-[10px]">FINALIZADO</Badge>;
+    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">EM ANDAMENTO</Badge>;
+  };
+
+  const renderCarregamentoItem = (car: Carregamento, kind: 'ativo' | 'finalizado') => {
+    const iniKey = toKey((car as any).data_criacao);
+    const fimKey = toKey((car as any).data_finalizacao);
+    const iniTs = toTs(iniKey, (car as any).hora_criacao);
+    const fimTs = fimKey ? toTs(fimKey, (car as any).hora_finalizacao) : null;
+    const durMin = iniTs != null && fimTs != null ? Math.max(0, Math.round((fimTs - iniTs) / 60000)) : null;
+    const nroLinha = (car as any).nro_linha ?? (car as any).nroLinha ?? null;
+    const destino = String((car as any).destino ?? '').trim().toUpperCase();
+    return (
+      <div className="flex items-start justify-between gap-3 py-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{String(car.placa_provisoria ?? '').toUpperCase()}</span>
+            <LinhaBadge kind={kind === 'finalizado' ? 'finalizado' : 'ativo'} />
+            {typeof nroLinha === 'number' && nroLinha > 0 ? (
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">Linha {String(nroLinha).padStart(3, '0')}</Badge>
+            ) : null}
+            {destino ? (
+              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200 text-[10px]">{destino}</Badge>
+            ) : null}
           </div>
-          <div className="flex gap-2">
-            {carregamentos.length > 0 && (
+          <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Início: <span className="font-mono">{iniKey ? `${fmtDiaBrAno(iniKey)} ${fmtHora(iniKey, (car as any).hora_criacao)}`.trim() : '-'}</span>
+            </span>
+            <span>
+              Fim: <span className="font-mono">{fimKey ? `${fmtDiaBrAno(fimKey)} ${fmtHora(fimKey, (car as any).hora_finalizacao)}`.trim() : '-'}</span>
+            </span>
+            <span>
+              Tempo: <span className="font-mono">{durMin != null ? fmtDuracao(durMin) : '-'}</span>
+            </span>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+            {String((car as any).login_criacao ?? '').trim() ? <span className="font-mono">{String((car as any).login_criacao ?? '').trim()}</span> : null}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700"
+          onClick={() => setCalOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendário de carregamentos</h3>
+            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">30 dias</Badge>
+            {loadingCarregamentosCalendario ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : null}
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${calOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {calOpen && (
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-[11px] shrink-0"
+                onClick={() => {
+                  const d = new Date();
+                  setDiaSel(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+                }}
+              >
+                HOJE
+              </Button>
+              {ultimosDias.map((k) => {
+                const isSel = k === diaSel;
+                const ini = calIniCount.get(k) ?? 0;
+                const fim = calFimCount.get(k) ?? 0;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    className={`h-8 px-2 rounded-md border text-[11px] font-semibold shrink-0 flex items-center gap-2 ${
+                      isSel
+                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                    onClick={() => setDiaSel(k)}
+                    title={fmtDiaBrAno(k)}
+                  >
+                    <span className="font-mono">{fmtDiaBr(k)}</span>
+                    <span className={`text-[10px] font-mono tabular-nums ${isSel ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {ini}/{fim}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  {fmtDiaBrAno(diaSel)}
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                  <span>Não iniciados: <span className="font-mono font-semibold">{linhasNaoIniciadas.length}</span></span>
+                  <span>Ativos: <span className="font-mono font-semibold">{itensAtivos.length}</span></span>
+                  <span>Finalizados: <span className="font-mono font-semibold">{itensFinalizadosDia.length}</span></span>
+                </div>
+              </div>
+
+              <div className="px-3 py-2">
+                {linhasNaoIniciadas.length > 0 ? (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Deveria ter iniciado e não iniciou</div>
+                      <Badge className="bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 text-[10px]">{linhasNaoIniciadas.length}</Badge>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {linhasNaoIniciadas.map((l) => (
+                        <div key={l.nro_linha} className="flex items-start justify-between gap-3 py-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">Linha {String(l.nro_linha).padStart(3, '0')}</span>
+                              <LinhaBadge kind="nao_iniciado" />
+                              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200 text-[10px]">{String(l.sigla_dest ?? '').toUpperCase()}</Badge>
+                            </div>
+                            <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 truncate">{l.nome}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {itensIniciadosDiaNaoFinal.length > 0 ? (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Iniciados no dia e não finalizados</div>
+                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">{itensIniciadosDiaNaoFinal.length}</Badge>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {itensIniciadosDiaNaoFinal.map((x) => (
+                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'ativo')}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mb-3">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Em andamento (não finalizados)</div>
+                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">{itensAtivos.length}</Badge>
+                  </div>
+                  {itensAtivosParaLista.length === 0 ? (
+                    <div className="py-2 text-[11px] text-slate-500 dark:text-slate-400">—</div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {itensAtivosParaLista.map((x) => (
+                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'ativo')}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Finalizados no dia</div>
+                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 text-[10px]">{itensFinalizadosDia.length}</Badge>
+                  </div>
+                  {itensFinalizadosDia.length === 0 ? (
+                    <div className="py-2 text-[11px] text-slate-500 dark:text-slate-400">—</div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {itensFinalizadosDia.map((x) => (
+                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'finalizado')}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative">
+        <div className={`${importandoCarregamentos ? 'blur-sm pointer-events-none select-none' : ''}`}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-emerald-500" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
+              {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+              {carregamentos.length > 0 && (
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                  {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
+              {modoApontamento && (
+                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
+                  <CheckSquare className="w-3 h-3" />
+                  Apontando para: <strong>{modoApontamento}</strong>
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {carregamentos.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  onClick={handleExcluirTodos}
+                  title="Excluir todos os carregamentos"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                onClick={handleExcluirTodos}
-                title="Excluir todos os carregamentos"
+                className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                onClick={() => setModalImportarAberto(true)}
+                disabled={importandoCarregamentos}
               >
-                <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
+                <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
               </Button>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-              onClick={() => setModalImportarAberto(true)}
-              disabled={importandoCarregamentos}
-            >
-              <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
-            </Button>
-            <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
-              <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
+              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
+                <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                onClick={() => setModalAberto(true)}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                onClick={() => setModalAutomaticoAberto(true)}
+              >
+                <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-              onClick={() => setModalAberto(true)}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
-              onClick={() => setModalAutomaticoAberto(true)}
-            >
-              <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
-            </Button>
           </div>
-        </div>
 
         {carregamentos.length === 0 && !loadingCarregamentos ? (
           <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
@@ -3613,6 +4004,7 @@ function CarregamentoArea({
           onExecutar={onImportarCarregamentos}
         />
       )}
+      </div>
     </div>
   );
 }
@@ -3766,6 +4158,8 @@ export function Disponiveis() {
 
   const [carregamentos, setCarregamentos] = useState<Carregamento[]>([]);
   const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
+  const [carregamentosCalendario, setCarregamentosCalendario] = useState<Carregamento[]>([]);
+  const [loadingCarregamentosCalendario, setLoadingCarregamentosCalendario] = useState(false);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
@@ -3862,7 +4256,16 @@ export function Disponiveis() {
         true
       );
       if (res.success) {
-        setDados(res.data);
+        const d = res.data;
+        const ctes = Array.isArray(d?.ctes)
+          ? d.ctes.map((c: any) => ({
+              ...c,
+              emissao: String(c?.emissao ?? ''),
+              chegadaUnid: String(c?.chegadaUnid ?? c?.data_chegada_unid ?? ''),
+              unidAtual: String(c?.unidAtual ?? c?.unid_atual ?? ''),
+            }))
+          : [];
+        setDados({ ...d, ctes });
         setUltimaAtualizacao(res.data.geradoEm);
         setCountdown(300);
       } else {
@@ -3904,7 +4307,12 @@ export function Disponiveis() {
       if (res.success) {
         const d = res.data;
         const ctes = Array.isArray(d?.ctes)
-          ? d.ctes.map((c: any) => ({ ...c, emissao: String(c?.emissao ?? '') }))
+          ? d.ctes.map((c: any) => ({
+              ...c,
+              emissao: String(c?.emissao ?? ''),
+              chegadaUnid: String(c?.chegadaUnid ?? c?.data_chegada_unid ?? ''),
+              unidAtual: String(c?.unidAtual ?? c?.unid_atual ?? ''),
+            }))
           : [];
         setDadosEntrega({ ...d, ctes });
       } else {
@@ -3943,6 +4351,32 @@ export function Disponiveis() {
     }
     finally { setLoadingCarregamentos(false); }
   }, []);
+
+  const carregarCarregamentosCalendario = useCallback(async () => {
+    setLoadingCarregamentosCalendario(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_carregamentos.php`,
+        { method: 'POST', body: JSON.stringify({ modo: 'calendario', dias: 30 }) },
+        true
+      );
+      if (res.success) {
+        const lista = Array.isArray(res.carregamentos) ? res.carregamentos : [];
+        setCarregamentosCalendario(lista);
+      } else {
+        toast.error(res.message || 'Erro ao buscar calendário de carregamentos.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao buscar calendário de carregamentos.');
+    } finally {
+      setLoadingCarregamentosCalendario(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sigla || isMTZ) return;
+    void carregarCarregamentosCalendario();
+  }, [sigla, isMTZ, carregamentos, carregarCarregamentosCalendario]);
 
   const handleImportarCarregamentos = useCallback(async () => {
     if (importandoCarregamentosRef.current) return { success: false, message: 'Importação já em andamento.' };
@@ -4971,6 +5405,7 @@ export function Disponiveis() {
       'NF',
       'Situação',
       'Emissão',
+      'Chegada na Unid.',
       'Prev. Ent.',
       'Pagador',
       'Destinatário',
@@ -4990,6 +5425,7 @@ export function Disponiveis() {
       esc(c.nfiscal || ''),
       esc('NO ARMAZÉM'),
       esc(c.emissao),
+      esc(c.chegadaUnid || ''),
       esc(c.prevEnt),
       esc(c.pagador),
       esc(c.destinatario),
@@ -5009,6 +5445,7 @@ export function Disponiveis() {
       esc(c.nfiscal || ''),
       esc('EM TRÂNSITO'),
       esc(c.emissao),
+      esc(c.chegadaUnid || ''),
       esc(c.prevEnt),
       esc(c.pagador),
       esc(c.destinatario),
@@ -5078,6 +5515,7 @@ export function Disponiveis() {
       'Setor',
       'CTRC',
       'Emissão',
+      'Chegada na Unid.',
       'NF',
       'Situação',
       'Pagador',
@@ -5108,6 +5546,7 @@ export function Disponiveis() {
         esc(c.setor || ''),
         esc(c.ctrc),
         esc(c.emissao || ''),
+        esc(c.chegadaUnid || ''),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.pagador || ''),
@@ -5759,6 +6198,8 @@ export function Disponiveis() {
             sigla={sigla}
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
+            carregamentosCalendario={carregamentosCalendario}
+            loadingCarregamentosCalendario={loadingCarregamentosCalendario}
             linhasOrigem={linhasOrigem}
             loadingLinhasOrigem={loadingLinhasOrigem}
             totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}

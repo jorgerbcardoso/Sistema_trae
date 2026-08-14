@@ -242,6 +242,8 @@ foreach ($linhas as $linha) {
         'serCte'       => $serCte,
         'nroCte'       => $nroCte,
         'emissao'      => '',
+        'chegadaUnid'  => '',
+        'unidAtual'    => '',
         'setor'        => $setor,
         'nfiscal'      => $nfiscal,
         'pagador'      => $pagador,
@@ -271,7 +273,7 @@ foreach ($linhas as $linha) {
 }
 
 $tblCte = "{$domain}_cte";
-$emissaoPorCte = [];
+$infoPorCte = [];
 
 if (!empty($ctes)) {
     $ctrcs = [];
@@ -301,7 +303,9 @@ if (!empty($ctes)) {
             SELECT DISTINCT ON (UPPER(BTRIM(c.ser_cte)), c.nro_cte)
                 UPPER(BTRIM(c.ser_cte)) AS ser_cte,
                 c.nro_cte,
-                TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao
+                TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao,
+                TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
+                COALESCE(c.unid_atual, '') AS unid_atual
             FROM {$tblCte} c
             JOIN req r
               ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
@@ -313,15 +317,21 @@ if (!empty($ctes)) {
         if ($resEmi) {
             while ($row = pg_fetch_assoc($resEmi)) {
                 $k = ((string)($row['ser_cte'] ?? '')) . '|' . (int)($row['nro_cte'] ?? 0);
-                $emissaoPorCte[$k] = (string)($row['emissao'] ?? '');
+                $infoPorCte[$k] = [
+                    'emissao' => (string)($row['emissao'] ?? ''),
+                    'chegadaUnid' => (string)($row['chegada_unid'] ?? ''),
+                    'unidAtual' => (string)($row['unid_atual'] ?? ''),
+                ];
             }
         }
     }
 
     foreach ($ctes as &$c) {
         $k = ((string)($c['serCte'] ?? '')) . '|' . (int)($c['nroCte'] ?? 0);
-        if (isset($emissaoPorCte[$k]) && $emissaoPorCte[$k] !== '') {
-            $c['emissao'] = $emissaoPorCte[$k];
+        if (isset($infoPorCte[$k]) && is_array($infoPorCte[$k])) {
+            if ($infoPorCte[$k]['emissao'] !== '') $c['emissao'] = $infoPorCte[$k]['emissao'];
+            if ($infoPorCte[$k]['chegadaUnid'] !== '') $c['chegadaUnid'] = $infoPorCte[$k]['chegadaUnid'];
+            if ($infoPorCte[$k]['unidAtual'] !== '') $c['unidAtual'] = $infoPorCte[$k]['unidAtual'];
         }
     }
     unset($c);
