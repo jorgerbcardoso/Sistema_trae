@@ -34,6 +34,10 @@ $tabelaLinha = "{$domain}_linha";
 $conn = connect();
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 function parseCsvSiglas($csv) {
     $s = strtoupper(trim((string)$csv));
@@ -574,6 +578,35 @@ if ($acao === 'excluir_todos') {
         respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos.']);
     }
     respondJson(['success' => true]);
+}
+
+// ─── Ação: finalizar carregamento ─────────────────────────────────────────────
+if ($acao === 'finalizar_carregamento') {
+    $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+    if ($placa === '') {
+        respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    }
+
+    $res = pg_query($conn,
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '" . pg_escape_string($conn, $login) . "'
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND data_finalizacao IS NULL"
+    );
+
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro ao finalizar carregamento.']);
+    }
+
+    $affected = pg_affected_rows($res);
+    if ($affected <= 0) {
+        respondJson(['success' => true, 'already' => true]);
+    }
+
+    respondJson(['success' => true, 'updated' => $affected]);
 }
 
 respondJson(['success' => false, 'message' => 'Ação inválida.']);

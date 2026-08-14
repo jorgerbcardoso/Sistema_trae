@@ -33,6 +33,10 @@ $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap   = "{$domain}_carregamento_capacidade";
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 
@@ -97,6 +101,7 @@ function getCtesJaUsadosEmCarregamentos($conn, $tabela, $unidade) {
             "SELECT ser_cte, nro_cte
              FROM {$tabela}
              WHERE unidade = \$1
+               AND data_finalizacao IS NULL
                AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
             [$unidade],
             $conn
@@ -120,6 +125,7 @@ function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
             "SELECT DISTINCT destino
              FROM {$tabela}
              WHERE unidade = \$1
+               AND data_finalizacao IS NULL
                AND destino IS NOT NULL
                AND TRIM(destino) <> ''",
             [$unidade],
@@ -135,6 +141,7 @@ function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
             "SELECT DISTINCT unidades
              FROM {$tabela}
              WHERE unidade = \$1
+               AND data_finalizacao IS NULL
                AND unidades IS NOT NULL
                AND TRIM(unidades) <> ''",
             [$unidade],
@@ -162,7 +169,8 @@ function getOcupacaoPorUnidade($conn, $tabela, $unidade) {
         $res = sql(
             "SELECT placa_provisoria, destino, unidades
              FROM {$tabela}
-             WHERE unidade = \$1",
+             WHERE unidade = \$1
+               AND data_finalizacao IS NULL",
             [$unidade],
             $conn
         );
@@ -441,7 +449,7 @@ function gerarResumos($conn, $tabela, $placa, $unidade) {
                     COALESCE(SUM(cubagem_cte), 0) AS cub_total,
                     COALESCE(SUM(vlr_frete_cte), 0) AS frete_total
              FROM {$tabela}
-             WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0
+             WHERE unidade = \$1 AND placa_provisoria = \$2 AND nro_cte > 0 AND data_finalizacao IS NULL
              GROUP BY COALESCE(NULLIF(destino_cte, ''), '-')
              ORDER BY qtd DESC",
             [$unidade, $placa], $conn
@@ -591,8 +599,9 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
 /**
  * Insere CT-es na tabela de carregamento com destino e unidades em cada linha.
  */
-function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidades, $ctesSelecionados) {
+function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidades, $ctesSelecionados, $nroLinha) {
     $inseridos = 0;
+    $nroLinhaSql = ((int)$nroLinha > 0) ? (int)$nroLinha : null;
     foreach ($ctesSelecionados as $cteData) {
         $nroCte = (int)($cteData['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
@@ -606,6 +615,7 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND data_finalizacao IS NULL
                AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
              LIMIT 1"
@@ -616,6 +626,7 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         $checkOutro = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND data_finalizacao IS NULL
                AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
                AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
@@ -682,13 +693,13 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-              destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
+              destino, unidades, origem_ssw, origem_criacao, unidade_carregamento, nro_linha)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', NULL, 'AUTO', '{$unidCar}')"
+              '{$destEsc}', '{$unidEsc}', NULL, 'AUTO', '{$unidCar}', " . ($nroLinhaSql !== null ? (string)$nroLinhaSql : "NULL") . ")"
         );
 
         if (!$res) {
@@ -746,7 +757,7 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Esta linha não está configurada para carregar hoje.']);
     }
 
-    $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaAuto], $conn);
+    $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 AND data_finalizacao IS NULL LIMIT 1", [$unidade, $placaAuto], $conn);
     if ($check && pg_num_rows($check) > 0) {
         respondJson(['success' => true, 'message' => "Carregamento {$placaAuto} já existe.", 'resultados' => [['placa' => $placaAuto, 'status' => 'ignorado', 'msg' => 'Carregamento já existe.']]]);
     }
@@ -889,7 +900,7 @@ if ($modoAutomatico) {
 
     pg_query($conn, 'BEGIN');
 
-    $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados);
+    $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados, $nroLinha);
     if ($inseridos < 0) {
         pg_query($conn, 'ROLLBACK');
         respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);
@@ -972,7 +983,7 @@ if (!empty($invalid)) {
 
 $paradasCsv = implode(',', $paradas);
 
-$check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1", [$unidade, $placaFinal], $conn);
+$check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 AND data_finalizacao IS NULL LIMIT 1", [$unidade, $placaFinal], $conn);
 if ($check && pg_num_rows($check) > 0) {
     respondJson(['success' => false, 'message' => "Já existe um carregamento com a placa {$placaFinal}."]);
 }
@@ -1004,7 +1015,7 @@ if (empty($ctesSelecionados)) {
 
 pg_query($conn, 'BEGIN');
 
-$inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados);
+$inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados, 0);
 if ($inseridos < 0) {
     pg_query($conn, 'ROLLBACK');
     respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);

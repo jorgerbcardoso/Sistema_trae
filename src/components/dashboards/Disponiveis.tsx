@@ -209,6 +209,10 @@ interface Carregamento {
   data_criacao: string;
   hora_criacao: string;
   login_criacao: string;
+  data_finalizacao?: string | null;
+  hora_finalizacao?: string | null;
+  login_finalizacao?: string | null;
+  nro_linha?: number | null;
   capacidade_ton: number | null;
   capacidade_m3: number | null;
   vlr_min_frete?: number | null;
@@ -1667,6 +1671,7 @@ function CardCarregamento({
   const [novaCapM3, setNovaCapM3] = useState('');
   const [novaVlrMinFrete, setNovaVlrMinFrete] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [finalizando, setFinalizando] = useState(false);
   const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
@@ -1674,6 +1679,30 @@ function CardCarregamento({
   const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
+
+  const finalizarELevarAoSSW = async () => {
+    if (finalizando) return;
+    const placa = carregamento.placa_provisoria;
+    if (!confirm(`Finalizar o carregamento ${placa}?`)) return;
+    setFinalizando(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'finalizar_carregamento', placa }) },
+        true
+      );
+      if (res?.success) {
+        toast.success(`Carregamento ${placa} finalizado.`);
+        await onRecarregarCarregamentos();
+      } else {
+        toast.error(res?.message || 'Erro ao finalizar carregamento.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao finalizar carregamento.');
+    } finally {
+      setFinalizando(false);
+    }
+  };
 
   const abrirCteDetalhe = async () => {
     setCteDetalheDialogOpen(true);
@@ -2033,8 +2062,8 @@ function CardCarregamento({
               <X className="w-3.5 h-3.5 mr-1" />Canc.
             </Button>
           )}
-          <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={() => onCarregarSSW(carregamento.placa_provisoria)} title="Carregar no SSW">
-            <Truck className="w-3.5 h-3.5 mr-1" />SSW
+          <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={finalizarELevarAoSSW} title="Finalizar o carregamento" disabled={finalizando || importandoCarregamentos}>
+            {finalizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Finalizar
           </Button>
           <Button
             size="sm"
@@ -2348,6 +2377,11 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     const MIN_M3 = 67;
 
     const placasExistentes = new Set((carregamentos ?? []).map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+    const linhasEmCarregamento = new Set<number>(
+      (carregamentos ?? [])
+        .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
+        .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
+    );
 
     const hasDiretaPorDestino = new Set<string>();
     for (const l of linhasHoje) {
@@ -2387,11 +2421,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
       const placaAuto = dest ? `${siglaUnidade}-${dest}` : '';
-      const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
+      const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
+      const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
+      const jaExiste = jaExistePlaca || jaExisteLinha;
       const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
       const motivos: string[] = [];
-      if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
+      if (jaExisteLinha) motivos.push(`Linha ${String(nro).padStart(3, '0')} já possui carregamento iniciado.`);
+      if (jaExistePlaca) motivos.push(`Carregamento ${placaAuto} já existe.`);
       if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
 
       const bloqueada = jaExiste || bloqueadaPorDireta;
@@ -2414,13 +2451,20 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
 
   const linhasHojeSemCriadas = React.useMemo(() => {
     const orig = (siglaUnidade ?? '').trim().toUpperCase();
+    const linhasEmCarregamento = new Set<number>(
+      (carregamentos ?? [])
+        .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
+        .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
+    );
     return linhasHoje.filter((l) => {
+      const nro = l.nro_linha ?? 0;
+      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
       return !placasExistentes.has(placaAuto);
     });
-  }, [linhasHoje, placasExistentes, siglaUnidade]);
+  }, [carregamentos, linhasHoje, placasExistentes, siglaUnidade]);
 
   const handleConfirmarManual = async () => {
     if (loading) return;
@@ -3889,7 +3933,8 @@ export function Disponiveis() {
         true
       );
       if (res.success) {
-        setCarregamentos(res.carregamentos ?? []);
+        const lista = Array.isArray(res.carregamentos) ? res.carregamentos : [];
+        setCarregamentos(lista.filter((c: any) => !(c?.data_finalizacao ?? c?.dataFinalizacao)));
       } else {
         toast.error(res.message || 'Erro ao buscar carregamentos.');
       }
@@ -4086,15 +4131,25 @@ export function Disponiveis() {
     return new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
   }, [carregamentos]);
 
+  const linhasEmCarregamento = React.useMemo(() => {
+    return new Set<number>(
+      (carregamentos ?? [])
+        .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
+        .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
+    );
+  }, [carregamentos]);
+
   const linhasCarregamHojeVisiveis = React.useMemo(() => {
     const orig = (unidadeAtual ?? '').trim().toUpperCase();
     return linhasCarregamHojeOrdenadas.filter((l) => {
+      const nro = l.nro_linha ?? 0;
+      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
       return !placasExistentes.has(placaAuto);
     });
-  }, [linhasCarregamHojeOrdenadas, placasExistentes, unidadeAtual]);
+  }, [linhasCarregamHojeOrdenadas, linhasEmCarregamento, placasExistentes, unidadeAtual]);
 
   const handleCarregarTodasLinhasHoje = useCallback(async () => {
     if (carregandoNroLinhaHoje !== null || carregandoTodasLinhasHoje) return;
@@ -4679,6 +4734,11 @@ export function Disponiveis() {
       }
 
       const placasExistentes = new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+      const linhasEmCarregamento = new Set<number>(
+        carregamentos
+          .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
+          .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
+      );
 
       const status: Record<number, LinhaHojeStatus> = {};
       for (const l of linhasCarregamHoje) {
@@ -4704,12 +4764,15 @@ export function Disponiveis() {
         const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
         const placaAuto = dest ? `${unidadeAtual}-${dest}` : '';
-        const jaExiste = placaAuto ? placasExistentes.has(placaAuto) : false;
+        const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
+        const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
+        const jaExiste = jaExistePlaca || jaExisteLinha;
 
         const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
         const motivos: string[] = [];
-        if (jaExiste) motivos.push(`Carregamento ${placaAuto} já existe.`);
+        if (jaExisteLinha) motivos.push(`Linha ${String(nro).padStart(3, '0')} já possui carregamento iniciado.`);
+        if (jaExistePlaca) motivos.push(`Carregamento ${placaAuto} já existe.`);
         if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
         const bloqueada = jaExiste || bloqueadaPorDireta;
 

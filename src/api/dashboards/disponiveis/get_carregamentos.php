@@ -32,6 +32,10 @@ $tabelaCap          = "{$domain}_carregamento_capacidade";
 $tabelaLinha        = "{$domain}_linha";
 
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 // ─── Busca carregamentos agrupados por placa ──────────────────────────────────
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
@@ -55,6 +59,10 @@ $sqlCarregamentos = "
         MIN(c.data_inclusao)                    AS data_criacao,
         MIN(c.hora_inclusao)                    AS hora_criacao,
         MIN(c.login_inclusao)                   AS login_criacao,
+        MAX(c.data_finalizacao)                 AS data_finalizacao,
+        MAX(c.hora_finalizacao)                 AS hora_finalizacao,
+        MAX(c.login_finalizacao)                AS login_finalizacao,
+        MAX(c.nro_linha)                        AS nro_linha,
         (SELECT destino  FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND destino  IS NOT NULL AND destino  <> '' LIMIT 1) AS destino,
         (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' LIMIT 1) AS paradas,
         v.capacidade_ton,
@@ -68,6 +76,7 @@ $sqlCarregamentos = "
            ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = \$1
     GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
+    HAVING MAX(c.data_finalizacao) IS NULL
     ORDER BY MIN(c.data_inclusao) DESC, MIN(c.hora_inclusao) DESC
 ";
 
@@ -116,6 +125,10 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'data_criacao'     => $row['data_criacao'] ?? null,
         'hora_criacao'     => $row['hora_criacao'] ?? null,
         'login_criacao'    => $row['login_criacao'] ?? '',
+        'data_finalizacao' => $row['data_finalizacao'] ?? null,
+        'hora_finalizacao' => $row['hora_finalizacao'] ?? null,
+        'login_finalizacao' => $row['login_finalizacao'] ?? null,
+        'nro_linha'        => ($row['nro_linha'] !== null && $row['nro_linha'] !== '') ? (int)$row['nro_linha'] : null,
         'capacidade_ton'   => $capTon,
         'capacidade_m3'    => $capM3,
         'vlr_min_frete'    => $vlrMinFrete,
@@ -204,6 +217,7 @@ $sqlCtes = "
         c.hora_inclusao
     FROM {$tabelaCarregamento} c
     WHERE c.unidade = \$1
+      AND c.data_finalizacao IS NULL
       AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
 ";
