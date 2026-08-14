@@ -3519,6 +3519,17 @@ function CarregamentoArea({
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, []);
+  const diasScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!calOpen) return;
+    const el = diasScrollRef.current;
+    if (!el) return;
+    window.setTimeout(() => {
+      if (!diasScrollRef.current) return;
+      diasScrollRef.current.scrollLeft = diasScrollRef.current.scrollWidth;
+    }, 0);
+  }, [calOpen]);
 
   const ultimosDias = React.useMemo(() => {
     const d = new Date();
@@ -3774,7 +3785,7 @@ function CarregamentoArea({
 
         {calOpen && (
           <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <div ref={diasScrollRef} className="flex items-center gap-2 overflow-x-auto pb-1">
               {ultimosDias.map((k) => {
                 const isSel = k === diaSel;
                 const count = calCountByDay.get(k) ?? 0;
@@ -3814,7 +3825,7 @@ function CarregamentoArea({
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                       <th className="px-3 py-2 text-left"><CalTh col="placa">Placa</CalTh></th>
-                      <th className="px-3 py-2 text-left"><CalTh col="linha">Linha</CalTh></th>
+                      <th className="px-3 py-2 text-left min-w-[280px]"><CalTh col="linha">Linha</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="destino">Destino</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="inter">Intermediárias</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete</CalTh></th>
@@ -3838,13 +3849,19 @@ function CarregamentoArea({
                       const fimTs = fimK ? toTs(fimK, c.hora_finalizacao) : null;
                       const end = fimTs ?? Date.now();
                       const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
+                      const isFinalizado = !!fimK;
                       const linhaNum = Number(c.nro_linha ?? 0) || 0;
                       const linhaNome = String(c.linha_nome ?? '').trim();
                       const linhaLabel = linhaNum > 0 ? `${String(linhaNum).padStart(3, '0')}${linhaNome ? ` - ${linhaNome}` : ''}` : '-';
                       return (
-                        <tr key={c.placa_provisoria} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                        <tr
+                          key={c.placa_provisoria}
+                          className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
+                            isFinalizado ? 'bg-emerald-50/60 dark:bg-emerald-950/15' : 'bg-red-50/60 dark:bg-red-950/15'
+                          }`}
+                        >
                           <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{String(c.placa_provisoria ?? '').toUpperCase()}</td>
-                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap max-w-[200px] truncate" title={linhaLabel}>{linhaLabel}</td>
+                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap max-w-[360px] truncate" title={linhaLabel}>{linhaLabel}</td>
                           <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
                           <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={String(c.paradas ?? '')}>{String(c.paradas ?? '') || '-'}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_frete ?? 0) || 0)}</td>
