@@ -705,6 +705,16 @@ function GrupoDestinoCard({
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
     const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+    const diasParado = (chegada: string) => {
+      const s = String(chegada ?? '').trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return '';
+      const dt = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diff = Math.floor((hoje.getTime() - dt.getTime()) / 86400000);
+      return diff >= 0 && Number.isFinite(diff) ? String(diff) : '';
+    };
 
     const header = [
       'Destino',
@@ -713,6 +723,7 @@ function GrupoDestinoCard({
       'Situação',
       'Emissão',
       'Chegada na Unid.',
+      'Parado (dias)',
       'Prev. Ent.',
       'Pagador',
       'Destinatário',
@@ -735,6 +746,7 @@ function GrupoDestinoCard({
         esc(situacao),
         esc(c.emissao),
         esc(c.chegadaUnid || ''),
+        esc(diasParado(c.chegadaUnid || '')),
         esc(c.prevEnt),
         esc(c.pagador),
         esc(c.destinatario),
@@ -1200,12 +1212,23 @@ function GrupoSetorCard({
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
     const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+    const diasParado = (chegada: string) => {
+      const s = String(chegada ?? '').trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return '';
+      const dt = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diff = Math.floor((hoje.getTime() - dt.getTime()) / 86400000);
+      return diff >= 0 && Number.isFinite(diff) ? String(diff) : '';
+    };
 
     const header = [
       'Setor',
       'CTRC',
       'Emissão',
       'Chegada na Unid.',
+      'Parado (dias)',
       'NF',
       'Situação',
       'Pagador',
@@ -1237,6 +1260,7 @@ function GrupoSetorCard({
         esc(c.ctrc),
         esc(c.emissao || ''),
         esc(c.chegadaUnid || ''),
+        esc(diasParado(c.chegadaUnid || '')),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.pagador || ''),
@@ -5413,6 +5437,16 @@ export function Disponiveis() {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
     const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+    const diasParado = (chegada: string) => {
+      const s = String(chegada ?? '').trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return '';
+      const dt = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diff = Math.floor((hoje.getTime() - dt.getTime()) / 86400000);
+      return diff >= 0 && Number.isFinite(diff) ? String(diff) : '';
+    };
 
     const downloadCsv = (filename: string, header: string[], rows: string[][]) => {
       if (!rows.length) return;
@@ -5437,6 +5471,7 @@ export function Disponiveis() {
       'Situação',
       'Emissão',
       'Chegada na Unid.',
+      'Parado (dias)',
       'Prev. Ent.',
       'Pagador',
       'Destinatário',
@@ -5457,6 +5492,7 @@ export function Disponiveis() {
       esc('NO ARMAZÉM'),
       esc(c.emissao),
       esc(c.chegadaUnid || ''),
+      esc(diasParado(c.chegadaUnid || '')),
       esc(c.prevEnt),
       esc(c.pagador),
       esc(c.destinatario),
@@ -5477,6 +5513,7 @@ export function Disponiveis() {
       esc('EM TRÂNSITO'),
       esc(c.emissao),
       esc(c.chegadaUnid || ''),
+      esc(diasParado(c.chegadaUnid || '')),
       esc(c.prevEnt),
       esc(c.pagador),
       esc(c.destinatario),
@@ -5541,12 +5578,23 @@ export function Disponiveis() {
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const fmtMoeda = (n: number) => n.toFixed(2).replace('.', ',');
     const fmtNum = (n: number, dec: number) => n.toFixed(dec).replace('.', ',');
+    const diasParado = (chegada: string) => {
+      const s = String(chegada ?? '').trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return '';
+      const dt = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diff = Math.floor((hoje.getTime() - dt.getTime()) / 86400000);
+      return diff >= 0 && Number.isFinite(diff) ? String(diff) : '';
+    };
 
     const header = [
       'Setor',
       'CTRC',
       'Emissão',
       'Chegada na Unid.',
+      'Parado (dias)',
       'NF',
       'Situação',
       'Pagador',
@@ -5578,6 +5626,7 @@ export function Disponiveis() {
         esc(c.ctrc),
         esc(c.emissao || ''),
         esc(c.chegadaUnid || ''),
+        esc(diasParado(c.chegadaUnid || '')),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.pagador || ''),
