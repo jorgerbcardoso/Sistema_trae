@@ -343,7 +343,7 @@ if ($headerLine !== null) {
         }
 
         $ctrc = trim(substr($linha, 0, 13));
-        if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+        if (!preg_match('/^[A-Z0-9]{3}\d{6}-\d$/', $ctrc)) continue;
 
         $tipo        = trim(substr($linha, 14, 1));
         $autor       = trim(substr($linha, 16, 5));
@@ -435,39 +435,40 @@ $tblCte = "{$domain}_cte";
 $infoPorCte = [];
 
 if (!empty($ctes)) {
-    $pares = [];
+    $ctrcs = [];
     $seen = [];
     foreach ($ctes as $c) {
-        $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
-        $nro = (int)($c['nroCte'] ?? 0);
-        if ($ser === '' || $nro <= 0) continue;
-        $k = $ser . '|' . $nro;
-        if (isset($seen[$k])) continue;
-        $seen[$k] = true;
-        $pares[] = [$ser, $nro];
+        $ctrc = strtoupper(trim((string)($c['ctrc'] ?? '')));
+        if ($ctrc === '') continue;
+        if (isset($seen[$ctrc])) continue;
+        $seen[$ctrc] = true;
+        $ctrcs[] = $ctrc;
     }
 
-    foreach (array_chunk($pares, 500) as $chunk) {
+    foreach (array_chunk($ctrcs, 500) as $chunk) {
         $params = [];
         $values = [];
         $p = 1;
-        foreach ($chunk as $par) {
-            $values[] = "($" . $p . ", $" . ($p + 1) . ")";
-            $params[] = $par[0];
-            $params[] = $par[1];
-            $p += 2;
+        foreach ($chunk as $ctrc) {
+            $values[] = "($" . $p . ")";
+            $params[] = $ctrc;
+            $p += 1;
         }
         if (empty($values)) continue;
 
         $q = "
-            WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $values) . ")
-            SELECT
+            WITH req(ctrc) AS (VALUES " . implode(',', $values) . ")
+            SELECT DISTINCT ON (UPPER(BTRIM(c.ser_cte)), c.nro_cte)
                 UPPER(BTRIM(c.ser_cte)) AS ser_cte,
                 c.nro_cte,
                 TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
                 COALESCE(c.unid_atual, '') AS unid_atual
             FROM {$tblCte} c
-            JOIN req r ON UPPER(BTRIM(r.ser_cte)) = UPPER(BTRIM(c.ser_cte)) AND r.nro_cte = c.nro_cte
+            JOIN req r
+              ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
+             AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
+             AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
+            ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_chegada_unid DESC NULLS LAST
         ";
         $resInfo = @pg_query_params($g_sql, $q, $params);
         if ($resInfo) {
@@ -483,7 +484,18 @@ if (!empty($ctes)) {
 
     $tsHoje = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
     foreach ($ctes as &$c) {
-        $k = strtoupper(trim((string)($c['serCte'] ?? ''))) . '|' . (int)($c['nroCte'] ?? 0);
+        $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
+        $nro = (int)($c['nroCte'] ?? 0);
+        if ($ser === '' || $nro <= 0) {
+            $ctrc = strtoupper(trim((string)($c['ctrc'] ?? '')));
+            if ($ctrc !== '' && preg_match('/^([A-Z0-9]{3})(\d{6})-/', $ctrc, $m)) {
+                $ser = strtoupper($m[1]);
+                $nro = (int)$m[2];
+                $c['serCte'] = $ser;
+                $c['nroCte'] = $nro;
+            }
+        }
+        $k = $ser . '|' . $nro;
         if (isset($infoPorCte[$k]) && is_array($infoPorCte[$k])) {
             $c['chegadaUnid'] = $infoPorCte[$k]['chegadaUnid'] ?? '';
             $c['unidAtual'] = $infoPorCte[$k]['unidAtual'] ?? '';
