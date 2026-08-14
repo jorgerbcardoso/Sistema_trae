@@ -211,6 +211,10 @@ interface Carregamento {
   placa_provisoria: string;
   origem_criacao?: 'MANUAL' | 'AUTO' | 'SSW' | null;
   total_ctes: number;
+  total_frete?: number;
+  total_mercadoria?: number;
+  total_peso?: number;
+  total_cubagem?: number;
   data_criacao: string;
   hora_criacao: string;
   login_criacao: string;
@@ -218,6 +222,9 @@ interface Carregamento {
   hora_finalizacao?: string | null;
   login_finalizacao?: string | null;
   nro_linha?: number | null;
+  linha_nome?: string | null;
+  linha_dest?: string | null;
+  linha_unidades?: string | null;
   capacidade_ton: number | null;
   capacidade_m3: number | null;
   vlr_min_frete?: number | null;
@@ -3508,6 +3515,10 @@ function CarregamentoArea({
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+  const hojeKey = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
 
   const ultimosDias = React.useMemo(() => {
     const d = new Date();
@@ -3577,20 +3588,6 @@ function CarregamentoArea({
     return `${h}h${String(m).padStart(2, '0')}`;
   };
 
-  const linhaCarregaEm = (l: LinhaCarregamento, key: string): boolean => {
-    const m = String(key ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return false;
-    const dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 0, 0, 0, 0);
-    const dow = dt.getDay();
-    if (dow === 0) return !!l.carrega_dom;
-    if (dow === 1) return !!l.carrega_seg;
-    if (dow === 2) return !!l.carrega_ter;
-    if (dow === 3) return !!l.carrega_qua;
-    if (dow === 4) return !!l.carrega_qui;
-    if (dow === 5) return !!l.carrega_sex;
-    return !!l.carrega_sab;
-  };
-
   const calNorm = React.useMemo(() => {
     const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
     return list.map((c) => {
@@ -3600,134 +3597,161 @@ function CarregamentoArea({
     });
   }, [carregamentosCalendario]);
 
-  const calIniCount = React.useMemo(() => {
-    const m = new Map<string, number>();
-    for (const x of calNorm) {
-      if (!x.iniKey) continue;
-      m.set(x.iniKey, (m.get(x.iniKey) ?? 0) + 1);
-    }
-    return m;
-  }, [calNorm]);
-
-  const calFimCount = React.useMemo(() => {
-    const m = new Map<string, number>();
-    for (const x of calNorm) {
-      if (!x.fimKey) continue;
-      m.set(x.fimKey, (m.get(x.fimKey) ?? 0) + 1);
-    }
-    return m;
-  }, [calNorm]);
-
-  const itensFinalizadosDia = React.useMemo(() => {
-    return calNorm
-      .filter((x) => x.fimKey === diaSel)
-      .sort((a, b) => String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? '')));
-  }, [calNorm, diaSel]);
-
-  const itensIniciadosDiaNaoFinal = React.useMemo(() => {
-    return calNorm
-      .filter((x) => x.iniKey === diaSel && !x.fimKey)
-      .sort((a, b) => String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? '')));
-  }, [calNorm, diaSel]);
-
-  const itensAtivos = React.useMemo(() => {
-    return calNorm
-      .filter((x) => !x.fimKey)
-      .sort((a, b) => {
-        const da = toKey((a.c as any).data_criacao);
-        const db = toKey((b.c as any).data_criacao);
-        if (da !== db) return String(da).localeCompare(String(db));
-        return String(a.c.placa_provisoria ?? '').localeCompare(String(b.c.placa_provisoria ?? ''));
-      });
-  }, [calNorm]);
-
-  const itensAtivosParaLista = React.useMemo(() => {
-    if (itensIniciadosDiaNaoFinal.length === 0) return itensAtivos;
-    const startedToday = new Set(itensIniciadosDiaNaoFinal.map((x) => String(x.c.placa_provisoria ?? '')));
-    return itensAtivos.filter((x) => !startedToday.has(String(x.c.placa_provisoria ?? '')));
-  }, [itensAtivos, itensIniciadosDiaNaoFinal]);
-
-  const linhasAgendadasDia = React.useMemo(() => {
-    const list = Array.isArray(linhasOrigem) ? linhasOrigem : [];
-    return list.filter((l) => linhaCarregaEm(l, diaSel));
-  }, [linhasOrigem, diaSel]);
-
-  const linhasAtivas = React.useMemo(() => {
-    const set = new Set<number>();
-    for (const x of itensAtivos) {
-      const n = (x.c as any).nro_linha ?? (x.c as any).nroLinha ?? 0;
-      if (typeof n === 'number' && n > 0) set.add(n);
-    }
-    return set;
-  }, [itensAtivos]);
-
-  const linhasComRegistroNoDia = React.useMemo(() => {
-    const set = new Set<number>();
-    for (const x of calNorm) {
-      const n = (x.c as any).nro_linha ?? (x.c as any).nroLinha ?? 0;
-      if (!(typeof n === 'number' && n > 0)) continue;
-      if (x.iniKey === diaSel || x.fimKey === diaSel) set.add(n);
-    }
-    return set;
-  }, [calNorm, diaSel]);
-
-  const linhasNaoIniciadas = React.useMemo(() => {
-    return linhasAgendadasDia
-      .filter((l) => {
-        const n = l.nro_linha ?? 0;
-        if (n <= 0) return false;
-        if (linhasAtivas.has(n)) return false;
-        if (linhasComRegistroNoDia.has(n)) return false;
-        return true;
-      })
-      .sort((a, b) => (a.nro_linha ?? 0) - (b.nro_linha ?? 0));
-  }, [linhasAgendadasDia, linhasAtivas, linhasComRegistroNoDia]);
-
-  const LinhaBadge = ({ kind }: { kind: 'nao_iniciado' | 'ativo' | 'finalizado' }) => {
-    if (kind === 'nao_iniciado') return <Badge className="bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 text-[10px]">NÃO INICIADO</Badge>;
-    if (kind === 'finalizado') return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 text-[10px]">FINALIZADO</Badge>;
-    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">EM ANDAMENTO</Badge>;
+  const isPresentOnDay = (x: { iniKey: string; fimKey: string }, dayKey: string): boolean => {
+    if (!x.iniKey) return false;
+    if (x.iniKey > dayKey) return false;
+    if (x.fimKey && x.fimKey < dayKey) return false;
+    return true;
   };
 
-  const renderCarregamentoItem = (car: Carregamento, kind: 'ativo' | 'finalizado') => {
-    const iniKey = toKey((car as any).data_criacao);
-    const fimKey = toKey((car as any).data_finalizacao);
-    const iniTs = toTs(iniKey, (car as any).hora_criacao);
-    const fimTs = fimKey ? toTs(fimKey, (car as any).hora_finalizacao) : null;
-    const durMin = iniTs != null && fimTs != null ? Math.max(0, Math.round((fimTs - iniTs) / 60000)) : null;
-    const nroLinha = (car as any).nro_linha ?? (car as any).nroLinha ?? null;
-    const destino = String((car as any).destino ?? '').trim().toUpperCase();
+  const calCountByDay = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of ultimosDias) {
+      let count = 0;
+      for (const x of calNorm) {
+        if (isPresentOnDay(x as any, d)) count += 1;
+      }
+      m.set(d, count);
+    }
+    return m;
+  }, [ultimosDias, calNorm]);
+
+  type CalSortCol =
+    | 'placa'
+    | 'linha'
+    | 'destino'
+    | 'inter'
+    | 'frete'
+    | 'merc'
+    | 'peso'
+    | 'cub'
+    | 'inicio'
+    | 'fim'
+    | 'tempo';
+
+  const [calSortCol, setCalSortCol] = useState<CalSortCol>('inicio');
+  const [calSortDir, setCalSortDir] = useState<'asc' | 'desc'>('desc');
+  const [calPage, setCalPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCalPage(1);
+  }, [diaSel]);
+
+  const calItemsDia = React.useMemo(() => {
+    return calNorm
+      .filter((x) => isPresentOnDay(x as any, diaSel))
+      .map((x) => x.c);
+  }, [calNorm, diaSel]);
+
+  const fmtMoney = (n: number) =>
+    (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const fmtNum = (n: number, dec: number) =>
+    (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+
+  const dtLabel = (dateKey: string, timeVal: any): string => {
+    const k = toKey(dateKey);
+    if (!k) return '';
+    const h = fmtHora(k, timeVal);
+    return `${fmtDiaBrAno(k)}${h ? ` ${h}` : ''}`;
+  };
+
+  const calSorted = React.useMemo(() => {
+    const dir = calSortDir === 'asc' ? 1 : -1;
+    const now = Date.now();
+    const getStr = (v: any) => String(v ?? '').trim().toUpperCase();
+    const getNum = (c: Carregamento): number => {
+      switch (calSortCol) {
+        case 'linha': return Number(c.nro_linha ?? 0) || 0;
+        case 'frete': return Number(c.total_frete ?? 0) || 0;
+        case 'merc': return Number(c.total_mercadoria ?? 0) || 0;
+        case 'peso': return Number(c.total_peso ?? 0) || 0;
+        case 'cub': return Number(c.total_cubagem ?? 0) || 0;
+        case 'inicio': {
+          const k = toKey(c.data_criacao);
+          return toTs(k, c.hora_criacao) ?? 0;
+        }
+        case 'fim': {
+          const k = toKey(c.data_finalizacao);
+          return k ? (toTs(k, c.hora_finalizacao) ?? 0) : 0;
+        }
+        case 'tempo': {
+          const iniK = toKey(c.data_criacao);
+          const iniTs = toTs(iniK, c.hora_criacao);
+          if (iniTs == null) return 0;
+          const fimK = toKey(c.data_finalizacao);
+          const fimTs = fimK ? toTs(fimK, c.hora_finalizacao) : null;
+          const end = fimTs ?? now;
+          return Math.max(0, Math.round((end - iniTs) / 60000));
+        }
+        default:
+          return 0;
+      }
+    };
+    const copy = [...calItemsDia];
+    copy.sort((a, b) => {
+      if (calSortCol === 'placa') return dir * getStr(a.placa_provisoria).localeCompare(getStr(b.placa_provisoria));
+      if (calSortCol === 'linha') return dir * (getNum(a) - getNum(b));
+      if (calSortCol === 'destino') return dir * getStr(a.destino).localeCompare(getStr(b.destino));
+      if (calSortCol === 'inter') return dir * getStr(a.paradas).localeCompare(getStr(b.paradas));
+      if (calSortCol === 'frete' || calSortCol === 'merc' || calSortCol === 'peso' || calSortCol === 'cub' || calSortCol === 'inicio' || calSortCol === 'fim' || calSortCol === 'tempo') {
+        return dir * (getNum(a) - getNum(b));
+      }
+      return 0;
+    });
+    return copy;
+  }, [calItemsDia, calSortCol, calSortDir]);
+
+  const calTotals = React.useMemo(() => {
+    return calSorted.reduce(
+      (acc, c) => {
+        acc.frete += Number(c.total_frete ?? 0) || 0;
+        acc.merc += Number(c.total_mercadoria ?? 0) || 0;
+        acc.peso += Number(c.total_peso ?? 0) || 0;
+        acc.cub += Number(c.total_cubagem ?? 0) || 0;
+        return acc;
+      },
+      { frete: 0, merc: 0, peso: 0, cub: 0 }
+    );
+  }, [calSorted]);
+
+  const totalPages = Math.max(1, Math.ceil(calSorted.length / pageSize));
+  const calPageSafe = Math.min(Math.max(calPage, 1), totalPages);
+
+  useEffect(() => {
+    if (calPage !== calPageSafe) setCalPage(calPageSafe);
+  }, [calPage, calPageSafe]);
+
+  const calPageItems = React.useMemo(() => {
+    const start = (calPageSafe - 1) * pageSize;
+    return calSorted.slice(start, start + pageSize);
+  }, [calSorted, calPageSafe]);
+
+  const toggleCalSort = (col: CalSortCol) => {
+    if (calSortCol === col) setCalSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setCalSortCol(col);
+      setCalSortDir(col === 'placa' || col === 'linha' || col === 'destino' || col === 'inter' ? 'asc' : 'desc');
+    }
+  };
+
+  const CalTh = ({ col, children, align }: { col: CalSortCol; children: React.ReactNode; align?: 'left' | 'right' | 'center' }) => {
+    const base =
+      align === 'right' ? 'justify-end text-right' :
+      align === 'center' ? 'justify-center text-center' :
+      'justify-start text-left';
     return (
-      <div className="flex items-start justify-between gap-3 py-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{String(car.placa_provisoria ?? '').toUpperCase()}</span>
-            <LinhaBadge kind={kind === 'finalizado' ? 'finalizado' : 'ativo'} />
-            {typeof nroLinha === 'number' && nroLinha > 0 ? (
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">Linha {String(nroLinha).padStart(3, '0')}</Badge>
-            ) : null}
-            {destino ? (
-              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200 text-[10px]">{destino}</Badge>
-            ) : null}
-          </div>
-          <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>
-              Início: <span className="font-mono">{iniKey ? `${fmtDiaBrAno(iniKey)} ${fmtHora(iniKey, (car as any).hora_criacao)}`.trim() : '-'}</span>
-            </span>
-            <span>
-              Fim: <span className="font-mono">{fimKey ? `${fmtDiaBrAno(fimKey)} ${fmtHora(fimKey, (car as any).hora_finalizacao)}`.trim() : '-'}</span>
-            </span>
-            <span>
-              Tempo: <span className="font-mono">{durMin != null ? fmtDuracao(durMin) : '-'}</span>
-            </span>
-          </div>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {String((car as any).login_criacao ?? '').trim() ? <span className="font-mono">{String((car as any).login_criacao ?? '').trim()}</span> : null}
-          </div>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => toggleCalSort(col)}
+        className={`w-full flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors ${base}`}
+      >
+        {children}
+        {calSortCol === col
+          ? (calSortDir === 'asc' ? <ChevronDown className="w-3 h-3 shrink-0 rotate-180" /> : <ChevronDown className="w-3 h-3 shrink-0" />)
+          : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
+      </button>
     );
   };
 
@@ -3751,22 +3775,9 @@ function CarregamentoArea({
         {calOpen && (
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 text-[11px] shrink-0"
-                onClick={() => {
-                  const d = new Date();
-                  setDiaSel(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-                }}
-              >
-                HOJE
-              </Button>
               {ultimosDias.map((k) => {
                 const isSel = k === diaSel;
-                const ini = calIniCount.get(k) ?? 0;
-                const fim = calFimCount.get(k) ?? 0;
+                const count = calCountByDay.get(k) ?? 0;
                 return (
                   <button
                     key={k}
@@ -3779,10 +3790,10 @@ function CarregamentoArea({
                     onClick={() => setDiaSel(k)}
                     title={fmtDiaBrAno(k)}
                   >
-                    <span className="font-mono">{fmtDiaBr(k)}</span>
-                    <span className={`text-[10px] font-mono tabular-nums ${isSel ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {ini}/{fim}
-                    </span>
+                    <span className="font-mono">{k === hojeKey ? 'HOJE' : fmtDiaBr(k)}</span>
+                    <Badge className={isSel ? 'bg-white/20 text-white text-[10px]' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]'}>
+                      {count}
+                    </Badge>
                   </button>
                 );
               })}
@@ -3790,84 +3801,87 @@ function CarregamentoArea({
 
             <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
               <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                  {fmtDiaBrAno(diaSel)}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                  <span>Não iniciados: <span className="font-mono font-semibold">{linhasNaoIniciadas.length}</span></span>
-                  <span>Ativos: <span className="font-mono font-semibold">{itensAtivos.length}</span></span>
-                  <span>Finalizados: <span className="font-mono font-semibold">{itensFinalizadosDia.length}</span></span>
+                <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">{fmtDiaBrAno(diaSel)}</div>
+                <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-300">
+                  <span>Frete: <span className="font-mono font-semibold">{fmtMoney(calTotals.frete)}</span></span>
+                  <span>Merc.: <span className="font-mono font-semibold">{fmtMoney(calTotals.merc)}</span></span>
+                  <span>Registros: <span className="font-mono font-semibold">{calSorted.length}</span></span>
                 </div>
               </div>
 
-              <div className="px-3 py-2">
-                {linhasNaoIniciadas.length > 0 ? (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Deveria ter iniciado e não iniciou</div>
-                      <Badge className="bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 text-[10px]">{linhasNaoIniciadas.length}</Badge>
-                    </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {linhasNaoIniciadas.map((l) => (
-                        <div key={l.nro_linha} className="flex items-start justify-between gap-3 py-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">Linha {String(l.nro_linha).padStart(3, '0')}</span>
-                              <LinhaBadge kind="nao_iniciado" />
-                              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200 text-[10px]">{String(l.sigla_dest ?? '').toUpperCase()}</Badge>
-                            </div>
-                            <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-300 truncate">{l.nome}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <th className="px-3 py-2 text-left"><CalTh col="placa">Placa</CalTh></th>
+                      <th className="px-3 py-2 text-left"><CalTh col="linha">Linha</CalTh></th>
+                      <th className="px-3 py-2 text-left"><CalTh col="destino">Destino</CalTh></th>
+                      <th className="px-3 py-2 text-left"><CalTh col="inter">Intermediárias</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="merc" align="right">Mercadoria</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="peso" align="right">Peso</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="cub" align="right">Cubagem</CalTh></th>
+                      <th className="px-3 py-2 text-left"><CalTh col="inicio">Início</CalTh></th>
+                      <th className="px-3 py-2 text-left"><CalTh col="fim">Fim</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="tempo" align="right">Tempo</CalTh></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calPageItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
+                      </tr>
+                    ) : calPageItems.map((c) => {
+                      const iniK = toKey(c.data_criacao);
+                      const fimK = toKey(c.data_finalizacao);
+                      const iniTs = toTs(iniK, c.hora_criacao);
+                      const fimTs = fimK ? toTs(fimK, c.hora_finalizacao) : null;
+                      const end = fimTs ?? Date.now();
+                      const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
+                      const linhaNum = Number(c.nro_linha ?? 0) || 0;
+                      const linhaNome = String(c.linha_nome ?? '').trim();
+                      const linhaLabel = linhaNum > 0 ? `${String(linhaNum).padStart(3, '0')}${linhaNome ? ` - ${linhaNome}` : ''}` : '-';
+                      return (
+                        <tr key={c.placa_provisoria} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                          <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{String(c.placa_provisoria ?? '').toUpperCase()}</td>
+                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap max-w-[200px] truncate" title={linhaLabel}>{linhaLabel}</td>
+                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
+                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={String(c.paradas ?? '')}>{String(c.paradas ?? '') || '-'}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_frete ?? 0) || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_mercadoria ?? 0) || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</td>
+                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{iniK ? dtLabel(iniK, c.hora_criacao) : ''}</td>
+                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabel(fimK, c.hora_finalizacao) : ''}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700">
+                      <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200" colSpan={4}>Total</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.frete)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.merc)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.peso, 2)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.cub, 3)}</td>
+                      <td className="px-3 py-2" colSpan={3} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
-                {itensIniciadosDiaNaoFinal.length > 0 ? (
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Iniciados no dia e não finalizados</div>
-                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">{itensIniciadosDiaNaoFinal.length}</Badge>
-                    </div>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {itensIniciadosDiaNaoFinal.map((x) => (
-                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'ativo')}</div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mb-3">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Em andamento (não finalizados)</div>
-                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 text-[10px]">{itensAtivos.length}</Badge>
-                  </div>
-                  {itensAtivosParaLista.length === 0 ? (
-                    <div className="py-2 text-[11px] text-slate-500 dark:text-slate-400">—</div>
-                  ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {itensAtivosParaLista.map((x) => (
-                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'ativo')}</div>
-                      ))}
-                    </div>
-                  )}
+              <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
+                <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Página <span className="font-mono font-semibold">{calPageSafe}</span> / <span className="font-mono font-semibold">{totalPages}</span>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Finalizados no dia</div>
-                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 text-[10px]">{itensFinalizadosDia.length}</Badge>
-                  </div>
-                  {itensFinalizadosDia.length === 0 ? (
-                    <div className="py-2 text-[11px] text-slate-500 dark:text-slate-400">—</div>
-                  ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {itensFinalizadosDia.map((x) => (
-                        <div key={x.c.placa_provisoria}>{renderCarregamentoItem(x.c, 'finalizado')}</div>
-                      ))}
-                    </div>
-                  )}
+                <div className="flex items-center gap-2">
+                  <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" disabled={calPageSafe <= 1} onClick={() => setCalPage((p) => Math.max(1, p - 1))}>
+                    Anterior
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" disabled={calPageSafe >= totalPages} onClick={() => setCalPage((p) => Math.min(totalPages, p + 1))}>
+                    Próxima
+                  </Button>
                 </div>
               </div>
             </div>

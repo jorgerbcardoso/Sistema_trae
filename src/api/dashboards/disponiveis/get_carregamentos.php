@@ -62,8 +62,12 @@ $sqlCarregamentos = "
                 ELSE 0
             END
         ) AS total_ctes,
-        MIN(c.data_inclusao)                    AS data_criacao,
-        MIN(c.hora_inclusao)                    AS hora_criacao,
+        COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0)), 0) AS total_frete,
+        COALESCE(SUM(COALESCE(c.vlr_merc_cte, 0)), 0)  AS total_mercadoria,
+        COALESCE(SUM(COALESCE(c.peso_cte, 0)), 0)      AS total_peso,
+        COALESCE(SUM(COALESCE(c.cubagem_cte, 0)), 0)   AS total_cubagem,
+        MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
+        MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
         MIN(c.login_inclusao)                   AS login_criacao,
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
@@ -139,15 +143,26 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         if (preg_match('/^[A-Z0-9]{2,5}-[A-Z0-9]{2,5}$/', $placa)) $origemCriacao = 'AUTO';
         else $origemCriacao = 'MANUAL';
     }
+    $inicioTs = (string)($row['inicio_ts'] ?? '');
+    $fimTs = (string)($row['fim_ts'] ?? '');
+    $dataCriacao = $inicioTs !== '' ? substr($inicioTs, 0, 10) : ($row['data_criacao'] ?? null);
+    $horaCriacao = $inicioTs !== '' ? substr($inicioTs, 11, 8) : ($row['hora_criacao'] ?? null);
+    $dataFinal = $fimTs !== '' ? substr($fimTs, 0, 10) : ($row['data_finalizacao'] ?? null);
+    $horaFinal = $fimTs !== '' ? substr($fimTs, 11, 8) : ($row['hora_finalizacao'] ?? null);
+
     $carregamentos[] = [
         'placa_provisoria' => $placa,
         'origem_criacao'   => $origemCriacao,
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
-        'data_criacao'     => $row['data_criacao'] ?? null,
-        'hora_criacao'     => $row['hora_criacao'] ?? null,
+        'total_frete'      => (float)($row['total_frete'] ?? 0),
+        'total_mercadoria' => (float)($row['total_mercadoria'] ?? 0),
+        'total_peso'       => (float)($row['total_peso'] ?? 0),
+        'total_cubagem'    => (float)($row['total_cubagem'] ?? 0),
+        'data_criacao'     => $dataCriacao,
+        'hora_criacao'     => $horaCriacao,
         'login_criacao'    => $row['login_criacao'] ?? '',
-        'data_finalizacao' => $row['data_finalizacao'] ?? null,
-        'hora_finalizacao' => $row['hora_finalizacao'] ?? null,
+        'data_finalizacao' => $dataFinal,
+        'hora_finalizacao' => $horaFinal,
         'login_finalizacao' => $row['login_finalizacao'] ?? null,
         'nro_linha'        => ($row['nro_linha'] !== null && $row['nro_linha'] !== '') ? (int)$row['nro_linha'] : null,
         'capacidade_ton'   => $capTon,
@@ -161,6 +176,66 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
 if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
+}
+
+// ─── Enriquecer com dados da linha (left join por nro_linha) ───────────────────
+$linhasMap = [];
+$nros = [];
+foreach ($carregamentos as $c) {
+    $n = (int)($c['nro_linha'] ?? 0);
+    if ($n > 0) $nros[$n] = true;
+}
+if (count($nros) > 0) {
+    $listaNros = array_keys($nros);
+    foreach (array_chunk($listaNros, 500) as $chunk) {
+        $params = [$unidade];
+        $ph = [];
+        $p = 2;
+        foreach ($chunk as $n) {
+            $ph[] = '$' . $p;
+            $params[] = (int)$n;
+            $p += 1;
+        }
+        if (empty($ph)) continue;
+        $q = "
+            SELECT
+                nro_linha,
+                COALESCE(nome, '') AS nome,
+                COALESCE(sigla_dest, '') AS sigla_dest,
+                COALESCE(unidades, '') AS unidades
+            FROM {$tabelaLinha}
+            WHERE sigla_emit = \$1
+              AND nro_linha IN (" . implode(',', $ph) . ")
+        ";
+        $resLin = @pg_query_params($conn, $q, $params);
+        if ($resLin) {
+            while ($r = pg_fetch_assoc($resLin)) {
+                $n = (int)($r['nro_linha'] ?? 0);
+                if ($n <= 0) continue;
+                $linhasMap[$n] = [
+                    'linha_nome' => (string)($r['nome'] ?? ''),
+                    'linha_dest' => (string)($r['sigla_dest'] ?? ''),
+                    'linha_unidades' => (string)($r['unidades'] ?? ''),
+                ];
+            }
+        }
+    }
+}
+
+if (count($linhasMap) > 0) {
+    foreach ($carregamentos as &$c) {
+        $n = (int)($c['nro_linha'] ?? 0);
+        if ($n > 0 && isset($linhasMap[$n])) {
+            $c['linha_nome'] = $linhasMap[$n]['linha_nome'];
+            $c['linha_dest'] = $linhasMap[$n]['linha_dest'];
+            $c['linha_unidades'] = $linhasMap[$n]['linha_unidades'];
+        } else {
+            $c['linha_nome'] = null;
+            $c['linha_dest'] = null;
+            $c['linha_unidades'] = null;
+        }
+    }
+    unset($c);
 }
 
 if ($modo === 'calendario') {
