@@ -13,6 +13,7 @@ import { apiFetch } from '../../utils/apiUtils';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Pie, PieChart, Cell, Legend, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { useAuth } from '../../contexts/AuthContext';
 
 type TpCliente = '' | 'R' | 'D' | 'P';
 
@@ -355,6 +356,8 @@ function buildDonut(rows: RowAgg[]) {
 const DONUT_COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
 export function FretesExpedidosRecebidos() {
+  const { user } = useAuth();
+  const isAcv = String(user?.domain || '').trim().toUpperCase() === 'ACV';
   const defaultPeriod = useMemo(() => getUltimos30DiasSemHojePeriod(), []);
   const [filters, setFilters] = useState<Filters>({
     sigla_unid: '',
@@ -386,12 +389,27 @@ export function FretesExpedidosRecebidos() {
     if (!dataAbaExpedidos) return null;
     const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
     const rowsBase = dataAbaExpedidos.rows || [];
-    const rows =
+    const rows0 =
       filtroExpedidos === 'todos'
         ? rowsBase
         : filtroExpedidos === 'fec'
           ? rowsBase.filter(isFec)
           : rowsBase.filter((r) => !isFec(r));
+
+    const rows =
+      isAcv && filtroExpedidos === 'todos'
+        ? rows0.map((r) => {
+            if (!isFec(r)) return r;
+            return {
+              ...r,
+              frete_cif: -(Number(r.frete_cif) || 0),
+              frete_fob: -(Number(r.frete_fob) || 0),
+              frete_ter: -(Number(r.frete_ter) || 0),
+              frete_sub: -(Number(r.frete_sub) || 0),
+              frete_tot: -(Number(r.frete_tot) || 0),
+            };
+          })
+        : rows0;
 
     const totals = rows.reduce(
       (acc, r) => {
@@ -420,7 +438,7 @@ export function FretesExpedidosRecebidos() {
     );
 
     return { totals, rows };
-  }, [dataAbaExpedidos, filtroExpedidos]);
+  }, [dataAbaExpedidos, filtroExpedidos, isAcv]);
 
   const dataRecView = useMemo<ApiData | null>(() => {
     if (!dataAbaRecebidos) return null;
