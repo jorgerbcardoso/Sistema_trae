@@ -483,6 +483,23 @@ if (!empty($ctes)) {
     }
 
     $tsHoje = mktime(0, 0, 0, (int)date('m'), (int)date('d'), (int)date('Y'));
+    $parseDateBrTs = static function(string $s): ?int {
+        $s = trim($s);
+        if ($s === '') return null;
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+            return mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
+        }
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2})$/', $s, $m)) {
+            return mktime(0, 0, 0, (int)$m[2], (int)$m[1], 2000 + (int)$m[3]);
+        }
+        if (preg_match('/^(\d{2})\/(\d{2})$/', $s, $m)) {
+            return mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)date('Y'));
+        }
+        return null;
+    };
+    $fmtDateBr = static function(int $ts): string {
+        return date('d/m/Y', $ts);
+    };
     foreach ($ctes as &$c) {
         $ser = strtoupper(trim((string)($c['serCte'] ?? '')));
         $nro = (int)($c['nroCte'] ?? 0);
@@ -502,7 +519,17 @@ if (!empty($ctes)) {
         }
 
         $indic = null;
+        $emissao = trim((string)($c['emissao'] ?? ''));
         $cheg = trim((string)($c['chegadaUnid'] ?? ''));
+        $tsEmi = $parseDateBrTs($emissao);
+        $tsCheg = $parseDateBrTs($cheg);
+        if ($cheg === '' && $emissao !== '') {
+            $cheg = $tsEmi !== null ? $fmtDateBr($tsEmi) : $emissao;
+            $c['chegadaUnid'] = (string)$cheg;
+        } elseif ($tsEmi !== null && $tsCheg !== null && $tsEmi > $tsCheg) {
+            $cheg = $fmtDateBr($tsEmi);
+            $c['chegadaUnid'] = $cheg;
+        }
         if ($cheg !== '' && preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $cheg, $m)) {
             $tsCheg = mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
             $diffDias = (int)floor(($tsHoje - $tsCheg) / 86400);

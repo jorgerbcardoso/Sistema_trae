@@ -337,6 +337,36 @@ if (!empty($ctes)) {
     unset($c);
 }
 
+$parseDateBrTs = static function(string $s): ?int {
+    $s = trim($s);
+    if ($s === '') return null;
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+        return mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
+    }
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2})$/', $s, $m)) {
+        return mktime(0, 0, 0, (int)$m[2], (int)$m[1], 2000 + (int)$m[3]);
+    }
+    if (preg_match('/^(\d{2})\/(\d{2})$/', $s, $m)) {
+        return mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)date('Y'));
+    }
+    return null;
+};
+$fmtDateBr = static function(int $ts): string {
+    return date('d/m/Y', $ts);
+};
+foreach ($ctes as &$c) {
+    $emissao = trim((string)($c['emissao'] ?? ''));
+    $cheg = trim((string)($c['chegadaUnid'] ?? ''));
+    $tsEmi = $parseDateBrTs($emissao);
+    $tsCheg = $parseDateBrTs($cheg);
+    if ($cheg === '' && $emissao !== '') {
+        $c['chegadaUnid'] = $tsEmi !== null ? $fmtDateBr($tsEmi) : $emissao;
+    } elseif ($tsEmi !== null && $tsCheg !== null && $tsEmi > $tsCheg) {
+        $c['chegadaUnid'] = $fmtDateBr($tsEmi);
+    }
+}
+unset($c);
+
 respondJson([
     'success' => true,
     'data'    => [
