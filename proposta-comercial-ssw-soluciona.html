@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Proposta Comercial — Consultoria e Implantação SSW — Soluciona Logística</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #0f172a;
+        --muted: #475569;
+        --border: #e2e8f0;
+        --card: rgba(255, 255, 255, 0.92);
+        --shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+        --primary: #1d4ed8;
+        --primary-2: #0ea5e9;
+        --ok: #059669;
+        --warn: #d97706;
+        --danger: #dc2626;
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: "Open Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--fg);
+        background:
+          radial-gradient(1200px 700px at 18% 0%, rgba(29, 78, 216, 0.10), rgba(29, 78, 216, 0) 55%),
+          radial-gradient(1000px 650px at 85% 25%, rgba(14, 165, 233, 0.12), rgba(14, 165, 233, 0) 55%),
+          linear-gradient(#ffffff, #ffffff);
+      }
+      a { color: inherit; text-decoration: none; }
+      .wrap { max-width: 1040px; margin: 0 auto; padding: 22px 18px 40px; }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(10px);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .brand img { height: 22px; width: auto; display: block; }
+      .brand .meta {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .brand .meta .title { font-weight: 800; letter-spacing: 0.02em; font-size: 12px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .brand .meta .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(29, 78, 216, 0.25);
+        background: linear-gradient(135deg, rgba(29, 78, 216, 0.10), rgba(14, 165, 233, 0.08));
+        color: var(--fg);
+        font-weight: 700;
+        padding: 10px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .btn:hover { border-color: rgba(29, 78, 216, 0.45); }
+      .btn svg { width: 16px; height: 16px; }
+      .hero {
+        margin-top: 18px;
+        padding: 26px 22px;
+        border-radius: var(--radius);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: var(--card);
+        box-shadow: var(--shadow);
+        position: relative;
+        overflow: hidden;
+      }
+      .hero:before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        background: radial-gradient(900px 280px at 40% 0%, rgba(29, 78, 216, 0.18), rgba(29, 78, 216, 0) 55%);
+        pointer-events: none;
+      }
+      .hero-inner { position: relative; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; align-items: start; }
+      .kicker { display: inline-flex; gap: 10px; align-items: center; font-size: 12px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(29, 78, 216, 0.95); }
+      .kicker .dot { width: 8px; height: 8px; border-radius: 999px; background: linear-gradient(180deg, var(--primary), var(--primary-2)); }
+      h1 { margin: 10px 0 10px; font-size: 34px; line-height: 1.12; letter-spacing: -0.02em; }
+      .lead { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+      .hero-card {
+        border-radius: 12px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(255, 255, 255, 0.88);
+        padding: 14px 14px 12px;
+      }
+      .hero-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.10em; font-weight: 800; }
+      .hero-card .value { margin-top: 6px; font-size: 16px; font-weight: 800; }
+      .hero-card .meta { margin-top: 8px; display: grid; gap: 8px; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--fg);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .pill svg { width: 14px; height: 14px; }
+      .grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .section {
+        margin-top: 14px;
+        border-radius: var(--radius);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: var(--card);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        padding: 18px 18px 16px;
+      }
+      .section h2 { margin: 0 0 10px; font-size: 18px; letter-spacing: -0.01em; }
+      .section p { margin: 0; color: var(--muted); line-height: 1.65; font-size: 14px; }
+      .section + .section { margin-top: 14px; }
+      .icon-title { display: inline-flex; gap: 10px; align-items: center; }
+      .icon {
+        width: 30px; height: 30px; border-radius: 10px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: linear-gradient(180deg, rgba(29, 78, 216, 0.12), rgba(14, 165, 233, 0.08));
+        border: 1px solid rgba(29, 78, 216, 0.18);
+      }
+      .icon svg { width: 16px; height: 16px; color: rgba(29, 78, 216, 0.95); }
+      .steps { display: grid; gap: 12px; }
+      .step {
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.88);
+        padding: 12px 12px 11px;
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+      .step .when {
+        display: grid;
+        gap: 6px;
+        align-content: start;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(248, 250, 252, 0.88);
+      }
+      .badge .mini { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
+      .badge.presencial .mini { background: var(--ok); }
+      .badge.remota .mini { background: var(--primary); }
+      .week { font-size: 12px; color: var(--muted); font-weight: 700; }
+      .step h3 { margin: 0 0 6px; font-size: 14px; }
+      .step ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+      .table-wrap { margin-top: 10px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(226, 232, 240, 0.9); background: rgba(255, 255, 255, 0.9); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 11px 12px; border-top: 1px solid rgba(226, 232, 240, 0.9); font-size: 13px; }
+      th { text-align: left; background: rgba(248, 250, 252, 0.9); font-size: 12px; text-transform: uppercase; letter-spacing: 0.10em; color: rgba(71, 85, 105, 0.95); }
+      tr:first-child th, tr:first-child td { border-top: 0; }
+      td.mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .money { font-weight: 800; color: var(--fg); }
+      .note {
+        margin-top: 10px;
+        padding: 12px 12px;
+        border-radius: 12px;
+        border: 1px dashed rgba(29, 78, 216, 0.35);
+        background: rgba(29, 78, 216, 0.06);
+        color: rgba(15, 23, 42, 0.85);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .footer {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(255, 255, 255, 0.78);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .muted { color: var(--muted); }
+      .right { text-align: right; }
+      .page-break { break-before: page; page-break-before: always; }
+      @media print {
+        body { background: #ffffff; }
+        .toolbar { display: none; }
+        .wrap { padding: 0; max-width: none; }
+        .hero, .section { box-shadow: none; }
+        @page { size: A4; margin: 14mm 12mm; }
+        .page-break { break-before: page; page-break-before: always; }
+        a { text-decoration: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="toolbar">
+        <div class="brand">
+          <img src="https://sistema.webpresto.com.br/images/logo_preta.png" alt="Presto Tecnologia" />
+          <div class="meta">
+            <div class="title">Proposta Comercial</div>
+            <div class="sub">Consultoria e Implantação SSW · Soluciona Logística</div>
+          </div>
+        </div>
+        <button class="btn" type="button" onclick="window.print()">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 8V4h10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 17H5a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 14h10v6H7v-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Imprimir PDF
+        </button>
+      </div>
+
+      <section class="hero">
+        <div class="hero-inner">
+          <div>
+            <div class="kicker"><span class="dot"></span> Presto Tecnologia · SSW</div>
+            <h1>Consultoria e Implantação SSW</h1>
+            <p class="lead">
+              Com 19 anos de experiência no TMS SSW, a Presto Tecnologia é uma das líderes do mercado em consultoria SSW,
+              além de possuirmos o Sistema Presto, melhor integrador SSW e BI do mercado, do qual falaremos mais adiante.
+            </p>
+          </div>
+          <div class="hero-card">
+            <div class="label">Cliente</div>
+            <div class="value">Soluciona Logística</div>
+            <div class="meta">
+              <div class="pill">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M4.22 6.22l2.83 2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M16.95 16.95l2.83 2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M3 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M17 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M6.22 19.78l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M16.95 7.05l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                4 semanas de implantação
+              </div>
+              <div class="pill">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 7h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M5 7v14h14V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M8 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M7.5 11h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M7.5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                15 dias presenciais + 5 remotos
+              </div>
+              <div class="pill">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 1v22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 1 0 0 7H14a3.5 3.5 0 1 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Semana remota não cobrada
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="section">
+          <div class="icon-title">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <h2>Experiência e Entrega</h2>
+          </div>
+          <p>
+            A Presto atua com foco em implantação eficiente, aderente às particularidades operacionais, com acompanhamento presencial
+            nos marcos mais críticos (mapeamento, treinamento e go-live).
+          </p>
+        </section>
+
+        <section class="section">
+          <div class="icon-title">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 19V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M4 19h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M7 15l3-3 2 2 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <h2>Objetivo</h2>
+          </div>
+          <p>
+            Implantar o SSW com dados reais e equipes capacitadas, garantindo a virada de chave em produção com acompanhamento presencial.
+          </p>
+        </section>
+      </div>
+
+      <section class="section page-break">
+        <div class="icon-title">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M7 7h10v10H7V7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <h2>Cronograma de Implantação</h2>
+        </div>
+        <p>Etapas planejadas para implantação com previsibilidade e acompanhamento nos pontos críticos.</p>
+
+        <div class="steps" style="margin-top: 12px;">
+          <div class="step">
+            <div class="when">
+              <div class="badge presencial"><span class="mini"></span> Presencial</div>
+              <div class="week">Semana 1</div>
+            </div>
+            <div>
+              <h3>Mapeamento</h3>
+              <ul>
+                <li>Levantamento de dados e particularidades da empresa.</li>
+                <li>Análise da necessidade de mais de um domínio no SSW.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="when">
+              <div class="badge remota"><span class="mini"></span> Remota</div>
+              <div class="week">Semana 2</div>
+            </div>
+            <div>
+              <h3>Alimentação</h3>
+              <ul>
+                <li>Importação de informações como tabelas de frete, usuários, vendedores, etc.</li>
+                <li>Importações automáticas via planilha + robô.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="when">
+              <div class="badge presencial"><span class="mini"></span> Presencial</div>
+              <div class="week">Semana 3</div>
+            </div>
+            <div>
+              <h3>Treinamentos</h3>
+              <ul>
+                <li>Capacitação das equipes dos setores Operacional, Comercial, Financeiro, SAC, etc.</li>
+                <li>Treinamento já com dados reais no SSW.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="when">
+              <div class="badge presencial"><span class="mini"></span> Presencial</div>
+              <div class="week">Semana 4</div>
+            </div>
+            <div>
+              <h3>Go-live</h3>
+              <ul>
+                <li>Virada de chave e início das emissões em ambiente de produção.</li>
+                <li>Acompanhamento presencial de 5 dias.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          Com isso, teremos <strong>3 semanas presenciais</strong>, totalizando <strong>15 dias</strong>, e <strong>1 semana remota</strong>, totalizando <strong>5 dias</strong>.
+        </div>
+      </section>
+
+      <section class="section page-break">
+        <div class="icon-title">
+          <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2v20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M17 5H9.5a3.5 3.5 0 1 0 0 7H14a3.5 3.5 0 1 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <h2>Valores</h2>
+        </div>
+        <p>Condições comerciais para a consultoria e implantação do SSW.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="right">Valor / Condição</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Cada diária presencial</td>
+                <td class="right mono money">R$ 400,00</td>
+              </tr>
+              <tr>
+                <td>Semana remota</td>
+                <td class="right"><span class="money">Não será cobrada</span></td>
+              </tr>
+              <tr>
+                <td>Total (15 dias presenciais)</td>
+                <td class="right mono money">R$ 6.000,00</td>
+              </tr>
+              <tr>
+                <td>Condição de pagamento</td>
+                <td class="right">50% na reserva das agendas (4 semanas) · 50% após o go-live</td>
+              </tr>
+              <tr>
+                <td>Deslocamento, refeições e hospedagem</td>
+                <td class="right">Por conta da transportadora</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          A proposta considera o cronograma informado e a execução das etapas em conjunto com as áreas envolvidas, garantindo treinamento e go-live com suporte presencial.
+        </div>
+      </section>
+
+      <div class="footer">
+        <div>
+          <strong>Presto Tecnologia</strong>
+          <div class="muted">Consultoria SSW · Integração · BI</div>
+        </div>
+        <div class="right">
+          <div class="muted">Documento preparado para impressão em PDF</div>
+          <div class="muted">Cliente: Soluciona Logística</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

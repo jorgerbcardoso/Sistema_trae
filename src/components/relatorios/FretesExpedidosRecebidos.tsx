@@ -13,7 +13,6 @@ import { apiFetch } from '../../utils/apiUtils';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Pie, PieChart, Cell, Legend, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
 
 type TpCliente = '' | 'R' | 'D' | 'P';
 
@@ -356,8 +355,6 @@ function buildDonut(rows: RowAgg[]) {
 const DONUT_COLORS = ['#2563eb', '#16a34a', '#f97316', '#a855f7', '#06b6d4', '#ef4444', '#84cc16', '#64748b', '#0f172a'];
 
 export function FretesExpedidosRecebidos() {
-  const { user } = useAuth();
-  const isAcv = String(user?.domain || '').trim().toUpperCase() === 'ACV';
   const defaultPeriod = useMemo(() => getUltimos30DiasSemHojePeriod(), []);
   const [filters, setFilters] = useState<Filters>({
     sigla_unid: '',
@@ -376,14 +373,14 @@ export function FretesExpedidosRecebidos() {
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
   const [filtroExpedidos, setFiltroExpedidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
-  const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
+  const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados'>('todos');
   const runRef = useRef(0);
 
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
   const [sortRec, setSortRec] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
 
-  const dataAbaExpedidos = dataRec;
-  const dataAbaRecebidos = dataExp;
+  const dataAbaExpedidos = dataExp;
+  const dataAbaRecebidos = dataRec;
 
   const dataExpView = useMemo<ApiData | null>(() => {
     if (!dataAbaExpedidos) return null;
@@ -396,20 +393,7 @@ export function FretesExpedidosRecebidos() {
           ? rowsBase.filter(isFec)
           : rowsBase.filter((r) => !isFec(r));
 
-    const rows =
-      isAcv && filtroExpedidos === 'todos'
-        ? rows0.map((r) => {
-            if (!isFec(r)) return r;
-            return {
-              ...r,
-              frete_cif: -(Number(r.frete_cif) || 0),
-              frete_fob: -(Number(r.frete_fob) || 0),
-              frete_ter: -(Number(r.frete_ter) || 0),
-              frete_sub: -(Number(r.frete_sub) || 0),
-              frete_tot: -(Number(r.frete_tot) || 0),
-            };
-          })
-        : rows0;
+    const rows = rows0;
 
     const totals = rows.reduce(
       (acc, r) => {
@@ -438,18 +422,13 @@ export function FretesExpedidosRecebidos() {
     );
 
     return { totals, rows };
-  }, [dataAbaExpedidos, filtroExpedidos, isAcv]);
+  }, [dataAbaExpedidos, filtroExpedidos]);
 
   const dataRecView = useMemo<ApiData | null>(() => {
     if (!dataAbaRecebidos) return null;
     const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
     const rowsBase = dataAbaRecebidos.rows || [];
-    const rows =
-      filtroRecebidos === 'todos'
-        ? rowsBase
-        : filtroRecebidos === 'fec'
-          ? rowsBase.filter(isFec)
-          : rowsBase.filter((r) => !isFec(r));
+    const rows = filtroRecebidos === 'fracionados' ? rowsBase.filter((r) => !isFec(r)) : rowsBase;
 
     const totals = rows.reduce(
       (acc, r) => {
@@ -685,10 +664,10 @@ export function FretesExpedidosRecebidos() {
       if (!exp && !rec) {
         toast.info('Nenhum dado disponível após o download.');
       } else if (!exp) {
-        setTab('expedidos');
+        setTab('recebidos');
         toast.info('O relatório retornou apenas Recebidos para os parâmetros informados.');
       } else if (!rec) {
-        setTab('recebidos');
+        setTab('expedidos');
         toast.info('O relatório retornou apenas Expedidos para os parâmetros informados.');
       }
     } finally {
@@ -930,7 +909,7 @@ export function FretesExpedidosRecebidos() {
                       return;
                     }
                     const kind = isExp ? 'Expedidos' : 'Recebidos';
-                    const unidadeLabel = isExp ? 'Unidade Origem' : 'Unidade Destino';
+                    const unidadeLabel = isExp ? 'Unidade Destino' : 'Unidade Origem';
                     const rows = isExp ? rowsExpSorted : rowsRecSorted;
                     const csv = buildCsv(kind, { ...data, rows }, unidadeLabel);
                     const stamp = new Date();
@@ -1123,7 +1102,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'unidade')}>
-                              Unidade Origem{sortIcon('expedidos', 'unidade')}
+                              Unidade Destino{sortIcon('expedidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('expedidos', 'uf')}>
                               UF{sortIcon('expedidos', 'uf')}
@@ -1211,18 +1190,6 @@ export function FretesExpedidosRecebidos() {
                       disabled={loading}
                     >
                       Apenas Fracionados
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
-                        filtroRecebidos === 'fec'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                      onClick={() => setFiltroRecebidos('fec')}
-                      disabled={loading}
-                    >
-                      Apenas FEC
                     </button>
                   </div>
                 </div>
@@ -1344,7 +1311,7 @@ export function FretesExpedidosRecebidos() {
                         <thead>
                           <tr className="text-left border-b">
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'unidade')}>
-                              Unidade Destino{sortIcon('recebidos', 'unidade')}
+                              Unidade Origem{sortIcon('recebidos', 'unidade')}
                             </th>
                             <th className="py-2 pr-3 cursor-pointer select-none" onClick={() => toggleSort('recebidos', 'uf')}>
                               UF{sortIcon('recebidos', 'uf')}
