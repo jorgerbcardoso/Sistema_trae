@@ -70,6 +70,7 @@ interface CotacaoRow {
   cnpj_pagador: string;
   nome_pagador: string;
   vendedor: string;
+  vendedor_login?: string;
   origem: string;
   destino: string;
   tipo_frete: string;
@@ -290,7 +291,7 @@ export function BICotacoes() {
   const [filters, setFilters] = useState<Filters>(() => getDefaultFilters());
   const [tempFilters, setTempFilters] = useState<Filters>(() => getDefaultFilters());
 
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'usuarios' | 'clientes' | 'origem-destino' | 'ranking' | 'lista'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'usuarios' | 'clientes' | 'vendedores' | 'origem-destino' | 'ranking' | 'lista'>('pipeline');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [data, setData] = useState<ApiData | null>(null);
@@ -300,6 +301,7 @@ export function BICotacoes() {
   const [dailyMode, setDailyMode] = useState<'todas' | 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [usersDailyMode, setUsersDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [clientsDailyMode, setClientsDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
+  const [vendorsDailyMode, setVendorsDailyMode] = useState<'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi'>('cotacoes');
   const [origemDestinoMode, setOrigemDestinoMode] = useState<'origem' | 'destino'>('origem');
   const tooltipStyle = useTooltipStyle();
 
@@ -320,6 +322,10 @@ export function BICotacoes() {
     key: 'ctrc_emi',
     dir: 'desc',
   });
+  const [vendorsSort, setVendorsSort] = useState<{ key: 'vendedor' | 'cotacoes' | 'contratadas' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido'; dir: 'asc' | 'desc' }>({
+    key: 'ctrc_emi',
+    dir: 'desc',
+  });
   const [rankingConvertidoSort, setRankingConvertidoSort] = useState<{
     key: 'usuario' | 'cotacoes' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido';
     dir: 'asc' | 'desc';
@@ -330,6 +336,7 @@ export function BICotacoes() {
   const rankingBaseRunRef = useRef(0);
   const rankingBaseKeyRef = useRef('');
   const [clientsPage, setClientsPage] = useState(1);
+  const [vendorsPage, setVendorsPage] = useState(1);
 
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
@@ -577,6 +584,7 @@ export function BICotacoes() {
         r.usuario_inclusao,
         r.cnpj_pagador,
         r.nome_pagador,
+        String((r as any).vendedor_login ?? ''),
         r.vendedor,
         r.origem,
         r.destino,
@@ -616,6 +624,7 @@ export function BICotacoes() {
         r.usuario_inclusao,
         r.cnpj_pagador,
         r.nome_pagador,
+        String((r as any).vendedor_login ?? ''),
         r.vendedor,
         r.origem,
         r.destino,
@@ -713,6 +722,35 @@ export function BICotacoes() {
         const nome = String(r.nome_pagador || '').trim();
         const ck = String((cnpj || nome).trim()).toLowerCase();
         if (!clientSet.has(ck)) continue;
+        if (mode === 'ctrc_emi') {
+          if (r.status_kind !== 'CTRC_EMI') continue;
+          const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+          if (d === iso) out.push(r);
+          continue;
+        }
+        const di = datePart(r.data_inclusao);
+        if (di !== iso) continue;
+        if (mode === 'cotacoes') out.push(r);
+        else if (mode === 'simuladas') {
+          if (r.status_kind === 'COTADO') out.push(r);
+        } else if (mode === 'contratadas') {
+          if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') out.push(r);
+        }
+      }
+      return out;
+    },
+    [rowsFiltered]
+  );
+
+  const rowsForVendorsDailyIso = useCallback(
+    (iso: string, mode: 'cotacoes' | 'simuladas' | 'contratadas' | 'ctrc_emi') => {
+      const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+      const vendorSet = new Set(topVendedores5.map((v) => v.key).filter(Boolean));
+      const out: CotacaoRow[] = [];
+      for (const r of rowsFiltered) {
+        const loginRaw = String((r as any).vendedor_login ?? '').trim();
+        const loginKey = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+        if (!vendorSet.has(loginKey)) continue;
         if (mode === 'ctrc_emi') {
           if (r.status_kind !== 'CTRC_EMI') continue;
           const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
@@ -914,6 +952,20 @@ export function BICotacoes() {
     return out.slice(0, 5);
   }, [rowsFiltered]);
 
+  const topVendedores5 = useMemo(() => {
+    const map = new Map<string, { key: string; display: string; cotacoes: number }>();
+    for (const r of rowsFiltered) {
+      const loginRaw = String((r as any).vendedor_login ?? '').trim();
+      const key = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+      const display = loginRaw || 'Sem Vendedor';
+      if (!map.has(key)) map.set(key, { key, display, cotacoes: 0 });
+      map.get(key)!.cotacoes += 1;
+    }
+    const out = Array.from(map.values());
+    out.sort((a, b) => b.cotacoes - a.cotacoes || a.display.localeCompare(b.display));
+    return out.slice(0, 5);
+  }, [rowsFiltered]);
+
   const usersDailySeries = useMemo(() => {
     const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
     const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -997,6 +1049,48 @@ export function BICotacoes() {
       return { iso, label, ...(byDay.get(iso) || {}) };
     });
   }, [clientsDailyMode, periodDays, rowsFiltered, topClientes5]);
+
+  const vendorsDailySeries = useMemo(() => {
+    const datePart = (s: string) => (s && s.length >= 10 ? s.slice(0, 10) : '');
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const idxByVendor = new Map<string, number>();
+    topVendedores5.forEach((v, i) => idxByVendor.set(v.key, i));
+    const byDay = new Map<string, Record<string, number>>();
+    for (const d of periodDays) {
+      const rec: Record<string, number> = {};
+      for (let i = 0; i < topVendedores5.length; i++) rec[`v${i}`] = 0;
+      byDay.set(d, rec);
+    }
+    for (const r of rowsFiltered) {
+      const loginRaw = String((r as any).vendedor_login ?? '').trim();
+      const key = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+      const idx = idxByVendor.get(key);
+      if (idx === undefined) continue;
+
+      if (vendorsDailyMode === 'ctrc_emi') {
+        if (r.status_kind !== 'CTRC_EMI') continue;
+        const d = datePart(r.data_emissao_ctrc) || datePart(r.data_inclusao);
+        if (!byDay.has(d)) continue;
+        byDay.get(d)![`v${idx}`] += 1;
+        continue;
+      }
+
+      const di = datePart(r.data_inclusao);
+      if (!byDay.has(di)) continue;
+      if (vendorsDailyMode === 'cotacoes') {
+        byDay.get(di)![`v${idx}`] += 1;
+      } else if (vendorsDailyMode === 'simuladas') {
+        if (r.status_kind === 'COTADO') byDay.get(di)![`v${idx}`] += 1;
+      } else if (vendorsDailyMode === 'contratadas') {
+        if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') byDay.get(di)![`v${idx}`] += 1;
+      }
+    }
+    return periodDays.map((iso) => {
+      const dt = new Date(`${iso}T12:00:00`);
+      const label = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
+      return { iso, label, ...(byDay.get(iso) || {}) };
+    });
+  }, [periodDays, rowsFiltered, topVendedores5, vendorsDailyMode]);
 
   const rankingPeriodDays = useMemo(() => {
     const end = String(filters.periodoFim || '').slice(0, 10);
@@ -1170,12 +1264,37 @@ export function BICotacoes() {
     return out;
   }, [rowsFiltered]);
 
+  const rankingVendedores = useMemo(() => {
+    const map = new Map<string, { key: string; login: string; cotacoes: number; contratadas: number; ctrc_emi: number; potencial: number; convertido: number }>();
+    for (const r of rowsFiltered) {
+      const loginRaw = String((r as any).vendedor_login ?? '').trim();
+      const loginKey = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+      const display = loginRaw || 'Sem Vendedor';
+      if (!map.has(loginKey)) map.set(loginKey, { key: loginKey, login: display, cotacoes: 0, contratadas: 0, ctrc_emi: 0, potencial: 0, convertido: 0 });
+      const a = map.get(loginKey)!;
+      a.cotacoes++;
+      a.potencial += toNumber(r.proposta_atual);
+      if (r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI') a.contratadas++;
+      if (r.status_kind === 'CTRC_EMI') {
+        a.ctrc_emi++;
+        a.convertido += toNumber(r.frete_ctrc);
+      }
+    }
+    const out = Array.from(map.values()).map((x) => ({ ...x, conversao: x.cotacoes > 0 ? x.ctrc_emi / x.cotacoes : 0 }));
+    out.sort((a, b) => b.ctrc_emi - a.ctrc_emi || b.potencial - a.potencial || a.login.localeCompare(b.login));
+    return out;
+  }, [rowsFiltered]);
+
   const toggleUsersSort = useCallback((key: typeof usersSort.key) => {
     setUsersSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
   }, []);
 
   const toggleClientsSort = useCallback((key: typeof clientsSort.key) => {
     setClientsSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+  }, []);
+
+  const toggleVendorsSort = useCallback((key: typeof vendorsSort.key) => {
+    setVendorsSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
   }, []);
 
   const toggleRankingConvertidoSort = useCallback((key: typeof rankingConvertidoSort.key) => {
@@ -1216,6 +1335,17 @@ export function BICotacoes() {
     });
     return rows;
   }, [clientsSort.dir, clientsSort.key, rankingClientes]);
+
+  const rankingVendedoresSorted = useMemo(() => {
+    const rows = [...rankingVendedores];
+    rows.sort((a, b) => {
+      if (vendorsSort.key === 'vendedor') return vendorsSort.dir === 'asc' ? a.login.localeCompare(b.login) : b.login.localeCompare(a.login);
+      const av = toNumber((a as any)[vendorsSort.key]);
+      const bv = toNumber((b as any)[vendorsSort.key]);
+      return vendorsSort.dir === 'asc' ? av - bv : bv - av;
+    });
+    return rows;
+  }, [rankingVendedores, vendorsSort.dir, vendorsSort.key]);
 
   const usersTotalsRow = useMemo(() => {
     let cotacoes = 0;
@@ -1271,6 +1401,30 @@ export function BICotacoes() {
     return rankingClientesSorted.slice(start, start + clientsPageSize);
   }, [clientsPageSafe, rankingClientesSorted]);
 
+  const vendorsTotalsRow = useMemo(() => {
+    let cotacoes = 0;
+    let contratadas = 0;
+    let ctrc_emi = 0;
+    let potencial = 0;
+    let convertido = 0;
+    for (const v of rankingVendedoresSorted) {
+      cotacoes += toNumber(v.cotacoes);
+      contratadas += toNumber(v.contratadas);
+      ctrc_emi += toNumber(v.ctrc_emi);
+      potencial += toNumber(v.potencial);
+      convertido += toNumber(v.convertido);
+    }
+    return { cotacoes, contratadas, ctrc_emi, conversao: cotacoes > 0 ? ctrc_emi / cotacoes : 0, potencial, convertido };
+  }, [rankingVendedoresSorted]);
+
+  const vendorsPageSize = 40;
+  const vendorsTotalPages = Math.max(1, Math.ceil(rankingVendedoresSorted.length / vendorsPageSize));
+  const vendorsPageSafe = Math.min(Math.max(1, vendorsPage), vendorsTotalPages);
+  const rankingVendedoresPage = useMemo(() => {
+    const start = (vendorsPageSafe - 1) * vendorsPageSize;
+    return rankingVendedoresSorted.slice(start, start + vendorsPageSize);
+  }, [rankingVendedoresSorted, vendorsPageSafe]);
+
   const exportCsv = () => {
     if (!data) {
       toast.info('Nenhum dado carregado para exportar.');
@@ -1306,7 +1460,7 @@ export function BICotacoes() {
           r.usuario_inclusao,
           r.cnpj_pagador,
           r.nome_pagador,
-          r.vendedor,
+          String((r as any).vendedor_login ?? r.vendedor ?? ''),
           r.origem,
           r.destino,
           r.tipo_frete,
@@ -1361,7 +1515,7 @@ export function BICotacoes() {
           r.usuario_inclusao,
           r.cnpj_pagador,
           r.nome_pagador,
-          r.vendedor,
+          String((r as any).vendedor_login ?? r.vendedor ?? ''),
           r.origem,
           r.destino,
           r.tipo_frete,
@@ -1761,7 +1915,7 @@ export function BICotacoes() {
 
         <div className="space-y-3">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-            <TabsList className="w-full h-12 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 grid grid-cols-6">
+            <TabsList className="w-full h-12 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 grid grid-cols-7">
               <TabsTrigger value="pipeline" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                 <Target className="w-4 h-4" />
                 <span className="hidden sm:inline">Pipeline</span>
@@ -1773,6 +1927,10 @@ export function BICotacoes() {
               <TabsTrigger value="clientes" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Clientes</span>
+              </TabsTrigger>
+              <TabsTrigger value="vendedores" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                <UserIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Vendedores</span>
               </TabsTrigger>
               <TabsTrigger value="origem-destino" className="h-10 gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                 <MapPin className="w-4 h-4" />
@@ -2801,6 +2959,321 @@ export function BICotacoes() {
                             </td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.potencial)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(clientsTotalsRow.convertido)}</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="vendedores" className="mt-0">
+            <div className="space-y-4">
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  const vendorSet = new Set(topVendedores5.map((v) => v.key).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => {
+                    const loginRaw = String((r as any).vendedor_login ?? '').trim();
+                    const key = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+                    return vendorSet.has(key);
+                  });
+                  const rs =
+                    vendorsDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : vendorsDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : vendorsDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Vendedores · Série diária · ${
+                      vendorsDailyMode === 'cotacoes'
+                        ? 'Cotações'
+                        : vendorsDailyMode === 'simuladas'
+                          ? 'Simuladas'
+                          : vendorsDailyMode === 'contratadas'
+                            ? 'Contratadas'
+                            : 'CTRC emit.'
+                    } (Top ${formatNumber(topVendedores5.length)})`,
+                    rs
+                  );
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  const vendorSet = new Set(topVendedores5.map((v) => v.key).filter(Boolean));
+                  const base = rowsFiltered.filter((r) => {
+                    const loginRaw = String((r as any).vendedor_login ?? '').trim();
+                    const key = loginRaw ? loginRaw.toLowerCase() : '__sem_vendedor__';
+                    return vendorSet.has(key);
+                  });
+                  const rs =
+                    vendorsDailyMode === 'simuladas'
+                      ? base.filter((r) => r.status_kind === 'COTADO')
+                      : vendorsDailyMode === 'contratadas'
+                        ? base.filter((r) => r.status_kind === 'CONTRAT' || r.status_kind === 'CTRC_EMI')
+                        : vendorsDailyMode === 'ctrc_emi'
+                          ? base.filter((r) => r.status_kind === 'CTRC_EMI')
+                          : base;
+                  openDrill(
+                    `Vendedores · Série diária · ${
+                      vendorsDailyMode === 'cotacoes'
+                        ? 'Cotações'
+                        : vendorsDailyMode === 'simuladas'
+                          ? 'Simuladas'
+                          : vendorsDailyMode === 'contratadas'
+                            ? 'Contratadas'
+                            : 'CTRC emit.'
+                    } (Top ${formatNumber(topVendedores5.length)})`,
+                    rs
+                  );
+                }}
+                className="dark:bg-slate-900 dark:border-slate-700 cursor-pointer hover:opacity-95"
+              >
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <UserIcon className="w-4 h-4 text-sky-500" />
+                      Volume diário por vendedor
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant={vendorsDailyMode === 'cotacoes' ? 'default' : 'outline'}
+                        className={
+                          vendorsDailyMode === 'cotacoes'
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                            : 'border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-900/60 dark:text-blue-200 dark:hover:bg-blue-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setVendorsDailyMode('cotacoes'); }}
+                      >
+                        Cotações
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={vendorsDailyMode === 'simuladas' ? 'default' : 'outline'}
+                        className={
+                          vendorsDailyMode === 'simuladas'
+                            ? 'bg-slate-600 hover:bg-slate-700 text-white border-slate-600'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setVendorsDailyMode('simuladas'); }}
+                      >
+                        Simuladas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={vendorsDailyMode === 'contratadas' ? 'default' : 'outline'}
+                        className={
+                          vendorsDailyMode === 'contratadas'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                            : 'border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-900/60 dark:text-amber-200 dark:hover:bg-amber-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setVendorsDailyMode('contratadas'); }}
+                      >
+                        Contratadas
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={vendorsDailyMode === 'ctrc_emi' ? 'default' : 'outline'}
+                        className={
+                          vendorsDailyMode === 'ctrc_emi'
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                            : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-200 dark:hover:bg-emerald-950/30'
+                        }
+                        onClick={(e) => { e.stopPropagation(); setVendorsDailyMode('ctrc_emi'); }}
+                      >
+                        CTRC emit.
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="h-[280px]">
+                    {!data ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Gere para visualizar.</div>
+                    ) : topVendedores5.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-slate-500">Sem vendedores.</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={vendorsDailySeries} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                          <XAxis dataKey="label" interval="preserveStartEnd" />
+                          <YAxis allowDecimals={false} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(v: any, name: any) => [formatNumber(Number(v)), String(name)]} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          {topVendedores5.map((v, idx) => (
+                            <Line
+                              key={v.key}
+                              type="monotone"
+                              dataKey={`v${idx}`}
+                              name={v.display}
+                              stroke={USER_LINE_COLORS[idx % USER_LINE_COLORS.length]}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 5 }}
+                              onClick={(d: any, _i: any, e: any) => {
+                                e?.stopPropagation?.();
+                                const iso = d?.payload?.iso;
+                                if (!iso) return;
+                                openDrill(
+                                  `Vendedores · Série diária · ${
+                                    vendorsDailyMode === 'cotacoes'
+                                      ? 'Cotações'
+                                      : vendorsDailyMode === 'simuladas'
+                                        ? 'Simuladas'
+                                        : vendorsDailyMode === 'contratadas'
+                                          ? 'Contratadas'
+                                          : 'CTRC emit.'
+                                  } · ${String(iso)}`,
+                                  rowsForVendorsDailyIso(String(iso), vendorsDailyMode)
+                                );
+                              }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    Top {formatNumber(topVendedores5.length)} vendedores · Série diária do período selecionado
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="dark:bg-slate-900 dark:border-slate-700">
+                <CardContent className="p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100 font-semibold">
+                      <UserIcon className="w-4 h-4 text-sky-500" />
+                      Performance por Vendedor
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{formatNumber(rankingVendedoresSorted.length)} vendedores</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setVendorsPage((p) => Math.max(1, p - 1))}
+                        disabled={vendorsPageSafe <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Badge variant="outline">
+                        {formatNumber(vendorsPageSafe)} / {formatNumber(vendorsTotalPages)}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setVendorsPage((p) => Math.min(vendorsTotalPages, p + 1))}
+                        disabled={vendorsPageSafe >= vendorsTotalPages}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    <table className="min-w-[1040px] w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-900/50">
+                        <tr className="text-left">
+                          <th className="py-2 px-3">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('vendedor')}>
+                              Vendedor{vendorsSort.key === 'vendedor' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('cotacoes')}>
+                              Cotações{vendorsSort.key === 'cotacoes' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('contratadas')}>
+                              Contratadas{vendorsSort.key === 'contratadas' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('ctrc_emi')}>
+                              CTRC{vendorsSort.key === 'ctrc_emi' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('conversao')}>
+                              Conversão{vendorsSort.key === 'conversao' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('potencial')}>
+                              Potencial{vendorsSort.key === 'potencial' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="py-2 px-3 text-right">
+                            <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleVendorsSort('convertido')}>
+                              Convertido{vendorsSort.key === 'convertido' ? (vendorsSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rankingVendedoresSorted.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 px-3 text-center text-slate-500">
+                              Sem dados.
+                            </td>
+                          </tr>
+                        ) : (
+                          rankingVendedoresPage.map((v) => (
+                            <tr
+                              key={v.key}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                const rs = rowsFiltered.filter((r) => {
+                                  const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
+                                  if (v.key === '__sem_vendedor__') return login === '';
+                                  return login === v.key;
+                                });
+                                openDrill(`Vendedor: ${v.login}`, rs);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key !== 'Enter' && e.key !== ' ') return;
+                                const rs = rowsFiltered.filter((r) => {
+                                  const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
+                                  if (v.key === '__sem_vendedor__') return login === '';
+                                  return login === v.key;
+                                });
+                                openDrill(`Vendedor: ${v.login}`, rs);
+                              }}
+                              className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 cursor-pointer"
+                            >
+                              <td className="py-2 px-3 font-mono">{v.login}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(v.cotacoes)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(v.contratadas)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatNumber(v.ctrc_emi)}</td>
+                              <td className="py-2 px-3 text-right">
+                                <ConversaoBar value={v.conversao} />
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(v.potencial)}</td>
+                              <td className="py-2 px-3 text-right font-mono">{formatCurrency(v.convertido)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      {rankingVendedoresSorted.length > 0 && (
+                        <tfoot>
+                          <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
+                            <td className="py-2 px-3">TOTAL ({formatNumber(rankingVendedoresSorted.length)} vendedores)</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(vendorsTotalsRow.cotacoes)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(vendorsTotalsRow.contratadas)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatNumber(vendorsTotalsRow.ctrc_emi)}</td>
+                            <td className="py-2 px-3 text-right">
+                              <ConversaoBar value={vendorsTotalsRow.conversao} />
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(vendorsTotalsRow.potencial)}</td>
+                            <td className="py-2 px-3 text-right font-mono">{formatCurrency(vendorsTotalsRow.convertido)}</td>
                           </tr>
                         </tfoot>
                       )}

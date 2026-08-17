@@ -628,7 +628,9 @@ function TabelaCtes({
                   {cte.nfiscal || '-'}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.chegadaUnid || ''}</td>
+                <td className={`px-3 py-2 whitespace-nowrap ${cte.indicadorSaida ? TEXTO_INDICADOR[cte.indicadorSaida] : 'text-slate-600 dark:text-slate-400'}`}>
+                  {cte.chegadaUnid || ''}
+                </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
@@ -3516,7 +3518,7 @@ function CarregamentoArea({
   };
 
   const handleExcluirTodos = async () => {
-    if (!window.confirm(`Excluir TODOS os ${carregamentos.length} carregamento(s) da unidade ${sigla}? Esta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Finalizar TODOS os ${carregamentos.length} carregamento(s) da unidade ${sigla}?`)) return;
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -3524,13 +3526,13 @@ function CarregamentoArea({
         true
       );
       if (res.success) {
-        toast.success('Todos os carregamentos foram excluídos.');
+        toast.success('Todos os carregamentos foram finalizados.');
         onRecarregarCarregamentos();
       } else {
-        toast.error(res.message || 'Erro ao excluir carregamentos.');
+        toast.error(res.message || 'Erro ao finalizar carregamentos.');
       }
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao excluir carregamentos.');
+      toast.error(e.message || 'Erro ao finalizar carregamentos.');
     }
   };
 
@@ -4488,7 +4490,7 @@ export function Disponiveis() {
   }, [carregarCarregamentos]);
 
   const handleExcluirCarregamento = useCallback(async (placa: string) => {
-    if (!confirm(`Excluir o carregamento "${placa}"? Todos os CT-es serão removidos.`)) return;
+    if (!confirm(`Finalizar o carregamento "${placa}"?`)) return;
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -4496,14 +4498,14 @@ export function Disponiveis() {
         true
       );
       if (res.success) {
-        toast.success(`Carregamento ${placa} excluído.`);
+        toast.success(`Carregamento ${placa} finalizado.`);
         if (modoApontamento === placa) setModoApontamento(null);
         await carregarCarregamentos();
       } else {
-        toast.error(res.message || 'Erro ao excluir carregamento');
+        toast.error(res.message || 'Erro ao finalizar carregamento');
       }
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao excluir');
+      toast.error(e.message || 'Erro ao finalizar');
     }
   }, [carregarCarregamentos, modoApontamento]);
 

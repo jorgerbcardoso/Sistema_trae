@@ -759,7 +759,68 @@ $parseReport = static function(string $raw, bool $withRows) use ($parseSciToDigi
     ];
 };
 
-$buildResponse = static function(array $parsed, ?array $comparisons) use ($url, $tpFrete, $situacaoFiltro, $unidInclusao, $unidOrigem, $usuarioInclusao, $cnpjDigits, $f17, $f18): array {
+$buildResponse = static function(array $parsed, ?array $comparisons) use ($url, $tpFrete, $situacaoFiltro, $unidInclusao, $unidOrigem, $usuarioInclusao, $cnpjDigits, $f17, $f18, $domain, $g_sql): array {
+    if (isset($parsed['rows']) && is_array($parsed['rows']) && count($parsed['rows']) > 0) {
+        $tblVc = "{$domain}_vendedor_cliente";
+        $digits = static function(string $s): string {
+            return preg_replace('/\D+/', '', (string)$s);
+        };
+
+        $cnpjsSet = [];
+        foreach ($parsed['rows'] as $r) {
+            $c = $digits((string)($r['cnpj_pagador'] ?? ''));
+            if ($c !== '') $cnpjsSet[$c] = true;
+        }
+
+        $map = [];
+        if (count($cnpjsSet) > 0) {
+            $tblReg = "public.{$tblVc}";
+            $resChk = @pg_query_params($g_sql, "SELECT to_regclass($1) AS reg", [$tblReg]);
+            $tblExists = false;
+            if ($resChk && pg_num_rows($resChk) > 0) {
+                $reg = pg_fetch_assoc($resChk);
+                $tblExists = isset($reg['reg']) && $reg['reg'] !== null && $reg['reg'] !== '';
+            }
+
+            if ($tblExists) {
+                $cnpjs = array_keys($cnpjsSet);
+                foreach (array_chunk($cnpjs, 500) as $chunk) {
+                    $params = [];
+                    $ph = [];
+                    $p = 1;
+                    foreach ($chunk as $c) {
+                        $ph[] = '$' . $p;
+                        $params[] = (string)$c;
+                        $p++;
+                    }
+                    if (empty($ph)) continue;
+                    $q = "
+                        SELECT
+                            LOWER(BTRIM(login)) AS login,
+                            regexp_replace(COALESCE(cnpj, ''), '\\\\D', '', 'g') AS cnpj_digits
+                        FROM {$tblVc}
+                        WHERE regexp_replace(COALESCE(cnpj, ''), '\\\\D', '', 'g') IN (" . implode(',', $ph) . ")
+                    ";
+                    $res = @pg_query_params($g_sql, $q, $params);
+                    if ($res) {
+                        while ($row = pg_fetch_assoc($res)) {
+                            $c = (string)($row['cnpj_digits'] ?? '');
+                            $login = trim((string)($row['login'] ?? ''));
+                            if ($c !== '' && $login !== '' && !isset($map[$c])) {
+                                $map[$c] = $login;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach ($parsed['rows'] as $i => $r) {
+            $c = $digits((string)($r['cnpj_pagador'] ?? ''));
+            $parsed['rows'][$i]['vendedor_login'] = ($c !== '' && isset($map[$c])) ? (string)$map[$c] : '';
+        }
+    }
+
     return [
         'success' => true,
         'meta' => [

@@ -22,6 +22,9 @@ $conn = connect();
 $acao = strtoupper(trim((string)($input['acao'] ?? '')));
 if ($acao === 'EXCLUIR_INEXISTENTES') {
     $tabela = "{$domain}_carregamento";
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
     $origens = $input['origens_ssw'] ?? [];
     if (!is_array($origens)) $origens = [];
     $origens = array_values(array_unique(array_filter(array_map(function ($v) {
@@ -38,20 +41,25 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
         return "'" . pg_escape_string($conn, $p) . "'";
     }, $origens));
 
-    $resDel = pg_query(
+    $loginEsc = pg_escape_string($conn, $login);
+    $resUpd = pg_query(
         $conn,
-        "DELETE FROM {$tabela}
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '{$loginEsc}'
          WHERE UPPER(unidade) = '{$unidadeEsc}'
+           AND data_finalizacao IS NULL
            AND origem_ssw IS NOT NULL AND origem_ssw <> ''
            AND UPPER(origem_ssw) IN ({$in})"
     );
-    if ($resDel === false) {
-        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos inexistentes.']);
+    if ($resUpd === false) {
+        respondJson(['success' => false, 'message' => 'Erro ao finalizar carregamentos inexistentes.']);
     }
 
     respondJson([
         'success' => true,
-        'removidos' => pg_affected_rows($resDel),
+        'finalizados' => pg_affected_rows($resUpd),
     ]);
 }
 
@@ -63,6 +71,9 @@ $tabelaVeiculo = "{$domain}_veiculo";
 $domainUpper = strtoupper(trim((string)$domain));
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&prioritario=N");
@@ -108,29 +119,27 @@ if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPla
 $placas_ssw = array_values(array_unique($placas_ssw));
 
 $unidadeEsc = pg_escape_string($conn, $unidade);
-
-$resDelAll = pg_query(
-    $conn,
-    "DELETE FROM {$tabela}
-     WHERE UPPER(unidade) = '{$unidadeEsc}'
-       AND origem_ssw IS NOT NULL AND origem_ssw <> ''"
-);
-if ($resDelAll === false) {
-    respondJson(['success' => false, 'message' => 'Erro ao limpar carregamentos importados do SSW no Presto.']);
-}
-$removidosOrigemSsw = (int)pg_affected_rows($resDelAll);
-$carregamentosInexistentes = [];
-$removidosInexistentes = 0;
+$finalizadosSumiramSsw = 0;
 
 if (empty($placas_ssw)) {
+    $loginEsc = pg_escape_string($conn, $login);
+    $resFinAll = @pg_query(
+        $conn,
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '{$loginEsc}'
+         WHERE UPPER(unidade) = '{$unidadeEsc}'
+           AND data_finalizacao IS NULL
+           AND origem_ssw IS NOT NULL AND origem_ssw <> ''"
+    );
+    if ($resFinAll) $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAll);
     respondJson([
         'success' => true,
         'message' => "Nenhum carregamento encontrado no SSW para esta unidade.",
         'logs' => [],
         'placas_ssw' => [],
-        'removidos_origem_ssw' => $removidosOrigemSsw,
-        'removidos_inexistentes' => $removidosOrigemSsw,
-        'carregamentos_inexistentes' => [],
+        'finalizados_sumiram_ssw' => $finalizadosSumiramSsw,
     ]);
 }
 
@@ -318,8 +327,13 @@ foreach ($placas_ssw as $placa) {
 
     $placaProvEsc = pg_escape_string($conn, $placaProvisoriaSalvar);
 
-    $res_check = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' LIMIT 1");
-    $ja_existe = $res_check && pg_num_rows($res_check) > 0;
+    $res_check = pg_query($conn, "SELECT MIN(data_inclusao) AS data_inclusao, MIN(hora_inclusao) AS hora_inclusao, MAX(data_finalizacao) AS data_finalizacao FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}'");
+    $row_check = ($res_check && pg_num_rows($res_check) > 0) ? pg_fetch_assoc($res_check) : null;
+    $ja_existe = $row_check && (($row_check['data_inclusao'] ?? null) !== null);
+    $dataInc = $row_check ? (string)($row_check['data_inclusao'] ?? '') : '';
+    $horaInc = $row_check ? (string)($row_check['hora_inclusao'] ?? '') : '';
+    $dataIncSql = ($dataInc !== '') ? ("DATE '" . pg_escape_string($conn, $dataInc) . "'") : 'CURRENT_DATE';
+    $horaIncSql = ($horaInc !== '') ? ("TIME '" . pg_escape_string($conn, $horaInc) . "'") : 'CURRENT_TIME';
 
     $info = $carregamentos[$placa] ?? null;
     $ctes = $info['ctes'] ?? [];
@@ -337,32 +351,90 @@ foreach ($placas_ssw as $placa) {
 
     pg_query($conn, 'BEGIN');
     try {
-        $resDel = pg_query($conn, "DELETE FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}'");
-        if ($resDel === false) throw new Exception(pg_last_error($conn));
-
         $inseridos = 0;
         $ignoradosEmOutro = 0;
+        $resHdr = pg_query($conn,
+            "UPDATE {$tabela}
+             SET placa_provisoria = '{$placaProvEsc}',
+                 destino = {$destinoCarEsc},
+                 origem_criacao = 'SSW',
+                 data_finalizacao = NULL,
+                 hora_finalizacao = NULL,
+                 login_finalizacao = NULL
+             WHERE UPPER(unidade) = '{$unidadeEsc}'
+               AND origem_ssw = '{$placaEsc}'"
+        );
+        if ($resHdr === false) throw new Exception(pg_last_error($conn));
+
         if (empty($ctes)) {
-            $resInsSent = pg_query(
-                $conn,
-                "INSERT INTO {$tabela}
-                 (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                  nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
-                 VALUES
-                 ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
-                  0, {$destinoCarEsc}, NULL, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
-            );
-            if (!$resInsSent) throw new Exception(pg_last_error($conn));
+            $resAny = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' LIMIT 1");
+            if (!$resAny || pg_num_rows($resAny) === 0) {
+                $resInsSent = pg_query(
+                    $conn,
+                    "INSERT INTO {$tabela}
+                     (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                      nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
+                     VALUES
+                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
+                      0, {$destinoCarEsc}, NULL, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                );
+                if (!$resInsSent) throw new Exception(pg_last_error($conn));
+            }
         } else {
             foreach ($ctes as $cte_info) {
                 $ser = pg_escape_string($conn, strtoupper(trim($cte_info['ser_cte'] ?? '')));
                 $nro = (int)($cte_info['nro_cte'] ?? 0);
                 if ($ser === '' || $nro <= 0) continue;
 
-                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND placa_provisoria = '{$placaProvEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
-                if ($check_dup && pg_num_rows($check_dup) > 0) continue;
+                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
+                if ($check_dup && pg_num_rows($check_dup) > 0) {
+                    $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
+                    $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
+                    $pagador    = pg_escape_string($conn, trim($cte_info['pagador'] ?? ''));
+                    $destinat   = pg_escape_string($conn, trim($cte_info['destinatario'] ?? ''));
+                    $cidade     = pg_escape_string($conn, trim($cte_info['cidade'] ?? ''));
 
-                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND placa_provisoria <> '{$placaProvEsc}' LIMIT 1");
+                    $emissao = trim($cte_info['emissao'] ?? '');
+                    $prevEnt = trim($cte_info['prev_ent'] ?? '');
+                    $emissaoSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $emissao) ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')" : 'NULL';
+                    $prevEntSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $prevEnt) ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')" : 'NULL';
+
+                    $vlrMerc  = normalizarNumero($cte_info['vlr_merc']  ?? 0);
+                    $vlrFrete = normalizarNumero($cte_info['vlr_frete'] ?? 0);
+                    $pesoVal  = normalizarNumero($cte_info['peso']      ?? 0);
+                    $cubVal   = normalizarNumero($cte_info['cubagem']   ?? 0);
+                    $qtdeVol  = (int)($cte_info['qtde_vol'] ?? 0);
+
+                    $resUpdCte = pg_query($conn,
+                        "UPDATE {$tabela}
+                         SET placa_provisoria = '{$placaProvEsc}',
+                             destino = {$destinoCarEsc},
+                             destino_cte = '{$destinoCte}',
+                             data_emissao_cte = {$emissaoSql},
+                             data_prev_ent_cte = {$prevEntSql},
+                             remetente_cte = '{$remetente}',
+                             destinatario_cte = '{$destinat}',
+                             pagador_cte = '{$pagador}',
+                             cidade_destino_cte = '{$cidade}',
+                             vlr_merc_cte = {$vlrMerc},
+                             vlr_frete_cte = {$vlrFrete},
+                             peso_cte = {$pesoVal},
+                             cubagem_cte = {$cubVal},
+                             qtde_vol_cte = {$qtdeVol},
+                             origem_criacao = 'SSW',
+                             data_finalizacao = NULL,
+                             hora_finalizacao = NULL,
+                             login_finalizacao = NULL
+                         WHERE UPPER(unidade) = '{$unidadeEsc}'
+                           AND origem_ssw = '{$placaEsc}'
+                           AND ser_cte = '{$ser}'
+                           AND nro_cte = {$nro}"
+                    );
+                    if (!$resUpdCte) throw new Exception(pg_last_error($conn));
+                    continue;
+                }
+
+                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND data_finalizacao IS NULL AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND origem_ssw <> '{$placaEsc}' LIMIT 1");
                 if ($check_outro && pg_num_rows($check_outro) > 0) { $ignoradosEmOutro++; continue; }
 
                 $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
@@ -391,7 +463,7 @@ foreach ($placas_ssw as $placa) {
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
-                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
+                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
                       {$destinoCarEsc}, NULL,
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
@@ -403,20 +475,8 @@ foreach ($placas_ssw as $placa) {
             }
         }
 
-        // Atualiza timestamps/usuário do carregamento inteiro (inclui linhas manuais)
-        $resUpd = pg_query($conn,
-            "UPDATE {$tabela}
-             SET data_inclusao = CURRENT_DATE,
-                 hora_inclusao = CURRENT_TIME,
-                 login_inclusao = '{$loginEsc}',
-                 origem_criacao = 'SSW'
-             WHERE UPPER(unidade) = '{$unidadeEsc}'
-               AND placa_provisoria = '{$placaProvEsc}'"
-        );
-        if ($resUpd === false) throw new Exception(pg_last_error($conn));
-
         pg_query($conn, 'COMMIT');
-        $status = $ja_existe ? 'sobrescrito' : 'importado';
+        $status = $ja_existe ? 'atualizado' : 'importado';
         $msg = ($placaProvisoriaSalvar !== $placa)
             ? "{$inseridos} CT-e(s) importado(s). Agrupado em {$placaProvisoriaSalvar}."
             : "{$inseridos} CT-e(s) importado(s).";
@@ -430,11 +490,32 @@ foreach ($placas_ssw as $placa) {
     }
 }
 
+$placasUp = array_values(array_unique(array_filter(array_map(function($p) {
+    $s = strtoupper(trim((string)$p));
+    return $s !== '' ? $s : null;
+}, $placas_ssw))));
+if (count($placasUp) > 0) {
+    $inUp = implode(',', array_map(function($p) use ($conn) {
+        return "'" . pg_escape_string($conn, strtoupper(trim((string)$p))) . "'";
+    }, $placasUp));
+    $loginEsc = pg_escape_string($conn, $login);
+    $resFin = @pg_query(
+        $conn,
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '{$loginEsc}'
+         WHERE UPPER(unidade) = '{$unidadeEsc}'
+           AND data_finalizacao IS NULL
+           AND origem_ssw IS NOT NULL AND origem_ssw <> ''
+           AND UPPER(origem_ssw) NOT IN ({$inUp})"
+    );
+    if ($resFin) $finalizadosSumiramSsw = (int)pg_affected_rows($resFin);
+}
+
 respondJson([
     'success' => true,
     'placas_ssw' => $placas_ssw,
-    'removidos_origem_ssw' => $removidosOrigemSsw,
-    'removidos_inexistentes' => $removidosOrigemSsw,
-    'carregamentos_inexistentes' => [],
+    'finalizados_sumiram_ssw' => $finalizadosSumiramSsw,
     'logs' => $logs,
 ]);

@@ -59,7 +59,8 @@ function getUnidadesOcupadasCarregamentos($conn, $tabela, $unidade) {
         $res = sql(
             "SELECT placa_provisoria, destino, unidades
              FROM {$tabela}
-             WHERE unidade = \$1",
+             WHERE unidade = \$1
+               AND data_finalizacao IS NULL",
             [$unidade],
             $conn
         );
@@ -447,23 +448,24 @@ if ($acao === 'excluir_carregamento') {
     }
 
     $res = pg_query($conn,
-        "DELETE FROM {$tabela}
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '" . pg_escape_string($conn, $login) . "'
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
+           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND data_finalizacao IS NULL"
     );
 
     if (!$res) {
-        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento.']);
+        respondJson(['success' => false, 'message' => 'Erro ao finalizar carregamento.']);
     }
 
-    // Limpa capacidade também
-    pg_query($conn,
-        "DELETE FROM {$tabelaCap}
-         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
-    );
-
-    respondJson(['success' => true]);
+    $affected = pg_affected_rows($res);
+    if ($affected <= 0) {
+        respondJson(['success' => true, 'already' => true]);
+    }
+    respondJson(['success' => true, 'updated' => $affected]);
 }
 
 // ─── Ação: atualizar placa ────────────────────────────────────────────────────
@@ -572,12 +574,17 @@ if ($acao === 'atualizar_capacidade') {
 // ─── Ação: excluir todos ──────────────────────────────────────────────────────
 if ($acao === 'excluir_todos') {
     $res = pg_query($conn,
-        "DELETE FROM {$tabela} WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'"
+        "UPDATE {$tabela}
+         SET data_finalizacao = CURRENT_DATE,
+             hora_finalizacao = CURRENT_TIME,
+             login_finalizacao = '" . pg_escape_string($conn, $login) . "'
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND data_finalizacao IS NULL"
     );
     if (!$res) {
-        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos.']);
+        respondJson(['success' => false, 'message' => 'Erro ao finalizar carregamentos.']);
     }
-    respondJson(['success' => true]);
+    respondJson(['success' => true, 'updated' => pg_affected_rows($res)]);
 }
 
 // ─── Ação: finalizar carregamento ─────────────────────────────────────────────
