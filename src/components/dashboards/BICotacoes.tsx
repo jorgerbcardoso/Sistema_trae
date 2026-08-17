@@ -329,16 +329,15 @@ export function BICotacoes() {
   const [listSort, setListSort] = useState<{
     key:
       | 'cotacao'
+      | 'data'
       | 'situacao'
       | 'cliente'
       | 'origem'
       | 'destino'
       | 'usuario'
-      | 'unidade'
       | 'proposta'
       | 'frete_ctrc'
-      | 'ctrc'
-      | 'validade';
+      | 'ctrc';
     dir: 'asc' | 'desc';
   }>({ key: 'proposta', dir: 'desc' });
   const [rankingConvertidoSort, setRankingConvertidoSort] = useState<{
@@ -353,6 +352,7 @@ export function BICotacoes() {
   const [clientsPage, setClientsPage] = useState(1);
   const [vendorsPage, setVendorsPage] = useState(1);
   const [listPage, setListPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
 
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
@@ -883,21 +883,20 @@ export function BICotacoes() {
     };
   }, [rowsFiltered]);
 
-  const listPageSize = 80;
+  const listPageSize = 40;
 
   const toggleListSort = useCallback((key: typeof listSort.key) => {
     const defaultDir: Record<typeof listSort.key, 'asc' | 'desc'> = {
       cotacao: 'asc',
+      data: 'desc',
       situacao: 'asc',
       cliente: 'asc',
       origem: 'asc',
       destino: 'asc',
       usuario: 'asc',
-      unidade: 'asc',
       proposta: 'desc',
       frete_ctrc: 'desc',
       ctrc: 'asc',
-      validade: 'desc',
     };
     setListSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: defaultDir[key] }));
   }, [listSort.key]);
@@ -911,8 +910,8 @@ export function BICotacoes() {
     const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
     const getCliente = (r: CotacaoRow) => String(r.nome_pagador || r.cnpj_pagador || '').trim();
     const getSituacao = (r: CotacaoRow) => String(funilSituacaoLabel(r.situacao) || '').trim();
-    const getValTs = (r: CotacaoRow) => {
-      const d = String(r.validade || '').slice(0, 10);
+    const getDataTs = (r: CotacaoRow) => {
+      const d = String(r.data_inclusao || '').slice(0, 10);
       const t = Date.parse(`${d}T00:00:00`);
       return Number.isFinite(t) ? t : 0;
     };
@@ -921,16 +920,15 @@ export function BICotacoes() {
     rows.sort((a, b) => {
       let c = 0;
       if (listSort.key === 'cotacao') c = cmpStr(getCot(a), getCot(b));
+      else if (listSort.key === 'data') c = getDataTs(a) - getDataTs(b);
       else if (listSort.key === 'situacao') c = cmpStr(getSituacao(a), getSituacao(b));
       else if (listSort.key === 'cliente') c = cmpStr(getCliente(a), getCliente(b));
       else if (listSort.key === 'origem') c = cmpStr(String(a.origem || ''), String(b.origem || ''));
       else if (listSort.key === 'destino') c = cmpStr(String(a.destino || ''), String(b.destino || ''));
       else if (listSort.key === 'usuario') c = cmpStr(String(a.usuario_inclusao || ''), String(b.usuario_inclusao || ''));
-      else if (listSort.key === 'unidade') c = cmpStr(String(a.unidade_inclusao || ''), String(b.unidade_inclusao || ''));
       else if (listSort.key === 'ctrc') c = cmpStr(String(a.ctrc || ''), String(b.ctrc || ''));
       else if (listSort.key === 'proposta') c = toNumber(a.proposta_atual) - toNumber(b.proposta_atual);
       else if (listSort.key === 'frete_ctrc') c = toNumber(a.frete_ctrc) - toNumber(b.frete_ctrc);
-      else if (listSort.key === 'validade') c = getValTs(a) - getValTs(b);
       return c === 0 ? 0 : c * dir;
     });
     return rows;
@@ -1387,6 +1385,18 @@ export function BICotacoes() {
     });
     return rows;
   }, [rankingUsuarios, usersSort.dir, usersSort.key]);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [usersSort.key, usersSort.dir, rankingUsuariosSorted.length]);
+
+  const usersPageSize = 40;
+  const usersTotalPages = Math.max(1, Math.ceil(rankingUsuariosSorted.length / usersPageSize));
+  const usersPageSafe = Math.min(Math.max(1, usersPage), usersTotalPages);
+  const rankingUsuariosPage = useMemo(() => {
+    const start = (usersPageSafe - 1) * usersPageSize;
+    return rankingUsuariosSorted.slice(start, start + usersPageSize);
+  }, [rankingUsuariosSorted, usersPageSafe]);
 
   const rankingUsuariosConvertidoSorted = useMemo(() => {
     const rows = [...rankingUsuariosConvertidoTab];
@@ -2642,7 +2652,30 @@ export function BICotacoes() {
                       <UserIcon className="w-4 h-4 text-indigo-500" />
                       Performance por Usuário
                     </div>
-                    <Badge variant="outline">{formatNumber(rankingUsuarios.length)} usuários</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{formatNumber(rankingUsuariosSorted.length)} usuários</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                        disabled={usersPageSafe <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Badge variant="outline">
+                        {formatNumber(usersPageSafe)} / {formatNumber(usersTotalPages)}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="dark:border-slate-700"
+                        onClick={() => setUsersPage((p) => Math.min(usersTotalPages, p + 1))}
+                        disabled={usersPageSafe >= usersTotalPages}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
@@ -2694,7 +2727,7 @@ export function BICotacoes() {
                             </td>
                           </tr>
                         ) : (
-                          rankingUsuariosSorted.map((u) => (
+                          rankingUsuariosPage.map((u) => (
                             <tr
                               key={u.usuario}
                               role="button"
@@ -3811,11 +3844,11 @@ export function BICotacoes() {
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => openDrill('Lista (CRM)', rowsFiltered)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Lista (CRM)', rowsFiltered); }}
+                    onClick={() => openDrill('Lista', rowsFiltered)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openDrill('Lista', rowsFiltered); }}
                     className="text-slate-900 dark:text-slate-100 font-semibold cursor-pointer hover:opacity-95"
                   >
-                    Lista (CRM)
+                    Lista
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{formatNumber(rowsFiltered.length)} registros</Badge>
@@ -3846,12 +3879,17 @@ export function BICotacoes() {
                 </div>
 
                 <div className="overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                  <table className="min-w-[1400px] w-full text-sm">
+                  <table className="min-w-[1200px] w-full text-sm">
                     <thead className="bg-slate-50 dark:bg-slate-900/50">
                       <tr className="text-left">
                         <th className="py-2 px-3">
                           <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('cotacao')}>
                             Cotação{listSort.key === 'cotacao' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('data')}>
+                            Data{listSort.key === 'data' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                           </button>
                         </th>
                         <th className="py-2 px-3">
@@ -3879,11 +3917,6 @@ export function BICotacoes() {
                             Usuário{listSort.key === 'usuario' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                           </button>
                         </th>
-                        <th className="py-2 px-3">
-                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('unidade')}>
-                            Unid{listSort.key === 'unidade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
                         <th className="py-2 px-3 text-right">
                           <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('proposta')}>
                             Proposta{listSort.key === 'proposta' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -3899,31 +3932,26 @@ export function BICotacoes() {
                             CTRC{listSort.key === 'ctrc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                           </button>
                         </th>
-                        <th className="py-2 px-3">
-                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('validade')}>
-                            Validade{listSort.key === 'validade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="py-2 px-3">Ação</th>
                       </tr>
                     </thead>
                     <tbody>
                       {!data ? (
                         <tr>
-                          <td colSpan={12} className="py-10 text-center text-slate-500">
+                          <td colSpan={10} className="py-10 text-center text-slate-500">
                             Gere para visualizar.
                           </td>
                         </tr>
                       ) : rowsFiltered.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="py-10 text-center text-slate-500">
+                          <td colSpan={10} className="py-10 text-center text-slate-500">
                             Nenhum registro com os filtros atuais.
                           </td>
                         </tr>
                       ) : (
                         listPageRows.map((r, idx) => (
                           <tr key={`${r.cotacao}-${idx}`} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
-                            <td className="py-2 px-3 font-mono">{r.cotacao || '-'}</td>
+                            <td className="py-2 px-3 font-mono">{cotacaoKeyLabel(r)}</td>
+                            <td className="py-2 px-3 font-mono">{shortDateLabel(r.data_inclusao)}</td>
                             <td className="py-2 px-3">
                               <Badge
                                 className={
@@ -3948,36 +3976,9 @@ export function BICotacoes() {
                             <td className="py-2 px-3">{r.origem || '-'}</td>
                             <td className="py-2 px-3">{r.destino || '-'}</td>
                             <td className="py-2 px-3 font-mono">{r.usuario_inclusao || '-'}</td>
-                            <td className="py-2 px-3 font-mono">{r.unidade_inclusao || '-'}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(r.proposta_atual)}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(r.frete_ctrc)}</td>
                             <td className="py-2 px-3 font-mono">{r.ctrc || '-'}</td>
-                            <td className="py-2 px-3">
-                              <div className="flex items-center gap-2">
-                                <span>{r.validade || '-'}</span>
-                                {r.status_kind !== 'CTRC_EMI' && r.status_kind !== 'OUTRO' && isSoon(r.validade, 2) && (
-                                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                    <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                                    risco
-                                  </Badge>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-2 px-3">
-                              {r.status_kind === 'CTRC_EMI' ? (
-                                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Concluído</Badge>
-                              ) : r.status_kind === 'CONTRAT' ? (
-                                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">Emitir CTRC</Badge>
-                              ) : r.status_kind === 'COTADO' ? (
-                                isSoon(r.validade, 2) ? (
-                                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Follow-up urgente</Badge>
-                                ) : (
-                                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">Follow-up</Badge>
-                                )
-                              ) : (
-                                <span className="text-slate-500">-</span>
-                              )}
-                            </td>
                           </tr>
                         ))
                       )}
@@ -3990,7 +3991,7 @@ export function BICotacoes() {
                           </td>
                           <td className="py-2 px-3 text-right font-mono">{formatCurrency(totalsView.potencial)}</td>
                           <td className="py-2 px-3 text-right font-mono">{formatCurrency(totalsView.convertido)}</td>
-                          <td className="py-2 px-3" colSpan={3} />
+                          <td className="py-2 px-3" />
                         </tr>
                       </tfoot>
                     )}
