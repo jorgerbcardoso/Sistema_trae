@@ -1857,7 +1857,7 @@ export function BICotacoes() {
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs tracking-wide text-indigo-800 dark:text-indigo-200">Conversão</p>
+                  <p className="text-xs tracking-wide text-indigo-800 dark:text-indigo-200">Cotações Convertidas</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatPercent(totalsView.conversao)}</p>
                 </div>
                 <BadgePercent className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
@@ -1895,6 +1895,9 @@ export function BICotacoes() {
                 <div>
                   <p className="text-xs tracking-wide text-green-800 dark:text-green-200">Frete CTRC</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(totalsView.convertido)}</p>
+                  <p className="text-xs mt-1 text-slate-600 dark:text-slate-300">
+                    {totalsView.potencial > 0 ? `${formatPercent(totalsView.convertido / totalsView.potencial)} do Frete cotado` : '—'}
+                  </p>
                 </div>
                 <Wallet className="w-5 h-5 text-green-700 dark:text-green-300" />
               </div>
