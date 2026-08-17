@@ -326,6 +326,21 @@ export function BICotacoes() {
     key: 'ctrc_emi',
     dir: 'desc',
   });
+  const [listSort, setListSort] = useState<{
+    key:
+      | 'cotacao'
+      | 'situacao'
+      | 'cliente'
+      | 'origem'
+      | 'destino'
+      | 'usuario'
+      | 'unidade'
+      | 'proposta'
+      | 'frete_ctrc'
+      | 'ctrc'
+      | 'validade';
+    dir: 'asc' | 'desc';
+  }>({ key: 'proposta', dir: 'desc' });
   const [rankingConvertidoSort, setRankingConvertidoSort] = useState<{
     key: 'usuario' | 'cotacoes' | 'ctrc_emi' | 'conversao' | 'potencial' | 'convertido';
     dir: 'asc' | 'desc';
@@ -337,6 +352,7 @@ export function BICotacoes() {
   const rankingBaseKeyRef = useRef('');
   const [clientsPage, setClientsPage] = useState(1);
   const [vendorsPage, setVendorsPage] = useState(1);
+  const [listPage, setListPage] = useState(1);
 
   const runRef = useRef(0);
   const initialLoadRef = useRef(false);
@@ -866,6 +882,66 @@ export function BICotacoes() {
       conversao: t.cotacoes > 0 ? t.ctrc_emi / t.cotacoes : 0,
     };
   }, [rowsFiltered]);
+
+  const listPageSize = 80;
+
+  const toggleListSort = useCallback((key: typeof listSort.key) => {
+    const defaultDir: Record<typeof listSort.key, 'asc' | 'desc'> = {
+      cotacao: 'asc',
+      situacao: 'asc',
+      cliente: 'asc',
+      origem: 'asc',
+      destino: 'asc',
+      usuario: 'asc',
+      unidade: 'asc',
+      proposta: 'desc',
+      frete_ctrc: 'desc',
+      ctrc: 'asc',
+      validade: 'desc',
+    };
+    setListSort((p) => (p.key === key ? { key, dir: p.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: defaultDir[key] }));
+  }, [listSort.key]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [listSort.key, listSort.dir, rowsFiltered]);
+
+  const listSorted = useMemo(() => {
+    const dir = listSort.dir === 'asc' ? 1 : -1;
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
+    const getCliente = (r: CotacaoRow) => String(r.nome_pagador || r.cnpj_pagador || '').trim();
+    const getSituacao = (r: CotacaoRow) => String(funilSituacaoLabel(r.situacao) || '').trim();
+    const getValTs = (r: CotacaoRow) => {
+      const d = String(r.validade || '').slice(0, 10);
+      const t = Date.parse(`${d}T00:00:00`);
+      return Number.isFinite(t) ? t : 0;
+    };
+    const getCot = (r: CotacaoRow) => cotacaoKeyLabel(r as any);
+    const rows = [...rowsFiltered];
+    rows.sort((a, b) => {
+      let c = 0;
+      if (listSort.key === 'cotacao') c = cmpStr(getCot(a), getCot(b));
+      else if (listSort.key === 'situacao') c = cmpStr(getSituacao(a), getSituacao(b));
+      else if (listSort.key === 'cliente') c = cmpStr(getCliente(a), getCliente(b));
+      else if (listSort.key === 'origem') c = cmpStr(String(a.origem || ''), String(b.origem || ''));
+      else if (listSort.key === 'destino') c = cmpStr(String(a.destino || ''), String(b.destino || ''));
+      else if (listSort.key === 'usuario') c = cmpStr(String(a.usuario_inclusao || ''), String(b.usuario_inclusao || ''));
+      else if (listSort.key === 'unidade') c = cmpStr(String(a.unidade_inclusao || ''), String(b.unidade_inclusao || ''));
+      else if (listSort.key === 'ctrc') c = cmpStr(String(a.ctrc || ''), String(b.ctrc || ''));
+      else if (listSort.key === 'proposta') c = toNumber(a.proposta_atual) - toNumber(b.proposta_atual);
+      else if (listSort.key === 'frete_ctrc') c = toNumber(a.frete_ctrc) - toNumber(b.frete_ctrc);
+      else if (listSort.key === 'validade') c = getValTs(a) - getValTs(b);
+      return c === 0 ? 0 : c * dir;
+    });
+    return rows;
+  }, [listSort.dir, listSort.key, rowsFiltered]);
+
+  const listTotalPages = Math.max(1, Math.ceil(listSorted.length / listPageSize));
+  const listPageSafe = Math.min(Math.max(1, listPage), listTotalPages);
+  const listPageRows = useMemo(() => {
+    const start = (listPageSafe - 1) * listPageSize;
+    return listSorted.slice(start, start + listPageSize);
+  }, [listPageSafe, listSorted]);
 
   const periodDays = useMemo(() => {
     const start = filters.periodoIni;
@@ -3745,6 +3821,27 @@ export function BICotacoes() {
                     <Badge variant="outline">{formatNumber(rowsFiltered.length)} registros</Badge>
                     <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">Potencial: {formatCurrency(totalsView.potencial)}</Badge>
                     <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">Convertido: {formatCurrency(totalsView.convertido)}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="dark:border-slate-700"
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      disabled={listPageSafe <= 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Badge variant="outline">
+                      {formatNumber(listPageSafe)} / {formatNumber(listTotalPages)}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="dark:border-slate-700"
+                      onClick={() => setListPage((p) => Math.min(listTotalPages, p + 1))}
+                      disabled={listPageSafe >= listTotalPages}
+                    >
+                      Próxima
+                    </Button>
                   </div>
                 </div>
 
@@ -3752,17 +3849,61 @@ export function BICotacoes() {
                   <table className="min-w-[1400px] w-full text-sm">
                     <thead className="bg-slate-50 dark:bg-slate-900/50">
                       <tr className="text-left">
-                        <th className="py-2 px-3">Cotação</th>
-                        <th className="py-2 px-3">Situação</th>
-                        <th className="py-2 px-3">Cliente</th>
-                        <th className="py-2 px-3">Origem</th>
-                        <th className="py-2 px-3">Destino</th>
-                        <th className="py-2 px-3">Usuário</th>
-                        <th className="py-2 px-3">Unid</th>
-                        <th className="py-2 px-3 text-right">Proposta</th>
-                        <th className="py-2 px-3 text-right">Frete CTRC</th>
-                        <th className="py-2 px-3">CTRC</th>
-                        <th className="py-2 px-3">Validade</th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('cotacao')}>
+                            Cotação{listSort.key === 'cotacao' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('situacao')}>
+                            Situação{listSort.key === 'situacao' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('cliente')}>
+                            Cliente{listSort.key === 'cliente' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('origem')}>
+                            Origem{listSort.key === 'origem' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('destino')}>
+                            Destino{listSort.key === 'destino' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('usuario')}>
+                            Usuário{listSort.key === 'usuario' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('unidade')}>
+                            Unid{listSort.key === 'unidade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3 text-right">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('proposta')}>
+                            Proposta{listSort.key === 'proposta' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3 text-right">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('frete_ctrc')}>
+                            Frete CTRC{listSort.key === 'frete_ctrc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('ctrc')}>
+                            CTRC{listSort.key === 'ctrc' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
+                        <th className="py-2 px-3">
+                          <button type="button" className="hover:text-slate-900 dark:hover:text-slate-100" onClick={() => toggleListSort('validade')}>
+                            Validade{listSort.key === 'validade' ? (listSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </button>
+                        </th>
                         <th className="py-2 px-3">Ação</th>
                       </tr>
                     </thead>
@@ -3780,7 +3921,7 @@ export function BICotacoes() {
                           </td>
                         </tr>
                       ) : (
-                        rowsFiltered.slice(0, 800).map((r, idx) => (
+                        listPageRows.map((r, idx) => (
                           <tr key={`${r.cotacao}-${idx}`} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
                             <td className="py-2 px-3 font-mono">{r.cotacao || '-'}</td>
                             <td className="py-2 px-3">
@@ -3855,9 +3996,6 @@ export function BICotacoes() {
                     )}
                   </table>
                 </div>
-                {data && rowsFiltered.length > 800 && (
-                  <div className="text-xs text-slate-500 mt-2">Limite visual: mostrando os primeiros 800 registros. Use CSV para exportar tudo.</div>
-                )}
               </CardContent>
             </Card>
         </TabsContent>
