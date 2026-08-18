@@ -50,6 +50,26 @@ if (!empty($filters['siglaDest']) && is_array($filters['siglaDest']) && count($f
     $whereConditions[] = 'cte.sigla_dest IN (' . implode(', ', $placeholders) . ')';
 }
 
+$vendedorLogin = trim((string)($filters['vendedorLogin'] ?? ''));
+if ($vendedorLogin !== '') {
+    $tblVc = "{$domain}_vendedor_cliente";
+    if ($vendedorLogin === '__sem_vendedor__') {
+        $whereConditions[] = "NOT EXISTS (
+            SELECT 1
+            FROM {$tblVc} vc
+            WHERE regexp_replace(COALESCE(vc.cnpj, ''), '\\\\D', '', 'g') = regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')
+        )";
+    } else {
+        $whereConditions[] = "EXISTS (
+            SELECT 1
+            FROM {$tblVc} vc
+            WHERE LOWER(BTRIM(vc.login)) = LOWER(BTRIM($" . $paramIndex++ . "))
+              AND regexp_replace(COALESCE(vc.cnpj, ''), '\\\\D', '', 'g') = regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')
+        )";
+        $params[] = $vendedorLogin;
+    }
+}
+
 $cnpjsSelecionados = !empty($filters['cnpjsPagadores']) && is_array($filters['cnpjsPagadores'])
     ? $filters['cnpjsPagadores']
     : [];

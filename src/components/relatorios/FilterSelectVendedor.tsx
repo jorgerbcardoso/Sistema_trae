@@ -18,6 +18,9 @@ interface Vendedor {
 interface FilterSelectVendedorProps {
   value: string;
   onChange: (value: string) => void;
+  includeSemVendedor?: boolean;
+  semVendedorValue?: string;
+  semVendedorLabel?: string;
 }
 
 // ✅ MOCK DATA - Dados obrigatórios
@@ -32,7 +35,7 @@ const mockVendedores: Vendedor[] = [
   { login: 'JULIANA.ROCHA', nome: 'JULIANA ROCHA' },
 ];
 
-export function FilterSelectVendedor({ value, onChange }: FilterSelectVendedorProps) {
+export function FilterSelectVendedor({ value, onChange, includeSemVendedor = false, semVendedorValue = '__sem_vendedor__', semVendedorLabel = 'Sem Vendedor' }: FilterSelectVendedorProps) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [options, setOptions] = useState<Vendedor[]>([]);
@@ -118,6 +121,7 @@ export function FilterSelectVendedor({ value, onChange }: FilterSelectVendedorPr
   const selectedVendedor = options.find(v => v.login === value);
   const getButtonText = () => {
     if (!value) return 'Selecione um vendedor';
+    if (value === semVendedorValue) return semVendedorLabel;
     return selectedVendedor ? `${selectedVendedor.login} - ${selectedVendedor.nome}` : value;
   };
 
@@ -174,6 +178,17 @@ export function FilterSelectVendedor({ value, onChange }: FilterSelectVendedorPr
             className="max-h-[300px] overflow-y-auto"
             onWheel={handleWheel}
           >
+            {includeSemVendedor && (
+              <button
+                key={semVendedorValue}
+                onClick={() => selectVendedor(semVendedorValue)}
+                className="w-full px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground flex flex-col cursor-pointer border-b"
+              >
+                <span className="font-semibold">{semVendedorLabel}</span>
+                <span className="text-sm text-muted-foreground">Clientes sem vínculo com vendedor</span>
+              </button>
+            )}
+
             {loading ? (
               <div className="p-4 text-center text-muted-foreground">
                 Carregando vendedores...

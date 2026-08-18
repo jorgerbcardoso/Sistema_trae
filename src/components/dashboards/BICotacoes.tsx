@@ -51,6 +51,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectCliente } from './FilterSelectCliente';
+import { FilterSelectVendedor } from '../relatorios/FilterSelectVendedor';
 import { useTooltipStyle } from './CustomTooltip';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -130,6 +131,7 @@ interface Filters {
   f13: string;
   f14: string;
   f16: string;
+  vendedorLogin: string;
 }
 
 const PALETTE = ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#a855f7', '#94a3b8'];
@@ -284,6 +286,7 @@ export function BICotacoes() {
       f13: '',
       f14: '',
       f16: '',
+      vendedorLogin: '',
     };
   }, [user]);
 
@@ -591,9 +594,18 @@ export function BICotacoes() {
             return true;
           });
 
+    const vKey = String(filters.vendedorLogin || '').trim().toLowerCase();
+    const byVendor = !vKey
+      ? byQuick
+      : byQuick.filter((r) => {
+          const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
+          if (vKey === '__sem_vendedor__') return login === '';
+          return login === vKey;
+        });
+
     const q = search.trim().toLowerCase();
-    if (!q) return byQuick;
-    return byQuick.filter((r) => {
+    if (!q) return byVendor;
+    return byVendor.filter((r) => {
       const bag = [
         r.cotacao,
         r.unidade_inclusao,
@@ -611,7 +623,7 @@ export function BICotacoes() {
         .toLowerCase();
       return bag.includes(q);
     });
-  }, [data, quickStatus, search]);
+  }, [data, filters.vendedorLogin, quickStatus, search]);
 
   const rowsSimuladas = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'COTADO'), [rowsFiltered]);
   const rowsContratadas = useMemo(
@@ -631,9 +643,19 @@ export function BICotacoes() {
             if (quickStatus === 'CTRC_EMI') return r.status_kind === 'CTRC_EMI';
             return true;
           });
+
+    const vKey = String(filters.vendedorLogin || '').trim().toLowerCase();
+    const byVendor = !vKey
+      ? byQuick
+      : byQuick.filter((r) => {
+          const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
+          if (vKey === '__sem_vendedor__') return login === '';
+          return login === vKey;
+        });
+
     const q = search.trim().toLowerCase();
-    if (!q) return byQuick;
-    return byQuick.filter((r) => {
+    if (!q) return byVendor;
+    return byVendor.filter((r) => {
       const bag = [
         r.cotacao,
         r.unidade_inclusao,
@@ -651,7 +673,7 @@ export function BICotacoes() {
         .toLowerCase();
       return bag.includes(q);
     });
-  }, [quickStatus, rankingBaseRows, search]);
+  }, [filters.vendedorLogin, quickStatus, rankingBaseRows, search]);
 
   const openDrill = useCallback((title: string, rows: CotacaoRow[]) => {
     setDrillTitle(title);
@@ -1773,7 +1795,7 @@ export function BICotacoes() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                     <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-200">Unidade de inclusão</Label>
@@ -1790,6 +1812,16 @@ export function BICotacoes() {
                     <div className="space-y-2">
                       <Label className="text-slate-700 dark:text-slate-200">Pagador</Label>
                       <FilterSelectCliente type="pagador" value={tempFilters.f16} onChange={(v) => setTempFilters({ ...tempFilters, f16: v })} />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-200">Vendedor</Label>
+                      <FilterSelectVendedor
+                        value={tempFilters.vendedorLogin}
+                        onChange={(v) => setTempFilters({ ...tempFilters, vendedorLogin: v })}
+                        includeSemVendedor
+                      />
                     </div>
                   </div>
                 </div>

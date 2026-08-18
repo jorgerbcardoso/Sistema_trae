@@ -373,7 +373,7 @@ export function FretesExpedidosRecebidos() {
   const [dataExp, setDataExp] = useState<ApiData | null>(null);
   const [dataRec, setDataRec] = useState<ApiData | null>(null);
   const [filtroExpedidos, setFiltroExpedidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
-  const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados'>('todos');
+  const [filtroRecebidos, setFiltroRecebidos] = useState<'todos' | 'fracionados' | 'fec'>('todos');
   const runRef = useRef(0);
 
   const [sortExp, setSortExp] = useState<{ key: keyof RowAgg; dir: 'asc' | 'desc' }>({ key: 'frete_tot', dir: 'desc' });
@@ -426,21 +426,71 @@ export function FretesExpedidosRecebidos() {
 
   const dataRecView = useMemo<ApiData | null>(() => {
     if (!dataAbaRecebidos) return null;
-    const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
-    const rowsBase = dataAbaRecebidos.rows || [];
-    const rows = filtroRecebidos === 'fracionados' ? rowsBase.filter((r) => !isFec(r)) : rowsBase;
+    const groupsRaw = (dataAbaRecebidos as any)?.groups;
+    const groups = Array.isArray(groupsRaw) ? groupsRaw : [];
 
-    const totals = rows.reduce(
-      (acc, r) => {
-        acc.quant_vol += Number(r.quant_vol) || 0;
-        acc.quant_ctrc += Number(r.quant_ctrc) || 0;
-        acc.peso_ton += Number(r.peso_ton) || 0;
-        acc.val_merc += Number(r.val_merc) || 0;
-        acc.frete_tot += Number(r.frete_tot) || 0;
-        acc.frete_cif += Number(r.frete_cif) || 0;
-        acc.frete_fob += Number(r.frete_fob) || 0;
-        acc.frete_ter += Number(r.frete_ter) || 0;
-        acc.frete_sub += Number(r.frete_sub) || 0;
+    const isFecGroup = (g: any) => String(g?.unidade_base_sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
+
+    if (groups.length === 0) {
+      const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
+      const rowsBase = dataAbaRecebidos.rows || [];
+      const rows =
+        filtroRecebidos === 'todos'
+          ? rowsBase
+          : filtroRecebidos === 'fec'
+            ? rowsBase.filter(isFec)
+            : rowsBase.filter((r) => !isFec(r));
+
+      const totals = rows.reduce(
+        (acc, r) => {
+          acc.quant_vol += Number(r.quant_vol) || 0;
+          acc.quant_ctrc += Number(r.quant_ctrc) || 0;
+          acc.peso_ton += Number(r.peso_ton) || 0;
+          acc.val_merc += Number(r.val_merc) || 0;
+          acc.frete_tot += Number(r.frete_tot) || 0;
+          acc.frete_cif += Number(r.frete_cif) || 0;
+          acc.frete_fob += Number(r.frete_fob) || 0;
+          acc.frete_ter += Number(r.frete_ter) || 0;
+          acc.frete_sub += Number(r.frete_sub) || 0;
+          return acc;
+        },
+        {
+          quant_vol: 0,
+          quant_ctrc: 0,
+          peso_ton: 0,
+          val_merc: 0,
+          frete_tot: 0,
+          frete_cif: 0,
+          frete_fob: 0,
+          frete_ter: 0,
+          frete_sub: 0,
+        }
+      );
+
+      return { totals, rows };
+    }
+
+    const chosen =
+      filtroRecebidos === 'todos'
+        ? groups
+        : filtroRecebidos === 'fec'
+          ? groups.filter(isFecGroup)
+          : groups.filter((g: any) => !isFecGroup(g));
+
+    const totals = chosen.reduce(
+      (acc: any, g: any) => {
+        const t = (g?.total ?? null) as any;
+        if (t) {
+          acc.quant_vol += Number(t.quant_vol) || 0;
+          acc.quant_ctrc += Number(t.quant_ctrc) || 0;
+          acc.peso_ton += Number(t.peso_ton) || 0;
+          acc.val_merc += Number(t.val_merc) || 0;
+          acc.frete_tot += Number(t.frete_tot) || 0;
+          acc.frete_cif += Number(t.frete_cif) || 0;
+          acc.frete_fob += Number(t.frete_fob) || 0;
+          acc.frete_ter += Number(t.frete_ter) || 0;
+          acc.frete_sub += Number(t.frete_sub) || 0;
+        }
         return acc;
       },
       {
@@ -456,8 +506,49 @@ export function FretesExpedidosRecebidos() {
       }
     );
 
+    const by = new Map<string, RowAgg>();
+    for (const g of chosen) {
+      const rs = Array.isArray(g?.rows) ? g.rows : [];
+      for (const r of rs) {
+        const sigla = String(r?.sigla ?? '').trim().toUpperCase();
+        if (!sigla) continue;
+        if (!by.has(sigla)) {
+          by.set(sigla, {
+            sigla,
+            unidade: String(r?.unidade ?? ''),
+            uf: String(r?.uf ?? ''),
+            quant_vol: 0,
+            quant_ctrc: 0,
+            peso_ton: 0,
+            val_merc: 0,
+            frete_cif: 0,
+            frete_fob: 0,
+            frete_ter: 0,
+            frete_sub: 0,
+            frete_tot: 0,
+          });
+        }
+        const a = by.get(sigla)!;
+        a.quant_vol += Number(r?.quant_vol) || 0;
+        a.quant_ctrc += Number(r?.quant_ctrc) || 0;
+        a.peso_ton += Number(r?.peso_ton) || 0;
+        a.val_merc += Number(r?.val_merc) || 0;
+        a.frete_tot += Number(r?.frete_tot) || 0;
+        a.frete_cif += Number(r?.frete_cif) || 0;
+        a.frete_fob += Number(r?.frete_fob) || 0;
+        a.frete_ter += Number(r?.frete_ter) || 0;
+        a.frete_sub += Number(r?.frete_sub) || 0;
+      }
+    }
+
+    const rows = Array.from(by.values()).sort((a, b) => (Number(b.frete_tot) || 0) - (Number(a.frete_tot) || 0));
     return { totals, rows };
   }, [dataAbaRecebidos, filtroRecebidos]);
+
+  const dataRecListView = useMemo<ApiData | null>(() => {
+    if (!dataAbaRecebidos) return null;
+    return dataAbaRecebidos;
+  }, [dataAbaRecebidos]);
 
   const rowsExpSorted = useMemo(() => {
     const rows = [...(dataExpView?.rows || [])];
@@ -474,7 +565,7 @@ export function FretesExpedidosRecebidos() {
   }, [dataExpView, sortExp]);
 
   const rowsRecSorted = useMemo(() => {
-    const rows = [...(dataRecView?.rows || [])];
+    const rows = [...(dataRecListView?.rows || [])];
     const { key, dir } = sortRec;
     rows.sort((a, b) => {
       const av: any = (a as any)[key];
@@ -485,7 +576,7 @@ export function FretesExpedidosRecebidos() {
       return dir === 'asc' ? cmp : -cmp;
     });
     return rows;
-  }, [dataRecView, sortRec]);
+  }, [dataRecListView, sortRec]);
 
   const toggleSort = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
     if (kind === 'expedidos') {
@@ -903,7 +994,7 @@ export function FretesExpedidosRecebidos() {
                   disabled={loading}
                   onClick={() => {
                     const isExp = tab === 'expedidos';
-                    const data = isExp ? dataExpView : dataRecView;
+                    const data = isExp ? dataExpView : dataRecListView;
                     if (!data) {
                       toast.info('Nenhum dado carregado para exportar.');
                       return;
@@ -918,9 +1009,7 @@ export function FretesExpedidosRecebidos() {
                       ? filtroExpedidos !== 'todos'
                         ? `_${filtroExpedidos}`
                         : ''
-                      : filtroRecebidos !== 'todos'
-                        ? `_${filtroRecebidos}`
-                        : '';
+                      : '';
                     const name = `fretes_${kind.toLowerCase()}${suf}_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}_${pad(stamp.getHours())}${pad(
                       stamp.getMinutes()
                     )}.csv`;
@@ -1156,7 +1245,7 @@ export function FretesExpedidosRecebidos() {
               </div>
             ) : (
               <div>
-            {!dataRecView ? (
+            {!dataRecListView ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
                   Nenhum dado de Recebidos carregado.
@@ -1190,6 +1279,18 @@ export function FretesExpedidosRecebidos() {
                       disabled={loading}
                     >
                       Apenas Fracionados
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        filtroRecebidos === 'fec'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                      onClick={() => setFiltroRecebidos('fec')}
+                      disabled={loading}
+                    >
+                      Apenas FEC
                     </button>
                   </div>
                 </div>
@@ -1347,12 +1448,12 @@ export function FretesExpedidosRecebidos() {
                         </tbody>
                         <tfoot>
                           <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
-                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataRecView.rows.length)} unidades)</td>
+                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataRecListView.rows.length)} unidades)</td>
                             <td className="py-2 pr-3" />
-                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecView.totals.quant_ctrc)}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecView.totals.peso_ton) || 0))}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.val_merc)}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.frete_tot)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecListView.totals.quant_ctrc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecListView.totals.peso_ton) || 0))}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecListView.totals.val_merc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecListView.totals.frete_tot)}</td>
                           </tr>
                         </tfoot>
                       </table>

@@ -51,6 +51,7 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { FilterSelectUnidadeOrdered } from '../cadastros/FilterSelectUnidadeOrdered';
+import { FilterSelectVendedor } from '../relatorios/FilterSelectVendedor';
 import { Switch } from '../ui/switch';
 import { uploadClienteLogo } from '../../services/clientesService';
 
@@ -101,6 +102,7 @@ interface Filters {
   siglaDest: string[];
   cnpjsPagadores: string[];
   topN: 10 | 20;
+  vendedorLogin: string;
 }
 
 interface ClienteRanking {
@@ -174,6 +176,7 @@ export function FaturamentoClientes() {
     siglaDest: [],
     cnpjsPagadores: [],
     topN: 10,
+    vendedorLogin: '',
   });
   const [tempFilters, setTempFilters] = useState<Filters>(filters);
   const [showFilters, setShowFilters] = useState(false);
@@ -650,6 +653,7 @@ export function FaturamentoClientes() {
       siglaDest: [],
       cnpjsPagadores: [],
       topN: 10,
+      vendedorLogin: '',
     };
     setTempFilters(empty);
     setClientesSelecionados([]);
@@ -1625,6 +1629,11 @@ export function FaturamentoClientes() {
                 value={tempFilters.siglaDest}
                 onChange={v => setTempFilters({ ...tempFilters, siglaDest: v })}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-900 dark:text-slate-100">Vendedor</Label>
+              <FilterSelectVendedor value={tempFilters.vendedorLogin} onChange={(v) => setTempFilters({ ...tempFilters, vendedorLogin: v })} includeSemVendedor />
             </div>
 
             <div className="space-y-2">
