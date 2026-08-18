@@ -111,6 +111,7 @@ if ($modo === 'AGENDA') {
                 dia,
                 COUNT(*) AS agendados,
                 COUNT(*) FILTER (WHERE all_delivered AND NOT any_late) AS entregues,
+                COUNT(*) FILTER (WHERE (NOT all_delivered) AND (NOT any_pending_late)) AS pendentes_no_prazo,
                 COUNT(*) FILTER (WHERE (NOT all_delivered) AND any_pending_late) AS atrasados_sem_entrega,
                 COUNT(*) FILTER (WHERE all_delivered AND any_late) AS entregues_com_atraso
             FROM agenda_stats
@@ -120,6 +121,7 @@ if ($modo === 'AGENDA') {
             dias.dia,
             COALESCE(agg.agendados, 0) AS agendados,
             COALESCE(agg.entregues, 0) AS entregues,
+            COALESCE(agg.pendentes_no_prazo, 0) AS pendentes_no_prazo,
             COALESCE(agg.atrasados_sem_entrega, 0) AS atrasados_sem_entrega,
             COALESCE(agg.entregues_com_atraso, 0) AS entregues_com_atraso,
             (COALESCE(agg.atrasados_sem_entrega, 0) + COALESCE(agg.entregues_com_atraso, 0)) AS atrasados
@@ -195,17 +197,39 @@ if ($modo === 'AGENDA') {
               AND cte.data_entrega > cte.data_prev_ent
               AND (COALESCE(cte.entrega_abonada, false) = FALSE AND (oc.tipo IS DISTINCT FROM 'C') AND UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA')
             GROUP BY dia
+        ),
+        pendentes_no_prazo AS (
+            SELECT
+                cte.data_prev_ent::date AS dia,
+                {$countExpr} AS total
+            FROM {$domain}_cte cte
+            LEFT JOIN (
+                SELECT codigo::text as codigo, MAX(tipo) as tipo
+                FROM {$domain}_ocorrencia
+                GROUP BY codigo::text
+            ) oc ON oc.codigo = cte.ult_ocor::text
+            WHERE {$whereClause}
+              AND cte.data_prev_ent IS NOT NULL
+              AND cte.data_entrega IS NULL
+              AND (CASE
+                  WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE
+                  WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE
+                  ELSE cte.data_prev_ent
+              END)::date >= CURRENT_DATE
+            GROUP BY dia
         )
         SELECT
             dias.dia,
             COALESCE(agendados.total, 0) AS agendados,
             COALESCE(entregues.total, 0) AS entregues,
+            COALESCE(pendentes_no_prazo.total, 0) AS pendentes_no_prazo,
             COALESCE(atrasados_sem_entrega.total, 0) AS atrasados_sem_entrega,
             COALESCE(entregues_com_atraso.total, 0) AS entregues_com_atraso,
             (COALESCE(atrasados_sem_entrega.total, 0) + COALESCE(entregues_com_atraso.total, 0)) AS atrasados
         FROM dias
         LEFT JOIN agendados ON agendados.dia = dias.dia
         LEFT JOIN entregues ON entregues.dia  = dias.dia
+        LEFT JOIN pendentes_no_prazo ON pendentes_no_prazo.dia = dias.dia
         LEFT JOIN atrasados_sem_entrega ON atrasados_sem_entrega.dia = dias.dia
         LEFT JOIN entregues_com_atraso ON entregues_com_atraso.dia = dias.dia
         ORDER BY dias.dia ASC
@@ -232,6 +256,7 @@ while ($row = pg_fetch_assoc($result)) {
     $ts        = strtotime($row['dia']);
     $agendados = (int)$row['agendados'];
     $entregues = (int)$row['entregues'];
+    $pendentesNoPrazo = (int)($row['pendentes_no_prazo'] ?? 0);
     $atrasadosSemEntrega = (int)($row['atrasados_sem_entrega'] ?? 0);
     $entreguesComAtraso  = (int)($row['entregues_com_atraso'] ?? 0);
     $atrasados = (int)($row['atrasados'] ?? ($atrasadosSemEntrega + $entreguesComAtraso));
@@ -243,6 +268,7 @@ while ($row = pg_fetch_assoc($result)) {
         'diaSemana'  => $diasSemana[(int)date('w', $ts)] ?? '',
         'agendados'  => $agendados,
         'entregues'  => $entregues,
+        'pendentes_no_prazo' => $pendentesNoPrazo,
         'atrasados_sem_entrega' => $atrasadosSemEntrega,
         'entregues_com_atraso'  => $entreguesComAtraso,
         'atrasados'  => $atrasados,

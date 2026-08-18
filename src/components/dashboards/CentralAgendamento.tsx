@@ -490,12 +490,13 @@ export function CentralAgendamento() {
     }
   };
 
-  const abrirCalendarioDialog = async (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => {
+  const abrirCalendarioDialog = async (data: string, tipo: 'agendados' | 'no_prazo' | 'pendentes_no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => {
     const [ano, mes, dia] = data.split('-');
     const dataFormatada = `${dia}/${mes}/${ano}`;
     const nomesTipo = {
       agendados: 'Agendados',
       no_prazo: 'No Prazo',
+      pendentes_no_prazo: 'Pendentes',
       atrasados: 'Atrasados',
       atrasados_sem_entrega: 'Atraso (sem entrega)',
       entregues_com_atraso: 'Entregues com atraso',

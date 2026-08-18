@@ -12,6 +12,7 @@ export interface DiaAgendamento {
   agendados: number;
   entregues: number;
   atrasados?: number;
+  pendentes_no_prazo?: number;
   atrasados_sem_entrega?: number;
   entregues_com_atraso?: number;
 }
@@ -21,7 +22,7 @@ interface CalendarioAgendamentosProps {
   setPeriodo: (periodo: 7 | 15 | 30) => void;
   diasData: DiaAgendamento[];
   loading: boolean;
-  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => void;
+  onClickDia?: (data: string, tipo: 'agendados' | 'no_prazo' | 'pendentes_no_prazo' | 'atrasados' | 'atrasados_sem_entrega' | 'entregues_com_atraso') => void;
   modoVisao?: 'CTE' | 'AGENDA';
 }
 
@@ -91,12 +92,16 @@ export function CalendarioAgendamentos({
               const isFuture = dia.data > todayISO;
               const atrasSemEntregaRaw = Number.isFinite(dia.atrasados_sem_entrega as number) ? (dia.atrasados_sem_entrega as number) : 0;
               const entreguesAtrasoRaw = Number.isFinite(dia.entregues_com_atraso as number) ? (dia.entregues_com_atraso as number) : 0;
+              const pendentesRaw = Number.isFinite(dia.pendentes_no_prazo as number)
+                ? (dia.pendentes_no_prazo as number)
+                : Math.max(0, dia.agendados - dia.entregues - Math.max(0, atrasSemEntregaRaw) - Math.max(0, entreguesAtrasoRaw));
               const atrasadosTotalRaw = Number.isFinite(dia.atrasados as number)
                 ? (dia.atrasados as number)
                 : Math.max(0, dia.agendados - dia.entregues);
               const atrasadosSemEntrega = isFromTodayOn ? 0 : Math.max(0, atrasSemEntregaRaw);
               const entreguesComAtraso = isFromTodayOn ? 0 : Math.max(0, entreguesAtrasoRaw);
               const atrasados = isFromTodayOn ? 0 : Math.max(0, atrasadosTotalRaw);
+              const pendentesNoPrazo = Math.max(0, pendentesRaw);
 
               const isToday = dia.data === todayISO;
 
@@ -163,6 +168,16 @@ export function CalendarioAgendamentos({
                     </div>
 
                     <div
+                      className={`flex justify-between items-center px-2 py-1 rounded ${pendentesNoPrazo > 0 && onClickDia ? 'cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40' : ''}`}
+                      onClick={pendentesNoPrazo > 0 && onClickDia ? () => onClickDia(dia.data, 'pendentes_no_prazo') : undefined}
+                    >
+                      <span className="text-slate-600 dark:text-slate-400">Pendentes:</span>
+                      <span className={`font-semibold text-amber-700 dark:text-amber-400 ${pendentesNoPrazo > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {pendentesNoPrazo}
+                      </span>
+                    </div>
+
+                    <div
                       className={`flex justify-between items-center px-2 py-1 rounded ${atrasadosSemEntrega > 0 && onClickDia ? 'cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/40' : ''}`}
                       onClick={atrasadosSemEntrega > 0 && onClickDia ? () => onClickDia(dia.data, 'atrasados_sem_entrega') : undefined}
                     >
@@ -202,6 +217,15 @@ export function CalendarioAgendamentos({
                       <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">No prazo</p>
                       <p className={`font-semibold text-green-600 dark:text-green-400 ${dia.agendados > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
                         {dia.entregues}/{dia.agendados}
+                      </p>
+                    </div>
+                    <div
+                      className={`px-2 py-1 text-center rounded ${pendentesNoPrazo > 0 && onClickDia ? 'cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40' : ''}`}
+                      onClick={pendentesNoPrazo > 0 && onClickDia ? () => onClickDia(dia.data, 'pendentes_no_prazo') : undefined}
+                    >
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">Pendentes</p>
+                      <p className={`font-semibold text-amber-700 dark:text-amber-400 ${pendentesNoPrazo > 0 && onClickDia ? 'underline decoration-dotted' : ''}`}>
+                        {pendentesNoPrazo}
                       </p>
                     </div>
                     <div

@@ -20,8 +20,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
     respondJson(['success' => false, 'message' => 'Data inválida']);
 }
 
-if (!in_array($tipo, ['agendados', 'no_prazo', 'atrasados', 'atrasados_sem_entrega', 'entregues_com_atraso'])) {
-    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados, no_prazo, atrasados, atrasados_sem_entrega ou entregues_com_atraso']);
+if (!in_array($tipo, ['agendados', 'no_prazo', 'pendentes_no_prazo', 'atrasados', 'atrasados_sem_entrega', 'entregues_com_atraso'])) {
+    respondJson(['success' => false, 'message' => 'Tipo inválido. Use agendados, no_prazo, pendentes_no_prazo, atrasados, atrasados_sem_entrega ou entregues_com_atraso']);
 }
 
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
@@ -56,6 +56,10 @@ if ($modo !== 'AGENDA') {
     if ($tipo === 'no_prazo') {
         $whereConditions[] = "cte.data_entrega IS NOT NULL";
         $whereConditions[] = "cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)";
+    }
+    if ($tipo === 'pendentes_no_prazo') {
+        $whereConditions[] = "cte.data_entrega IS NULL";
+        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date >= CURRENT_DATE";
     }
     if ($tipo === 'atrasados') {
         $whereConditions[] = "cte.data_prev_ent::date < CURRENT_DATE";
@@ -105,6 +109,7 @@ $ocorrenciaJoin = "
 if ($modo === 'AGENDA') {
     $agendaFilterSql = 'TRUE';
     if ($tipo === 'no_prazo') $agendaFilterSql = 'all_delivered AND NOT any_late';
+    elseif ($tipo === 'pendentes_no_prazo') $agendaFilterSql = '(NOT all_delivered) AND (NOT any_pending_late)';
     elseif ($tipo === 'entregues_com_atraso') $agendaFilterSql = 'all_delivered AND any_late';
     elseif ($tipo === 'atrasados_sem_entrega') $agendaFilterSql = '(NOT all_delivered) AND any_pending_late';
     elseif ($tipo === 'atrasados') $agendaFilterSql = '((NOT all_delivered) AND any_pending_late) OR (all_delivered AND any_late)';
