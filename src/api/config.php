@@ -1108,6 +1108,23 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
         'COMANDADA' => '1', 'COLETADA' => '2', 'CANCELADA' => '3',
     ];
 
+    $toUtf8 = function ($v) {
+        $s = (string)$v;
+        if ($s === '') return $s;
+        $s = str_replace("\0", '', $s);
+        if (@preg_match('//u', $s)) return $s;
+        $c = @iconv('Windows-1252', 'UTF-8//IGNORE', $s);
+        if ($c !== false && $c !== '') return $c;
+        $c = @iconv('ISO-8859-1', 'UTF-8//IGNORE', $s);
+        if ($c !== false && $c !== '') return $c;
+        $c = @iconv('UTF-8', 'UTF-8//IGNORE', $s);
+        if ($c !== false) return $c;
+        return preg_replace('/[^\x20-\x7E]/', '', $s);
+    };
+    $esc = function ($v) use ($g_sql, $toUtf8) {
+        return pg_escape_string($g_sql, $toUtf8($v));
+    };
+
     pg_query($g_sql, 'BEGIN');
 
     for ($i = 0; $i < ($count - 1); $i++) {
@@ -1116,23 +1133,23 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
 
         if ($arr[0] != '3') continue;
 
-        $unidade         = pg_escape_string($g_sql, $arr[1]);
-        $nro_coleta      = pg_escape_string($g_sql, $arr[2]);
+        $unidade         = $esc($arr[1]);
+        $nro_coleta      = $esc($arr[2]);
         $data_inclusao   = trim($arr[3]);
-        $hora_inclusao   = pg_escape_string($g_sql, $arr[4]);
-        $solicitante     = pg_escape_string($g_sql, str_replace("'", '', $arr[6]));
-        $nome_emit       = pg_escape_string($g_sql, str_replace("'", '', $arr[7]));
-        $cnpj_emit       = pg_escape_string($g_sql, substr($arr[8], 0, 14));
-        $endereco_emit   = pg_escape_string($g_sql, str_replace("'", '', $arr[9]));
-        $bairro_emit     = pg_escape_string($g_sql, str_replace("'", '', $arr[10]));
-        $cidade_emit     = pg_escape_string($g_sql, str_replace("'", '', $arr[11]));
-        $uf_emit         = pg_escape_string($g_sql, $arr[12]);
-        $setor           = pg_escape_string($g_sql, $arr[13]);
-        $cep_emit        = pg_escape_string($g_sql, $arr[14]);
+        $hora_inclusao   = $esc($arr[4]);
+        $solicitante     = $esc(str_replace("'", '', $arr[6]));
+        $nome_emit       = $esc(str_replace("'", '', $arr[7]));
+        $cnpj_emit       = $esc(substr($arr[8], 0, 14));
+        $endereco_emit   = $esc(str_replace("'", '', $arr[9]));
+        $bairro_emit     = $esc(str_replace("'", '', $arr[10]));
+        $cidade_emit     = $esc(str_replace("'", '', $arr[11]));
+        $uf_emit         = $esc($arr[12]);
+        $setor           = $esc($arr[13]);
+        $cep_emit        = $esc($arr[14]);
         $cnpj_dest_raw   = $arr[19];
-        $cnpj_dest       = pg_escape_string($g_sql, strlen($cnpj_dest_raw) < 5 ? '' : substr($cnpj_dest_raw, 0, 14));
-        $nome_dest       = pg_escape_string($g_sql, str_replace("'", '', (string)($arr[20] ?? '')));
-        $cidade_dest     = pg_escape_string($g_sql, str_replace("'", '', (string)($arr[21] ?? '')));
+        $cnpj_dest       = $esc(strlen($cnpj_dest_raw) < 5 ? '' : substr($cnpj_dest_raw, 0, 14));
+        $nome_dest       = $esc(str_replace("'", '', (string)($arr[20] ?? '')));
+        $cidade_dest     = $esc(str_replace("'", '', (string)($arr[21] ?? '')));
         $uf_dest_raw     = strtoupper(trim((string)($arr[22] ?? '')));
         if (!preg_match('/^[A-Z]{2}$/', $uf_dest_raw)) {
             for ($k = 20; $k <= 24; $k++) {
@@ -1140,17 +1157,17 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
                 if (preg_match('/^[A-Z]{2}$/', $cand)) { $uf_dest_raw = $cand; break; }
             }
         }
-        $uf_dest = pg_escape_string($g_sql, $uf_dest_raw);
+        $uf_dest = $esc($uf_dest_raw);
         $peso            = (float) str_replace(',', '.', str_replace('.', '', $arr[25]));
         $qtde_vol        = (float) $arr[27];
         $vlr_merc        = (float) str_replace(',', '.', str_replace('.', '', $arr[28]));
         $data_limite_raw = trim($arr[30]);
-        $hora_limite     = pg_escape_string($g_sql, trim($arr[31]) !== '' ? $arr[31] : '17:00');
+        $hora_limite     = $esc(trim($arr[31]) !== '' ? $arr[31] : '17:00');
         $data_efet_raw   = trim($arr[32]);
         $hora_efet_raw   = trim($arr[33]);
         $situacao_raw    = $arr[34];
-        $placa           = pg_escape_string($g_sql, $arr[36]);
-        $observacao      = pg_escape_string($g_sql, str_replace("'", '', trim($arr[44] . ' ' . $arr[45] . ' ' . $arr[46])));
+        $placa           = $esc($arr[36]);
+        $observacao      = $esc(str_replace("'", '', trim($arr[44] . ' ' . $arr[45] . ' ' . $arr[46])));
 
         if ($data_inclusao === '') { $data_inclusao = $data_limite_raw; $hora_inclusao = '12:00'; }
         $data_inclusao = str_replace('/20', '/', $data_inclusao);
@@ -1165,10 +1182,10 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
             $data_efet_raw = str_replace('/20', '/', $data_efet_raw);
             $data_efet_fmt = date('Y-m-d', strtodate(str_replace('/', '', $data_efet_raw)));
             $data_efet_sql = "'$data_efet_fmt'";
-            $hora_efet_sql = "'" . pg_escape_string($g_sql, $hora_efet_raw) . "'";
+            $hora_efet_sql = "'" . $esc($hora_efet_raw) . "'";
         }
 
-        $situacao = pg_escape_string($g_sql, $situacao_map[$situacao_raw] ?? $situacao_raw);
+        $situacao = $esc($situacao_map[$situacao_raw] ?? $situacao_raw);
 
         $values[] = "('$unidade','$nro_coleta','$data_limite_fmt','$hora_limite'," .
                     "'$cnpj_emit','$nome_emit','$endereco_emit','$bairro_emit'," .
