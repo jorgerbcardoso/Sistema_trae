@@ -56,7 +56,18 @@ ini_set('display_startup_errors', 0);
 error_reporting(E_ALL & ~E_DEPRECATED); // Ignorar avisos de depreciação
 
 ini_set('log_errors', 1);
-ini_set('error_log', '/var/www/html/tmp/php_debug.log');
+$preferredLog = '/var/www/html/tmp/php_debug.log';
+$fallbackLog = rtrim(sys_get_temp_dir(), "\\/") . DIRECTORY_SEPARATOR . 'php_debug.log';
+$logPath = $preferredLog;
+if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+    $logPath = $fallbackLog;
+} else {
+    $dir = dirname($preferredLog);
+    if (!@is_dir($dir) || !@is_writable($dir)) {
+        $logPath = $fallbackLog;
+    }
+}
+ini_set('error_log', $logPath);
 
 // ============================================
 // FUNÇÕES AUXILIARES

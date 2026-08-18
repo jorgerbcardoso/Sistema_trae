@@ -1,120 +1,57 @@
 <?php
-/**
- * API: Buscar Vendedores
- * 
- * Busca vendedores da tabela [dominio]_vendedor por login/nome
- * Retorna: { success: true, vendedores: [...] }
- */
+require_once __DIR__ . '/../config.php';
 
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+setupCORS();
+handleOptionsRequest();
+validateRequestMethod('POST');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+$auth = authenticateAndGetUser();
+$domain = strtolower(trim($auth['domain'] ?? ''));
+
+if ($domain === '' || !preg_match('/^[a-z0-9_]+$/', $domain)) {
+    returnError('Domínio inválido', 400);
 }
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/auth.php';
-
-// ================================================================
-// AUTENTICAÇÃO
-// ================================================================
-$headers = getallheaders();
-$authHeader = $headers['Authorization'] ?? '';
-
-if (empty($authHeader) || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Token não fornecido']);
-    exit;
-}
-
-$token = $matches[1];
-$userData = validateToken($token);
-
-if (!$userData) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Token inválido ou expirado']);
-    exit;
-}
-
-// ================================================================
-// CONEXÃO COM BANCO
-// ================================================================
 global $g_sql;
-
 if (!$g_sql) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro ao conectar ao banco de dados']);
-    exit;
+    $g_sql = getDBConnection();
 }
 
-// ================================================================
-// OBTER PARÂMETROS
-// ================================================================
-$input = json_decode(file_get_contents('php://input'), true);
-$search = $input['search'] ?? '';
-$userDomain = $userData['domain'] ?? '';
+$input = getRequestInput();
+$search = trim((string)($input['search'] ?? ''));
 
-// ================================================================
-// BUSCAR VENDEDORES
-// ================================================================
 try {
-    $tableName = $userDomain . '_vendedor';
-    
-    // Verificar se a tabela existe
-    $checkTable = "SELECT to_regclass('public.$tableName')";
-    $result = sql($g_sql, $checkTable, false, []);
-    
-    if (!$result || pg_num_rows($result) === 0 || pg_fetch_result($result, 0, 0) === null) {
-        // Tabela não existe - retornar array vazio
-        echo json_encode([
+    $tableName = $domain . '_vendedor';
+
+    $check = sql("SELECT to_regclass($1)", ["public.$tableName"], $g_sql);
+    $reg = $check ? pg_fetch_result($check, 0, 0) : null;
+
+    if ($reg === null) {
+        respondJson([
             'success' => true,
             'vendedores' => []
         ]);
-        exit;
     }
-    
-    // Construir query
-    if (empty($search)) {
-        // Buscar todos os vendedores ativos
-        $query = "
-            SELECT 
-                login,
-                nome
-            FROM $tableName
-            WHERE ativo = true
-            ORDER BY login
-            LIMIT 100
-        ";
-        $params = [];
+
+    if ($search === '') {
+        $result = sql(
+            "SELECT login, nome FROM {$tableName} ORDER BY login LIMIT 100",
+            [],
+            $g_sql
+        );
     } else {
-        // Buscar com filtro
-        $searchUpper = strtoupper($search);
-        $query = "
-            SELECT 
-                login,
-                nome
-            FROM $tableName
-            WHERE ativo = true
-              AND (
-                UPPER(login) LIKE $1
-                OR UPPER(nome) LIKE $1
-              )
-            ORDER BY login
-            LIMIT 100
-        ";
-        $params = ["%$searchUpper%"];
+        $term = '%' . $search . '%';
+        $result = sql(
+            "SELECT login, nome
+             FROM {$tableName}
+             WHERE login ILIKE $1 OR nome ILIKE $1
+             ORDER BY login
+             LIMIT 100",
+            [$term],
+            $g_sql
+        );
     }
-    
-    $result = sql($g_sql, $query, false, $params);
-    
-    if (!$result) {
-        throw new Exception('Erro ao buscar vendedores');
-    }
-    
+
     $vendedores = [];
     while ($row = pg_fetch_assoc($result)) {
         $vendedores[] = [
@@ -122,16 +59,15 @@ try {
             'nome' => $row['nome']
         ];
     }
-    
-    echo json_encode([
+
+    respondJson([
         'success' => true,
         'vendedores' => $vendedores
     ]);
-    
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
+} catch (Throwable $e) {
+    error_log('[search_vendedores] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    respondJson([
         'success' => false,
-        'message' => 'Erro ao buscar vendedores: ' . $e->getMessage()
-    ]);
+        'message' => 'Erro ao buscar vendedores'
+    ], 500);
 }
