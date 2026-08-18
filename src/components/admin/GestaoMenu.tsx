@@ -859,6 +859,36 @@ export function GestaoMenu() {
             </DialogHeader>
             
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="dark:text-slate-200">Seção *</Label>
+                <Select
+                  value={String(itemForm.section_id || '')}
+                  onValueChange={(value) => {
+                    const newSectionId = parseInt(value, 10) || 0;
+                    if (!newSectionId) return;
+                    if (newSectionId === itemForm.section_id) return;
+
+                    const target = menuData.find((m) => m.section.id === newSectionId);
+                    const maxOrdem = target && target.items.length > 0 ? Math.max(...target.items.map((it) => Number(it.ordem) || 0)) : 0;
+                    setItemForm({ ...itemForm, section_id: newSectionId, ordem: maxOrdem + 1 });
+                  }}
+                >
+                  <SelectTrigger className="dark:bg-slate-800 dark:border-slate-700">
+                    <SelectValue placeholder="Selecione a seção" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {menuData.map((m) => (
+                      <SelectItem key={m.section.id} value={String(m.section.id)}>
+                        {m.section.name} ({m.section.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Para mover o item entre seções, selecione outra seção.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="dark:text-slate-200">Código *</Label>
