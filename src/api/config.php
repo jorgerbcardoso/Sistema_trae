@@ -1049,6 +1049,8 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
 
     ssw_login($domain);
 
+    $str = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
+
     $f19 = !empty($unidade) ? strtoupper(substr(trim($unidade), 0, 3)) : '';
 
     $param = "act=FIL_COL" .
