@@ -49,6 +49,7 @@ try {
     $carrega_sex = $parseBool($input['carrega_sex'] ?? null, true);
     $carrega_sab = $parseBool($input['carrega_sab'] ?? null, true);
     $carrega_dom = $parseBool($input['carrega_dom'] ?? null, true);
+    $multi_carr_diario = $parseBool($input['multi_carr_diario'] ?? null, false);
 
     $toPgBool = function($v) {
         return $v ? 't' : 'f';
@@ -61,6 +62,7 @@ try {
     $carrega_sex = $toPgBool($carrega_sex);
     $carrega_sab = $toPgBool($carrega_sab);
     $carrega_dom = $toPgBool($carrega_dom);
+    $multi_carr_diario = $toPgBool($multi_carr_diario);
     
     // Validações
     if (!$domain) {
@@ -146,14 +148,17 @@ try {
     // Inserir linha
     $insertQuery = "INSERT INTO $tableName (
                         nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                        multi_carr_diario,
                         carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
                         vlr_min_frete
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6, 0,
-                        $7, $8, $9, $10, $11, $12, $13,
-                        $14
+                        $7,
+                        $8, $9, $10, $11, $12, $13, $14,
+                        $15
                     )
                     RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                              multi_carr_diario,
                               carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
                               vlr_min_frete";
     
@@ -164,6 +169,7 @@ try {
         strtoupper($sigla_dest),
         strtoupper($unidades),
         (int)$km_ida,
+        $multi_carr_diario,
         $carrega_seg,
         $carrega_ter,
         $carrega_qua,
@@ -187,6 +193,7 @@ try {
             'km_ida' => (int)$newLinha['km_ida'],
             'km_volta' => (int)$newLinha['km_volta'],
             'vlr_min_frete' => ($newLinha['vlr_min_frete'] === null || $newLinha['vlr_min_frete'] === '') ? null : (float)$newLinha['vlr_min_frete'],
+            'multi_carr_diario' => ((string)($newLinha['multi_carr_diario'] ?? '') === 't'),
             'carrega_seg' => ((string)($newLinha['carrega_seg'] ?? '') === 't'),
             'carrega_ter' => ((string)($newLinha['carrega_ter'] ?? '') === 't'),
             'carrega_qua' => ((string)($newLinha['carrega_qua'] ?? '') === 't'),

@@ -11,6 +11,7 @@ export interface Linha {
   km_ida: number;  // INTEGER
   km_volta: number; // INTEGER
   vlr_min_frete: number | null;
+  multi_carr_diario?: boolean;
   carrega_seg: boolean;
   carrega_ter: boolean;
   carrega_qua: boolean;
@@ -27,6 +28,7 @@ interface LinhaInput {
   unidades: string;
   km_ida: number; // INTEGER
   vlr_min_frete?: number | null;
+  multi_carr_diario?: boolean;
   carrega_seg: boolean;
   carrega_ter: boolean;
   carrega_qua: boolean;
@@ -49,6 +51,7 @@ const MOCK_LINHAS: Linha[] = [
     km_ida: 450,
     km_volta: 0,
     vlr_min_frete: null,
+    multi_carr_diario: false,
     carrega_seg: true,
     carrega_ter: true,
     carrega_qua: true,
@@ -66,6 +69,7 @@ const MOCK_LINHAS: Linha[] = [
     km_ida: 580,
     km_volta: 0,
     vlr_min_frete: null,
+    multi_carr_diario: false,
     carrega_seg: true,
     carrega_ter: true,
     carrega_qua: true,
@@ -83,6 +87,7 @@ const MOCK_LINHAS: Linha[] = [
     km_ida: 280,
     km_volta: 0,
     vlr_min_frete: null,
+    multi_carr_diario: false,
     carrega_seg: true,
     carrega_ter: true,
     carrega_qua: true,
@@ -163,6 +168,7 @@ export async function createLinha(domain: string, data: LinhaInput) {
       km_ida: data.km_ida,
       km_volta: 0,
       vlr_min_frete: data.vlr_min_frete ?? null,
+      multi_carr_diario: !!data.multi_carr_diario,
       carrega_seg: data.carrega_seg,
       carrega_ter: data.carrega_ter,
       carrega_qua: data.carrega_qua,
@@ -246,6 +252,7 @@ export async function updateLinha(domain: string, nroLinha: number, data: LinhaI
       unidades: data.unidades,
       km_ida: data.km_ida,
       vlr_min_frete: data.vlr_min_frete ?? null,
+      multi_carr_diario: !!data.multi_carr_diario,
       carrega_seg: data.carrega_seg,
       carrega_ter: data.carrega_ter,
       carrega_qua: data.carrega_qua,

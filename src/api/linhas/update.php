@@ -57,6 +57,7 @@ try {
     $carrega_sex = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_sex'));
     $carrega_sab = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_sab'));
     $carrega_dom = $toPgBoolOrNull($parseBoolOrNull($input, 'carrega_dom'));
+    $multi_carr_diario = $toPgBoolOrNull($parseBoolOrNull($input, 'multi_carr_diario'));
     
     // Validações
     if (!$domain) {
@@ -156,9 +157,11 @@ try {
                         carrega_qui = COALESCE($10::boolean, carrega_qui),
                         carrega_sex = COALESCE($11::boolean, carrega_sex),
                         carrega_sab = COALESCE($12::boolean, carrega_sab),
-                        carrega_dom = COALESCE($13::boolean, carrega_dom)
-                    WHERE nro_linha = $14
+                        carrega_dom = COALESCE($13::boolean, carrega_dom),
+                        multi_carr_diario = COALESCE($14::boolean, multi_carr_diario)
+                    WHERE nro_linha = $15
                     RETURNING nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta,
+                              multi_carr_diario,
                               carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
                               vlr_min_frete";
     
@@ -176,6 +179,7 @@ try {
         $carrega_sex,
         $carrega_sab,
         $carrega_dom,
+        $multi_carr_diario,
         (int)$nro_linha
     ]);
     
@@ -192,6 +196,7 @@ try {
             'km_ida' => (int)$updatedLinha['km_ida'],
             'km_volta' => (int)$updatedLinha['km_volta'],
             'vlr_min_frete' => ($updatedLinha['vlr_min_frete'] === null || $updatedLinha['vlr_min_frete'] === '') ? null : (float)$updatedLinha['vlr_min_frete'],
+            'multi_carr_diario' => ((string)($updatedLinha['multi_carr_diario'] ?? '') === 't'),
             'carrega_seg' => ((string)($updatedLinha['carrega_seg'] ?? '') === 't'),
             'carrega_ter' => ((string)($updatedLinha['carrega_ter'] ?? '') === 't'),
             'carrega_qua' => ((string)($updatedLinha['carrega_qua'] ?? '') === 't'),

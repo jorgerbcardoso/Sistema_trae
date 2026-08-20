@@ -24,6 +24,7 @@ try {
 
     // Buscar linhas ordenadas por nome
     $query = "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
+                     multi_carr_diario,
                      carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
                 FROM $dominio" . "_linha
                ORDER BY nome";
@@ -42,6 +43,7 @@ try {
               'km_ida' => (int)$row['km_ida'],
             'km_volta' => (int)$row['km_volta'],
         'vlr_min_frete' => ($row['vlr_min_frete'] === null || $row['vlr_min_frete'] === '') ? null : (float)$row['vlr_min_frete'],
+        'multi_carr_diario' => ((string)($row['multi_carr_diario'] ?? '') === 't'),
           'carrega_seg' => ((string)($row['carrega_seg'] ?? '') === 't'),
           'carrega_ter' => ((string)($row['carrega_ter'] ?? '') === 't'),
           'carrega_qua' => ((string)($row['carrega_qua'] ?? '') === 't'),

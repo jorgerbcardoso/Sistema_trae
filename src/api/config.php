@@ -59,13 +59,9 @@ ini_set('log_errors', 1);
 $preferredLog = '/var/www/html/tmp/php_debug.log';
 $fallbackLog = rtrim(sys_get_temp_dir(), "\\/") . DIRECTORY_SEPARATOR . 'php_debug.log';
 $logPath = $preferredLog;
-if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+$dir = dirname($preferredLog);
+if (!@is_dir($dir) || !@is_writable($dir)) {
     $logPath = $fallbackLog;
-} else {
-    $dir = dirname($preferredLog);
-    if (!@is_dir($dir) || !@is_writable($dir)) {
-        $logPath = $fallbackLog;
-    }
 }
 ini_set('error_log', $logPath);
 

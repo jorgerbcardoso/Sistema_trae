@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 import {
   Table,
   TableBody,
@@ -60,6 +61,7 @@ export function CadastroLinhas() {
     unidades: [] as string[],
     km_ida: '',
     vlr_min_frete: '',
+    multi_carr_diario: false,
     carrega_seg: true,
     carrega_ter: true,
     carrega_qua: true,
@@ -109,6 +111,7 @@ export function CadastroLinhas() {
       unidades: [],
       km_ida: '',
       vlr_min_frete: '',
+      multi_carr_diario: false,
       carrega_seg: true,
       carrega_ter: true,
       carrega_qua: true,
@@ -132,6 +135,7 @@ export function CadastroLinhas() {
       vlr_min_frete: linha.vlr_min_frete !== null && linha.vlr_min_frete !== undefined
         ? Number(linha.vlr_min_frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '',
+      multi_carr_diario: !!linha.multi_carr_diario,
       carrega_seg: linha.carrega_seg ?? true,
       carrega_ter: linha.carrega_ter ?? true,
       carrega_qua: linha.carrega_qua ?? true,
@@ -214,6 +218,7 @@ export function CadastroLinhas() {
           if (parsed === null) return 0;
           return Number(parsed.toFixed(2));
         })(),
+        multi_carr_diario: !!formData.multi_carr_diario,
         carrega_seg: !!formData.carrega_seg,
         carrega_ter: !!formData.carrega_ter,
         carrega_qua: !!formData.carrega_qua,
@@ -435,6 +440,15 @@ export function CadastroLinhas() {
                               Dias Carr.
                             </TableHead>
                             <TableHead 
+                              className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 w-[120px]" 
+                              onClick={() => handleSort('multi_carr_diario')}
+                            >
+                              <div className="flex items-center">
+                                Multi/dia
+                                {getSortIcon('multi_carr_diario')}
+                              </div>
+                            </TableHead>
+                            <TableHead 
                               className="cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" 
                               onClick={() => handleSort('sigla_dest')}
                             >
@@ -469,6 +483,9 @@ export function CadastroLinhas() {
                               </TableCell>
                               <TableCell>
                                 <span className="text-xs font-mono tracking-widest tabular-nums text-slate-700 dark:text-slate-300">{diasCarrCompacto(linha)}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm">{linha.multi_carr_diario ? 'Sim' : 'Não'}</span>
                               </TableCell>
                               <TableCell>{linha.sigla_dest}</TableCell>
                               <TableCell>{linha.km_ida.toLocaleString('pt-BR')}</TableCell>
@@ -643,6 +660,19 @@ export function CadastroLinhas() {
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">Permitir múltiplos carregamentos no dia</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
+                    Quando desativado, a linha só pode carregar uma vez por dia
+                  </div>
+                </div>
+                <Switch
+                  checked={!!formData.multi_carr_diario}
+                  onCheckedChange={(checked) => setFormData({ ...formData, multi_carr_diario: checked })}
+                />
               </div>
             </div>
           </div>
