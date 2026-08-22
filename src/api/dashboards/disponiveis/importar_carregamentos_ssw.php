@@ -69,6 +69,7 @@ set_time_limit(300);
 $tabela = "{$domain}_carregamento";
 $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap = "{$domain}_carregamento_capacidade";
+$tabelaLinha = "{$domain}_linha";
 $domainUpper = strtoupper(trim((string)$domain));
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
@@ -162,6 +163,24 @@ if (empty($placas_ssw)) {
 $logs = [];
 
 $loginEsc   = pg_escape_string($conn, $login);
+
+$destinosLinhaSet = [];
+try {
+    $resLinha = sql(
+        "SELECT DISTINCT UPPER(sigla_dest) AS sigla_dest
+         FROM {$tabelaLinha}
+         WHERE UPPER(sigla_emit) = UPPER(\$1)
+           AND COALESCE(sigla_dest, '') <> ''",
+        [$unidade],
+        $conn
+    );
+    while ($resLinha && ($r = pg_fetch_assoc($resLinha))) {
+        $sd = strtoupper(trim((string)($r['sigla_dest'] ?? '')));
+        if ($sd !== '') $destinosLinhaSet[$sd] = true;
+    }
+} catch (Exception $e) {
+    $destinosLinhaSet = [];
+}
 
 function normalizarNumero($v) {
     $s = trim((string)$v);
@@ -524,14 +543,49 @@ foreach ($placas_ssw as $placa) {
 
     $destinos = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
     $destinoCar = null;
-    if ($destinoFromPlaca !== null && $destinoFromPlaca !== '') {
-        $destinoCar = strtoupper($destinoFromPlaca);
-    } elseif (!empty($destinos)) {
-        $freq = array_count_values($destinos);
-        arsort($freq);
-        $destinoCar = array_key_first($freq);
+    $unidadesCarCsv = '';
+    $destUnicos = array_values(array_unique(array_filter($destinos)));
+    if (count($destUnicos) === 1) {
+        $destinoCar = $destUnicos[0];
+        $unidadesCarCsv = '';
+    } elseif (count($destUnicos) > 1) {
+        $candidatos = [];
+        foreach ($destUnicos as $d) {
+            if (isset($destinosLinhaSet[$d])) $candidatos[] = $d;
+        }
+        if (count($candidatos) === 1) {
+            $destinoCar = $candidatos[0];
+        } elseif (count($candidatos) > 1) {
+            $freq = array_count_values($destinos);
+            usort($candidatos, function($a, $b) use ($freq) {
+                $fa = (int)($freq[$a] ?? 0);
+                $fb = (int)($freq[$b] ?? 0);
+                if ($fa === $fb) return strcmp($a, $b);
+                return $fb <=> $fa;
+            });
+            $destinoCar = $candidatos[0] ?? null;
+        } else {
+            if ($destinoFromPlaca !== null && $destinoFromPlaca !== '' && in_array(strtoupper($destinoFromPlaca), $destUnicos, true)) {
+                $destinoCar = strtoupper($destinoFromPlaca);
+            } else {
+                $freq = array_count_values($destinos);
+                arsort($freq);
+                $destinoCar = array_key_first($freq);
+            }
+        }
+
+        $outras = array_values(array_filter($destUnicos, function($u) use ($destinoCar) { return $destinoCar ? ($u !== $destinoCar) : true; }));
+        sort($outras);
+        $unidadesCarCsv = implode(',', $outras);
+    } else {
+        if ($destinoFromPlaca !== null && $destinoFromPlaca !== '') {
+            $destinoCar = strtoupper($destinoFromPlaca);
+        }
+        $unidadesCarCsv = '';
     }
+
     $destinoCarEsc = $destinoCar ? ("'" . pg_escape_string($conn, $destinoCar) . "'") : 'NULL';
+    $unidadesCarEsc = ($unidadesCarCsv !== '') ? ("'" . pg_escape_string($conn, $unidadesCarCsv) . "'") : 'NULL';
 
     pg_query($conn, 'BEGIN');
     try {
@@ -542,6 +596,7 @@ foreach ($placas_ssw as $placa) {
              SET placa_provisoria = '{$placaProvEsc}',
                  seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                  destino = {$destinoCarEsc},
+                 unidades = {$unidadesCarEsc},
                  origem_criacao = 'SSW',
                  data_finalizacao = NULL,
                  hora_finalizacao = NULL,
@@ -578,7 +633,7 @@ foreach ($placas_ssw as $placa) {
                       nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      0, {$destinoCarEsc}, NULL, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
             }
@@ -612,6 +667,7 @@ foreach ($placas_ssw as $placa) {
                          SET placa_provisoria = '{$placaProvEsc}',
                              seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                              destino = {$destinoCarEsc},
+                             unidades = {$unidadesCarEsc},
                              destino_cte = '{$destinoCte}',
                              data_emissao_cte = {$emissaoSql},
                              data_prev_ent_cte = {$prevEntSql},
@@ -667,7 +723,7 @@ foreach ($placas_ssw as $placa) {
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      {$destinoCarEsc}, NULL,
+                      {$destinoCarEsc}, {$unidadesCarEsc},
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},

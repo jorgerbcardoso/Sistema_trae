@@ -5841,6 +5841,20 @@ export function Disponiveis() {
     await carregar();
   }, [sigla, importarCarregamentosSSWObrigatorio, carregar]);
 
+  const verificarSaidasEmViagem = useCallback(async () => {
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'verificar_saidas_ssw' }) },
+        true
+      );
+      if (res?.success && (Number(res.updated ?? 0) || 0) > 0) {
+        toast.info(`${res.updated} registro(s) finalizado(s) automaticamente (saída detectada no SSW).`);
+      }
+    } catch (e: any) {
+    }
+  }, []);
+
   useEffect(() => {
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
@@ -5851,11 +5865,13 @@ export function Disponiveis() {
     void (async () => {
       await importarCarregamentosSSWObrigatorio();
       if (!ativo) return;
+      await verificarSaidasEmViagem();
+      await carregarCarregamentos();
       await carregar();
       await carregarEntrega();
     })();
     return () => { ativo = false; };
-  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio]);
+  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
 
   useEffect(() => {
     if (!sigla) return;

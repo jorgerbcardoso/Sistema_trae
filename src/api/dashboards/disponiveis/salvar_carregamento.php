@@ -957,4 +957,142 @@ if ($acao === 'finalizar_carregamento') {
     respondJson(['success' => true, 'updated' => $affected]);
 }
 
+if ($acao === 'verificar_saidas_ssw') {
+    $ddmmaaHoje = date('dmy');
+    $ddmmaaOntem = date('dmy', strtotime('-1 day'));
+
+    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+        "&t_data_saida_ini=" . rawurlencode($ddmmaaOntem) .
+        "&t_data_saida_fin=" . rawurlencode($ddmmaaHoje);
+
+    $extractXml = function ($html) {
+        $html = (string)$html;
+        if ($html === '') return null;
+
+        $inicio = strpos($html, '<?xml');
+        if ($inicio === false) $inicio = strpos($html, '<xml');
+        if ($inicio === false) {
+            $dec = @urldecode($html);
+            if ($dec && $dec !== $html) {
+                $inicio = strpos($dec, '<?xml');
+                if ($inicio === false) $inicio = strpos($dec, '<xml');
+                if ($inicio !== false) $html = $dec;
+            }
+        }
+        if ($inicio === false) return null;
+
+        $fim = strrpos($html, '</xml>');
+        $tagFim = '</xml>';
+        if ($fim === false) {
+            $fim = strrpos($html, '</data>');
+            $tagFim = '</data>';
+        }
+        if ($fim === false) return null;
+
+        return substr($html, $inicio, ($fim + strlen($tagFim)) - $inicio);
+    };
+
+    $parseDt = function ($s) {
+        $s = trim((string)$s);
+        if ($s === '') return null;
+        $m = null;
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
+            $dia = (int)$m[1];
+            $mes = (int)$m[2];
+            $anoRaw = (string)$m[3];
+            $ano = strlen($anoRaw) === 2 ? (2000 + (int)$anoRaw) : (int)$anoRaw;
+            $hh = (int)$m[4];
+            $mm = (int)$m[5];
+            $ss = isset($m[6]) ? (int)$m[6] : 0;
+            $dt = DateTime::createFromFormat('Y-m-d H:i:s', sprintf('%04d-%02d-%02d %02d:%02d:%02d', $ano, $mes, $dia, $hh, $mm, $ss));
+            return $dt ?: null;
+        }
+        $dt = DateTime::createFromFormat('d/m/y H:i:s', $s);
+        if ($dt !== false) return $dt;
+        $dt = DateTime::createFromFormat('d/m/Y H:i:s', $s);
+        if ($dt !== false) return $dt;
+        $dt = DateTime::createFromFormat('d/m/y H:i', $s);
+        if ($dt !== false) return $dt;
+        $dt = DateTime::createFromFormat('d/m/Y H:i', $s);
+        if ($dt !== false) return $dt;
+        return null;
+    };
+
+    $html = '';
+    try {
+        if (function_exists('ssw_login')) @ssw_login();
+        $html = ssw_go($url);
+    } catch (Exception $e) {
+        respondJson(['success' => true, 'updated' => 0, 'message' => 'Falha ao consultar o SSW.']);
+    }
+
+    $xmlStr = $extractXml($html);
+    if ($xmlStr === null) {
+        respondJson(['success' => true, 'updated' => 0, 'message' => 'SSW: retorno sem XML.']);
+    }
+
+    $xml = @simplexml_load_string($xmlStr);
+    if ($xml === false) {
+        respondJson(['success' => true, 'updated' => 0, 'message' => 'SSW: XML inválido.']);
+    }
+
+    $placaParaSaida = [];
+    $rows = $xml->xpath('//r');
+    if ($rows && count($rows) > 0) {
+        foreach ($rows as $r) {
+            $placa = strtoupper(trim((string)($r->f2 ?? '')));
+            if ($placa === '') continue;
+            $f11 = trim((string)($r->f11 ?? ''));
+            if ($f11 === '') continue;
+            $dt = $parseDt($f11);
+            if ($dt === null) continue;
+            if (!isset($placaParaSaida[$placa]) || $dt->getTimestamp() < $placaParaSaida[$placa]->getTimestamp()) {
+                $placaParaSaida[$placa] = $dt;
+            }
+        }
+    }
+
+    if (count($placaParaSaida) === 0) {
+        respondJson(['success' => true, 'updated' => 0]);
+    }
+
+    $resOpen = sql(
+        "SELECT DISTINCT UPPER(c.placa_provisoria) AS placa
+         FROM {$tabela} c
+         LEFT JOIN {$tabelaCap} cap
+                ON cap.unidade = c.unidade AND cap.seq_carregamento = c.seq_carregamento
+         WHERE c.unidade = \$1
+           AND c.data_finalizacao IS NULL
+           AND COALESCE(cap.simulado, FALSE) = FALSE",
+        [$unidade],
+        $conn
+    );
+    $open = [];
+    while ($resOpen && ($row = pg_fetch_assoc($resOpen))) {
+        $p = strtoupper(trim((string)($row['placa'] ?? '')));
+        if ($p !== '') $open[$p] = true;
+    }
+
+    $updated = 0;
+    foreach ($placaParaSaida as $placa => $dt) {
+        if (!isset($open[$placa])) continue;
+        $data = $dt->format('Y-m-d');
+        $hora = $dt->format('H:i:s');
+        $resUpd = sql(
+            "UPDATE {$tabela}
+             SET data_finalizacao = \$1::date,
+                 hora_finalizacao = \$2::time,
+                 login_finalizacao = \$3
+             WHERE unidade = \$4
+               AND UPPER(placa_provisoria) = \$5
+               AND data_finalizacao IS NULL",
+            [$data, $hora, $login, $unidade, $placa],
+            $conn
+        );
+        if ($resUpd) $updated += (int)pg_affected_rows($resUpd);
+    }
+
+    respondJson(['success' => true, 'updated' => $updated]);
+}
+
 respondJson(['success' => false, 'message' => 'Ação inválida.']);
