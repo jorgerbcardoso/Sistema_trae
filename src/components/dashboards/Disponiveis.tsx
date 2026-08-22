@@ -66,8 +66,13 @@ const AVISO_SIMULACAO_TITULO =
 const AVISO_SIMULACAO_DESC =
   'Após finalizar as simulações, clique em Iniciar. Então comece a conferência de carregamento no TMS. O carregamento será automaticamente alimentado nesta tela.';
 
-function toastAvisoSimulacao() {
-  toast.warning(AVISO_SIMULACAO_TITULO, { description: AVISO_SIMULACAO_DESC, duration: 16000 });
+function abrirAvisoSimulacao(confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>) {
+  void confirmar({
+    title: 'Carregamentos em simulação',
+    description: `${AVISO_SIMULACAO_TITULO}\n\n${AVISO_SIMULACAO_DESC}`,
+    confirmText: 'Entendi',
+    cancelText: 'Fechar',
+  });
 }
 
 interface Cte {
@@ -1425,7 +1430,7 @@ interface CarregamentoAreaProps {
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
-  onExcluirCarregamento: (placa: string) => void;
+  onExcluirCarregamento: (placa: string) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onCarregarHub: (carregamento: Carregamento) => void;
@@ -1724,7 +1729,7 @@ function CardCarregamento({
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
-  onExcluirCarregamento: (placa: string) => void;
+  onExcluirCarregamento: (placa: string) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onCarregarHub: (carregamento: Carregamento) => void;
@@ -2123,7 +2128,7 @@ function CardCarregamento({
                 </Badge>
                 {carregamento.seq_carregamento ? (
                   <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono shrink-0">
-                    #{carregamento.seq_carregamento}
+                    {String(carregamento.seq_carregamento).padStart(6, '0')}
                   </Badge>
                 ) : null}
                 <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500 shrink-0" title="Editar placa">
@@ -2308,10 +2313,11 @@ function CardCarregamento({
             <Search className="w-3.5 h-3.5 mr-1" />Lista
           </Button>
           <Button
+            type="button"
             size="sm"
             variant="outline"
             className="h-8 text-xs border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-            onClick={() => onExcluirCarregamento(carregamento.placa_provisoria)}
+            onClick={() => void onExcluirCarregamento(carregamento.placa_provisoria)}
             title="Excluir carregamento"
           >
             <Trash2 className="w-3.5 h-3.5 mr-1" />Excl.
@@ -2342,7 +2348,7 @@ function CardCarregamento({
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
               <DialogTitle>
-                CT-es · Carregamento{carregamento.seq_carregamento ? ` #${carregamento.seq_carregamento}` : ''} · {carregamento.placa_provisoria}
+                CT-es · Carregamento{carregamento.seq_carregamento ? ` ${String(carregamento.seq_carregamento).padStart(6, '0')}` : ''} · {carregamento.placa_provisoria}
               </DialogTitle>
               <DialogDescription>Selecione os CT-es e clique em “Excluir selecionados” para remover do carregamento</DialogDescription>
             </DialogHeader>
@@ -2869,11 +2875,11 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
         }
         if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
         if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
-        if (okCount > 0) toastAvisoSimulacao();
+        if (okCount > 0) abrirAvisoSimulacao(confirmar);
         return;
       }
 
-      if (okCount > 0) toastAvisoSimulacao();
+      if (okCount > 0) abrirAvisoSimulacao(confirmar);
       if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
         setResumoPlaca(lastOk.placa);
         setResumoUnidades((lastOk.resumo as any) ?? []);
@@ -3005,7 +3011,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
       }
       if (okCount > 0) toast.success(`${okCount} carregamento(s) adicional(is) criado(s).`);
       if (failCount > 0) toast.error(`${failCount} item(ns) falharam ao criar adicional.`);
-      if (okCount > 0) toastAvisoSimulacao();
+      if (okCount > 0) abrirAvisoSimulacao(confirmar);
       if (current.length === 0) handleFecharSobras();
     } finally {
       setLoading(false);
@@ -4278,7 +4284,7 @@ function CarregamentoArea({
                 <DialogContent className="sm:max-w-[760px]">
                   <DialogHeader>
                     <DialogTitle>
-                      Carregamento{calDetalheItem?.seq_carregamento ? ` #${calDetalheItem.seq_carregamento}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                      Carregamento{calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
                     </DialogTitle>
                     <DialogDescription>Detalhes do carregamento selecionado</DialogDescription>
                   </DialogHeader>
@@ -4372,6 +4378,21 @@ function CarregamentoArea({
                             Tempo: <span className="font-mono font-semibold">{durMin != null ? fmtDuracao(durMin) : '—'}</span>
                           </div>
                           <div className="flex items-center gap-2">
+                            {!fimK ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-sky-500 hover:bg-sky-600 text-white"
+                                onClick={async () => {
+                                  const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                                  if (!placa) return;
+                                  const finalizou = await onExcluirCarregamento(placa);
+                                  if (finalizou) setCalDetalheOpen(false);
+                                }}
+                              >
+                                Finalizar
+                              </Button>
+                            ) : null}
                             <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''), (c as any).seq_carregamento ?? null)}>
                               Ver CT-es
                             </Button>
@@ -4390,7 +4411,7 @@ function CarregamentoArea({
                 <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
                   <DialogHeader>
                     <DialogTitle>
-                      CT-es · Carregamento{calDetalheItem?.seq_carregamento ? ` #${calDetalheItem.seq_carregamento}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                      CT-es · Carregamento{calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
                     </DialogTitle>
                     <DialogDescription>Lista de CT-es envolvidos no carregamento</DialogDescription>
                   </DialogHeader>
@@ -4615,10 +4636,11 @@ function CarregamentoArea({
             <div className="flex gap-2">
               {carregamentos.length > 0 && (
                 <Button
+                  type="button"
                   size="sm"
                   variant="outline"
                   className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  onClick={handleExcluirTodos}
+                  onClick={() => void handleExcluirTodos()}
                   title="Excluir todos os carregamentos"
                   disabled={importandoCarregamentos}
                 >
@@ -5166,7 +5188,7 @@ export function Disponiveis() {
       cancelText: 'Cancelar',
       variant: 'destructive',
     });
-    if (!ok) return;
+    if (!ok) return false;
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -5177,11 +5199,14 @@ export function Disponiveis() {
         toast.success(`Carregamento ${placa} finalizado.`);
         if (modoApontamento === placa) setModoApontamento(null);
         await carregarCarregamentos();
+        return true;
       } else {
         toast.error(res.message || 'Erro ao finalizar carregamento');
+        return false;
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao finalizar');
+      return false;
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
 
@@ -5241,7 +5266,7 @@ export function Disponiveis() {
           : !(msg.toLowerCase().includes('já existe'));
         if (!silent) {
           toast.success(msg || 'Carregamento automático iniciado!');
-          if (criou) toastAvisoSimulacao();
+          if (criou) abrirAvisoSimulacao(confirmar);
         }
         if (recarregar) await carregarCarregamentos();
         return {
@@ -5388,7 +5413,7 @@ export function Disponiveis() {
       }
       if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
       if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
-      if (okCount > 0) toastAvisoSimulacao();
+      if (okCount > 0) abrirAvisoSimulacao(confirmar);
       setResumoHojeMassaItens(itens);
       setResumoHojeMassaDialogOpen(true);
       setLinhasHojeDialogOpen(false);
