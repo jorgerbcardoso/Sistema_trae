@@ -1740,8 +1740,10 @@ function CardCarregamento({
   onImportarCarregamentos: () => Promise<any>;
   importandoCarregamentos: boolean;
 }) {
-  const [editandoPlaca, setEditandoPlaca] = useState(false);
-  const [novaPlaca, setNovaPlaca] = useState('');
+  const [editarPlacaDialogOpen, setEditarPlacaDialogOpen] = useState(false);
+  const [editarPlacaTipo, setEditarPlacaTipo] = useState<'real' | 'ficticia'>('real');
+  const [editarPlacaReal, setEditarPlacaReal] = useState('');
+  const [editarPlacaFicticia, setEditarPlacaFicticia] = useState('');
   const [editandoCapacidade, setEditandoCapacidade] = useState(false);
   const [novaCapTon, setNovaCapTon] = useState('');
   const [novaCapM3, setNovaCapM3] = useState('');
@@ -1936,16 +1938,33 @@ function CardCarregamento({
 
   const ativo = modoApontamento === carregamento.placa_provisoria;
 
+  const abrirEditarPlaca = () => {
+    setEditarPlacaDialogOpen(true);
+    setEditarPlacaReal('');
+    setEditarPlacaFicticia(String(carregamento.placa_provisoria ?? '').toUpperCase());
+    setEditarPlacaTipo('real');
+  };
+
   const handleSalvarPlaca = async () => {
-    if (!novaPlaca.trim()) return;
+    const placaNova = (editarPlacaTipo === 'real' ? editarPlacaReal : editarPlacaFicticia).trim().toUpperCase();
+    if (!placaNova) return;
+    if (placaNova === String(carregamento.placa_provisoria ?? '').trim().toUpperCase()) {
+      setEditarPlacaDialogOpen(false);
+      return;
+    }
     setSalvandoEdicao(true);
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_placa', placa_antiga: carregamento.placa_provisoria, placa_nova: novaPlaca.trim().toUpperCase() }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_placa', placa_antiga: carregamento.placa_provisoria, placa_nova: placaNova }) },
         true
       );
-      if (res.success) { toast.success('Placa atualizada.'); setEditandoPlaca(false); onRecarregarCarregamentos(); }
+      if (res.success) {
+        toast.success('Placa atualizada.');
+        if (ativo) onCancelarApontamento();
+        setEditarPlacaDialogOpen(false);
+        await onRecarregarCarregamentos();
+      }
       else toast.error(res.message || 'Erro ao atualizar placa.');
     } catch (e: any) { toast.error(e.message || 'Erro ao atualizar placa.'); }
     finally { setSalvandoEdicao(false); }
@@ -2109,34 +2128,26 @@ function CardCarregamento({
       <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
           <div className="min-w-0">
-            {editandoPlaca ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  className="font-bold font-mono text-sm w-36 rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  value={novaPlaca}
-                  onChange={e => setNovaPlaca(e.target.value.toUpperCase())}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSalvarPlaca(); if (e.key === 'Escape') setEditandoPlaca(false); }}
-                />
-                <button onClick={handleSalvarPlaca} disabled={salvandoEdicao} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-50"><CheckSquare className="w-3.5 h-3.5" /></button>
-                <button onClick={() => setEditandoPlaca(false)} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 group min-w-0">
-                <Badge className={`min-w-0 max-w-full h-6 px-2 text-xs font-mono inline-flex items-center gap-1 ${ativo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
-                  <Truck className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{carregamento.placa_provisoria}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Badge className={`min-w-0 max-w-full h-6 px-2 text-xs font-mono inline-flex items-center gap-1 ${ativo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                <Truck className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{carregamento.placa_provisoria}</span>
+              </Badge>
+              <button
+                type="button"
+                onClick={abrirEditarPlaca}
+                disabled={salvandoEdicao}
+                className="text-slate-400 hover:text-indigo-500 disabled:opacity-50 shrink-0"
+                title="Editar placa"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              {carregamento.seq_carregamento ? (
+                <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono shrink-0">
+                  {String(carregamento.seq_carregamento).padStart(6, '0')}
                 </Badge>
-                {carregamento.seq_carregamento ? (
-                  <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono shrink-0">
-                    {String(carregamento.seq_carregamento).padStart(6, '0')}
-                  </Badge>
-                ) : null}
-                <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500 shrink-0" title="Editar placa">
-                  <Pencil className="w-3 h-3" />
-                </button>
-              </div>
-            )}
+              ) : null}
+            </div>
 
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap mt-0.5">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
@@ -2325,6 +2336,64 @@ function CardCarregamento({
           </Button>
         </div>
       </div>
+      <Dialog open={editarPlacaDialogOpen} onOpenChange={setEditarPlacaDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Alterar placa</DialogTitle>
+            <DialogDescription>Escolha uma placa real (cadastrada) ou informe uma placa fictícia.</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={editarPlacaTipo === 'real' ? 'border-indigo-300 text-indigo-700 dark:text-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30' : undefined}
+              onClick={() => setEditarPlacaTipo('real')}
+            >
+              Placa real
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={editarPlacaTipo === 'ficticia' ? 'border-indigo-300 text-indigo-700 dark:text-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30' : undefined}
+              onClick={() => setEditarPlacaTipo('ficticia')}
+            >
+              Placa fictícia
+            </Button>
+          </div>
+
+          {editarPlacaTipo === 'real' ? (
+            <div className="space-y-2">
+              <Label>Placa cadastrada</Label>
+              <FilterSelectVeiculo value={editarPlacaReal} onChange={setEditarPlacaReal} placeholder="Digite a placa para buscar no cadastro" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Placa fictícia</Label>
+              <Input
+                value={editarPlacaFicticia}
+                placeholder="Ex: VIX-TESTE01"
+                onChange={(e) => setEditarPlacaFicticia(e.target.value.toUpperCase())}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleSalvarPlaca(); }}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setEditarPlacaDialogOpen(false)} disabled={salvandoEdicao}>Cancelar</Button>
+            <Button
+              type="button"
+              onClick={() => void handleSalvarPlaca()}
+              disabled={salvandoEdicao || !(editarPlacaTipo === 'real' ? editarPlacaReal.trim() : editarPlacaFicticia.trim())}
+            >
+              {salvandoEdicao ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={iniciarDialogOpen} onOpenChange={(open) => { if (!iniciandoSimulacao) setIniciarDialogOpen(open); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -4636,19 +4705,6 @@ function CarregamentoArea({
               )}
             </div>
             <div className="flex gap-2">
-              {carregamentos.length > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                  onClick={() => void handleExcluirTodos()}
-                  title="Excluir todos os carregamentos"
-                  disabled={importandoCarregamentos}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
-                </Button>
-              )}
               <Button
                 size="sm"
                 variant="outline"
