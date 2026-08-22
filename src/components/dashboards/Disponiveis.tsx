@@ -228,6 +228,7 @@ interface Carregamento {
   capacidade_ton: number | null;
   capacidade_m3: number | null;
   vlr_min_frete?: number | null;
+  vlr_frete_carreteiro?: number | null;
   destino?: string | null;
   paradas?: string | null;
   ctes: CteCarregamento[];
@@ -1721,6 +1722,7 @@ function CardCarregamento({
   const [novaCapTon, setNovaCapTon] = useState('');
   const [novaCapM3, setNovaCapM3] = useState('');
   const [novaVlrMinFrete, setNovaVlrMinFrete] = useState('');
+  const [novaVlrFreteCarreteiro, setNovaVlrFreteCarreteiro] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
@@ -1867,6 +1869,7 @@ function CardCarregamento({
     const capTonNum = novaCapTon !== '' ? parseFloat(novaCapTon) : null;
     const capM3Num = novaCapM3 !== '' ? parseFloat(novaCapM3) : null;
     const vlrMinNum = novaVlrMinFrete !== '' ? parseFloat(novaVlrMinFrete) : null;
+    const vlrTerNum = novaVlrFreteCarreteiro !== '' ? parseFloat(novaVlrFreteCarreteiro) : null;
     const mudouTon = capTonNum !== null && carregamento.capacidade_ton !== null
       ? Math.abs(capTonNum - carregamento.capacidade_ton) > 0.0001
       : capTonNum !== carregamento.capacidade_ton;
@@ -1876,8 +1879,11 @@ function CardCarregamento({
     const mudouMinFrete = vlrMinNum !== null && carregamento.vlr_min_frete !== null && carregamento.vlr_min_frete !== undefined
       ? Math.abs(vlrMinNum - (carregamento.vlr_min_frete as number)) > 0.0001
       : vlrMinNum !== (carregamento.vlr_min_frete ?? null);
+    const mudouFreteTer = vlrTerNum !== null && carregamento.vlr_frete_carreteiro !== null && carregamento.vlr_frete_carreteiro !== undefined
+      ? Math.abs(vlrTerNum - (carregamento.vlr_frete_carreteiro as number)) > 0.0001
+      : vlrTerNum !== (carregamento.vlr_frete_carreteiro ?? null);
 
-    if (mudouTon || mudouM3 || mudouMinFrete) {
+    if (mudouTon || mudouM3 || mudouMinFrete || mudouFreteTer) {
       const linhas: string[] = [];
       linhas.push('Confirmar alteração dos parâmetros?');
       if (mudouMinFrete) linhas.push('- Min. Frete: será alterado também na linha (tabela [dominio]_linha).');
@@ -1890,7 +1896,7 @@ function CardCarregamento({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, destino, paradas: (paradasArray || []).join(',') }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, vlr_frete_carreteiro: vlrTerNum, destino, paradas: (paradasArray || []).join(',') }) },
         true
       );
       if (res.success) {
@@ -2057,18 +2063,22 @@ function CardCarregamento({
         {editandoCapacidade && (
           <div className="mb-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 space-y-2">
             <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Parâmetros do carregamento</p>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-[10px] text-slate-500 dark:text-slate-400">Ton</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Cap. Ton (t)</label>
                 <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapTon} onChange={e => setNovaCapTon(e.target.value)} placeholder="Ex: 15" />
               </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-slate-500 dark:text-slate-400">m³</label>
+              <div className="min-w-0">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Cap. Vol (m³)</label>
                 <input type="number" min="0" step="0.1" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaCapM3} onChange={e => setNovaCapM3(e.target.value)} placeholder="Ex: 40" />
               </div>
-              <div className="flex-1">
+              <div className="min-w-0">
                 <label className="text-[10px] text-slate-500 dark:text-slate-400">Min. Frete (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrMinFrete} onChange={e => setNovaVlrMinFrete(e.target.value)} placeholder="Ex: 3500" />
+              </div>
+              <div className="min-w-0">
+                <label className="text-[10px] text-slate-500 dark:text-slate-400">Frete Ter. (R$)</label>
+                <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrFreteCarreteiro} onChange={e => setNovaVlrFreteCarreteiro(e.target.value)} placeholder="Ex: 1200" />
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -2095,6 +2105,31 @@ function CardCarregamento({
               label="Cubagem (m³)"
             />
             <BarraFreteSegmentada cif={freteCif} fob={freteFob} minimo={carregamento.vlr_min_frete ?? null} />
+            <div className="flex-1 min-w-0">
+              {(() => {
+                const totalFrete = (Number.isFinite(freteCif) ? freteCif : 0) + (Number.isFinite(freteFob) ? freteFob : 0);
+                const ter = Number(carregamento.vlr_frete_carreteiro ?? 0) || 0;
+                const pct = totalFrete > 0 ? Math.max(0, Math.min((ter / totalFrete) * 100, 100)) : 0;
+                const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-1 gap-2">
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Frete Ter. (R$)</span>
+                      <span className="text-[10px] font-bold whitespace-nowrap text-slate-700 dark:text-slate-300">
+                        {fmt(ter)}{totalFrete > 0 ? ` (${pct.toFixed(0)}%)` : ''}
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${pct}%`, backgroundImage: 'linear-gradient(90deg, #334155, #64748b)' }}
+                        title={totalFrete > 0 ? `Frete Terceiro: ${fmt(ter)} (${pct.toFixed(0)}%)` : `Frete Terceiro: ${fmt(ter)}`}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -2134,7 +2169,7 @@ function CardCarregamento({
             size="sm"
             variant="outline"
             className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-            onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
+            onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setNovaVlrFreteCarreteiro(carregamento.vlr_frete_carreteiro?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
             title="Editar Parâmetros do Carregamento."
           >
             <Gauge className="w-3.5 h-3.5 mr-1" />Param.
@@ -2326,6 +2361,7 @@ type LinhaCarregamento = {
   km_ida: number | null;
   km_volta: number | null;
   vlr_min_frete?: number | null;
+  multi_carr_diario?: boolean;
   carrega_seg?: boolean;
   carrega_ter?: boolean;
   carrega_qua?: boolean;
@@ -2472,8 +2508,9 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
       const placaAuto = dest ? `${siglaUnidade}-${dest}` : '';
-      const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
-      const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
+      const multiCarr = !!(l as any).multi_carr_diario;
+      const jaExistePlaca = !multiCarr && placaAuto ? placasExistentes.has(placaAuto) : false;
+      const jaExisteLinha = !multiCarr && nro > 0 && linhasEmCarregamento.has(nro);
       const jaExiste = jaExistePlaca || jaExisteLinha;
       const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
@@ -2509,10 +2546,12 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     );
     return linhasHoje.filter((l) => {
       const nro = l.nro_linha ?? 0;
-      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
+      const multiCarr = !!(l as any).multi_carr_diario;
+      if (!multiCarr && nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
+      if (multiCarr) return true;
       return !placasExistentes.has(placaAuto);
     });
   }, [carregamentos, linhasHoje, placasExistentes, siglaUnidade]);
@@ -4634,10 +4673,12 @@ export function Disponiveis() {
     const orig = (unidadeAtual ?? '').trim().toUpperCase();
     return linhasCarregamHojeOrdenadas.filter((l) => {
       const nro = l.nro_linha ?? 0;
-      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
+      const multiCarr = !!(l as any).multi_carr_diario;
+      if (!multiCarr && nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
+      if (multiCarr) return true;
       return !placasExistentes.has(placaAuto);
     });
   }, [linhasCarregamHojeOrdenadas, linhasEmCarregamento, placasExistentes, unidadeAtual]);
@@ -5255,8 +5296,9 @@ export function Disponiveis() {
         const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
         const placaAuto = dest ? `${unidadeAtual}-${dest}` : '';
-        const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
-        const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
+        const multiCarr = !!(l as any).multi_carr_diario;
+        const jaExistePlaca = !multiCarr && placaAuto ? placasExistentes.has(placaAuto) : false;
+        const jaExisteLinha = !multiCarr && nro > 0 && linhasEmCarregamento.has(nro);
         const jaExiste = jaExistePlaca || jaExisteLinha;
 
         const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);

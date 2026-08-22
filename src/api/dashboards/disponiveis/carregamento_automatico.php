@@ -37,6 +37,7 @@ $tabelaCap   = "{$domain}_carregamento_capacidade";
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS multi_carr_diario BOOLEAN DEFAULT FALSE");
 
 $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 
@@ -45,6 +46,7 @@ if ($acao === 'listar_linhas') {
     try {
         $res = sql(
             "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
+                    multi_carr_diario,
                     carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
              FROM {$tabelaLinha}
              WHERE sigla_emit = \$1
@@ -62,6 +64,7 @@ if ($acao === 'listar_linhas') {
                 'km_ida'     => $r['km_ida']   !== null ? (int)$r['km_ida']   : null,
                 'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
                 'vlr_min_frete' => $r['vlr_min_frete'] !== null ? (float)$r['vlr_min_frete'] : null,
+                'multi_carr_diario' => ((string)($r['multi_carr_diario'] ?? '') === 't'),
                 'carrega_seg' => ((string)($r['carrega_seg'] ?? '') === 't'),
                 'carrega_ter' => ((string)($r['carrega_ter'] ?? '') === 't'),
                 'carrega_qua' => ((string)($r['carrega_qua'] ?? '') === 't'),

@@ -38,6 +38,7 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 
 function parseCsvSiglas($csv) {
     $s = strtoupper(trim((string)$csv));
@@ -512,6 +513,7 @@ if ($acao === 'atualizar_capacidade') {
     $capTon = ($input['cap_ton'] !== '' && $input['cap_ton'] !== null) ? (float)$input['cap_ton'] : null;
     $capM3  = ($input['cap_m3']  !== '' && $input['cap_m3']  !== null) ? (float)$input['cap_m3']  : null;
     $vlrMinFrete = ($input['vlr_min_frete'] !== '' && $input['vlr_min_frete'] !== null) ? (float)$input['vlr_min_frete'] : null;
+    $vlrFreteCarreteiro = ($input['vlr_frete_carreteiro'] !== '' && $input['vlr_frete_carreteiro'] !== null) ? (float)$input['vlr_frete_carreteiro'] : null;
     $destinoLinha = strtoupper(trim((string)($input['destino'] ?? '')));
     $paradasLinha = strtoupper(trim((string)($input['paradas'] ?? $input['unidades'] ?? '')));
 
@@ -519,6 +521,7 @@ if ($acao === 'atualizar_capacidade') {
 
     $capTonSql = $capTon !== null ? $capTon : 'NULL';
     $capM3Sql  = $capM3  !== null ? $capM3  : 'NULL';
+    $vlrTerSql = $vlrFreteCarreteiro !== null ? $vlrFreteCarreteiro : 'NULL';
 
     pg_query($conn, "
         CREATE TABLE IF NOT EXISTS {$tabelaCap} (
@@ -526,14 +529,15 @@ if ($acao === 'atualizar_capacidade') {
             placa_provisoria VARCHAR(20) NOT NULL,
             cap_ton          NUMERIC,
             cap_m3           NUMERIC,
+            vlr_frete_carreteiro NUMERIC,
             PRIMARY KEY (unidade, placa_provisoria)
         )
     ");
 
     pg_query($conn,
-        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql})
-         ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3"
+        "INSERT INTO {$tabelaCap} (unidade, placa_provisoria, cap_ton, cap_m3, vlr_frete_carreteiro)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql}, {$vlrTerSql})
+         ON CONFLICT (unidade, placa_provisoria) DO UPDATE SET cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, vlr_frete_carreteiro = EXCLUDED.vlr_frete_carreteiro"
     );
 
     if (strpos($placa, '-') === false) {

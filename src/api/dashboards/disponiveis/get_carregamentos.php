@@ -36,6 +36,7 @@ $tabelaLinha        = "{$domain}_linha";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 
 $modo = strtolower(trim((string)($input['modo'] ?? 'ativos')));
 $dias = (int)($input['dias'] ?? 30);
@@ -78,14 +79,15 @@ $sqlCarregamentos = "
         v.capacidade_ton,
         v.capacidade_m3,
         cap.cap_ton,
-        cap.cap_m3
+        cap.cap_m3,
+        cap.vlr_frete_carreteiro
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v
            ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
     WHERE c.unidade = \$1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3
+    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro
 ";
 
 if ($modo === 'calendario') {
@@ -127,6 +129,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
     $capTon = $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null);
     $capM3  = $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null);
+    $vlrFreteCarreteiro = ($row['vlr_frete_carreteiro'] !== null && $row['vlr_frete_carreteiro'] !== '') ? (float)$row['vlr_frete_carreteiro'] : null;
     $vlrMinFrete = null;
 
     if ($capTon === null || $capTon <= 0) $capTon = 27.0;
@@ -168,6 +171,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'capacidade_ton'   => $capTon,
         'capacidade_m3'    => $capM3,
         'vlr_min_frete'    => $vlrMinFrete,
+        'vlr_frete_carreteiro' => $vlrFreteCarreteiro,
         'destino'          => $destino !== '' ? $destino : null,
         'paradas'          => $paradas !== '' ? $paradas : null,
         'ctes'             => [],
