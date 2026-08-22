@@ -57,6 +57,11 @@ PADRÕES DE CÓDIGO CRÍTICOS:
 3. GRÁFICOS RECHARTS — PADRÕES VISUAIS:
    - Gráfico Donut (PieChart + Pie): SEMPRE usar `stroke="none"` no componente `<Pie>` para eliminar a borda branca entre as seções.
      Exemplo: `<Pie dataKey="value" stroke="none" ...>`
+  - Tooltip (RechartsTooltip): SEMPRE aplicar estilo compatível com tema escuro usando `useTooltipStyle()` e passar em `contentStyle`, senão no dark o tooltip tende a ficar com fundo branco.
+    - Hook padrão: `src/components/dashboards/CustomTooltip.tsx`
+    - Exemplo:
+      - `const tooltipStyle = useTooltipStyle();`
+      - `<RechartsTooltip contentStyle={tooltipStyle as any} ... />`
    - Gráfico de Área (AreaChart): usar gradiente vertical com `<defs><linearGradient>` do recharts, opacidade de 0.35 no topo e 0 na base.
    - Gráfico de Barras horizontais (Top N): usar gradiente horizontal (`x1="0" x2="1" y1="0" y2="0"`) com duas cores complementares.
 

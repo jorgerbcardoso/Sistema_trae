@@ -56,6 +56,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { useTooltipStyle } from './CustomTooltip';
 
 const DESTINOS_IGNORADOS_RVE = new Set<string>(['SAL', 'DK4', 'TNE', 'DEV']);
 
@@ -3550,6 +3551,7 @@ function CarregamentoArea({
   const [modalAberto, setModalAberto] = useState(false);
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
+  const tooltipStyle = useTooltipStyle();
 
   const handleCriar = (placa: string, destino: string, paradas: string) => {
     setModalAberto(false);
@@ -3743,7 +3745,7 @@ function CarregamentoArea({
   const [calCtesLoading, setCalCtesLoading] = useState(false);
   const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
   const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
-  const [calVolMode, setCalVolMode] = useState<'peso' | 'cub' | 'merc' | 'todas'>('todas');
+  const [calVolMode, setCalVolMode] = useState<'frete' | 'peso' | 'cub' | 'merc'>('frete');
 
   const abrirDetalheCarregamento = (c: Carregamento) => {
     setCalDetalheItem(c);
@@ -4237,32 +4239,18 @@ function CarregamentoArea({
 
             <div className="grid grid-cols-1 gap-3">
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
-                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Frete diário</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">30 dias</div>
-                </div>
-                <div className="h-[200px] p-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={calDailySeries} margin={{ top: 10, right: 18, bottom: 10, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
-                      <XAxis dataKey="label" interval="preserveStartEnd" />
-                      <YAxis tickFormatter={(v) => fmtCompact(Number(v))} />
-                      <RechartsTooltip
-                        formatter={(v: any, name: any) => [fmtMoney(Number(v)), String(name)]}
-                        labelFormatter={(l: any) => `Dia ${String(l || '')}`}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Line type="monotone" dataKey="frete" name="Frete total" stroke="#4f46e5" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="freteTer" name="Frete Ter." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
                 <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Volume diário</div>
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Série diária</div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={calVolMode === 'frete' ? 'default' : 'outline'}
+                      className={calVolMode === 'frete' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
+                      onClick={() => setCalVolMode('frete')}
+                    >
+                      Frete (R$)
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -4290,27 +4278,21 @@ function CarregamentoArea({
                     >
                       Valor Merc. (R$)
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={calVolMode === 'todas' ? 'default' : 'outline'}
-                      className={calVolMode === 'todas' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
-                      onClick={() => setCalVolMode('todas')}
-                    >
-                      Todas
-                    </Button>
                   </div>
                 </div>
-                <div className="h-[220px] p-2">
+                <div className="h-[240px] p-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={calDailySeries} margin={{ top: 10, right: 18, bottom: 10, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
                       <XAxis dataKey="label" interval="preserveStartEnd" />
                       <YAxis tickFormatter={(v) => fmtCompact(Number(v))} />
                       <RechartsTooltip
+                        contentStyle={tooltipStyle as any}
                         formatter={(v: any, name: any) => {
                           const n = Number(v);
                           const key = String(name || '');
+                          if (key === 'Frete total') return [fmtMoney(n), key];
+                          if (key === 'Frete Ter.') return [fmtMoney(n), key];
                           if (key === 'Valor Merc.') return [fmtMoney(n), key];
                           if (key === 'Cubagem') return [fmtNum(n, 3), `${key} (m³)`];
                           if (key === 'Peso') return [fmtNum(n, 2), `${key} (Kg)`];
@@ -4319,13 +4301,19 @@ function CarregamentoArea({
                         labelFormatter={(l: any) => `Dia ${String(l || '')}`}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
-                      {(calVolMode === 'peso' || calVolMode === 'todas') && (
+                      {calVolMode === 'frete' && (
+                        <Line type="monotone" dataKey="frete" name="Frete total" stroke="#4f46e5" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                      {calVolMode === 'frete' && (
+                        <Line type="monotone" dataKey="freteTer" name="Frete Ter." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                      {calVolMode === 'peso' && (
                         <Line type="monotone" dataKey="peso" name="Peso" stroke="#7c3aed" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
-                      {(calVolMode === 'cub' || calVolMode === 'todas') && (
+                      {calVolMode === 'cub' && (
                         <Line type="monotone" dataKey="cub" name="Cubagem" stroke="#2563eb" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
-                      {(calVolMode === 'merc' || calVolMode === 'todas') && (
+                      {calVolMode === 'merc' && (
                         <Line type="monotone" dataKey="merc" name="Valor Merc." stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
                     </LineChart>
