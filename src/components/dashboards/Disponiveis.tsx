@@ -2122,7 +2122,7 @@ function CardCarregamento({
                     <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                       <div
                         className="h-2.5 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${pct}%`, backgroundImage: 'linear-gradient(90deg, #334155, #64748b)' }}
+                        style={{ width: `${pct}%`, backgroundImage: 'linear-gradient(90deg, #dc2626, #f87171)' }}
                         title={totalFrete > 0 ? `Frete Terceiro: ${fmt(ter)} (${pct.toFixed(0)}%)` : `Frete Terceiro: ${fmt(ter)}`}
                       />
                     </div>
