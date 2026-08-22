@@ -2569,13 +2569,13 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
 
   const intermediariasUsadas = React.useMemo(() => {
     const set = new Set<string>();
-    for (const c of (carregamentosNaoSimulados ?? [])) {
+    for (const c of (carregamentos ?? [])) {
       const d = (c.destino ?? parseDestinoFromPlaca(c.placa_provisoria) ?? '').trim().toUpperCase();
       if (d) set.add(d);
       for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
     }
     return set;
-  }, [carregamentosNaoSimulados]);
+  }, [carregamentos]);
 
   const getIntermediariasEfetivas = React.useCallback((l: LinhaCarregamento): string[] => {
     return escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
