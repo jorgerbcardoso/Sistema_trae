@@ -1430,6 +1430,7 @@ interface CarregamentoAreaProps {
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
+  onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (placa: string) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
@@ -3705,6 +3706,7 @@ function CarregamentoArea({
   onIniciarApontamento,
   onCancelarApontamento,
   onCriarCarregamento,
+  onFinalizarCarregamento,
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
@@ -4386,7 +4388,7 @@ function CarregamentoArea({
                                 onClick={async () => {
                                   const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
                                   if (!placa) return;
-                                  const finalizou = await onExcluirCarregamento(placa);
+                                  const finalizou = await onFinalizarCarregamento(placa);
                                   if (finalizou) setCalDetalheOpen(false);
                                 }}
                               >
@@ -5180,7 +5182,7 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos]);
 
-  const handleExcluirCarregamento = useCallback(async (placa: string) => {
+  const handleFinalizarCarregamento = useCallback(async (placa: string) => {
     const ok = await confirmar({
       title: 'Finalizar carregamento?',
       description: `Finalizar o carregamento "${placa}"?`,
@@ -5192,7 +5194,7 @@ export function Disponiveis() {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'excluir_carregamento', placa }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'finalizar_carregamento', placa }) },
         true
       );
       if (res.success) {
@@ -5206,6 +5208,36 @@ export function Disponiveis() {
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao finalizar');
+      return false;
+    }
+  }, [carregarCarregamentos, modoApontamento, confirmar]);
+
+  const handleExcluirCarregamento = useCallback(async (placa: string) => {
+    const ok = await confirmar({
+      title: 'Excluir carregamento?',
+      description: `Excluir o carregamento "${placa}" da base?\n\nEssa ação remove o carregamento (enquanto estiver em aberto) e não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return false;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento', placa }) },
+        true
+      );
+      if (res.success) {
+        toast.success(`Carregamento ${placa} excluído.`);
+        if (modoApontamento === placa) setModoApontamento(null);
+        await carregarCarregamentos();
+        return true;
+      } else {
+        toast.error(res.message || 'Erro ao excluir carregamento');
+        return false;
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao excluir');
       return false;
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
@@ -7009,6 +7041,7 @@ export function Disponiveis() {
             onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
             onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
             onCriarCarregamento={handleCriarCarregamento}
+            onFinalizarCarregamento={handleFinalizarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}

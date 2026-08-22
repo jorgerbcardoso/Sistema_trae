@@ -176,6 +176,66 @@ function normalizarNumero($v) {
     return (float)$s;
 }
 
+function extrairXmlDoRetornoSsw($html) {
+    $html = (string)$html;
+    if ($html === '') return null;
+
+    $inicio = strpos($html, '<?xml');
+    if ($inicio === false) $inicio = strpos($html, '<xml');
+    if ($inicio === false) {
+        $dec = @urldecode($html);
+        if ($dec && $dec !== $html) {
+            $inicio = strpos($dec, '<?xml');
+            if ($inicio === false) $inicio = strpos($dec, '<xml');
+            if ($inicio !== false) $html = $dec;
+        }
+    }
+    if ($inicio === false) return null;
+
+    $fim = strrpos($html, '</xml>');
+    $tagFim = '</xml>';
+    if ($fim === false) {
+        $fim = strrpos($html, '</data>');
+        $tagFim = '</data>';
+    }
+    if ($fim === false) return null;
+
+    return substr($html, $inicio, ($fim + strlen($tagFim)) - $inicio);
+}
+
+function obterPrimeiraCapturaSsw($placaSsw) {
+    $placaSsw = strtoupper(trim((string)$placaSsw));
+    if ($placaSsw === '') return null;
+
+    $url = "https://sistema.ssw.inf.br/bin/ssw0194?act=VER_BAR2&placa=" . rawurlencode($placaSsw);
+    $html = ssw_go($url);
+    $xmlStr = extrairXmlDoRetornoSsw($html);
+    if ($xmlStr === null) return null;
+
+    $xml = @simplexml_load_string($xmlStr);
+    if ($xml === false) return null;
+
+    $nodes = $xml->xpath('//r/f12');
+    if (!$nodes || count($nodes) === 0) return null;
+
+    $minDt = null;
+    foreach ($nodes as $n) {
+        $s = trim((string)$n);
+        if ($s === '') continue;
+        $dt = DateTime::createFromFormat('d/m/y H:i:s', $s);
+        if ($dt === false) continue;
+        if ($minDt === null || $dt->getTimestamp() < $minDt->getTimestamp()) {
+            $minDt = $dt;
+        }
+    }
+    if ($minDt === null) return null;
+
+    return [
+        'data' => $minDt->format('Y-m-d'),
+        'hora' => $minDt->format('H:i:s'),
+    ];
+}
+
 function parseRelatorioCarregamentos($texto) {
     $texto = mb_convert_encoding($texto, 'UTF-8', 'ISO-8859-1');
     $texto = str_replace("\r\n", "\n", str_replace("\r", "\n", $texto));
@@ -364,13 +424,29 @@ foreach ($placas_ssw as $placa) {
 
     $placaProvEsc = pg_escape_string($conn, $placaProvisoriaSalvar);
 
+    $captura = null;
+    try {
+        $captura = obterPrimeiraCapturaSsw($placa);
+    } catch (Exception $e) {
+        $captura = null;
+    }
+
     $res_check = pg_query($conn, "SELECT MIN(data_inclusao) AS data_inclusao, MIN(hora_inclusao) AS hora_inclusao, MAX(data_finalizacao) AS data_finalizacao FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}'");
     $row_check = ($res_check && pg_num_rows($res_check) > 0) ? pg_fetch_assoc($res_check) : null;
     $ja_existe = $row_check && (($row_check['data_inclusao'] ?? null) !== null);
     $dataInc = $row_check ? (string)($row_check['data_inclusao'] ?? '') : '';
     $horaInc = $row_check ? (string)($row_check['hora_inclusao'] ?? '') : '';
-    $dataIncSql = ($dataInc !== '') ? ("DATE '" . pg_escape_string($conn, $dataInc) . "'") : 'CURRENT_DATE';
-    $horaIncSql = ($horaInc !== '') ? ("TIME '" . pg_escape_string($conn, $horaInc) . "'") : 'CURRENT_TIME';
+
+    if (is_array($captura) && ($captura['data'] ?? '') !== '' && ($captura['hora'] ?? '') !== '') {
+        $dataIncSql = "DATE '" . pg_escape_string($conn, (string)$captura['data']) . "'";
+        $horaIncSql = "TIME '" . pg_escape_string($conn, (string)$captura['hora']) . "'";
+    } else if ($dataInc !== '' && $horaInc !== '') {
+        $dataIncSql = "DATE '" . pg_escape_string($conn, $dataInc) . "'";
+        $horaIncSql = "TIME '" . pg_escape_string($conn, $horaInc) . "'";
+    } else {
+        $dataIncSql = 'CURRENT_DATE';
+        $horaIncSql = 'CURRENT_TIME';
+    }
 
     $seqCarreg = 0;
     if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {

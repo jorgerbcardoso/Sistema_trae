@@ -704,6 +704,61 @@ if ($acao === 'excluir_carregamento') {
     respondJson(['success' => true, 'updated' => $affected]);
 }
 
+// ─── Ação: deletar carregamento (exclusão física) ─────────────────────────────
+if ($acao === 'deletar_carregamento') {
+    $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+    if ($placa === '') {
+        respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    }
+
+    $seqCarreg = 0;
+    $resSeq = sql(
+        "SELECT seq_carregamento
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND placa_provisoria = \$2
+           AND data_finalizacao IS NULL
+         ORDER BY COALESCE(seq_carregamento, 0) DESC
+         LIMIT 1",
+        [$unidade, $placa],
+        $conn
+    );
+    if ($resSeq && pg_num_rows($resSeq) > 0) {
+        $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
+    }
+
+    $resDel = sql(
+        "DELETE FROM {$tabela}
+         WHERE unidade = \$1
+           AND placa_provisoria = \$2
+           AND data_finalizacao IS NULL",
+        [$unidade, $placa],
+        $conn
+    );
+    if (!$resDel) {
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento.']);
+    }
+
+    $deleted = pg_affected_rows($resDel);
+
+    // Remove parâmetros associados (capacidade) se existir
+    if ($seqCarreg > 0) {
+        @pg_query($conn,
+            "DELETE FROM {$tabelaCap}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND seq_carregamento = " . ((int)$seqCarreg)
+        );
+    } else {
+        @pg_query($conn,
+            "DELETE FROM {$tabelaCap}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
+        );
+    }
+
+    respondJson(['success' => true, 'deleted' => $deleted]);
+}
+
 // ─── Ação: atualizar placa ────────────────────────────────────────────────────
 if ($acao === 'atualizar_placa') {
     $placaAntiga = strtoupper(trim($input['placa_antiga'] ?? ''));
