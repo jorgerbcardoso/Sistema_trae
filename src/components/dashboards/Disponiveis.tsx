@@ -3971,13 +3971,22 @@ function CarregamentoArea({
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative">
-        <div className={`${importandoCarregamentos ? 'blur-sm pointer-events-none select-none' : ''}`}>
+      <div className={`rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative ${importandoCarregamentos ? 'ring-2 ring-indigo-200 dark:ring-indigo-900' : ''}`}>
+        {importandoCarregamentos && (
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-500 animate-pulse" />
+        )}
+        <div>
           <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-emerald-500" />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
               {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+              {importandoCarregamentos && (
+                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Atualizando do SSW...
+                </Badge>
+              )}
               {carregamentos.length > 0 && (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
                   {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
@@ -3998,6 +4007,7 @@ function CarregamentoArea({
                   className="text-xs h-8 border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                   onClick={handleExcluirTodos}
                   title="Excluir todos os carregamentos"
+                  disabled={importandoCarregamentos}
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-1.5" />Excluir todos
                 </Button>
@@ -4013,13 +4023,14 @@ function CarregamentoArea({
               </Button>
               <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
-                <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} />
+                <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                 onClick={() => setModalAberto(true)}
+                disabled={importandoCarregamentos}
               >
                 <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
               </Button>
@@ -4028,6 +4039,7 @@ function CarregamentoArea({
                 variant="outline"
                 className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
                 onClick={() => setModalAutomaticoAberto(true)}
+                disabled={importandoCarregamentos}
               >
                 <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
               </Button>
@@ -4065,12 +4077,11 @@ function CarregamentoArea({
       </div>
 
       {importandoCarregamentos && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="absolute inset-0 bg-white/35 dark:bg-black/35" />
-          <div className="relative rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-5 py-4 shadow-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-              Atualizando Carregamentos
+        <div className="absolute top-3 right-3 z-10 pointer-events-none">
+          <div className="rounded-full border border-indigo-200 dark:border-indigo-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Atualizando…
             </div>
           </div>
         </div>
