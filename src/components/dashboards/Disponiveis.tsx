@@ -57,8 +57,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useTooltipStyle } from './CustomTooltip';
+import { FilterSelectVeiculo } from './FilterSelectVeiculo';
 
 const DESTINOS_IGNORADOS_RVE = new Set<string>(['SAL', 'DK4', 'TNE', 'DEV']);
+const AVISO_SIMULACAO_TITULO =
+  'Atenção: os carregamentos criados são SIMULAÇÕES para medição e otimização da operação, e não irão para o TMS.';
+const AVISO_SIMULACAO_DESC =
+  'Após finalizar as simulações, clique em Iniciar. Então comece a conferência de carregamento no TMS. O carregamento será automaticamente alimentado nesta tela.';
+
+function toastAvisoSimulacao() {
+  toast.warning(AVISO_SIMULACAO_TITULO, { description: AVISO_SIMULACAO_DESC, duration: 16000 });
+}
 
 interface Cte {
   ctrc: string;
@@ -209,6 +218,7 @@ interface CteCarregamento {
 }
 
 interface Carregamento {
+  seq_carregamento?: number | null;
   placa_provisoria: string;
   origem_criacao?: 'MANUAL' | 'AUTO' | 'SSW' | null;
   total_ctes: number;
@@ -1726,6 +1736,9 @@ function CardCarregamento({
   const [novaVlrFreteCarreteiro, setNovaVlrFreteCarreteiro] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
+  const [iniciarDialogOpen, setIniciarDialogOpen] = useState(false);
+  const [placaVerdadeira, setPlacaVerdadeira] = useState('');
+  const [iniciandoSimulacao, setIniciandoSimulacao] = useState(false);
   const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
@@ -1733,6 +1746,44 @@ function CardCarregamento({
   const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
+
+  const abrirIniciarSimulacao = () => {
+    if (!window.confirm('Atenção: a simulação do carregamento será limpa, para início do carregamento atráves do TMS, por bipagem ou manualmente. Confirma?')) return;
+    const seq = Number(carregamento.seq_carregamento ?? 0) || 0;
+    if (seq <= 0) {
+      toast.error('Não foi possível identificar o seq_carregamento deste carregamento.');
+      return;
+    }
+    setPlacaVerdadeira('');
+    setIniciarDialogOpen(true);
+  };
+
+  const confirmarIniciarSimulacao = async () => {
+    if (iniciandoSimulacao) return;
+    const seq = Number(carregamento.seq_carregamento ?? 0) || 0;
+    const placa = placaVerdadeira.trim().toUpperCase();
+    if (seq <= 0) { toast.error('seq_carregamento não informado.'); return; }
+    if (!placa) { toast.error('Informe a placa verdadeira (veículo cadastrado).'); return; }
+    setIniciandoSimulacao(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'iniciar_simulacao', seq_carregamento: seq, placa }) },
+        true
+      );
+      if (res?.success) {
+        toast.success(`Carregamento ${placa} iniciado no modo TMS.`);
+        setIniciarDialogOpen(false);
+        await onRecarregarCarregamentos();
+      } else {
+        toast.error(res?.message || 'Erro ao iniciar carregamento.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao iniciar carregamento.');
+    } finally {
+      setIniciandoSimulacao(false);
+    }
+  };
 
   const finalizarELevarAoSSW = async () => {
     if (finalizando) return;
@@ -1770,7 +1821,7 @@ function CardCarregamento({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria }) },
+        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null }) },
         true
       );
       if (res.success) {
@@ -1897,7 +1948,7 @@ function CardCarregamento({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, vlr_frete_carreteiro: vlrTerNum, destino, paradas: (paradasArray || []).join(',') }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, vlr_frete_carreteiro: vlrTerNum, destino, paradas: (paradasArray || []).join(',') }) },
         true
       );
       if (res.success) {
@@ -2026,9 +2077,19 @@ function CardCarregamento({
                 </div>
               ) : (
                 <div className="flex items-center gap-1 group">
+                  {carregamento.seq_carregamento ? (
+                    <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono">
+                      #{carregamento.seq_carregamento}
+                    </Badge>
+                  ) : null}
                   <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
                   {origemTag && (
                     <Badge className={`${origemTag.className} text-[10px] h-5 px-2`}>{origemTag.label}</Badge>
+                  )}
+                  {!!(carregamento as any).simulado && (
+                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2">
+                      Simulado
+                    </Badge>
                   )}
                   <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" title="Editar placa">
                     <Pencil className="w-3 h-3" />
@@ -2149,9 +2210,21 @@ function CardCarregamento({
               <X className="w-3.5 h-3.5 mr-1" />Canc.
             </Button>
           )}
-          <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={finalizarELevarAoSSW} title="Finalizar o carregamento" disabled={finalizando || importandoCarregamentos}>
-            {finalizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Finalizar
-          </Button>
+          {!!(carregamento as any).simulado ? (
+            <Button
+              size="sm"
+              className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs"
+              onClick={abrirIniciarSimulacao}
+              title="Iniciar carregamento via TMS"
+              disabled={importandoCarregamentos || iniciandoSimulacao}
+            >
+              {iniciandoSimulacao ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Iniciar
+            </Button>
+          ) : (
+            <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={finalizarELevarAoSSW} title="Finalizar o carregamento" disabled={finalizando || importandoCarregamentos}>
+              {finalizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Finalizar
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -2195,11 +2268,32 @@ function CardCarregamento({
           </Button>
         </div>
       </div>
+      <Dialog open={iniciarDialogOpen} onOpenChange={(open) => { if (!iniciandoSimulacao) setIniciarDialogOpen(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Iniciar carregamento (TMS)</DialogTitle>
+            <DialogDescription>Informe a placa verdadeira do veículo (cadastrada) para iniciar o carregamento via TMS.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Placa verdadeira</Label>
+            <FilterSelectVeiculo value={placaVerdadeira} onChange={setPlacaVerdadeira} placeholder="Digite a placa para buscar no cadastro" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIniciarDialogOpen(false)} disabled={iniciandoSimulacao}>Cancelar</Button>
+            <Button className="bg-emerald-500 hover:bg-emerald-600 text-white" onClick={confirmarIniciarSimulacao} disabled={iniciandoSimulacao || !placaVerdadeira.trim()}>
+              {iniciandoSimulacao ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+              Iniciar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
         <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
-              <DialogTitle>CT-es · Carregamento {carregamento.placa_provisoria}</DialogTitle>
+              <DialogTitle>
+                CT-es · Carregamento{carregamento.seq_carregamento ? ` #${carregamento.seq_carregamento}` : ''} · {carregamento.placa_provisoria}
+              </DialogTitle>
               <DialogDescription>Selecione os CT-es e clique em “Excluir selecionados” para remover do carregamento</DialogDescription>
             </DialogHeader>
 
@@ -2448,13 +2542,13 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
 
   const intermediariasUsadas = React.useMemo(() => {
     const set = new Set<string>();
-    for (const c of (carregamentos ?? [])) {
+    for (const c of (carregamentosNaoSimulados ?? [])) {
       const d = (c.destino ?? parseDestinoFromPlaca(c.placa_provisoria) ?? '').trim().toUpperCase();
       if (d) set.add(d);
       for (const u of parseUnidadesCsv(c.paradas ?? '')) set.add(u);
     }
     return set;
-  }, [carregamentos]);
+  }, [carregamentosNaoSimulados]);
 
   const getIntermediariasEfetivas = React.useCallback((l: LinhaCarregamento): string[] => {
     return escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
@@ -2645,12 +2739,6 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     if (loading) return;
     if (placasDialogOrdem.length === 0) return;
 
-    const faltando = placasDialogOrdem.filter((nro) => !(placasDialogValues[nro] ?? '').trim());
-    if (faltando.length > 0) {
-      toast.error('Informe a placa REAL para todas as linhas selecionadas.');
-      return;
-    }
-
     const multi = placasDialogOrdem.length > 1;
 
     if (placasDialogMinFreteAbaixo.length > 0) {
@@ -2723,9 +2811,11 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         }
         if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
         if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
+        if (okCount > 0) toastAvisoSimulacao();
         return;
       }
 
+      if (okCount > 0) toastAvisoSimulacao();
       if (lastOk?.placa && ((lastOk.resumo?.length ?? 0) > 0 || (lastOk.resumoDestinos?.length ?? 0) > 0)) {
         setResumoPlaca(lastOk.placa);
         setResumoUnidades((lastOk.resumo as any) ?? []);
@@ -2801,7 +2891,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const handleCriarAdicional = async (item: SobrasCarregamento) => {
     if (loading) return;
     const hint = item.nro_linha ? ` para a linha ${String(item.nro_linha).padStart(3, '0')}` : ` para o destino ${item.destino}`;
-    const placaInformada = prompt(`Informe a placa REAL do veículo${hint}:`, '');
+    const placaInformada = prompt(`Informe a placa / identificação do veículo${hint}:`, '');
     const placaReal = (placaInformada ?? '').trim().toUpperCase();
     if (!placaReal) return;
     try {
@@ -2829,7 +2919,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         const item = snapshot[i];
         if (!current.includes(item)) continue;
         const hint = item.nro_linha ? `linha ${String(item.nro_linha).padStart(3, '0')}` : `destino ${item.destino}`;
-        const placaInformada = prompt(`Informe a placa REAL do veículo para ${hint}:`, '');
+        const placaInformada = prompt(`Informe a placa / identificação do veículo para ${hint}:`, '');
         const placaReal = (placaInformada ?? '').trim().toUpperCase();
         if (!placaReal) break;
         const r = await criarAdicionalComPlaca(item, placaReal, current, { recarregar: true, silent: true });
@@ -2843,6 +2933,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       }
       if (okCount > 0) toast.success(`${okCount} carregamento(s) adicional(is) criado(s).`);
       if (failCount > 0) toast.error(`${failCount} item(ns) falharam ao criar adicional.`);
+      if (okCount > 0) toastAvisoSimulacao();
       if (current.length === 0) handleFecharSobras();
     } finally {
       setLoading(false);
@@ -3349,7 +3440,7 @@ function ModalHub({
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Informe a placa REAL</h3>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Informe a placa / identificação</h3>
               </div>
               <button
                 onClick={() => setPlacasDialogOpen(false)}
@@ -3367,7 +3458,7 @@ function ModalHub({
                   <span>Nome</span>
                   <span>Dest.</span>
                   <span>Intermediárias</span>
-                  <span>Placa real</span>
+                  <span>Placa / ident.</span>
                 </div>
                 <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                   {placasDialogLinhas.map((l) => (
@@ -3552,6 +3643,9 @@ function CarregamentoArea({
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const tooltipStyle = useTooltipStyle();
+  const carregamentosNaoSimulados = React.useMemo(() => {
+    return (carregamentos ?? []).filter((c: any) => !c?.simulado);
+  }, [carregamentos]);
 
   const handleCriar = (placa: string, destino: string, paradas: string) => {
     setModalAberto(false);
@@ -3777,7 +3871,7 @@ function CarregamentoArea({
     setCalDetalheOpen(true);
   };
 
-  const abrirCtesCarregamento = async (placa: string) => {
+  const abrirCtesCarregamento = async (placa: string, seqCarregamento?: number | null) => {
     const p = String(placa ?? '').trim().toUpperCase();
     if (!p) return;
     setCalCtesOpen(true);
@@ -3787,7 +3881,7 @@ function CarregamentoArea({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: p }) },
+        { method: 'POST', body: JSON.stringify({ placa: p, seq_carregamento: seqCarregamento ?? null }) },
         true
       );
       if (res?.success) {
@@ -4036,13 +4130,22 @@ function CarregamentoArea({
                             : 'text-red-700 dark:text-red-400';
                       return (
                         <tr
-                          key={c.placa_provisoria}
+                          key={`${String((c as any).seq_carregamento ?? '')}-${String(c.placa_provisoria ?? '')}`}
                           className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer ${
                             isFinalizado ? 'bg-emerald-50/60 dark:bg-emerald-950/15' : 'bg-red-50/60 dark:bg-red-950/15'
                           }`}
                           onClick={() => abrirDetalheCarregamento(c)}
                         >
-                          <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{String(c.placa_provisoria ?? '').toUpperCase()}</td>
+                          <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {(c as any).seq_carregamento ? (
+                                <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                                  #{(c as any).seq_carregamento}
+                                </span>
+                              ) : null}
+                              <span>{String(c.placa_provisoria ?? '').toUpperCase()}</span>
+                            </div>
+                          </td>
                           <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTotal)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTer)}</td>
@@ -4083,7 +4186,9 @@ function CarregamentoArea({
               >
                 <DialogContent className="sm:max-w-[760px]">
                   <DialogHeader>
-                    <DialogTitle>Carregamento {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}</DialogTitle>
+                    <DialogTitle>
+                      Carregamento{calDetalheItem?.seq_carregamento ? ` #${calDetalheItem.seq_carregamento}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                    </DialogTitle>
                     <DialogDescription>Detalhes do carregamento selecionado</DialogDescription>
                   </DialogHeader>
                   {(() => {
@@ -4176,7 +4281,7 @@ function CarregamentoArea({
                             Tempo: <span className="font-mono font-semibold">{durMin != null ? fmtDuracao(durMin) : '—'}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''))}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''), (c as any).seq_carregamento ?? null)}>
                               Ver CT-es
                             </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => setCalDetalheOpen(false)}>
@@ -4193,7 +4298,9 @@ function CarregamentoArea({
               <Dialog open={calCtesOpen} onOpenChange={setCalCtesOpen}>
                 <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
                   <DialogHeader>
-                    <DialogTitle>CT-es · Carregamento {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}</DialogTitle>
+                    <DialogTitle>
+                      CT-es · Carregamento{calDetalheItem?.seq_carregamento ? ` #${calDetalheItem.seq_carregamento}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                    </DialogTitle>
                     <DialogDescription>Lista de CT-es envolvidos no carregamento</DialogDescription>
                   </DialogHeader>
                   <div className="min-h-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
@@ -4514,7 +4621,7 @@ function CarregamentoArea({
           onFechar={() => setModalAutomaticoAberto(false)}
           linhasOrigem={linhasOrigem}
           loadingLinhasOrigem={loadingLinhasOrigem}
-          carregamentos={carregamentos}
+          carregamentos={carregamentosNaoSimulados}
           siglaUnidade={sigla}
           totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
         />
@@ -5023,7 +5130,15 @@ export function Disponiveis() {
         true
       );
       if (res.success) {
-        if (!silent) toast.success(res.message || 'Carregamento automático iniciado!');
+        const msg = String(res.message ?? '').trim();
+        const resultados = Array.isArray(res.resultados) ? res.resultados : [];
+        const criou = resultados.length > 0
+          ? resultados.some((r: any) => String(r?.status ?? '').toLowerCase() === 'criado')
+          : !(msg.toLowerCase().includes('já existe'));
+        if (!silent) {
+          toast.success(msg || 'Carregamento automático iniciado!');
+          if (criou) toastAvisoSimulacao();
+        }
         if (recarregar) await carregarCarregamentos();
         return {
           ok: true,
@@ -5058,10 +5173,6 @@ export function Disponiveis() {
   const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
     if (carregandoNroLinhaHoje) return;
     try {
-      const placaInformada = prompt(`Informe a placa REAL do veículo para a linha ${String(nroLinha).padStart(3, '0')}:`, '');
-      const placaReal = (placaInformada ?? '').trim().toUpperCase();
-      if (!placaReal) return;
-
       const atingiuMin = (linhasHojeStatus[nroLinha]?.atingiuMinFrete ?? true);
       if (!atingiuMin) {
         if (!confirm(`Atenção: as cargas disponíveis para a linha ${String(nroLinha).padStart(3, '0')} não atingem o frete mínimo! Continuar?`)) {
@@ -5070,7 +5181,7 @@ export function Disponiveis() {
       }
 
       setCarregandoNroLinhaHoje(nroLinha);
-      const result = await handleCarregamentoAutomatico(placaReal, '', [], nroLinha, { forcarMinFrete: !atingiuMin });
+      const result = await handleCarregamentoAutomatico('', '', [], nroLinha, { forcarMinFrete: !atingiuMin });
       if (result.ok && result.placa && ((result.resumo?.length ?? 0) > 0 || (result.resumoDestinos?.length ?? 0) > 0)) {
         setResumoHojePlaca(result.placa);
         setResumoHojeUnidades((result.resumo as any) ?? []);
@@ -5083,17 +5194,21 @@ export function Disponiveis() {
     }
   }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico, linhasHojeStatus]);
 
-  const placasExistentes = React.useMemo(() => {
-    return new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+  const carregamentosNaoSimulados = React.useMemo(() => {
+    return (carregamentos ?? []).filter((c: any) => !c?.simulado);
   }, [carregamentos]);
+
+  const placasExistentes = React.useMemo(() => {
+    return new Set(carregamentosNaoSimulados.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+  }, [carregamentosNaoSimulados]);
 
   const linhasEmCarregamento = React.useMemo(() => {
     return new Set<number>(
-      (carregamentos ?? [])
+      carregamentosNaoSimulados
         .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
         .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
     );
-  }, [carregamentos]);
+  }, [carregamentosNaoSimulados]);
 
   const linhasCarregamHojeVisiveis = React.useMemo(() => {
     const orig = (unidadeAtual ?? '').trim().toUpperCase();
@@ -5126,14 +5241,6 @@ export function Disponiveis() {
         }
       }
 
-      const placasPorLinha: Record<number, string> = {};
-      for (const nro of possiveis) {
-        const placaInformada = prompt(`Informe a placa REAL do veículo para a linha ${String(nro).padStart(3, '0')}:`, '');
-        const placaReal = (placaInformada ?? '').trim().toUpperCase();
-        if (!placaReal) return;
-        placasPorLinha[nro] = placaReal;
-      }
-
       setCarregandoTodasLinhasHoje(true);
       let okCount = 0;
       let failCount = 0;
@@ -5143,8 +5250,7 @@ export function Disponiveis() {
       for (let i = 0; i < possiveis.length; i++) {
         const nro = possiveis[i];
         const isLast = i === possiveis.length - 1;
-        const placaReal = placasPorLinha[nro];
-        const result = await handleCarregamentoAutomatico(placaReal, '', [], nro, { recarregar: isLast, silent: true, forcarMinFrete: abaixoMin.includes(nro) });
+        const result = await handleCarregamentoAutomatico('', '', [], nro, { recarregar: isLast, silent: true, forcarMinFrete: abaixoMin.includes(nro) });
         if (result.ok) {
           okCount++;
         } else {
@@ -5155,7 +5261,7 @@ export function Disponiveis() {
         const intermediarias = linha ? escolherIntermediariasLinha(linha.unidades, linha.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2).join(', ') : '';
         itens.push({
           nro_linha: nro,
-          placa: result.placa ?? placaReal,
+          placa: result.placa ?? '',
           destino: destino || '-',
           intermediarias: intermediarias || '-',
           status: result.ok ? 'criado' : 'erro',
@@ -5164,6 +5270,7 @@ export function Disponiveis() {
       }
       if (okCount > 0) toast.success(`${okCount} carregamento(s) criado(s).`);
       if (failCount > 0) toast.error(`${failCount} linha(s) falharam ao carregar.`);
+      if (okCount > 0) toastAvisoSimulacao();
       setResumoHojeMassaItens(itens);
       setResumoHojeMassaDialogOpen(true);
       setLinhasHojeDialogOpen(false);
@@ -5691,9 +5798,9 @@ export function Disponiveis() {
         if (ton >= MIN_TON || t.cubagem >= MIN_M3) diretaLotaPorDestino.add(dest);
       }
 
-      const placasExistentes = new Set(carregamentos.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
+      const placasExistentes = new Set(carregamentosNaoSimulados.map((c) => (c.placa_provisoria ?? '').trim().toUpperCase()).filter(Boolean));
       const linhasEmCarregamento = new Set<number>(
-        carregamentos
+        carregamentosNaoSimulados
           .map((c: any) => (c?.nro_linha ?? c?.nroLinha ?? 0) as number)
           .filter((n: any) => Number.isFinite(n) && (n as number) > 0) as number[]
       );
@@ -5753,7 +5860,7 @@ export function Disponiveis() {
       ativo = false;
       window.clearTimeout(t);
     };
-  }, [carregamentos, ctesTransferFiltrados, intermediariasUsadas, linhasCarregamHoje, unidadeAtual]);
+  }, [carregamentosNaoSimulados, ctesTransferFiltrados, intermediariasUsadas, linhasCarregamHoje, unidadeAtual]);
 
   const coletasTransferFiltradas = React.useMemo(() => {
     const list = dados?.coletas ? [...dados.coletas] : [];

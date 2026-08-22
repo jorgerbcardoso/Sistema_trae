@@ -37,7 +37,22 @@ $tabelaCap   = "{$domain}_carregamento_capacidade";
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS multi_carr_diario BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+
+$seqName = "{$domain}_seq_carregamento_seq";
+@pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
+@pg_query($conn, "ALTER TABLE {$tabela} ALTER COLUMN seq_carregamento SET DEFAULT nextval('{$seqName}')");
+
+function nextSeqCarregamentoAuto($conn, $seqName) {
+    $seqName = trim((string)$seqName);
+    if ($seqName === '') return 0;
+    $res = @pg_query($conn, "SELECT nextval('" . pg_escape_string($conn, $seqName) . "') AS seq");
+    if (!$res || pg_num_rows($res) === 0) return 0;
+    return (int)pg_fetch_result($res, 0, 0);
+}
 
 $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 
@@ -165,15 +180,18 @@ function getIntermediariasJaUsadas($conn, $tabela, $unidade) {
     return $usadas;
 }
 
-function getOcupacaoPorUnidade($conn, $tabela, $unidade) {
+function getOcupacaoPorUnidade($conn, $tabela, $tabelaCap, $unidade) {
     $unidade = strtoupper(trim((string)$unidade));
     $map = [];
     try {
         $res = sql(
-            "SELECT placa_provisoria, destino, unidades
-             FROM {$tabela}
-             WHERE unidade = \$1
-               AND data_finalizacao IS NULL",
+            "SELECT c.placa_provisoria, c.destino, c.unidades
+             FROM {$tabela} c
+             LEFT JOIN {$tabelaCap} cap
+                    ON cap.unidade = c.unidade AND cap.seq_carregamento = c.seq_carregamento
+             WHERE c.unidade = \$1
+               AND c.data_finalizacao IS NULL
+               AND COALESCE(cap.simulado, FALSE) = FALSE",
             [$unidade],
             $conn
         );
@@ -602,9 +620,11 @@ function filtrarCtesPorCapacidade($ctesDisponiveis, $unidadeOrigem, $destinoFina
 /**
  * Insere CT-es na tabela de carregamento com destino e unidades em cada linha.
  */
-function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidades, $ctesSelecionados, $nroLinha) {
+function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidades, $ctesSelecionados, $nroLinha, $seqCarregamento) {
     $inseridos = 0;
     $nroLinhaSql = ((int)$nroLinha > 0) ? (int)$nroLinha : null;
+    $seqCarregamento = (int)$seqCarregamento;
+    if ($seqCarregamento <= 0) return -1;
     foreach ($ctesSelecionados as $cteData) {
         $nroCte = (int)($cteData['nroCte'] ?? 0);
         if ($nroCte <= 0) continue;
@@ -692,13 +712,13 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
 
         $res = pg_query($conn,
             "INSERT INTO {$tabela}
-             (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+             (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
               destino, unidades, origem_ssw, origem_criacao, unidade_carregamento, nro_linha)
              VALUES
-             ('" . pg_escape_string($conn, $unidade) . "', '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
+             ('" . pg_escape_string($conn, $unidade) . "', {$seqCarregamento}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
@@ -901,9 +921,31 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos desta linha.']);
     }
 
-    pg_query($conn, 'BEGIN');
+    $seqCarreg = nextSeqCarregamentoAuto($conn, $seqName);
+    if ($seqCarreg <= 0) {
+        respondJson(['success' => false, 'message' => 'Erro ao gerar seq_carregamento.']);
+    }
 
-    $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados, $nroLinha);
+    pg_query($conn, 'BEGIN');
+    @pg_query($conn, "
+        CREATE TABLE IF NOT EXISTS {$tabelaCap} (
+            unidade          VARCHAR(10) NOT NULL,
+            seq_carregamento INT NOT NULL,
+            placa_provisoria VARCHAR(20) NOT NULL,
+            cap_ton          NUMERIC,
+            cap_m3           NUMERIC,
+            vlr_frete_carreteiro NUMERIC,
+            simulado         BOOLEAN DEFAULT FALSE,
+            PRIMARY KEY (unidade, seq_carregamento)
+        )
+    ");
+    @pg_query($conn,
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', TRUE)
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE"
+    );
+
+    $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados, $nroLinha, $seqCarreg);
     if ($inseridos < 0) {
         pg_query($conn, 'ROLLBACK');
         respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);
@@ -948,7 +990,7 @@ if (empty($unidadeDestino)) {
 
 $placaFinal = !empty($placa) ? $placa : ($unidade . '-' . $unidadeDestino);
 
-$ocupacao = getOcupacaoPorUnidade($conn, $tabela, $unidade);
+$ocupacao = getOcupacaoPorUnidade($conn, $tabela, $tabelaCap, $unidade);
 $usadasSet = [];
 foreach ($ocupacao as $u => $_v) $usadasSet[$u] = true;
 
@@ -1016,9 +1058,31 @@ if (empty($ctesSelecionados)) {
     respondJson(['success' => false, 'message' => 'Nenhum CT-e disponível para os destinos informados.']);
 }
 
-pg_query($conn, 'BEGIN');
+$seqCarreg = nextSeqCarregamentoAuto($conn, $seqName);
+if ($seqCarreg <= 0) {
+    respondJson(['success' => false, 'message' => 'Erro ao gerar seq_carregamento.']);
+}
 
-$inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados, 0);
+pg_query($conn, 'BEGIN');
+@pg_query($conn, "
+    CREATE TABLE IF NOT EXISTS {$tabelaCap} (
+        unidade          VARCHAR(10) NOT NULL,
+        seq_carregamento INT NOT NULL,
+        placa_provisoria VARCHAR(20) NOT NULL,
+        cap_ton          NUMERIC,
+        cap_m3           NUMERIC,
+        vlr_frete_carreteiro NUMERIC,
+        simulado         BOOLEAN DEFAULT FALSE,
+        PRIMARY KEY (unidade, seq_carregamento)
+    )
+");
+@pg_query($conn,
+    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado)
+     VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaFinal) . "', TRUE)
+     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE"
+);
+
+$inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados, 0, $seqCarreg);
 if ($inseridos < 0) {
     pg_query($conn, 'ROLLBACK');
     respondJson(['success' => false, 'message' => 'Erro ao inserir CT-es: ' . pg_last_error($conn)]);

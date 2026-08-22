@@ -68,12 +68,28 @@ set_time_limit(300);
 
 $tabela = "{$domain}_carregamento";
 $tabelaVeiculo = "{$domain}_veiculo";
+$tabelaCap = "{$domain}_carregamento_capacidade";
 $domainUpper = strtoupper(trim((string)$domain));
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+
+$seqName = "{$domain}_seq_carregamento_seq";
+@pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
+@pg_query($conn, "ALTER TABLE {$tabela} ALTER COLUMN seq_carregamento SET DEFAULT nextval('{$seqName}')");
+
+function nextSeqCarregamentoSsw($conn, $seqName) {
+    $seqName = trim((string)$seqName);
+    if ($seqName === '') return 0;
+    $res = @pg_query($conn, "SELECT nextval('" . pg_escape_string($conn, $seqName) . "') AS seq");
+    if (!$res || pg_num_rows($res) === 0) return 0;
+    return (int)pg_fetch_result($res, 0, 0);
+}
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&prioritario=N");
@@ -307,20 +323,41 @@ foreach ($placas_ssw as $placa) {
 
     $placaProvisoriaSalvar = $placa;
     $destinoFromPlaca = null;
+    $sufixoRve = null;
+    $seqCarregRveAgrupado = 0;
 
     if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $placa)) {
         $destinoFromPlaca = substr($placa, 0, 3);
-        $sufixo = substr($placa, 3, 4);
-        if ($sufixo !== '') {
-            $resVeic = sql(
-                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
-                [$sufixo],
+        $sufixoRve = substr($placa, 3, 4);
+        if ($sufixoRve !== '') {
+            $resCapMatch = sql(
+                "SELECT cap.placa_provisoria
+                 FROM {$tabelaCap} cap
+                 JOIN {$tabela} c
+                   ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+                 WHERE cap.unidade = \$1
+                   AND RIGHT(UPPER(cap.placa_provisoria), 4) = \$2
+                   AND COALESCE(cap.simulado, FALSE) = FALSE
+                   AND c.data_finalizacao IS NULL
+                 ORDER BY cap.seq_carregamento DESC
+                 LIMIT 1",
+                [$unidade, $sufixoRve],
                 $conn
             );
-            if ($resVeic && pg_num_rows($resVeic) > 0) {
-                $rowV = pg_fetch_assoc($resVeic);
-                $cand = strtoupper(trim((string)($rowV['placa'] ?? '')));
+            if ($resCapMatch && pg_num_rows($resCapMatch) > 0) {
+                $cand = strtoupper(trim((string)pg_fetch_result($resCapMatch, 0, 0)));
                 if ($cand !== '') $placaProvisoriaSalvar = $cand;
+            } else {
+                $resVeic = sql(
+                    "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
+                    [$sufixoRve],
+                    $conn
+                );
+                if ($resVeic && pg_num_rows($resVeic) > 0) {
+                    $rowV = pg_fetch_assoc($resVeic);
+                    $cand = strtoupper(trim((string)($rowV['placa'] ?? '')));
+                    if ($cand !== '') $placaProvisoriaSalvar = $cand;
+                }
             }
         }
     }
@@ -334,6 +371,77 @@ foreach ($placas_ssw as $placa) {
     $horaInc = $row_check ? (string)($row_check['hora_inclusao'] ?? '') : '';
     $dataIncSql = ($dataInc !== '') ? ("DATE '" . pg_escape_string($conn, $dataInc) . "'") : 'CURRENT_DATE';
     $horaIncSql = ($horaInc !== '') ? ("TIME '" . pg_escape_string($conn, $horaInc) . "'") : 'CURRENT_TIME';
+
+    $seqCarreg = 0;
+    if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
+        $resSeqPlaca = sql(
+            "SELECT cap.seq_carregamento
+             FROM {$tabelaCap} cap
+             JOIN {$tabela} c
+               ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+             WHERE cap.unidade = \$1
+               AND UPPER(cap.placa_provisoria) = UPPER(\$2)
+               AND COALESCE(cap.simulado, FALSE) = FALSE
+               AND c.data_finalizacao IS NULL
+             ORDER BY cap.seq_carregamento DESC
+             LIMIT 1",
+            [$unidade, $placaProvisoriaSalvar],
+            $conn
+        );
+        if ($resSeqPlaca && pg_num_rows($resSeqPlaca) > 0) {
+            $seqCarreg = (int)pg_fetch_result($resSeqPlaca, 0, 0);
+            if ($seqCarreg > 0) $seqCarregRveAgrupado = $seqCarreg;
+        }
+    }
+    if ($seqCarreg <= 0) {
+        $resSeq = @pg_query($conn, "SELECT seq_carregamento FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' AND seq_carregamento IS NOT NULL LIMIT 1");
+        if ($resSeq && pg_num_rows($resSeq) > 0) {
+            $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
+        }
+    }
+    if ($seqCarreg <= 0) {
+        $seqCarreg = nextSeqCarregamentoSsw($conn, $seqName);
+        if ($seqCarreg <= 0) {
+            $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Erro ao gerar seq_carregamento.'];
+            continue;
+        }
+    }
+
+    $resSimOrig = sql(
+        "SELECT COALESCE(cap.simulado, FALSE) AS simulado
+         FROM {$tabela} c
+         LEFT JOIN {$tabelaCap} cap
+                ON cap.unidade = c.unidade AND cap.seq_carregamento = c.seq_carregamento
+         WHERE c.unidade = \$1
+           AND c.origem_ssw = \$2
+           AND c.data_finalizacao IS NULL
+         ORDER BY c.data_inclusao ASC, c.hora_inclusao ASC
+         LIMIT 1",
+        [$unidade, $placa],
+        $conn
+    );
+    if ($resSimOrig && pg_num_rows($resSimOrig) > 0) {
+        $isSim = ((string)pg_fetch_result($resSimOrig, 0, 0) === 't');
+        if ($isSim) {
+            $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Carregamento simulado (Presto) não é alterado pela importação do SSW.'];
+            continue;
+        }
+    }
+    $resSimSeq = sql(
+        "SELECT COALESCE(simulado, FALSE) AS simulado
+         FROM {$tabelaCap}
+         WHERE unidade = \$1 AND seq_carregamento = \$2
+         LIMIT 1",
+        [$unidade, $seqCarreg],
+        $conn
+    );
+    if ($resSimSeq && pg_num_rows($resSimSeq) > 0) {
+        $isSim = ((string)pg_fetch_result($resSimSeq, 0, 0) === 't');
+        if ($isSim) {
+            $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Carregamento simulado (Presto) não é alterado pela importação do SSW.'];
+            continue;
+        }
+    }
 
     $info = $carregamentos[$placa] ?? null;
     $ctes = $info['ctes'] ?? [];
@@ -356,6 +464,7 @@ foreach ($placas_ssw as $placa) {
         $resHdr = pg_query($conn,
             "UPDATE {$tabela}
              SET placa_provisoria = '{$placaProvEsc}',
+                 seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                  destino = {$destinoCarEsc},
                  origem_criacao = 'SSW',
                  data_finalizacao = NULL,
@@ -366,16 +475,33 @@ foreach ($placas_ssw as $placa) {
         );
         if ($resHdr === false) throw new Exception(pg_last_error($conn));
 
+        @pg_query($conn, "
+            CREATE TABLE IF NOT EXISTS {$tabelaCap} (
+                unidade          VARCHAR(10) NOT NULL,
+                seq_carregamento INT NOT NULL,
+                placa_provisoria VARCHAR(20) NOT NULL,
+                cap_ton          NUMERIC,
+                cap_m3           NUMERIC,
+                vlr_frete_carreteiro NUMERIC,
+                PRIMARY KEY (unidade, seq_carregamento)
+            )
+        ");
+        @pg_query($conn,
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria)
+             VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}')
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria"
+        );
+
         if (empty($ctes)) {
             $resAny = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' LIMIT 1");
             if (!$resAny || pg_num_rows($resAny) === 0) {
                 $resInsSent = pg_query(
                     $conn,
                     "INSERT INTO {$tabela}
-                     (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
                       nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
-                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
+                     ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
                       0, {$destinoCarEsc}, NULL, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
@@ -408,6 +534,7 @@ foreach ($placas_ssw as $placa) {
                     $resUpdCte = pg_query($conn,
                         "UPDATE {$tabela}
                          SET placa_provisoria = '{$placaProvEsc}',
+                             seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                              destino = {$destinoCarEsc},
                              destino_cte = '{$destinoCte}',
                              data_emissao_cte = {$emissaoSql},
@@ -456,14 +583,14 @@ foreach ($placas_ssw as $placa) {
 
                 $resIns = pg_query($conn,
                     "INSERT INTO {$tabela}
-                     (unidade, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
                       destino, unidades,
                       ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                       remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
-                     ('{$unidadeEsc}', '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
+                     ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
                       {$destinoCarEsc}, NULL,
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',

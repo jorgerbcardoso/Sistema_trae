@@ -36,7 +36,14 @@ $tabelaLinha        = "{$domain}_linha";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+
+$seqName = "{$domain}_seq_carregamento_seq";
+@pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ALTER COLUMN seq_carregamento SET DEFAULT nextval('{$seqName}')");
 
 $modo = strtolower(trim((string)($input['modo'] ?? 'ativos')));
 $dias = (int)($input['dias'] ?? 30);
@@ -48,6 +55,7 @@ $dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
     SELECT
+        c.seq_carregamento,
         c.placa_provisoria,
         MAX(
             CASE
@@ -80,14 +88,15 @@ $sqlCarregamentos = "
         v.capacidade_m3,
         cap.cap_ton,
         cap.cap_m3,
-        cap.vlr_frete_carreteiro
+        cap.vlr_frete_carreteiro,
+        COALESCE(cap.simulado, FALSE) AS simulado
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v
            ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
-           ON cap.unidade = \$1 AND cap.placa_provisoria = c.placa_provisoria
+           ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
     WHERE c.unidade = \$1
-    GROUP BY c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro
+    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado
 ";
 
 if ($modo === 'calendario') {
@@ -119,6 +128,7 @@ $idxPorPlaca   = [];
 while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $placa = $row['placa_provisoria'] ?? '';
     if ($placa === '') continue;
+    $seqCarreg = ($row['seq_carregamento'] !== null && $row['seq_carregamento'] !== '') ? (int)$row['seq_carregamento'] : null;
 
     $destino = strtoupper(trim($row['destino'] ?? ''));
     // Fallback: extrai destino da placa fictícia (ex: SAO-CTB → CTB)
@@ -154,8 +164,10 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $horaFinal = $fimTs !== '' ? substr($fimTs, 11, 8) : ($row['hora_finalizacao'] ?? null);
 
     $carregamentos[] = [
+        'seq_carregamento'  => $seqCarreg,
         'placa_provisoria' => $placa,
         'origem_criacao'   => $origemCriacao,
+        'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
         'total_frete'      => (float)($row['total_frete'] ?? 0),
         'total_mercadoria' => (float)($row['total_mercadoria'] ?? 0),

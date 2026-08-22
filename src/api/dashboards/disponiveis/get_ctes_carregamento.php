@@ -9,9 +9,10 @@ $domain = $auth['domain'];
 
 $input  = getRequestInput();
 $placa  = strtoupper(trim($input['placa'] ?? ''));
+$seqCarreg = (int)($input['seq_carregamento'] ?? 0);
 
-if (empty($placa)) {
-    respondJson(['success' => false, 'message' => 'Placa não informada.']);
+if ($seqCarreg <= 0 && empty($placa)) {
+    respondJson(['success' => false, 'message' => 'Placa ou seq_carregamento não informado.']);
 }
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
@@ -26,6 +27,11 @@ $unidade = strtoupper(trim(
 
 $conn = connect();
 $tabela = "{$domain}_carregamento";
+
+$whereSql = $seqCarreg > 0
+    ? "unidade = \$1 AND seq_carregamento = \$2"
+    : "unidade = \$1 AND UPPER(placa_provisoria) = \$2";
+$params = $seqCarreg > 0 ? [$unidade, $seqCarreg] : [$unidade, $placa];
 
 $sql = "
     SELECT
@@ -77,13 +83,12 @@ $sql = "
         COALESCE(cubagem_cte, 0)    AS cubagem,
         COALESCE(qtde_vol_cte, 0)   AS qtde_vol
     FROM {$tabela}
-    WHERE unidade = \$1
-      AND UPPER(placa_provisoria) = \$2
+    WHERE {$whereSql}
       AND nro_cte > 0
     ORDER BY data_inclusao ASC, hora_inclusao ASC
 ";
 
-$res = sql($sql, [$unidade, $placa], $conn);
+$res = sql($sql, $params, $conn);
 
 $ctes     = [];
 $totFrete = 0.0;
