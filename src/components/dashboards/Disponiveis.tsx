@@ -13,6 +13,7 @@ import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
 import { toast } from 'sonner';
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
+import { useConfirmDialog, usePromptDialog, type ConfirmDialogOptions, type PromptDialogOptions } from '../ui/alert-dialog';
 import {
   Warehouse,
   Truck,
@@ -1418,6 +1419,8 @@ interface CarregamentoAreaProps {
   linhasOrigem: LinhaCarregamento[];
   loadingLinhasOrigem: boolean;
   totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
+  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
+  perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
   modoApontamento: string | null;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
@@ -1702,6 +1705,7 @@ function CardCarregamento({
   carregamento,
   todosCtes,
   modoApontamento,
+  confirmar,
   onIniciarApontamento,
   onCancelarApontamento,
   onExcluirCarregamento,
@@ -1717,6 +1721,7 @@ function CardCarregamento({
   carregamento: Carregamento;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   modoApontamento: string | null;
+  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onExcluirCarregamento: (placa: string) => void;
@@ -1749,8 +1754,15 @@ function CardCarregamento({
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
 
-  const abrirIniciarSimulacao = () => {
-    if (!window.confirm('Atenção: a simulação do carregamento será limpa, para início do carregamento atráves do TMS, por bipagem ou manualmente. Confirma?')) return;
+  const abrirIniciarSimulacao = async () => {
+    const ok = await confirmar({
+      title: 'Iniciar carregamento via TMS?',
+      description: 'Atenção: a simulação do carregamento será limpa, para início do carregamento atráves do TMS, por bipagem ou manualmente.',
+      confirmText: 'Continuar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     const seq = Number(carregamento.seq_carregamento ?? 0) || 0;
     if (seq <= 0) {
       toast.error('Não foi possível identificar o seq_carregamento deste carregamento.');
@@ -1790,7 +1802,14 @@ function CardCarregamento({
   const finalizarELevarAoSSW = async () => {
     if (finalizando) return;
     const placa = carregamento.placa_provisoria;
-    if (!confirm(`Finalizar o carregamento ${placa}?`)) return;
+    const ok = await confirmar({
+      title: 'Finalizar carregamento?',
+      description: `Finalizar o carregamento ${placa}?`,
+      confirmText: 'Finalizar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setFinalizando(true);
     try {
       const res = await apiFetch(
@@ -1843,7 +1862,14 @@ function CardCarregamento({
   const removerCtesSelecionados = async () => {
     if (cteDetalheSelecionados.size === 0) return;
     const qtd = cteDetalheSelecionados.size;
-    if (!confirm(`Excluir ${qtd} CT-e(s) selecionado(s) deste carregamento?`)) return;
+    const ok = await confirmar({
+      title: 'Excluir CT-es do carregamento?',
+      description: `Excluir ${qtd} CT-e(s) selecionado(s) deste carregamento?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setLoadingCteDetalhe(true);
     try {
       const seq_ctes = Array.from(cteDetalheSelecionados.values()).filter(n => Number.isFinite(n) && n > 0);
@@ -1939,10 +1965,15 @@ function CardCarregamento({
 
     if (mudouTon || mudouM3 || mudouMinFrete || mudouFreteTer) {
       const linhas: string[] = [];
-      linhas.push('Confirmar alteração dos parâmetros?');
       if (mudouMinFrete) linhas.push('- Min. Frete: será alterado também na linha (tabela [dominio]_linha).');
       if (mudouTon || mudouM3) linhas.push('- Capacidades: serão alteradas também no veículo (tabela [dominio]_veiculo).');
-      const ok = confirm(linhas.join('\n'));
+      if (mudouFreteTer) linhas.push('- Frete Ter.: será alterado no carregamento.');
+      const ok = await confirmar({
+        title: 'Confirmar alteração dos parâmetros?',
+        description: linhas.join('\n'),
+        confirmText: 'Confirmar',
+        cancelText: 'Cancelar',
+      });
       if (!ok) return;
     }
 
@@ -2513,7 +2544,7 @@ type SobrasCarregamento = {
   uso?: { peso_kg?: number; cubagem?: number; frete?: number };
 };
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
+function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, perguntarTexto, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
   onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
@@ -2528,6 +2559,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
     uso?: { peso_kg?: number; cubagem?: number; frete?: number };
   }>;
   onFechar: () => void;
+  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
+  perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
   linhasOrigem: LinhaCarregamento[];
   loadingLinhasOrigem: boolean;
   carregamentos: Carregamento[];
@@ -2764,7 +2797,13 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
       const msg = multi
         ? 'Atenção: um ou mais carregamentos não atingem o frete mínimo. Continuar?'
         : `Atenção: as cargas disponíveis para a linha ${String(placasDialogOrdem[0]).padStart(3, '0')} não atingem o frete mínimo! Continuar?`;
-      if (!confirm(msg)) return;
+      const ok = await confirmar({
+        title: 'Frete mínimo não atingido',
+        description: msg,
+        confirmText: 'Continuar',
+        cancelText: 'Cancelar',
+      });
+      if (!ok) return;
     }
 
     try {
@@ -2910,7 +2949,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
   const handleCriarAdicional = async (item: SobrasCarregamento) => {
     if (loading) return;
     const hint = item.nro_linha ? ` para a linha ${String(item.nro_linha).padStart(3, '0')}` : ` para o destino ${item.destino}`;
-    const placaInformada = prompt(`Informe a placa / identificação do veículo${hint}:`, '');
+    const placaInformada = await perguntarTexto({
+      title: 'Criar carregamento adicional',
+      description: `Informe a placa / identificação do veículo${hint}:`,
+      label: 'Placa / Identificação',
+      placeholder: 'Ex: ABC1234 ou ROTA-01',
+      confirmText: 'Criar',
+      cancelText: 'Cancelar',
+    });
     const placaReal = (placaInformada ?? '').trim().toUpperCase();
     if (!placaReal) return;
     try {
@@ -2938,7 +2984,14 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, linhasOrigem, load
         const item = snapshot[i];
         if (!current.includes(item)) continue;
         const hint = item.nro_linha ? `linha ${String(item.nro_linha).padStart(3, '0')}` : `destino ${item.destino}`;
-        const placaInformada = prompt(`Informe a placa / identificação do veículo para ${hint}:`, '');
+        const placaInformada = await perguntarTexto({
+          title: 'Criar carregamento adicional',
+          description: `Informe a placa / identificação do veículo para ${hint}:`,
+          label: 'Placa / Identificação',
+          placeholder: 'Ex: ABC1234 ou ROTA-01',
+          confirmText: 'Criar',
+          cancelText: 'Parar',
+        });
         const placaReal = (placaInformada ?? '').trim().toUpperCase();
         if (!placaReal) break;
         const r = await criarAdicionalComPlaca(item, placaReal, current, { recarregar: true, silent: true });
@@ -3640,6 +3693,8 @@ function CarregamentoArea({
   linhasOrigem,
   loadingLinhasOrigem,
   totalsPorUnidadeParaLinhas,
+  confirmar,
+  perguntarTexto,
   modoApontamento,
   onIniciarApontamento,
   onCancelarApontamento,
@@ -3672,7 +3727,14 @@ function CarregamentoArea({
   };
 
   const handleExcluirTodos = async () => {
-    if (!window.confirm(`Finalizar TODOS os ${carregamentos.length} carregamento(s) da unidade ${sigla}?`)) return;
+    const ok = await confirmar({
+      title: 'Finalizar todos os carregamentos?',
+      description: `Finalizar TODOS os ${carregamentos.length} carregamento(s) da unidade ${sigla}?`,
+      confirmText: 'Finalizar todos',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -4611,6 +4673,7 @@ function CarregamentoArea({
                 carregamento={c}
                 todosCtes={todosCtes}
                 modoApontamento={modoApontamento}
+                confirmar={confirmar}
                 onIniciarApontamento={onIniciarApontamento}
                 onCancelarApontamento={onCancelarApontamento}
                 onExcluirCarregamento={onExcluirCarregamento}
@@ -4649,6 +4712,8 @@ function CarregamentoArea({
         <ModalCarregamentoAutomatico
           onConfirmar={onCarregamentoAutomatico}
           onFechar={() => setModalAutomaticoAberto(false)}
+          confirmar={confirmar}
+          perguntarTexto={perguntarTexto}
           linhasOrigem={linhasOrigem}
           loadingLinhasOrigem={loadingLinhasOrigem}
           carregamentos={carregamentosNaoSimulados}
@@ -4672,6 +4737,8 @@ export function Disponiveis() {
   usePageTitle('Disponíveis no Armazém');
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { confirm: confirmar, dialog: confirmarDialog } = useConfirmDialog();
+  const { prompt: perguntarTexto, dialog: perguntarTextoDialog } = usePromptDialog();
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
@@ -5092,7 +5159,14 @@ export function Disponiveis() {
   }, [carregarCarregamentos]);
 
   const handleExcluirCarregamento = useCallback(async (placa: string) => {
-    if (!confirm(`Finalizar o carregamento "${placa}"?`)) return;
+    const ok = await confirmar({
+      title: 'Finalizar carregamento?',
+      description: `Finalizar o carregamento "${placa}"?`,
+      confirmText: 'Finalizar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -5109,7 +5183,7 @@ export function Disponiveis() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao finalizar');
     }
-  }, [carregarCarregamentos, modoApontamento]);
+  }, [carregarCarregamentos, modoApontamento, confirmar]);
 
   const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{
     ok: boolean;
@@ -5187,7 +5261,13 @@ export function Disponiveis() {
         if (!silent && !forcarMinFrete && String(res?.code ?? '') === 'MIN_FRETE') {
           const freteAtual = Number(res?.frete_atual ?? 0) || 0;
           const minFrete = Number(res?.min_frete ?? 0) || 0;
-          if (confirm(`Frete atual abaixo do mínimo da linha.\n\nFrete: ${freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\nMínimo: ${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\nContinuar mesmo assim?`)) {
+          const ok = await confirmar({
+            title: 'Frete abaixo do mínimo',
+            description: `Frete atual abaixo do mínimo da linha.\n\nFrete: ${freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\nMínimo: ${minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\nContinuar mesmo assim?`,
+            confirmText: 'Continuar',
+            cancelText: 'Cancelar',
+          });
+          if (ok) {
             return await handleCarregamentoAutomatico(placa, unidadeDestino, paradas, nroLinha, { ...opts, forcarMinFrete: true });
           }
         }
@@ -5198,16 +5278,20 @@ export function Disponiveis() {
       if (!silent) toast.error(e.message || 'Erro ao iniciar carregamento automático');
       return { ok: false, message: e?.message || 'Erro ao iniciar carregamento automático' };
     }
-  }, [carregarCarregamentos, dados]);
+  }, [carregarCarregamentos, dados, confirmar]);
 
   const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
     if (carregandoNroLinhaHoje) return;
     try {
       const atingiuMin = (linhasHojeStatus[nroLinha]?.atingiuMinFrete ?? true);
       if (!atingiuMin) {
-        if (!confirm(`Atenção: as cargas disponíveis para a linha ${String(nroLinha).padStart(3, '0')} não atingem o frete mínimo! Continuar?`)) {
-          return;
-        }
+        const ok = await confirmar({
+          title: 'Frete mínimo não atingido',
+          description: `Atenção: as cargas disponíveis para a linha ${String(nroLinha).padStart(3, '0')} não atingem o frete mínimo! Continuar?`,
+          confirmText: 'Continuar',
+          cancelText: 'Cancelar',
+        });
+        if (!ok) return;
       }
 
       setCarregandoNroLinhaHoje(nroLinha);
@@ -5222,7 +5306,7 @@ export function Disponiveis() {
     } finally {
       setCarregandoNroLinhaHoje(null);
     }
-  }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico, linhasHojeStatus]);
+  }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico, linhasHojeStatus, confirmar]);
 
   const carregamentosNaoSimulados = React.useMemo(() => {
     return (carregamentos ?? []).filter((c: any) => !c?.simulado);
@@ -5266,9 +5350,13 @@ export function Disponiveis() {
     try {
       const abaixoMin = possiveis.filter((n) => !(linhasHojeStatus[n]?.atingiuMinFrete ?? true));
       if (abaixoMin.length > 0) {
-        if (!confirm('Atenção: um ou mais carregamentos não atingem o frete mínimo. Continuar?')) {
-          return;
-        }
+        const ok = await confirmar({
+          title: 'Frete mínimo não atingido',
+          description: 'Atenção: um ou mais carregamentos não atingem o frete mínimo. Continuar?',
+          confirmText: 'Continuar',
+          cancelText: 'Cancelar',
+        });
+        if (!ok) return;
       }
 
       setCarregandoTodasLinhasHoje(true);
@@ -5307,7 +5395,7 @@ export function Disponiveis() {
     } finally {
       setCarregandoTodasLinhasHoje(false);
     }
-  }, [carregandoNroLinhaHoje, carregandoTodasLinhasHoje, handleCarregamentoAutomatico, linhasCarregamHojeVisiveis, linhasHojeStatus]);
+  }, [carregandoNroLinhaHoje, carregandoTodasLinhasHoje, handleCarregamentoAutomatico, linhasCarregamHojeVisiveis, linhasHojeStatus, confirmar]);
 
   const handleRemoverCte = useCallback(async (placa: string, seqCte: number) => {
     try {
@@ -6890,6 +6978,8 @@ export function Disponiveis() {
             linhasOrigem={linhasOrigem}
             loadingLinhasOrigem={loadingLinhasOrigem}
             totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
+            confirmar={confirmar}
+            perguntarTexto={perguntarTexto}
             modoApontamento={modoApontamento}
             onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
             onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
@@ -7320,6 +7410,8 @@ export function Disponiveis() {
           )}
         </div>
       ) : null}
+      {confirmarDialog}
+      {perguntarTextoDialog}
     </DashboardLayout>
   );
 }

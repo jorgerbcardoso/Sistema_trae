@@ -178,7 +178,6 @@ export function LancamentosReceitasPage({ period, onBack }: LancamentosReceitasP
 
   const handleDelete = async (lancamento: LancamentoReceita) => {
     if (!confirm('Deseja realmente excluir este lançamento?')) return;
-
     try {
       await deleteLancamentoReceita(lancamento.nro_cte, lancamento.ser_cte);
       toast.success('Lançamento excluído com sucesso!');

@@ -5,6 +5,172 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 import { cn } from "./utils";
 import { buttonVariants } from "./button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog";
+import { Input } from "./input";
+import { Label } from "./label";
+import { Button } from "./button";
+
+type ConfirmDialogOptions = {
+  title: string;
+  description?: React.ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: "default" | "destructive";
+};
+
+type PromptDialogOptions = {
+  title: string;
+  description?: React.ReactNode;
+  label?: string;
+  placeholder?: string;
+  confirmText?: string;
+  cancelText?: string;
+  initialValue?: string;
+};
+
+function useConfirmDialog() {
+  const resolverRef = React.useRef<((value: boolean) => void) | null>(null);
+  const [state, setState] = React.useState<{
+    open: boolean;
+    title: string;
+    description?: React.ReactNode;
+    confirmText: string;
+    cancelText: string;
+    variant: "default" | "destructive";
+  }>({
+    open: false,
+    title: "",
+    description: undefined,
+    confirmText: "Confirmar",
+    cancelText: "Cancelar",
+    variant: "default",
+  });
+
+  const finalize = React.useCallback((value: boolean) => {
+    const r = resolverRef.current;
+    if (r) {
+      resolverRef.current = null;
+      r(value);
+    }
+    setState((s) => (s.open ? { ...s, open: false } : s));
+  }, []);
+
+  const confirm = React.useCallback((opts: ConfirmDialogOptions) => {
+    return new Promise<boolean>((resolve) => {
+      resolverRef.current = resolve;
+      setState({
+        open: true,
+        title: opts.title,
+        description: opts.description,
+        confirmText: opts.confirmText ?? "Confirmar",
+        cancelText: opts.cancelText ?? "Cancelar",
+        variant: opts.variant ?? "default",
+      });
+    });
+  }, []);
+
+  const dialog = (
+    <AlertDialog open={state.open} onOpenChange={(open) => { if (!open) finalize(false); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{state.title}</AlertDialogTitle>
+          {state.description ? (
+            <AlertDialogDescription>
+              <div className="whitespace-pre-line">{state.description}</div>
+            </AlertDialogDescription>
+          ) : null}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => finalize(false)}>{state.cancelText}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => finalize(true)}
+            className={state.variant === "destructive" ? "bg-red-600 hover:bg-red-700 text-white" : undefined}
+          >
+            {state.confirmText}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  return { confirm, dialog };
+}
+
+function usePromptDialog() {
+  const resolverRef = React.useRef<((value: string | null) => void) | null>(null);
+  const [state, setState] = React.useState<{
+    open: boolean;
+    title: string;
+    description?: React.ReactNode;
+    label: string;
+    placeholder: string;
+    confirmText: string;
+    cancelText: string;
+  }>({
+    open: false,
+    title: "",
+    description: undefined,
+    label: "Valor",
+    placeholder: "",
+    confirmText: "Confirmar",
+    cancelText: "Cancelar",
+  });
+  const [value, setValue] = React.useState("");
+
+  const finalize = React.useCallback((v: string | null) => {
+    const r = resolverRef.current;
+    if (r) {
+      resolverRef.current = null;
+      r(v);
+    }
+    setState((s) => (s.open ? { ...s, open: false } : s));
+  }, []);
+
+  const prompt = React.useCallback((opts: PromptDialogOptions) => {
+    return new Promise<string | null>((resolve) => {
+      resolverRef.current = resolve;
+      setValue(opts.initialValue ?? "");
+      setState({
+        open: true,
+        title: opts.title,
+        description: opts.description,
+        label: opts.label ?? "Valor",
+        placeholder: opts.placeholder ?? "",
+        confirmText: opts.confirmText ?? "Confirmar",
+        cancelText: opts.cancelText ?? "Cancelar",
+      });
+    });
+  }, []);
+
+  const canConfirm = value.trim().length > 0;
+
+  const dialog = (
+    <Dialog open={state.open} onOpenChange={(open) => { if (!open) finalize(null); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{state.title}</DialogTitle>
+          {state.description ? <DialogDescription>{state.description}</DialogDescription> : null}
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label>{state.label}</Label>
+          <Input
+            autoFocus
+            value={value}
+            placeholder={state.placeholder}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && canConfirm) finalize(value); if (e.key === "Escape") finalize(null); }}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => finalize(null)}>{state.cancelText}</Button>
+          <Button onClick={() => finalize(value)} disabled={!canConfirm}>{state.confirmText}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return { prompt, dialog };
+}
 
 function AlertDialog({
   ...props
@@ -154,4 +320,8 @@ export {
   AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  useConfirmDialog,
+  usePromptDialog,
 };
+
+export type { ConfirmDialogOptions, PromptDialogOptions };

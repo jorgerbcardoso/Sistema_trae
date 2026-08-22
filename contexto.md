@@ -69,6 +69,12 @@ PADRÕES DE CÓDIGO CRÍTICOS:
    - Botão de ação principal (Aplicar, Salvar, etc.): usar `bg-indigo-600 hover:bg-indigo-700`
    - Ícone de loading (Loader2): usar `text-slate-400` sem cor específica forte
 
+5. DIALOGS (CONFIRMAÇÃO / PERGUNTA) — REGRA OBRIGATÓRIA:
+   - NÃO usar `alert()`, `confirm()`, `prompt()` (nem `window.alert/confirm/prompt`) em telas novas.
+   - Para confirmações e perguntas, usar dialogs estilizados com as funções padrão:
+     - `useConfirmDialog()` e `usePromptDialog()` exportados de `src/components/ui/alert-dialog.tsx`
+   - Para avisos/erros informativos (sem pergunta), usar `toast` (sonner).
+
 
 PADRÃO PARA TELAS COM FILTROS (DIALOG):
 
