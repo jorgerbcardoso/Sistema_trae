@@ -7,7 +7,7 @@ import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
@@ -3692,12 +3692,40 @@ function CarregamentoArea({
     return m;
   }, [ultimosDias, calNorm]);
 
+  const calDailySeries = React.useMemo(() => {
+    return ultimosDias.map((d) => {
+      let frete = 0;
+      let freteTer = 0;
+      let merc = 0;
+      let peso = 0;
+      let cub = 0;
+      for (const x of calNorm) {
+        if (!isPresentOnDay(x as any, d)) continue;
+        const c = (x as any).c as Carregamento;
+        frete += Number(c.total_frete ?? 0) || 0;
+        freteTer += Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+        merc += Number(c.total_mercadoria ?? 0) || 0;
+        peso += Number(c.total_peso ?? 0) || 0;
+        cub += Number(c.total_cubagem ?? 0) || 0;
+      }
+      return {
+        iso: d,
+        label: d === hojeKey ? 'HOJE' : fmtDiaBr(d),
+        frete,
+        freteTer,
+        merc,
+        peso,
+        cub,
+      };
+    });
+  }, [ultimosDias, calNorm, hojeKey]);
+
   type CalSortCol =
     | 'placa'
-    | 'linha'
     | 'destino'
-    | 'inter'
     | 'frete'
+    | 'frete_ter'
+    | 'frete_ter_pct'
     | 'merc'
     | 'peso'
     | 'cub'
@@ -3709,6 +3737,44 @@ function CarregamentoArea({
   const [calSortDir, setCalSortDir] = useState<'asc' | 'desc'>('desc');
   const [calPage, setCalPage] = useState(1);
   const pageSize = 10;
+  const [calDetalheOpen, setCalDetalheOpen] = useState(false);
+  const [calDetalheItem, setCalDetalheItem] = useState<Carregamento | null>(null);
+  const [calCtesOpen, setCalCtesOpen] = useState(false);
+  const [calCtesLoading, setCalCtesLoading] = useState(false);
+  const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
+  const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
+  const [calVolMode, setCalVolMode] = useState<'peso' | 'cub' | 'merc' | 'todas'>('todas');
+
+  const abrirDetalheCarregamento = (c: Carregamento) => {
+    setCalDetalheItem(c);
+    setCalDetalheOpen(true);
+  };
+
+  const abrirCtesCarregamento = async (placa: string) => {
+    const p = String(placa ?? '').trim().toUpperCase();
+    if (!p) return;
+    setCalCtesOpen(true);
+    setCalCtesLista([]);
+    setCalCtesTotais(null);
+    setCalCtesLoading(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ placa: p }) },
+        true
+      );
+      if (res?.success) {
+        setCalCtesLista(res.ctes ?? []);
+        setCalCtesTotais(res.totais ?? null);
+      } else {
+        toast.error(res?.message || 'Erro ao carregar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar CT-es');
+    } finally {
+      setCalCtesLoading(false);
+    }
+  };
 
   useEffect(() => {
     setCalPage(1);
@@ -3726,6 +3792,15 @@ function CarregamentoArea({
   const fmtNum = (n: number, dec: number) =>
     (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
+  const fmtCompact = (v: number) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '0';
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${Math.round(n / 1_000)}k`;
+    return String(Math.round(n));
+  };
+
   const dtLabel = (dateKey: string, timeVal: any): string => {
     const k = toKey(dateKey);
     if (!k) return '';
@@ -3739,8 +3814,13 @@ function CarregamentoArea({
     const getStr = (v: any) => String(v ?? '').trim().toUpperCase();
     const getNum = (c: Carregamento): number => {
       switch (calSortCol) {
-        case 'linha': return Number(c.nro_linha ?? 0) || 0;
         case 'frete': return Number(c.total_frete ?? 0) || 0;
+        case 'frete_ter': return Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+        case 'frete_ter_pct': {
+          const total = Number(c.total_frete ?? 0) || 0;
+          const ter = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+          return total > 0 ? (ter / total) * 100 : 0;
+        }
         case 'merc': return Number(c.total_mercadoria ?? 0) || 0;
         case 'peso': return Number(c.total_peso ?? 0) || 0;
         case 'cub': return Number(c.total_cubagem ?? 0) || 0;
@@ -3768,10 +3848,8 @@ function CarregamentoArea({
     const copy = [...calItemsDia];
     copy.sort((a, b) => {
       if (calSortCol === 'placa') return dir * getStr(a.placa_provisoria).localeCompare(getStr(b.placa_provisoria));
-      if (calSortCol === 'linha') return dir * (getNum(a) - getNum(b));
       if (calSortCol === 'destino') return dir * getStr(a.destino).localeCompare(getStr(b.destino));
-      if (calSortCol === 'inter') return dir * getStr(a.paradas).localeCompare(getStr(b.paradas));
-      if (calSortCol === 'frete' || calSortCol === 'merc' || calSortCol === 'peso' || calSortCol === 'cub' || calSortCol === 'inicio' || calSortCol === 'fim' || calSortCol === 'tempo') {
+      if (calSortCol === 'frete' || calSortCol === 'frete_ter' || calSortCol === 'frete_ter_pct' || calSortCol === 'merc' || calSortCol === 'peso' || calSortCol === 'cub' || calSortCol === 'inicio' || calSortCol === 'fim' || calSortCol === 'tempo') {
         return dir * (getNum(a) - getNum(b));
       }
       return 0;
@@ -3783,12 +3861,13 @@ function CarregamentoArea({
     return calSorted.reduce(
       (acc, c) => {
         acc.frete += Number(c.total_frete ?? 0) || 0;
+        acc.freteTer += Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
         acc.merc += Number(c.total_mercadoria ?? 0) || 0;
         acc.peso += Number(c.total_peso ?? 0) || 0;
         acc.cub += Number(c.total_cubagem ?? 0) || 0;
         return acc;
       },
-      { frete: 0, merc: 0, peso: 0, cub: 0 }
+      { frete: 0, freteTer: 0, merc: 0, peso: 0, cub: 0 }
     );
   }, [calSorted]);
 
@@ -3808,7 +3887,7 @@ function CarregamentoArea({
     if (calSortCol === col) setCalSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
       setCalSortCol(col);
-      setCalSortDir(col === 'placa' || col === 'linha' || col === 'destino' || col === 'inter' ? 'asc' : 'desc');
+      setCalSortDir(col === 'placa' || col === 'destino' ? 'asc' : 'desc');
     }
   };
 
@@ -3884,16 +3963,19 @@ function CarregamentoArea({
                   <span>Registros: <span className="font-mono font-semibold">{calSorted.length}</span></span>
                 </div>
               </div>
+              <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] text-slate-600 dark:text-slate-300">
+                Clique sobre o carregamento para detalhes
+              </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-[11px]">
                   <thead>
                     <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                       <th className="px-3 py-2 text-left"><CalTh col="placa">Placa</CalTh></th>
-                      <th className="px-3 py-2 text-left min-w-[280px]"><CalTh col="linha">Linha</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="destino">Destino</CalTh></th>
-                      <th className="px-3 py-2 text-left"><CalTh col="inter">Intermediárias</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Frete Ter.</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter_pct" align="right">% Ter.</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="merc" align="right">Mercadoria</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="peso" align="right">Peso</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="cub" align="right">Cubagem</CalTh></th>
@@ -3915,21 +3997,29 @@ function CarregamentoArea({
                       const end = fimTs ?? Date.now();
                       const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
                       const isFinalizado = !!fimK;
-                      const linhaNum = Number(c.nro_linha ?? 0) || 0;
-                      const linhaNome = String(c.linha_nome ?? '').trim();
-                      const linhaLabel = linhaNum > 0 ? `${String(linhaNum).padStart(3, '0')}${linhaNome ? ` - ${linhaNome}` : ''}` : '-';
+                      const freteTotal = Number(c.total_frete ?? 0) || 0;
+                      const freteTer = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+                      const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
+                      const pctClass = pctTer < 30
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : pctTer <= 60
+                          ? 'text-yellow-700 dark:text-yellow-400'
+                          : pctTer <= 80
+                            ? 'text-orange-700 dark:text-orange-400'
+                            : 'text-red-700 dark:text-red-400';
                       return (
                         <tr
                           key={c.placa_provisoria}
-                          className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
+                          className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50 cursor-pointer ${
                             isFinalizado ? 'bg-emerald-50/60 dark:bg-emerald-950/15' : 'bg-red-50/60 dark:bg-red-950/15'
                           }`}
+                          onClick={() => abrirDetalheCarregamento(c)}
                         >
                           <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{String(c.placa_provisoria ?? '').toUpperCase()}</td>
-                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap max-w-[360px] truncate" title={linhaLabel}>{linhaLabel}</td>
                           <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
-                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={String(c.paradas ?? '')}>{String(c.paradas ?? '') || '-'}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_frete ?? 0) || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTotal)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTer)}</td>
+                          <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_mercadoria ?? 0) || 0)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</td>
@@ -3942,8 +4032,12 @@ function CarregamentoArea({
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700">
-                      <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200" colSpan={4}>Total</td>
+                      <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200" colSpan={2}>Total</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.frete)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.freteTer)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {calTotals.frete > 0 ? `${Math.max(0, Math.min((calTotals.freteTer / calTotals.frete) * 100, 999)).toFixed(0)}%` : '—'}
+                      </td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.merc)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.peso, 2)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.cub, 3)}</td>
@@ -3952,6 +4046,179 @@ function CarregamentoArea({
                   </tfoot>
                 </table>
               </div>
+
+              <Dialog
+                open={calDetalheOpen}
+                onOpenChange={(v) => {
+                  setCalDetalheOpen(v);
+                  if (!v) setCalDetalheItem(null);
+                }}
+              >
+                <DialogContent className="sm:max-w-[760px]">
+                  <DialogHeader>
+                    <DialogTitle>Carregamento {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}</DialogTitle>
+                    <DialogDescription>Detalhes do carregamento selecionado</DialogDescription>
+                  </DialogHeader>
+                  {(() => {
+                    const c = calDetalheItem;
+                    if (!c) return null;
+                    const iniK = toKey(c.data_criacao);
+                    const fimK = toKey(c.data_finalizacao);
+                    const iniTs = toTs(iniK, c.hora_criacao);
+                    const fimTs = fimK ? toTs(fimK, c.hora_finalizacao) : null;
+                    const end = fimTs ?? Date.now();
+                    const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
+                    const freteTotal = Number(c.total_frete ?? 0) || 0;
+                    const freteTer = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+                    const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
+                    const pctClass = pctTer < 30
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : pctTer <= 60
+                        ? 'text-yellow-700 dark:text-yellow-400'
+                        : pctTer <= 80
+                          ? 'text-orange-700 dark:text-orange-400'
+                          : 'text-red-700 dark:text-red-400';
+                    const linhaNum = Number(c.nro_linha ?? 0) || 0;
+                    const linhaNome = String(c.linha_nome ?? '').trim();
+                    const linhaLabel = linhaNum > 0 ? `${String(linhaNum).padStart(3, '0')}${linhaNome ? ` - ${linhaNome}` : ''}` : '-';
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={fimK ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}>
+                            {fimK ? 'Finalizado' : 'Em andamento'}
+                          </Badge>
+                          {String(c.origem_criacao ?? '').trim() ? (
+                            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                              Origem: {String(c.origem_criacao ?? '').trim()}
+                            </Badge>
+                          ) : null}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Linha</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200 truncate" title={linhaLabel}>{linhaLabel}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Destino</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{String(c.destino ?? '').toUpperCase() || '-'}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 sm:col-span-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Paradas (intermediárias)</div>
+                            <div className="text-sm font-mono text-slate-700 dark:text-slate-200 break-words">{String(c.paradas ?? '') || '—'}</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Frete total (R$)</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(freteTotal)}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Frete Ter. (R$)</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(freteTer)}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">% Ter.</div>
+                            <div className={`text-sm font-mono font-semibold ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Mercadoria (R$)</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(Number(c.total_mercadoria ?? 0) || 0)}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Peso (kg)</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Cubagem (m³)</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Início</div>
+                            <div className="text-sm font-mono text-slate-800 dark:text-slate-200">{iniK ? dtLabel(iniK, c.hora_criacao) : '—'}</div>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Fim</div>
+                            <div className="text-sm font-mono text-slate-800 dark:text-slate-200">{fimK ? dtLabel(fimK, c.hora_finalizacao) : '—'}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-slate-600 dark:text-slate-300">
+                            Tempo: <span className="font-mono font-semibold">{durMin != null ? fmtDuracao(durMin) : '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''))}>
+                              Ver CT-es
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setCalDetalheOpen(false)}>
+                              Fechar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={calCtesOpen} onOpenChange={setCalCtesOpen}>
+                <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+                  <DialogHeader>
+                    <DialogTitle>CT-es · Carregamento {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}</DialogTitle>
+                    <DialogDescription>Lista de CT-es envolvidos no carregamento</DialogDescription>
+                  </DialogHeader>
+                  <div className="min-h-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                      <span>CTRC</span>
+                      <span>Carr.</span>
+                      <span>Emissão</span>
+                      <span>Prev. Entr.</span>
+                      <span>Dest.</span>
+                      <span>Pagador</span>
+                      <span className="text-right">Frete (R$)</span>
+                      <span className="text-right">Peso (Kg)</span>
+                      <span className="text-right">Cub. (m³)</span>
+                    </div>
+                    <div className="min-h-0 overflow-y-auto">
+                      {calCtesLoading ? (
+                        <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Carregando CT-es...
+                        </div>
+                      ) : calCtesLista.length === 0 ? (
+                        <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 text-center">—</div>
+                      ) : calCtesLista.map((cte: any, idx: number) => (
+                        <div key={`${cte.seq_cte ?? idx}-${idx}`} className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[11px] border-b border-slate-100 dark:border-slate-800">
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{cte.ctrc}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
+                          <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
+                          <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{Number(cte.vlr_frete ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{Number(cte.peso ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{Number(cte.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {calCtesTotais && (
+                      <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                        <span className="text-slate-600 dark:text-slate-300">Total</span>
+                        <span className="text-slate-500 dark:text-slate-400">{calCtesLista.length} CT-es</span>
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                        <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{Number(calCtesTotais.vlr_frete ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-right font-mono">{Number(calCtesTotais.peso ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-right font-mono">{Number(calCtesTotais.cubagem ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between gap-3">
                 <div className="text-[11px] text-slate-600 dark:text-slate-300">
@@ -3964,6 +4231,105 @@ function CarregamentoArea({
                   <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" disabled={calPageSafe >= totalPages} onClick={() => setCalPage((p) => Math.min(totalPages, p + 1))}>
                     Próxima
                   </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Frete diário</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">30 dias</div>
+                </div>
+                <div className="h-[200px] p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={calDailySeries} margin={{ top: 10, right: 18, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                      <XAxis dataKey="label" interval="preserveStartEnd" />
+                      <YAxis tickFormatter={(v) => fmtCompact(Number(v))} />
+                      <RechartsTooltip
+                        formatter={(v: any, name: any) => [fmtMoney(Number(v)), String(name)]}
+                        labelFormatter={(l: any) => `Dia ${String(l || '')}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Line type="monotone" dataKey="frete" name="Frete total" stroke="#4f46e5" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="freteTer" name="Frete Ter." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Volume diário</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={calVolMode === 'peso' ? 'default' : 'outline'}
+                      className={calVolMode === 'peso' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
+                      onClick={() => setCalVolMode('peso')}
+                    >
+                      Peso (Kg)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={calVolMode === 'cub' ? 'default' : 'outline'}
+                      className={calVolMode === 'cub' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
+                      onClick={() => setCalVolMode('cub')}
+                    >
+                      Cubagem (m³)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={calVolMode === 'merc' ? 'default' : 'outline'}
+                      className={calVolMode === 'merc' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
+                      onClick={() => setCalVolMode('merc')}
+                    >
+                      Valor Merc. (R$)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={calVolMode === 'todas' ? 'default' : 'outline'}
+                      className={calVolMode === 'todas' ? 'h-7 px-2 text-[11px] bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200' : 'h-7 px-2 text-[11px] dark:border-slate-700'}
+                      onClick={() => setCalVolMode('todas')}
+                    >
+                      Todas
+                    </Button>
+                  </div>
+                </div>
+                <div className="h-[220px] p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={calDailySeries} margin={{ top: 10, right: 18, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                      <XAxis dataKey="label" interval="preserveStartEnd" />
+                      <YAxis tickFormatter={(v) => fmtCompact(Number(v))} />
+                      <RechartsTooltip
+                        formatter={(v: any, name: any) => {
+                          const n = Number(v);
+                          const key = String(name || '');
+                          if (key === 'Valor Merc.') return [fmtMoney(n), key];
+                          if (key === 'Cubagem') return [fmtNum(n, 3), `${key} (m³)`];
+                          if (key === 'Peso') return [fmtNum(n, 2), `${key} (Kg)`];
+                          return [String(v ?? ''), key];
+                        }}
+                        labelFormatter={(l: any) => `Dia ${String(l || '')}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {(calVolMode === 'peso' || calVolMode === 'todas') && (
+                        <Line type="monotone" dataKey="peso" name="Peso" stroke="#7c3aed" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                      {(calVolMode === 'cub' || calVolMode === 'todas') && (
+                        <Line type="monotone" dataKey="cub" name="Cubagem" stroke="#2563eb" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                      {(calVolMode === 'merc' || calVolMode === 'todas') && (
+                        <Line type="monotone" dataKey="merc" name="Valor Merc." stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
