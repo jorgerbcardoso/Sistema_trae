@@ -2054,27 +2054,14 @@ function CardCarregamento({
     return null;
   })();
 
+  const carregamentoIniciado = !Boolean((carregamento as any).simulado) && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
+
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
-          <div className="flex flex-col items-start gap-1 shrink-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
-              <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
-            </div>
-            {carregamento.seq_carregamento ? (
-              <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono w-fit">
-                #{carregamento.seq_carregamento}
-              </Badge>
-            ) : null}
-            {origemTag ? (
-              <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit`}>{origemTag.label}</Badge>
-            ) : null}
-            {!!(carregamento as any).simulado ? (
-              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2 w-fit">
-                Simulado
-              </Badge>
-            ) : null}
+          <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
+            <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
           </div>
 
           <div className="min-w-0">
@@ -2092,6 +2079,11 @@ function CardCarregamento({
               </div>
             ) : (
               <div className="flex items-center gap-1 group min-w-0">
+                {carregamento.seq_carregamento ? (
+                  <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono shrink-0">
+                    #{carregamento.seq_carregamento}
+                  </Badge>
+                ) : null}
                 <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
                 <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500 shrink-0" title="Editar placa">
                   <Pencil className="w-3 h-3" />
@@ -2106,13 +2098,19 @@ function CardCarregamento({
             </Badge>
           </div>
 
-          <div className="col-start-2 col-span-2 min-w-0">
+          <div className="row-start-2 col-start-1">
+            {origemTag ? (
+              <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit`}>{origemTag.label}</Badge>
+            ) : null}
+          </div>
+
+          <div className="row-start-2 col-start-2 col-span-2 min-w-0">
             {infoCriacao ? (
               <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{infoCriacao}</p>
             ) : (
               <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
             )}
-            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
                 ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
@@ -2120,6 +2118,14 @@ function CardCarregamento({
               }
             </div>
           </div>
+
+          {!!(carregamento as any).simulado ? (
+            <div className="row-start-3 col-start-1">
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2 w-fit">
+                Simulado
+              </Badge>
+            </div>
+          ) : null}
         </div>
 
         {editandoCapacidade && (
@@ -2202,7 +2208,13 @@ function CardCarregamento({
 
         <div className="grid grid-cols-3 gap-1.5">
           {!ativo ? (
-            <Button size="sm" className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs" onClick={() => onIniciarApontamento(carregamento.placa_provisoria)} title="Apontar CT-es neste carregamento">
+            <Button
+              size="sm"
+              className={carregamentoIniciado ? 'h-8 bg-slate-300 hover:bg-slate-300 text-slate-600 text-xs' : 'h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs'}
+              onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}
+              title="Apontar CT-es neste carregamento"
+              disabled={carregamentoIniciado}
+            >
               <CheckSquare className="w-3.5 h-3.5 mr-1" />Apont.
             </Button>
           ) : (
@@ -2228,9 +2240,13 @@ function CardCarregamento({
           <Button
             size="sm"
             variant="outline"
-            className={`h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`}
+            className={
+              carregamentoIniciado
+                ? 'h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                : `h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`
+            }
             onClick={() => onCarregarHub(carregamento)}
-            disabled={loadingHub}
+            disabled={loadingHub || carregamentoIniciado}
             title="Completar carregamento com CT-es via Hub"
           >
             {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria

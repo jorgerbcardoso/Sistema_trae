@@ -297,7 +297,7 @@ if ($acao === 'iniciar_simulacao') {
               nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
              VALUES
              (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME,
-              0, \$5, \$6, NULL, 'MANUAL', \$7)",
+              0, \$5, \$6, NULL, 'AUTO', \$7)",
             [$unidade, $seqCarreg, $placaNova, $login, $destinoCarreg, $unidadesCarreg, $unidade],
             $conn
         );
