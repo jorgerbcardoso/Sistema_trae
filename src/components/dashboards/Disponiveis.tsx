@@ -3701,6 +3701,8 @@ function CarregamentoArea({
       let merc = 0;
       let peso = 0;
       let cub = 0;
+      let totalDurMin = 0;
+      let countDur = 0;
       for (const x of calNorm) {
         if (!isPresentOnDay(x as any, d)) continue;
         const c = (x as any).c as Carregamento;
@@ -3710,6 +3712,28 @@ function CarregamentoArea({
         peso += Number(c.total_peso ?? 0) || 0;
         cub += Number(c.total_cubagem ?? 0) || 0;
       }
+
+      for (const x of calNorm) {
+        const iniKey = (x as any).iniKey as string;
+        if (!iniKey || iniKey !== d) continue;
+        const c = (x as any).c as Carregamento;
+        const iniTs = toTs(d, (c as any).hora_criacao);
+        if (iniTs == null) continue;
+        const fimKey = (x as any).fimKey as string;
+        const fimTs = fimKey ? toTs(fimKey, (c as any).hora_finalizacao) : null;
+        let endTs: number;
+        if (fimTs != null && fimTs > 0) endTs = fimTs;
+        else if (d < hojeKey) {
+          const m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          endTs = m ? new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 23, 59, 59, 0).getTime() : Date.now();
+        } else endTs = Date.now();
+
+        const durMin = Math.max(0, Math.round((endTs - iniTs) / 60000));
+        totalDurMin += durMin;
+        countDur += 1;
+      }
+
+      const avgTempoMin = countDur > 0 ? totalDurMin / countDur : null;
       return {
         iso: d,
         label: d === hojeKey ? 'HOJE' : fmtDiaBr(d),
@@ -3718,6 +3742,7 @@ function CarregamentoArea({
         merc,
         peso,
         cub,
+        avgTempoMin,
       };
     });
   }, [ultimosDias, calNorm, hojeKey]);
@@ -4316,6 +4341,42 @@ function CarregamentoArea({
                       {calVolMode === 'merc' && (
                         <Line type="monotone" dataKey="merc" name="Valor Merc." stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">Tempo médio de carregamento</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">por dia</div>
+                </div>
+                <div className="h-[200px] p-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={calDailySeries} margin={{ top: 10, right: 18, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} />
+                      <XAxis dataKey="label" interval="preserveStartEnd" />
+                      <YAxis tickFormatter={(v) => fmtDuracao(Math.round(Number(v) || 0))} />
+                      <RechartsTooltip
+                        contentStyle={tooltipStyle as any}
+                        formatter={(v: any) => {
+                          const n = Number(v);
+                          if (!Number.isFinite(n)) return ['—', 'Tempo médio'];
+                          return [fmtDuracao(Math.round(n)), 'Tempo médio'];
+                        }}
+                        labelFormatter={(l: any) => `Dia ${String(l || '')}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="avgTempoMin"
+                        name="Tempo médio"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls={false}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
