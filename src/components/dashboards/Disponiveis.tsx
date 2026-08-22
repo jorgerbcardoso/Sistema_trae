@@ -2057,67 +2057,67 @@ function CardCarregamento({
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
+          <div className="flex flex-col items-start gap-1 shrink-0">
             <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
               <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
             </div>
-            <div className="min-w-0">
-              {editandoPlaca ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    autoFocus
-                    className="font-bold font-mono text-sm w-28 rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                    value={novaPlaca}
-                    onChange={e => setNovaPlaca(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === 'Enter') handleSalvarPlaca(); if (e.key === 'Escape') setEditandoPlaca(false); }}
-                  />
-                  <button onClick={handleSalvarPlaca} disabled={salvandoEdicao} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-50"><CheckSquare className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setEditandoPlaca(false)} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 group">
-                  {carregamento.seq_carregamento ? (
-                    <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono">
-                      #{carregamento.seq_carregamento}
-                    </Badge>
-                  ) : null}
-                  <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
-                  {origemTag && (
-                    <Badge className={`${origemTag.className} text-[10px] h-5 px-2`}>{origemTag.label}</Badge>
-                  )}
-                  {!!(carregamento as any).simulado && (
-                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2">
-                      Simulado
-                    </Badge>
-                  )}
-                  <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" title="Editar placa">
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
+            {carregamento.seq_carregamento ? (
+              <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono w-fit">
+                #{carregamento.seq_carregamento}
+              </Badge>
+            ) : null}
+            {origemTag ? (
+              <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit`}>{origemTag.label}</Badge>
+            ) : null}
+            {!!(carregamento as any).simulado ? (
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2 w-fit">
+                Simulado
+              </Badge>
+            ) : null}
           </div>
+
+          <div className="min-w-0">
+            {editandoPlaca ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  className="font-bold font-mono text-sm w-36 rounded border border-indigo-300 dark:border-indigo-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  value={novaPlaca}
+                  onChange={e => setNovaPlaca(e.target.value.toUpperCase())}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSalvarPlaca(); if (e.key === 'Escape') setEditandoPlaca(false); }}
+                />
+                <button onClick={handleSalvarPlaca} disabled={salvandoEdicao} className="text-emerald-500 hover:text-emerald-600 disabled:opacity-50"><CheckSquare className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setEditandoPlaca(false)} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 group min-w-0">
+                <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
+                <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500 shrink-0" title="Editar placa">
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-1.5 shrink-0 justify-end">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
           </div>
-          <div className="col-span-2 flex gap-2 min-w-0">
-            <div className="w-8 shrink-0" />
-            <div className="min-w-0 flex-1">
-              {infoCriacao ? (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{infoCriacao}</p>
-              ) : (
-                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
-              )}
-              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
-                {unidadesDestinoTexto
-                  ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
-                  : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
-                }
-              </div>
+
+          <div className="col-start-2 col-span-2 min-w-0">
+            {infoCriacao ? (
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{infoCriacao}</p>
+            ) : (
+              <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
+            )}
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
+              {unidadesDestinoTexto
+                ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
+                : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
+              }
             </div>
           </div>
         </div>
@@ -3910,6 +3910,9 @@ function CarregamentoArea({
   const fmtMoney = (n: number) =>
     (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  const fmtMoneySemSimbolo = (n: number) =>
+    (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const fmtNum = (n: number, dec: number) =>
     (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
@@ -3927,6 +3930,13 @@ function CarregamentoArea({
     if (!k) return '';
     const h = fmtHora(k, timeVal);
     return `${fmtDiaBrAno(k)}${h ? ` ${h}` : ''}`;
+  };
+
+  const dtLabelSemAno = (dateKey: string, timeVal: any): string => {
+    const k = toKey(dateKey);
+    if (!k) return '';
+    const h = fmtHora(k, timeVal);
+    return `${fmtDiaBr(k)}${h ? ` ${h}` : ''}`;
   };
 
   const calSorted = React.useMemo(() => {
@@ -4094,10 +4104,10 @@ function CarregamentoArea({
                     <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                       <th className="px-3 py-2 text-left"><CalTh col="placa">Placa</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="destino">Destino</CalTh></th>
-                      <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete</CalTh></th>
-                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Frete Ter.</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete (R$)</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Frete Ter. (R$)</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="frete_ter_pct" align="right">% Ter.</CalTh></th>
-                      <th className="px-3 py-2 text-right"><CalTh col="merc" align="right">Mercadoria</CalTh></th>
+                      <th className="px-3 py-2 text-right"><CalTh col="merc" align="right">Mercadoria (R$)</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="peso" align="right">Peso</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="cub" align="right">Cubagem</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="inicio">Início</CalTh></th>
@@ -4140,21 +4150,21 @@ function CarregamentoArea({
                             <div className="flex items-center gap-2">
                               {(c as any).seq_carregamento ? (
                                 <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                                  #{(c as any).seq_carregamento}
+                                  {String((c as any).seq_carregamento).padStart(6, '0')}
                                 </span>
                               ) : null}
                               <span>{String(c.placa_provisoria ?? '').toUpperCase()}</span>
                             </div>
                           </td>
                           <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTotal)}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(freteTer)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTotal)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTer)}</td>
                           <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoney(Number(c.total_mercadoria ?? 0) || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(Number(c.total_mercadoria ?? 0) || 0)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</td>
-                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{iniK ? dtLabel(iniK, c.hora_criacao) : ''}</td>
-                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabel(fimK, c.hora_finalizacao) : ''}</td>
+                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{iniK ? dtLabelSemAno(iniK, c.hora_criacao) : ''}</td>
+                          <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabelSemAno(fimK, c.hora_finalizacao) : ''}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
                         </tr>
                       );
@@ -4163,12 +4173,12 @@ function CarregamentoArea({
                   <tfoot>
                     <tr className="bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700">
                       <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200" colSpan={2}>Total</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.frete)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.freteTer)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.frete)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.freteTer)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         {calTotals.frete > 0 ? `${Math.max(0, Math.min((calTotals.freteTer / calTotals.frete) * 100, 999)).toFixed(0)}%` : '—'}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoney(calTotals.merc)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.merc)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.peso, 2)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.cub, 3)}</td>
                       <td className="px-3 py-2" colSpan={3} />
