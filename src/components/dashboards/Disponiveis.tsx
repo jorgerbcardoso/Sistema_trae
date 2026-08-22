@@ -1711,6 +1711,7 @@ function CardCarregamento({
   loadingHub,
   hubCarregamentoPlaca,
   onRecarregarCarregamentos,
+  onImportarCarregamentos,
   importandoCarregamentos,
 }: {
   carregamento: Carregamento;
@@ -1725,6 +1726,7 @@ function CardCarregamento({
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
+  onImportarCarregamentos: () => Promise<any>;
   importandoCarregamentos: boolean;
 }) {
   const [editandoPlaca, setEditandoPlaca] = useState(false);
@@ -1774,7 +1776,7 @@ function CardCarregamento({
       if (res?.success) {
         toast.success(`Carregamento ${placa} iniciado no modo TMS.`);
         setIniciarDialogOpen(false);
-        await onRecarregarCarregamentos();
+        await onImportarCarregamentos();
       } else {
         toast.error(res?.message || 'Erro ao iniciar carregamento.');
       }
@@ -2054,10 +2056,19 @@ function CardCarregamento({
     return null;
   })();
 
-  const carregamentoIniciado = !Boolean((carregamento as any).simulado) && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
+  const isSimulado = Boolean((carregamento as any).simulado);
+  const carregamentoIniciado = !isSimulado && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
+
+  const bordaCardClass = ativo
+    ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30'
+    : isSimulado
+      ? 'border-emerald-400 dark:border-emerald-600'
+      : carregamentoIniciado
+        ? 'border-indigo-300 dark:border-indigo-800 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/30'
+        : 'border-slate-200 dark:border-slate-700';
 
   return (
-    <div className={`rounded-xl border-2 transition-all duration-200 ${ativo ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 overflow-hidden`}>
+    <div className={`rounded-xl border-2 transition-all duration-200 ${bordaCardClass} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
           <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
@@ -4617,6 +4628,7 @@ function CarregamentoArea({
                 loadingHub={loadingHub}
                 hubCarregamentoPlaca={hubCarregamentoPlaca}
                 onRecarregarCarregamentos={onRecarregarCarregamentos}
+                onImportarCarregamentos={onImportarCarregamentos}
                 importandoCarregamentos={importandoCarregamentos}
               />
             ))}
