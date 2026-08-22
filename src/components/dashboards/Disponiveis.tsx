@@ -2101,23 +2101,6 @@ function CardCarregamento({
               </div>
             )}
 
-            <div className="mt-1 flex items-center gap-2 min-w-0">
-              {origemTag ? (
-                <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit shrink-0`}>{origemTag.label}</Badge>
-              ) : null}
-              {infoCriacao ? (
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap truncate">
-                  {infoCriacao}
-                  {isSimulado ? <span className="text-emerald-600 dark:text-emerald-400 font-semibold"> · simulação</span> : null}
-                </p>
-              ) : (
-                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic whitespace-nowrap truncate">
-                  Sem CT-es
-                  {isSimulado ? <span className="text-emerald-600 dark:text-emerald-400 font-semibold not-italic"> · simulação</span> : null}
-                </p>
-              )}
-            </div>
-
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap mt-0.5">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
@@ -2131,6 +2114,20 @@ function CardCarregamento({
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
+          </div>
+
+          <div className="col-span-2 mt-1 flex items-center gap-2 min-w-0">
+            {origemTag ? (
+              <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit shrink-0`}>{origemTag.label}</Badge>
+            ) : null}
+            <p className={`text-[10px] whitespace-nowrap truncate min-w-0 flex-1 ${infoCriacao ? 'text-slate-400 dark:text-slate-500' : 'text-slate-300 dark:text-slate-600 italic'}`}>
+              {infoCriacao ?? 'Sem CT-es'}
+            </p>
+            {isSimulado ? (
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                simulação
+              </span>
+            ) : null}
           </div>
         </div>
 
