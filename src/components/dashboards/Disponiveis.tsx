@@ -2070,11 +2070,7 @@ function CardCarregamento({
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${bordaCardClass} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
-          <div className={`p-1.5 rounded-lg shrink-0 ${ativo ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
-            <Truck className={`w-4 h-4 ${ativo ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`} />
-          </div>
-
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
           <div className="min-w-0">
             {editandoPlaca ? (
               <div className="flex items-center gap-1">
@@ -2089,39 +2085,40 @@ function CardCarregamento({
                 <button onClick={() => setEditandoPlaca(false)} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
               </div>
             ) : (
-              <div className="flex items-center gap-1 group min-w-0">
+              <div className="flex items-center gap-1.5 group min-w-0">
+                <Badge className={`min-w-0 max-w-full h-6 px-2 text-xs font-mono inline-flex items-center gap-1 ${ativo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                  <Truck className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{carregamento.placa_provisoria}</span>
+                </Badge>
                 {carregamento.seq_carregamento ? (
                   <Badge className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] h-5 px-2 font-mono shrink-0">
                     #{carregamento.seq_carregamento}
                   </Badge>
                 ) : null}
-                <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm truncate">{carregamento.placa_provisoria}</p>
                 <button onClick={() => { setNovaPlaca(carregamento.placa_provisoria); setEditandoPlaca(true); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500 shrink-0" title="Editar placa">
                   <Pencil className="w-3 h-3" />
                 </button>
               </div>
             )}
-          </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 justify-end">
-            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
-            </Badge>
-          </div>
+            <div className="mt-1 flex items-center gap-2 min-w-0">
+              {origemTag ? (
+                <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit shrink-0`}>{origemTag.label}</Badge>
+              ) : null}
+              {infoCriacao ? (
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap truncate">
+                  {infoCriacao}
+                  {isSimulado ? <span className="text-emerald-600 dark:text-emerald-400 font-semibold"> · simulação</span> : null}
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-300 dark:text-slate-600 italic whitespace-nowrap truncate">
+                  Sem CT-es
+                  {isSimulado ? <span className="text-emerald-600 dark:text-emerald-400 font-semibold not-italic"> · simulação</span> : null}
+                </p>
+              )}
+            </div>
 
-          <div className="row-start-2 col-start-1">
-            {origemTag ? (
-              <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit`}>{origemTag.label}</Badge>
-            ) : null}
-          </div>
-
-          <div className="row-start-2 col-start-2 col-span-2 min-w-0">
-            {infoCriacao ? (
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{infoCriacao}</p>
-            ) : (
-              <p className="text-[10px] text-slate-300 dark:text-slate-600 italic">Sem CT-es</p>
-            )}
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap mt-0.5">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
                 ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
@@ -2130,13 +2127,11 @@ function CardCarregamento({
             </div>
           </div>
 
-          {!!(carregamento as any).simulado ? (
-            <div className="row-start-3 col-start-1">
-              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-[10px] h-5 px-2 w-fit">
-                Simulado
-              </Badge>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1.5 shrink-0 justify-end">
+            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
+              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
+            </Badge>
+          </div>
         </div>
 
         {editandoCapacidade && (
