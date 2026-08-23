@@ -122,3 +122,20 @@ REGRA GERAL PARA DIALOGS (CADASTROS/EDIÇÃO):
 - Se a tela exigir unidade fixa para não-MTZ, o filtro de unidade deve ficar travado:
   - o estado deve forçar `unidadeDestino = [unidadeAtual]` ao inicializar e ao aplicar filtros
   - o componente deve receber `disabled={true}` e bloquear alterações
+
+
+PADRÃO PARA LISTAS (TABELAS) EM DASHBOARDS:
+
+Objetivo: listas grandes com navegação rápida, ordenação clara e consistência visual.
+
+1) ORDENAÇÃO (SEM SELECT NO CABEÇALHO):
+- Não usar seletor de ordenação no cabeçalho da página.
+- Tornar a tabela ordenável pelo clique no título da coluna (toggle ASC/DESC).
+
+2) PAGINAÇÃO:
+- Padrão: 70 registros por página.
+- Exibir “Página X de Y” e botões Anterior/Próxima (e opcional Primeiro/Último).
+
+3) TOTALIZAÇÃO:
+- Exibir totalizadores do conjunto filtrado/buscado (não apenas da página atual).
+- Exemplo: somas de mercadoria/frete, volumes, peso, cubagem, e quantidade de registros.
