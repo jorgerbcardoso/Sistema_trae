@@ -1114,7 +1114,8 @@ export function CondicaoArmazens() {
             </div>
 
             {(unitStats.length > 0) && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <Card className="border-slate-200 dark:border-slate-800 lg:col-span-2">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center justify-between gap-3">
@@ -1193,8 +1194,8 @@ export function CondicaoArmazens() {
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-              <Card className="border-slate-200 dark:border-slate-800">
+                </div>
+                <Card className="border-slate-200 dark:border-slate-800">
                 <CardContent className="pt-4 pb-3 px-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mapa de aging por unidade</p>
@@ -1267,6 +1268,7 @@ export function CondicaoArmazens() {
                   </div>
                 </CardContent>
               </Card>
+              </>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
