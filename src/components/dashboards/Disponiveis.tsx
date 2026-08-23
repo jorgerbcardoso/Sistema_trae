@@ -4866,6 +4866,7 @@ export function Disponiveis() {
   };
 
   const [showFilters, setShowFilters] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
 
@@ -6726,6 +6727,329 @@ export function Disponiveis() {
                         Aplicar Filtros
                       </Button>
                     </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={showManual} onOpenChange={setShowManual}>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label="Manual"
+                          className="relative dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                        >
+                          <span className="font-black text-slate-700 dark:text-slate-200">?</span>
+                        </Button>
+                      </DialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Manual</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <DialogContent className="sm:max-w-[920px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle className="text-slate-900 dark:text-slate-100">
+                      Manual · Simulador de Carregamentos
+                    </DialogTitle>
+                    <DialogDescription className="text-slate-600 dark:text-slate-400">
+                      Como usar o painel de “Disponíveis no Armazém” para montar, simular, iniciar (TMS) e acompanhar carregamentos.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+                    <div className="space-y-5 py-4">
+                      <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                Este painel funciona como um SIMULADOR de carregamentos
+                              </p>
+                              <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-[11px]">SIMULAÇÃO</Badge>
+                              {sigla ? <Badge className="bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px]">Unidade: {sigla}</Badge> : null}
+                              {dominioUsuario ? <Badge className="bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px]">Domínio: {dominioUsuario}</Badge> : null}
+                            </div>
+                            <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                              Carregamentos criados aqui servem para medição e otimização. Eles não seguem para o TMS automaticamente. Para operação real, use o botão Iniciar (TMS).
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {dominioUsuario === 'RVE' && (
+                        <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-4">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+                                Regra de placa no domínio RVE (4 últimos caracteres)
+                              </p>
+                              <p className="text-xs text-indigo-800 dark:text-indigo-300 mt-1">
+                                No RVE, o sistema usa os 4 últimos caracteres da placa para relacionar veículo/capacidade e para agrupar importações do SSW.
+                              </p>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-slate-900/40 p-3">
+                                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Na importação do SSW</p>
+                                  <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se a placa vier no formato de 7 caracteres (ex.: ABC1D23), o sistema considera os 4 últimos (ex.: 1D23).</span></li>
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se existir carregamento em aberto com a mesma terminação (4 últimos), ele pode ser reaproveitado/agrupado.</span></li>
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se houver veículo cadastrado com a mesma terminação, a placa “salva” pode ser ajustada para a placa cadastrada.</span></li>
+                                  </ul>
+                                </div>
+                                <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-slate-900/40 p-3">
+                                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Ao editar / digitar placa</p>
+                                  <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Mantenha os 4 últimos caracteres coerentes com o veículo real quando quiser “casar” com capacidades/placas do cadastro.</span></li>
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Carregamentos simulados não são alterados pela importação do SSW.</span></li>
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Alguns destinos podem ser ignorados no RVE (ex.: SAL, DK4, TNE, DEV, e regras específicas SAO↔CAM).</span></li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <ListTree className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Visão geral do painel</p>
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">1) Carregamentos (topo)</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Área para criar carregamentos (manual/automático), importar do SSW, iniciar via TMS, finalizar e apontar CT-es.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">2) Disponíveis (abaixo)</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Listas por destino (transferência) e por setor (entrega), com totais, indicadores e exportação CSV.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregamentos (Simulação)</p>
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Criar carregamento manual</p>
+                            <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                              <li className="flex gap-2"><span className="text-emerald-600 dark:text-emerald-400 font-black">•</span><span>Escolha “Placa livre” ou “Veículo cadastrado”.</span></li>
+                              <li className="flex gap-2"><span className="text-emerald-600 dark:text-emerald-400 font-black">•</span><span>Informe destino e, se quiser, paradas intermediárias.</span></li>
+                              <li className="flex gap-2"><span className="text-emerald-600 dark:text-emerald-400 font-black">•</span><span>O carregamento nasce como simulação (borda/indicador visual no card).</span></li>
+                            </ul>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Carregamento automático</p>
+                            <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                              <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Seleciona linhas e gera simulações (inclusive em massa).</span></li>
+                              <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>O painel mostra resumos e sugere intermediárias conforme regra do domínio/unidade.</span></li>
+                            </ul>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Ações no card do carregamento</p>
+                          <div className="mt-2 grid gap-3 md:grid-cols-2">
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Apontar</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                                Coloca o painel em modo seleção: você marca CT-es nas listas e confirma para adicionar ao carregamento.
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Editar placa (ícone lápis)</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                                Permite trocar a placa por uma real ou fictícia, sem recriar o carregamento.
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Iniciar (TMS)</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                                Converte a simulação para início operacional: limpa a simulação e pede a placa verdadeira. Depois, importa do SSW para alimentar os dados reais.
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Finalizar / Excluir</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                                Finalizar encerra o carregamento. Excluir remove o carregamento da base (com confirmação).
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Importação do SSW</p>
+                        </div>
+                        <div className="mt-2 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Importar carregamentos</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Atualiza os carregamentos vindos do SSW. O painel pode limpar dados antigos do SSW e trazer novamente os dados atuais.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Importação automática</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Se habilitada, reimporta periodicamente para manter a tela sincronizada com o SSW.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática (SSW)</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                            Ao abrir o painel, o sistema pode verificar placas “em andamento” que já saíram para viagem no SSW e finalizar automaticamente com a data/hora informada.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Transferência</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          Agrupa CT-es por destino. Clique no destino para expandir e ver as abas (No Armazém / Em Transferência / Em Coleta).
+                        </p>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Colunas e totais</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Mostra volumes, peso, cubagem, frete e valor total da NF por destino, com exportação CSV por destino e CSV geral.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Indicador de saída</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Cores (verde/amarelo/laranja/vermelho) ajudam a priorizar atrasos de saída/manifesto conforme regras do painel.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Modo Apontamento</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                            Ao clicar em Apontar em um carregamento, você pode selecionar CT-es nas tabelas. Quando houver CT-es selecionados, aparece uma barra para Confirmar e adicionar ao carregamento.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Home className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Disponíveis para Entrega</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          Agrupa CT-es por setor. Mostra atrasos, volumes, peso, cubagem, frete e valor de NF, com CSV por setor e CSV geral.
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Filter className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filtros</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          Use o botão de filtros no topo para refinar a visualização. Os filtros são aplicados após carregar os dados (não alteram a importação).
+                        </p>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Períodos</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Filtra por emissão (transferência) e por previsão de entrega (transferência e entrega).
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Tempo no armazém</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Baseado na data de chegada na unidade: hoje - chegada (em dias).
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendário e acompanhamento</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          A área de carregamentos inclui um calendário/lista para acompanhar carregamentos em andamento. Ao clicar em um carregamento não finalizado, o painel pode permitir finalizar pelo próprio dialog.
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Share2 className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Hub (integração de unidades)</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          Quando ativado em um carregamento, o Hub pode integrar CT-es de outras unidades aos grupos, facilitando a visualização e a montagem. Use “Limpar hub” para voltar à visão normal.
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Gauge className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ordenação, CSV e conferência</p>
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Ordenar por coluna</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              No cabeçalho de “CT-es por Destino”, clique nas colunas para ordenar (ex.: destino, volume, peso, cubagem, frete).
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Exportar CSV</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Há exportação por destino/setor e também CSV “tudo”. Use para análises e compartilhamento rápido.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Detalhar CT-es do carregamento</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              No card do carregamento, o detalhamento lista CT-es vinculados, permite exportar CSV e remover CT-es selecionados (com confirmação).
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Atualizar</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              O botão Atualizar no topo recarrega os dados de transferência/SSW para manter a tela sincronizada.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Filter className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Aba “Todos os Disponíveis”</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          Mostra, em uma única visão, os blocos de Transferência e Entrega. Útil para priorização rápida sem ficar alternando de aba.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" onClick={() => setShowManual(false)} className="dark:border-slate-700 dark:hover:bg-slate-800">
+                      Fechar
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
