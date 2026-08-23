@@ -14,7 +14,6 @@ import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { useTooltipStyle } from './CustomTooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
   AlertCircle,
   CalendarDays,
@@ -224,6 +223,7 @@ export function CondicaoArmazens() {
   });
   const pageSize = 70;
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'dashboard' | 'lista'>('dashboard');
   const [rankSort, setRankSort] = useState<{ key: 'score' | 'unidade' | 'total' | 'parados8' | 'pend_cliente' | 'pend_transportadora' | 'max_dias'; dir: 'asc' | 'desc' }>({
     key: 'score',
     dir: 'desc',
@@ -1041,13 +1041,32 @@ export function CondicaoArmazens() {
         )}
 
         {!loading && !erro && (
-          <Tabs defaultValue="dashboard" className="gap-4">
-            <TabsList className="w-full sm:w-fit">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="lista">Lista</TabsTrigger>
-            </TabsList>
+          <>
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 w-fit">
+              <button
+                onClick={() => setViewMode('dashboard')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'dashboard'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setViewMode('lista')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'lista'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Lista
+              </button>
+            </div>
 
-            <TabsContent value="dashboard" className="space-y-6">
+            {viewMode === 'dashboard' ? (
+              <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-900 dark:to-indigo-950/20">
                   <CardContent className="pt-4 pb-3 px-4">
@@ -1106,10 +1125,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendCliente}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-fuchsia-50 to-white dark:from-slate-900 dark:to-fuchsia-950/15">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-fuchsia-500" />
                       Pendência (transportadora)
                     </div>
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendTransp}</div>
@@ -1146,8 +1165,8 @@ export function CondicaoArmazens() {
 
               {(unitStats.length > 0) && (
                 <>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20 lg:col-span-2">
                       <CardContent className="pt-4 pb-3 px-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ranking de pendências por unidade</p>
@@ -1156,43 +1175,43 @@ export function CondicaoArmazens() {
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden bg-white/60 dark:bg-slate-900/40">
                           <div className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                             <button
-                              className="text-left hover:underline"
+                              className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
                             >
                               Unidade{rankSort.key === 'unidade' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-right hover:underline"
+                              className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'total', dir: s.key === 'total' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               Total{rankSort.key === 'total' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-right hover:underline"
+                              className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'parados8', dir: s.key === 'parados8' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               ≥8d{rankSort.key === 'parados8' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-right hover:underline"
+                              className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'pend_cliente', dir: s.key === 'pend_cliente' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               Pend. cliente{rankSort.key === 'pend_cliente' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-right hover:underline"
+                              className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'pend_transportadora', dir: s.key === 'pend_transportadora' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               Pend. transportadora{rankSort.key === 'pend_transportadora' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-right hover:underline"
+                              className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'max_dias', dir: s.key === 'max_dias' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               Máx{rankSort.key === 'max_dias' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                             <button
-                              className="text-left hover:underline"
+                              className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                               onClick={() => setRankSort((s) => ({ key: 'score', dir: s.key === 'score' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
                             >
                               Indicador{rankSort.key === 'score' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -1232,13 +1251,13 @@ export function CondicaoArmazens() {
                       </CardContent>
                     </Card>
 
-                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-red-50 dark:from-slate-900 dark:to-red-950/15">
-                      <CardContent className="pt-4 pb-3 px-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-red-50 dark:from-slate-900 dark:to-red-950/15 lg:aspect-square">
+                      <CardContent className="pt-4 pb-3 px-4 flex flex-col h-full">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Pendências por unidade</p>
                           <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Cliente / Transport.</Badge>
                         </div>
-                        <div className="mt-3 max-h-[360px] overflow-y-auto pr-1">
+                        <div className="mt-3 flex-1 overflow-y-auto pr-1">
                           <div style={{ height: Math.max(240, unitCP.length * 28) }}>
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={unitCP} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 0 }} barCategoryGap={10}>
@@ -1276,8 +1295,8 @@ export function CondicaoArmazens() {
                     </Card>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20 lg:col-span-2">
                       <CardContent className="pt-4 pb-3 px-4">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mapa de tempo de armazém por unidade</p>
@@ -1285,14 +1304,14 @@ export function CondicaoArmazens() {
                             {unitHeat.length} unidade(s)
                           </Badge>
                         </div>
-                        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
-                          <div className="w-full min-w-[980px]">
-                            <div className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 overflow-hidden">
+                          <div className="w-full">
+                            <div className="grid grid-cols-[74px_minmax(0,1fr)_64px_52px_52px_52px_60px] md:grid-cols-[74px_minmax(0,1fr)_64px_52px_52px_52px_52px_52px_60px] gap-2 px-2 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                               <span>Sigla</span>
                               <span>Unidade</span>
                               <span className="text-right">Total</span>
-                              <span className="text-right">0-1</span>
-                              <span className="text-right">2-3</span>
+                              <span className="text-right hidden md:block">0-1</span>
+                              <span className="text-right hidden md:block">2-3</span>
                               <span className="text-right">4-7</span>
                               <span className="text-right">8-15</span>
                               <span className="text-right">16+</span>
@@ -1305,7 +1324,7 @@ export function CondicaoArmazens() {
                                 unitHeat.map((u) => {
                                   const sigla = String(u.unid_atual ?? '').toUpperCase() || '—';
                                   const nome = unidadesMap[sigla] || '';
-                                  const cell = (n: number, tone: 'slate' | 'blue' | 'amber' | 'orange' | 'red') => {
+                                  const cell = (n: number, tone: 'slate' | 'blue' | 'amber' | 'orange' | 'red', extraClassName = '') => {
                                     const v = n ?? 0;
                                     const bg =
                                       v === 0 ? 'bg-slate-50 dark:bg-slate-900/40' :
@@ -1322,15 +1341,15 @@ export function CondicaoArmazens() {
                                       tone === 'blue' ? 'text-blue-700 dark:text-blue-300' :
                                       'text-slate-700 dark:text-slate-200';
                                     return (
-                                      <span className={`text-right font-mono tabular-nums px-2 py-1 rounded ${bg} ${text}`}>
+                                      <span className={`text-right font-mono tabular-nums px-2 py-1 rounded ${bg} ${text} ${extraClassName}`}>
                                         {v.toLocaleString('pt-BR')}
                                       </span>
                                     );
                                   };
                                   return (
-                                    <div key={sigla} className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-xs items-center">
+                                  <div key={sigla} className="grid grid-cols-[74px_minmax(0,1fr)_64px_52px_52px_52px_60px] md:grid-cols-[74px_minmax(0,1fr)_64px_52px_52px_52px_52px_52px_60px] gap-2 px-2 py-2 text-xs items-center">
                                       <button
-                                        className="text-left font-mono font-semibold text-slate-800 dark:text-slate-200 hover:underline"
+                                      className="text-left font-mono font-semibold text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                                         onClick={() => {
                                           if (!isMTZ) {
                                             toast.info('Unidade já está definida para seu usuário.');
@@ -1345,8 +1364,8 @@ export function CondicaoArmazens() {
                                         <div className="text-slate-700 dark:text-slate-200 truncate">{nome || '—'}</div>
                                       </div>
                                       <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{(u.total ?? 0).toLocaleString('pt-BR')}</span>
-                                      {cell(u.b_0_1, 'slate')}
-                                      {cell(u.b_2_3, 'blue')}
+                                      {cell(u.b_0_1, 'slate', 'hidden md:inline-block')}
+                                      {cell(u.b_2_3, 'blue', 'hidden md:inline-block')}
                                       {cell(u.b_4_7, 'amber')}
                                       {cell(u.b_8_15, 'orange')}
                                       {cell(u.b_16p, 'red')}
@@ -1361,23 +1380,29 @@ export function CondicaoArmazens() {
                       </CardContent>
                     </Card>
 
-                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900 dark:to-indigo-950/20">
-                      <CardContent className="pt-4 pb-3 px-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900 dark:to-indigo-950/20 lg:aspect-square">
+                      <CardContent className="pt-4 pb-3 px-4 flex flex-col h-full">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">CT-es no armazém por unidade</p>
                           <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Distribuição</Badge>
                         </div>
-                        <div className="mt-3 h-[260px]">
+                        <div className="mt-3 flex-1 min-h-[240px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie data={unitDistrib} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} stroke="none">
+                              <Pie data={unitDistrib} dataKey="value" nameKey="name" innerRadius={44} outerRadius={80} stroke="none" cx="35%" cy="50%">
                                 {unitDistrib.map((_, idx) => {
                                   const palette = ['#6366f1', '#22c55e', '#f97316', '#ef4444', '#06b6d4', '#94a3b8'];
                                   return <Cell key={idx} fill={palette[idx % palette.length]} />;
                                 })}
                               </Pie>
                               <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(value: any, _name: any, props: any) => [value, String(props?.payload?.fullName ?? props?.payload?.name ?? '')]} />
-                              <Legend wrapperStyle={{ fontSize: 11 }} />
+                              <Legend
+                                layout="vertical"
+                                align="right"
+                                verticalAlign="middle"
+                                wrapperStyle={{ fontSize: 11, lineHeight: '18px', whiteSpace: 'nowrap' }}
+                                formatter={(_value: any, entry: any) => String(entry?.payload?.fullName ?? entry?.payload?.name ?? '')}
+                              />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
@@ -1422,7 +1447,7 @@ export function CondicaoArmazens() {
                     <div className="mt-3 h-[260px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={pieMotivos} dataKey="count" nameKey="tipo" outerRadius={92} innerRadius={40} stroke="none">
+                          <Pie data={pieMotivos} dataKey="count" nameKey="tipo" outerRadius={80} innerRadius={44} stroke="none" cx="35%" cy="50%">
                             {pieMotivos.map((it, idx) => {
                               const t = String((it as any).tipoKey ?? '—').toUpperCase();
                               const tone = (TIPOS_OCOR[t]?.tone ?? 'slate') as any;
@@ -1437,7 +1462,7 @@ export function CondicaoArmazens() {
                             })}
                           </Pie>
                           <RechartsTooltip contentStyle={tooltipStyle as any} />
-                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11, lineHeight: '18px', whiteSpace: 'nowrap' }} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1480,9 +1505,8 @@ export function CondicaoArmazens() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
-
-            <TabsContent value="lista" className="space-y-6">
+              </div>
+            ) : (
               <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
                 <CardContent className="p-0">
                   <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
@@ -1502,51 +1526,51 @@ export function CondicaoArmazens() {
                       <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                         <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           <th className="px-3 py-2 text-left whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
+                            <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
                               Unidade{sort.key === 'unidade' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'prio', dir: s.key === 'prio' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'prio', dir: s.key === 'prio' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Prio{sort.key === 'prio' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Dias{sort.key === 'dias_armazem' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Atraso{sort.key === 'dias_atraso' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-center whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Agend.{sort.key === 'agendado' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Últ. ocorrência{sort.key === 'ult_ocor' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'hrs_ult', dir: s.key === 'hrs_ult' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'hrs_ult', dir: s.key === 'hrs_ult' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Hrs últ.{sort.key === 'hrs_ult' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Vlr Merc.{sort.key === 'vlr_merc' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Frete{sort.key === 'vlr_frete' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
@@ -1684,8 +1708,8 @@ export function CondicaoArmazens() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
+            )}
+          </>
         )}
       </div>
     </DashboardLayout>
