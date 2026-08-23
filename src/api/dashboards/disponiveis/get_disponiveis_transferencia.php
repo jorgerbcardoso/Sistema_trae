@@ -610,6 +610,12 @@ if (
         if (count($arr) < 35) continue;
         if (trim((string)$arr[0]) !== '3') continue;
 
+        $isPreCad = false;
+        foreach ($arr as $v) {
+            if (strtoupper(trim((string)$v)) === 'PRE-CADASTRADA') { $isPreCad = true; break; }
+        }
+        if ($isPreCad) continue;
+
         $serColeta  = strtoupper(trim((string)($arr[1] ?? '')));
         $nroColeta  = trim((string)($arr[2] ?? ''));
         $remetente  = trim((string)($arr[7] ?? ''));

@@ -183,6 +183,7 @@ interface GrupoSetor {
   totalPeso: number;
   totalCubagem: number;
   totalFrete: number;
+  totalVlrNf: number;
 }
 
 interface GrupoDestino {
@@ -196,6 +197,7 @@ interface GrupoDestino {
   totalPeso: number;
   totalCubagem: number;
   totalFrete: number;
+  totalVlrNf: number;
 }
 
 interface DadosHub {
@@ -795,7 +797,7 @@ function GrupoDestinoCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -848,6 +850,9 @@ function GrupoDestinoCard({
         </span>
         <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
           {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalVlrNf.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-center pl-1">
           <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={exportarDestinoCSV}>
@@ -1319,7 +1324,7 @@ function GrupoSetorCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}
+        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -1363,6 +1368,9 @@ function GrupoSetorCard({
         </span>
         <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
           {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalVlrNf.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-center pl-1">
           <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={exportarSetorCSV}>
@@ -4843,6 +4851,8 @@ export function Disponiveis() {
     periodoEmissaoFim: string;
     periodoPrevisaoInicio: string;
     periodoPrevisaoFim: string;
+    tempoArmazemDe: string;
+    tempoArmazemAte: string;
   };
 
   const filtrosVazios: FiltrosDisponiveis = {
@@ -4851,6 +4861,8 @@ export function Disponiveis() {
     periodoEmissaoFim: '',
     periodoPrevisaoInicio: '',
     periodoPrevisaoFim: '',
+    tempoArmazemDe: '',
+    tempoArmazemAte: '',
   };
 
   const [showFilters, setShowFilters] = useState(false);
@@ -5894,7 +5906,9 @@ export function Disponiveis() {
     !!filters.periodoEmissaoInicio ||
     !!filters.periodoEmissaoFim ||
     !!filters.periodoPrevisaoInicio ||
-    !!filters.periodoPrevisaoFim;
+    !!filters.periodoPrevisaoFim ||
+    !!filters.tempoArmazemDe ||
+    !!filters.tempoArmazemAte;
 
   const parseDataISO = (v: string): Date | null => {
     const s = (v ?? '').trim();
@@ -5961,6 +5975,28 @@ export function Disponiveis() {
   const emissaoFim = parseDataISO(filters.periodoEmissaoFim);
   const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
   const previsaoFim = parseDataISO(filters.periodoPrevisaoFim);
+  const tempoArmazemDe = (() => {
+    const s = (filters.tempoArmazemDe ?? '').trim();
+    if (!s) return null;
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? Math.max(0, n) : null;
+  })();
+  const tempoArmazemAte = (() => {
+    const s = (filters.tempoArmazemAte ?? '').trim();
+    if (!s) return null;
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? Math.max(0, n) : null;
+  })();
+
+  const diasNoArmazem = (chegadaUnid: string): number | null => {
+    const d = parseDataBR(chegadaUnid);
+    if (!d) return null;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    const diff = Math.floor((hoje.getTime() - dt.getTime()) / 86400000);
+    return diff >= 0 && Number.isFinite(diff) ? diff : null;
+  };
 
   const ctesTransferFiltrados = React.useMemo(() => {
     const list: Cte[] = [];
@@ -5983,9 +6019,16 @@ export function Disponiveis() {
       if (previsaoInicio || previsaoFim) {
         if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
       }
+      if (tempoArmazemDe !== null || tempoArmazemAte !== null) {
+        if (cte.emTransito) return false;
+        const dias = diasNoArmazem(cte.chegadaUnid);
+        if (dias === null) return false;
+        if (tempoArmazemDe !== null && dias < tempoArmazemDe) return false;
+        if (tempoArmazemAte !== null && dias > tempoArmazemAte) return false;
+      }
       return true;
     });
-  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
+  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
     const totals: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
@@ -6120,10 +6163,19 @@ export function Disponiveis() {
     const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
     return list.filter((cte) => {
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
-      if (!previsaoInicio && !previsaoFim) return true;
-      return matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim);
+      if (previsaoInicio || previsaoFim) {
+        if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
+      }
+      if (tempoArmazemDe !== null || tempoArmazemAte !== null) {
+        if (cte.emTransito) return false;
+        const dias = diasNoArmazem(cte.chegadaUnid);
+        if (dias === null) return false;
+        if (tempoArmazemDe !== null && dias < tempoArmazemDe) return false;
+        if (tempoArmazemAte !== null && dias > tempoArmazemAte) return false;
+      }
+      return true;
     });
-  }, [dadosEntrega, previsaoInicio, previsaoFim, dominioUsuario, unidadeAtual]);
+  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
     setFilters(filtrosVazios);
@@ -6156,7 +6208,7 @@ export function Disponiveis() {
     const addCte = (cte: Cte) => {
       const key = cte.unidadeDest;
       if (!map[key]) {
-        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
+        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -6168,18 +6220,20 @@ export function Disponiveis() {
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
       map[key].totalFrete   += parseMoeda(cte.frete);
+      map[key].totalVlrNf   += parseMoeda(cte.vlrNf);
     };
     for (const cte of ctesTransferFiltrados) addCte(cte);
     for (const coleta of coletasTransferFiltradas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
         const nomeGrupo = key === 'SEM DESTINO' ? (coleta.cidadeDest || key) : key;
-        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
+        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
       }
       map[key].coletas.push(coleta);
       const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalPeso    += pesoColeta;
       map[key].totalCubagem += pesoColeta * 0.0033333333333333;
+      map[key].totalVlrNf   += parseMoeda(coleta.valMerc);
     }
     const lista = Object.values(map);
     const mult = ordemDir === 'desc' ? -1 : 1;
@@ -6215,7 +6269,7 @@ export function Disponiveis() {
     for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
-        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0 };
+        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -6227,6 +6281,7 @@ export function Disponiveis() {
       map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
       map[key].totalFrete   += parseMoeda(cte.frete);
+      map[key].totalVlrNf   += parseMoeda(cte.vlrMerc);
     }
     return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
   }, [dadosEntrega, ctesEntregaFiltrados]);
@@ -6597,6 +6652,37 @@ export function Disponiveis() {
                               value={tempFilters.periodoPrevisaoFim}
                               onChange={(e) => setTempFilters({ ...tempFilters, periodoPrevisaoFim: e.target.value })}
                               className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <Label className="text-slate-900 dark:text-slate-100">Tempo no armazém (dias)</Label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Baseado na Data de chegada na unidade (hoje - chegada)</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">De</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={tempFilters.tempoArmazemDe}
+                              onChange={(e) => setTempFilters({ ...tempFilters, tempoArmazemDe: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm text-slate-600 dark:text-slate-400">Até</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={tempFilters.tempoArmazemAte}
+                              onChange={(e) => setTempFilters({ ...tempFilters, tempoArmazemAte: e.target.value })}
+                              className="dark:bg-slate-800 dark:border-slate-700"
                             />
                           </div>
                         </div>
@@ -7375,7 +7461,7 @@ export function Disponiveis() {
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}>
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
                       <span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span>
                       <span />
@@ -7386,6 +7472,7 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -7454,7 +7541,7 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}>
+                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
@@ -7464,6 +7551,7 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -7491,7 +7579,7 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 60px' }}>
+                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
@@ -7500,6 +7588,7 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
