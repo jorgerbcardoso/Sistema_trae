@@ -13,6 +13,7 @@ import { FluxoCaixa } from './dashboards/FluxoCaixa';
 import { FinanceiroDashboard } from './dashboards/FinanceiroDashboard';
 import { CentralAgendamento } from './dashboards/CentralAgendamento';
 import { Disponiveis } from './dashboards/Disponiveis';
+import { CondicaoArmazens } from './dashboards/CondicaoArmazens';
 import { ColetaEntrega } from './dashboards/ColetaEntrega';
 import { PainelRetidos } from './dashboards/PainelRetidos';
 import { ContasPagar } from './dashboards/ContasPagar';
@@ -113,6 +114,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'dashboards/FinanceiroDashboard': FinanceiroDashboard,
   'dashboards/CentralAgendamento': CentralAgendamento,
   'dashboards/Disponíveis': Disponiveis,
+  'dashboards/CondicaoArmazens': CondicaoArmazens,
   'dashboards/ColetaEntrega': ColetaEntrega,
   'dashboards/PainelRetidos': PainelRetidos,
   'dashboards/ContasPagar': ContasPagar,
