@@ -7353,7 +7353,7 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 60px' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
@@ -7365,6 +7365,7 @@ export function Disponiveis() {
                             <ThBtn col="totalPeso" align="center">Peso</ThBtn>
                             <ThBtn col="totalCubagem" align="center">Cubagem</ThBtn>
                             <ThBtn col="totalFrete" align="right">Frete (R$)</ThBtn>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
                           <div className="divide-y divide-slate-100 dark:divide-slate-800">
