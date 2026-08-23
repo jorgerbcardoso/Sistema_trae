@@ -115,6 +115,8 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'dashboards/CentralAgendamento': CentralAgendamento,
   'dashboards/Disponíveis': Disponiveis,
   'dashboards/CondicaoArmazens': CondicaoArmazens,
+  'dashboards/condicao-armazens': CondicaoArmazens,
+  'dashboards/condicao_armazens': CondicaoArmazens,
   'dashboards/ColetaEntrega': ColetaEntrega,
   'dashboards/PainelRetidos': PainelRetidos,
   'dashboards/ContasPagar': ContasPagar,
@@ -207,7 +209,18 @@ export const COMPONENT_REGISTRY: ComponentMap = {
  * Retorna ComponentNotFound se não encontrar
  */
 export const getComponent = (componentPath: string): ComponentType<any> => {
-  const Component = COMPONENT_REGISTRY[componentPath];
+  const raw = String(componentPath || '');
+  const normalized = raw.trim().replace(/^\/+/, '');
+  const Component =
+    COMPONENT_REGISTRY[raw] ||
+    COMPONENT_REGISTRY[normalized] ||
+    COMPONENT_REGISTRY[normalized.toLowerCase()] ||
+    COMPONENT_REGISTRY[raw.toLowerCase()] ||
+    (() => {
+      const lower = normalized.toLowerCase();
+      const matchKey = Object.keys(COMPONENT_REGISTRY).find((k) => k.toLowerCase() === lower);
+      return matchKey ? COMPONENT_REGISTRY[matchKey] : undefined;
+    })();
   
   if (!Component) {
     console.error('❌ [ComponentRegistry] Componente NÃO encontrado:', componentPath);
