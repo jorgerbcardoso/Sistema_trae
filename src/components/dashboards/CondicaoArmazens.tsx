@@ -14,6 +14,7 @@ import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { useTooltipStyle } from './CustomTooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
   AlertCircle,
   CalendarDays,
@@ -145,6 +146,8 @@ const TIPOS_OCOR: Record<string, { label: string; badge: string; tone: 'slate' |
   P: { label: 'Pendência por culpa da transportadora', badge: 'P', tone: 'red' },
 };
 
+const TODOS_TIPOS_OCOR = ['B', 'S', 'R', 'E', 'I', 'C', 'P'] as const;
+
 function fmtDateBR(iso: string | null | undefined) {
   if (!iso) return '';
   const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -221,11 +224,26 @@ export function CondicaoArmazens() {
   });
   const pageSize = 70;
   const [page, setPage] = useState(1);
+  const [rankSort, setRankSort] = useState<{ key: 'score' | 'unidade' | 'total' | 'parados8' | 'pend_cliente' | 'pend_transportadora' | 'max_dias'; dir: 'asc' | 'desc' }>({
+    key: 'score',
+    dir: 'desc',
+  });
   const [unidadesMap, setUnidadesMap] = useState<Record<string, string>>({});
 
   const dominio = (user?.domain ?? '').trim().toUpperCase();
 
   const tooltipStyle = useTooltipStyle();
+
+  const tiposSelecionadosTexto = useMemo(() => {
+    const selRaw = (filters.tipoUltOcor ?? []).map((t) => String(t).trim().toUpperCase()).filter(Boolean);
+    const sel = Array.from(new Set(selRaw));
+    const all = TODOS_TIPOS_OCOR.map((t) => String(t));
+    if (sel.length === 0) return 'Todos';
+    if (sel.length === all.length && sel.every((t) => all.includes(t))) return 'Todos';
+    return sel
+      .map((t) => TIPOS_OCOR[t]?.label ?? t)
+      .join(' • ');
+  }, [filters.tipoUltOcor]);
 
   useEffect(() => {
     if (!user?.domain) return;
@@ -339,6 +357,14 @@ export function CondicaoArmazens() {
   }, [carregar]);
 
   const clearFilters = () => {
+    setFilters({ ...filtrosVazios, unidadeAtual: isMTZ ? [] : [unidadeLogada] });
+    setShowFilters(false);
+  };
+
+  const clearAllFilters = () => {
+    setBusca('');
+    setSort({ key: 'prio', dir: 'desc' });
+    setPage(1);
     setFilters({ ...filtrosVazios, unidadeAtual: isMTZ ? [] : [unidadeLogada] });
     setShowFilters(false);
   };
@@ -674,19 +700,35 @@ export function CondicaoArmazens() {
         total * 0.05
       );
     };
-    return [...unitStats]
-      .map((u) => ({ ...u, score: calc(u) }))
-      .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0));
+    return [...unitStats].map((u) => ({ ...u, score: calc(u) }));
   }, [unitStats]);
+
+  const unitRankSorted = useMemo(() => {
+    const arr = [...unitRank];
+    const mul = rankSort.dir === 'asc' ? 1 : -1;
+    const num = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? -Infinity : v);
+    const str = (v: string | null | undefined) => String(v ?? '').trim().toUpperCase();
+    arr.sort((a: any, b: any) => {
+      if (rankSort.key === 'unidade') return str(a.unid_atual).localeCompare(str(b.unid_atual)) * mul;
+      if (rankSort.key === 'total') return (num(a.total) - num(b.total)) * mul;
+      if (rankSort.key === 'parados8') return (num(a.parados8) - num(b.parados8)) * mul;
+      if (rankSort.key === 'pend_cliente') return (num(a.pend_cliente) - num(b.pend_cliente)) * mul;
+      if (rankSort.key === 'pend_transportadora') return (num(a.pend_transportadora) - num(b.pend_transportadora)) * mul;
+      if (rankSort.key === 'max_dias') return (num(a.max_dias_armazem) - num(b.max_dias_armazem)) * mul;
+      return (num(a.score) - num(b.score)) * mul;
+    });
+    return arr;
+  }, [unitRank, rankSort]);
 
   const unitCP = useMemo(() => {
     return [...unitStats]
       .map((u) => {
-        const total = u.total ?? 0;
         const c = u.pend_cliente ?? 0;
         const p = u.pend_transportadora ?? 0;
+        const total = c + p;
         return { unidade: u.unid_atual || '—', C: c, P: p, total };
       })
+      .filter((u) => (u.C ?? 0) + (u.P ?? 0) > 0)
       .sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
   }, [unitStats]);
 
@@ -696,15 +738,16 @@ export function CondicaoArmazens() {
 
   const unitDistrib = useMemo(() => {
     const items = [...unitStats].sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
-    const top = items.slice(0, 10);
-    const rest = items.slice(10).reduce((s, u) => s + (u.total ?? 0), 0);
+    const top = items.slice(0, 5);
+    const rest = items.slice(5).reduce((s, u) => s + (u.total ?? 0), 0);
     const label = (sigla: string) => {
       const s = String(sigla ?? '').trim().toUpperCase();
       const nome = unidadesMap[s] || '';
       return nome ? `${s} - ${nome}` : s || '—';
     };
-    const data = top.map((u) => ({ name: label(u.unid_atual), value: u.total ?? 0 }));
-    if (rest > 0) data.push({ name: 'Demais', value: rest });
+    const sigla = (s: string) => String(s ?? '').trim().toUpperCase() || '—';
+    const data = top.map((u) => ({ name: sigla(u.unid_atual), fullName: label(u.unid_atual), value: u.total ?? 0 }));
+    if (rest > 0) data.push({ name: 'Demais', fullName: 'Demais', value: rest });
     return data;
   }, [unitStats, unidadesMap]);
 
@@ -959,7 +1002,7 @@ export function CondicaoArmazens() {
               Fonte: Base Presto
             </Badge>
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
-              Tipos: Baixa • Solução • Reentrega • Entrega • Informativa • Pendência (cliente) • Pendência (transportadora)
+              Tipos: {tiposSelecionadosTexto}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -969,72 +1012,15 @@ export function CondicaoArmazens() {
               placeholder="Buscar CT-e, unidade, pagador, ocorrência..."
               className="h-9 w-full lg:w-[420px] dark:bg-slate-900 dark:border-slate-700"
             />
-            <span className="hidden lg:inline text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-              {viewRows.length}/{rows.length}
-            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllFilters}
+              className="h-9 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Limpar Filtros
+            </Button>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, tempoArmazemDe: '4' }))} className="dark:border-slate-700">
-            ≥ 4 dias
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setFilters((f) => ({ ...f, tempoArmazemDe: '8' }))} className="dark:border-slate-700">
-            ≥ 8 dias
-          </Button>
-          <Button
-            size="sm"
-            variant={filters.apenasAgendados ? 'default' : 'outline'}
-            onClick={() => setFilters((f) => ({ ...f, apenasAgendados: !f.apenasAgendados }))}
-            className={filters.apenasAgendados ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'dark:border-slate-700'}
-          >
-            Agendados
-          </Button>
-          <Button
-            size="sm"
-            variant={(filters.tipoUltOcor ?? []).includes('C') ? 'default' : 'outline'}
-            onClick={() => {
-              setFilters((f) => {
-                const set = new Set(f.tipoUltOcor ?? []);
-                if (set.has('C')) set.delete('C');
-                else set.add('C');
-                return { ...f, tipoUltOcor: Array.from(set) };
-              });
-            }}
-            className={(filters.tipoUltOcor ?? []).includes('C') ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'dark:border-slate-700'}
-          >
-            Pendência cliente
-          </Button>
-          <Button
-            size="sm"
-            variant={(filters.tipoUltOcor ?? []).includes('P') ? 'default' : 'outline'}
-            onClick={() => {
-              setFilters((f) => {
-                const set = new Set(f.tipoUltOcor ?? []);
-                if (set.has('P')) set.delete('P');
-                else set.add('P');
-                return { ...f, tipoUltOcor: Array.from(set) };
-              });
-            }}
-            className={(filters.tipoUltOcor ?? []).includes('P') ? 'bg-red-600 hover:bg-red-700 text-white' : 'dark:border-slate-700'}
-          >
-            Pendência transportadora
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setBusca('');
-              setSort({ key: 'prio', dir: 'desc' });
-              clearFilters();
-            }}
-            className="dark:border-slate-700"
-          >
-            Limpar
-          </Button>
-          <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-            Exibindo {viewRows.length} de {rows.length}
-          </span>
         </div>
 
         {erro && (
@@ -1055,184 +1041,197 @@ export function CondicaoArmazens() {
         )}
 
         {!loading && !erro && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-900 dark:to-indigo-950/20">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <Warehouse className="w-3.5 h-3.5" />
-                    Total no armazém
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.total}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-amber-50 to-white dark:from-slate-900 dark:to-amber-950/20">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    Parados ≥ 4 dias
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados4}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    Parados ≥ 8 dias
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados8}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-rose-50 to-white dark:from-slate-900 dark:to-rose-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <Clock className="w-3.5 h-3.5" />
-                    Atrasados (prev.)
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.atrasoPrev}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-orange-50 to-white dark:from-slate-900 dark:to-orange-950/20">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500" />
-                    Pendência do cliente
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendCliente}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
-                    Pendência da transportadora
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendTransp}</div>
-                </CardContent>
-              </Card>
-            </div>
+          <Tabs defaultValue="dashboard" className="gap-4">
+            <TabsList className="w-full sm:w-fit">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="lista">Lista</TabsTrigger>
+            </TabsList>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-violet-50 to-white dark:from-slate-900 dark:to-violet-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    Agendados
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.agendados}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950/20">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    Sem ocorrência
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.semOcorrencia}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-emerald-50 to-white dark:from-slate-900 dark:to-emerald-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="font-black text-emerald-600 dark:text-emerald-400">R$</span>
-                    Vlr. mercadoria
-                  </div>
-                  <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrMerc)}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-sky-50 to-white dark:from-slate-900 dark:to-sky-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span className="font-black text-sky-600 dark:text-sky-400">R$</span>
-                    Vlr. frete
-                  </div>
-                  <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrFrete)}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-amber-50 to-white dark:from-slate-900 dark:to-amber-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                    Média dias (armazém)
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtNum(totais.avgDias, 1)}</div>
-                </CardContent>
-              </Card>
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <Clock className="w-3.5 h-3.5" />
-                    Média horas (últ. ocorrência)
-                  </div>
-                  <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtNum(totais.avgHorasUltOcor, 0)}</div>
-                </CardContent>
-              </Card>
-            </div>
+            <TabsContent value="dashboard" className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-900 dark:to-indigo-950/20">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <Warehouse className="w-3.5 h-3.5" />
+                      Total no armazém
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.total}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-amber-50 to-white dark:from-slate-900 dark:to-amber-950/20">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      Parados ≥ 4 dias
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados4}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      Parados ≥ 8 dias
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados8}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-rose-50 to-white dark:from-slate-900 dark:to-rose-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <Clock className="w-3.5 h-3.5" />
+                      Atrasados (prev.)
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.atrasoPrev}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-violet-50 to-white dark:from-slate-900 dark:to-violet-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      Agendados
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.agendados}</div>
+                  </CardContent>
+                </Card>
+              </div>
 
-            {(unitStats.length > 0) && (
-              <>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <Card className="border-slate-200 dark:border-slate-800 lg:col-span-2 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20">
-                    <CardContent className="pt-4 pb-3 px-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ranking de pendências por unidade</p>
-                        <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Todas</Badge>
-                      </div>
-                      <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden bg-white/60 dark:bg-slate-900/40">
-                        <div className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
-                          <span>Unidade</span>
-                          <span className="text-right">Total</span>
-                          <span className="text-right">≥8d</span>
-                          <span className="text-right">Pend. cliente</span>
-                          <span className="text-right">Pend. transportadora</span>
-                          <span className="text-right">Máx</span>
-                          <span>Indicador</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-orange-50 to-white dark:from-slate-900 dark:to-orange-950/20">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500" />
+                      Pendência (cliente)
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendCliente}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                      Pendência (transportadora)
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendTransp}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-emerald-50 to-white dark:from-slate-900 dark:to-emerald-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="font-black text-emerald-600 dark:text-emerald-400">R$</span>
+                      Vlr. mercadoria
+                    </div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrMerc)}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-sky-50 to-white dark:from-slate-900 dark:to-sky-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="font-black text-sky-600 dark:text-sky-400">R$</span>
+                      Vlr. frete
+                    </div>
+                    <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrFrete)}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 to-white dark:from-slate-900 dark:to-teal-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      Média dias (armazém)
+                    </div>
+                    <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtNum(totais.avgDias, 1)}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {(unitStats.length > 0) && (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20">
+                      <CardContent className="pt-4 pb-3 px-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ranking de pendências por unidade</p>
+                          <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Todas</Badge>
                         </div>
-                        <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                          {unitRank.length === 0 ? (
-                            <div className="px-3 py-10 text-sm text-slate-400 dark:text-slate-500 text-center">—</div>
-                          ) : (
-                            (() => {
-                              const maxScore = Math.max(...unitRank.map((u: any) => Number(u.score ?? 0)), 1);
-                              return unitRank.map((u: any) => {
-                                const sigla = String(u.unid_atual ?? '').toUpperCase() || '—';
-                                const nome = unidadesMap[sigla] || '';
-                                const pct = Math.round((Number(u.score ?? 0) / maxScore) * 100);
-                                return (
-                                  <div key={sigla} className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-xs items-center">
-                                    <button
-                                      className="text-left hover:underline min-w-0"
-                                      onClick={() => {
-                                        if (!isMTZ) {
-                                          toast.info('Unidade já está definida para seu usuário.');
-                                          return;
-                                        }
-                                        setFilters((f) => ({ ...f, unidadeAtual: [sigla] }));
-                                      }}
-                                    >
-                                      <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{sigla}</div>
-                                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{nome || '—'}</div>
-                                    </button>
-                                    <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.total ?? 0}</span>
-                                    <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.parados8 ?? 0}</span>
-                                    <span className="text-right font-mono tabular-nums text-orange-700 dark:text-orange-300 font-semibold">{u.pend_cliente ?? 0}</span>
-                                    <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.pend_transportadora ?? 0}</span>
-                                    <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.max_dias_armazem ?? 0}</span>
-                                    <div className="relative h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                      <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 via-red-500 to-red-600" style={{ width: `${pct}%` }} />
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden bg-white/60 dark:bg-slate-900/40">
+                          <div className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                            <button
+                              className="text-left hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                            >
+                              Unidade{rankSort.key === 'unidade' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-right hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'total', dir: s.key === 'total' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              Total{rankSort.key === 'total' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-right hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'parados8', dir: s.key === 'parados8' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              ≥8d{rankSort.key === 'parados8' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-right hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'pend_cliente', dir: s.key === 'pend_cliente' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              Pend. cliente{rankSort.key === 'pend_cliente' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-right hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'pend_transportadora', dir: s.key === 'pend_transportadora' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              Pend. transportadora{rankSort.key === 'pend_transportadora' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-right hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'max_dias', dir: s.key === 'max_dias' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              Máx{rankSort.key === 'max_dias' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                            <button
+                              className="text-left hover:underline"
+                              onClick={() => setRankSort((s) => ({ key: 'score', dir: s.key === 'score' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                            >
+                              Indicador{rankSort.key === 'score' ? (rankSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </div>
+                          <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                            {unitRankSorted.length === 0 ? (
+                              <div className="px-3 py-10 text-sm text-slate-400 dark:text-slate-500 text-center">—</div>
+                            ) : (
+                              (() => {
+                                const maxScore = Math.max(...unitRankSorted.map((u: any) => Number(u.score ?? 0)), 1);
+                                return unitRankSorted.map((u: any) => {
+                                  const sigla = String(u.unid_atual ?? '').toUpperCase() || '—';
+                                  const nome = unidadesMap[sigla] || '';
+                                  const pct = Math.round((Number(u.score ?? 0) / maxScore) * 100);
+                                  return (
+                                    <div key={sigla} className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-xs items-center">
+                                      <div className="min-w-0">
+                                        <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{sigla}</div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{nome || '—'}</div>
+                                      </div>
+                                      <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.total ?? 0}</span>
+                                      <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.parados8 ?? 0}</span>
+                                      <span className="text-right font-mono tabular-nums text-orange-700 dark:text-orange-300 font-semibold">{u.pend_cliente ?? 0}</span>
+                                      <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.pend_transportadora ?? 0}</span>
+                                      <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.max_dias_armazem ?? 0}</span>
+                                      <div className="relative h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                        <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 via-red-500 to-red-600" style={{ width: `${pct}%` }} />
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              });
-                            })()
-                          )}
+                                  );
+                                });
+                              })()
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
 
-                  <div className="space-y-4">
                     <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-red-50 dark:from-slate-900 dark:to-red-950/15">
                       <CardContent className="pt-4 pb-3 px-4">
                         <div className="flex items-center justify-between gap-3">
@@ -1260,12 +1259,12 @@ export function CondicaoArmazens() {
                                   contentStyle={tooltipStyle as any}
                                   formatter={(value: any, name: any) => [
                                     value,
-                                    name === 'P' ? 'Pendência da transportadora' : name === 'C' ? 'Pendência do cliente' : String(name),
+                                    name === 'P' ? 'Pendência por culpa da transportadora' : name === 'C' ? 'Pendência por culpa do cliente' : String(name),
                                   ]}
                                 />
                                 <Legend
                                   wrapperStyle={{ fontSize: 11 }}
-                                  formatter={(value: any) => (value === 'P' ? 'Pendência da transportadora' : value === 'C' ? 'Pendência do cliente' : String(value))}
+                                  formatter={(value: any) => (value === 'P' ? 'Pendência (transportadora)' : value === 'C' ? 'Pendência (cliente)' : String(value))}
                                 />
                                 <Bar dataKey="P" fill="url(#gradPendP)" radius={[0, 8, 8, 0]} barSize={10} />
                                 <Bar dataKey="C" fill="url(#gradPendC)" radius={[0, 8, 8, 0]} barSize={10} />
@@ -1275,6 +1274,93 @@ export function CondicaoArmazens() {
                         </div>
                       </CardContent>
                     </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20">
+                      <CardContent className="pt-4 pb-3 px-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mapa de tempo de armazém por unidade</p>
+                          <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
+                            {unitHeat.length} unidade(s)
+                          </Badge>
+                        </div>
+                        <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
+                          <div className="w-full min-w-[980px]">
+                            <div className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                              <span>Sigla</span>
+                              <span>Unidade</span>
+                              <span className="text-right">Total</span>
+                              <span className="text-right">0-1</span>
+                              <span className="text-right">2-3</span>
+                              <span className="text-right">4-7</span>
+                              <span className="text-right">8-15</span>
+                              <span className="text-right">16+</span>
+                              <span className="text-right">Máx</span>
+                            </div>
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[360px] overflow-y-auto">
+                              {unitHeat.length === 0 ? (
+                                <div className="px-3 py-10 text-sm text-slate-400 dark:text-slate-500 text-center">—</div>
+                              ) : (
+                                unitHeat.map((u) => {
+                                  const sigla = String(u.unid_atual ?? '').toUpperCase() || '—';
+                                  const nome = unidadesMap[sigla] || '';
+                                  const cell = (n: number, tone: 'slate' | 'blue' | 'amber' | 'orange' | 'red') => {
+                                    const v = n ?? 0;
+                                    const bg =
+                                      v === 0 ? 'bg-slate-50 dark:bg-slate-900/40' :
+                                      tone === 'red' ? 'bg-red-50 dark:bg-red-950/20' :
+                                      tone === 'orange' ? 'bg-orange-50 dark:bg-orange-950/20' :
+                                      tone === 'amber' ? 'bg-amber-50 dark:bg-amber-950/20' :
+                                      tone === 'blue' ? 'bg-blue-50 dark:bg-blue-950/20' :
+                                      'bg-slate-100 dark:bg-slate-800/60';
+                                    const text =
+                                      v === 0 ? 'text-slate-400 dark:text-slate-500' :
+                                      tone === 'red' ? 'text-red-700 dark:text-red-300' :
+                                      tone === 'orange' ? 'text-orange-700 dark:text-orange-300' :
+                                      tone === 'amber' ? 'text-amber-700 dark:text-amber-300' :
+                                      tone === 'blue' ? 'text-blue-700 dark:text-blue-300' :
+                                      'text-slate-700 dark:text-slate-200';
+                                    return (
+                                      <span className={`text-right font-mono tabular-nums px-2 py-1 rounded ${bg} ${text}`}>
+                                        {v.toLocaleString('pt-BR')}
+                                      </span>
+                                    );
+                                  };
+                                  return (
+                                    <div key={sigla} className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-xs items-center">
+                                      <button
+                                        className="text-left font-mono font-semibold text-slate-800 dark:text-slate-200 hover:underline"
+                                        onClick={() => {
+                                          if (!isMTZ) {
+                                            toast.info('Unidade já está definida para seu usuário.');
+                                            return;
+                                          }
+                                          setFilters((f) => ({ ...f, unidadeAtual: [sigla] }));
+                                        }}
+                                      >
+                                        {sigla}
+                                      </button>
+                                      <div className="min-w-0">
+                                        <div className="text-slate-700 dark:text-slate-200 truncate">{nome || '—'}</div>
+                                      </div>
+                                      <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{(u.total ?? 0).toLocaleString('pt-BR')}</span>
+                                      {cell(u.b_0_1, 'slate')}
+                                      {cell(u.b_2_3, 'blue')}
+                                      {cell(u.b_4_7, 'amber')}
+                                      {cell(u.b_8_15, 'orange')}
+                                      {cell(u.b_16p, 'red')}
+                                      {cell(u.max_dias_armazem, 'red')}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
                     <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900 dark:to-indigo-950/20">
                       <CardContent className="pt-4 pb-3 px-4">
                         <div className="flex items-center justify-between gap-3">
@@ -1286,11 +1372,11 @@ export function CondicaoArmazens() {
                             <PieChart>
                               <Pie data={unitDistrib} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} stroke="none">
                                 {unitDistrib.map((_, idx) => {
-                                  const palette = ['#6366f1', '#22c55e', '#f97316', '#ef4444', '#06b6d4', '#a855f7', '#eab308', '#64748b', '#14b8a6', '#f43f5e', '#94a3b8'];
+                                  const palette = ['#6366f1', '#22c55e', '#f97316', '#ef4444', '#06b6d4', '#94a3b8'];
                                   return <Cell key={idx} fill={palette[idx % palette.length]} />;
                                 })}
                               </Pie>
-                              <RechartsTooltip contentStyle={tooltipStyle as any} />
+                              <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(value: any, _name: any, props: any) => [value, String(props?.payload?.fullName ?? props?.payload?.name ?? '')]} />
                               <Legend wrapperStyle={{ fontSize: 11 }} />
                             </PieChart>
                           </ResponsiveContainer>
@@ -1298,389 +1384,308 @@ export function CondicaoArmazens() {
                       </CardContent>
                     </Card>
                   </div>
-                </div>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20">
+                </>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900 dark:to-blue-950/15">
                   <CardContent className="pt-4 pb-3 px-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Mapa de tempo de armazém por unidade</p>
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
-                        {unitHeat.length} unidade(s)
-                      </Badge>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Tempo de armazém por unidade</p>
+                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">CT-es</Badge>
                     </div>
-                    <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40">
-                      <div className="w-full min-w-[980px]">
-                        <div className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
-                          <span>Sigla</span>
-                          <span>Unidade</span>
-                          <span className="text-right">Total</span>
-                          <span className="text-right">0-1</span>
-                          <span className="text-right">2-3</span>
-                          <span className="text-right">4-7</span>
-                          <span className="text-right">8-15</span>
-                          <span className="text-right">16+</span>
-                          <span className="text-right">Máx</span>
-                        </div>
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[360px] overflow-y-auto">
-                          {unitHeat.length === 0 ? (
-                            <div className="px-3 py-10 text-sm text-slate-400 dark:text-slate-500 text-center">—</div>
-                          ) : (
-                            unitHeat.map((u) => {
-                              const sigla = String(u.unid_atual ?? '').toUpperCase() || '—';
-                              const nome = unidadesMap[sigla] || '';
-                              const cell = (n: number, tone: 'slate' | 'blue' | 'amber' | 'orange' | 'red') => {
-                                const v = n ?? 0;
-                                const bg =
-                                  v === 0 ? 'bg-slate-50 dark:bg-slate-900/40' :
-                                  tone === 'red' ? 'bg-red-50 dark:bg-red-950/20' :
-                                  tone === 'orange' ? 'bg-orange-50 dark:bg-orange-950/20' :
-                                  tone === 'amber' ? 'bg-amber-50 dark:bg-amber-950/20' :
-                                  tone === 'blue' ? 'bg-blue-50 dark:bg-blue-950/20' :
-                                  'bg-slate-100 dark:bg-slate-800/60';
-                                const text =
-                                  v === 0 ? 'text-slate-400 dark:text-slate-500' :
-                                  tone === 'red' ? 'text-red-700 dark:text-red-300' :
-                                  tone === 'orange' ? 'text-orange-700 dark:text-orange-300' :
-                                  tone === 'amber' ? 'text-amber-700 dark:text-amber-300' :
-                                  tone === 'blue' ? 'text-blue-700 dark:text-blue-300' :
-                                  'text-slate-700 dark:text-slate-200';
-                                return (
-                                  <span className={`text-right font-mono tabular-nums px-2 py-1 rounded ${bg} ${text}`}>
-                                    {v.toLocaleString('pt-BR')}
-                                  </span>
-                                );
-                              };
-                              return (
-                                <div key={sigla} className="grid grid-cols-[90px_minmax(0,1fr)_80px_70px_70px_70px_70px_70px_70px] gap-2 px-3 py-2 text-xs items-center">
-                                  <button
-                                    className="text-left font-mono font-semibold text-slate-800 dark:text-slate-200 hover:underline"
-                                    onClick={() => {
-                                      if (!isMTZ) {
-                                        toast.info('Unidade já está definida para seu usuário.');
-                                        return;
-                                      }
-                                      setFilters((f) => ({ ...f, unidadeAtual: [sigla] }));
-                                    }}
-                                  >
-                                    {sigla}
-                                  </button>
-                                  <div className="min-w-0">
-                                    <div className="text-slate-700 dark:text-slate-200 truncate">{nome || '—'}</div>
-                                  </div>
-                                  <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{(u.total ?? 0).toLocaleString('pt-BR')}</span>
-                                  {cell(u.b_0_1, 'slate')}
-                                  {cell(u.b_2_3, 'blue')}
-                                  {cell(u.b_4_7, 'amber')}
-                                  {cell(u.b_8_15, 'orange')}
-                                  {cell(u.b_16p, 'red')}
-                                  {cell(u.max_dias_armazem, 'red')}
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
+                    <div className="mt-3 h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={buckets} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                          <XAxis dataKey="unidade" tick={{ fontSize: 11 }} />
+                          <YAxis tick={{ fontSize: 11 }} />
+                          <RechartsTooltip contentStyle={tooltipStyle as any} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="0-1" stackId="a" fill="#a3a3a3" />
+                          <Bar dataKey="2-3" stackId="a" fill="#60a5fa" />
+                          <Bar dataKey="4-7" stackId="a" fill="#f59e0b" />
+                          <Bar dataKey="8-15" stackId="a" fill="#f97316" />
+                          <Bar dataKey="16+" stackId="a" fill="#ef4444" />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
-              </>
-            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900 dark:to-blue-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Tempo de armazém por unidade</p>
-                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">CT-es</Badge>
-                  </div>
-                  <div className="mt-3 h-[260px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={buckets} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                        <XAxis dataKey="unidade" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <RechartsTooltip contentStyle={tooltipStyle as any} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="0-1" stackId="a" fill="#a3a3a3" />
-                        <Bar dataKey="2-3" stackId="a" fill="#60a5fa" />
-                        <Bar dataKey="4-7" stackId="a" fill="#f59e0b" />
-                        <Bar dataKey="8-15" stackId="a" fill="#f97316" />
-                        <Bar dataKey="16+" stackId="a" fill="#ef4444" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Motivo (tipo de ocorrência)</p>
+                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Última ocorrência</Badge>
+                    </div>
+                    <div className="mt-3 h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={pieMotivos} dataKey="count" nameKey="tipo" outerRadius={92} innerRadius={40} stroke="none">
+                            {pieMotivos.map((it, idx) => {
+                              const t = String((it as any).tipoKey ?? '—').toUpperCase();
+                              const tone = (TIPOS_OCOR[t]?.tone ?? 'slate') as any;
+                              const color =
+                                tone === 'red' ? '#ef4444' :
+                                tone === 'orange' ? '#f97316' :
+                                tone === 'emerald' ? '#10b981' :
+                                tone === 'violet' ? '#8b5cf6' :
+                                tone === 'amber' ? '#f59e0b' :
+                                '#94a3b8';
+                              return <Cell key={idx} fill={color} />;
+                            })}
+                          </Pie>
+                          <RechartsTooltip contentStyle={tooltipStyle as any} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950/20">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Motivo (tipo de ocorrência)</p>
-                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Última ocorrência</Badge>
-                  </div>
-                  <div className="mt-3 h-[260px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={pieMotivos} dataKey="count" nameKey="tipo" outerRadius={92} innerRadius={40} stroke="none">
-                          {pieMotivos.map((it, idx) => {
-                            const t = String((it as any).tipoKey ?? '—').toUpperCase();
-                            const tone = (TIPOS_OCOR[t]?.tone ?? 'slate') as any;
-                            const color =
-                              tone === 'red' ? '#ef4444' :
-                              tone === 'orange' ? '#f97316' :
-                              tone === 'emerald' ? '#10b981' :
-                              tone === 'violet' ? '#8b5cf6' :
-                              tone === 'amber' ? '#f59e0b' :
-                              '#94a3b8';
-                            return <Cell key={idx} fill={color} />;
-                          })}
-                        </Pie>
-                        <RechartsTooltip contentStyle={tooltipStyle as any} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-red-50 dark:from-slate-900 dark:to-red-950/15">
-                <CardContent className="pt-4 pb-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top pendências</p>
-                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Códigos</Badge>
-                  </div>
-                  <div className="mt-3 space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                    {topOcorrencias.length === 0 ? (
-                      <div className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">—</div>
-                    ) : (
-                      topOcorrencias.map((o) => {
-                        const tipo = (o.tipo || '').toUpperCase();
-                        const t = TIPOS_OCOR[tipo]?.tone ?? 'slate';
-                        const tipoLabel = TIPOS_OCOR[tipo]?.label ?? tipo;
-                        return (
-                          <button
-                            key={`${o.codigo}-${o.tipo}`}
-                            className="w-full text-left flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-800 p-2 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
-                            onClick={() => setFilters((f) => ({ ...f, codigoUltOcor: String(o.codigo || '') }))}
-                          >
-                            <Badge className={`${toneClasses(t)} text-[11px] shrink-0`}>{o.codigo}</Badge>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                {tipo ? <Badge className={`${toneClasses(t)} text-[11px]`}>{tipoLabel}</Badge> : null}
-                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{o.count}</span>
-                              </div>
-                              <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{o.desc || '—'}</div>
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">CT-es em armazém (todas as unidades)</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Priorize pelo “Dias no armazém” e observe as pendências do cliente e da transportadora para entender o motivo.
-                    </p>
-                  </div>
-                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
-                    {sortedRows.length} registros{rows.length !== sortedRows.length ? ` (de ${rows.length})` : ''} • {page}/{totalPages}
-                  </Badge>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
-                      <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        <th className="px-3 py-2 text-left whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
-                            Unidade{sort.key === 'unidade' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'prio', dir: s.key === 'prio' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Prio{sort.key === 'prio' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Dias{sort.key === 'dias_armazem' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Atraso{sort.key === 'dias_atraso' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-center whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Agend.{sort.key === 'agendado' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-left whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Últ. ocorrência{sort.key === 'ult_ocor' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'hrs_ult', dir: s.key === 'hrs_ult' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Hrs últ.{sort.key === 'hrs_ult' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Vlr Merc.{sort.key === 'vlr_merc' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                        <th className="px-3 py-2 text-right whitespace-nowrap">
-                          <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                            Frete{sort.key === 'vlr_frete' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                          </button>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {sortedRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={13} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
-                            Nenhum CT-e encontrado com os filtros atuais.
-                          </td>
-                        </tr>
+                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-red-50 dark:from-slate-900 dark:to-red-950/15">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Top pendências</p>
+                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">Códigos</Badge>
+                    </div>
+                    <div className="mt-3 space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                      {topOcorrencias.length === 0 ? (
+                        <div className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">—</div>
                       ) : (
-                        pagedRows.map((r) => {
-                          const cte = `${r.ser_cte || ''}-${String(r.nro_cte || 0).padStart(9, '0')}`;
-                          const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
-                          const tone = TIPOS_OCOR[tipo]?.tone ?? 'slate';
-                          const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
-                          const dias = r.dias_armazem ?? 0;
-                          const atraso = r.dias_atraso_prev ?? 0;
-                          const prio = prioridadeScore(r);
-                          const hrsUlt = r.horas_desde_ult_ocor ?? null;
-                          const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
-                          const nomeUnid = unidadesMap[sigla] || '';
-
-                          const rowTone =
-                            tipo === 'P'
-                              ? 'bg-red-50/50 dark:bg-red-950/15'
-                              : tipo === 'C'
-                                ? 'bg-orange-50/50 dark:bg-orange-950/15'
-                                : r.agendado
-                                  ? 'bg-violet-50/40 dark:bg-violet-950/15'
-                                  : '';
-
+                        topOcorrencias.map((o) => {
+                          const tipo = (o.tipo || '').toUpperCase();
+                          const t = TIPOS_OCOR[tipo]?.tone ?? 'slate';
+                          const tipoLabel = TIPOS_OCOR[tipo]?.label ?? tipo;
                           return (
-                            <tr key={r.seq_cte} className={`${rowTone}`}>
-                              <td className="px-3 py-2 whitespace-nowrap">
-                                <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{nomeUnid || '—'}</div>
-                              </td>
-                              <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                                {cte}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
-                                <span className={prio >= 70 ? 'text-red-700 dark:text-red-300 font-bold' : prio >= 45 ? 'text-orange-700 dark:text-orange-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
-                                  {Math.round(prio)}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                {fmtDateBR(r.data_chegada_unid)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
-                                <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
-                                  {dias}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                {fmtDateBR(r.data_prev_ent)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
-                                <span className={atraso > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
-                                  {atraso > 0 ? atraso : 0}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap">
-                                {r.agendado ? <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[11px]">SIM</Badge> : <span className="text-slate-400">—</span>}
-                              </td>
-                              <td className="px-3 py-2 whitespace-nowrap">
+                            <button
+                              key={`${o.codigo}-${o.tipo}`}
+                              className="w-full text-left flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-800 p-2 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
+                              onClick={() => setFilters((f) => ({ ...f, codigoUltOcor: String(o.codigo || '') }))}
+                            >
+                              <Badge className={`${toneClasses(t)} text-[11px] shrink-0`}>{o.codigo}</Badge>
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  {r.ult_ocor_codigo !== null ? (
-                                    <Badge className={`${toneClasses(tone)} text-[11px] font-mono`}>
-                                      {r.ult_ocor_codigo}
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px]">
-                                      —
-                                    </Badge>
-                                  )}
-                                  {tipoLabel ? <Badge className={`${toneClasses(tone)} text-[11px]`}>{tipoLabel}</Badge> : null}
-                                  <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[320px]">
-                                    {r.ult_ocor_descricao || 'Sem ocorrência'}
-                                  </span>
+                                  {tipo ? <Badge className={`${toneClasses(t)} text-[11px]`}>{tipoLabel}</Badge> : null}
+                                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{o.count}</span>
                                 </div>
-                                {(r.ult_ocor_data || r.ult_ocor_hora) && (
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    {fmtDateBR(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
-                                {hrsUlt === null || hrsUlt === undefined ? '—' : Math.round(hrsUlt).toLocaleString('pt-BR')}
-                              </td>
-                              <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 max-w-[320px] truncate">
-                                {r.ult_ocor_complemento || '—'}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
-                                {fmtMoney(r.vlr_merc)}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
-                                {fmtMoney(r.vlr_frete)}
-                              </td>
-                            </tr>
+                                <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{o.desc || '—'}</div>
+                              </div>
+                            </button>
                           );
                         })
                       )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="text-xs text-slate-600 dark:text-slate-300">
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">Totais (filtro/busca):</span>{' '}
-                    {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0))} (merc.) •{' '}
-                    {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0))} (frete) •{' '}
-                    {viewRows.reduce((s, r) => s + (r.qtde_vol ?? 0), 0).toLocaleString('pt-BR')} (vol.) •{' '}
-                    {fmtNum(viewRows.reduce((s, r) => s + (r.peso ?? 0), 0), 0)} (kg) •{' '}
-                    {fmtNum(viewRows.reduce((s, r) => s + (r.cubagem ?? 0), 0), 2)} (m³)
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="lista" className="space-y-6">
+              <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">CT-es em armazém (todas as unidades)</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Priorize pelo “Dias no armazém” e observe as pendências do cliente e da transportadora para entender o motivo.
+                      </p>
+                    </div>
+                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
+                      {sortedRows.length} registros{rows.length !== sortedRows.length ? ` (de ${rows.length})` : ''} • {page}/{totalPages}
+                    </Badge>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page <= 1} onClick={() => setPage(1)}>
-                      «
-                    </Button>
-                    <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                      Anterior
-                    </Button>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                      Página {page} de {totalPages}
-                    </span>
-                    <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                      Próxima
-                    </Button>
-                    <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>
-                      »
-                    </Button>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                        <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          <th className="px-3 py-2 text-left whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
+                              Unidade{sort.key === 'unidade' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'prio', dir: s.key === 'prio' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Prio{sort.key === 'prio' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Dias{sort.key === 'dias_armazem' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Atraso{sort.key === 'dias_atraso' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-center whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Agend.{sort.key === 'agendado' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Últ. ocorrência{sort.key === 'ult_ocor' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'hrs_ult', dir: s.key === 'hrs_ult' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Hrs últ.{sort.key === 'hrs_ult' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Vlr Merc.{sort.key === 'vlr_merc' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                            <button className="hover:underline" onClick={() => setSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Frete{sort.key === 'vlr_frete' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {sortedRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={13} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                              Nenhum CT-e encontrado com os filtros atuais.
+                            </td>
+                          </tr>
+                        ) : (
+                          pagedRows.map((r) => {
+                            const cte = `${r.ser_cte || ''}-${String(r.nro_cte || 0).padStart(9, '0')}`;
+                            const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
+                            const tone = TIPOS_OCOR[tipo]?.tone ?? 'slate';
+                            const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
+                            const dias = r.dias_armazem ?? 0;
+                            const atraso = r.dias_atraso_prev ?? 0;
+                            const prio = prioridadeScore(r);
+                            const hrsUlt = r.horas_desde_ult_ocor ?? null;
+                            const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
+                            const nomeUnid = unidadesMap[sigla] || '';
+
+                            const rowTone =
+                              tipo === 'P'
+                                ? 'bg-red-50/50 dark:bg-red-950/15'
+                                : tipo === 'C'
+                                  ? 'bg-orange-50/50 dark:bg-orange-950/15'
+                                  : r.agendado
+                                    ? 'bg-violet-50/40 dark:bg-violet-950/15'
+                                    : '';
+
+                            return (
+                              <tr key={r.seq_cte} className={`${rowTone}`}>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</div>
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{nomeUnid || '—'}</div>
+                                </td>
+                                <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                  {cte}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                                  <span className={prio >= 70 ? 'text-red-700 dark:text-red-300 font-bold' : prio >= 45 ? 'text-orange-700 dark:text-orange-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
+                                    {Math.round(prio)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                  {fmtDateBR(r.data_chegada_unid)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                                  <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
+                                    {dias}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                  {fmtDateBR(r.data_prev_ent)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                                  <span className={atraso > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
+                                    {atraso > 0 ? atraso : 0}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  {r.agendado ? <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[11px]">SIM</Badge> : <span className="text-slate-400">—</span>}
+                                </td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    {r.ult_ocor_codigo !== null ? (
+                                      <Badge className={`${toneClasses(tone)} text-[11px] font-mono`}>
+                                        {r.ult_ocor_codigo}
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px]">
+                                        —
+                                      </Badge>
+                                    )}
+                                    {tipoLabel ? <Badge className={`${toneClasses(tone)} text-[11px]`}>{tipoLabel}</Badge> : null}
+                                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[320px]">
+                                      {r.ult_ocor_descricao || 'Sem ocorrência'}
+                                    </span>
+                                  </div>
+                                  {(r.ult_ocor_data || r.ult_ocor_hora) && (
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                      {fmtDateBR(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
+                                  {hrsUlt === null || hrsUlt === undefined ? '—' : Math.round(hrsUlt).toLocaleString('pt-BR')}
+                                </td>
+                                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 max-w-[320px] truncate">
+                                  {r.ult_ocor_complemento || '—'}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
+                                  {fmtMoney(r.vlr_merc)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
+                                  {fmtMoney(r.vlr_frete)}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
+                  <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">Totais (filtro/busca):</span>{' '}
+                      {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0))} (merc.) •{' '}
+                      {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0))} (frete) •{' '}
+                      {viewRows.reduce((s, r) => s + (r.qtde_vol ?? 0), 0).toLocaleString('pt-BR')} (vol.) •{' '}
+                      {fmtNum(viewRows.reduce((s, r) => s + (r.peso ?? 0), 0), 0)} (kg) •{' '}
+                      {fmtNum(viewRows.reduce((s, r) => s + (r.cubagem ?? 0), 0), 2)} (m³)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page <= 1} onClick={() => setPage(1)}>
+                        «
+                      </Button>
+                      <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                        Anterior
+                      </Button>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        Página {page} de {totalPages}
+                      </span>
+                      <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                        Próxima
+                      </Button>
+                      <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>
+                        »
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </DashboardLayout>
