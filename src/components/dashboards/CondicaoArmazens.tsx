@@ -744,6 +744,13 @@ export function CondicaoArmazens() {
     return sortedRows.slice(start, start + pageSize);
   }, [sortedRows, page, pageSize]);
 
+  const listaTotais = useMemo(() => {
+    const total = viewRows.length;
+    const vlrMerc = viewRows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0);
+    const vlrFrete = viewRows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0);
+    return { total, vlrMerc, vlrFrete };
+  }, [viewRows]);
+
   const openDrill = useCallback(
     (title: string, predicate: (r: Row) => boolean) => {
       const list = viewRows.filter(predicate);
@@ -1858,9 +1865,9 @@ export function CondicaoArmazens() {
                     </Badge>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[85vh] overflow-y-auto overflow-x-hidden relative">
                     <table className="w-full text-sm table-fixed">
-                      <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                      <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
                         <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           <th className="px-3 py-2 text-left whitespace-nowrap w-[120px]">
                             <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
@@ -2004,15 +2011,26 @@ export function CondicaoArmazens() {
                       </tbody>
                     </table>
                   </div>
+                  <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
+                    <table className="w-full text-sm table-fixed">
+                      <tbody>
+                        <tr className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <td className="px-3 py-2 whitespace-nowrap w-[120px]">TOTAL</td>
+                          <td className="px-3 py-2 whitespace-nowrap w-[90px]">{listaTotais.total.toLocaleString('pt-BR')}</td>
+                          <td className="px-3 py-2 w-[80px]" />
+                          <td className="px-3 py-2 w-[64px]" />
+                          <td className="px-3 py-2 w-[80px]" />
+                          <td className="px-3 py-2 w-[64px]" />
+                          <td className="px-3 py-2 w-[70px]" />
+                          <td className="px-3 py-2 w-[220px]" />
+                          <td className="px-3 py-2" />
+                          <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[110px]">{fmtMoney(listaTotais.vlrMerc)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[110px]">{fmtMoney(listaTotais.vlrFrete)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                   <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div className="text-xs text-slate-600 dark:text-slate-300">
-                      <span className="font-semibold text-slate-800 dark:text-slate-100">Totais (filtro/busca):</span>{' '}
-                      {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0))} (merc.) •{' '}
-                      {fmtMoney(viewRows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0))} (frete) •{' '}
-                      {viewRows.reduce((s, r) => s + (r.qtde_vol ?? 0), 0).toLocaleString('pt-BR')} (vol.) •{' '}
-                      {fmtNum(viewRows.reduce((s, r) => s + (r.peso ?? 0), 0), 0)} (kg) •{' '}
-                      {fmtNum(viewRows.reduce((s, r) => s + (r.cubagem ?? 0), 0), 2)} (m³)
-                    </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={page <= 1} onClick={() => setPage(1)}>
                         «
@@ -2039,7 +2057,7 @@ export function CondicaoArmazens() {
       </div>
 
       <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
-        <DialogContent className="max-w-7xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white dark:bg-slate-900">
+        <DialogContent className="max-w-7xl h-[85vh] flex flex-col overflow-hidden bg-white dark:bg-slate-900">
           <DialogHeader className="shrink-0 pr-16">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
@@ -2055,11 +2073,11 @@ export function CondicaoArmazens() {
             </div>
           </DialogHeader>
 
-          <div className="grid min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)_auto]">
-            <div className="rounded-lg border border-slate-200 dark:border-slate-800 min-h-0 overflow-hidden">
-              <div className="min-h-0 overflow-y-auto overflow-x-hidden relative">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
                 <table className="w-full text-sm table-fixed">
-                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 z-10">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
                     <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                       <th className="px-3 py-2 text-left whitespace-nowrap w-[6%]">
                         <button
@@ -2210,20 +2228,24 @@ export function CondicaoArmazens() {
                       })
                     )}
                   </tbody>
-                  <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 z-10">
+                </table>
+              </div>
+              <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
+                <table className="w-full text-sm table-fixed">
+                  <tbody>
                     <tr className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      <td className="px-3 py-2 whitespace-nowrap">TOTAL</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{drillTotais.total.toLocaleString('pt-BR')}</td>
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2" />
-                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(drillTotais.vlrMerc)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(drillTotais.vlrFrete)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap w-[6%]">TOTAL</td>
+                      <td className="px-3 py-2 whitespace-nowrap w-[10%]">{drillTotais.total.toLocaleString('pt-BR')}</td>
+                      <td className="px-3 py-2 w-[9%]" />
+                      <td className="px-3 py-2 w-[6%]" />
+                      <td className="px-3 py-2 w-[9%]" />
+                      <td className="px-3 py-2 w-[6%]" />
+                      <td className="px-3 py-2 w-[6%]" />
+                      <td className="px-3 py-2 w-[20%]" />
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[14%]">{fmtMoney(drillTotais.vlrMerc)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[14%]">{fmtMoney(drillTotais.vlrFrete)}</td>
                     </tr>
-                  </tfoot>
+                  </tbody>
                 </table>
               </div>
             </div>
