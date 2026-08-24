@@ -23,13 +23,20 @@ $tableCteOcor = "{$domain}_cte_ocorrencia";
 $tableOcor = "{$domain}_ocorrencia";
 $tableEmpParam = "{$domain}_emp_param";
 
+$defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
 $defaultOcorAgendamento = 15;
+$ocorAguardando = $defaultOcorAguardando;
 $ocorAgendamento = $defaultOcorAgendamento;
 try {
-    $resultEmpParam = sql("SELECT ocor_agendamento FROM {$tableEmpParam} LIMIT 1", [], $conn);
+    $resultEmpParam = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento FROM {$tableEmpParam} LIMIT 1", [], $conn);
     $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
-    if ($rowEmpParam && $rowEmpParam['ocor_agendamento'] !== null && $rowEmpParam['ocor_agendamento'] !== '') {
-        $ocorAgendamento = (int)$rowEmpParam['ocor_agendamento'];
+    if ($rowEmpParam) {
+        if ($rowEmpParam['ocor_aguardando_agendamento'] !== null && $rowEmpParam['ocor_aguardando_agendamento'] !== '') {
+            $ocorAguardando = (int)$rowEmpParam['ocor_aguardando_agendamento'];
+        }
+        if ($rowEmpParam['ocor_agendamento'] !== null && $rowEmpParam['ocor_agendamento'] !== '') {
+            $ocorAgendamento = (int)$rowEmpParam['ocor_agendamento'];
+        }
     }
 } catch (Exception $e) {
 }
@@ -131,7 +138,7 @@ if ($tipoUltOcor !== null) {
 
 $apenasAgendados = $filters['apenasAgendados'] ?? false;
 if ($apenasAgendados === true || $apenasAgendados === 1 || $apenasAgendados === '1' || $apenasAgendados === 'true') {
-    $where[] = "(cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_ult_ocor_agend IS NOT NULL)";
+    $where[] = "(cte.ult_ocor_agend IN ({$ocorAgendamento}, {$ocorAguardando}) AND cte.data_ult_ocor_agend IS NOT NULL)";
 }
 
 $whereClause = 'WHERE ' . implode(' AND ', $where);
@@ -196,7 +203,7 @@ base AS (
         cte.data_ult_ocor_agend,
         cte.hora_ult_ocor_agend,
         CASE
-          WHEN cte.ult_ocor_agend = {$ocorAgendamento} AND cte.data_ult_ocor_agend IS NOT NULL THEN TRUE
+          WHEN cte.ult_ocor_agend IN ({$ocorAgendamento}, {$ocorAguardando}) AND cte.data_ult_ocor_agend IS NOT NULL THEN TRUE
           ELSE FALSE
         END AS agendado,
         COALESCE(lo.codigo, cte.ult_ocor) AS ult_ocor_codigo,
@@ -438,6 +445,7 @@ if ($unitTopOcRes) {
 
 respondJson([
     'success' => true,
+    'ocorAguardandoAgendamento' => $ocorAguardando,
     'ocorAgendamento' => $ocorAgendamento,
     'limit' => $limit,
     'rows' => $rows,

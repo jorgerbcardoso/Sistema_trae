@@ -20,6 +20,8 @@ type Ocorrencia = {
 type EmpParam = {
   ocor_aguardando_agendamento: number | null;
   ocor_agendamento: number | null;
+  ocor_saida_transf: number | null;
+  ocor_saida_entrega: number | null;
   ocor_chegada_unid: number | null;
   ocor_chegada_unid_dest: number | null;
   ocor_cte_retido: number | null;
@@ -164,6 +166,8 @@ export function ParametrosEmpresa() {
   const [params, setParams] = useState<EmpParam>({
     ocor_aguardando_agendamento: null,
     ocor_agendamento: null,
+    ocor_saida_transf: null,
+    ocor_saida_entrega: null,
     ocor_chegada_unid: null,
     ocor_chegada_unid_dest: null,
     ocor_cte_retido: null,
@@ -172,6 +176,8 @@ export function ParametrosEmpresa() {
   const [ocorrenciasOpen, setOcorrenciasOpen] = useState<Record<FieldKey, boolean>>({
     ocor_aguardando_agendamento: false,
     ocor_agendamento: false,
+    ocor_saida_transf: false,
+    ocor_saida_entrega: false,
     ocor_chegada_unid: false,
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
@@ -180,6 +186,8 @@ export function ParametrosEmpresa() {
   const [searchTerm, setSearchTerm] = useState<Record<FieldKey, string>>({
     ocor_aguardando_agendamento: '',
     ocor_agendamento: '',
+    ocor_saida_transf: '',
+    ocor_saida_entrega: '',
     ocor_chegada_unid: '',
     ocor_chegada_unid_dest: '',
     ocor_cte_retido: '',
@@ -188,6 +196,8 @@ export function ParametrosEmpresa() {
   const debouncedSearch = {
     ocor_aguardando_agendamento: useDebouncedValue(searchTerm.ocor_aguardando_agendamento, 250),
     ocor_agendamento: useDebouncedValue(searchTerm.ocor_agendamento, 250),
+    ocor_saida_transf: useDebouncedValue(searchTerm.ocor_saida_transf, 250),
+    ocor_saida_entrega: useDebouncedValue(searchTerm.ocor_saida_entrega, 250),
     ocor_chegada_unid: useDebouncedValue(searchTerm.ocor_chegada_unid, 250),
     ocor_chegada_unid_dest: useDebouncedValue(searchTerm.ocor_chegada_unid_dest, 250),
     ocor_cte_retido: useDebouncedValue(searchTerm.ocor_cte_retido, 250),
@@ -196,6 +206,8 @@ export function ParametrosEmpresa() {
   const [loadingOcor, setLoadingOcor] = useState<Record<FieldKey, boolean>>({
     ocor_aguardando_agendamento: false,
     ocor_agendamento: false,
+    ocor_saida_transf: false,
+    ocor_saida_entrega: false,
     ocor_chegada_unid: false,
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
@@ -204,6 +216,8 @@ export function ParametrosEmpresa() {
   const [ocorrencias, setOcorrencias] = useState<Record<FieldKey, Ocorrencia[]>>({
     ocor_aguardando_agendamento: [],
     ocor_agendamento: [],
+    ocor_saida_transf: [],
+    ocor_saida_entrega: [],
     ocor_chegada_unid: [],
     ocor_chegada_unid_dest: [],
     ocor_cte_retido: [],
@@ -225,7 +239,15 @@ export function ParametrosEmpresa() {
       }
       const p = response.params as EmpParam;
       setParams(p);
-      const fields: FieldKey[] = ['ocor_aguardando_agendamento', 'ocor_agendamento', 'ocor_chegada_unid', 'ocor_chegada_unid_dest', 'ocor_cte_retido'];
+      const fields: FieldKey[] = [
+        'ocor_aguardando_agendamento',
+        'ocor_agendamento',
+        'ocor_saida_transf',
+        'ocor_saida_entrega',
+        'ocor_chegada_unid',
+        'ocor_chegada_unid_dest',
+        'ocor_cte_retido',
+      ];
       await Promise.all(
         fields
           .filter((f) => p?.[f] != null)
@@ -262,13 +284,30 @@ export function ParametrosEmpresa() {
   }, []);
 
   useEffect(() => {
-    const fields: FieldKey[] = ['ocor_aguardando_agendamento', 'ocor_agendamento', 'ocor_chegada_unid', 'ocor_chegada_unid_dest', 'ocor_cte_retido'];
+    const fields: FieldKey[] = [
+      'ocor_aguardando_agendamento',
+      'ocor_agendamento',
+      'ocor_saida_transf',
+      'ocor_saida_entrega',
+      'ocor_chegada_unid',
+      'ocor_chegada_unid_dest',
+      'ocor_cte_retido',
+    ];
     fields.forEach((field) => {
       if (ocorrenciasOpen[field]) {
         loadOcorrencias(field, debouncedSearch[field]);
       }
     });
-  }, [ocorrenciasOpen, debouncedSearch.ocor_aguardando_agendamento, debouncedSearch.ocor_agendamento, debouncedSearch.ocor_chegada_unid, debouncedSearch.ocor_chegada_unid_dest, debouncedSearch.ocor_cte_retido]);
+  }, [
+    ocorrenciasOpen,
+    debouncedSearch.ocor_aguardando_agendamento,
+    debouncedSearch.ocor_agendamento,
+    debouncedSearch.ocor_saida_transf,
+    debouncedSearch.ocor_saida_entrega,
+    debouncedSearch.ocor_chegada_unid,
+    debouncedSearch.ocor_chegada_unid_dest,
+    debouncedSearch.ocor_cte_retido,
+  ]);
 
   const save = async () => {
     try {
@@ -341,6 +380,44 @@ export function ParametrosEmpresa() {
               selectedLabel={
                 params.ocor_agendamento != null
                   ? `${formatOcorCodigo(params.ocor_agendamento)}. ${occurrenceMap.get(params.ocor_agendamento)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
+            />
+            <OcorrenciaPicker
+              field="ocor_saida_transf"
+              label="Saída para Transferência"
+              placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_saida_transf}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_saida_transf}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_saida_transf}
+              isLoadingList={loadingOcor.ocor_saida_transf}
+              selectedCode={params.ocor_saida_transf}
+              selectedLabel={
+                params.ocor_saida_transf != null
+                  ? `${formatOcorCodigo(params.ocor_saida_transf)}. ${occurrenceMap.get(params.ocor_saida_transf)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
+            />
+            <OcorrenciaPicker
+              field="ocor_saida_entrega"
+              label="Saída para Entrega"
+              placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_saida_entrega}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_saida_entrega}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_saida_entrega}
+              isLoadingList={loadingOcor.ocor_saida_entrega}
+              selectedCode={params.ocor_saida_entrega}
+              selectedLabel={
+                params.ocor_saida_entrega != null
+                  ? `${formatOcorCodigo(params.ocor_saida_entrega)}. ${occurrenceMap.get(params.ocor_saida_entrega)?.descricao ?? ''}`.trim()
                   : 'Selecionar ocorrência'
               }
               onSelect={handleSelect}
