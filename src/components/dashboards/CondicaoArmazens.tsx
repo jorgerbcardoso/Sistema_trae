@@ -154,6 +154,13 @@ function fmtDateBR(iso: string | null | undefined) {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+function fmtDateBR2y(iso: string | null | undefined) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(iso);
+  return `${m[3]}/${m[2]}/${String(m[1]).slice(2)}`;
+}
+
 function fmtMoney(n: number | null | undefined) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '';
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -483,6 +490,50 @@ export function CondicaoArmazens() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `condicao_armazens_${(dominio || 'DOM').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportarCSVLista = () => {
+    const lista = sortedRows;
+    if (!lista.length) {
+      toast.info('Nenhum registro para exportar.');
+      return;
+    }
+
+    const header = ['Unidade', 'CT-e', 'Chegada', 'Dias', 'Prev. Ent.', 'Atraso', 'Agendado', 'Últ. ocorrência', 'Complemento', 'Vlr Merc.', 'Frete'];
+
+    const rowsCsv = lista.map((r) => {
+      const sigla = String(r.unid_atual ?? '').trim().toUpperCase();
+      const cte = fmtCte(r.ser_cte, r.nro_cte);
+      const ult = r.ult_ocor_codigo !== null ? String(r.ult_ocor_codigo) : '';
+      const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
+      const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
+      const desc = String(r.ult_ocor_descricao ?? '').trim();
+      const ultTxt = [ult, tipoLabel, desc].filter(Boolean).join(' • ');
+      const vlrMerc = r.vlr_merc ?? null;
+      const vlrFrete = r.vlr_frete ?? null;
+      return [
+        csvEscape(sigla),
+        csvEscape(cte),
+        csvEscape(fmtDateBR2y(r.data_chegada_unid)),
+        csvEscape(r.dias_armazem ?? ''),
+        csvEscape(fmtDateBR2y(r.data_prev_ent)),
+        csvEscape(Math.max(0, r.dias_atraso_prev ?? 0)),
+        csvEscape(r.agendado ? 'SIM' : 'NÃO'),
+        csvEscape(ultTxt),
+        csvEscape(r.ult_ocor_complemento ?? ''),
+        csvEscape(vlrMerc !== null && Number.isFinite(vlrMerc) ? Number(vlrMerc).toFixed(2).replace('.', ',') : ''),
+        csvEscape(vlrFrete !== null && Number.isFinite(vlrFrete) ? Number(vlrFrete).toFixed(2).replace('.', ',') : ''),
+      ];
+    });
+
+    const csv = [header.join(';'), ...rowsCsv.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `condicao_armazens_lista_${(dominio || 'DOM').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1142,27 +1193,33 @@ export function CondicaoArmazens() {
 
         {!loading && !erro && (
           <>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 w-fit">
-              <button
-                onClick={() => setViewMode('dashboard')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'dashboard'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => setViewMode('lista')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'lista'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-              >
-                Lista
-              </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 w-fit">
+                <button
+                  onClick={() => setViewMode('dashboard')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'dashboard'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setViewMode('lista')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'lista'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Lista
+                </button>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportarCSVLista} disabled={loading || sortedRows.length === 0} className="h-9 dark:border-slate-700 dark:hover:bg-slate-800">
+                <Download className="w-4 h-4" />
+                <span className="ml-1.5">CSV</span>
+              </Button>
             </div>
 
             {viewMode === 'dashboard' ? (
@@ -1688,44 +1745,44 @@ export function CondicaoArmazens() {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
                       <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                         <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          <th className="px-3 py-2 text-left whitespace-nowrap">
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[120px]">
                             <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}>
                               Unidade{sort.key === 'unidade' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[90px]">CT-e</th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">Chegada</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap w-[64px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Dias{sort.key === 'dias_armazem' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">Prev. Ent.</th>
+                          <th className="px-3 py-2 text-right whitespace-nowrap w-[64px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Atraso{sort.key === 'dias_atraso' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-center whitespace-nowrap">
+                          <th className="px-3 py-2 text-center whitespace-nowrap w-[70px]">
                             <button className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Agend.{sort.key === 'agendado' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap">
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[220px]">
                             <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Últ. ocorrência{sort.key === 'ult_ocor' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                          <th className="px-3 py-2 text-right whitespace-nowrap w-[110px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Vlr Merc.{sort.key === 'vlr_merc' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
+                          <th className="px-3 py-2 text-right whitespace-nowrap w-[110px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Frete{sort.key === 'vlr_frete' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
@@ -1761,23 +1818,23 @@ export function CondicaoArmazens() {
 
                             return (
                               <tr key={r.seq_cte} className={`${rowTone}`}>
-                                <td className="px-3 py-2 whitespace-nowrap">
+                                <td className="px-3 py-2 whitespace-nowrap w-[120px]">
                                   <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</div>
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{nomeUnid || '—'}</div>
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[140px]">{nomeUnid || '—'}</div>
                                 </td>
                                 <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
                                   {cte}
                                 </td>
-                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                  {fmtDateBR(r.data_chegada_unid)}
+                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
+                                  {fmtDateBR2y(r.data_chegada_unid)}
                                 </td>
                                 <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                                   <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
                                     {dias}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                  {fmtDateBR(r.data_prev_ent)}
+                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">
+                                  {fmtDateBR2y(r.data_prev_ent)}
                                 </td>
                                 <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                                   <span className={atraso > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
@@ -1799,7 +1856,7 @@ export function CondicaoArmazens() {
                                       </Badge>
                                     )}
                                     {tipoLabel ? <Badge className={`${toneClasses(tone)} text-[11px]`}>{tipoLabel}</Badge> : null}
-                                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[320px]">
+                                    <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[220px]">
                                       {r.ult_ocor_descricao || 'Sem ocorrência'}
                                     </span>
                                   </div>
