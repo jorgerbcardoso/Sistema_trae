@@ -57,6 +57,8 @@ type Row = {
   seq_cte: number;
   ser_cte: string;
   nro_cte: number;
+  tp_documento?: string | null;
+  entrega_abonada?: boolean;
   data_emissao: string | null;
   data_prev_ent: string | null;
   data_chegada_unid: string | null;
@@ -136,16 +138,14 @@ type ApiResponse = {
 };
 
 const TIPOS_OCOR: Record<string, { label: string; badge: string; tone: 'slate' | 'amber' | 'red' | 'orange' | 'emerald' | 'violet' }> = {
-  B: { label: 'Baixa', badge: 'B', tone: 'slate' },
   S: { label: 'Solução', badge: 'S', tone: 'emerald' },
   R: { label: 'Reentrega', badge: 'R', tone: 'violet' },
-  E: { label: 'Entrega', badge: 'E', tone: 'emerald' },
   I: { label: 'Informativa', badge: 'I', tone: 'slate' },
   C: { label: 'Pendência por culpa do cliente', badge: 'C', tone: 'orange' },
   P: { label: 'Pendência por culpa da transportadora', badge: 'P', tone: 'red' },
 };
 
-const TODOS_TIPOS_OCOR = ['B', 'S', 'R', 'E', 'I', 'C', 'P'] as const;
+const TODOS_TIPOS_OCOR = ['S', 'R', 'I', 'C', 'P'] as const;
 
 function fmtDateBR(iso: string | null | undefined) {
   if (!iso) return '';
@@ -162,6 +162,12 @@ function fmtMoney(n: number | null | undefined) {
 function fmtNum(n: number | null | undefined, maxFractionDigits: number) {
   if (n === null || n === undefined || !Number.isFinite(n)) return '';
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: maxFractionDigits });
+}
+
+function fmtCte(ser: string | null | undefined, nro: number | null | undefined) {
+  const s = String(ser ?? '').trim();
+  const n = String(nro ?? 0).padStart(6, '0');
+  return `${s}${n}`;
 }
 
 function toneClasses(tone: 'slate' | 'amber' | 'red' | 'orange' | 'emerald' | 'violet') {
@@ -215,10 +221,15 @@ export function CondicaoArmazens() {
   const [unitStats, setUnitStats] = useState<UnitStats[]>([]);
   const [unitMotivos, setUnitMotivos] = useState<UnitMotivo[]>([]);
   const [unitTopOcorrencias, setUnitTopOcorrencias] = useState<UnitTopOcorrencia[]>([]);
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<Row[]>([]);
+  const drillPageSize = 80;
+  const [drillPage, setDrillPage] = useState(1);
 
   const [busca, setBusca] = useState('');
-  const [sort, setSort] = useState<{ key: 'prio' | 'unidade' | 'dias_armazem' | 'dias_atraso' | 'agendado' | 'ult_ocor' | 'hrs_ult' | 'vlr_merc' | 'vlr_frete'; dir: 'asc' | 'desc' }>({
-    key: 'prio',
+  const [sort, setSort] = useState<{ key: 'unidade' | 'dias_armazem' | 'dias_atraso' | 'agendado' | 'ult_ocor' | 'vlr_merc' | 'vlr_frete'; dir: 'asc' | 'desc' }>({
+    key: 'dias_armazem',
     dir: 'desc',
   });
   const pageSize = 70;
@@ -363,34 +374,26 @@ export function CondicaoArmazens() {
 
   const clearAllFilters = () => {
     setBusca('');
-    setSort({ key: 'prio', dir: 'desc' });
+    setSort({ key: 'dias_armazem', dir: 'desc' });
     setPage(1);
     setFilters({ ...filtrosVazios, unidadeAtual: isMTZ ? [] : [unidadeLogada] });
     setShowFilters(false);
   };
 
   const applyFilters = () => {
-    setFilters({ ...tempFilters, unidadeAtual: isMTZ ? tempFilters.unidadeAtual : [unidadeLogada] });
+    const tiposValidos = new Set(TODOS_TIPOS_OCOR.map((t) => String(t)));
+    const nextTipos = Array.from(new Set((tempFilters.tipoUltOcor ?? []).map((t) => String(t).trim().toUpperCase()).filter((t) => tiposValidos.has(t))));
+    setFilters({ ...tempFilters, tipoUltOcor: nextTipos, unidadeAtual: isMTZ ? tempFilters.unidadeAtual : [unidadeLogada] });
     setShowFilters(false);
   };
 
   const cancelFilters = () => setShowFilters(false);
 
-  const prioridadeScore = useCallback((r: Row) => {
-    const dias = Math.max(0, r.dias_armazem ?? 0);
-    const atraso = Math.max(0, r.dias_atraso_prev ?? 0);
-    const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
-    const base = dias * 2 + atraso * 3;
-    const add = tipo === 'P' ? 25 : tipo === 'C' ? 15 : tipo === '' ? 5 : 0;
-    const ag = r.agendado ? -5 : 0;
-    return base + add + ag;
-  }, []);
-
   const viewRows = useMemo(() => {
     const q = busca.trim().toUpperCase();
     if (!q) return rows;
     return rows.filter((r) => {
-      const cte = `${r.ser_cte || ''}-${String(r.nro_cte || 0).padStart(9, '0')}`.toUpperCase();
+      const cte = fmtCte(r.ser_cte, r.nro_cte).toUpperCase();
       const campos = [
         String(r.unid_atual ?? ''),
         String(r.sigla_emit ?? ''),
@@ -441,12 +444,11 @@ export function CondicaoArmazens() {
       'Últ. ocorrência (descrição)',
       'Últ. ocorrência (data)',
       'Últ. ocorrência (hora)',
-      'Horas desde últ. ocorrência',
       'Complemento',
     ];
 
     const rowsCsv = lista.map((r) => {
-      const cte = `${r.ser_cte || ''}-${String(r.nro_cte || 0).padStart(9, '0')}`;
+      const cte = fmtCte(r.ser_cte, r.nro_cte);
       return [
         csvEscape(r.unid_atual ?? ''),
         csvEscape(cte),
@@ -471,7 +473,6 @@ export function CondicaoArmazens() {
         csvEscape(r.ult_ocor_descricao ?? ''),
         csvEscape(r.ult_ocor_data ?? ''),
         csvEscape(r.ult_ocor_hora ?? ''),
-        csvEscape(r.horas_desde_ult_ocor ?? ''),
         csvEscape(r.ult_ocor_complemento ?? ''),
       ];
     });
@@ -640,11 +641,6 @@ export function CondicaoArmazens() {
         const ab = num(b.ult_ocor_codigo ?? null);
         if (aa !== ab) return (aa - ab) * mul;
       }
-      if (sort.key === 'hrs_ult') {
-        const aa = num(a.horas_desde_ult_ocor ?? null);
-        const ab = num(b.horas_desde_ult_ocor ?? null);
-        if (aa !== ab) return (aa - ab) * mul;
-      }
       if (sort.key === 'vlr_merc') {
         const aa = num(a.vlr_merc);
         const ab = num(b.vlr_merc);
@@ -655,18 +651,13 @@ export function CondicaoArmazens() {
         const ab = num(b.vlr_frete);
         if (aa !== ab) return (aa - ab) * mul;
       }
-      if (sort.key === 'prio') {
-        const sa = prioridadeScore(a);
-        const sb = prioridadeScore(b);
-        if (sa !== sb) return (sa - sb) * mul;
-      }
       const da2 = a.dias_armazem ?? -1;
       const db2 = b.dias_armazem ?? -1;
       if (da2 !== db2) return db2 - da2;
       return (b.seq_cte ?? 0) - (a.seq_cte ?? 0);
     });
     return copy;
-  }, [viewRows, sort, prioridadeScore]);
+  }, [viewRows, sort]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedRows.length / pageSize)), [sortedRows.length, pageSize]);
 
@@ -678,6 +669,108 @@ export function CondicaoArmazens() {
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
   }, [sortedRows, page, pageSize]);
+
+  const openDrill = useCallback(
+    (title: string, predicate: (r: Row) => boolean) => {
+      const list = viewRows.filter(predicate);
+      list.sort((a, b) => (b.dias_armazem ?? 0) - (a.dias_armazem ?? 0));
+      setDrillTitle(`${title} (${list.length})`);
+      setDrillRows(list);
+      setDrillPage(1);
+      setDrillOpen(true);
+    },
+    [viewRows]
+  );
+
+  const exportarDrillCSV = () => {
+    const lista = drillRows;
+    if (!lista.length) {
+      toast.info('Nenhum registro para exportar.');
+      return;
+    }
+
+    const header = [
+      'Unidade atual',
+      'CT-e',
+      'Emissão',
+      'Chegada na unidade',
+      'Dias no armazém',
+      'Prev. entrega',
+      'Dias atraso (prev.)',
+      'Agendado',
+      'Emitente',
+      'Destinatário',
+      'Pagador',
+      'Origem',
+      'Destino',
+      'Volumes',
+      'Peso',
+      'Cubagem',
+      'Vlr. mercadoria',
+      'Frete',
+      'Últ. ocorrência (código)',
+      'Últ. ocorrência (tipo)',
+      'Últ. ocorrência (descrição)',
+      'Últ. ocorrência (data)',
+      'Últ. ocorrência (hora)',
+      'Complemento',
+    ];
+
+    const rowsCsv = lista.map((r) => {
+      const cte = fmtCte(r.ser_cte, r.nro_cte);
+      return [
+        csvEscape(r.unid_atual ?? ''),
+        csvEscape(cte),
+        csvEscape(r.data_emissao ?? ''),
+        csvEscape(r.data_chegada_unid ?? ''),
+        csvEscape(r.dias_armazem ?? ''),
+        csvEscape(r.data_prev_ent ?? ''),
+        csvEscape(r.dias_atraso_prev ?? ''),
+        csvEscape(r.agendado ? 'SIM' : 'NÃO'),
+        csvEscape(r.nome_emit ?? ''),
+        csvEscape(r.nome_dest ?? ''),
+        csvEscape(r.nome_pag ?? ''),
+        csvEscape(r.sigla_emit ?? ''),
+        csvEscape(r.sigla_dest ?? ''),
+        csvEscape(r.qtde_vol ?? ''),
+        csvEscape(r.peso ?? ''),
+        csvEscape(r.cubagem ?? ''),
+        csvEscape(r.vlr_merc ?? ''),
+        csvEscape(r.vlr_frete ?? ''),
+        csvEscape(r.ult_ocor_codigo ?? ''),
+        csvEscape(r.ult_ocor_tipo ?? ''),
+        csvEscape(r.ult_ocor_descricao ?? ''),
+        csvEscape(r.ult_ocor_data ?? ''),
+        csvEscape(r.ult_ocor_hora ?? ''),
+        csvEscape(r.ult_ocor_complemento ?? ''),
+      ];
+    });
+
+    const csv = [header.join(';'), ...rowsCsv.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safe = String(drillTitle || 'drilldown')
+      .replace(/\s+/g, '_')
+      .replace(/[^\w\-_.]+/g, '')
+      .slice(0, 80);
+    a.href = url;
+    a.download = `condicao_armazens_${(dominio || 'DOM').toLowerCase()}_${safe}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const drillTotalPages = useMemo(() => Math.max(1, Math.ceil(drillRows.length / drillPageSize)), [drillRows.length, drillPageSize]);
+
+  useEffect(() => {
+    if (!drillOpen) return;
+    setDrillPage((p) => Math.min(Math.max(1, p), drillTotalPages));
+  }, [drillTotalPages, drillOpen]);
+
+  const drillPagedRows = useMemo(() => {
+    const start = (drillPage - 1) * drillPageSize;
+    return drillRows.slice(start, start + drillPageSize);
+  }, [drillRows, drillPage, drillPageSize]);
 
   const unitRank = useMemo(() => {
     const calc = (u: UnitStats) => {
@@ -739,15 +832,22 @@ export function CondicaoArmazens() {
   const unitDistrib = useMemo(() => {
     const items = [...unitStats].sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
     const top = items.slice(0, 5);
-    const rest = items.slice(5).reduce((s, u) => s + (u.total ?? 0), 0);
+    const restItems = items.slice(5);
+    const rest = restItems.reduce((s, u) => s + (u.total ?? 0), 0);
     const label = (sigla: string) => {
       const s = String(sigla ?? '').trim().toUpperCase();
       const nome = unidadesMap[s] || '';
       return nome ? `${s} - ${nome}` : s || '—';
     };
     const sigla = (s: string) => String(s ?? '').trim().toUpperCase() || '—';
-    const data = top.map((u) => ({ name: sigla(u.unid_atual), fullName: label(u.unid_atual), value: u.total ?? 0 }));
-    if (rest > 0) data.push({ name: 'Demais', fullName: 'Demais', value: rest });
+    const data = top.map((u) => {
+      const s = sigla(u.unid_atual);
+      return { name: s, fullName: label(u.unid_atual), value: u.total ?? 0, units: [s] };
+    });
+    if (rest > 0) {
+      const units = restItems.map((u) => sigla(u.unid_atual)).filter((u) => u && u !== '—');
+      data.push({ name: 'Demais', fullName: 'Demais', value: rest, units });
+    }
     return data;
   }, [unitStats, unidadesMap]);
 
@@ -913,7 +1013,7 @@ export function CondicaoArmazens() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {(['C', 'P', 'B', 'S', 'R', 'E', 'I'] as const).map((t) => {
+                      {TODOS_TIPOS_OCOR.map((t) => {
                         const ativo = (tempFilters.tipoUltOcor ?? []).includes(t);
                         const tone = (TIPOS_OCOR[t]?.tone ?? 'slate') as any;
                         return (
@@ -1068,7 +1168,10 @@ export function CondicaoArmazens() {
             {viewMode === 'dashboard' ? (
               <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-900 dark:to-indigo-950/20">
+                <Card
+                  className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                  onClick={() => openDrill('Total no armazém', () => true)}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <Warehouse className="w-3.5 h-3.5" />
@@ -1077,7 +1180,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.total}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-amber-50 to-white dark:from-slate-900 dark:to-amber-950/20">
+                <Card
+                  className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800 cursor-pointer"
+                  onClick={() => openDrill('Parados ≥ 4 dias', (r) => (r.dias_armazem ?? 0) >= 4)}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <CalendarDays className="w-3.5 h-3.5" />
@@ -1086,7 +1192,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados4}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-red-50 to-white dark:from-slate-900 dark:to-red-950/15">
+                <Card
+                  className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800 cursor-pointer"
+                  onClick={() => openDrill('Parados ≥ 8 dias', (r) => (r.dias_armazem ?? 0) >= 8)}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <CalendarDays className="w-3.5 h-3.5" />
@@ -1095,7 +1204,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.parados8}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-rose-50 to-white dark:from-slate-900 dark:to-rose-950/15">
+                <Card
+                  className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900 border-rose-200 dark:border-rose-800 cursor-pointer"
+                  onClick={() => openDrill('Atrasados (prev.)', (r) => (r.dias_atraso_prev ?? 0) > 0)}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <Clock className="w-3.5 h-3.5" />
@@ -1104,7 +1216,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.atrasoPrev}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-violet-50 to-white dark:from-slate-900 dark:to-violet-950/15">
+                <Card
+                  className="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950 dark:to-violet-900 border-violet-200 dark:border-violet-800 cursor-pointer"
+                  onClick={() => openDrill('Agendados', (r) => !!r.agendado)}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <CalendarDays className="w-3.5 h-3.5" />
@@ -1116,7 +1231,10 @@ export function CondicaoArmazens() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-orange-50 to-white dark:from-slate-900 dark:to-orange-950/20">
+                <Card
+                  className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800 cursor-pointer"
+                  onClick={() => openDrill('Pendência por culpa do cliente', (r) => String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'C')}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-500" />
@@ -1125,7 +1243,10 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendCliente}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-fuchsia-50 to-white dark:from-slate-900 dark:to-fuchsia-950/15">
+                <Card
+                  className="bg-gradient-to-br from-fuchsia-50 to-fuchsia-100 dark:from-fuchsia-950 dark:to-fuchsia-900 border-fuchsia-200 dark:border-fuchsia-800 cursor-pointer"
+                  onClick={() => openDrill('Pendência por culpa da transportadora', (r) => String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'P')}
+                >
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="inline-block w-2.5 h-2.5 rounded-full bg-fuchsia-500" />
@@ -1134,7 +1255,7 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totais.pendTransp}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-emerald-50 to-white dark:from-slate-900 dark:to-emerald-950/15">
+                <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="font-black text-emerald-600 dark:text-emerald-400">R$</span>
@@ -1143,7 +1264,7 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrMerc)}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-sky-50 to-white dark:from-slate-900 dark:to-sky-950/15">
+                <Card className="bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-950 dark:to-sky-900 border-sky-200 dark:border-sky-800">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="font-black text-sky-600 dark:text-sky-400">R$</span>
@@ -1152,7 +1273,7 @@ export function CondicaoArmazens() {
                     <div className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{fmtMoney(totais.totalVlrFrete)}</div>
                   </CardContent>
                 </Card>
-                <Card className="border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 to-white dark:from-slate-900 dark:to-teal-950/15">
+                <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 border-teal-200 dark:border-teal-800">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <CalendarDays className="w-3.5 h-3.5" />
@@ -1229,10 +1350,13 @@ export function CondicaoArmazens() {
                                   const pct = Math.round((Number(u.score ?? 0) / maxScore) * 100);
                                   return (
                                     <div key={sigla} className="grid grid-cols-[minmax(0,220px)_70px_70px_110px_130px_80px_minmax(0,1fr)] gap-2 px-3 py-2 text-xs items-center">
-                                      <div className="min-w-0">
+                                      <button
+                                        className="min-w-0 text-left hover:bg-slate-50 dark:hover:bg-slate-900/60 rounded px-1 -mx-1 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla)}
+                                      >
                                         <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{sigla}</div>
                                         <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{nome || '—'}</div>
-                                      </div>
+                                      </button>
                                       <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.total ?? 0}</span>
                                       <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.parados8 ?? 0}</span>
                                       <span className="text-right font-mono tabular-nums text-orange-700 dark:text-orange-300 font-semibold">{u.pend_cliente ?? 0}</span>
@@ -1285,8 +1409,28 @@ export function CondicaoArmazens() {
                                   wrapperStyle={{ fontSize: 11 }}
                                   formatter={(value: any) => (value === 'P' ? 'Pendência (transportadora)' : value === 'C' ? 'Pendência (cliente)' : String(value))}
                                 />
-                                <Bar dataKey="P" fill="url(#gradPendP)" radius={[0, 8, 8, 0]} barSize={10} />
-                                <Bar dataKey="C" fill="url(#gradPendC)" radius={[0, 8, 8, 0]} barSize={10} />
+                                <Bar
+                                  dataKey="P"
+                                  fill="url(#gradPendP)"
+                                  radius={[0, 8, 8, 0]}
+                                  barSize={10}
+                                  onClick={(d: any) => {
+                                    const sigla = String(d?.payload?.unidade ?? '').trim().toUpperCase() || '—';
+                                    const nome = unidadesMap[sigla] || '';
+                                    openDrill(`Pendência (transportadora) • ${sigla}${nome ? ` - ${nome}` : ''}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'P');
+                                  }}
+                                />
+                                <Bar
+                                  dataKey="C"
+                                  fill="url(#gradPendC)"
+                                  radius={[0, 8, 8, 0]}
+                                  barSize={10}
+                                  onClick={(d: any) => {
+                                    const sigla = String(d?.payload?.unidade ?? '').trim().toUpperCase() || '—';
+                                    const nome = unidadesMap[sigla] || '';
+                                    openDrill(`Pendência (cliente) • ${sigla}${nome ? ` - ${nome}` : ''}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'C');
+                                  }}
+                                />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
@@ -1351,11 +1495,7 @@ export function CondicaoArmazens() {
                                       <button
                                       className="text-left font-mono font-semibold text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                                         onClick={() => {
-                                          if (!isMTZ) {
-                                            toast.info('Unidade já está definida para seu usuário.');
-                                            return;
-                                          }
-                                          setFilters((f) => ({ ...f, unidadeAtual: [sigla] }));
+                                          openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla);
                                         }}
                                       >
                                         {sigla}
@@ -1390,9 +1530,19 @@ export function CondicaoArmazens() {
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie data={unitDistrib} dataKey="value" nameKey="name" innerRadius={44} outerRadius={80} stroke="none" cx="35%" cy="50%">
-                                {unitDistrib.map((_, idx) => {
+                                {unitDistrib.map((it: any, idx) => {
                                   const palette = ['#6366f1', '#22c55e', '#f97316', '#ef4444', '#06b6d4', '#94a3b8'];
-                                  return <Cell key={idx} fill={palette[idx % palette.length]} />;
+                                  return (
+                                    <Cell
+                                      key={idx}
+                                      fill={palette[idx % palette.length]}
+                                      className="cursor-pointer"
+                                      onClick={() => {
+                                        const units = Array.isArray(it?.units) ? (it.units as string[]) : [];
+                                        openDrill(`CT-es no armazém • ${String(it?.fullName ?? it?.name ?? '')}`, (r) => units.includes(String(r.unid_atual ?? '').trim().toUpperCase()));
+                                      }}
+                                    />
+                                  );
                                 })}
                               </Pie>
                               <RechartsTooltip contentStyle={tooltipStyle as any} formatter={(value: any, _name: any, props: any) => [value, String(props?.payload?.fullName ?? props?.payload?.name ?? '')]} />
@@ -1458,7 +1608,20 @@ export function CondicaoArmazens() {
                                 tone === 'violet' ? '#8b5cf6' :
                                 tone === 'amber' ? '#f59e0b' :
                                 '#94a3b8';
-                              return <Cell key={idx} fill={color} />;
+                              return (
+                                <Cell
+                                  key={idx}
+                                  fill={color}
+                                  className="cursor-pointer"
+                                  onClick={() => {
+                                    const label = String((it as any).tipo ?? '');
+                                    openDrill(`Motivo • ${label}`, (r) => {
+                                      const rt = String(r.ult_ocor_tipo ?? '').trim().toUpperCase() || '—';
+                                      return rt === t;
+                                    });
+                                  }}
+                                />
+                              );
                             })}
                           </Pie>
                           <RechartsTooltip contentStyle={tooltipStyle as any} />
@@ -1487,7 +1650,10 @@ export function CondicaoArmazens() {
                             <button
                               key={`${o.codigo}-${o.tipo}`}
                               className="w-full text-left flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-800 p-2 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
-                              onClick={() => setFilters((f) => ({ ...f, codigoUltOcor: String(o.codigo || '') }))}
+                              onClick={() => {
+                                const cod = Number(o.codigo);
+                                openDrill(`CT-es com pendência ${o.codigo}${o.desc ? ` - ${o.desc}` : ''}`, (r) => Number(r.ult_ocor_codigo ?? 0) === cod);
+                              }}
                             >
                               <Badge className={`${toneClasses(t)} text-[11px] shrink-0`}>{o.codigo}</Badge>
                               <div className="min-w-0 flex-1">
@@ -1531,11 +1697,6 @@ export function CondicaoArmazens() {
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'prio', dir: s.key === 'prio' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                              Prio{sort.key === 'prio' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                            </button>
-                          </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
@@ -1558,11 +1719,6 @@ export function CondicaoArmazens() {
                               Últ. ocorrência{sort.key === 'ult_ocor' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-right whitespace-nowrap">
-                            <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'hrs_ult', dir: s.key === 'hrs_ult' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
-                              Hrs últ.{sort.key === 'hrs_ult' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-                            </button>
-                          </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
                           <th className="px-3 py-2 text-right whitespace-nowrap">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
@@ -1579,20 +1735,18 @@ export function CondicaoArmazens() {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {sortedRows.length === 0 ? (
                           <tr>
-                            <td colSpan={13} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                            <td colSpan={11} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
                               Nenhum CT-e encontrado com os filtros atuais.
                             </td>
                           </tr>
                         ) : (
                           pagedRows.map((r) => {
-                            const cte = `${r.ser_cte || ''}-${String(r.nro_cte || 0).padStart(9, '0')}`;
+                            const cte = fmtCte(r.ser_cte, r.nro_cte);
                             const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
                             const tone = TIPOS_OCOR[tipo]?.tone ?? 'slate';
                             const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
                             const dias = r.dias_armazem ?? 0;
                             const atraso = r.dias_atraso_prev ?? 0;
-                            const prio = prioridadeScore(r);
-                            const hrsUlt = r.horas_desde_ult_ocor ?? null;
                             const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
                             const nomeUnid = unidadesMap[sigla] || '';
 
@@ -1613,11 +1767,6 @@ export function CondicaoArmazens() {
                                 </td>
                                 <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
                                   {cte}
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
-                                  <span className={prio >= 70 ? 'text-red-700 dark:text-red-300 font-bold' : prio >= 45 ? 'text-orange-700 dark:text-orange-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
-                                    {Math.round(prio)}
-                                  </span>
                                 </td>
                                 <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                                   {fmtDateBR(r.data_chegada_unid)}
@@ -1659,9 +1808,6 @@ export function CondicaoArmazens() {
                                       {fmtDateBR(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
                                     </div>
                                   )}
-                                </td>
-                                <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">
-                                  {hrsUlt === null || hrsUlt === undefined ? '—' : Math.round(hrsUlt).toLocaleString('pt-BR')}
                                 </td>
                                 <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 max-w-[320px] truncate">
                                   {r.ult_ocor_complemento || '—'}
@@ -1712,6 +1858,142 @@ export function CondicaoArmazens() {
           </>
         )}
       </div>
+
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="max-w-7xl h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-white dark:bg-slate-900">
+          <DialogHeader className="shrink-0 pr-16">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-slate-900 dark:text-slate-100 truncate">{drillTitle || 'CT-es'}</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-400">Lista de CT-es que compõem o indicador.</DialogDescription>
+              </div>
+              {drillRows.length > 0 && (
+                <Button variant="outline" size="sm" onClick={exportarDrillCSV} className="gap-2 shrink-0 dark:border-slate-700">
+                  <Download className="w-4 h-4" />
+                  Exportar CSV
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="grid min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)_auto]">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 min-h-0 overflow-hidden">
+              <div className="min-h-0 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 z-10">
+                    <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Unidade</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">Dias</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">Atraso</th>
+                      <th className="px-3 py-2 text-center whitespace-nowrap">Agend.</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Últ. ocorrência</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">Vlr Merc.</th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap">Frete</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {drillRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                          Nenhum CT-e neste grupo.
+                        </td>
+                      </tr>
+                    ) : (
+                      drillPagedRows.map((r) => {
+                        const cte = fmtCte(r.ser_cte, r.nro_cte);
+                        const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
+                        const tone = TIPOS_OCOR[tipo]?.tone ?? 'slate';
+                        const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
+                        const dias = r.dias_armazem ?? 0;
+                        const atraso = r.dias_atraso_prev ?? 0;
+                        const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
+                        const nomeUnid = unidadesMap[sigla] || '';
+                        const rowTone =
+                          tipo === 'P'
+                            ? 'bg-red-50/50 dark:bg-red-950/15'
+                            : tipo === 'C'
+                              ? 'bg-orange-50/50 dark:bg-orange-950/15'
+                              : r.agendado
+                                ? 'bg-violet-50/40 dark:bg-violet-950/15'
+                                : '';
+
+                        return (
+                          <tr key={r.seq_cte} className={rowTone}>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{nomeUnid || '—'}</div>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{cte}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_chegada_unid)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                              <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
+                                {dias}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_prev_ent)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                              <span className={atraso > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>{atraso > 0 ? atraso : 0}</span>
+                            </td>
+                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                              {r.agendado ? <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[11px]">SIM</Badge> : <span className="text-slate-400">—</span>}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                {r.ult_ocor_codigo !== null ? (
+                                  <Badge className={`${toneClasses(tone)} text-[11px] font-mono`}>{r.ult_ocor_codigo}</Badge>
+                                ) : (
+                                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px]">—</Badge>
+                                )}
+                                {tipoLabel ? <Badge className={`${toneClasses(tone)} text-[11px]`}>{tipoLabel}</Badge> : null}
+                                <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[320px]">{r.ult_ocor_descricao || 'Sem ocorrência'}</span>
+                              </div>
+                              {(r.ult_ocor_data || r.ult_ocor_hora) && (
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  {fmtDateBR(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 max-w-[320px] truncate">{r.ult_ocor_complemento || '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_merc)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_frete)}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
+                {drillRows.length} registros • {drillPage}/{drillTotalPages}
+              </Badge>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage <= 1} onClick={() => setDrillPage(1)}>
+                  «
+                </Button>
+                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage <= 1} onClick={() => setDrillPage((p) => Math.max(1, p - 1))}>
+                  Anterior
+                </Button>
+                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  Página {drillPage} de {drillTotalPages}
+                </span>
+                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage >= drillTotalPages} onClick={() => setDrillPage((p) => Math.min(drillTotalPages, p + 1))}>
+                  Próxima
+                </Button>
+                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage >= drillTotalPages} onClick={() => setDrillPage(drillTotalPages)}>
+                  »
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

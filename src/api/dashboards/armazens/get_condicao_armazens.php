@@ -42,6 +42,8 @@ $where[] = "cte.status <> 'C'";
 $where[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 $where[] = "cte.data_entrega IS NULL";
 $where[] = "cte.unid_atual IS NOT NULL AND BTRIM(cte.unid_atual) <> ''";
+// Regra: não considerar CT-es já baixados/entregues (tipos de ocorrência B/E)
+$where[] = "(om.tipo IS NULL OR UPPER(BTRIM(om.tipo)) NOT IN ('B', 'E'))";
 
 if (!empty($filters['unidadeAtual']) && is_array($filters['unidadeAtual']) && count($filters['unidadeAtual']) > 0) {
     $placeholders = [];
@@ -161,6 +163,8 @@ base AS (
         cte.seq_cte,
         cte.ser_cte,
         cte.nro_cte,
+        cte.tp_documento,
+        COALESCE(cte.entrega_abonada, false) AS entrega_abonada,
         cte.data_emissao,
         cte.data_prev_ent,
         cte.data_chegada_unid,
@@ -178,7 +182,15 @@ base AS (
         (CURRENT_DATE - {$baseDataArmazem})::int AS dias_armazem,
         CASE
           WHEN cte.data_prev_ent IS NULL THEN NULL
-          ELSE (CURRENT_DATE - cte.data_prev_ent)::int
+          ELSE (
+            CURRENT_DATE - (
+              CASE
+                WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE
+                WHEN UPPER(BTRIM(COALESCE(om.tipo, ''))) = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE
+                ELSE cte.data_prev_ent
+              END
+            )
+          )::int
         END AS dias_atraso_prev,
         cte.ult_ocor_agend,
         cte.data_ult_ocor_agend,
@@ -209,6 +221,8 @@ SELECT
     seq_cte,
     ser_cte,
     nro_cte,
+    tp_documento,
+    entrega_abonada,
     data_emissao,
     data_prev_ent,
     data_chegada_unid,
@@ -255,6 +269,8 @@ while ($row = pg_fetch_assoc($result)) {
         'seq_cte' => (int)($row['seq_cte'] ?? 0),
         'ser_cte' => (string)($row['ser_cte'] ?? ''),
         'nro_cte' => (int)($row['nro_cte'] ?? 0),
+        'tp_documento' => $row['tp_documento'] ?? null,
+        'entrega_abonada' => ($row['entrega_abonada'] ?? '') === 't',
         'data_emissao' => $row['data_emissao'] ?? null,
         'data_prev_ent' => $row['data_prev_ent'] ?? null,
         'data_chegada_unid' => $row['data_chegada_unid'] ?? null,
