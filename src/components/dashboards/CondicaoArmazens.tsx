@@ -231,11 +231,19 @@ export function CondicaoArmazens() {
   const [drillOpen, setDrillOpen] = useState(false);
   const [drillTitle, setDrillTitle] = useState('');
   const [drillRows, setDrillRows] = useState<Row[]>([]);
-  const drillPageSize = 80;
-  const [drillPage, setDrillPage] = useState(1);
+  const [drillSort, setDrillSort] = useState<{
+    key: 'unidade' | 'cte' | 'chegada' | 'dias_armazem' | 'prev_ent' | 'dias_atraso' | 'agendado' | 'ult_ocor' | 'vlr_merc' | 'vlr_frete';
+    dir: 'asc' | 'desc';
+  }>({
+    key: 'dias_armazem',
+    dir: 'desc',
+  });
 
   const [busca, setBusca] = useState('');
-  const [sort, setSort] = useState<{ key: 'unidade' | 'dias_armazem' | 'dias_atraso' | 'agendado' | 'ult_ocor' | 'vlr_merc' | 'vlr_frete'; dir: 'asc' | 'desc' }>({
+  const [sort, setSort] = useState<{
+    key: 'unidade' | 'chegada' | 'dias_armazem' | 'prev_ent' | 'dias_atraso' | 'agendado' | 'ult_ocor' | 'vlr_merc' | 'vlr_frete';
+    dir: 'asc' | 'desc';
+  }>({
     key: 'dias_armazem',
     dir: 'desc',
   });
@@ -666,15 +674,30 @@ export function CondicaoArmazens() {
     const mul = sort.dir === 'asc' ? 1 : -1;
     const num = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? -Infinity : v);
     const str = (v: string | null | undefined) => String(v ?? '').trim().toUpperCase();
+    const dateMs = (iso: string | null | undefined) => {
+      if (!iso) return -Infinity;
+      const ms = Date.parse(String(iso));
+      return Number.isFinite(ms) ? ms : -Infinity;
+    };
     copy.sort((a, b) => {
       if (sort.key === 'unidade') {
         const ua = str(a.unid_atual);
         const ub = str(b.unid_atual);
         if (ua !== ub) return ua.localeCompare(ub) * mul;
       }
+      if (sort.key === 'chegada') {
+        const da = dateMs(a.data_chegada_unid);
+        const db = dateMs(b.data_chegada_unid);
+        if (da !== db) return (da - db) * mul;
+      }
       if (sort.key === 'dias_armazem') {
         const da = num(a.dias_armazem);
         const db = num(b.dias_armazem);
+        if (da !== db) return (da - db) * mul;
+      }
+      if (sort.key === 'prev_ent') {
+        const da = dateMs(a.data_prev_ent);
+        const db = dateMs(b.data_prev_ent);
         if (da !== db) return (da - db) * mul;
       }
       if (sort.key === 'dias_atraso') {
@@ -727,7 +750,7 @@ export function CondicaoArmazens() {
       list.sort((a, b) => (b.dias_armazem ?? 0) - (a.dias_armazem ?? 0));
       setDrillTitle(`${title} (${list.length})`);
       setDrillRows(list);
-      setDrillPage(1);
+      setDrillSort({ key: 'dias_armazem', dir: 'desc' });
       setDrillOpen(true);
     },
     [viewRows]
@@ -811,17 +834,83 @@ export function CondicaoArmazens() {
     URL.revokeObjectURL(url);
   };
 
-  const drillTotalPages = useMemo(() => Math.max(1, Math.ceil(drillRows.length / drillPageSize)), [drillRows.length, drillPageSize]);
+  const drillSortedRows = useMemo(() => {
+    const copy = [...drillRows];
+    const mul = drillSort.dir === 'asc' ? 1 : -1;
+    const num = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? -Infinity : v);
+    const str = (v: string | null | undefined) => String(v ?? '').trim().toUpperCase();
+    const dateMs = (iso: string | null | undefined) => {
+      if (!iso) return -Infinity;
+      const ms = Date.parse(String(iso));
+      return Number.isFinite(ms) ? ms : -Infinity;
+    };
+    const cteKey = (r: Row) => `${String(r.ser_cte ?? '').trim().toUpperCase()}${String(r.nro_cte ?? 0).padStart(6, '0')}`;
 
-  useEffect(() => {
-    if (!drillOpen) return;
-    setDrillPage((p) => Math.min(Math.max(1, p), drillTotalPages));
-  }, [drillTotalPages, drillOpen]);
+    copy.sort((a, b) => {
+      if (drillSort.key === 'unidade') {
+        const ua = str(a.unid_atual);
+        const ub = str(b.unid_atual);
+        if (ua !== ub) return ua.localeCompare(ub) * mul;
+      }
+      if (drillSort.key === 'cte') {
+        const ca = cteKey(a);
+        const cb = cteKey(b);
+        if (ca !== cb) return ca.localeCompare(cb) * mul;
+      }
+      if (drillSort.key === 'chegada') {
+        const da = dateMs(a.data_chegada_unid);
+        const db = dateMs(b.data_chegada_unid);
+        if (da !== db) return (da - db) * mul;
+      }
+      if (drillSort.key === 'dias_armazem') {
+        const da = num(a.dias_armazem);
+        const db = num(b.dias_armazem);
+        if (da !== db) return (da - db) * mul;
+      }
+      if (drillSort.key === 'prev_ent') {
+        const da = dateMs(a.data_prev_ent);
+        const db = dateMs(b.data_prev_ent);
+        if (da !== db) return (da - db) * mul;
+      }
+      if (drillSort.key === 'dias_atraso') {
+        const aa = Math.max(0, a.dias_atraso_prev ?? 0);
+        const ab = Math.max(0, b.dias_atraso_prev ?? 0);
+        if (aa !== ab) return (aa - ab) * mul;
+      }
+      if (drillSort.key === 'agendado') {
+        const aa = a.agendado ? 1 : 0;
+        const ab = b.agendado ? 1 : 0;
+        if (aa !== ab) return (aa - ab) * mul;
+      }
+      if (drillSort.key === 'ult_ocor') {
+        const aa = num(a.ult_ocor_codigo ?? null);
+        const ab = num(b.ult_ocor_codigo ?? null);
+        if (aa !== ab) return (aa - ab) * mul;
+      }
+      if (drillSort.key === 'vlr_merc') {
+        const aa = num(a.vlr_merc);
+        const ab = num(b.vlr_merc);
+        if (aa !== ab) return (aa - ab) * mul;
+      }
+      if (drillSort.key === 'vlr_frete') {
+        const aa = num(a.vlr_frete);
+        const ab = num(b.vlr_frete);
+        if (aa !== ab) return (aa - ab) * mul;
+      }
+      const da2 = a.dias_armazem ?? -1;
+      const db2 = b.dias_armazem ?? -1;
+      if (da2 !== db2) return db2 - da2;
+      return (b.seq_cte ?? 0) - (a.seq_cte ?? 0);
+    });
+    return copy;
+  }, [drillRows, drillSort]);
 
-  const drillPagedRows = useMemo(() => {
-    const start = (drillPage - 1) * drillPageSize;
-    return drillRows.slice(start, start + drillPageSize);
-  }, [drillRows, drillPage, drillPageSize]);
+  const drillTotais = useMemo(() => {
+    const total = drillRows.length;
+    const vlrMerc = drillRows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0);
+    const vlrFrete = drillRows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0);
+    return { total, vlrMerc, vlrFrete };
+  }, [drillRows]);
 
   const unitRank = useMemo(() => {
     const calc = (u: UnitStats) => {
@@ -1779,13 +1868,21 @@ export function CondicaoArmazens() {
                             </button>
                           </th>
                           <th className="px-3 py-2 text-left whitespace-nowrap w-[90px]">CT-e</th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">Chegada</th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">
+                            <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'chegada', dir: s.key === 'chegada' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Chegada{sort.key === 'chegada' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
                           <th className="px-3 py-2 text-right whitespace-nowrap w-[64px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Dias{sort.key === 'dias_armazem' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                             </button>
                           </th>
-                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">Prev. Ent.</th>
+                          <th className="px-3 py-2 text-left whitespace-nowrap w-[80px]">
+                            <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'prev_ent', dir: s.key === 'prev_ent' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
+                              Prev. Ent.{sort.key === 'prev_ent' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                            </button>
+                          </th>
                           <th className="px-3 py-2 text-right whitespace-nowrap w-[64px]">
                             <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => setSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}>
                               Atraso{sort.key === 'dias_atraso' ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
@@ -1960,40 +2057,107 @@ export function CondicaoArmazens() {
 
           <div className="grid min-h-0 gap-3 overflow-hidden grid-rows-[minmax(0,1fr)_auto]">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 min-h-0 overflow-hidden">
-              <div className="min-h-0 overflow-auto">
-                <table className="w-full text-sm">
+              <div className="min-h-0 overflow-y-auto overflow-x-hidden relative">
+                <table className="w-full text-sm table-fixed">
                   <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 z-10">
                     <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                      <th className="px-3 py-2 text-left whitespace-nowrap">Unidade</th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap">CT-e</th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap">Chegada</th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap">Dias</th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap">Prev. Ent.</th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap">Atraso</th>
-                      <th className="px-3 py-2 text-center whitespace-nowrap">Agend.</th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap">Últ. ocorrência</th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap">Complemento</th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap">Vlr Merc.</th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap">Frete</th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[6%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                        >
+                          Unid.{drillSort.key === 'unidade' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[10%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'cte', dir: s.key === 'cte' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                        >
+                          CT-e{drillSort.key === 'cte' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'chegada', dir: s.key === 'chegada' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Cheg.{drillSort.key === 'chegada' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[6%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'dias_armazem', dir: s.key === 'dias_armazem' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Dias{drillSort.key === 'dias_armazem' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'prev_ent', dir: s.key === 'prev_ent' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Prev.{drillSort.key === 'prev_ent' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[6%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'dias_atraso', dir: s.key === 'dias_atraso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Atr.{drillSort.key === 'dias_atraso' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-center whitespace-nowrap w-[6%]">
+                        <button
+                          className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'agendado', dir: s.key === 'agendado' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Ag.{drillSort.key === 'agendado' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[20%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Últ. ocor.{drillSort.key === 'ult_ocor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[14%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Vlr Merc.{drillSort.key === 'vlr_merc' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[14%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setDrillSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Frete{drillSort.key === 'vlr_frete' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {drillRows.length === 0 ? (
+                    {drillSortedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                        <td colSpan={10} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
                           Nenhum CT-e neste grupo.
                         </td>
                       </tr>
                     ) : (
-                      drillPagedRows.map((r) => {
+                      drillSortedRows.map((r) => {
                         const cte = fmtCte(r.ser_cte, r.nro_cte);
                         const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
                         const tone = TIPOS_OCOR[tipo]?.tone ?? 'slate';
-                        const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');
                         const dias = r.dias_armazem ?? 0;
                         const atraso = r.dias_atraso_prev ?? 0;
                         const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
-                        const nomeUnid = unidadesMap[sigla] || '';
                         const rowTone =
                           tipo === 'P'
                             ? 'bg-red-50/50 dark:bg-red-950/15'
@@ -2006,17 +2170,16 @@ export function CondicaoArmazens() {
                         return (
                           <tr key={r.seq_cte} className={rowTone}>
                             <td className="px-3 py-2 whitespace-nowrap">
-                              <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</div>
-                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">{nomeUnid || '—'}</div>
+                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</span>
                             </td>
                             <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{cte}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_chegada_unid)}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{fmtDateBR2y(r.data_chegada_unid)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                               <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
                                 {dias}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_prev_ent)}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{fmtDateBR2y(r.data_prev_ent)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                               <span className={atraso > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>{atraso > 0 ? atraso : 0}</span>
                             </td>
@@ -2024,22 +2187,22 @@ export function CondicaoArmazens() {
                               {r.agendado ? <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[11px]">SIM</Badge> : <span className="text-slate-400">—</span>}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
                                 {r.ult_ocor_codigo !== null ? (
-                                  <Badge className={`${toneClasses(tone)} text-[11px] font-mono`}>{r.ult_ocor_codigo}</Badge>
+                                  <Badge className={`${toneClasses(tone)} text-[11px] font-mono shrink-0`}>{r.ult_ocor_codigo}</Badge>
                                 ) : (
-                                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px]">—</Badge>
+                                  <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px] shrink-0">—</Badge>
                                 )}
-                                {tipoLabel ? <Badge className={`${toneClasses(tone)} text-[11px]`}>{tipoLabel}</Badge> : null}
-                                <span className="text-xs text-slate-700 dark:text-slate-200 truncate max-w-[320px]">{r.ult_ocor_descricao || 'Sem ocorrência'}</span>
+                                <span className="text-xs text-slate-700 dark:text-slate-200 truncate">
+                                  {r.ult_ocor_descricao || 'Sem ocorrência'}
+                                </span>
                               </div>
                               {(r.ult_ocor_data || r.ult_ocor_hora) && (
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  {fmtDateBR(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
+                                  {fmtDateBR2y(r.ult_ocor_data)} {String(r.ult_ocor_hora ?? '').slice(0, 5)}
                                 </div>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 max-w-[320px] truncate">{r.ult_ocor_complemento || '—'}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_merc)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_frete)}</td>
                           </tr>
@@ -2047,30 +2210,21 @@ export function CondicaoArmazens() {
                       })
                     )}
                   </tbody>
+                  <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 z-10">
+                    <tr className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <td className="px-3 py-2 whitespace-nowrap">TOTAL</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{drillTotais.total.toLocaleString('pt-BR')}</td>
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2" />
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(drillTotais.vlrMerc)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(drillTotais.vlrFrete)}</td>
+                    </tr>
+                  </tfoot>
                 </table>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">
-                {drillRows.length} registros • {drillPage}/{drillTotalPages}
-              </Badge>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage <= 1} onClick={() => setDrillPage(1)}>
-                  «
-                </Button>
-                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage <= 1} onClick={() => setDrillPage((p) => Math.max(1, p - 1))}>
-                  Anterior
-                </Button>
-                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                  Página {drillPage} de {drillTotalPages}
-                </span>
-                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage >= drillTotalPages} onClick={() => setDrillPage((p) => Math.min(drillTotalPages, p + 1))}>
-                  Próxima
-                </Button>
-                <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={drillPage >= drillTotalPages} onClick={() => setDrillPage(drillTotalPages)}>
-                  »
-                </Button>
               </div>
             </div>
           </div>
