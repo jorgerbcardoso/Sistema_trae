@@ -1414,11 +1414,36 @@ export function CondicaoArmazens() {
                                         <div className="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">{sigla}</div>
                                         <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{nome || '—'}</div>
                                       </button>
-                                      <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.total ?? 0}</span>
-                                      <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.parados8 ?? 0}</span>
-                                      <span className="text-right font-mono tabular-nums text-orange-700 dark:text-orange-300 font-semibold">{u.pend_cliente ?? 0}</span>
-                                      <span className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold">{u.pend_transportadora ?? 0}</span>
-                                      <span className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200">{u.max_dias_armazem ?? 0}</span>
+                                      <button
+                                        className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla)}
+                                      >
+                                        {u.total ?? 0}
+                                      </button>
+                                      <button
+                                        className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold hover:text-red-800 dark:hover:text-red-200 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''} • Parados ≥ 8 dias`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && (r.dias_armazem ?? 0) >= 8)}
+                                      >
+                                        {u.parados8 ?? 0}
+                                      </button>
+                                      <button
+                                        className="text-right font-mono tabular-nums text-orange-700 dark:text-orange-300 font-semibold hover:text-orange-800 dark:hover:text-orange-200 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''} • Pendência (cliente)`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'C')}
+                                      >
+                                        {u.pend_cliente ?? 0}
+                                      </button>
+                                      <button
+                                        className="text-right font-mono tabular-nums text-red-700 dark:text-red-300 font-semibold hover:text-red-800 dark:hover:text-red-200 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''} • Pendência (transportadora)`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && String(r.ult_ocor_tipo ?? '').trim().toUpperCase() === 'P')}
+                                      >
+                                        {u.pend_transportadora ?? 0}
+                                      </button>
+                                      <button
+                                        className="text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                                        onClick={() => openDrill(`CT-es na unidade ${sigla}${nome ? ` - ${nome}` : ''} • Máx dias = ${u.max_dias_armazem ?? 0}`, (r) => String(r.unid_atual ?? '').trim().toUpperCase() === sigla && (r.dias_armazem ?? 0) === Number(u.max_dias_armazem ?? 0))}
+                                      >
+                                        {u.max_dias_armazem ?? 0}
+                                      </button>
                                       <div className="relative h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                                         <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-400 via-red-500 to-red-600" style={{ width: `${pct}%` }} />
                                       </div>
