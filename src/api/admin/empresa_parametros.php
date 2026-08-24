@@ -14,6 +14,8 @@ $tableOcor = "{$domain}_ocorrencia";
 $conn = connect();
 
 @pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS ocor_chegada_unid INT");
+@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS ocor_saida_transf INT");
+@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS ocor_saida_entrega INT");
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -84,14 +86,16 @@ if ($method === 'GET') {
         ]);
     }
 
-    $result = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido FROM {$tableEmpParam} LIMIT 1", [], $conn);
+    $result = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido FROM {$tableEmpParam} LIMIT 1", [], $conn);
     $row = pg_fetch_assoc($result);
 
     if (!$row) {
-        sql("INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido) VALUES (NULL, NULL, NULL, NULL, NULL)", [], $conn);
+        sql("INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido) VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL)", [], $conn);
         $row = [
             'ocor_aguardando_agendamento' => null,
             'ocor_agendamento' => null,
+            'ocor_saida_transf' => null,
+            'ocor_saida_entrega' => null,
             'ocor_chegada_unid' => null,
             'ocor_chegada_unid_dest' => null,
             'ocor_cte_retido' => null,
@@ -102,6 +106,8 @@ if ($method === 'GET') {
         'params' => [
             'ocor_aguardando_agendamento' => $row['ocor_aguardando_agendamento'] !== null ? (int) $row['ocor_aguardando_agendamento'] : null,
             'ocor_agendamento' => $row['ocor_agendamento'] !== null ? (int) $row['ocor_agendamento'] : null,
+            'ocor_saida_transf' => $row['ocor_saida_transf'] !== null ? (int) $row['ocor_saida_transf'] : null,
+            'ocor_saida_entrega' => $row['ocor_saida_entrega'] !== null ? (int) $row['ocor_saida_entrega'] : null,
             'ocor_chegada_unid' => $row['ocor_chegada_unid'] !== null ? (int) $row['ocor_chegada_unid'] : null,
             'ocor_chegada_unid_dest' => $row['ocor_chegada_unid_dest'] !== null ? (int) $row['ocor_chegada_unid_dest'] : null,
             'ocor_cte_retido' => $row['ocor_cte_retido'] !== null ? (int) $row['ocor_cte_retido'] : null,
@@ -113,6 +119,8 @@ $input = getRequestInput();
 
 $ocorAguardando = isset($input['ocor_aguardando_agendamento']) && $input['ocor_aguardando_agendamento'] !== '' ? (int) $input['ocor_aguardando_agendamento'] : null;
 $ocorAgendamento = isset($input['ocor_agendamento']) && $input['ocor_agendamento'] !== '' ? (int) $input['ocor_agendamento'] : null;
+$ocorSaidaTransf = isset($input['ocor_saida_transf']) && $input['ocor_saida_transf'] !== '' ? (int) $input['ocor_saida_transf'] : null;
+$ocorSaidaEntrega = isset($input['ocor_saida_entrega']) && $input['ocor_saida_entrega'] !== '' ? (int) $input['ocor_saida_entrega'] : null;
 $ocorChegadaUnid = isset($input['ocor_chegada_unid']) && $input['ocor_chegada_unid'] !== '' ? (int) $input['ocor_chegada_unid'] : null;
 $ocorChegada = isset($input['ocor_chegada_unid_dest']) && $input['ocor_chegada_unid_dest'] !== '' ? (int) $input['ocor_chegada_unid_dest'] : null;
 $ocorCteRetido = isset($input['ocor_cte_retido']) && $input['ocor_cte_retido'] !== '' ? (int) $input['ocor_cte_retido'] : null;
@@ -122,14 +130,14 @@ $exists = (bool) pg_fetch_assoc($existsResult);
 
 if (!$exists) {
     sql(
-        "INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido) VALUES ($1, $2, $3, $4, $5)",
-        [$ocorAguardando, $ocorAgendamento, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido],
+        "INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido],
         $conn
     );
 } else {
     sql(
-        "UPDATE {$tableEmpParam} SET ocor_aguardando_agendamento = $1, ocor_agendamento = $2, ocor_chegada_unid = $3, ocor_chegada_unid_dest = $4, ocor_cte_retido = $5",
-        [$ocorAguardando, $ocorAgendamento, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido],
+        "UPDATE {$tableEmpParam} SET ocor_aguardando_agendamento = $1, ocor_agendamento = $2, ocor_saida_transf = $3, ocor_saida_entrega = $4, ocor_chegada_unid = $5, ocor_chegada_unid_dest = $6, ocor_cte_retido = $7",
+        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido],
         $conn
     );
 }
