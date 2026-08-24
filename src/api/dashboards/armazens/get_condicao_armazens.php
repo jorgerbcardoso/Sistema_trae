@@ -22,11 +22,14 @@ $tableCte = "{$domain}_cte";
 $tableCteOcor = "{$domain}_cte_ocorrencia";
 $tableOcor = "{$domain}_ocorrencia";
 $tableEmpParam = "{$domain}_emp_param";
+$tableParam = "{$domain}_param";
 
 $defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
 $defaultOcorAgendamento = 15;
 $ocorAguardando = $defaultOcorAguardando;
 $ocorAgendamento = $defaultOcorAgendamento;
+$ocorSaidaTransf = null;
+$ocorSaidaEntrega = null;
 try {
     $resultEmpParam = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento FROM {$tableEmpParam} LIMIT 1", [], $conn);
     $rowEmpParam = $resultEmpParam ? pg_fetch_assoc($resultEmpParam) : null;
@@ -41,6 +44,26 @@ try {
 } catch (Exception $e) {
 }
 
+$readSaidas = function(string $table) use ($conn): array {
+    $res = sql("SELECT ocor_saida_transf, ocor_saida_entrega FROM {$table} LIMIT 1", [], $conn);
+    $row = $res ? pg_fetch_assoc($res) : null;
+    $transf = null;
+    $entrega = null;
+    if ($row) {
+        if ($row['ocor_saida_transf'] !== null && $row['ocor_saida_transf'] !== '') $transf = (int)$row['ocor_saida_transf'];
+        if ($row['ocor_saida_entrega'] !== null && $row['ocor_saida_entrega'] !== '') $entrega = (int)$row['ocor_saida_entrega'];
+    }
+    return [$transf, $entrega];
+};
+try {
+    [$ocorSaidaTransf, $ocorSaidaEntrega] = $readSaidas($tableParam);
+} catch (Exception $e) {
+    try {
+        [$ocorSaidaTransf, $ocorSaidaEntrega] = $readSaidas($tableEmpParam);
+    } catch (Exception $e2) {
+    }
+}
+
 $params = [];
 $paramIndex = 1;
 $where = [];
@@ -51,6 +74,15 @@ $where[] = "cte.data_entrega IS NULL";
 $where[] = "cte.unid_atual IS NOT NULL AND BTRIM(cte.unid_atual) <> ''";
 // Regra: não considerar CT-es já baixados/entregues (tipos de ocorrência B/E)
 $where[] = "(om.tipo IS NULL OR UPPER(BTRIM(om.tipo)) NOT IN ('B', 'E'))";
+// Regra: não considerar CT-es em trânsito (saída para transferência/entrega)
+if ($ocorSaidaTransf !== null || $ocorSaidaEntrega !== null) {
+    $codes = [];
+    if ($ocorSaidaTransf !== null) $codes[] = (int)$ocorSaidaTransf;
+    if ($ocorSaidaEntrega !== null) $codes[] = (int)$ocorSaidaEntrega;
+    if (count($codes) > 0) {
+        $where[] = "(COALESCE(lo.codigo, cte.ult_ocor) IS NULL OR COALESCE(lo.codigo, cte.ult_ocor) NOT IN (" . implode(', ', $codes) . "))";
+    }
+}
 
 if (!empty($filters['unidadeAtual']) && is_array($filters['unidadeAtual']) && count($filters['unidadeAtual']) > 0) {
     $placeholders = [];
