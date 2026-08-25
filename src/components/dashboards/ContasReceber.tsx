@@ -483,6 +483,7 @@ export function ContasReceber() {
   const [status0049, setStatus0049] = useState<string>('');
   const [data0049, setData0049] = useState<FatData | null>(null);
   const req0049Ref = useRef(0);
+  const req0103Ref = useRef(0);
   const initialLoadRef = useRef(false);
 
   const [loading0103, setLoading0103] = useState(false);
@@ -677,7 +678,7 @@ export function ContasReceber() {
 
       const baselineSeq = Number((start as any).baseline_seq) || 0;
       const requestStartTs = Number((start as any).request_start_ts) || 0;
-      const deadline = Date.now() + 70000;
+      const deadline = Date.now() + 140000;
 
       setStatus0049('Processando relatório...');
 
@@ -751,20 +752,81 @@ export function ContasReceber() {
 
   const carregar0103 = useCallback(
     async (opts?: { silent?: boolean }) => {
+      const reqId = (req0103Ref.current += 1);
       setLoading0103(true);
-      setStatus0103('Lendo disponíveis para faturar...');
+      setStatus0103('Solicitando relatório no TMS...');
       try {
-        const res = await apiFetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`, { method: 'GET' }, true);
-        if (!res?.success) {
+        const start = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`,
+          { method: 'POST', body: JSON.stringify({ step: 'START' }) },
+          true
+        );
+
+        if (reqId !== req0103Ref.current) return;
+        if (!start?.success) {
           setStatus0103('');
-          if (!opts?.silent) toast.error(res?.message || 'Falha ao ler disponíveis para faturar.');
+          if (!opts?.silent) toast.error(start?.message || 'Falha ao iniciar o TMS0103.');
           return;
         }
-        setData0103(res);
-        setStatus0103('Concluído');
-        if (!opts?.silent) toast.success(`Disponíveis para faturar: ${Number(res?.totals?.ctes || 0)} CT-e(s).`);
+
+        if ((start as any).status === 'ready' && (start as any).result === 'data') {
+          setData0103(start);
+          setStatus0103('Concluído');
+          if (!opts?.silent) toast.success(`Disponíveis para faturar: ${Number((start as any)?.totals?.ctes || 0)} CT-e(s).`);
+          return;
+        }
+
+        if ((start as any).status !== 'started') {
+          setStatus0103('');
+          if (!opts?.silent) toast.error('Resposta inesperada ao iniciar o TMS0103.');
+          return;
+        }
+
+        const baselineSeq = Number((start as any).baseline_seq) || 0;
+        const requestStartTs = Number((start as any).request_start_ts) || 0;
+        const deadline = Date.now() + 140000;
+
+        setStatus0103('Aguardando o TMS gerar o relatório...');
+
+        while (Date.now() < deadline) {
+          if (reqId !== req0103Ref.current) return;
+
+          const poll = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/contas-receber/ssw0103.php`,
+            { method: 'POST', body: JSON.stringify({ step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }) },
+            true
+          );
+
+          if (reqId !== req0103Ref.current) return;
+          if (!poll?.success) {
+            setStatus0103('');
+            if (!opts?.silent) toast.error(poll?.message || 'Falha ao processar o TMS0103.');
+            return;
+          }
+
+          if ((poll as any).status === 'pending') {
+            setStatus0103('Aguardando o TMS gerar o relatório...');
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
+
+          if ((poll as any).status === 'ready' && (poll as any).result === 'data') {
+            setStatus0103('Carregando dados...');
+            setData0103(poll);
+            setStatus0103('Concluído');
+            if (!opts?.silent) toast.success(`Disponíveis para faturar: ${Number((poll as any)?.totals?.ctes || 0)} CT-e(s).`);
+            return;
+          }
+
+          setStatus0103('');
+          if (!opts?.silent) toast.error('Resposta inesperada ao processar o TMS0103.');
+          return;
+        }
+
+        setStatus0103('');
+        if (!opts?.silent) toast.error('Timeout ao processar o TMS0103.');
       } finally {
-        setLoading0103(false);
+        if (reqId === req0103Ref.current) setLoading0103(false);
       }
     },
     []
@@ -772,12 +834,12 @@ export function ContasReceber() {
 
   useEffect(() => {
     if (initialLoad0103Ref.current) return;
+    if (loading0049) return;
+    if (!data0049) return;
     initialLoad0103Ref.current = true;
-    const t = window.setTimeout(() => {
-      void carregar0103({ silent: true });
-    }, 250);
+    const t = window.setTimeout(() => void carregar0103({ silent: true }), 300);
     return () => window.clearTimeout(t);
-  }, [carregar0103]);
+  }, [carregar0103, data0049, loading0049]);
 
   const normalizedFaturas = useMemo(() => {
     const base = data0049?.faturas || [];
@@ -1822,7 +1884,7 @@ export function ContasReceber() {
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
-                <div className="space-y-6 py-4">
+                <div className="space-y-5 py-0">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-slate-600 dark:text-slate-400">Situação da fatura</Label>
@@ -1844,7 +1906,20 @@ export function ContasReceber() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-slate-600 dark:text-slate-400">Tipo de período</Label>
-                      <Select value={tempPeriodoTipo} onValueChange={(v) => setTempPeriodoTipo(v as any)}>
+                      <Select
+                        value={tempPeriodoTipo}
+                        onValueChange={(v) => {
+                          const next = v as any;
+                          setTempPeriodoTipo(next);
+                          if (next === 'E' || next === 'L') {
+                            const now = new Date();
+                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setTempPeriodoIni(dateToInput(start));
+                            setTempPeriodoFim(dateToInput(end));
+                          }
+                        }}
+                      >
                         <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
                           <SelectValue placeholder="Tipo" />
                         </SelectTrigger>
@@ -1897,7 +1972,7 @@ export function ContasReceber() {
                 </div>
               </div>
 
-              <div className="shrink-0 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="shrink-0 py-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <Button variant="outline" onClick={clearTempFilters} className="dark:border-slate-700 dark:hover:bg-slate-800">
                   Limpar tudo
                 </Button>

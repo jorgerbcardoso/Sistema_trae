@@ -802,7 +802,7 @@ try {
             );
         }
 
-        $deadline = time() + 45;
+        $deadline = time() + 90;
         while (time() <= $deadline) {
             $rows = $get1440Rows();
             $best = null;
