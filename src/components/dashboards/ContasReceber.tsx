@@ -450,8 +450,8 @@ export function ContasReceber() {
   const [periodoTipo, setPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>('V');
   const defaultPeriodo = useMemo(() => {
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15);
     return { ini: dateToInput(start), fim: dateToInput(end) };
   }, []);
   const [periodoIni, setPeriodoIni] = useState<string>(defaultPeriodo.ini);
@@ -1768,6 +1768,19 @@ export function ContasReceber() {
   }, [syncTempFromApplied]);
 
   const applyFilters = useCallback(() => {
+    const parseMidday = (iso: string) => Date.parse(`${iso}T12:00:00`);
+    const s = parseMidday(tempPeriodoIni);
+    const e = parseMidday(tempPeriodoFim);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || s > e) {
+      toast.error('Período inválido.');
+      return;
+    }
+    const days = Math.floor((e - s) / 86400000) + 1;
+    if ((tempPeriodoTipo === 'V' || tempPeriodoTipo === 'E') && days > 31) {
+      toast.error('Para Vencimento e Emissão, selecione no máximo 31 dias.');
+      return;
+    }
+
     setPeriodoTipo(tempPeriodoTipo);
     setPeriodoIni(tempPeriodoIni);
     setPeriodoFim(tempPeriodoFim);
@@ -1906,7 +1919,27 @@ export function ContasReceber() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-slate-600 dark:text-slate-400">Tipo de período</Label>
-                      <Select value={tempPeriodoTipo} onValueChange={(v) => setTempPeriodoTipo(v as any)}>
+                      <Select
+                        value={tempPeriodoTipo}
+                        onValueChange={(v) => {
+                          const next = v as any;
+                          setTempPeriodoTipo(next);
+                          if (next === 'V') {
+                            const now = new Date();
+                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15);
+                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15);
+                            setTempPeriodoIni(dateToInput(start));
+                            setTempPeriodoFim(dateToInput(end));
+                          }
+                          if (next === 'E' || next === 'L') {
+                            const now = new Date();
+                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setTempPeriodoIni(dateToInput(start));
+                            setTempPeriodoFim(dateToInput(end));
+                          }
+                        }}
+                      >
                         <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
                           <SelectValue placeholder="Tipo" />
                         </SelectTrigger>

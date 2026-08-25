@@ -196,22 +196,7 @@ $normKey = static function(string $s): string {
     return preg_replace('/[^A-Z0-9]/', '', strtoupper($s));
 };
 
-$parseSsw0049Csv = static function(string $content) use ($parseMoney, $parseCnpj, $normKey): array {
-    $content = mb_convert_encoding((string)$content, 'UTF-8', 'ISO-8859-1');
-    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $content);
-    $content = str_replace("\r\n", "\n", str_replace("\r", "\n", $content));
-
-    $lines = explode("\n", $content);
-    $lines = array_values(array_filter($lines, static fn($l) => trim((string)$l) !== ''));
-
-    $delimiter = ';';
-    foreach ($lines as $l) {
-        $t = trim((string)$l);
-        if ($t === '') continue;
-        if (strpos($t, ';') !== false) { $delimiter = ';'; break; }
-        if (strpos($t, ',') !== false) { $delimiter = ','; break; }
-    }
-
+$parseSsw0049Rows = static function(array $rows) use ($parseMoney, $parseCnpj, $normKey): array {
     $headerFat = [];
     $idxFat = [];
     $headerCte = [];
@@ -238,11 +223,18 @@ $parseSsw0049Csv = static function(string $content) use ($parseMoney, $parseCnpj
         return '';
     };
 
-    foreach ($lines as $l) {
-        $row = str_getcsv($l, $delimiter);
-        if (empty($row)) continue;
-        $row[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$row[0]);
+    foreach ($rows as $rowRaw) {
+        if (!is_array($rowRaw) || empty($rowRaw)) continue;
+        $row = [];
+        $hasAny = false;
+        foreach ($rowRaw as $v) {
+            $s = trim((string)($v ?? ''));
+            if ($s !== '') $hasAny = true;
+            $row[] = $s;
+        }
+        if (!$hasAny) continue;
 
+        if (isset($row[0])) $row[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$row[0]);
         $tipo = trim((string)($row[0] ?? ''));
         if ($tipo === '') continue;
 
@@ -376,6 +368,57 @@ $parseSsw0049Csv = static function(string $content) use ($parseMoney, $parseCnpj
     ];
 };
 
+$parseSsw0049Content = static function(string $content, ?string $filename) use ($parseSsw0049Rows): array {
+    $fn = strtoupper(trim((string)($filename ?? '')));
+    $isXlsx = (substr($content, 0, 2) === 'PK') || ($fn !== '' && substr($fn, -5) === '.XLSX');
+
+    if ($isXlsx) {
+        $autoload = '/var/www/html/lib/vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            throw new Exception('Leitor XLSX indisponível no servidor para processar o relatório.');
+        }
+        require_once $autoload;
+        if (!class_exists('\\PhpOffice\\PhpSpreadsheet\\IOFactory')) {
+            throw new Exception('PhpSpreadsheet não disponível para processar o relatório.');
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'ssw0049_');
+        if ($tmp === false) {
+            throw new Exception('Não foi possível criar arquivo temporário para processar o relatório.');
+        }
+        file_put_contents($tmp, $content);
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp);
+            $sheet = $spreadsheet->getSheet(0);
+            $rows = $sheet->toArray(null, false, false, false);
+            return $parseSsw0049Rows($rows);
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
+    $content = mb_convert_encoding((string)$content, 'UTF-8', 'ISO-8859-1');
+    $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $content);
+    $content = str_replace("\r\n", "\n", str_replace("\r", "\n", $content));
+    $lines = explode("\n", $content);
+    $lines = array_values(array_filter($lines, static fn($l) => trim((string)$l) !== ''));
+
+    $delimiter = ';';
+    foreach ($lines as $l) {
+        $t = trim((string)$l);
+        if ($t === '') continue;
+        if (strpos($t, ';') !== false) { $delimiter = ';'; break; }
+        if (strpos($t, ',') !== false) { $delimiter = ','; break; }
+    }
+
+    $rows = [];
+    foreach ($lines as $l) {
+        $r = str_getcsv($l, $delimiter);
+        if (is_array($r) && !empty($r)) $rows[] = $r;
+    }
+    return $parseSsw0049Rows($rows);
+};
+
 try {
     require_ssw();
     if (!function_exists('ssw_login') || !function_exists('ssw_go')) {
@@ -464,7 +507,7 @@ try {
         return ['', ''];
     };
 
-    $tryImmediate = static function() use ($sswFetch, $buildUrl, $params, $getActArq, $parseSsw0049Csv): array {
+    $tryImmediate = static function() use ($sswFetch, $buildUrl, $params, $getActArq, $parseSsw0049Content): array {
         $t0 = microtime(true);
         $html = (string)$sswFetch($buildUrl($params), 3);
         $t1 = microtime(true);
@@ -520,7 +563,7 @@ try {
                 ];
             }
 
-            $parsed = $parseSsw0049Csv($csvRaw);
+            $parsed = $parseSsw0049Content($csvRaw, $arq);
             return [
                 'kind' => 'ready',
                 'data' => $parsed,
@@ -539,7 +582,7 @@ try {
             ];
         }
 
-        $tryDownloadByAbrir = static function(string $body) use ($sswFetch, $parseSsw0049Csv, $t0, $t1): ?array {
+        $tryDownloadByAbrir = static function(string $body) use ($sswFetch, $parseSsw0049Content, $t0, $t1): ?array {
             if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/i", $body, $mArq)) {
                 return null;
             }
@@ -555,7 +598,7 @@ try {
             $t3 = microtime(true);
             if ($csvRaw === '' || strlen($csvRaw) < 50) return null;
 
-            $parsed = $parseSsw0049Csv($csvRaw);
+            $parsed = $parseSsw0049Content($csvRaw, $filename);
             return [
                 'kind' => 'ready',
                 'data' => $parsed,
@@ -605,7 +648,7 @@ try {
         }
 
         $t0 = microtime(true);
-        $parsed = $parseSsw0049Csv((string)$dl['content']);
+        $parsed = $parseSsw0049Content((string)$dl['content'], (string)($dl['filename'] ?? ''));
         $t1 = microtime(true);
 
         $respondJson([
@@ -852,7 +895,7 @@ try {
                     $dl = $downloadFromAct((string)$acts[0]);
                     if (!$dl) break;
                     $t0 = microtime(true);
-                    $parsed = $parseSsw0049Csv((string)$dl['content']);
+                    $parsed = $parseSsw0049Content((string)$dl['content'], (string)($dl['filename'] ?? ''));
                     $t1 = microtime(true);
                     $respondJson([
                         'success' => true,
