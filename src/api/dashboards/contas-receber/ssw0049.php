@@ -418,7 +418,7 @@ try {
 
     $params = [
         'act' => 'ANA',
-        'tp_arquivo' => 'C',
+        'tp_arquivo' => 'F',
         'rel_ana_fg_data' => $fgData,
         'rel_ana_per_pesq_ini' => $iniDmy,
         'rel_ana_per_pesq_fin' => $fimDmy,

@@ -636,7 +636,7 @@ $parseReport = static function(string $raw, bool $withRows) use ($parseSciToDigi
     $byCliente = [];
     $rows = [];
     $truncated = false;
-    $maxRows = $withRows ? 6000 : 0;
+    $maxRows = 0;
 
     $addAgg = static function(array &$agg, string $key, array $row) : void {
         if (!isset($agg[$key])) {
@@ -733,11 +733,6 @@ $parseReport = static function(string $raw, bool $withRows) use ($parseSciToDigi
             if ($unidInc !== '') $addAgg($byUnid, $unidInc, $row);
             $clienteKey = $cnpjPag !== '' ? $cnpjPag : ($nomePag !== '' ? $nomePag : '');
             if ($clienteKey !== '') $addAgg($byCliente, $clienteKey, $row);
-
-            if (count($rows) >= $maxRows) {
-                $truncated = true;
-                break;
-            }
         }
     }
 
@@ -754,7 +749,7 @@ $parseReport = static function(string $raw, bool $withRows) use ($parseSciToDigi
         'byCliente' => $withRows ? $finalizeAgg($byCliente) : [],
         'meta' => [
             'truncated' => $truncated,
-            'max_rows' => $withRows ? $maxRows : 0,
+            'max_rows' => 0,
         ],
     ];
 };

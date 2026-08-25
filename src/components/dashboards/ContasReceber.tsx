@@ -1906,20 +1906,7 @@ export function ContasReceber() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm text-slate-600 dark:text-slate-400">Tipo de período</Label>
-                      <Select
-                        value={tempPeriodoTipo}
-                        onValueChange={(v) => {
-                          const next = v as any;
-                          setTempPeriodoTipo(next);
-                          if (next === 'E' || next === 'L') {
-                            const now = new Date();
-                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
-                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                            setTempPeriodoIni(dateToInput(start));
-                            setTempPeriodoFim(dateToInput(end));
-                          }
-                        }}
-                      >
+                      <Select value={tempPeriodoTipo} onValueChange={(v) => setTempPeriodoTipo(v as any)}>
                         <SelectTrigger className="h-9 dark:bg-slate-800 dark:border-slate-700">
                           <SelectValue placeholder="Tipo" />
                         </SelectTrigger>

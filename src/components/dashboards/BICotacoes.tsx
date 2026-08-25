@@ -555,11 +555,7 @@ export function BICotacoes() {
       setData(parsed);
       setRankingWindowDays(90);
       fetchRankingBase(f);
-      if (parsed.meta?.truncated) {
-        toast.warning(`Planilha grande: exibindo apenas ${formatNumber(parsed.meta.max_rows || 0)} registros (limite técnico).`);
-      } else {
-        toast.success('Cotações carregadas.');
-      }
+      toast.success('Cotações carregadas.');
     } catch (e: any) {
       console.error(e);
       toast.error('Erro ao buscar cotações.');
@@ -582,31 +578,11 @@ export function BICotacoes() {
     carregar(d);
   }, [user, getDefaultFilters]);
 
-  const rowsFiltered = useMemo(() => {
-    const base = data?.rows || [];
-    const byQuick =
-      quickStatus === 'ALL'
-        ? base
-        : base.filter((r) => {
-            if (quickStatus === 'COTADO') return r.status_kind === 'COTADO';
-            if (quickStatus === 'CONTRAT') return r.status_kind === 'CONTRAT';
-            if (quickStatus === 'CTRC_EMI') return r.status_kind === 'CTRC_EMI';
-            return true;
-          });
-
-    const vKey = String(filters.vendedorLogin || '').trim().toLowerCase();
-    const byVendor = !vKey
-      ? byQuick
-      : byQuick.filter((r) => {
-          const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
-          if (vKey === '__sem_vendedor__') return login === '';
-          return login === vKey;
-        });
-
-    const q = search.trim().toLowerCase();
-    if (!q) return byVendor;
-    return byVendor.filter((r) => {
-      const bag = [
+  const baseRows = data?.rows ?? [];
+  const baseSearchIndex = useMemo(() => {
+    if (!baseRows.length) return [];
+    return baseRows.map((r) =>
+      [
         r.cotacao,
         r.unidade_inclusao,
         r.usuario_inclusao,
@@ -620,10 +596,42 @@ export function BICotacoes() {
         r.ctrc,
       ]
         .join(' ')
-        .toLowerCase();
-      return bag.includes(q);
-    });
-  }, [data, filters.vendedorLogin, quickStatus, search]);
+        .toLowerCase()
+    );
+  }, [baseRows]);
+
+  const rowsFiltered = useMemo(() => {
+    if (!baseRows.length) return [];
+    const q = search.trim().toLowerCase();
+    const hasQ = !!q;
+    const vKey = String(filters.vendedorLogin || '').trim().toLowerCase();
+    const hasV = !!vKey;
+
+    const out: CotacaoRow[] = [];
+    for (let i = 0; i < baseRows.length; i++) {
+      const r = baseRows[i];
+      if (quickStatus === 'COTADO' && r.status_kind !== 'COTADO') continue;
+      if (quickStatus === 'CONTRAT' && r.status_kind !== 'CONTRAT' && r.status_kind !== 'CTRC_EMI') continue;
+      if (quickStatus === 'CTRC_EMI' && r.status_kind !== 'CTRC_EMI') continue;
+
+      if (hasV) {
+        const login = String((r as any).vendedor_login ?? '').trim().toLowerCase();
+        if (vKey === '__sem_vendedor__') {
+          if (login !== '') continue;
+        } else if (login !== vKey) {
+          continue;
+        }
+      }
+
+      if (hasQ) {
+        const bag = baseSearchIndex[i] || '';
+        if (!bag.includes(q)) continue;
+      }
+
+      out.push(r);
+    }
+    return out;
+  }, [baseRows, baseSearchIndex, filters.vendedorLogin, quickStatus, search]);
 
   const rowsSimuladas = useMemo(() => rowsFiltered.filter((r) => r.status_kind === 'COTADO'), [rowsFiltered]);
   const rowsContratadas = useMemo(
