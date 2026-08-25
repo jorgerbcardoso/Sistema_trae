@@ -154,6 +154,13 @@ function dateToInput(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function formatDateBr(iso: string): string {
+  const s = String(iso ?? '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return s;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 function parseDateBr(dmy: string): number | null {
   const s = String(dmy ?? '').trim();
   let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
