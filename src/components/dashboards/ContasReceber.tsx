@@ -450,8 +450,8 @@ export function ContasReceber() {
   const [periodoTipo, setPeriodoTipo] = useState<'E' | 'V' | 'L' | 'X'>('V');
   const defaultPeriodo = useMemo(() => {
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15);
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10);
     return { ini: dateToInput(start), fim: dateToInput(end) };
   }, []);
   const [periodoIni, setPeriodoIni] = useState<string>(defaultPeriodo.ini);
@@ -1874,6 +1874,15 @@ export function ContasReceber() {
       description="Painel em tempo real (faturamento e disponíveis para faturar)"
       headerActions={
         <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden md:flex items-center gap-2 px-3 h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-300">
+            <span className="font-medium">
+              {periodoTipo === 'V' ? 'Vencimento' : periodoTipo === 'E' ? 'Emissão' : periodoTipo === 'L' ? 'Liquidação' : 'Cancelamento'}
+            </span>
+            <span className="text-slate-400">•</span>
+            <span className="font-mono">
+              {formatDateBr(periodoIni)}–{formatDateBr(periodoFim)}
+            </span>
+          </div>
           <Dialog
             open={showFilters}
             onOpenChange={(open) => {
@@ -1926,8 +1935,8 @@ export function ContasReceber() {
                           setTempPeriodoTipo(next);
                           if (next === 'V') {
                             const now = new Date();
-                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15);
-                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 15);
+                            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10);
+                            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 10);
                             setTempPeriodoIni(dateToInput(start));
                             setTempPeriodoFim(dateToInput(end));
                           }
