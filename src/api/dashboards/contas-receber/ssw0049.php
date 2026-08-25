@@ -258,6 +258,60 @@ $parseSsw0049Rows = static function(array $rows) use ($parseMoney, $parseCnpj, $
         }
 
         if ($tipo === '2') {
+            $k1 = $normKey((string)($row[1] ?? ''));
+            if (!empty($idxFat) && $k1 !== 'FATURA') {
+                $fatura = $getCell($row, $idxFat, ['FATURA']);
+                $cnpj = $parseCnpj($getCell($row, $idxFat, ['CNPJ/CPF', 'CNPJCPF']));
+                $cliente = $getCell($row, $idxFat, ['CLIENTE']);
+                $tipoCobranca = $getCell($row, $idxFat, ['TIPO DE COBRANCA', 'TIPO DE COBRANÇA']);
+                $bancoCarteira = $getCell($row, $idxFat, ['BANCO/CARTEIRA']);
+                $periodicidade = $getCell($row, $idxFat, ['PERIODICIDADE']);
+                $fil = $getCell($row, $idxFat, ['FIL']);
+                $emissao = $getCell($row, $idxFat, ['EMISSAO']);
+                $venc = $getCell($row, $idxFat, ['VENCIMEN', 'VENCIMENTO']);
+                $pagamento = $getCell($row, $idxFat, ['PAGAMENTO']);
+                $diasAtraso = $getCell($row, $idxFat, ['DIAS ATRASO']);
+                $sit = $getCell($row, $idxFat, ['LIQUIDADA/ATRASADA']);
+                $vlrFatur = $parseMoney($getCell($row, $idxFat, ['VLR FATUR', 'VLR FATUR.']));
+                $vlrPago = $parseMoney($getCell($row, $idxFat, ['VLR PAGO']));
+                $saldo = $parseMoney($getCell($row, $idxFat, ['SALDO']));
+                $ultimaOc = $getCell($row, $idxFat, ['ULTIMA OCORRENCIA', 'ÚLTIMA OCORRÊNCIA']);
+                $unidadeResp = $getCell($row, $idxFat, ['UNIDADE RESPONSAVEL', 'UNIDADE RESPONSÁVEL']);
+                $vendedor = $getCell($row, $idxFat, ['VENDEDOR']);
+
+                $inv = [
+                    'fatura' => $fatura,
+                    'cnpj' => $cnpj,
+                    'cliente' => $cliente,
+                    'tipo_cobranca' => $tipoCobranca,
+                    'banco_carteira' => $bancoCarteira,
+                    'periodicidade' => $periodicidade,
+                    'fil' => $fil,
+                    'emissao' => $emissao,
+                    'vencimento' => $venc,
+                    'pagamento' => $pagamento,
+                    'dias_atraso' => $diasAtraso,
+                    'situacao' => $sit,
+                    'vlr_fatur' => $vlrFatur,
+                    'vlr_pago' => $vlrPago,
+                    'saldo' => $saldo,
+                    'ultima_ocorrencia' => $ultimaOc,
+                    'unidade_responsavel' => $unidadeResp,
+                    'vendedor' => $vendedor,
+                    'ctes' => [],
+                    'ctes_total_frete' => 0.0,
+                    'ctes_total_contabil' => 0.0,
+                ];
+
+                $invoices[] = $inv;
+                $currentIndex = count($invoices) - 1;
+
+                $totals['faturas'] += 1;
+                $totals['vlr_fatur_total'] += $vlrFatur;
+                $totals['saldo_total'] += $saldo;
+                continue;
+            }
+
             $headerCte = $row;
             $idxCte = [];
             foreach ($headerCte as $i => $h) {
