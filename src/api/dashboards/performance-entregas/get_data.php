@@ -79,6 +79,9 @@ try {
     // ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
     $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 
+    // ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
+    $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
+
     // Filtro: Período de Emissão
     if (!empty($filters['periodoEmissaoInicio'])) {
         $whereConditions[] = "cte.data_emissao >= $" . $paramIndex;

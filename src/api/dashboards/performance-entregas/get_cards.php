@@ -95,6 +95,9 @@ $whereConditions[] = "cte.status <> 'C'";
 // ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
 $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
+$whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
+
 // Filtro: Período de Emissão
 if (!empty($filters['periodoEmissaoInicio'])) {
     $whereConditions[] = "cte.data_emissao >= $" . $paramIndex;
@@ -109,12 +112,12 @@ if (!empty($filters['periodoEmissaoFim'])) {
 
 // Filtro: Período de Previsão de Entrega
 if (!empty($filters['periodoPrevisaoInicio'])) {
-    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoInicio'];
     $paramIndex++;
 }
 if (!empty($filters['periodoPrevisaoFim'])) {
-    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex;
+    $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex;
     $params[] = $filters['periodoPrevisaoFim'];
     $paramIndex++;
 }
@@ -156,16 +159,16 @@ $query = "
     SELECT
         COUNT(*) as total_ctes,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                    AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+                    AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as entregues_no_prazo,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                    AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+                    AND cte.data_entrega > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as entregues_com_atraso,
         COUNT(CASE WHEN cte.data_entrega IS NULL
-                    AND CURRENT_DATE > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+                    AND CURRENT_DATE > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as pendentes_atrasados,
         COUNT(CASE WHEN cte.data_entrega IS NULL
-                    AND CURRENT_DATE <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+                    AND CURRENT_DATE <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
               THEN 1 END) as pendentes_no_prazo
     FROM {$domain}_cte cte
     LEFT JOIN {$domain}_ocorrencia oc ON oc.codigo::text = cte.ult_ocor::text

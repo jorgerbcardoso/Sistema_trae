@@ -101,7 +101,8 @@ $params = [];
 $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
-    "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')"
+    "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')",
+    "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'"
 ];
 
 if (!empty($unidadeDestino) && is_array($unidadeDestino) && count($unidadeDestino) > 0) {
@@ -167,7 +168,7 @@ $query = "
         ) oc ON oc.codigo = cte.ult_ocor::text
         WHERE cte.data_prev_ent IS NOT NULL
         AND data_entrega IS NOT NULL
-        AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
+        AND data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
         AND $whereClause
         GROUP BY cte.data_prev_ent::date
     ),
@@ -183,9 +184,9 @@ $query = "
         ) oc ON oc.codigo = cte.ult_ocor::text
         WHERE cte.data_prev_ent IS NOT NULL
         AND (
-            (data_entrega IS NOT NULL AND data_entrega::date > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date)
+            (data_entrega IS NOT NULL AND data_entrega::date > (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date)
             OR
-            (data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date < CURRENT_DATE)
+            (data_entrega IS NULL AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)::date < CURRENT_DATE)
         )
         AND $whereClause
         GROUP BY cte.data_prev_ent::date

@@ -102,6 +102,9 @@ $whereConditions[] = "cte.status <> 'C'";
 // ✅ FILTRO OBRIGATÓRIO: Ignorar documentos complementares
 $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
+$whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
+
 // ✅ FILTRO DE STATUS DE ENTREGA (dos cards ou da tabela)
 if ($statusEntrega) {
     switch ($statusEntrega) {
