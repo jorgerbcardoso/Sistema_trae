@@ -1233,7 +1233,7 @@ export function ColetaEntrega() {
                                   </Badge>
                                 )}
                               </div>
-                              {(!((g.isFrota ?? ((g.tpPropriedade ?? '').toUpperCase() === 'F'))) && g.proprietarioNome) ? (
+                              {g.proprietarioNome ? (
                                 <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[260px] truncate" title={g.proprietarioNome}>
                                   {g.proprietarioNome}
                                 </span>
@@ -1592,7 +1592,6 @@ export function ColetaEntrega() {
                         <tr className="bg-slate-800 dark:bg-slate-950">
                           <ThAnd field="romaneio" label="Romaneio" />
                           <ThAnd field="placa" label="Veículo" />
-                          <ThAnd field="carreta" label="Carreta" />
                           <ThAnd field="inclusao" label="Inclusão" />
                           <ThAnd field="marcaModelo" label="Marca / modelo" />
                           <ThAnd field="motorista" label="Motorista" />
@@ -1609,7 +1608,6 @@ export function ColetaEntrega() {
                           >
                             <td className="px-3 py-2 font-mono font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">{r.romaneio}</td>
                             <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{r.placa || '-'}</td>
-                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{r.carreta || '-'}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{r.inclusao}</td>
                             <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[220px] truncate" title={r.marcaModelo}>{r.marcaModelo}</td>
                             <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[220px] truncate" title={r.motorista}>{r.motorista}</td>
