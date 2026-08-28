@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../ThemeProvider';
@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { apiFetch } from '../../utils/apiUtils';
 import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
@@ -43,6 +44,8 @@ interface Operacao {
   valMerc: number;
   vlrFrete: number;
   nroCtrb: string;
+  contratado?: string;
+  remuneracaoDia?: number;
 }
 
 interface GrupoPlaca {
@@ -54,6 +57,8 @@ interface GrupoPlaca {
   frete: number;
   valMerc: number;
   vol: number;
+  contratado?: string;
+  remuneracao?: number;
   ctrcs: Operacao[];
 }
 
@@ -74,12 +79,47 @@ interface Totais {
   frete: number;
   valMerc: number;
   vol: number;
+  remuneracao?: number;
 }
 
-type SortField = 'placa' | 'total' | 'coletas' | 'entregas' | 'peso' | 'frete' | 'valMerc';
+interface GrupoContratado {
+  contratado: string;
+  placas: number;
+  coletas: number;
+  entregas: number;
+  total: number;
+  peso: number;
+  frete: number;
+  valMerc: number;
+  vol: number;
+  remuneracao: number;
+}
+
+type SortField = 'placa' | 'total' | 'coletas' | 'entregas' | 'peso' | 'frete' | 'valMerc' | 'remuneracao';
 type SortDir = 'asc' | 'desc';
 
 const COLORS_DONUT = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444'];
+
+interface RomaneioAndamento {
+  romaneio: string;
+  placa: string;
+  carreta: string;
+  inclusao: string;
+  marcaModelo: string;
+  motorista: string;
+  qtdeCtrcs: number;
+  faltaOcorrencia: number;
+  unidade: string;
+  seqRomaneio: string;
+  erro: string;
+}
+
+interface TotaisAndamento {
+  romaneios: number;
+  ctrcs: number;
+  faltaOcorrencia: number;
+  veiculos: number;
+}
 
 function formatMoeda(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -118,6 +158,8 @@ export function ColetaEntrega() {
   const unidadeAtual = user?.unidade_atual || user?.unidade || '';
   const isMTZ = unidadeAtual === 'MTZ';
 
+  const [tab, setTab] = useState<'076' | 'ANDAMENTO'>('076');
+
   const datas = getDataPadrao();
   const [dataIni, setDataIni] = useState(datas.ini);
   const [dataFin, setDataFin] = useState(datas.fin);
@@ -131,7 +173,14 @@ export function ColetaEntrega() {
   const [grupos, setGrupos] = useState<GrupoPlaca[]>([]);
   const [serie, setSerie] = useState<SerieDia[]>([]);
   const [totais, setTotais] = useState<Totais | null>(null);
+  const [contratados, setContratados] = useState<GrupoContratado[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+
+  const [loadingAndamento, setLoadingAndamento] = useState(false);
+  const [elapsedAndamento, setElapsedAndamento] = useState(0);
+  const [romaneios, setRomaneios] = useState<RomaneioAndamento[]>([]);
+  const [totaisAndamento, setTotaisAndamento] = useState<TotaisAndamento | null>(null);
+  const [hasLoadedAndamento, setHasLoadedAndamento] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>('total');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -151,13 +200,18 @@ export function ColetaEntrega() {
   };
 
   const gruposOrdenados = [...grupos].sort((a, b) => {
-    const va = a[sortField] as number | string;
-    const vb = b[sortField] as number | string;
-    if (typeof va === 'number' && typeof vb === 'number')
+    const vaRaw = (a as any)[sortField];
+    const vbRaw = (b as any)[sortField];
+
+    if (sortField !== 'placa') {
+      const va = Number(vaRaw ?? 0);
+      const vb = Number(vbRaw ?? 0);
       return sortDir === 'asc' ? va - vb : vb - va;
+    }
+
     return sortDir === 'asc'
-      ? String(va).localeCompare(String(vb))
-      : String(vb).localeCompare(String(va));
+      ? String(vaRaw ?? '').localeCompare(String(vbRaw ?? ''))
+      : String(vbRaw ?? '').localeCompare(String(vaRaw ?? ''));
   });
 
   const handleGerar = async () => {
@@ -176,6 +230,7 @@ export function ColetaEntrega() {
     setGrupos([]);
     setSerie([]);
     setTotais(null);
+    setContratados([]);
     setExpandedPlacas(new Set());
 
     const timer = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -193,6 +248,7 @@ export function ColetaEntrega() {
         setGrupos(res.grupos ?? []);
         setSerie(res.serieCronologica ?? []);
         setTotais(res.totais ?? null);
+        setContratados(res.contratados ?? []);
         setHasSearched(true);
         if ((res.grupos ?? []).length === 0) toast.info('Nenhuma operação encontrada para o período.');
       } else {
@@ -206,6 +262,41 @@ export function ColetaEntrega() {
       setLoading(false);
     }
   };
+
+  const handleCarregarAndamento = async () => {
+    setLoadingAndamento(true);
+    setElapsedAndamento(0);
+    const timer = setInterval(() => setElapsedAndamento(e => e + 1), 1000);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+        { method: 'POST', body: JSON.stringify({ view: 'ANDAMENTO' }) },
+        true
+      );
+      clearInterval(timer);
+      setElapsedAndamento(0);
+      if (res.success) {
+        setRomaneios(res.romaneios ?? []);
+        setTotaisAndamento(res.totais ?? null);
+        setHasLoadedAndamento(true);
+        if ((res.romaneios ?? []).length === 0) toast.info('Nenhum romaneio em andamento no momento.');
+      } else {
+        toast.error(res.message || 'Erro ao buscar entregas em andamento.');
+      }
+    } catch (e: any) {
+      clearInterval(timer);
+      setElapsedAndamento(0);
+      toast.error(e.message || 'Erro ao buscar entregas em andamento.');
+    } finally {
+      setLoadingAndamento(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'ANDAMENTO' && !hasLoadedAndamento && !loadingAndamento) {
+      handleCarregarAndamento();
+    }
+  }, [tab]);
 
   const exportarExcel = async (ctrcs: Operacao[], placaLabel: string) => {
     const isGeral = placaLabel === 'GERAL';
@@ -287,6 +378,11 @@ export function ColetaEntrega() {
     .slice(0, 5)
     .map(g => ({ placa: g.placa, frete: g.frete, peso: g.peso / 1000 }));
 
+  const top5Contratados = [...contratados]
+    .sort((a, b) => (b.remuneracao ?? 0) - (a.remuneracao ?? 0))
+    .slice(0, 5)
+    .map(c => ({ contratado: c.contratado, remuneracao: c.remuneracao, placas: c.placas }));
+
   return (
     <DashboardLayout
       user={user} logout={logout} theme={theme} toggleTheme={toggleTheme}
@@ -302,70 +398,75 @@ export function ColetaEntrega() {
             <p className="text-lg font-medium">Acesso não disponível para a unidade MTZ</p>
             <p className="text-sm mt-1">Faça login em uma unidade específica para visualizar este painel.</p>
           </div>
-        ) : (<>
+        ) : (
+          <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="076">Coleta/Entrega</TabsTrigger>
+              <TabsTrigger value="ANDAMENTO">Entregas em Andamento</TabsTrigger>
+            </TabsList>
 
-        {/* FILTROS */}
-        <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
-              <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              Filtros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Data Início</Label>
-                <Input type="text" value={dataIni} onChange={e => setDataIni(e.target.value)}
-                  placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Data Fim</Label>
-                <Input type="text" value={dataFin} onChange={e => setDataFin(e.target.value)}
-                  placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Placa (opcional)</Label>
-                <FilterSelectVeiculo value={placa} onChange={setPlaca} placeholder="Todas as placas" />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleGerar} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-                  {loading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}</>
-                  ) : (
-                    <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
-                  )}
-                </Button>
-                {hasSearched && (
-                  <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
-                    disabled={loadingExcel || grupos.length === 0} variant="outline"
-                    className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                    {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {loading && (
-              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                      Processando informações...
-                    </p>
-                    <div className="mt-2 bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
-                      <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
+            <TabsContent value="076" className="space-y-6">
+              <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
+                    <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    Filtros
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Data Início</Label>
+                      <Input type="text" value={dataIni} onChange={e => setDataIni(e.target.value)}
+                        placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Data Fim</Label>
+                      <Input type="text" value={dataFin} onChange={e => setDataFin(e.target.value)}
+                        placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Placa (opcional)</Label>
+                      <FilterSelectVeiculo value={placa} onChange={setPlaca} placeholder="Todas as placas" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleGerar} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                        {loading ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}</>
+                        ) : (
+                          <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
+                        )}
+                      </Button>
+                      {hasSearched && (
+                        <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
+                          disabled={loadingExcel || grupos.length === 0} variant="outline"
+                          className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                          {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300 min-w-[3rem] text-right">{elapsed}s</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {hasSearched && totais && (<>
+                  {loading && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                            Processando informações...
+                          </p>
+                          <div className="mt-2 bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
+                            <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
+                          </div>
+                        </div>
+                        <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300 min-w-[3rem] text-right">{elapsed}s</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {hasSearched && totais && (<>
 
         {/* CARDS — 3 por linha, 2 linhas */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -449,6 +550,20 @@ export function ColetaEntrega() {
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Vlr Mercadoria</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-xl">
+                  <DollarSign className="h-6 w-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Remuneração (terceiros)</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.remuneracao ?? 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -548,6 +663,30 @@ export function ColetaEntrega() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 5 Contratados — Remuneração</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={top5Contratados} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradTopContr" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#fb7185" stopOpacity={0.7} />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
+                  <YAxis type="category" dataKey="contratado" tick={{ fontSize: 10, fill: '#94a3b8' }} width={95} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="remuneracao" fill="url(#gradTopContr)" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </div>
 
         {/* TABELA AGRUPADA POR PLACA */}
@@ -585,12 +724,43 @@ export function ColetaEntrega() {
                     <ThH field="peso" label="Peso (t)" right />
                     <ThH field="frete" label="Vlr Frete" right />
                     <ThH field="valMerc" label="Vlr Merc" right />
+                    <ThH field="remuneracao" label="Remuneração" right />
                     <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Excel</th>
                   </tr>
                 </thead>
                 <tbody>
                   {gruposOrdenados.map((g, idx) => {
                     const expanded = expandedPlacas.has(g.placa);
+                    const resumoDias = Object.values(
+                      g.ctrcs.reduce((acc, op) => {
+                        const k = op.dataBaixa;
+                        if (!acc[k]) {
+                          acc[k] = {
+                            data: k,
+                            coletas: 0,
+                            entregas: 0,
+                            total: 0,
+                            peso: 0,
+                            frete: 0,
+                            remuneracaoDia: op.remuneracaoDia ?? 0,
+                          };
+                        }
+                        acc[k].total += 1;
+                        if (op.tipoCodigo === 'C') acc[k].coletas += 1;
+                        if (op.tipoCodigo === 'E') acc[k].entregas += 1;
+                        acc[k].peso += op.pesoCalculo;
+                        acc[k].frete += op.vlrFrete;
+                        if ((acc[k].remuneracaoDia ?? 0) === 0 && (op.remuneracaoDia ?? 0) > 0) {
+                          acc[k].remuneracaoDia = op.remuneracaoDia ?? 0;
+                        }
+                        return acc;
+                      }, {} as Record<string, { data: string; coletas: number; entregas: number; total: number; peso: number; frete: number; remuneracaoDia: number }>)
+                    ).sort((a, b) => {
+                      const da = parseDateBR(a.data)?.getTime() ?? 0;
+                      const db = parseDateBR(b.data)?.getTime() ?? 0;
+                      return da - db;
+                    });
+
                     return (
                       <React.Fragment key={g.placa}>
                         <tr
@@ -602,7 +772,16 @@ export function ColetaEntrega() {
                               ? <ChevronDown className="h-4 w-4" />
                               : <ChevronRight className="h-4 w-4" />}
                           </td>
-                          <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{g.placa}</td>
+                          <td className="px-3 py-2 min-w-[160px]">
+                            <div className="flex flex-col">
+                              <span className="font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{g.placa}</span>
+                              {g.contratado ? (
+                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] truncate" title={g.contratado}>
+                                  {g.contratado}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
                           <td className="px-3 py-2 text-right">
                             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800 text-xs">{g.coletas}</Badge>
                           </td>
@@ -613,6 +792,7 @@ export function ColetaEntrega() {
                           <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatTon(g.peso)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(g.frete)}</td>
                           <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatMoeda(g.valMerc)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-rose-700 dark:text-rose-400 whitespace-nowrap">{formatMoeda(g.remuneracao ?? 0)}</td>
                           <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
                             <Button size="sm" variant="ghost"
                               disabled={loadingExcelPlaca === g.placa}
@@ -627,7 +807,40 @@ export function ColetaEntrega() {
 
                         {expanded && (
                           <tr className="bg-slate-50 dark:bg-slate-950/60">
-                            <td colSpan={9} className="p-0">
+                            <td colSpan={10} className="p-0">
+                              <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700">
+                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                  Resumo por Dia
+                                </div>
+                                <div className="mt-2 overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="bg-slate-700 dark:bg-slate-900">
+                                        <th className="px-3 py-1.5 text-left text-slate-300 font-medium whitespace-nowrap">Data</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Coletas</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Entregas</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Total</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Peso (t)</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Frete</th>
+                                        <th className="px-3 py-1.5 text-right text-slate-300 font-medium whitespace-nowrap">Remun. do Dia</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {resumoDias.map((d, i) => (
+                                        <tr key={d.data} className={`border-b border-slate-200 dark:border-slate-800 ${i % 2 === 0 ? 'bg-white/70 dark:bg-slate-900/30' : 'bg-slate-50/60 dark:bg-slate-900/20'}`}>
+                                          <td className="px-3 py-1.5 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{d.data}</td>
+                                          <td className="px-3 py-1.5 text-right text-orange-700 dark:text-orange-300 whitespace-nowrap">{d.coletas}</td>
+                                          <td className="px-3 py-1.5 text-right text-blue-700 dark:text-blue-300 whitespace-nowrap">{d.entregas}</td>
+                                          <td className="px-3 py-1.5 text-right font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">{d.total}</td>
+                                          <td className="px-3 py-1.5 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatTon(d.peso)}</td>
+                                          <td className="px-3 py-1.5 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(d.frete)}</td>
+                                          <td className="px-3 py-1.5 text-right font-semibold text-rose-700 dark:text-rose-400 whitespace-nowrap">{formatMoeda(d.remuneracaoDia ?? 0)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
                               <div className="overflow-x-auto border-t border-slate-200 dark:border-slate-700">
                                 <table className="w-full text-xs">
                                   <thead>
@@ -705,6 +918,7 @@ export function ColetaEntrega() {
                       <td className="px-3 py-2 text-right text-xs text-slate-200 whitespace-nowrap">{formatTon(totais.peso)}</td>
                       <td className="px-3 py-2 text-right text-xs text-emerald-300 whitespace-nowrap">{formatMoeda(totais.frete)}</td>
                       <td className="px-3 py-2 text-right text-xs text-slate-200 whitespace-nowrap">{formatMoeda(totais.valMerc)}</td>
+                      <td className="px-3 py-2 text-right text-xs text-rose-300 whitespace-nowrap">{formatMoeda(totais.remuneracao ?? 0)}</td>
                       <td />
                     </tr>
                   </tfoot>
@@ -715,8 +929,154 @@ export function ColetaEntrega() {
         </Card>
 
         </>)}
+            </TabsContent>
 
-        </>)}
+            <TabsContent value="ANDAMENTO" className="space-y-6">
+              <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center justify-between text-base">
+                    <span className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      Entregas em Andamento
+                    </span>
+                    <Button onClick={handleCarregarAndamento} disabled={loadingAndamento} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      {loadingAndamento
+                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsedAndamento > 0 ? `Atualizando... ${elapsedAndamento}s` : 'Atualizando...'}</>
+                        : <><RefreshCw className="h-4 w-4 mr-2" />Atualizar</>}
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Lista em tempo real de romaneios de entrega em trânsito (SSW0198).
+                  </p>
+                </CardContent>
+              </Card>
+
+              {hasLoadedAndamento && totaisAndamento && (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                          <Truck className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Romaneios</p>
+                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.romaneios}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                          <Package className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Qtde CTRCs</p>
+                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.ctrcs}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                          <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Falta Ocorrência</p>
+                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.faltaOcorrencia}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+                          <Truck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Veículos</p>
+                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.veiculos}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center justify-between text-base">
+                    <span className="flex items-center gap-2">
+                      <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      Romaneios em Trânsito
+                    </span>
+                    <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                      {romaneios.length} {romaneios.length === 1 ? 'romaneio' : 'romaneios'}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-800 dark:bg-slate-950">
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Romaneio</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Veículo</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Carreta</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Inclusão</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Marca / Modelo</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Motorista</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-right whitespace-nowrap">Qtde CTRCs</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-right whitespace-nowrap">Falta Ocorrência</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {romaneios.map((r, i) => (
+                          <tr
+                            key={`${r.romaneio}-${r.seqRomaneio || i}`}
+                            className={`border-b border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'} ${r.erro ? 'bg-rose-50 dark:bg-rose-900/10' : ''}`}
+                          >
+                            <td className="px-3 py-2 font-mono font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">{r.romaneio}</td>
+                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{r.placa || '-'}</td>
+                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{r.carreta || '-'}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{r.inclusao}</td>
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[220px] truncate" title={r.marcaModelo}>{r.marcaModelo}</td>
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[220px] truncate" title={r.motorista}>{r.motorista}</td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 text-xs">
+                                {r.qtdeCtrcs ?? 0}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800 text-xs">
+                                {r.faltaOcorrencia ?? 0}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 max-w-[260px] truncate" title={r.erro || ''}>
+                              {r.erro ? (
+                                <span className="text-rose-700 dark:text-rose-300">{r.erro}</span>
+                              ) : (
+                                <span className="text-emerald-700 dark:text-emerald-300">OK</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </DashboardLayout>
   );

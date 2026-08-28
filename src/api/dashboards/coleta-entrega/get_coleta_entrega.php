@@ -21,9 +21,119 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 }
 
 $input    = getRequestInput();
+$view     = strtoupper(trim($input['view'] ?? '076'));
 $dataIni  = trim($input['data_ini'] ?? '');
 $dataFin  = trim($input['data_fin'] ?? '');
 $placa    = strtoupper(trim($input['placa'] ?? ''));
+
+if (!in_array($view, ['076', 'ANDAMENTO', 'ROM'], true)) {
+    respondJson(['success' => false, 'message' => 'View inválida.']);
+}
+
+ssw_login($domain);
+set_time_limit(180);
+ini_set('memory_limit', '256M');
+
+register_shutdown_function(function() {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Erro fatal PHP: ' . $err['message'] . ' em ' . $err['file'] . ':' . $err['line']]);
+    }
+});
+
+function parseXmlFromResponse($str) {
+    $pos = strpos((string)$str, '<xml');
+    if ($pos === false) return null;
+    $xml = substr((string)$str, $pos);
+    $end = strpos($xml, '</xml>');
+    if ($end === false) return null;
+    $xml = substr($xml, 0, $end) . '</xml>';
+    return simplexml_load_string($xml) ?: null;
+}
+
+function extractHtmlCellText($s) {
+    $dec = html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (preg_match('/<!--\\s*(.*?)\\s*-->/', $dec, $m)) return trim((string)$m[1]);
+    if (preg_match('/<u>\\s*(.*?)\\s*<\\/u>/i', $dec, $m)) return trim(strip_tags((string)$m[1]));
+    return trim(strip_tags($dec));
+}
+
+if ($view !== '076') {
+    $strTroca = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
+    if (substr((string)$strTroca, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (troca unidade): ' . (string)$strTroca]);
+    }
+
+    $romXmlRaw = ssw_go('https://sistema.ssw.inf.br/bin/ssw0198?act=ROM');
+    if (substr((string)$romXmlRaw, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (0198): ' . (string)$romXmlRaw]);
+    }
+
+    $xml = parseXmlFromResponse((string)$romXmlRaw);
+    if (!$xml) {
+        respondJson(['success' => false, 'message' => 'Resposta inválida do SSW (0198 ROM).']);
+    }
+
+    $rows = $xml->xpath('rs/r') ?: [];
+    $romaneios = [];
+    $totRom = 0;
+    $totCtrcs = 0;
+    $totFalta = 0;
+    $placas = [];
+
+    foreach ($rows as $r) {
+        $rom = extractHtmlCellText((string)($r->f0 ?? ''));
+        if ($rom === '') continue;
+
+        $pl = extractHtmlCellText((string)($r->f1 ?? ''));
+        $carreta = extractHtmlCellText((string)($r->f2 ?? ''));
+        $inclusaoRaw = trim((string)($r->f3 ?? ''));
+        $marcaModelo = trim(html_entity_decode((string)($r->f4 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $motorista = trim(html_entity_decode((string)($r->f5 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $qtCtrcs = (int)trim((string)($r->f6 ?? '0'));
+        $faltaOcor = (int)trim((string)($r->f7 ?? '0'));
+        $unidadeInfo = trim(html_entity_decode((string)($r->f8 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $erroHtml = html_entity_decode((string)($r->f14 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $erro = trim(strip_tags((string)$erroHtml));
+        $seqRom = trim((string)($r->f17 ?? ''));
+
+        $romaneios[] = [
+            'romaneio' => $rom,
+            'placa' => $pl,
+            'carreta' => $carreta,
+            'inclusao' => $inclusaoRaw,
+            'marcaModelo' => $marcaModelo,
+            'motorista' => $motorista,
+            'qtdeCtrcs' => $qtCtrcs,
+            'faltaOcorrencia' => $faltaOcor,
+            'unidade' => $unidadeInfo,
+            'seqRomaneio' => $seqRom,
+            'erro' => $erro,
+        ];
+
+        $totRom++;
+        $totCtrcs += $qtCtrcs;
+        $totFalta += $faltaOcor;
+        if ($pl !== '') $placas[$pl] = true;
+    }
+
+    usort($romaneios, function($a, $b) {
+        return strcmp((string)($b['inclusao'] ?? ''), (string)($a['inclusao'] ?? ''));
+    });
+
+    respondJson([
+        'success' => true,
+        'view' => 'ANDAMENTO',
+        'romaneios' => $romaneios,
+        'totais' => [
+            'romaneios' => $totRom,
+            'ctrcs' => $totCtrcs,
+            'faltaOcorrencia' => $totFalta,
+            'veiculos' => count($placas),
+        ],
+    ]);
+}
 
 if (empty($dataIni) || empty($dataFin)) {
     respondJson(['success' => false, 'message' => 'Período obrigatório.']);
@@ -52,23 +162,11 @@ if ($diffDias > 31) {
 $dataIniSsw = str_replace('/', '', $dataIni);
 $dataFinSsw = str_replace('/', '', $dataFin);
 
-ssw_login($domain);
-set_time_limit(180);
-ini_set('memory_limit', '256M');
-
-register_shutdown_function(function() {
-    $err = error_get_last();
-    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        if (!headers_sent()) header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Erro fatal PHP: ' . $err['message'] . ' em ' . $err['file'] . ':' . $err['line']]);
-    }
-});
-
 $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
     . '&f4=' . urlencode($dataFinSsw)
-    . '&f7=E'
+    . '&f7=R'
     . '&t_email=N,';
 
 if (!empty($placa)) {
@@ -83,6 +181,7 @@ if (substr($str0216, 0, 5) === '<foc ') {
 
 $seqRelatorio  = null;
 $encontrado    = false;
+$downloadParams = null;
 $maxTentativas = 40;
 $intervalo     = 3;
 
@@ -95,6 +194,58 @@ function lerXml1440() {
     if ($end === false) return null;
     $str = substr($str, 0, $end) . '</xml>';
     return simplexml_load_string($str) ?: null;
+}
+
+function parseMoedaPtBr($s) {
+    $s = trim((string)$s);
+    if ($s === '') return 0.0;
+    $s = str_replace(['.', ' '], ['', ''], $s);
+    $s = str_replace(',', '.', $s);
+    return (float)$s;
+}
+
+function parseIntPtBr($s) {
+    $s = trim((string)$s);
+    if ($s === '') return 0;
+    $s = str_replace(['.', ',', ' '], ['', '', ''], $s);
+    return (int)$s;
+}
+
+function parseDownloadParamsFromRow($rowHtml) {
+    $rowHtml = html_entity_decode((string)$rowHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (!preg_match("/ajaxEnvia\\s*\\(\\s*'DOW(\\d+)'\\s*\\)/", $rowHtml, $mDow)) {
+        return null;
+    }
+
+    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+    if (empty($htmlDow)) return null;
+
+    if (!preg_match_all('/value="([^"]+)"/', $htmlDow, $mVals)) {
+        return null;
+    }
+
+    $best = null;
+    foreach ($mVals[1] as $v) {
+        $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (stripos($v, 'act=') !== false && stripos($v, 'filename=') !== false) {
+            if ($best === null || strlen($v) > strlen($best)) $best = $v;
+        }
+    }
+    if ($best === null) return null;
+
+    $qs = $best;
+    $pos = strpos($qs, '?');
+    if ($pos !== false) $qs = substr($qs, $pos + 1);
+    $qs = ltrim($qs, '&');
+
+    parse_str($qs, $p);
+    if (empty($p['act']) || empty($p['filename'])) return null;
+
+    return [
+        'act' => $p['act'],
+        'filename' => $p['filename'],
+        'path' => $p['path'] ?? '',
+    ];
 }
 
 for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
@@ -124,6 +275,10 @@ for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
 
             if ($seqNum === $seqRelatorio && $sitStr === 'Conclu&iacute;do') {
                 $encontrado = true;
+                $f8 = $xml1440->xpath('rs/r/f8')[$i] ?? null;
+                if ($f8) {
+                    $downloadParams = parseDownloadParamsFromRow((string)$f8);
+                }
             }
             break;
         }
@@ -137,10 +292,31 @@ if (!$encontrado || $seqRelatorio === null) {
 }
 
 $dominioUpper = strtoupper($domain);
-$arqCsv       = 'CSV' . $dominioUpper . sprintf('%08d', $seqRelatorio) . '.sswweb';
-$pathCsv      = '/usr/aws/jobs/' . $dominioUpper . '/';
+$file = null;
 
-$file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$arqCsv}&filename={$arqCsv}&path={$pathCsv}&down=1&nw=1");
+if ($downloadParams) {
+    $act = urlencode($downloadParams['act']);
+    $filename = urlencode($downloadParams['filename']);
+    $path = urlencode($downloadParams['path'] ?? '');
+    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$filename}&path={$path}&down=1&nw=1");
+}
+
+if (empty($file) || strlen($file) < 100) {
+    $pathJobs = '/usr/aws/jobs/' . $dominioUpper . '/';
+    $suffix = sprintf('%08d', $seqRelatorio) . '.sswweb';
+    $candidates = [
+        'REL' . $dominioUpper . $suffix,
+        'TXT' . $dominioUpper . $suffix,
+        'CSV' . $dominioUpper . $suffix,
+    ];
+    foreach ($candidates as $cand) {
+        $try = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$cand}&filename={$cand}&path={$pathJobs}&down=1&nw=1");
+        if (!empty($try) && strlen($try) >= 100) {
+            $file = $try;
+            break;
+        }
+    }
+}
 
 if (empty($file) || strlen($file) < 100) {
     respondJson(['success' => false, 'message' => 'Arquivo do relatório 076 vazio ou inválido.']);
@@ -152,79 +328,125 @@ $file   = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
 $linhas = explode("\n", $file);
 
 $operacoes = [];
+$contratadoPorPlacaDia = [];
+$remuneracaoPorPlacaDia = [];
 
-foreach ($linhas as $linha) {
-    $linha = trim($linha);
-    if ($linha === '') continue;
+$placaAtual = null;
+$contratadoAtual = null;
+$diaAtual = null;
+$tipoAtual = null;
+$tipoCodigoAtual = null;
+$colBounds = null;
 
-    $arr = str_getcsv($linha, ';');
+foreach ($linhas as $linhaRaw) {
+    $linha = rtrim($linhaRaw, "\r\n");
+    if (trim($linha) === '') continue;
 
-    if (count($arr) < 24) continue;
+    if (preg_match('/^VEICULO:\\s*([A-Z0-9]{7})\\b.*?CONTRATADO:\\s*(.+?)\\s*$/i', $linha, $m)) {
+        $placaAtual = strtoupper(trim($m[1]));
+        $contratadoAtual = trim($m[2]);
+        $diaAtual = null;
+        $tipoAtual = null;
+        $tipoCodigoAtual = null;
+        $colBounds = null;
+        continue;
+    }
 
-    $placa_csv      = trim($arr[0]  ?? '');
-    $tipoBaixa      = trim($arr[1]  ?? '');
-    $dataBaixa      = trim($arr[2]  ?? '');
-    $ctrc           = trim($arr[3]  ?? '');
-    $nf             = trim($arr[4]  ?? '');
-    $cnpjRemetente  = trim($arr[5]  ?? '');
-    $nomeRemetente  = trim($arr[6]  ?? '');
-    $cidadeRemetente = trim($arr[7] ?? '');
-    $cnpjExpedidor  = trim($arr[8]  ?? '');
-    $nomeExpedidor  = trim($arr[9]  ?? '');
-    $cnpjDestinatario = trim($arr[10] ?? '');
-    $nomeDestinatario = trim($arr[11] ?? '');
-    $cnpjRecebedor  = trim($arr[12] ?? '');
-    $nomeRecebedor  = trim($arr[13] ?? '');
-    $cidadeEntrega  = trim($arr[14] ?? '');
-    $cnpjPagador    = trim($arr[15] ?? '');
-    $nomePagador    = trim($arr[16] ?? '');
-    $ocorrencia     = trim($arr[17] ?? '');
-    $dataOcorrencia = trim($arr[18] ?? '');
-    $vlrCtrcOrigem  = trim($arr[19] ?? '');
-    $set            = trim($arr[20] ?? '');
-    $pesoCalculo    = trim($arr[21] ?? '');
-    $qtVol          = trim($arr[22] ?? '');
-    $valMerc        = trim($arr[23] ?? '');
-    $icms           = trim($arr[24] ?? '');
-    $vlrFrete       = trim($arr[25] ?? '');
-    $baseCalc       = trim($arr[26] ?? '');
-    $romaneio       = trim($arr[27] ?? '');
-    $ctrbOs         = trim($arr[28] ?? '');
+    if (preg_match('/^DIA\\s+(\\d{2}\\/\\d{2}\\/\\d{2})\\s+(COLETA|ENTREGA)\\s*$/i', trim($linha), $m)) {
+        $diaAtual = trim($m[1]);
+        $tipoAtual = strtoupper(trim($m[2]));
+        $tipoCodigoAtual = $tipoAtual === 'COLETA' ? 'C' : 'E';
+        if ($placaAtual && $contratadoAtual) {
+            $contratadoPorPlacaDia[$placaAtual . '|' . $diaAtual] = $contratadoAtual;
+        }
+        continue;
+    }
 
-    if (empty($placa_csv) || empty($tipoBaixa) || empty($dataBaixa)) continue;
-    if (!in_array($tipoBaixa, ['E', 'C'])) continue;
-    if ($placa_csv === 'PLACA') continue;
+    if (strpos($linha, '---') !== false && strpos($linha, '+') !== false) {
+        if (preg_match('/^-{3,}\\+/', trim($linha))) {
+            $bounds = [];
+            $len = strlen($linha);
+            $plus = [];
+            for ($i = 0; $i < $len; $i++) {
+                if ($linha[$i] === '+') $plus[] = $i;
+            }
+            if (count($plus) >= 5) {
+                $start = 0;
+                foreach ($plus as $p) {
+                    $bounds[] = [$start, $p];
+                    $start = $p + 1;
+                }
+                $bounds[] = [$start, $len];
+                $colBounds = $bounds;
+            }
+        }
+        continue;
+    }
 
-    $vlrFreteNum    = (float) str_replace(['.', ','], ['', '.'], $vlrFrete);
-    $vlrCtrcNum     = (float) str_replace(['.', ','], ['', '.'], $vlrCtrcOrigem);
-    $ctrbOsNum      = (float) str_replace(['.', ','], ['', '.'], $ctrbOs);
-    $pesoNum        = (float) str_replace(['.', ','], ['', '.'], $pesoCalculo);
-    $valMercNum     = (float) str_replace(['.', ','], ['', '.'], $valMerc);
-    $qtVolNum       = (int)   str_replace(['.', ','], ['', ''], $qtVol);
+    if ($placaAtual && $diaAtual && preg_match('/\\*\\*\\*REMUNERACAO DO DIA:\\s*([0-9\\.,]+)\\s*$/i', $linha, $m)) {
+        $valor = parseMoedaPtBr($m[1]);
+        $remuneracaoPorPlacaDia[$placaAtual . '|' . $diaAtual] = $valor;
+        continue;
+    }
 
+    if (!$placaAtual || !$diaAtual || !$tipoCodigoAtual || !$colBounds) continue;
+
+    if (stripos($linha, 'CTRC') === 0) continue;
+    if (stripos(trim($linha), 'SUB-TOTAL') === 0) continue;
+    if (stripos(trim($linha), 'TOTAL') === 0) continue;
+    if (stripos(trim($linha), 'BASE DE CALCULO') === 0) continue;
+    if (stripos(trim($linha), 'DIARIA') === 0) continue;
+
+    $cols = [];
+    foreach ($colBounds as $b) {
+        $seg = substr($linha, $b[0], $b[1] - $b[0]);
+        $cols[] = trim($seg);
+    }
+
+    $ctrc = $cols[0] ?? '';
+    if ($ctrc === '' || !preg_match('/^[A-Z0-9]{3,}[0-9]{3,}-[0-9]+$/', $ctrc)) continue;
+
+    $nf = $cols[1] ?? '';
+    $remetente = $cols[2] ?? '';
+    $expedidor = $cols[3] ?? '';
+    $recebedor = $cols[4] ?? '';
+    $pesoStr = $cols[8] ?? '';
+    $volStr = $cols[9] ?? '';
+    $valMercStr = $cols[10] ?? '';
+    $vlrFreteStr = $cols[11] ?? '';
+    $romaneio = $cols[14] ?? '';
+    $ctrbOs = $cols[15] ?? '';
+
+    $pesoNum = parseMoedaPtBr($pesoStr);
+    $volNum = parseIntPtBr($volStr);
+    $valMercNum = parseMoedaPtBr($valMercStr);
+    $vlrFreteNum = parseMoedaPtBr($vlrFreteStr);
+
+    $keyPd = $placaAtual . '|' . $diaAtual;
     $operacoes[] = [
-        'placa'            => $placa_csv,
-        'tipo'             => $tipoBaixa === 'E' ? 'ENTREGA' : 'COLETA',
-        'tipoCodigo'       => $tipoBaixa,
-        'dataBaixa'        => $dataBaixa,
+        'placa'            => $placaAtual,
+        'tipo'             => $tipoAtual,
+        'tipoCodigo'       => $tipoCodigoAtual,
+        'dataBaixa'        => $diaAtual,
         'ctrc'             => $ctrc,
         'nf'               => $nf,
-        'nomeRemetente'    => $nomeRemetente,
-        'cidadeRemetente'  => $cidadeRemetente,
-        'nomeExpedidor'    => $nomeExpedidor,
-        'nomeDestinatario' => $nomeDestinatario,
-        'nomeRecebedor'    => $nomeRecebedor,
-        'cidadeEntrega'    => $cidadeEntrega,
-        'nomePagador'      => $nomePagador,
-        'ocorrencia'       => $ocorrencia,
-        'dataOcorrencia'   => $dataOcorrencia,
-        'set'              => $set,
+        'nomeRemetente'    => $remetente,
+        'nomeExpedidor'    => $expedidor,
+        'nomeDestinatario' => $recebedor,
+        'nomeRecebedor'    => $recebedor,
+        'cidadeEntrega'    => '',
+        'nomePagador'      => '',
+        'ocorrencia'       => '',
+        'dataOcorrencia'   => '',
+        'set'              => '',
         'pesoCalculo'      => $pesoNum,
-        'qtVol'            => $qtVolNum,
+        'qtVol'            => $volNum,
         'valMerc'          => $valMercNum,
         'vlrFrete'         => $vlrFreteNum,
         'romaneio'         => $romaneio,
-        'nroCtrb'          => trim($ctrbOs),
+        'nroCtrb'          => $ctrbOs,
+        'contratado'       => $contratadoPorPlacaDia[$keyPd] ?? $contratadoAtual ?? '',
+        'remuneracaoDia'   => $remuneracaoPorPlacaDia[$keyPd] ?? 0.0,
     ];
 }
 
@@ -234,13 +456,29 @@ $totalPeso     = 0.0;
 $totalFrete    = 0.0;
 $totalValMerc  = 0.0;
 $totalVol      = 0;
+$totalRemuneracao = 0.0;
 
 $porPlaca    = [];
 $porData     = [];
+$porContratado = [];
+$remSeen = [];
+$remSeenContratado = [];
 
 foreach ($operacoes as $op) {
     $pl = $op['placa'];
     $dt = $op['dataBaixa'];
+    $contratado = trim((string)($op['contratado'] ?? ''));
+    if ($contratado === '') $contratado = 'N/I';
+    $remKey = $pl . '|' . $dt;
+    $remDia = (float)($op['remuneracaoDia'] ?? 0.0);
+    if ($remDia > 0 && empty($remSeen[$remKey])) {
+        $totalRemuneracao += $remDia;
+        $remSeen[$remKey] = true;
+    }
+    $remKeyContr = $contratado . '|' . $remKey;
+    if ($remDia > 0 && empty($remSeenContratado[$remKeyContr])) {
+        $remSeenContratado[$remKeyContr] = true;
+    }
 
     if ($op['tipoCodigo'] === 'C') $totalColetas++;
     if ($op['tipoCodigo'] === 'E') $totalEntregas++;
@@ -259,8 +497,19 @@ foreach ($operacoes as $op) {
             'frete'    => 0.0,
             'valMerc'  => 0.0,
             'vol'      => 0,
+            'contratado' => $contratado,
+            'remuneracao' => 0.0,
             'ctrcs'    => [],
         ];
+    }
+    if ($contratado !== 'N/I' && ($porPlaca[$pl]['contratado'] === 'N/I' || $porPlaca[$pl]['contratado'] === '')) {
+        $porPlaca[$pl]['contratado'] = $contratado;
+    }
+    $seenPlaca = $porPlaca[$pl]['_remSeen'] ?? [];
+    if ($remDia > 0 && empty($seenPlaca[$dt])) {
+        $porPlaca[$pl]['_remSeen'] = $seenPlaca;
+        $porPlaca[$pl]['_remSeen'][$dt] = true;
+        $porPlaca[$pl]['remuneracao'] += $remDia;
     }
     if ($op['tipoCodigo'] === 'C') $porPlaca[$pl]['coletas']++;
     if ($op['tipoCodigo'] === 'E') $porPlaca[$pl]['entregas']++;
@@ -278,12 +527,42 @@ foreach ($operacoes as $op) {
     if ($op['tipoCodigo'] === 'E') $porData[$dt]['entregas']++;
     $porData[$dt]['frete'] += $op['vlrFrete'];
     $porData[$dt]['peso']  += $op['pesoCalculo'];
+
+    if (!isset($porContratado[$contratado])) {
+        $porContratado[$contratado] = [
+            'contratado' => $contratado,
+            'placas' => [],
+            'coletas' => 0,
+            'entregas' => 0,
+            'total' => 0,
+            'peso' => 0.0,
+            'frete' => 0.0,
+            'valMerc' => 0.0,
+            'vol' => 0,
+            'remuneracao' => 0.0,
+            '_remSeen' => [],
+        ];
+    }
+    $porContratado[$contratado]['placas'][$pl] = true;
+    if ($op['tipoCodigo'] === 'C') $porContratado[$contratado]['coletas']++;
+    if ($op['tipoCodigo'] === 'E') $porContratado[$contratado]['entregas']++;
+    $porContratado[$contratado]['total']++;
+    $porContratado[$contratado]['peso'] += $op['pesoCalculo'];
+    $porContratado[$contratado]['frete'] += $op['vlrFrete'];
+    $porContratado[$contratado]['valMerc'] += $op['valMerc'];
+    $porContratado[$contratado]['vol'] += $op['qtVol'];
+    if ($remDia > 0 && empty($porContratado[$contratado]['_remSeen'][$remKey])) {
+        $porContratado[$contratado]['_remSeen'][$remKey] = true;
+        $porContratado[$contratado]['remuneracao'] += $remDia;
+    }
 }
 
 foreach ($porPlaca as &$g) {
     $g['peso']    = round($g['peso'], 3);
     $g['frete']   = round($g['frete'], 2);
     $g['valMerc'] = round($g['valMerc'], 2);
+    $g['remuneracao'] = round($g['remuneracao'], 2);
+    unset($g['_remSeen']);
 }
 unset($g);
 
@@ -293,10 +572,23 @@ $serieCronologica = array_values($porData);
 $placasOrdenadas = array_values($porPlaca);
 usort($placasOrdenadas, fn($a, $b) => $b['total'] - $a['total']);
 
+$contratadosOrdenados = array_values($porContratado);
+foreach ($contratadosOrdenados as &$c) {
+    $c['placas'] = count($c['placas']);
+    $c['peso'] = round($c['peso'], 3);
+    $c['frete'] = round($c['frete'], 2);
+    $c['valMerc'] = round($c['valMerc'], 2);
+    $c['remuneracao'] = round($c['remuneracao'], 2);
+    unset($c['_remSeen']);
+}
+unset($c);
+usort($contratadosOrdenados, fn($a, $b) => ($b['remuneracao'] <=> $a['remuneracao']) ?: ($b['total'] <=> $a['total']));
+
 respondJson([
     'success'          => true,
     'operacoes'        => $operacoes,
     'grupos'           => $placasOrdenadas,
+    'contratados'      => $contratadosOrdenados,
     'serieCronologica' => $serieCronologica,
     'totais'           => [
         'coletas'  => $totalColetas,
@@ -307,5 +599,6 @@ respondJson([
         'frete'    => round($totalFrete, 2),
         'valMerc'  => round($totalValMerc, 2),
         'vol'      => $totalVol,
+        'remuneracao' => round($totalRemuneracao, 2),
     ],
 ]);
