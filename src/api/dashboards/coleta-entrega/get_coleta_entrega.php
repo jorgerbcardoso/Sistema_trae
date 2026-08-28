@@ -162,6 +162,16 @@ if ($diffDias > 31) {
 $dataIniSsw = str_replace('/', '', $dataIni);
 $dataFinSsw = str_replace('/', '', $dataFin);
 
+$login = strtolower(trim((string)($currentUser['username'] ?? '')));
+$baselineSeq = 0;
+$xmlBaseline = parseXmlFromResponse((string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440'));
+if ($xmlBaseline) {
+    $rowsBase = $xmlBaseline->xpath('rs/r/f0') ?: [];
+    foreach ($rowsBase as $seqNode) {
+        $baselineSeq = max($baselineSeq, (int)(string)$seqNode);
+    }
+}
+
 $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
@@ -181,7 +191,7 @@ if (substr($str0216, 0, 5) === '<foc ') {
 
 $seqRelatorio  = null;
 $encontrado    = false;
-$downloadParams = null;
+$downloadAct = null;
 $maxTentativas = 40;
 $intervalo     = 3;
 
@@ -211,40 +221,42 @@ function parseIntPtBr($s) {
     return (int)$s;
 }
 
-function parseDownloadParamsFromRow($rowHtml) {
-    $rowHtml = html_entity_decode((string)$rowHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    if (!preg_match("/ajaxEnvia\\s*\\(\\s*'DOW(\\d+)'\\s*\\)/", $rowHtml, $mDow)) {
-        return null;
-    }
+function downloadFrom1440Act($act) {
+    $act = trim((string)$act);
+    if ($act === '') return null;
+    $dummy = (string)((int)(microtime(true) * 1000));
+    $html = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy);
+    if ($html === '') return null;
+    if (substr($html, 0, 5) === '<foc ') return null;
 
-    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
-    if (empty($htmlDow)) return null;
-
-    if (!preg_match_all('/value="([^"]+)"/', $htmlDow, $mVals)) {
-        return null;
-    }
-
-    $best = null;
-    foreach ($mVals[1] as $v) {
-        $v = html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        if (stripos($v, 'act=') !== false && stripos($v, 'filename=') !== false) {
-            if ($best === null || strlen($v) > strlen($best)) $best = $v;
+    if (!preg_match('/id=web_body[^>]*value="([^"]+)"/i', $html, $mVal)) {
+        if (!preg_match('/name=web_body[^>]*value="([^"]+)"/i', $html, $mVal)) {
+            return null;
         }
     }
-    if ($best === null) return null;
 
-    $qs = $best;
-    $pos = strpos($qs, '?');
-    if ($pos !== false) $qs = substr($qs, $pos + 1);
-    $qs = ltrim($qs, '&');
+    $decoded = urldecode((string)($mVal[1] ?? ''));
+    $decoded = html_entity_decode((string)$decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-    parse_str($qs, $p);
-    if (empty($p['act']) || empty($p['filename'])) return null;
+    if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'[^']*'\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*'([^']+)'/i", $decoded, $mArq)) {
+        if (!preg_match("/abrir\\s*\\(\\s*'([^']+)'\\s*,\\s*'([^']+)'/i", $decoded, $mArq2)) {
+            return null;
+        }
+        $filename = trim((string)($mArq2[1] ?? ''));
+        $path = trim((string)($mArq2[2] ?? ''));
+    } else {
+        $filename = trim((string)($mArq[1] ?? ''));
+        $path = trim((string)($mArq[2] ?? ''));
+    }
+
+    if ($filename === '' || $path === '') return null;
+    $file = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1');
+    if ($file === '' || strlen($file) < 100) return null;
 
     return [
-        'act' => $p['act'],
-        'filename' => $p['filename'],
-        'path' => $p['path'] ?? '',
+        'filename' => $filename,
+        'path' => $path,
+        'content' => $file,
     ];
 }
 
@@ -267,17 +279,18 @@ for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
         $seqNum = (int)(string)$seq;
 
         if ((substr((string)$opc, 0, 3) == '076')
-            && (($usr == 'presto') || ($usr == 'damasce1') || ($usr == 'claraj'))
+            && ($seqNum > $baselineSeq)
+            && ($login === '' || strtolower($usr) === $login)
         ) {
-            if ($seqRelatorio === null) {
-                $seqRelatorio = $seqNum;
-            }
-
-            if ($seqNum === $seqRelatorio && $sitStr === 'Conclu&iacute;do') {
+            $seqRelatorio = $seqNum;
+            if ($sitStr === 'Conclu&iacute;do') {
                 $encontrado = true;
                 $f8 = $xml1440->xpath('rs/r/f8')[$i] ?? null;
                 if ($f8) {
-                    $downloadParams = parseDownloadParamsFromRow((string)$f8);
+                    $f8dec = html_entity_decode((string)$f8, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    if (preg_match("/ajaxEnvia\\s*\\(\\s*'\\s*([^']+)\\s*'\\s*\\)/", $f8dec, $mAct)) {
+                        $downloadAct = trim((string)($mAct[1] ?? ''));
+                    }
                 }
             }
             break;
@@ -294,11 +307,11 @@ if (!$encontrado || $seqRelatorio === null) {
 $dominioUpper = strtoupper($domain);
 $file = null;
 
-if ($downloadParams) {
-    $act = urlencode($downloadParams['act']);
-    $filename = urlencode($downloadParams['filename']);
-    $path = urlencode($downloadParams['path'] ?? '');
-    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$filename}&path={$path}&down=1&nw=1");
+if ($downloadAct) {
+    $dl = downloadFrom1440Act($downloadAct);
+    if ($dl && !empty($dl['content'])) {
+        $file = (string)$dl['content'];
+    }
 }
 
 if (empty($file) || strlen($file) < 100) {
