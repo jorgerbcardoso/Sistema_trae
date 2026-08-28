@@ -366,8 +366,52 @@ if ($step !== 'RUN') {
                     'vol' => $volCsv,
                     'contratado' => '',
                     'remuneracao' => round($remVeicCsv, 2),
+                    'tpPropriedade' => null,
+                    'proprietarioNome' => null,
+                    'isFrota' => null,
                     'ctrcs' => [],
                 ];
+            }
+
+            $placas = [];
+            foreach ($grupos as $g) {
+                $pl = trim((string)($g['placa'] ?? ''));
+                if ($pl !== '') $placas[$pl] = true;
+            }
+            $placas = array_keys($placas);
+
+            $veiculoMap = [];
+            if (!empty($placas)) {
+                $ph = [];
+                $params = [];
+                $idx = 1;
+                foreach ($placas as $pl) {
+                    $ph[] = '$' . $idx++;
+                    $params[] = $pl;
+                }
+
+                $tabelaVeiculo = "{$domain}_veiculo";
+                $tabelaProp = "{$domain}_proprietario";
+                $sqlV = "
+                    SELECT
+                        v.placa,
+                        v.tp_propriedade,
+                        COALESCE(p.nome, '') AS proprietario
+                    FROM {$tabelaVeiculo} v
+                    LEFT JOIN {$tabelaProp} p ON v.cnpj_proprietario = p.cnpj
+                    WHERE v.placa IN (" . implode(',', $ph) . ")
+                ";
+                $resV = sql($sqlV, $params, $g_sql);
+                if ($resV) {
+                    while ($row = pg_fetch_assoc($resV)) {
+                        $pl = strtoupper(trim((string)($row['placa'] ?? '')));
+                        if ($pl === '') continue;
+                        $veiculoMap[$pl] = [
+                            'tp' => strtoupper(trim((string)($row['tp_propriedade'] ?? ''))),
+                            'prop' => trim((string)($row['proprietario'] ?? '')),
+                        ];
+                    }
+                }
             }
 
             usort($grupos, fn($a, $b) => ($b['total'] <=> $a['total']) ?: ($b['frete'] <=> $a['frete']));
@@ -379,7 +423,21 @@ if ($step !== 'RUN') {
             $totalValMerc = 0.0;
             $totalVol = 0;
             $totalRemuneracao = 0.0;
-            foreach ($grupos as $g) {
+            $proprietarios = [];
+            foreach ($grupos as &$g) {
+                $pl = strtoupper(trim((string)($g['placa'] ?? '')));
+                $info = $pl !== '' ? ($veiculoMap[$pl] ?? null) : null;
+                $tp = $info ? (string)($info['tp'] ?? '') : '';
+                $propNome = $info ? (string)($info['prop'] ?? '') : '';
+
+                $isFrota = ($tp === 'F');
+                $g['tpPropriedade'] = $tp !== '' ? $tp : null;
+                $g['proprietarioNome'] = $propNome !== '' ? $propNome : null;
+                $g['isFrota'] = $tp !== '' ? $isFrota : null;
+                if ($isFrota) {
+                    $g['remuneracao'] = 0.0;
+                }
+
                 $totalColetas += (int)$g['coletas'];
                 $totalEntregas += (int)$g['entregas'];
                 $totalPeso += (float)$g['peso'];
@@ -387,7 +445,11 @@ if ($step !== 'RUN') {
                 $totalValMerc += (float)$g['valMerc'];
                 $totalVol += (int)$g['vol'];
                 $totalRemuneracao += (float)$g['remuneracao'];
+
+                $pNome = trim((string)($g['proprietarioNome'] ?? ''));
+                if ($pNome !== '') $proprietarios[$pNome] = true;
             }
+            unset($g);
 
             respondJson([
                 'success' => true,
@@ -406,6 +468,7 @@ if ($step !== 'RUN') {
                     'valMerc' => round($totalValMerc, 2),
                     'vol' => $totalVol,
                     'remuneracao' => round($totalRemuneracao, 2),
+                    'proprietarios' => count($proprietarios),
                 ],
             ]);
         }
@@ -443,6 +506,7 @@ if ($view !== '076') {
     $totRom = 0;
     $totCtrcs = 0;
     $totFalta = 0;
+    $totEntregues = 0;
     $placas = [];
 
     foreach ($rows as $r) {
@@ -457,6 +521,8 @@ if ($view !== '076') {
         $qtCtrcs = (int)trim((string)($r->f6 ?? '0'));
         $faltaOcor = (int)trim((string)($r->f7 ?? '0'));
         $unidadeInfo = trim(html_entity_decode((string)($r->f8 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $entregueRaw = trim(html_entity_decode((string)($r->f16 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $entregue = strtoupper($entregueRaw) !== '' && strtoupper(substr($entregueRaw, 0, 1)) === 'S';
         $erroHtml = html_entity_decode((string)($r->f14 ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $erro = trim(strip_tags((string)$erroHtml));
         $seqRom = trim((string)($r->f17 ?? ''));
@@ -473,11 +539,13 @@ if ($view !== '076') {
             'unidade' => $unidadeInfo,
             'seqRomaneio' => $seqRom,
             'erro' => $erro,
+            'entregue' => $entregue,
         ];
 
         $totRom++;
         $totCtrcs += $qtCtrcs;
         $totFalta += $faltaOcor;
+        if ($entregue) $totEntregues++;
         if ($pl !== '') $placas[$pl] = true;
     }
 
@@ -494,6 +562,7 @@ if ($view !== '076') {
             'ctrcs' => $totCtrcs,
             'faltaOcorrencia' => $totFalta,
             'veiculos' => count($placas),
+            'entregues' => $totEntregues,
         ],
     ]);
 }

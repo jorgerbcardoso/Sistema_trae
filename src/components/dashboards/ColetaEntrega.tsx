@@ -117,6 +117,7 @@ interface RomaneioAndamento {
   unidade: string;
   seqRomaneio: string;
   erro: string;
+  entregue?: boolean;
 }
 
 interface TotaisAndamento {
@@ -124,6 +125,7 @@ interface TotaisAndamento {
   ctrcs: number;
   faltaOcorrencia: number;
   veiculos: number;
+  entregues?: number;
 }
 
 function formatMoeda(v: number) {
@@ -491,11 +493,6 @@ export function ColetaEntrega() {
     { name: 'Terceiros', value: totaisTerceiros.entregas },
   ];
 
-  const topPlacasEntregas = [...grupos]
-    .sort((a, b) => b.entregas - a.entregas)
-    .slice(0, 8)
-    .map(g => ({ placa: g.placa, entregas: g.entregas }));
-
   const topPlacasFrete = [...grupos]
     .sort((a, b) => b.frete - a.frete)
     .slice(0, 8)
@@ -522,6 +519,41 @@ export function ColetaEntrega() {
     }, {} as Record<string, { proprietario: string; remuneracao: number }>)
   )
     .sort((a, b) => b.remuneracao - a.remuneracao)
+    .slice(0, 8);
+
+  const andamentoEntregues = romaneios.filter(r => r.entregue).length;
+  const andamentoTotal = romaneios.length;
+  const andamentoEmTransito = Math.max(0, andamentoTotal - andamentoEntregues);
+  const andamentoComErro = romaneios.filter(r => String(r.erro ?? '').trim() !== '').length;
+  const andamentoPctEntregue = andamentoTotal > 0 ? Math.round((andamentoEntregues / andamentoTotal) * 100) : 0;
+
+  const donutAndamento = [
+    { name: 'Entregues', value: andamentoEntregues },
+    { name: 'Em trânsito', value: andamentoEmTransito },
+  ];
+
+  const topMotoristasAndamento = Object.values(
+    romaneios.reduce((acc, r) => {
+      const k = String(r.motorista ?? '').trim() || '(Sem motorista)';
+      if (!acc[k]) acc[k] = { motorista: k, ctrcs: 0, romaneios: 0 };
+      acc[k].ctrcs += Number(r.qtdeCtrcs ?? 0) || 0;
+      acc[k].romaneios += 1;
+      return acc;
+    }, {} as Record<string, { motorista: string; ctrcs: number; romaneios: number }>)
+  )
+    .sort((a, b) => b.ctrcs - a.ctrcs)
+    .slice(0, 8);
+
+  const topVeiculosAndamento = Object.values(
+    romaneios.reduce((acc, r) => {
+      const k = String(r.placa ?? '').trim() || '(Sem placa)';
+      if (!acc[k]) acc[k] = { placa: k, ctrcs: 0, faltaOcorrencia: 0 };
+      acc[k].ctrcs += Number(r.qtdeCtrcs ?? 0) || 0;
+      acc[k].faltaOcorrencia += Number(r.faltaOcorrencia ?? 0) || 0;
+      return acc;
+    }, {} as Record<string, { placa: string; ctrcs: number; faltaOcorrencia: number }>)
+  )
+    .sort((a, b) => b.ctrcs - a.ctrcs)
     .slice(0, 8);
 
   return (
@@ -634,232 +666,225 @@ export function ColetaEntrega() {
 
               {hasSearched && totais && (<>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-blue-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-                  <PackageCheck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Operações</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.total}</p>
+        <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
+              <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Resumo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-blue-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                    <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Operações</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.total}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-orange-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-900/10">
-                  <Package className="h-6 w-6 text-orange-700 dark:text-orange-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Coletas</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-orange-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/20">
+                    <Package className="h-5 w-5 text-orange-700 dark:text-orange-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Coletas</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-blue-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-900/10">
-                  <PackageCheck className="h-6 w-6 text-blue-700 dark:text-blue-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-blue-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20">
+                    <PackageCheck className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-                  <Truck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.placas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                    <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.placas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-purple-50 dark:from-slate-900/90 dark:to-purple-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-purple-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-900/10">
-                  <Weight className="h-6 w-6 text-purple-700 dark:text-purple-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Peso total</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatTon(totais.peso)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-purple-50 dark:from-slate-900/90 dark:to-purple-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-purple-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20">
+                    <Weight className="h-5 w-5 text-purple-700 dark:text-purple-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Peso total</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatTon(totais.peso)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
-                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr frete</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-violet-50 dark:from-slate-900/90 dark:to-violet-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-violet-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-violet-100 dark:bg-violet-900/20">
+                    <Package className="h-5 w-5 text-violet-700 dark:text-violet-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Volume</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totais.vol}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-amber-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-900/10">
-                  <FileText className="h-6 w-6 text-amber-700 dark:text-amber-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr mercadoria</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                    <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr frete</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-sky-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-sky-100 to-sky-200 dark:from-sky-900/30 dark:to-sky-900/10">
-                  <Building2 className="h-6 w-6 text-sky-700 dark:text-sky-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Proprietários</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{proprietariosCount || (totais.proprietarios ?? 0)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-amber-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/20">
+                    <FileText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr mercadoria</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-                  <Truck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas frota</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.placas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-sky-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-sky-100 dark:bg-sky-900/20">
+                    <Building2 className="h-5 w-5 text-sky-700 dark:text-sky-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Proprietários</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{proprietariosCount || (totais.proprietarios ?? 0)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
-                  <Truck className="h-6 w-6 text-rose-700 dark:text-rose-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas terceiros</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.placas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                    <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas frota</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.placas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
-                  <PackageCheck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas frota</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.entregas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                    <Truck className="h-5 w-5 text-rose-700 dark:text-rose-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas terceiros</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.placas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
-                  <PackageCheck className="h-6 w-6 text-rose-700 dark:text-rose-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas terceiros</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.entregas}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                    <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas frota</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.entregas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
-                  <DollarSign className="h-6 w-6 text-rose-700 dark:text-rose-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remuneração terceiros</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.remuneracao)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                    <PackageCheck className="h-5 w-5 text-rose-700 dark:text-rose-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas terceiros</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.entregas}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
-                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete frota</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisFrota.frete)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                    <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete frota</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisFrota.frete)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
-            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
-            <CardContent className="pt-5 pb-5 relative">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
-                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete terceiros</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.frete)}</p>
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                    <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete terceiros</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.frete)}</div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+
+              <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
+                <div className="relative flex items-center gap-3">
+                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                    <DollarSign className="h-5 w-5 text-rose-700 dark:text-rose-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remuneração terceiros</div>
+                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.remuneracao)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
@@ -1211,60 +1236,175 @@ export function ColetaEntrega() {
               </Card>
 
               {hasLoadedAndamento && totaisAndamento && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-                    <CardContent className="pt-5 pb-5">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                          <Truck className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                <>
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
+                        <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        Resumo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
+                        <div className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                              <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Romaneios</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.romaneios}</div>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Romaneios</p>
-                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.romaneios}</p>
+                        <div className="p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                              <Package className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ctrcs</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.ctrcs}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900/20">
+                              <FileText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Falta ocorrência</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.faltaOcorrencia}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/20">
+                              <Truck className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Veículos</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.veiculos}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                              <PackageCheck className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregues</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.entregues ?? andamentoEntregues}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                              <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Em trânsito</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoEmTransito}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                              <FileText className="h-5 w-5 text-rose-700 dark:text-rose-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Com erro</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoComErro}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-sky-100 dark:bg-sky-900/20">
+                              <PackageCheck className="h-5 w-5 text-sky-700 dark:text-sky-300" />
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">% entregue</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoPctEntregue}%</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-                    <CardContent className="pt-5 pb-5">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-                          <Package className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Qtde CTRCs</p>
-                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.ctrcs}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-                    <CardContent className="pt-5 pb-5">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                          <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Falta Ocorrência</p>
-                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.faltaOcorrencia}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-                    <CardContent className="pt-5 pb-5">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                          <Truck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Veículos</p>
-                          <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.veiculos}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Entregues vs em trânsito</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <PieChart>
+                            <Pie data={donutAndamento} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={3} stroke="none">
+                              <Cell fill="#10b981" />
+                              <Cell fill="#3b82f6" />
+                            </Pie>
+                            <RechartTooltip formatter={(v: number, n: string) => [v, n]} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 motoristas — ctrcs</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={topMotoristasAndamento} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="gradMotCtrc" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.7} />
+                                <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                            <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                            <YAxis type="category" dataKey="motorista" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
+                            <RechartTooltip formatter={(v: number) => [v, 'Ctrcs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                            <Bar dataKey="ctrcs" fill="url(#gradMotCtrc)" radius={[0, 6, 6, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 veículos — ctrcs</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={topVeiculosAndamento} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="gradPlacaCtrc" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#10b981" stopOpacity={0.7} />
+                                <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                            <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                            <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={70} />
+                            <RechartTooltip formatter={(v: number) => [v, 'Ctrcs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                            <Bar dataKey="ctrcs" fill="url(#gradPlacaCtrc)" radius={[0, 6, 6, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
               )}
 
               <Card className="dark:bg-slate-900/90 dark:border-slate-700">
@@ -1284,15 +1424,15 @@ export function ColetaEntrega() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-800 dark:bg-slate-950">
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Romaneio</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Veículo</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Carreta</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Inclusão</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Marca / Modelo</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Motorista</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-right whitespace-nowrap">Qtde CTRCs</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-right whitespace-nowrap">Falta Ocorrência</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider text-left whitespace-nowrap">Status</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Romaneio</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Veículo</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Carreta</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Inclusão</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Marca / modelo</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Motorista</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-right whitespace-nowrap">Qtde ctrcs</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-right whitespace-nowrap">Falta ocorrência</th>
+                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Status</th>
                         </tr>
                       </thead>
                       <tbody>
