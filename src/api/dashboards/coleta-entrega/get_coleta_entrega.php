@@ -31,7 +31,7 @@ if (!in_array($view, ['076', 'ANDAMENTO', 'ROM'], true)) {
 }
 
 ssw_login($domain);
-set_time_limit(300);
+set_time_limit(600);
 ini_set('memory_limit', '512M');
 
 register_shutdown_function(function() {
@@ -194,7 +194,7 @@ if (substr($str0216, 0, 5) === '<foc ') {
 $seqRelatorio  = null;
 $encontrado    = false;
 $downloadAct = null;
-$maxTentativas = 40;
+$maxTentativas = 80;
 $intervalo     = 3;
 
 function lerXml1440() {

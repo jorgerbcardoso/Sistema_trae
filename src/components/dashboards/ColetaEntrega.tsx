@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { apiFetch } from '../../utils/apiUtils';
 import { ENVIRONMENT } from '../../config/environment';
@@ -176,6 +177,8 @@ export function ColetaEntrega() {
   const [contratados, setContratados] = useState<GrupoContratado[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isResumo, setIsResumo] = useState(false);
+  const [confirmGerarOpen, setConfirmGerarOpen] = useState(false);
+  const [confirmGerarDiffDias, setConfirmGerarDiffDias] = useState<number | null>(null);
 
   const [loadingAndamento, setLoadingAndamento] = useState(false);
   const [elapsedAndamento, setElapsedAndamento] = useState(0);
@@ -264,6 +267,26 @@ export function ColetaEntrega() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGerarClick = () => {
+    const dtIni = parseDateBR(dataIni);
+    const dtFin = parseDateBR(dataFin);
+    if (!dtIni || !dtFin) {
+      handleGerar();
+      return;
+    }
+    if (dtFin < dtIni) {
+      handleGerar();
+      return;
+    }
+    const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
+    if (diffDias > 31) {
+      handleGerar();
+      return;
+    }
+    setConfirmGerarDiffDias(diffDias);
+    setConfirmGerarOpen(true);
   };
 
   const handleCarregarAndamento = async () => {
@@ -409,6 +432,38 @@ export function ColetaEntrega() {
             </TabsList>
 
             <TabsContent value="076" className="space-y-6">
+              <Dialog open={confirmGerarOpen} onOpenChange={setConfirmGerarOpen}>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Processamento demorado</DialogTitle>
+                    <DialogDescription>
+                      {confirmGerarDiffDias === 0
+                        ? 'Para 1 dia, o relatório detalhado pode levar vários minutos e ainda assim ocorrer timeout.'
+                        : 'Para períodos maiores que 1 dia, o SSW gera um resumo por placa (sem CT-es). Mesmo assim, pode demorar.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                    Evite sair da tela durante o processamento.
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setConfirmGerarOpen(false)} disabled={loading}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => {
+                        setConfirmGerarOpen(false);
+                        setTimeout(() => handleGerar(), 0);
+                      }}
+                      disabled={loading}
+                    >
+                      Continuar
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
@@ -447,7 +502,7 @@ export function ColetaEntrega() {
                       <FilterSelectVeiculo value={placa} onChange={setPlaca} placeholder="Todas as placas" />
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={handleGerar} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+                      <Button onClick={handleGerarClick} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
                         {loading ? (
                           <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}</>
                         ) : (
