@@ -102,6 +102,16 @@ interface GrupoContratado {
 
 type SortField = 'placa' | 'total' | 'coletas' | 'entregas' | 'peso' | 'frete' | 'valMerc' | 'remuneracao';
 type SortDir = 'asc' | 'desc';
+type SortFieldAndamento =
+  | 'romaneio'
+  | 'placa'
+  | 'carreta'
+  | 'inclusao'
+  | 'marcaModelo'
+  | 'motorista'
+  | 'qtdeCtrcs'
+  | 'faltaOcorrencia'
+  | 'status';
 
 const COLORS_DONUT = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444'];
 
@@ -136,6 +146,18 @@ function formatNum(v: number, dec = 3) {
 }
 function formatTon(kg: number) {
   return (kg / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' t';
+}
+
+function parseDateTimeBR(s: string): number {
+  const m = String(s ?? '').match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  const yy = 2000 + Number(m[3]);
+  const mm = Number(m[2]) - 1;
+  const dd = Number(m[1]);
+  const hh = Number(m[4]);
+  const mi = Number(m[5]);
+  const dt = new Date(yy, mm, dd, hh, mi, 0, 0);
+  return dt.getTime();
 }
 
 function getDataPadrao() {
@@ -195,6 +217,8 @@ export function ColetaEntrega() {
 
   const [sortField, setSortField] = useState<SortField>('total');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortAndamentoField, setSortAndamentoField] = useState<SortFieldAndamento>('inclusao');
+  const [sortAndamentoDir, setSortAndamentoDir] = useState<SortDir>('desc');
   const [expandedPlacas, setExpandedPlacas] = useState<Set<string>>(new Set());
 
   const handleSort = (field: SortField) => {
@@ -223,6 +247,32 @@ export function ColetaEntrega() {
     return sortDir === 'asc'
       ? String(vaRaw ?? '').localeCompare(String(vbRaw ?? ''))
       : String(vbRaw ?? '').localeCompare(String(vaRaw ?? ''));
+  });
+
+  const handleSortAndamento = (field: SortFieldAndamento) => {
+    if (sortAndamentoField === field) setSortAndamentoDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortAndamentoField(field); setSortAndamentoDir('desc'); }
+  };
+
+  const romaneiosOrdenados = [...romaneios].sort((a, b) => {
+    const dir = sortAndamentoDir === 'asc' ? 1 : -1;
+    const getStatus = (r: RomaneioAndamento) => (String(r.erro ?? '').trim() ? String(r.erro ?? '').trim() : 'OK');
+
+    if (sortAndamentoField === 'qtdeCtrcs' || sortAndamentoField === 'faltaOcorrencia') {
+      const va = Number((a as any)[sortAndamentoField] ?? 0);
+      const vb = Number((b as any)[sortAndamentoField] ?? 0);
+      return (va - vb) * dir;
+    }
+
+    if (sortAndamentoField === 'inclusao') {
+      const va = parseDateTimeBR(a.inclusao);
+      const vb = parseDateTimeBR(b.inclusao);
+      return (va - vb) * dir;
+    }
+
+    const va = sortAndamentoField === 'status' ? getStatus(a) : String((a as any)[sortAndamentoField] ?? '');
+    const vb = sortAndamentoField === 'status' ? getStatus(b) : String((b as any)[sortAndamentoField] ?? '');
+    return va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' }) * dir;
   });
 
   const handleGerar = async () => {
@@ -286,8 +336,8 @@ export function ColetaEntrega() {
         }
         if (poll.status === 'running') {
           const sit = String(poll.sit ?? '').trim();
-          const seq = String(poll.seq ?? '').trim();
-          setLoadingStage(`Gerando relatório... ${sit || ''}${seq ? ` (seq ${seq})` : ''}`.trim());
+          const sitLimpo = sit.replace(/\(seq\s*\d+\)/i, '').replace(/\s{2,}/g, ' ').trim();
+          setLoadingStage(`Gerando relatório... ${sitLimpo || ''}`.trim());
           continue;
         }
         setLoadingStage('Aguardando geração do relatório...');
@@ -449,6 +499,24 @@ export function ColetaEntrega() {
     >
       <span className={`flex items-center ${right ? 'justify-end' : ''}`}>
         {label}<SortIcon field={field} />
+      </span>
+    </th>
+  );
+
+  const SortIconAnd = ({ field }: { field: SortFieldAndamento }) => {
+    if (sortAndamentoField !== field) return <ChevronsUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortAndamentoDir === 'asc'
+      ? <ChevronUp className="h-3 w-3 ml-1 text-blue-400" />
+      : <ChevronDown className="h-3 w-3 ml-1 text-blue-400" />;
+  };
+
+  const ThAnd = ({ field, label, right = false }: { field: SortFieldAndamento; label: string; right?: boolean }) => (
+    <th
+      className={`px-3 py-2 text-xs font-semibold text-slate-200 cursor-pointer select-none whitespace-nowrap hover:text-white ${right ? 'text-right' : 'text-left'}`}
+      onClick={() => handleSortAndamento(field)}
+    >
+      <span className={`flex items-center ${right ? 'justify-end' : ''}`}>
+        {label}<SortIconAnd field={field} />
       </span>
     </th>
   );
@@ -666,13 +734,11 @@ export function ColetaEntrega() {
 
               {hasSearched && totais && (<>
 
-        <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
-              <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              Resumo
-            </CardTitle>
-          </CardHeader>
+        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+          <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="text-sm font-semibold">Resumo</div>
+        </div>
+        <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden rounded-xl">
           <CardContent className="p-0">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
@@ -1237,13 +1303,11 @@ export function ColetaEntrega() {
 
               {hasLoadedAndamento && totaisAndamento && (
                 <>
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
-                        <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        Resumo
-                      </CardTitle>
-                    </CardHeader>
+                  <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                    <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <div className="text-sm font-semibold">Resumo</div>
+                  </div>
+                  <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden rounded-xl">
                     <CardContent className="p-0">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
                         <div className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
@@ -1415,7 +1479,7 @@ export function ColetaEntrega() {
                       Romaneios em Trânsito
                     </span>
                     <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                      {romaneios.length} {romaneios.length === 1 ? 'romaneio' : 'romaneios'}
+                      {romaneiosOrdenados.length} {romaneiosOrdenados.length === 1 ? 'romaneio' : 'romaneios'}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -1424,19 +1488,19 @@ export function ColetaEntrega() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-800 dark:bg-slate-950">
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Romaneio</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Veículo</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Carreta</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Inclusão</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Marca / modelo</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Motorista</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-right whitespace-nowrap">Qtde ctrcs</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-right whitespace-nowrap">Falta ocorrência</th>
-                          <th className="px-3 py-2 text-xs font-semibold text-slate-200 text-left whitespace-nowrap">Status</th>
+                          <ThAnd field="romaneio" label="Romaneio" />
+                          <ThAnd field="placa" label="Veículo" />
+                          <ThAnd field="carreta" label="Carreta" />
+                          <ThAnd field="inclusao" label="Inclusão" />
+                          <ThAnd field="marcaModelo" label="Marca / modelo" />
+                          <ThAnd field="motorista" label="Motorista" />
+                          <ThAnd field="qtdeCtrcs" label="Qtde ctrcs" right />
+                          <ThAnd field="faltaOcorrencia" label="Falta ocorrência" right />
+                          <ThAnd field="status" label="Status" />
                         </tr>
                       </thead>
                       <tbody>
-                        {romaneios.map((r, i) => (
+                        {romaneiosOrdenados.map((r, i) => (
                           <tr
                             key={`${r.romaneio}-${r.seqRomaneio || i}`}
                             className={`border-b border-slate-100 dark:border-slate-800 ${i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'} ${r.erro ? 'bg-rose-50 dark:bg-rose-900/10' : ''}`}
