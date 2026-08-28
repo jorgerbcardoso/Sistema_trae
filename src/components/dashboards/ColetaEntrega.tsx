@@ -7,8 +7,8 @@ import { FilterSelectVeiculo } from './FilterSelectVeiculo';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { CalendarInput } from '../ui/calendar-input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { apiFetch } from '../../utils/apiUtils';
@@ -194,17 +194,31 @@ function ProgressoBar({ value }: { value: number }) {
   );
 }
 
+function ellipsize(s: string, max: number) {
+  const t = String(s ?? '');
+  if (t.length <= max) return t;
+  const cut = Math.max(0, max - 1);
+  return `${t.slice(0, cut).trimEnd()}…`;
+}
+
+function YAxisTickEllipsis({ x, y, payload }: { x?: number; y?: number; payload?: any }) {
+  const raw = String(payload?.value ?? '');
+  const label = ellipsize(raw, 22);
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text x={0} y={0} dy={3} textAnchor="end" fill="#94a3b8" fontSize={10}>
+        <title>{raw}</title>
+        {label}
+      </text>
+    </g>
+  );
+}
+
 function getDataPadrao() {
   const hoje = new Date();
   const ontem = new Date(hoje);
   ontem.setDate(hoje.getDate() - 1);
-  const fmt = (d: Date) => {
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yy = String(d.getFullYear()).slice(-2);
-    return `${dd}/${mm}/${yy}`;
-  };
-  return { ini: fmt(ontem), fin: fmt(ontem) };
+  return { ini: formatDateBR(ontem), fin: formatDateBR(ontem) };
 }
 
 const parseDateBR = (s: string): Date | null => {
@@ -212,6 +226,45 @@ const parseDateBR = (s: string): Date | null => {
   if (!m) return null;
   return new Date(2000 + parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
 };
+
+const formatDateBR = (d: Date) => {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
+};
+
+const parseISODate = (s: string): Date | null => {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+};
+
+const formatISODate = (d: Date) => {
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const isoToBR = (iso: string) => {
+  const d = parseISODate(iso);
+  return d ? formatDateBR(d) : '';
+};
+
+const brToISO = (br: string) => {
+  const d = parseDateBR(br);
+  return d ? formatISODate(d) : '';
+};
+
+const addDays = (d: Date, days: number) => {
+  const nd = new Date(d);
+  nd.setDate(nd.getDate() + days);
+  return nd;
+};
+
+const dayNumberUTC = (d: Date) => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+const diffDaysUTC = (ini: Date, fin: Date) => dayNumberUTC(fin) - dayNumberUTC(ini);
 
 export function ColetaEntrega() {
   const { user, logout, clientConfig } = useAuth();
@@ -254,6 +307,65 @@ export function ColetaEntrega() {
   const [sortAndamentoField, setSortAndamentoField] = useState<SortFieldAndamento>('inclusao');
   const [sortAndamentoDir, setSortAndamentoDir] = useState<SortDir>('desc');
   const [expandedPlacas, setExpandedPlacas] = useState<Set<string>>(new Set());
+
+  const dtIniParsed = parseDateBR(dataIni);
+  const dtFinParsed = parseDateBR(dataFin);
+  const dataIniISO = dtIniParsed ? formatISODate(dtIniParsed) : '';
+  const dataFinISO = dtFinParsed ? formatISODate(dtFinParsed) : '';
+
+  const setPeriodoIni = (nextBr: string) => {
+    const nextIni = parseDateBR(nextBr);
+    const curFin = parseDateBR(dataFin);
+
+    if (!nextIni) {
+      setDataIni(nextBr);
+      return;
+    }
+
+    let nextFinBr = dataFin;
+    let ajustou = false;
+
+    if (curFin) {
+      if (curFin < nextIni) {
+        nextFinBr = formatDateBR(nextIni);
+        ajustou = true;
+      } else if (diffDaysUTC(nextIni, curFin) > 30) {
+        nextFinBr = formatDateBR(addDays(nextIni, 30));
+        ajustou = true;
+      }
+    }
+
+    setDataIni(nextBr);
+    if (nextFinBr !== dataFin) setDataFin(nextFinBr);
+    if (ajustou) toast.info('Período limitado a 31 dias. Ajustei a data final.');
+  };
+
+  const setPeriodoFin = (nextBr: string) => {
+    const nextFin = parseDateBR(nextBr);
+    const curIni = parseDateBR(dataIni);
+
+    if (!nextFin) {
+      setDataFin(nextBr);
+      return;
+    }
+
+    let nextIniBr = dataIni;
+    let ajustou = false;
+
+    if (curIni) {
+      if (nextFin < curIni) {
+        nextIniBr = formatDateBR(nextFin);
+        ajustou = true;
+      } else if (diffDaysUTC(curIni, nextFin) > 30) {
+        nextIniBr = formatDateBR(addDays(nextFin, -30));
+        ajustou = true;
+      }
+    }
+
+    setDataFin(nextBr);
+    if (nextIniBr !== dataIni) setDataIni(nextIniBr);
+    if (ajustou) toast.info('Período limitado a 31 dias. Ajustei a data inicial.');
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -327,8 +439,8 @@ export function ColetaEntrega() {
     const dtFin = parseDateBR(dataFin);
     if (!dtIni || !dtFin) { toast.error('Data inválida. Use o formato DD/MM/AA.'); return; }
     if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
-    const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
-    if (diffDias > 31) { toast.error('O período não pode ser maior que 31 dias.'); return; }
+    const diffDias = diffDaysUTC(dtIni, dtFin);
+    if (diffDias > 30) { toast.error('O período não pode ser maior que 31 dias.'); return; }
     const modo = 'RESUMO';
 
     setLoading(true);
@@ -434,12 +546,12 @@ export function ColetaEntrega() {
       handleGerar();
       return;
     }
-    const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
-    if (diffDias > 31) {
+    const diffDias = diffDaysUTC(dtIni, dtFin);
+    if (diffDias > 30) {
       handleGerar();
       return;
     }
-    setConfirmGerarDiffDias(diffDias);
+    setConfirmGerarDiffDias(diffDias + 1);
     setConfirmGerarOpen(true);
   };
 
@@ -748,13 +860,21 @@ export function ColetaEntrega() {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-1">
                       <Label className="text-xs text-slate-600 dark:text-slate-400">Data Início</Label>
-                      <Input type="text" value={dataIni} onChange={e => setDataIni(e.target.value)}
-                        placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
+                      <CalendarInput
+                        value={dataIniISO}
+                        onChange={e => setPeriodoIni(isoToBR(e.target.value))}
+                        className="dark:bg-slate-800 dark:border-slate-700 font-mono"
+                      />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-slate-600 dark:text-slate-400">Data Fim</Label>
-                      <Input type="text" value={dataFin} onChange={e => setDataFin(e.target.value)}
-                        placeholder="DD/MM/AA" maxLength={8} className="dark:bg-slate-800 dark:border-slate-700 font-mono" />
+                      <CalendarInput
+                        value={dataFinISO}
+                        onChange={e => setPeriodoFin(isoToBR(e.target.value))}
+                        min={dtIniParsed ? dataIniISO : undefined}
+                        max={dtIniParsed ? formatISODate(addDays(dtIniParsed, 30)) : undefined}
+                        className="dark:bg-slate-800 dark:border-slate-700 font-mono"
+                      />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-slate-600 dark:text-slate-400">Placa (opcional)</Label>
@@ -1090,7 +1210,7 @@ export function ColetaEntrega() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis type="category" dataKey="proprietario" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
+                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} />
                   <RechartTooltip formatter={(v: number) => [v, 'Entregas']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="entregas" fill="url(#gradPropEnt)" radius={[0, 6, 6, 0]} />
                 </BarChart>
@@ -1136,7 +1256,7 @@ export function ColetaEntrega() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
-                  <YAxis type="category" dataKey="proprietario" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
+                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="remuneracao" fill="url(#gradPropRem)" radius={[0, 6, 6, 0]} />
                 </BarChart>
