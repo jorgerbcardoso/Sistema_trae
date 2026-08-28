@@ -111,7 +111,7 @@ type SortFieldAndamento =
   | 'motorista'
   | 'qtdeCtrcs'
   | 'faltaOcorrencia'
-  | 'status';
+  | 'progresso';
 
 const COLORS_DONUT = ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444'];
 
@@ -147,6 +147,11 @@ function formatNum(v: number, dec = 3) {
 function formatTon(kg: number) {
   return (kg / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' t';
 }
+function formatPercent1(v: number) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '0,0%';
+  return new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
+}
 
 function parseDateTimeBR(s: string): number {
   const m = String(s ?? '').match(/(\d{2})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
@@ -158,6 +163,35 @@ function parseDateTimeBR(s: string): number {
   const mi = Number(m[5]);
   const dt = new Date(yy, mm, dd, hh, mi, 0, 0);
   return dt.getTime();
+}
+
+function baixaBarClass(pct: number) {
+  const p = Math.max(0, Math.min(1, Number(pct) || 0)) * 100;
+  if (p <= 25) return 'bg-red-500';
+  if (p <= 50) return 'bg-orange-500';
+  if (p <= 75) return 'bg-yellow-500';
+  return 'bg-emerald-500';
+}
+
+function formatPct0(pct: number) {
+  const p = Math.max(0, Math.min(1, Number(pct) || 0));
+  return `${Math.round(p * 100)}%`;
+}
+
+function ProgressoBar({ value }: { value: number }) {
+  const pct = Math.max(0, Math.min(1, Number(value) || 0));
+  const w = Math.max(2, Math.round(pct * 100));
+  const label = formatPct0(pct);
+  return (
+    <div className="flex items-center justify-end">
+      <div className="relative w-[110px] h-5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+        <div className={`h-full ${baixaBarClass(pct)}`} style={{ width: `${w}%` }} />
+        <div className="absolute inset-0 flex items-center justify-center px-2">
+          <span className="font-mono text-[11px] font-semibold text-white drop-shadow tabular-nums">{label}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function getDataPadrao() {
@@ -256,9 +290,20 @@ export function ColetaEntrega() {
 
   const romaneiosOrdenados = [...romaneios].sort((a, b) => {
     const dir = sortAndamentoDir === 'asc' ? 1 : -1;
-    const getStatus = (r: RomaneioAndamento) => (String(r.erro ?? '').trim() ? String(r.erro ?? '').trim() : 'OK');
+    const progresso = (r: RomaneioAndamento) => {
+      const tot = Number(r.qtdeCtrcs ?? 0) || 0;
+      const falt = Number(r.faltaOcorrencia ?? 0) || 0;
+      if (tot <= 0) return 0;
+      const baix = Math.max(0, tot - falt);
+      return Math.max(0, Math.min(1, baix / tot));
+    };
 
-    if (sortAndamentoField === 'qtdeCtrcs' || sortAndamentoField === 'faltaOcorrencia') {
+    if (sortAndamentoField === 'qtdeCtrcs' || sortAndamentoField === 'faltaOcorrencia' || sortAndamentoField === 'progresso') {
+      if (sortAndamentoField === 'progresso') {
+        const va = progresso(a);
+        const vb = progresso(b);
+        return (va - vb) * dir;
+      }
       const va = Number((a as any)[sortAndamentoField] ?? 0);
       const vb = Number((b as any)[sortAndamentoField] ?? 0);
       return (va - vb) * dir;
@@ -270,8 +315,8 @@ export function ColetaEntrega() {
       return (va - vb) * dir;
     }
 
-    const va = sortAndamentoField === 'status' ? getStatus(a) : String((a as any)[sortAndamentoField] ?? '');
-    const vb = sortAndamentoField === 'status' ? getStatus(b) : String((b as any)[sortAndamentoField] ?? '');
+    const va = String((a as any)[sortAndamentoField] ?? '');
+    const vb = String((b as any)[sortAndamentoField] ?? '');
     return va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' }) * dir;
   });
 
@@ -566,6 +611,17 @@ export function ColetaEntrega() {
     .slice(0, 8)
     .map(g => ({ placa: g.placa, frete: g.frete }));
 
+  const topPlacasRemuneracao = [...gruposTerceiros]
+    .sort((a, b) => (Number(b.remuneracao ?? 0) || 0) - (Number(a.remuneracao ?? 0) || 0))
+    .slice(0, 8)
+    .map(g => ({ placa: g.placa, remuneracao: Number(g.remuneracao ?? 0) || 0 }));
+
+  const remunSobreFrete = totaisTerceiros.frete > 0 ? (totaisTerceiros.remuneracao / totaisTerceiros.frete) : 0;
+  const donutRemuSobreFrete = [
+    { name: 'Remuneração', value: Math.max(0, totaisTerceiros.remuneracao) },
+    { name: 'Frete (restante)', value: Math.max(0, totaisTerceiros.frete - totaisTerceiros.remuneracao) },
+  ];
+
   const topProprietariosEntregas = Object.values(
     grupos.reduce((acc, g) => {
       const k = String(g.proprietarioNome ?? '').trim() || '(Sem proprietário)';
@@ -589,14 +645,16 @@ export function ColetaEntrega() {
     .sort((a, b) => b.remuneracao - a.remuneracao)
     .slice(0, 8);
 
-  const andamentoEntregues = romaneios.filter(r => r.entregue).length;
-  const andamentoTotal = romaneios.length;
-  const andamentoEmTransito = Math.max(0, andamentoTotal - andamentoEntregues);
+  const andamentoTotalCtrcs = totaisAndamento?.ctrcs ?? romaneios.reduce((s, r) => s + (Number(r.qtdeCtrcs ?? 0) || 0), 0);
+  const andamentoFaltaOcorrenciaCtrcs =
+    totaisAndamento?.faltaOcorrencia ?? romaneios.reduce((s, r) => s + (Number(r.faltaOcorrencia ?? 0) || 0), 0);
+  const andamentoBaixadosCtrcs = Math.max(0, andamentoTotalCtrcs - andamentoFaltaOcorrenciaCtrcs);
+  const andamentoEmTransito = Math.max(0, andamentoFaltaOcorrenciaCtrcs);
   const andamentoComErro = romaneios.filter(r => String(r.erro ?? '').trim() !== '').length;
-  const andamentoPctEntregue = andamentoTotal > 0 ? Math.round((andamentoEntregues / andamentoTotal) * 100) : 0;
+  const andamentoPctBaixado = andamentoTotalCtrcs > 0 ? Math.round((andamentoBaixadosCtrcs / andamentoTotalCtrcs) * 100) : 0;
 
   const donutAndamento = [
-    { name: 'Entregues', value: andamentoEntregues },
+    { name: 'Baixado', value: andamentoBaixadosCtrcs },
     { name: 'Em trânsito', value: andamentoEmTransito },
   ];
 
@@ -738,13 +796,12 @@ export function ColetaEntrega() {
           <PackageCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <div className="text-sm font-semibold">Resumo</div>
         </div>
-        <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden rounded-xl">
-          <CardContent className="p-0">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-blue-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                  <div className="p-2">
                     <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                   </div>
                   <div>
@@ -757,7 +814,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-orange-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900/20">
+                  <div className="p-2">
                     <Package className="h-5 w-5 text-orange-700 dark:text-orange-300" />
                   </div>
                   <div>
@@ -770,7 +827,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-blue-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20">
+                  <div className="p-2">
                     <PackageCheck className="h-5 w-5 text-blue-700 dark:text-blue-300" />
                   </div>
                   <div>
@@ -783,7 +840,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                  <div className="p-2">
                     <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                   </div>
                   <div>
@@ -796,7 +853,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-purple-50 dark:from-slate-900/90 dark:to-purple-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-purple-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20">
+                  <div className="p-2">
                     <Weight className="h-5 w-5 text-purple-700 dark:text-purple-300" />
                   </div>
                   <div>
@@ -809,7 +866,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-violet-50 dark:from-slate-900/90 dark:to-violet-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-violet-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-violet-100 dark:bg-violet-900/20">
+                  <div className="p-2">
                     <Package className="h-5 w-5 text-violet-700 dark:text-violet-300" />
                   </div>
                   <div>
@@ -822,7 +879,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                  <div className="p-2">
                     <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                   </div>
                   <div>
@@ -835,7 +892,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-amber-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/20">
+                  <div className="p-2">
                     <FileText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                   </div>
                   <div>
@@ -848,7 +905,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-sky-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-sky-100 dark:bg-sky-900/20">
+                  <div className="p-2">
                     <Building2 className="h-5 w-5 text-sky-700 dark:text-sky-300" />
                   </div>
                   <div>
@@ -861,7 +918,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                  <div className="p-2">
                     <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                   </div>
                   <div>
@@ -874,11 +931,12 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                  <div className="p-2">
                     <Truck className="h-5 w-5 text-rose-700 dark:text-rose-300" />
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas terceiros</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.placas}</div>
                   </div>
                 </div>
@@ -887,7 +945,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-15 bg-slate-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                  <div className="p-2">
                     <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                   </div>
                   <div>
@@ -900,11 +958,12 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                  <div className="p-2">
                     <PackageCheck className="h-5 w-5 text-rose-700 dark:text-rose-300" />
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas terceiros</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.entregas}</div>
                   </div>
                 </div>
@@ -913,7 +972,7 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                  <div className="p-2">
                     <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                   </div>
                   <div>
@@ -926,11 +985,12 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-emerald-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                  <div className="p-2">
                     <DollarSign className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete terceiros</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.frete)}</div>
                   </div>
                 </div>
@@ -939,20 +999,20 @@ export function ColetaEntrega() {
               <div className="relative overflow-hidden p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
                 <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 bg-rose-400" />
                 <div className="relative flex items-center gap-3">
-                  <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                  <div className="p-2">
                     <DollarSign className="h-5 w-5 text-rose-700 dark:text-rose-300" />
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remuneração terceiros</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.remuneracao)}</div>
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Entregas por tipo</CardTitle>
@@ -967,6 +1027,50 @@ export function ColetaEntrega() {
                   <RechartTooltip formatter={(v: number, n: string) => [v, n]} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Legend />
                 </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Remuneração / Vlr frete (terceiros)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={donutRemuSobreFrete} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={3} stroke="none">
+                    <Cell fill="#f43f5e" />
+                    <Cell fill="#22c55e" />
+                  </Pie>
+                  <RechartTooltip formatter={(v: number, n: string) => [formatMoeda(Number(v) || 0), n]} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+                {formatPercent1(remunSobreFrete)} do frete (terceiros)
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 placas — remuneração (terceiros)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topPlacasRemuneracao} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradPlacaRemu" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#fb7185" stopOpacity={0.7} />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
+                  <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="remuneracao" fill="url(#gradPlacaRemu)" radius={[0, 6, 6, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -1129,7 +1233,7 @@ export function ColetaEntrega() {
                                   </Badge>
                                 )}
                               </div>
-                              {g.proprietarioNome ? (
+                              {(!((g.isFrota ?? ((g.tpPropriedade ?? '').toUpperCase() === 'F'))) && g.proprietarioNome) ? (
                                 <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[260px] truncate" title={g.proprietarioNome}>
                                   {g.proprietarioNome}
                                 </span>
@@ -1307,12 +1411,11 @@ export function ColetaEntrega() {
                     <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <div className="text-sm font-semibold">Resumo</div>
                   </div>
-                  <Card className="dark:bg-slate-900/90 dark:border-slate-700 overflow-hidden rounded-xl">
-                    <CardContent className="p-0">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 dark:bg-slate-800">
+                  <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
                         <div className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                            <div className="p-2">
                               <Truck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                             </div>
                             <div>
@@ -1323,18 +1426,18 @@ export function ColetaEntrega() {
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                            <div className="p-2">
                               <Package className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                             </div>
                             <div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ctrcs</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">CTRCs</div>
                               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.ctrcs}</div>
                             </div>
                           </div>
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-100 dark:bg-amber-900/20">
+                            <div className="p-2">
                               <FileText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                             </div>
                             <div>
@@ -1345,7 +1448,7 @@ export function ColetaEntrega() {
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/20">
+                            <div className="p-2">
                               <Truck className="h-5 w-5 text-blue-700 dark:text-blue-300" />
                             </div>
                             <div>
@@ -1357,18 +1460,18 @@ export function ColetaEntrega() {
 
                         <div className="p-4 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/20">
+                            <div className="p-2">
                               <PackageCheck className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                             </div>
                             <div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregues</div>
-                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisAndamento.entregues ?? andamentoEntregues}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Baixado</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoBaixadosCtrcs}</div>
                             </div>
                           </div>
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-slate-100 dark:bg-slate-800">
+                            <div className="p-2">
                               <PackageCheck className="h-5 w-5 text-slate-700 dark:text-slate-200" />
                             </div>
                             <div>
@@ -1379,7 +1482,7 @@ export function ColetaEntrega() {
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-rose-100 dark:bg-rose-900/20">
+                            <div className="p-2">
                               <FileText className="h-5 w-5 text-rose-700 dark:text-rose-300" />
                             </div>
                             <div>
@@ -1390,23 +1493,22 @@ export function ColetaEntrega() {
                         </div>
                         <div className="p-4 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-sky-100 dark:bg-sky-900/20">
+                            <div className="p-2">
                               <PackageCheck className="h-5 w-5 text-sky-700 dark:text-sky-300" />
                             </div>
                             <div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">% entregue</div>
-                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoPctEntregue}%</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">% baixado</div>
+                              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{andamentoPctBaixado}%</div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Entregues vs em trânsito</CardTitle>
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Baixado vs em trânsito</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={220}>
@@ -1424,7 +1526,7 @@ export function ColetaEntrega() {
 
                     <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 motoristas — ctrcs</CardTitle>
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 motoristas — CTRCs</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={220}>
@@ -1438,7 +1540,7 @@ export function ColetaEntrega() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                             <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                             <YAxis type="category" dataKey="motorista" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
-                            <RechartTooltip formatter={(v: number) => [v, 'Ctrcs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                            <RechartTooltip formatter={(v: number) => [v, 'CTRCs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                             <Bar dataKey="ctrcs" fill="url(#gradMotCtrc)" radius={[0, 6, 6, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
@@ -1447,7 +1549,7 @@ export function ColetaEntrega() {
 
                     <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 veículos — ctrcs</CardTitle>
+                        <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 veículos — CTRCs</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={220}>
@@ -1461,7 +1563,7 @@ export function ColetaEntrega() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                             <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                             <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={70} />
-                            <RechartTooltip formatter={(v: number) => [v, 'Ctrcs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                            <RechartTooltip formatter={(v: number) => [v, 'CTRCs']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                             <Bar dataKey="ctrcs" fill="url(#gradPlacaCtrc)" radius={[0, 6, 6, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
@@ -1494,9 +1596,9 @@ export function ColetaEntrega() {
                           <ThAnd field="inclusao" label="Inclusão" />
                           <ThAnd field="marcaModelo" label="Marca / modelo" />
                           <ThAnd field="motorista" label="Motorista" />
-                          <ThAnd field="qtdeCtrcs" label="Qtde ctrcs" right />
+                          <ThAnd field="qtdeCtrcs" label="Qtde CTRCs" right />
                           <ThAnd field="faltaOcorrencia" label="Falta ocorrência" right />
-                          <ThAnd field="status" label="Status" />
+                          <ThAnd field="progresso" label="Progresso" right />
                         </tr>
                       </thead>
                       <tbody>
@@ -1521,12 +1623,14 @@ export function ColetaEntrega() {
                                 {r.faltaOcorrencia ?? 0}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 max-w-[260px] truncate" title={r.erro || ''}>
-                              {r.erro ? (
-                                <span className="text-rose-700 dark:text-rose-300">{r.erro}</span>
-                              ) : (
-                                <span className="text-emerald-700 dark:text-emerald-300">OK</span>
-                              )}
+                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                              <ProgressoBar value={(() => {
+                                const tot = Number(r.qtdeCtrcs ?? 0) || 0;
+                                const falt = Number(r.faltaOcorrencia ?? 0) || 0;
+                                if (tot <= 0) return 0;
+                                const baix = Math.max(0, tot - falt);
+                                return Math.max(0, Math.min(1, baix / tot));
+                              })()} />
                             </td>
                           </tr>
                         ))}

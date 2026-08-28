@@ -398,7 +398,9 @@ if ($step !== 'RUN') {
                         v.tp_propriedade,
                         COALESCE(p.nome, '') AS proprietario
                     FROM {$tabelaVeiculo} v
-                    LEFT JOIN {$tabelaProp} p ON v.cnpj_proprietario = p.cnpj
+                    LEFT JOIN {$tabelaProp} p
+                        ON regexp_replace(COALESCE(v.cnpj_proprietario::text, ''), '\\D', '', 'g')
+                        = regexp_replace(COALESCE(p.cnpj::text, ''), '\\D', '', 'g')
                     WHERE v.placa IN (" . implode(',', $ph) . ")
                 ";
                 $resV = sql($sqlV, $params, $g_sql);
@@ -857,7 +859,9 @@ if ($modo === 'RESUMO') {
                 v.tp_propriedade,
                 COALESCE(p.nome, '') AS proprietario
             FROM {$tabelaVeiculo} v
-            LEFT JOIN {$tabelaProp} p ON v.cnpj_proprietario = p.cnpj
+            LEFT JOIN {$tabelaProp} p
+                ON regexp_replace(COALESCE(v.cnpj_proprietario::text, ''), '\\D', '', 'g')
+                = regexp_replace(COALESCE(p.cnpj::text, ''), '\\D', '', 'g')
             WHERE v.placa IN (" . implode(',', $ph) . ")
         ";
         $resV = sql($sqlV, $params, $g_sql);
