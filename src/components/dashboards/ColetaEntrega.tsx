@@ -167,6 +167,7 @@ export function ColetaEntrega() {
   const [placa, setPlaca] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('');
   const [loadingExcel, setLoadingExcel] = useState(false);
   const [loadingExcelPlaca, setLoadingExcelPlaca] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -227,9 +228,11 @@ export function ColetaEntrega() {
     if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
     const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
     if (diffDias > 31) { toast.error('O período não pode ser maior que 31 dias.'); return; }
+    const modo = diffDias === 0 ? 'DETALHE' : 'RESUMO';
 
     setLoading(true);
     setElapsed(0);
+    setLoadingStage('Solicitando relatório no SSW...');
     setHasSearched(false);
     setGrupos([]);
     setSerie([]);
@@ -241,13 +244,67 @@ export function ColetaEntrega() {
     const timer = setInterval(() => setElapsed(e => e + 1), 1000);
 
     try {
+      const start = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+        { method: 'POST', body: JSON.stringify({ step: 'START', data_ini: dataIni, data_fin: dataFin, placa }) },
+        true
+      );
+
+      if (!start?.success) {
+        throw new Error(start?.message || 'Erro ao solicitar relatório.');
+      }
+
+      const baselineSeq = start.baseline_seq ?? 0;
+      const requestStartTs = start.request_start_ts ?? 0;
+
+      setLoadingStage('Aguardando conclusão no SSW (fila 1440)...');
+
+      let downloadAct: string | null = null;
+      const pollStart = Date.now();
+      const pollMaxMs = 12 * 60 * 1000;
+      while (Date.now() - pollStart < pollMaxMs) {
+        await new Promise(r => setTimeout(r, 1500));
+        const poll = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+          { method: 'POST', body: JSON.stringify({ step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }) },
+          true
+        );
+        if (!poll?.success) {
+          setLoadingStage(poll?.message || 'Aguardando conclusão no SSW (fila 1440)...');
+          continue;
+        }
+        if (poll.status === 'ready') {
+          downloadAct = poll.download_act || null;
+          setLoadingStage('Relatório pronto no SSW. Baixando arquivo...');
+          break;
+        }
+        if (poll.status === 'running') {
+          const sit = String(poll.sit ?? '').trim();
+          const seq = String(poll.seq ?? '').trim();
+          const ms1440 = poll.ms_1440 ? ` — 1440 ${poll.ms_1440}ms` : '';
+          setLoadingStage(`SSW processando... ${sit || ''}${seq ? ` (seq ${seq})` : ''}${ms1440}`.trim());
+          continue;
+        }
+        if (poll.ms_1440) {
+          setLoadingStage(`Aguardando conclusão no SSW (fila 1440)... — 1440 ${poll.ms_1440}ms`);
+        } else {
+          setLoadingStage('Aguardando conclusão no SSW (fila 1440)...');
+        }
+      }
+
+      if (!downloadAct) {
+        throw new Error('Relatório 076 não ficou pronto no tempo esperado. Tente novamente.');
+      }
+
+      setLoadingStage('Processando arquivo...');
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ data_ini: dataIni, data_fin: dataFin, placa }) },
+        { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
         true
       );
       clearInterval(timer);
       setElapsed(0);
+      setLoadingStage('');
 
       if (res.success) {
         setGrupos(res.grupos ?? []);
@@ -263,6 +320,7 @@ export function ColetaEntrega() {
     } catch (e: any) {
       clearInterval(timer);
       setElapsed(0);
+      setLoadingStage('');
       toast.error(e.message || 'Erro ao gerar relatório.');
     } finally {
       setLoading(false);
@@ -504,7 +562,7 @@ export function ColetaEntrega() {
                     <div className="flex gap-2">
                       <Button onClick={handleGerarClick} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
                         {loading ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...'}</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{loadingStage ? `${loadingStage}${elapsed > 0 ? ` (${elapsed}s)` : ''}` : (elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...')}</>
                         ) : (
                           <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
                         )}
