@@ -1210,7 +1210,7 @@ export function ColetaEntrega() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} />
+                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} interval={0} tickMargin={6} />
                   <RechartTooltip formatter={(v: number) => [v, 'Entregas']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="entregas" fill="url(#gradPropEnt)" radius={[0, 6, 6, 0]} />
                 </BarChart>
@@ -1256,7 +1256,7 @@ export function ColetaEntrega() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
-                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} />
+                  <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} interval={0} tickMargin={6} />
                   <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Bar dataKey="remuneracao" fill="url(#gradPropRem)" radius={[0, 6, 6, 0]} />
                 </BarChart>
