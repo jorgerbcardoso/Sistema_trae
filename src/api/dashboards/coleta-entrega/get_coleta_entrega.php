@@ -146,7 +146,7 @@ if ($step !== 'RUN') {
         $diffDias = $dtIni->diff($dtFin)->days;
         if ($diffDias > 31) respondJson(['success' => false, 'message' => 'O período não pode ser maior que 31 dias.']);
 
-        $modo = ($diffDias === 0) ? 'DETALHE' : 'RESUMO';
+        $modo = 'RESUMO';
         $dataIniSsw = str_replace('/', '', $dataIni);
         $dataFinSsw = str_replace('/', '', $dataFin);
 
@@ -169,7 +169,7 @@ if ($step !== 'RUN') {
             . '&f2=' . urlencode($unidade)
             . '&f3=' . urlencode($dataIniSsw)
             . '&f4=' . urlencode($dataFinSsw)
-            . '&f7=' . urlencode($modo === 'DETALHE' ? 'R' : 'X')
+            . '&f7=' . urlencode('X')
             . '&t_email=N,';
         if (!empty($placa)) $url0216 .= '&f6=' . urlencode($placa);
         $str0216 = (string)ssw_go($url0216);
@@ -563,7 +563,7 @@ if ($diffDias > 31) {
     respondJson(['success' => false, 'message' => 'O período não pode ser maior que 31 dias.']);
 }
 
-$modo = ($diffDias === 0) ? 'DETALHE' : 'RESUMO';
+$modo = 'RESUMO';
 
 $dataIniSsw = str_replace('/', '', $dataIni);
 $dataFinSsw = str_replace('/', '', $dataFin);
@@ -601,7 +601,7 @@ $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
     . '&f4=' . urlencode($dataFinSsw)
-    . '&f7=' . urlencode($modo === 'DETALHE' ? 'R' : 'X')
+    . '&f7=' . urlencode('X')
     . '&t_email=N,';
 
 if (!empty($placa)) {

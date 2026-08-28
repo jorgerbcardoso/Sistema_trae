@@ -228,7 +228,7 @@ export function ColetaEntrega() {
     if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
     const diffDias = Math.round((dtFin.getTime() - dtIni.getTime()) / 86400000);
     if (diffDias > 31) { toast.error('O período não pode ser maior que 31 dias.'); return; }
-    const modo = diffDias === 0 ? 'DETALHE' : 'RESUMO';
+    const modo = 'RESUMO';
 
     setLoading(true);
     setElapsed(0);
@@ -291,30 +291,12 @@ export function ColetaEntrega() {
         throw new Error('Relatório 076 não ficou pronto no tempo esperado. Tente novamente.');
       }
 
-      let res: any;
-      if (modo === 'DETALHE') {
-        setLoadingStage('Baixando arquivo...');
-        const dl = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-          { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD_FILE', download_act: downloadAct }) },
-          true
-        );
-        if (!dl?.success) throw new Error(dl?.message || 'Erro ao baixar arquivo.');
-
-        setLoadingStage('Processando arquivo...');
-        res = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-          { method: 'POST', body: JSON.stringify({ step: 'PARSE_FILE', download_act: downloadAct, modo }) },
-          true
-        );
-      } else {
-        setLoadingStage('Processando arquivo...');
-        res = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-          { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
-          true
-        );
-      }
+      setLoadingStage('Processando arquivo...');
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+        { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
+        true
+      );
       clearInterval(timer);
       setElapsed(0);
       setLoadingStage('');
@@ -509,8 +491,8 @@ export function ColetaEntrega() {
                     <DialogTitle>Processamento demorado</DialogTitle>
                     <DialogDescription>
                       {confirmGerarDiffDias === 0
-                        ? 'Para 1 dia, o relatório detalhado pode levar vários minutos e ainda assim ocorrer timeout.'
-                        : 'Para períodos maiores que 1 dia, é gerado um resumo por placa (sem CT-es). Mesmo assim, pode demorar.'}
+                        ? 'A geração pode demorar alguns minutos e ainda assim ocorrer timeout.'
+                        : 'A geração pode demorar alguns minutos e ainda assim ocorrer timeout.'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="text-sm text-slate-600 dark:text-slate-400">
@@ -544,7 +526,7 @@ export function ColetaEntrega() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Para períodos de 1 dia, o painel traz o detalhe (com CT-es). Para períodos maiores que 1 dia, é gerado apenas um resumo por placa (sem CT-es).
+                    Para evitar timeouts, o painel utiliza o resumo por placa (sem CT-es), independentemente do período.
                   </p>
                 </CardContent>
               </Card>
