@@ -418,50 +418,9 @@ if ($step !== 'RUN') {
     respondJson(['success' => false, 'message' => 'Step inválido.']);
 }
 
-// #region debug-point coleta-entrega-504
-function dbg_ce504_url() {
-    static $cached = null;
-    if ($cached !== null) return $cached;
-    $cached = '';
-    $envPath = __DIR__ . '/../../../../.dbg/coleta-entrega-504.env';
-    if (is_file($envPath)) {
-        $raw = @file_get_contents($envPath);
-        if (is_string($raw) && $raw !== '') {
-            foreach (preg_split('/\\r\\n|\\r|\\n/', $raw) as $ln) {
-                $ln = trim((string)$ln);
-                if ($ln === '' || strpos($ln, '=') === false) continue;
-                [$k, $v] = explode('=', $ln, 2);
-                if (trim($k) === 'DEBUG_SERVER_URL') {
-                    $cached = trim((string)$v);
-                    break;
-                }
-            }
-        }
-    }
-    return $cached;
-}
-
 function dbg_ce504($runId, $event, $data = []) {
-    $url = dbg_ce504_url();
-    if ($url === '') return;
-    $payload = [
-        'ts' => (int)round(microtime(true) * 1000),
-        'sessionId' => 'coleta-entrega-504',
-        'runId' => (string)$runId,
-        'event' => (string)$event,
-        'data' => is_array($data) ? $data : ['value' => $data],
-    ];
-    $ctx = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\n",
-            'content' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            'timeout' => 2,
-        ],
-    ]);
-    @file_get_contents($url, false, $ctx);
+    return;
 }
-// #endregion debug-point coleta-entrega-504
 
 if ($view !== '076') {
     $strTroca = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
@@ -797,8 +756,52 @@ if ($modo === 'RESUMO') {
             'vol' => $volCsv,
             'contratado' => '',
             'remuneracao' => round($remVeicCsv, 2),
+            'tpPropriedade' => null,
+            'proprietarioNome' => null,
+            'isFrota' => null,
             'ctrcs' => [],
         ];
+    }
+
+    $placas = [];
+    foreach ($grupos as $g) {
+        $pl = trim((string)($g['placa'] ?? ''));
+        if ($pl !== '') $placas[$pl] = true;
+    }
+    $placas = array_keys($placas);
+
+    $veiculoMap = [];
+    if (!empty($placas)) {
+        $ph = [];
+        $params = [];
+        $idx = 1;
+        foreach ($placas as $pl) {
+            $ph[] = '$' . $idx++;
+            $params[] = $pl;
+        }
+
+        $tabelaVeiculo = "{$domain}_veiculo";
+        $tabelaProp = "{$domain}_proprietario";
+        $sqlV = "
+            SELECT
+                v.placa,
+                v.tp_propriedade,
+                COALESCE(p.nome, '') AS proprietario
+            FROM {$tabelaVeiculo} v
+            LEFT JOIN {$tabelaProp} p ON v.cnpj_proprietario = p.cnpj
+            WHERE v.placa IN (" . implode(',', $ph) . ")
+        ";
+        $resV = sql($sqlV, $params, $g_sql);
+        if ($resV) {
+            while ($row = pg_fetch_assoc($resV)) {
+                $pl = strtoupper(trim((string)($row['placa'] ?? '')));
+                if ($pl === '') continue;
+                $veiculoMap[$pl] = [
+                    'tp' => strtoupper(trim((string)($row['tp_propriedade'] ?? ''))),
+                    'prop' => trim((string)($row['proprietario'] ?? '')),
+                ];
+            }
+        }
     }
 
     usort($grupos, fn($a, $b) => ($b['total'] <=> $a['total']) ?: ($b['frete'] <=> $a['frete']));
@@ -810,7 +813,22 @@ if ($modo === 'RESUMO') {
     $totalValMerc = 0.0;
     $totalVol = 0;
     $totalRemuneracao = 0.0;
-    foreach ($grupos as $g) {
+    $proprietarios = [];
+    foreach ($grupos as &$g) {
+        $pl = strtoupper(trim((string)($g['placa'] ?? '')));
+        $info = $pl !== '' ? ($veiculoMap[$pl] ?? null) : null;
+        $tp = $info ? (string)($info['tp'] ?? '') : '';
+        $propNome = $info ? (string)($info['prop'] ?? '') : '';
+
+        $isFrota = ($tp === 'F');
+        $g['tpPropriedade'] = $tp !== '' ? $tp : null;
+        $g['proprietarioNome'] = $propNome !== '' ? $propNome : null;
+        $g['isFrota'] = $tp !== '' ? $isFrota : null;
+
+        if ($isFrota) {
+            $g['remuneracao'] = 0.0;
+        }
+
         $totalColetas += (int)$g['coletas'];
         $totalEntregas += (int)$g['entregas'];
         $totalPeso += (float)$g['peso'];
@@ -818,13 +836,17 @@ if ($modo === 'RESUMO') {
         $totalValMerc += (float)$g['valMerc'];
         $totalVol += (int)$g['vol'];
         $totalRemuneracao += (float)$g['remuneracao'];
+
+        $pNome = trim((string)($g['proprietarioNome'] ?? ''));
+        if ($pNome !== '') $proprietarios[$pNome] = true;
     }
+    unset($g);
 
     respondJson([
         'success' => true,
         'mode' => 'RESUMO',
         'operacoes' => [],
-        'grupos' => $grupos,
+        'grupos' => array_values($grupos),
         'contratados' => [],
         'serieCronologica' => [],
         'totais' => [
@@ -837,6 +859,7 @@ if ($modo === 'RESUMO') {
             'valMerc' => round($totalValMerc, 2),
             'vol' => $totalVol,
             'remuneracao' => round($totalRemuneracao, 2),
+            'proprietarios' => count($proprietarios),
         ],
     ]);
 }

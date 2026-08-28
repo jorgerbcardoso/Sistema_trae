@@ -60,6 +60,9 @@ interface GrupoPlaca {
   vol: number;
   contratado?: string;
   remuneracao?: number;
+  tpPropriedade?: string | null;
+  proprietarioNome?: string | null;
+  isFrota?: boolean | null;
   ctrcs: Operacao[];
 }
 
@@ -81,6 +84,7 @@ interface Totais {
   valMerc: number;
   vol: number;
   remuneracao?: number;
+  proprietarios?: number;
 }
 
 interface GrupoContratado {
@@ -438,7 +442,7 @@ export function ColetaEntrega() {
 
   const ThH = ({ field, label, right = false }: { field: SortField; label: string; right?: boolean }) => (
     <th
-      className={`px-3 py-2 text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-white ${right ? 'text-right' : 'text-left'}`}
+      className={`px-3 py-2 text-xs font-semibold text-slate-200 cursor-pointer select-none whitespace-nowrap hover:text-white ${right ? 'text-right' : 'text-left'}`}
       onClick={() => handleSort(field)}
     >
       <span className={`flex items-center ${right ? 'justify-end' : ''}`}>
@@ -447,20 +451,78 @@ export function ColetaEntrega() {
     </th>
   );
 
-  const donutColetas = totais ? [
-    { name: 'Coletas', value: totais.coletas },
-    { name: 'Entregas', value: totais.entregas },
-  ] : [];
+  const gruposFrota = grupos.filter(g => (g.tpPropriedade ?? '').toUpperCase() === 'F' || g.isFrota === true);
+  const gruposTerceiros = grupos.filter(g => !((g.tpPropriedade ?? '').toUpperCase() === 'F' || g.isFrota === true));
 
-  const top5Placas = [...grupos]
+  const sum = <T,>(arr: T[], fn: (v: T) => number) => arr.reduce((s, v) => s + (Number(fn(v)) || 0), 0);
+
+  const totaisFrota = {
+    placas: gruposFrota.length,
+    coletas: sum(gruposFrota, g => (g as any).coletas),
+    entregas: sum(gruposFrota, g => (g as any).entregas),
+    total: sum(gruposFrota, g => (g as any).total),
+    peso: sum(gruposFrota, g => (g as any).peso),
+    frete: sum(gruposFrota, g => (g as any).frete),
+    valMerc: sum(gruposFrota, g => (g as any).valMerc),
+    vol: sum(gruposFrota, g => (g as any).vol),
+    remuneracao: 0,
+  };
+
+  const totaisTerceiros = {
+    placas: gruposTerceiros.length,
+    coletas: sum(gruposTerceiros, g => (g as any).coletas),
+    entregas: sum(gruposTerceiros, g => (g as any).entregas),
+    total: sum(gruposTerceiros, g => (g as any).total),
+    peso: sum(gruposTerceiros, g => (g as any).peso),
+    frete: sum(gruposTerceiros, g => (g as any).frete),
+    valMerc: sum(gruposTerceiros, g => (g as any).valMerc),
+    vol: sum(gruposTerceiros, g => (g as any).vol),
+    remuneracao: sum(gruposTerceiros, g => (g as any).remuneracao ?? 0),
+  };
+
+  const proprietariosCount = new Set(
+    grupos
+      .map(g => String(g.proprietarioNome ?? '').trim())
+      .filter(Boolean)
+  ).size;
+
+  const donutTipo = [
+    { name: 'Frota', value: totaisFrota.entregas },
+    { name: 'Terceiros', value: totaisTerceiros.entregas },
+  ];
+
+  const topPlacasEntregas = [...grupos]
+    .sort((a, b) => b.entregas - a.entregas)
+    .slice(0, 8)
+    .map(g => ({ placa: g.placa, entregas: g.entregas }));
+
+  const topPlacasFrete = [...grupos]
     .sort((a, b) => b.frete - a.frete)
-    .slice(0, 5)
-    .map(g => ({ placa: g.placa, frete: g.frete, peso: g.peso / 1000 }));
+    .slice(0, 8)
+    .map(g => ({ placa: g.placa, frete: g.frete }));
 
-  const top5Contratados = [...contratados]
-    .sort((a, b) => (b.remuneracao ?? 0) - (a.remuneracao ?? 0))
-    .slice(0, 5)
-    .map(c => ({ contratado: c.contratado, remuneracao: c.remuneracao, placas: c.placas }));
+  const topProprietariosEntregas = Object.values(
+    grupos.reduce((acc, g) => {
+      const k = String(g.proprietarioNome ?? '').trim() || '(Sem proprietário)';
+      if (!acc[k]) acc[k] = { proprietario: k, entregas: 0, frete: 0 };
+      acc[k].entregas += g.entregas;
+      acc[k].frete += g.frete;
+      return acc;
+    }, {} as Record<string, { proprietario: string; entregas: number; frete: number }>)
+  )
+    .sort((a, b) => b.entregas - a.entregas)
+    .slice(0, 8);
+
+  const topProprietariosRemuneracao = Object.values(
+    gruposTerceiros.reduce((acc, g) => {
+      const k = String(g.proprietarioNome ?? '').trim() || '(Sem proprietário)';
+      if (!acc[k]) acc[k] = { proprietario: k, remuneracao: 0 };
+      acc[k].remuneracao += Number(g.remuneracao ?? 0) || 0;
+      return acc;
+    }, {} as Record<string, { proprietario: string; remuneracao: number }>)
+  )
+    .sort((a, b) => b.remuneracao - a.remuneracao)
+    .slice(0, 8);
 
   return (
     <DashboardLayout
@@ -518,20 +580,6 @@ export function ColetaEntrega() {
               </Dialog>
 
               <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
-                    <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    Regra de Período
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Para evitar timeouts, o painel utiliza o resumo por placa (sem CT-es), independentemente do período.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
                     <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -562,13 +610,6 @@ export function ColetaEntrega() {
                           <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
                         )}
                       </Button>
-                      {hasSearched && (
-                        <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
-                          disabled={isResumo || loadingExcel || grupos.length === 0} variant="outline"
-                          className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                          {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-                        </Button>
-                      )}
                     </div>
                   </div>
 
@@ -593,227 +634,321 @@ export function ColetaEntrega() {
 
               {hasSearched && totais && (<>
 
-        {/* CARDS — 3 por linha, 2 linhas */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-blue-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                  <Package className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                  <PackageCheck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Coletas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Operações</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.total}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-orange-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-900/10">
+                  <Package className="h-6 w-6 text-orange-700 dark:text-orange-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Coletas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.coletas}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-blue-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                  <PackageCheck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-900/10">
+                  <PackageCheck className="h-6 w-6 text-blue-700 dark:text-blue-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Entregas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.entregas}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                  <Truck className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                  <Truck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Placas</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totais.placas}</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">{totais.total} operações</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-purple-50 dark:from-slate-900/90 dark:to-purple-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-purple-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl">
-                  <Weight className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-900/10">
+                  <Weight className="h-6 w-6 text-purple-700 dark:text-purple-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Peso Total</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Peso total</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatTon(totais.peso)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-                  <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
+                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Vlr Frete</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr frete</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.frete)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-amber-50 dark:from-slate-900/90 dark:to-amber-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-amber-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                  <FileText className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-900/10">
+                  <FileText className="h-6 w-6 text-amber-700 dark:text-amber-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Vlr Mercadoria</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Vlr mercadoria</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.valMerc)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
-            <CardContent className="pt-5 pb-5">
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-sky-50 dark:from-slate-900/90 dark:to-sky-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-sky-400" />
+            <CardContent className="pt-5 pb-5 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-xl">
-                  <DollarSign className="h-6 w-6 text-rose-600 dark:text-rose-400" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-sky-100 to-sky-200 dark:from-sky-900/30 dark:to-sky-900/10">
+                  <Building2 className="h-6 w-6 text-sky-700 dark:text-sky-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 tracking-wide font-medium">Remuneração (terceiros)</p>
-                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totais.remuneracao ?? 0)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Proprietários</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{proprietariosCount || (totais.proprietarios ?? 0)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                  <Truck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas frota</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.placas}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
+                  <Truck className="h-6 w-6 text-rose-700 dark:text-rose-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas terceiros</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.placas}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-25 bg-slate-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                  <PackageCheck className="h-6 w-6 text-slate-700 dark:text-slate-200" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas frota</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisFrota.entregas}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
+                  <PackageCheck className="h-6 w-6 text-rose-700 dark:text-rose-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas terceiros</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.entregas}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-rose-50 dark:from-slate-900/90 dark:to-rose-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-rose-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-900/10">
+                  <DollarSign className="h-6 w-6 text-rose-700 dark:text-rose-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remuneração terceiros</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.remuneracao)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
+                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete frota</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisFrota.frete)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-700 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+            <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-30 bg-emerald-400" />
+            <CardContent className="pt-5 pb-5 relative">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-900/10">
+                  <DollarSign className="h-6 w-6 text-emerald-700 dark:text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete terceiros</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.frete)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {!isResumo && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Donut coletas x entregas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Coletas vs Entregas</CardTitle>
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Entregas por tipo</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={donutColetas} cx="50%" cy="50%" innerRadius={55} outerRadius={80}
-                    dataKey="value" paddingAngle={3} stroke="none">
-                    <Cell fill="#f97316" />
-                    <Cell fill="#3b82f6" />
+                  <Pie data={donutTipo} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={3} stroke="none">
+                    <Cell fill="#64748b" />
+                    <Cell fill="#fb7185" />
                   </Pie>
-                  <RechartTooltip formatter={(v: number, n: string) => [v, n]} />
+                  <RechartTooltip formatter={(v: number, n: string) => [v, n]} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Linha cronológica de operações */}
-          <Card className="lg:col-span-2 dark:bg-slate-900/90 dark:border-slate-700">
+          <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Operações por Dia</CardTitle>
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 proprietários — entregas</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topProprietariosEntregas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradPropEnt" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.7} />
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <RechartTooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="coletas" stroke="#f97316" strokeWidth={2} dot={false} name="Coletas" />
-                  <Line type="monotone" dataKey="entregas" stroke="#3b82f6" strokeWidth={2} dot={false} name="Entregas" />
-                </LineChart>
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis type="category" dataKey="proprietario" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
+                  <RechartTooltip formatter={(v: number) => [v, 'Entregas']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="entregas" fill="url(#gradPropEnt)" radius={[0, 6, 6, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Top 5 placas por frete */}
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 5 Placas — Frete</CardTitle>
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 placas — frete</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={top5Placas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topPlacasFrete} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gradTop5" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="gradPlacaFrete" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.7} />
                       <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
                   <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
-                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="frete" fill="url(#gradTop5)" radius={[0, 6, 6, 0]} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="frete" fill="url(#gradPlacaFrete)" radius={[0, 6, 6, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Frete por dia */}
-          <Card className="lg:col-span-2 dark:bg-slate-900/90 dark:border-slate-700">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Frete por Dia (R$)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={serie} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="gradFreteDia" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis dataKey="data" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
-                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="frete" stroke="#3b82f6" strokeWidth={2.5}
-                    fill="url(#gradFreteDia)" dot={false} name="Frete" />
-                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 5 Contratados — Remuneração</CardTitle>
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 proprietários — remuneração (terceiros)</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={top5Contratados} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topProprietariosRemuneracao} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gradTopContr" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="gradPropRem" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#fb7185" stopOpacity={0.7} />
                       <stop offset="100%" stopColor="#f43f5e" stopOpacity={1} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v)/1000).toFixed(0)}k` : ''} />
-                  <YAxis type="category" dataKey="contratado" tick={{ fontSize: 10, fill: '#94a3b8' }} width={95} />
-                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']}
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="remuneracao" fill="url(#gradTopContr)" radius={[0, 6, 6, 0]} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
+                  <YAxis type="category" dataKey="proprietario" tick={{ fontSize: 10, fill: '#94a3b8' }} width={140} />
+                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Remuneração']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="remuneracao" fill="url(#gradPropRem)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
-        )}
 
         {/* TABELA AGRUPADA POR PLACA */}
         <Card className="dark:bg-slate-900/90 dark:border-slate-700">
@@ -821,20 +956,11 @@ export function ColetaEntrega() {
             <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center justify-between text-base">
               <span className="flex items-center gap-2">
                 <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                Operações por Placa
+                Operações por placa
               </span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
-                  {grupos.length} {grupos.length === 1 ? 'placa' : 'placas'}
-                </span>
-                <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
-                  disabled={isResumo || loadingExcel} size="sm" variant="outline"
-                  className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                  {loadingExcel
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
-                    : <><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar Tudo</>}
-                </Button>
-              </div>
+              <span className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                {grupos.length} {grupos.length === 1 ? 'placa' : 'placas'}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -848,10 +974,9 @@ export function ColetaEntrega() {
                     <ThH field="entregas" label="Entregas" right />
                     <ThH field="total" label="Total" right />
                     <ThH field="peso" label="Peso (t)" right />
-                    <ThH field="frete" label="Vlr Frete" right />
-                    <ThH field="valMerc" label="Vlr Merc" right />
+                    <ThH field="frete" label="Vlr frete" right />
+                    <ThH field="valMerc" label="Vlr merc" right />
                     <ThH field="remuneracao" label="Remuneração" right />
-                    <th className="px-3 py-2 text-xs font-semibold text-slate-300 uppercase text-right whitespace-nowrap">Excel</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -901,10 +1026,21 @@ export function ColetaEntrega() {
                           </td>
                           <td className="px-3 py-2 min-w-[160px]">
                             <div className="flex flex-col">
-                              <span className="font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{g.placa}</span>
-                              {g.contratado ? (
-                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[240px] truncate" title={g.contratado}>
-                                  {g.contratado}
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{g.placa}</span>
+                                {(g.isFrota ?? ((g.tpPropriedade ?? '').toUpperCase() === 'F')) ? (
+                                  <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-[10px] px-1.5 py-0.5">
+                                    Frota
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800 text-[10px] px-1.5 py-0.5">
+                                    Terceiro
+                                  </Badge>
+                                )}
+                              </div>
+                              {g.proprietarioNome ? (
+                                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-[260px] truncate" title={g.proprietarioNome}>
+                                  {g.proprietarioNome}
                                 </span>
                               ) : null}
                             </div>
@@ -919,24 +1055,16 @@ export function ColetaEntrega() {
                           <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatTon(g.peso)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">{formatMoeda(g.frete)}</td>
                           <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatMoeda(g.valMerc)}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-rose-700 dark:text-rose-400 whitespace-nowrap">{formatMoeda(g.remuneracao ?? 0)}</td>
-                          <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
-                            {hasDetalhe && (
-                              <Button size="sm" variant="ghost"
-                                disabled={loadingExcelPlaca === g.placa}
-                                onClick={() => exportarExcel(g.ctrcs, g.placa)}
-                                className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                                {loadingExcelPlaca === g.placa
-                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  : <FileSpreadsheet className="h-3.5 w-3.5" />}
-                              </Button>
-                            )}
+                          <td className="px-3 py-2 text-right font-semibold whitespace-nowrap">
+                            {(g.isFrota ?? ((g.tpPropriedade ?? '').toUpperCase() === 'F'))
+                              ? <span className="text-slate-400 dark:text-slate-500">-</span>
+                              : <span className="text-rose-700 dark:text-rose-400">{formatMoeda(g.remuneracao ?? 0)}</span>}
                           </td>
                         </tr>
 
                         {expanded && (
                           <tr className="bg-slate-50 dark:bg-slate-950/60">
-                            <td colSpan={10} className="p-0">
+                            <td colSpan={9} className="p-0">
                               <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700">
                                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                                   Resumo por Dia
