@@ -201,26 +201,31 @@ if ($step !== 'RUN') {
         }
 
         $match = null;
+        $bestScore = -1;
         $rows = $xml->xpath('rs/r') ?: [];
         $i = 0;
         foreach ($rows as $row) {
-            if ($i++ >= 600) break;
+            if ($i++ >= 3000) break;
             $seqNum = (int)(string)($row->f0 ?? 0);
-            $opcStr = (string)($row->f1 ?? '');
+            $opcStr = ltrim((string)($row->f1 ?? ''));
             if (substr($opcStr, 0, 3) !== '076') continue;
 
             $usrStr = strtolower(trim((string)($row->f3 ?? '')));
-            if ($login !== '' && $usrStr !== $login) continue;
+            $userMatch = ($login !== '' && $usrStr === $login);
+            $unitStr = strtoupper(trim((string)($row->f4 ?? '')));
+            $unitMatch = ($unidade !== '' && strtoupper(trim((string)$unidade)) === $unitStr);
+            if (!$userMatch && !$unitMatch) continue;
 
             $f2 = (string)($row->f2 ?? '');
             $f2ts = parse1440F2Ts($f2);
             $fresh = ($baselineSeqIn > 0 && $seqNum > $baselineSeqIn)
                 || ($requestStartTsIn > 0 && $f2ts !== null && abs($f2ts - $requestStartTsIn) <= 6 * 3600);
-            if (!$fresh) continue;
+            $score = ($userMatch ? 100 : 0) + ($unitMatch ? 50 : 0) + ($fresh ? 10 : 0);
+            if ($score < $bestScore) continue;
 
             $sit = (string)($row->f6 ?? '');
             $f8 = (string)($row->f8 ?? '');
-            $match = [
+            $cand = [
                 'seq' => $seqNum,
                 'opc' => $opcStr,
                 'usr' => (string)($row->f3 ?? ''),
@@ -228,7 +233,11 @@ if ($step !== 'RUN') {
                 'sit' => $sit,
                 'download_act' => $f8 !== '' ? extractDownloadActFromF8($f8) : null,
             ];
-            break;
+            if ($score > $bestScore || ($score === $bestScore && $seqNum > (int)($match['seq'] ?? 0))) {
+                $bestScore = $score;
+                $match = $cand;
+            }
+            if ($bestScore >= 160 && ($match['sit'] ?? '') === 'Conclu&iacute;do' && !empty($match['download_act'])) break;
         }
 
         if (!$match) {
