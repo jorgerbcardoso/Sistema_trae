@@ -141,7 +141,7 @@ function getDataPadrao() {
     const yy = String(d.getFullYear()).slice(-2);
     return `${dd}/${mm}/${yy}`;
   };
-  return { ini: fmt(ontem), fin: fmt(hoje) };
+  return { ini: fmt(ontem), fin: fmt(ontem) };
 }
 
 const parseDateBR = (s: string): Date | null => {
@@ -175,6 +175,7 @@ export function ColetaEntrega() {
   const [totais, setTotais] = useState<Totais | null>(null);
   const [contratados, setContratados] = useState<GrupoContratado[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isResumo, setIsResumo] = useState(false);
 
   const [loadingAndamento, setLoadingAndamento] = useState(false);
   const [elapsedAndamento, setElapsedAndamento] = useState(0);
@@ -231,6 +232,7 @@ export function ColetaEntrega() {
     setSerie([]);
     setTotais(null);
     setContratados([]);
+    setIsResumo(false);
     setExpandedPlacas(new Set());
 
     const timer = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -249,6 +251,7 @@ export function ColetaEntrega() {
         setSerie(res.serieCronologica ?? []);
         setTotais(res.totais ?? null);
         setContratados(res.contratados ?? []);
+        setIsResumo((res.mode ?? '') === 'RESUMO');
         setHasSearched(true);
         if ((res.grupos ?? []).length === 0) toast.info('Nenhuma operação encontrada para o período.');
       } else {
@@ -407,6 +410,20 @@ export function ColetaEntrega() {
 
             <TabsContent value="076" className="space-y-6">
               <Card className="dark:bg-slate-900/90 dark:border-slate-700">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
+                    <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    Regra de Período
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Para períodos de 1 dia, o painel traz o detalhe (com CT-es). Para períodos maiores que 1 dia, o SSW gera apenas um resumo por placa (sem CT-es).
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="dark:bg-slate-900/90 dark:border-slate-700">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2 text-base">
                     <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -439,7 +456,7 @@ export function ColetaEntrega() {
                       </Button>
                       {hasSearched && (
                         <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
-                          disabled={loadingExcel || grupos.length === 0} variant="outline"
+                          disabled={isResumo || loadingExcel || grupos.length === 0} variant="outline"
                           className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
                           {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                         </Button>
@@ -570,8 +587,8 @@ export function ColetaEntrega() {
           </Card>
         </div>
 
-        {/* DASHBOARD — gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {!isResumo && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* Donut coletas x entregas */}
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
@@ -688,6 +705,7 @@ export function ColetaEntrega() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* TABELA AGRUPADA POR PLACA */}
         <Card className="dark:bg-slate-900/90 dark:border-slate-700">
@@ -702,7 +720,7 @@ export function ColetaEntrega() {
                   {grupos.length} {grupos.length === 1 ? 'placa' : 'placas'}
                 </span>
                 <Button onClick={() => exportarExcel(grupos.flatMap(g => g.ctrcs), 'GERAL')}
-                  disabled={loadingExcel} size="sm" variant="outline"
+                  disabled={isResumo || loadingExcel} size="sm" variant="outline"
                   className="border-emerald-600 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
                   {loadingExcel
                     ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exportando...</>
@@ -730,7 +748,8 @@ export function ColetaEntrega() {
                 </thead>
                 <tbody>
                   {gruposOrdenados.map((g, idx) => {
-                    const expanded = expandedPlacas.has(g.placa);
+                    const hasDetalhe = (g.ctrcs?.length ?? 0) > 0;
+                    const expanded = expandedPlacas.has(g.placa) && hasDetalhe;
                     const resumoDias = Object.values(
                       g.ctrcs.reduce((acc, op) => {
                         const k = op.dataBaixa;
@@ -764,13 +783,13 @@ export function ColetaEntrega() {
                     return (
                       <React.Fragment key={g.placa}>
                         <tr
-                          className={`border-b border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
-                          onClick={() => toggleExpand(g.placa)}
+                          className={`border-b border-slate-100 dark:border-slate-800 ${hasDetalhe ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}
+                          onClick={() => hasDetalhe ? toggleExpand(g.placa) : null}
                         >
                           <td className="px-3 py-2 text-slate-400">
-                            {expanded
-                              ? <ChevronDown className="h-4 w-4" />
-                              : <ChevronRight className="h-4 w-4" />}
+                            {hasDetalhe ? (
+                              expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                            ) : null}
                           </td>
                           <td className="px-3 py-2 min-w-[160px]">
                             <div className="flex flex-col">
@@ -794,14 +813,16 @@ export function ColetaEntrega() {
                           <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatMoeda(g.valMerc)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-rose-700 dark:text-rose-400 whitespace-nowrap">{formatMoeda(g.remuneracao ?? 0)}</td>
                           <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
-                            <Button size="sm" variant="ghost"
-                              disabled={loadingExcelPlaca === g.placa}
-                              onClick={() => exportarExcel(g.ctrcs, g.placa)}
-                              className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
-                              {loadingExcelPlaca === g.placa
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <FileSpreadsheet className="h-3.5 w-3.5" />}
-                            </Button>
+                            {hasDetalhe && (
+                              <Button size="sm" variant="ghost"
+                                disabled={loadingExcelPlaca === g.placa}
+                                onClick={() => exportarExcel(g.ctrcs, g.placa)}
+                                className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                                {loadingExcelPlaca === g.placa
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
                           </td>
                         </tr>
 

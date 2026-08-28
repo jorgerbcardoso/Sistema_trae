@@ -31,8 +31,8 @@ if (!in_array($view, ['076', 'ANDAMENTO', 'ROM'], true)) {
 }
 
 ssw_login($domain);
-set_time_limit(180);
-ini_set('memory_limit', '256M');
+set_time_limit(300);
+ini_set('memory_limit', '512M');
 
 register_shutdown_function(function() {
     $err = error_get_last();
@@ -159,6 +159,8 @@ if ($diffDias > 31) {
     respondJson(['success' => false, 'message' => 'O período não pode ser maior que 31 dias.']);
 }
 
+$modo = ($diffDias === 0) ? 'DETALHE' : 'RESUMO';
+
 $dataIniSsw = str_replace('/', '', $dataIni);
 $dataFinSsw = str_replace('/', '', $dataFin);
 
@@ -176,7 +178,7 @@ $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
     . '&f4=' . urlencode($dataFinSsw)
-    . '&f7=R'
+    . '&f7=' . urlencode($modo === 'DETALHE' ? 'R' : 'X')
     . '&t_email=N,';
 
 if (!empty($placa)) {
@@ -338,7 +340,91 @@ if (empty($file) || strlen($file) < 100) {
 $file   = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');
 $file   = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $file);
 $file   = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
-$linhas = explode("\n", $file);
+
+if ($modo === 'RESUMO') {
+    $grupos = [];
+    $p = 0;
+    $n = strlen((string)$file);
+    while ($p <= $n) {
+        $nl = strpos((string)$file, "\n", $p);
+        if ($nl === false) {
+            $ln = substr((string)$file, $p);
+            $p = $n + 1;
+        } else {
+            $ln = substr((string)$file, $p, $nl - $p);
+            $p = $nl + 1;
+        }
+        $ln = trim((string)$ln);
+        if ($ln === '') continue;
+        $cols = str_getcsv($ln, ';');
+        if (count($cols) < 15) continue;
+        $tp = trim((string)($cols[0] ?? ''));
+        if ($tp !== '2') continue;
+
+        $placaCsv = strtoupper(trim((string)($cols[3] ?? '')));
+        if ($placaCsv === '') continue;
+        $coletasCsv = parseIntPtBr($cols[5] ?? '0');
+        $entregasCsv = parseIntPtBr($cols[7] ?? '0');
+        $pesoCsv = parseMoedaPtBr($cols[9] ?? '0');
+        $volCsv = parseIntPtBr($cols[10] ?? '0');
+        $valMercCsv = parseMoedaPtBr($cols[11] ?? '0');
+        $freteCsv = parseMoedaPtBr($cols[12] ?? '0');
+        $remVeicCsv = parseMoedaPtBr($cols[25] ?? '0');
+
+        $grupos[] = [
+            'placa' => $placaCsv,
+            'coletas' => $coletasCsv,
+            'entregas' => $entregasCsv,
+            'total' => $coletasCsv + $entregasCsv,
+            'peso' => round($pesoCsv, 3),
+            'frete' => round($freteCsv, 2),
+            'valMerc' => round($valMercCsv, 2),
+            'vol' => $volCsv,
+            'contratado' => '',
+            'remuneracao' => round($remVeicCsv, 2),
+            'ctrcs' => [],
+        ];
+    }
+
+    usort($grupos, fn($a, $b) => ($b['total'] <=> $a['total']) ?: ($b['frete'] <=> $a['frete']));
+
+    $totalColetas = 0;
+    $totalEntregas = 0;
+    $totalPeso = 0.0;
+    $totalFrete = 0.0;
+    $totalValMerc = 0.0;
+    $totalVol = 0;
+    $totalRemuneracao = 0.0;
+    foreach ($grupos as $g) {
+        $totalColetas += (int)$g['coletas'];
+        $totalEntregas += (int)$g['entregas'];
+        $totalPeso += (float)$g['peso'];
+        $totalFrete += (float)$g['frete'];
+        $totalValMerc += (float)$g['valMerc'];
+        $totalVol += (int)$g['vol'];
+        $totalRemuneracao += (float)$g['remuneracao'];
+    }
+
+    respondJson([
+        'success' => true,
+        'mode' => 'RESUMO',
+        'operacoes' => [],
+        'grupos' => $grupos,
+        'contratados' => [],
+        'serieCronologica' => [],
+        'totais' => [
+            'coletas' => $totalColetas,
+            'entregas' => $totalEntregas,
+            'total' => $totalColetas + $totalEntregas,
+            'placas' => count($grupos),
+            'peso' => round($totalPeso, 3),
+            'frete' => round($totalFrete, 2),
+            'valMerc' => round($totalValMerc, 2),
+            'vol' => $totalVol,
+            'remuneracao' => round($totalRemuneracao, 2),
+        ],
+    ]);
+}
 
 $operacoes = [];
 $contratadoPorPlacaDia = [];
@@ -351,8 +437,19 @@ $tipoAtual = null;
 $tipoCodigoAtual = null;
 $colBounds = null;
 
-foreach ($linhas as $linhaRaw) {
-    $linha = rtrim($linhaRaw, "\r\n");
+{
+    $p = 0;
+    $n = strlen((string)$file);
+    while ($p <= $n) {
+        $nl = strpos((string)$file, "\n", $p);
+        if ($nl === false) {
+            $linha = substr((string)$file, $p);
+            $p = $n + 1;
+        } else {
+            $linha = substr((string)$file, $p, $nl - $p);
+            $p = $nl + 1;
+        }
+        $linha = rtrim((string)$linha, "\r\n");
     if (trim($linha) === '') continue;
 
     if (preg_match('/^VEICULO:\\s*([A-Z0-9]{7})\\b.*?CONTRATADO:\\s*(.+?)\\s*$/i', $linha, $m)) {
@@ -461,6 +558,7 @@ foreach ($linhas as $linhaRaw) {
         'contratado'       => $contratadoPorPlacaDia[$keyPd] ?? $contratadoAtual ?? '',
         'remuneracaoDia'   => $remuneracaoPorPlacaDia[$keyPd] ?? 0.0,
     ];
+    }
 }
 
 $totalColetas  = 0;
@@ -599,6 +697,7 @@ usort($contratadosOrdenados, fn($a, $b) => ($b['remuneracao'] <=> $a['remuneraca
 
 respondJson([
     'success'          => true,
+    'mode'             => 'DETALHE',
     'operacoes'        => $operacoes,
     'grupos'           => $placasOrdenadas,
     'contratados'      => $contratadosOrdenados,
