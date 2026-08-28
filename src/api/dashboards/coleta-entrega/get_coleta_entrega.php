@@ -150,12 +150,18 @@ if ($step !== 'RUN') {
         $dataIniSsw = str_replace('/', '', $dataIni);
         $dataFinSsw = str_replace('/', '', $dataFin);
 
+        $login = strtolower(trim((string)($currentUser['username'] ?? '')));
         $baselineSeq = 0;
         $xmlBaseline = parseXmlFromResponse((string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440'));
         if ($xmlBaseline) {
-            $rowsBase = $xmlBaseline->xpath('rs/r/f0') ?: [];
-            foreach ($rowsBase as $seqNode) {
-                $baselineSeq = max($baselineSeq, (int)(string)$seqNode);
+            $rows = $xmlBaseline->xpath('rs/r') ?: [];
+            foreach ($rows as $row) {
+                $seqNum = (int)(string)($row->f0 ?? 0);
+                $opcStr = (string)($row->f1 ?? '');
+                if (substr($opcStr, 0, 3) !== '076') continue;
+                $usrStr = strtolower(trim((string)($row->f3 ?? '')));
+                if ($login !== '' && $usrStr !== $login) continue;
+                $baselineSeq = max($baselineSeq, $seqNum);
             }
         }
 
@@ -208,7 +214,8 @@ if ($step !== 'RUN') {
 
             $f2 = (string)($row->f2 ?? '');
             $f2ts = parse1440F2Ts($f2);
-            $fresh = ($baselineSeqIn > 0 && $seqNum > $baselineSeqIn) || ($requestStartTsIn > 0 && $f2ts !== null && $f2ts >= $requestStartTsIn);
+            $fresh = ($baselineSeqIn > 0 && $seqNum > $baselineSeqIn)
+                || ($requestStartTsIn > 0 && $f2ts !== null && abs($f2ts - $requestStartTsIn) <= 6 * 3600);
             if (!$fresh) continue;
 
             $sit = (string)($row->f6 ?? '');

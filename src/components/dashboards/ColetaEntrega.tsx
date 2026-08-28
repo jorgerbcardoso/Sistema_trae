@@ -257,7 +257,7 @@ export function ColetaEntrega() {
       const baselineSeq = start.baseline_seq ?? 0;
       const requestStartTs = start.request_start_ts ?? 0;
 
-      setLoadingStage('Aguardando conclusão no SSW (fila 1440)...');
+      setLoadingStage('Aguardando geração do relatório...');
 
       let downloadAct: string | null = null;
       const pollStart = Date.now();
@@ -281,15 +281,10 @@ export function ColetaEntrega() {
         if (poll.status === 'running') {
           const sit = String(poll.sit ?? '').trim();
           const seq = String(poll.seq ?? '').trim();
-          const ms1440 = poll.ms_1440 ? ` — 1440 ${poll.ms_1440}ms` : '';
-          setLoadingStage(`SSW processando... ${sit || ''}${seq ? ` (seq ${seq})` : ''}${ms1440}`.trim());
+          setLoadingStage(`Gerando relatório... ${sit || ''}${seq ? ` (seq ${seq})` : ''}`.trim());
           continue;
         }
-        if (poll.ms_1440) {
-          setLoadingStage(`Aguardando conclusão no SSW (fila 1440)... — 1440 ${poll.ms_1440}ms`);
-        } else {
-          setLoadingStage('Aguardando conclusão no SSW (fila 1440)...');
-        }
+        setLoadingStage('Aguardando geração do relatório...');
       }
 
       if (!downloadAct) {
