@@ -232,7 +232,7 @@ export function ColetaEntrega() {
 
     setLoading(true);
     setElapsed(0);
-    setLoadingStage('Solicitando relatório no SSW...');
+    setLoadingStage('Iniciando geração do relatório...');
     setHasSearched(false);
     setGrupos([]);
     setSerie([]);
@@ -270,12 +270,12 @@ export function ColetaEntrega() {
           true
         );
         if (!poll?.success) {
-          setLoadingStage(poll?.message || 'Aguardando conclusão no SSW (fila 1440)...');
+          setLoadingStage(poll?.message || 'Aguardando geração do relatório...');
           continue;
         }
         if (poll.status === 'ready') {
           downloadAct = poll.download_act || null;
-          setLoadingStage('Relatório pronto no SSW. Baixando arquivo...');
+          setLoadingStage('Relatório pronto. Baixando arquivo...');
           break;
         }
         if (poll.status === 'running') {
@@ -291,12 +291,30 @@ export function ColetaEntrega() {
         throw new Error('Relatório 076 não ficou pronto no tempo esperado. Tente novamente.');
       }
 
-      setLoadingStage('Processando arquivo...');
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
-        true
-      );
+      let res: any;
+      if (modo === 'DETALHE') {
+        setLoadingStage('Baixando arquivo...');
+        const dl = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+          { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD_FILE', download_act: downloadAct }) },
+          true
+        );
+        if (!dl?.success) throw new Error(dl?.message || 'Erro ao baixar arquivo.');
+
+        setLoadingStage('Processando arquivo...');
+        res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+          { method: 'POST', body: JSON.stringify({ step: 'PARSE_FILE', download_act: downloadAct, modo }) },
+          true
+        );
+      } else {
+        setLoadingStage('Processando arquivo...');
+        res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+          { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
+          true
+        );
+      }
       clearInterval(timer);
       setElapsed(0);
       setLoadingStage('');
@@ -492,7 +510,7 @@ export function ColetaEntrega() {
                     <DialogDescription>
                       {confirmGerarDiffDias === 0
                         ? 'Para 1 dia, o relatório detalhado pode levar vários minutos e ainda assim ocorrer timeout.'
-                        : 'Para períodos maiores que 1 dia, o SSW gera um resumo por placa (sem CT-es). Mesmo assim, pode demorar.'}
+                        : 'Para períodos maiores que 1 dia, é gerado um resumo por placa (sem CT-es). Mesmo assim, pode demorar.'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="text-sm text-slate-600 dark:text-slate-400">
@@ -526,7 +544,7 @@ export function ColetaEntrega() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Para períodos de 1 dia, o painel traz o detalhe (com CT-es). Para períodos maiores que 1 dia, o SSW gera apenas um resumo por placa (sem CT-es).
+                    Para períodos de 1 dia, o painel traz o detalhe (com CT-es). Para períodos maiores que 1 dia, é gerado apenas um resumo por placa (sem CT-es).
                   </p>
                 </CardContent>
               </Card>
@@ -557,7 +575,7 @@ export function ColetaEntrega() {
                     <div className="flex gap-2">
                       <Button onClick={handleGerarClick} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
                         {loading ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{loadingStage ? `${loadingStage}${elapsed > 0 ? ` (${elapsed}s)` : ''}` : (elapsed > 0 ? `Aguardando... ${elapsed}s` : 'Processando...')}</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando arquivo{elapsed > 0 ? ` (${elapsed}s)` : ''}</>
                         ) : (
                           <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
                         )}
@@ -578,7 +596,7 @@ export function ColetaEntrega() {
                         <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                            Processando informações...
+                            {loadingStage || 'Gerando arquivo...'}
                           </p>
                           <div className="mt-2 bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
                             <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
@@ -1077,7 +1095,7 @@ export function ColetaEntrega() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Lista em tempo real de romaneios de entrega em trânsito (SSW0198).
+                    Lista em tempo real de romaneios de entrega em trânsito.
                   </p>
                 </CardContent>
               </Card>

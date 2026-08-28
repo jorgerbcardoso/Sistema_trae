@@ -251,6 +251,63 @@ if ($step !== 'RUN') {
         respondJson(['success' => true, 'status' => 'running', 'ms_1440' => $ms1440] + $match);
     }
 
+    if ($step === 'DOWNLOAD_FILE') {
+        $downloadActIn = trim((string)($input['download_act'] ?? ''));
+        if ($downloadActIn === '') respondJson(['success' => false, 'message' => 'download_act obrigatório.']);
+        $login = strtolower(trim((string)($currentUser['username'] ?? '')));
+        $tempPath = rtrim(sys_get_temp_dir(), "\\/") . DIRECTORY_SEPARATOR . 'presto_ce076_' . md5($domain . '|' . $login . '|' . $downloadActIn) . '.bin';
+
+        $t0 = microtime(true);
+        $dl = downloadFrom1440Act($downloadActIn);
+        $t1 = microtime(true);
+        if (!$dl || empty($dl['content']) || strlen((string)$dl['content']) < 100) {
+            respondJson(['success' => false, 'message' => 'Arquivo do relatório 076 vazio ou inválido.']);
+        }
+        @file_put_contents($tempPath, (string)$dl['content']);
+
+        respondJson([
+            'success' => true,
+            'status' => 'downloaded',
+            'download_act' => $downloadActIn,
+            'token' => basename($tempPath),
+            'temp_path' => $tempPath,
+            'filename' => (string)($dl['filename'] ?? ''),
+            'path' => (string)($dl['path'] ?? ''),
+            'bytes' => strlen((string)$dl['content']),
+            'ms_download' => (int)round(($t1 - $t0) * 1000),
+        ]);
+    }
+
+    if ($step === 'PARSE_FILE') {
+        $modoIn = strtoupper(trim((string)($input['modo'] ?? '')));
+        $downloadActIn = trim((string)($input['download_act'] ?? ''));
+        $login = strtolower(trim((string)($currentUser['username'] ?? '')));
+        $tempPath = rtrim(sys_get_temp_dir(), "\\/") . DIRECTORY_SEPARATOR . 'presto_ce076_' . md5($domain . '|' . $login . '|' . $downloadActIn) . '.bin';
+
+        if (!is_file($tempPath)) {
+            respondJson(['success' => false, 'message' => 'Arquivo temporário não encontrado. Gere novamente.']);
+        }
+        $raw = @file_get_contents($tempPath);
+        if (!is_string($raw) || $raw === '' || strlen($raw) < 100) {
+            respondJson(['success' => false, 'message' => 'Arquivo temporário vazio ou inválido. Gere novamente.']);
+        }
+
+        $file = (string)$raw;
+        $file = mb_convert_encoding($file, 'UTF-8', 'ISO-8859-1');
+        $file = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $file);
+        $file = str_replace("\r\n", "\n", str_replace("\r", "\n", $file));
+
+        $modo = in_array($modoIn, ['DETALHE', 'RESUMO'], true) ? $modoIn : 'DETALHE';
+        $runId = (string)((int)(microtime(true) * 1000));
+        dbg_ce504($runId, 'step_parse_start', ['downloadAct' => $downloadActIn, 'len' => strlen((string)$file), 'login' => $login, 'modo' => $modo]);
+
+        if ($modo === 'RESUMO') {
+            respondJson(['success' => false, 'message' => 'PARSE_FILE não é necessário para RESUMO.']);
+        }
+
+        goto __PARSE076__;
+    }
+
     if ($step === 'DOWNLOAD') {
         $downloadActIn = trim((string)($input['download_act'] ?? ''));
         $modoIn = strtoupper(trim((string)($input['modo'] ?? '')));

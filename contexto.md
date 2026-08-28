@@ -75,6 +75,9 @@ PADRÕES DE CÓDIGO CRÍTICOS:
      - `useConfirmDialog()` e `usePromptDialog()` exportados de `src/components/ui/alert-dialog.tsx`
    - Para avisos/erros informativos (sem pergunta), usar `toast` (sonner).
 
+6. TEXTOS DE STATUS:
+   - Evitar citar “SSW” nos textos de UI (botões/toasts/status). Preferir termos genéricos como “Gerando arquivo”, “Aguardando geração do relatório”, “Processando arquivo”.
+
 
 PADRÃO PARA TELAS COM FILTROS (DIALOG):
 
