@@ -7352,46 +7352,44 @@ export function Disponiveis() {
             );
           })()}
 
-          <Card
+          <div
             role="button"
             tabIndex={0}
             onClick={() => { if (!loadingLinhasOrigem) setLinhasHojeDialogOpen(true); }}
             onKeyDown={(e) => { if (!loadingLinhasOrigem && (e.key === 'Enter' || e.key === ' ')) setLinhasHojeDialogOpen(true); }}
-            className={`h-16 justify-center dark:bg-slate-900 dark:border-slate-700 transition-colors ${
+            className={`bg-card text-card-foreground border-border rounded-xl border shadow-sm h-16 px-3 flex items-center dark:bg-slate-900 dark:border-slate-700 transition-colors ${
               (loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
-            <CardContent className="w-full px-3 py-0 [&:last-child]:pb-0 flex items-center">
-              <div className="w-full flex items-center justify-between gap-3 min-w-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
-                    <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                  </div>
-                  <div className="min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
-                    <span className="font-semibold">
-                      {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? '...' : `${qtdLinhasHojeViaveis}/${linhasOrigem.length}`}
-                    </span>
-                    {' '}linha(s) com carregamento disponível para hoje
-                  </div>
+            <div className="w-full flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
+                  <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs h-8 border-rose-300 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (importandoCarregamentos) { toast.error('Aguarde: atualização do SSW em andamento.'); return; }
-                    void handleImportarVeiculos();
-                  }}
-                  disabled={importandoVeiculos}
-                  title="Importar proprietários, veículos e motoristas do SSW"
-                >
-                  {importandoVeiculos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Truck className="w-3.5 h-3.5 mr-1.5" />}
-                  Importar veículos recentes
-                </Button>
+                <div className="min-w-0 text-left text-sm text-slate-800 dark:text-slate-200 truncate">
+                  <span className="font-semibold">
+                    {(loadingLinhasOrigem || loadingLinhasHojeStatus) ? '...' : `${qtdLinhasHojeViaveis}/${linhasOrigem.length}`}
+                  </span>
+                  {' '}linha(s) com carregamento disponível para hoje
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-rose-300 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (importandoCarregamentos) { toast.error('Aguarde: atualização do SSW em andamento.'); return; }
+                  void handleImportarVeiculos();
+                }}
+                disabled={importandoVeiculos}
+                title="Importar proprietários, veículos e motoristas do SSW"
+              >
+                {importandoVeiculos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Truck className="w-3.5 h-3.5 mr-1.5" />}
+                Importar veículos recentes
+              </Button>
+            </div>
+          </div>
 
           <Dialog open={linhasHojeDialogOpen} onOpenChange={setLinhasHojeDialogOpen}>
             <DialogContent className="sm:max-w-[1100px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">

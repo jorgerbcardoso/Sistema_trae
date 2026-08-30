@@ -145,11 +145,22 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
     }
 
+    $prestoLib = '/var/www/html/lib/presto.php';
+    if (file_exists($prestoLib)) {
+        require_once $prestoLib;
+    }
+
     if (!function_exists('acento3')) {
         function acento3($str) {
             $s = (string)$str;
             $out = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
             return ($out === false || $out === null) ? $s : $out;
+        }
+    }
+
+    if (!function_exists('fmtnum')) {
+        function fmtnum($int, $length) {
+            return str_pad((string)(int)$int, (int)$length, "0", STR_PAD_LEFT);
         }
     }
 
