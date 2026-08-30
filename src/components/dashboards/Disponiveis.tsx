@@ -5277,6 +5277,7 @@ export function Disponiveis() {
     importandoVeiculosRef.current = true;
     setImportandoVeiculos(true);
     try {
+      toast.info('Importando veículos do SSW...');
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
         { method: 'POST', body: JSON.stringify({ acao: 'IMPORTAR_VEICULOS' }) },
@@ -7360,8 +7361,8 @@ export function Disponiveis() {
               (loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
-            <CardContent className="min-h-16 px-3 py-2">
-              <div className="h-full flex items-center justify-between gap-3 min-w-0">
+            <CardContent className="h-16 px-3 py-0 flex items-center">
+              <div className="w-full flex items-center justify-between gap-3 min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
                     <AlertCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
@@ -7377,8 +7378,12 @@ export function Disponiveis() {
                   size="sm"
                   variant="outline"
                   className="text-xs h-8 border-rose-300 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
-                  onClick={(e) => { e.stopPropagation(); void onImportarVeiculos(); }}
-                  disabled={importandoCarregamentos || importandoVeiculos}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (importandoCarregamentos) { toast.error('Aguarde: atualização do SSW em andamento.'); return; }
+                    void onImportarVeiculos();
+                  }}
+                  disabled={importandoVeiculos}
                   title="Importar proprietários, veículos e motoristas do SSW"
                 >
                   {importandoVeiculos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Truck className="w-3.5 h-3.5 mr-1.5" />}
