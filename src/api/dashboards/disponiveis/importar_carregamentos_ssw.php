@@ -138,42 +138,76 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
 }
 
 if ($acao === 'IMPORTAR_VEICULOS') {
-    ssw_login($domain);
     set_time_limit(600);
 
-    if (!function_exists('imp_ssw_prop') || !function_exists('imp_ssw_vei') || !function_exists('imp_ssw_mot')) {
-        respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
+    $dom = strtoupper(trim((string)$domain));
+    if ($dom === '' || !preg_match('/^[A-Z0-9_]+$/', $dom)) {
+        respondJson(['success' => false, 'message' => 'Domínio inválido para importação.']);
     }
 
-    $GLOBALS['g_sql'] = $conn;
+    $phpBin = '/usr/bin/php';
+    $script = '/var/www/html/imp_prop_veic.php';
+    $cwd = '/var/www/html';
 
-    if (!function_exists('acento3')) {
-        function acento3($str) {
-            $s = (string)$str;
-            $out = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
-            return ($out === false || $out === null) ? $s : $out;
+    if (!file_exists($phpBin)) {
+        respondJson(['success' => false, 'message' => 'PHP bin não encontrado em /usr/bin/php.']);
+    }
+    if (!file_exists($script)) {
+        respondJson(['success' => false, 'message' => 'Script imp_prop_veic.php não encontrado em /var/www/html.']);
+    }
+
+    $cmd = 'cd ' . escapeshellarg($cwd)
+        . ' && ' . escapeshellarg($phpBin)
+        . ' ' . escapeshellarg($script)
+        . ' ' . escapeshellarg($dom)
+        . ' ' . escapeshellarg('RECENTE')
+        . ' 2>&1';
+
+    $descriptorspec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+
+    $process = @proc_open($cmd, $descriptorspec, $pipes);
+    if (!is_resource($process)) {
+        respondJson(['success' => false, 'message' => 'Falha ao iniciar processo de importação.']);
+    }
+    @fclose($pipes[0]);
+    @stream_set_blocking($pipes[1], false);
+    @stream_set_blocking($pipes[2], false);
+
+    $out = '';
+    $err = '';
+    $timeoutSec = 120;
+    $start = time();
+    while (true) {
+        $out .= (string)@stream_get_contents($pipes[1]);
+        $err .= (string)@stream_get_contents($pipes[2]);
+        $status = @proc_get_status($process);
+        $running = is_array($status) ? (bool)($status['running'] ?? false) : false;
+        if (!$running) break;
+        if ((time() - $start) > $timeoutSec) {
+            @proc_terminate($process);
+            @usleep(200000);
+            @proc_terminate($process, 9);
+            break;
         }
+        @usleep(120000);
     }
 
-    if (!function_exists('fmtnum')) {
-        function fmtnum($int, $length) {
-            return str_pad((string)(int)$int, (int)$length, "0", STR_PAD_LEFT);
-        }
+    $out .= (string)@stream_get_contents($pipes[1]);
+    $err .= (string)@stream_get_contents($pipes[2]);
+    @fclose($pipes[1]);
+    @fclose($pipes[2]);
+    $exitCode = @proc_close($process);
+
+    $combined = trim($out . "\n" . $err);
+    if ((int)$exitCode !== 0) {
+        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: ' . ($combined !== '' ? $combined : ('exit_code=' . (int)$exitCode))]);
     }
 
-    try {
-        imp_ssw_prop();
-        imp_ssw_vei();
-        imp_ssw_mot();
-    } catch (Throwable $e) {
-        $pgErr = '';
-        try { $pgErr = (string)@pg_last_error($conn); } catch (Throwable $ee) {}
-        $msg = 'Erro ao importar veículos: ' . $e->getMessage();
-        if (trim($pgErr) !== '') $msg .= ' | pg_last_error: ' . $pgErr;
-        respondJson(['success' => false, 'message' => $msg]);
-    }
-
-    respondJson(['success' => true]);
+    respondJson(['success' => true, 'output' => $combined]);
 }
 
 ssw_login($domain);
