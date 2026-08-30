@@ -145,11 +145,6 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
     }
 
-    $prestoLib = '/var/www/html/lib/presto.php';
-    if (file_exists($prestoLib)) {
-        require_once $prestoLib;
-    }
-
     if (!function_exists('acento3')) {
         function acento3($str) {
             $s = (string)$str;
