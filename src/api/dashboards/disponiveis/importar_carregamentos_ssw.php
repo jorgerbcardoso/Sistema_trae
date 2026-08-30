@@ -19,12 +19,75 @@ $input       = getRequestInput();
 
 $conn = connect();
 
+function tabelaExisteImport($conn, string $tableName): bool {
+    $t = strtolower(trim($tableName));
+    if ($t === '') return false;
+    $res = sql(
+        "SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower($1)
+         LIMIT 1",
+        [$t],
+        $conn
+    );
+    return ($res && pg_num_rows($res) > 0);
+}
+
+function getTabelaUnidadesDominioImport($conn, string $domain): string {
+    $domain = trim((string)$domain);
+    $t1 = $domain . '_unidade';
+    $t2 = $domain . '_unidades';
+    if (tabelaExisteImport($conn, $t1)) return $t1;
+    if (tabelaExisteImport($conn, $t2)) return $t2;
+    return $t1;
+}
+
+function parseListaUnidadesCompartImport(string $csv): array {
+    $csv = strtoupper(trim((string)$csv));
+    if ($csv === '') return [];
+    $parts = preg_split('/[,\s;]+/', $csv);
+    if (!is_array($parts)) return [];
+    $out = [];
+    foreach ($parts as $p) {
+        $u = strtoupper(trim((string)$p));
+        if ($u === '') continue;
+        if (!preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+        $out[$u] = true;
+    }
+    return array_keys($out);
+}
+
+function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
+    $map = [];
+    $tblUnidade = trim((string)$tblUnidade);
+    if ($tblUnidade === '') return $map;
+    $res = sql(
+        "SELECT sigla, unidades_compart
+         FROM {$tblUnidade}
+         WHERE COALESCE(TRIM(unidades_compart), '') <> ''",
+        [],
+        $conn
+    );
+    while ($res && ($row = pg_fetch_assoc($res))) {
+        $main = strtoupper(trim((string)($row['sigla'] ?? '')));
+        if ($main === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $main)) continue;
+        $lista = parseListaUnidadesCompartImport((string)($row['unidades_compart'] ?? ''));
+        foreach ($lista as $u) {
+            if (!isset($map[$u])) $map[$u] = $main;
+        }
+    }
+    return $map;
+}
+
 $acao = strtoupper(trim((string)($input['acao'] ?? '')));
 if ($acao === 'EXCLUIR_INEXISTENTES') {
     $tabela = "{$domain}_carregamento";
+    $tabelaCap = "{$domain}_carregamento_capacidade";
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+    @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
     $origens = $input['origens_ssw'] ?? [];
     if (!is_array($origens)) $origens = [];
     $origens = array_values(array_unique(array_filter(array_map(function ($v) {
@@ -42,6 +105,16 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
     }, $origens));
 
     $loginEsc = pg_escape_string($conn, $login);
+    $extra = '';
+    if (tabelaExisteImport($conn, $tabelaCap)) {
+        $extra = " AND NOT EXISTS (
+            SELECT 1
+            FROM {$tabelaCap} cap
+            WHERE cap.unidade = {$tabela}.unidade
+              AND cap.seq_carregamento = {$tabela}.seq_carregamento
+              AND COALESCE(cap.simulado, FALSE) = TRUE
+        )";
+    }
     $resUpd = pg_query(
         $conn,
         "UPDATE {$tabela}
@@ -51,7 +124,8 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
          WHERE UPPER(unidade) = '{$unidadeEsc}'
            AND data_finalizacao IS NULL
            AND origem_ssw IS NOT NULL AND origem_ssw <> ''
-           AND UPPER(origem_ssw) IN ({$in})"
+           AND UPPER(origem_ssw) IN ({$in})
+           {$extra}"
     );
     if ($resUpd === false) {
         respondJson(['success' => false, 'message' => 'Erro ao finalizar carregamentos inexistentes.']);
@@ -90,6 +164,9 @@ $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap = "{$domain}_carregamento_capacidade";
 $tabelaLinha = "{$domain}_linha";
 $domainUpper = strtoupper(trim((string)$domain));
+
+$tblUnidade = getTabelaUnidadesDominioImport($conn, $domain);
+$mapDestinoCompart = buildMapaDestinoCompartilhadoImport($conn, $tblUnidade);
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
@@ -557,6 +634,13 @@ foreach ($placas_ssw as $placa) {
         }
     }
 
+    $destinoFromPlacaEf = null;
+    if ($destinoFromPlaca !== null && $destinoFromPlaca !== '') {
+        $k = strtoupper(trim((string)$destinoFromPlaca));
+        $destinoFromPlacaEf = (string)($mapDestinoCompart[$k] ?? $k);
+        $destinoFromPlacaEf = strtoupper(trim((string)$destinoFromPlacaEf));
+    }
+
     $placaProvEsc = pg_escape_string($conn, $placaProvisoriaSalvar);
 
     $captura = null;
@@ -657,7 +741,13 @@ foreach ($placas_ssw as $placa) {
     $info = $carregamentos[$placa] ?? null;
     $ctes = $info['ctes'] ?? [];
 
-    $destinos = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
+    $destinosRaw = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
+    $destinos = [];
+    foreach ($destinosRaw as $d) {
+        $k = strtoupper(trim((string)$d));
+        if ($k === '') continue;
+        $destinos[] = (string)($mapDestinoCompart[$k] ?? $k);
+    }
     $destinoCar = null;
     $unidadesCarCsv = '';
     $destUnicos = array_values(array_unique(array_filter($destinos)));
@@ -681,8 +771,8 @@ foreach ($placas_ssw as $placa) {
             });
             $destinoCar = $candidatos[0] ?? null;
         } else {
-            if ($destinoFromPlaca !== null && $destinoFromPlaca !== '' && in_array(strtoupper($destinoFromPlaca), $destUnicos, true)) {
-                $destinoCar = strtoupper($destinoFromPlaca);
+            if ($destinoFromPlacaEf !== null && $destinoFromPlacaEf !== '' && in_array(strtoupper($destinoFromPlacaEf), $destUnicos, true)) {
+                $destinoCar = strtoupper($destinoFromPlacaEf);
             } else {
                 $freq = array_count_values($destinos);
                 arsort($freq);
@@ -694,8 +784,8 @@ foreach ($placas_ssw as $placa) {
         sort($outras);
         $unidadesCarCsv = implode(',', $outras);
     } else {
-        if ($destinoFromPlaca !== null && $destinoFromPlaca !== '') {
-            $destinoCar = strtoupper($destinoFromPlaca);
+        if ($destinoFromPlacaEf !== null && $destinoFromPlacaEf !== '') {
+            $destinoCar = strtoupper($destinoFromPlacaEf);
         }
         $unidadesCarCsv = '';
     }

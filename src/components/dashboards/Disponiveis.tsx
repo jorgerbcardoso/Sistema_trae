@@ -2548,7 +2548,7 @@ function CardCarregamento({
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
+                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest_display ?? cte.sigla_dest ?? '-'}</span>
                         <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -4572,7 +4572,7 @@ function CarregamentoArea({
                           <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest || '-'}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest_display ?? cte.sigla_dest ?? '-'}</span>
                           <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                           <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{Number(cte.vlr_frete ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{Number(cte.peso ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

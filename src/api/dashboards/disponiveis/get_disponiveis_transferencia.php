@@ -20,6 +20,76 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
+function tabelaExiste($conn, string $tableName): bool {
+    $t = strtolower(trim($tableName));
+    if ($t === '') return false;
+    $res = sql(
+        "SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower($1)
+         LIMIT 1",
+        [$t],
+        $conn
+    );
+    return ($res && pg_num_rows($res) > 0);
+}
+
+function getTabelaUnidadesDominio($conn, string $domain): string {
+    $domain = trim((string)$domain);
+    $t1 = $domain . '_unidade';
+    $t2 = $domain . '_unidades';
+    if (tabelaExiste($conn, $t1)) return $t1;
+    if (tabelaExiste($conn, $t2)) return $t2;
+    return $t1;
+}
+
+function parseListaUnidadesCompart(string $csv): array {
+    $csv = strtoupper(trim((string)$csv));
+    if ($csv === '') return [];
+    $parts = preg_split('/[,\s;]+/', $csv);
+    if (!is_array($parts)) return [];
+    $out = [];
+    foreach ($parts as $p) {
+        $u = strtoupper(trim((string)$p));
+        if ($u === '') continue;
+        if (!preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+        $out[$u] = true;
+    }
+    return array_keys($out);
+}
+
+function buildMapaDestinoCompartilhado($conn, string $tblUnidade): array {
+    $map = [];
+    $tblUnidade = trim((string)$tblUnidade);
+    if ($tblUnidade === '') return $map;
+    $res = sql(
+        "SELECT sigla, unidades_compart
+         FROM {$tblUnidade}
+         WHERE COALESCE(TRIM(unidades_compart), '') <> ''",
+        [],
+        $conn
+    );
+    while ($res && ($row = pg_fetch_assoc($res))) {
+        $main = strtoupper(trim((string)($row['sigla'] ?? '')));
+        if ($main === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $main)) continue;
+        $lista = parseListaUnidadesCompart((string)($row['unidades_compart'] ?? ''));
+        foreach ($lista as $u) {
+            if (!isset($map[$u])) $map[$u] = $main;
+        }
+    }
+    return $map;
+}
+
+function destinoEfetivoEExibicao(string $destinoOriginal, array $map): array {
+    $orig = strtoupper(trim((string)$destinoOriginal));
+    if ($orig === '') return ['', '', ''];
+    $main = (string)($map[$orig] ?? $orig);
+    $main = strtoupper(trim($main));
+    $display = ($main !== '' && $main !== $orig) ? ($main . ' (' . $orig . ')') : $orig;
+    return [$main, $orig, $display];
+}
+
 function destinoBloqueadoRve(string $domain, string $siglaAtual, string $destino): bool {
     if (strtoupper(trim($domain)) !== 'RVE') return false;
 
@@ -41,6 +111,8 @@ ssw_login($domain);
 set_time_limit(120);
 ini_set('memory_limit', '256M');
 $agora = time();
+$tblUnidade = getTabelaUnidadesDominio($g_sql, $domain);
+$mapDestinoCompart = buildMapaDestinoCompartilhado($g_sql, $tblUnidade);
 
 register_shutdown_function(function() {
     $err = error_get_last();
@@ -189,11 +261,11 @@ if ($headerLine !== null) {
     }
 
     $nomeUnidadeCache = [];
-    $getNomeUnidade = static function(string $siglaUnid) use (&$nomeUnidadeCache, $domain, $g_sql): string {
+    $getNomeUnidade = static function(string $siglaUnid) use (&$nomeUnidadeCache, $tblUnidade, $g_sql): string {
         $k = strtoupper(trim($siglaUnid));
         if ($k === '') return '';
         if (array_key_exists($k, $nomeUnidadeCache)) return (string)$nomeUnidadeCache[$k];
-        $res = sql("SELECT nome FROM {$domain}_unidade WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$k], $g_sql);
+        $res = sql("SELECT nome FROM {$tblUnidade} WHERE UPPER(sigla) = UPPER($1) LIMIT 1", [$k], $g_sql);
         $nome = '';
         if ($res && pg_num_rows($res) > 0) {
             $row = pg_fetch_assoc($res);
@@ -236,10 +308,11 @@ if ($headerLine !== null) {
         $manifesto   = $getCell($arr, $idx, ['MANIFESTO/END']);
         $prevChegada = $getCell($arr, $idx, ['PREVCHEGADA']);
 
-        $unidadeDest = strtoupper($getCell($arr, $idx, ['DESTINO']));
-        if ($unidadeDest === '0') continue;
-        if (destinoBloqueadoRve($domain, $sigla, $unidadeDest)) continue;
-        $nomeDest    = $getNomeUnidade($unidadeDest);
+        $unidadeDestOrig = strtoupper($getCell($arr, $idx, ['DESTINO']));
+        if ($unidadeDestOrig === '0') continue;
+        if (destinoBloqueadoRve($domain, $sigla, $unidadeDestOrig)) continue;
+        [$unidadeDest, $unidadeDestOriginal, $unidadeDestExibicao] = destinoEfetivoEExibicao($unidadeDestOrig, $mapDestinoCompart);
+        $nomeDest = $getNomeUnidade($unidadeDest);
 
         $emTransito = $prevChegada !== '';
 
@@ -309,6 +382,8 @@ if ($headerLine !== null) {
             'prevChegada'    => $prevChegada,
             'emTransito'     => $emTransito,
             'unidadeDest'    => $unidadeDest,
+            'unidadeDestOriginal' => $unidadeDestOriginal,
+            'unidadeDestExibicao' => $unidadeDestExibicao,
             'nomeDest'       => $nomeDest,
             'indicadorSaida' => $indicadorSaida,
             'atrasoTransf'   => $atrasoTransf,
@@ -396,6 +471,8 @@ if ($headerLine !== null) {
 
         if (trim((string)$unidadeDestAtual) === '0') continue;
         if (destinoBloqueadoRve($domain, $sigla, (string)$unidadeDestAtual)) continue;
+        [$unidadeDestEf, $unidadeDestOriginal, $unidadeDestExibicao] = destinoEfetivoEExibicao((string)$unidadeDestAtual, $mapDestinoCompart);
+        $nomeDestEf = $getNomeUnidade($unidadeDestEf);
 
         $ctes[] = [
             'ctrc'           => $ctrc,
@@ -423,8 +500,10 @@ if ($headerLine !== null) {
             'manifesto'      => $manifesto,
             'prevChegada'    => $prevChegada,
             'emTransito'     => $emTransito,
-            'unidadeDest'    => $unidadeDestAtual,
-            'nomeDest'       => $nomeDestAtual,
+            'unidadeDest'    => $unidadeDestEf,
+            'unidadeDestOriginal' => $unidadeDestOriginal,
+            'unidadeDestExibicao' => $unidadeDestExibicao,
+            'nomeDest'       => ($nomeDestEf !== '' ? $nomeDestEf : $nomeDestAtual),
             'indicadorSaida' => $indicadorSaida,
             'atrasoTransf'   => $atrasoTransf,
         ];
