@@ -7357,11 +7357,11 @@ export function Disponiveis() {
             tabIndex={0}
             onClick={() => { if (!loadingLinhasOrigem) setLinhasHojeDialogOpen(true); }}
             onKeyDown={(e) => { if (!loadingLinhasOrigem && (e.key === 'Enter' || e.key === ' ')) setLinhasHojeDialogOpen(true); }}
-            className={`dark:bg-slate-900 dark:border-slate-700 transition-colors ${
+            className={`h-16 flex items-center dark:bg-slate-900 dark:border-slate-700 transition-colors ${
               (loadingLinhasOrigem || loadingLinhasHojeStatus) ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/70'
             }`}
           >
-            <CardContent className="h-16 px-3 py-0 flex items-center">
+            <CardContent className="w-full p-0 px-3 flex items-center">
               <div className="w-full flex items-center justify-between gap-3 min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-900/40 shrink-0">
@@ -7381,7 +7381,7 @@ export function Disponiveis() {
                   onClick={(e) => {
                     e.stopPropagation();
                     if (importandoCarregamentos) { toast.error('Aguarde: atualização do SSW em andamento.'); return; }
-                    void onImportarVeiculos();
+                    void handleImportarVeiculos();
                   }}
                   disabled={importandoVeiculos}
                   title="Importar proprietários, veículos e motoristas do SSW"
