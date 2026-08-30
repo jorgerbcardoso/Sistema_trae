@@ -1440,6 +1440,7 @@ interface CarregamentoAreaProps {
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (placa: string) => Promise<boolean>;
+  onExcluirCarregamentoFinalizado: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onCarregarHub: (carregamento: Carregamento) => void;
@@ -1448,6 +1449,8 @@ interface CarregamentoAreaProps {
   onRecarregarCarregamentos: () => Promise<void>;
   onImportarCarregamentos: () => Promise<any>;
   importandoCarregamentos: boolean;
+  onImportarVeiculos: () => Promise<any>;
+  importandoVeiculos: boolean;
   importacaoAutomatica: boolean;
   onToggleImportacaoAutomatica: (ativo: boolean) => void;
   onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
@@ -3785,6 +3788,7 @@ function CarregamentoArea({
   onCriarCarregamento,
   onFinalizarCarregamento,
   onExcluirCarregamento,
+  onExcluirCarregamentoFinalizado,
   onRemoverCte,
   onCarregarSSW,
   onCarregarHub,
@@ -3793,6 +3797,8 @@ function CarregamentoArea({
   onRecarregarCarregamentos,
   onImportarCarregamentos,
   importandoCarregamentos,
+  onImportarVeiculos,
+  importandoVeiculos,
   importacaoAutomatica,
   onToggleImportacaoAutomatica,
   onCarregamentoAutomatico,
@@ -4309,12 +4315,13 @@ function CarregamentoArea({
                       <th className="px-3 py-2 text-left"><CalTh col="inicio">Início</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="fim">Fim</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="tempo" align="right">Tempo</CalTh></th>
+                      <th className="px-2 py-2 text-center w-8" />
                     </tr>
                   </thead>
                   <tbody>
                     {calPageItems.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
+                        <td colSpan={12} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
                       </tr>
                     ) : calPageItems.map((c) => {
                       const iniK = toKey(c.data_criacao);
@@ -4362,6 +4369,21 @@ function CarregamentoArea({
                           <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{iniK ? dtLabelSemAno(iniK, c.hora_criacao) : ''}</td>
                           <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabelSemAno(fimK, c.hora_finalizacao) : ''}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
+                          <td className="px-2 py-2 text-center">
+                            {isFinalizado ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-red-200 dark:hover:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void onExcluirCarregamentoFinalizado(c);
+                                }}
+                                title="Excluir carregamento finalizado"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            ) : null}
+                          </td>
                         </tr>
                       );
                     })}
@@ -4377,7 +4399,7 @@ function CarregamentoArea({
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.merc)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.peso, 2)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.cub, 3)}</td>
-                      <td className="px-3 py-2" colSpan={3} />
+                      <td className="px-3 py-2" colSpan={4} />
                     </tr>
                   </tfoot>
                 </table>
@@ -4748,10 +4770,21 @@ function CarregamentoArea({
                 variant="outline"
                 className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
                 onClick={() => setModalImportarAberto(true)}
-                disabled={importandoCarregamentos}
+              disabled={importandoCarregamentos || importandoVeiculos}
               >
                 <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
               </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-rose-300 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              onClick={() => void onImportarVeiculos()}
+              disabled={importandoCarregamentos || importandoVeiculos}
+              title="Importar proprietários, veículos e motoristas do SSW"
+            >
+              {importandoVeiculos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Truck className="w-3.5 h-3.5 mr-1.5" />}
+              Importar novos veículos
+            </Button>
               <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
                 <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
@@ -5013,6 +5046,8 @@ export function Disponiveis() {
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const importandoCarregamentosRef = useRef(false);
+  const [importandoVeiculos, setImportandoVeiculos] = useState(false);
+  const importandoVeiculosRef = useRef(false);
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
@@ -5248,6 +5283,37 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos]);
 
+  const handleImportarVeiculos = useCallback(async () => {
+    if (importandoVeiculosRef.current) return { success: false, message: 'Importação já em andamento.' };
+    importandoVeiculosRef.current = true;
+    setImportandoVeiculos(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'IMPORTAR_VEICULOS' }) },
+        true
+      );
+      if (res?.success) {
+        await Promise.all([
+          carregar(),
+          carregarEntrega(),
+          carregarCarregamentos(),
+          carregarCarregamentosCalendario(),
+        ]);
+        toast.success('Veículos importados com sucesso.');
+      } else {
+        toast.error(res?.message || 'Erro ao importar veículos');
+      }
+      return res;
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao importar veículos');
+      return { success: false, message: e?.message || 'Erro ao importar veículos' };
+    } finally {
+      importandoVeiculosRef.current = false;
+      setImportandoVeiculos(false);
+    }
+  }, [carregar, carregarEntrega, carregarCarregamentos, carregarCarregamentosCalendario]);
+
   const importarCarregamentosSSWObrigatorio = useCallback(async () => {
     const res = await handleImportarCarregamentos();
     if (!res?.success) {
@@ -5339,6 +5405,39 @@ export function Disponiveis() {
       return false;
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
+
+  const handleExcluirCarregamentoFinalizado = useCallback(async (carregamento: Carregamento) => {
+    const placa = String(carregamento?.placa_provisoria ?? '').trim().toUpperCase();
+    const seqCarregamento = Number((carregamento as any)?.seq_carregamento ?? 0) || 0;
+    if (!placa && seqCarregamento <= 0) return false;
+
+    const ok = await confirmar({
+      title: 'Excluir carregamento finalizado?',
+      description: `Excluir o carregamento finalizado "${placa}" da base?\n\nEssa ação remove o carregamento e não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return false;
+
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento_finalizado', unidade: sigla, placa, seq_carregamento: seqCarregamento || undefined }) },
+        true
+      );
+      if (res?.success) {
+        toast.success(`Carregamento ${placa} excluído.`);
+        await Promise.all([carregarCarregamentos(), carregarCarregamentosCalendario()]);
+        return true;
+      }
+      toast.error(res?.message || 'Erro ao excluir carregamento');
+      return false;
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao excluir carregamento');
+      return false;
+    }
+  }, [confirmar, carregarCarregamentos, carregarCarregamentosCalendario, sigla]);
 
   const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{
     ok: boolean;
@@ -7554,6 +7653,7 @@ export function Disponiveis() {
             onCriarCarregamento={handleCriarCarregamento}
             onFinalizarCarregamento={handleFinalizarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
+            onExcluirCarregamentoFinalizado={handleExcluirCarregamentoFinalizado}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
             onCarregarHub={abrirHub}
@@ -7562,6 +7662,8 @@ export function Disponiveis() {
             onRecarregarCarregamentos={carregarCarregamentos}
             onImportarCarregamentos={handleImportarCarregamentos}
             importandoCarregamentos={importandoCarregamentos}
+            onImportarVeiculos={handleImportarVeiculos}
+            importandoVeiculos={importandoVeiculos}
             importacaoAutomatica={importacaoAutomatica}
             onToggleImportacaoAutomatica={setImportacaoAutomatica}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}

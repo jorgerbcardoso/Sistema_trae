@@ -63,6 +63,25 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
     ]);
 }
 
+if ($acao === 'IMPORTAR_VEICULOS') {
+    ssw_login($domain);
+    set_time_limit(600);
+
+    if (!function_exists('imp_ssw_prop') || !function_exists('imp_ssw_vei') || !function_exists('imp_ssw_mot')) {
+        respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
+    }
+
+    try {
+        imp_ssw_prop();
+        imp_ssw_vei();
+        imp_ssw_mot();
+    } catch (Throwable $e) {
+        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: ' . $e->getMessage()]);
+    }
+
+    respondJson(['success' => true]);
+}
+
 ssw_login($domain);
 set_time_limit(300);
 
@@ -134,6 +153,103 @@ if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPla
     }
 }
 $placas_ssw = array_values(array_unique($placas_ssw));
+
+$veiculosImportadosAuto = false;
+$veiculosFaltantes = [];
+if ($domainUpper === 'RVE') {
+    $sufixos = [];
+    foreach ($placas_ssw as $p) {
+        $p = strtoupper(trim((string)$p));
+        if ($p === '') continue;
+        if (!preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $p)) continue;
+        $suf = substr($p, 3, 4);
+        if ($suf !== '') $sufixos[$suf] = true;
+    }
+    $sufixos = array_keys($sufixos);
+    if (count($sufixos) > 0 && function_exists('imp_ssw_prop') && function_exists('imp_ssw_vei') && function_exists('imp_ssw_mot')) {
+        $found = [];
+        foreach (array_chunk($sufixos, 500) as $chunk) {
+            $ph = [];
+            $params = [];
+            $i = 1;
+            foreach ($chunk as $suf) {
+                $ph[] = '$' . $i;
+                $params[] = $suf;
+                $i += 1;
+            }
+            if (empty($ph)) continue;
+            $q = "SELECT DISTINCT RIGHT(UPPER(placa), 4) AS suf FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) IN (" . implode(',', $ph) . ")";
+            $r = @pg_query_params($conn, $q, $params);
+            if ($r) {
+                while ($row = pg_fetch_assoc($r)) {
+                    $s = strtoupper(trim((string)($row['suf'] ?? '')));
+                    if ($s !== '') $found[$s] = true;
+                }
+            }
+        }
+        $missing = [];
+        foreach ($sufixos as $suf) {
+            if (!isset($found[$suf])) $missing[] = $suf;
+        }
+        if (count($missing) > 0) {
+            $veiculosFaltantes = $missing;
+            try {
+                imp_ssw_prop();
+                imp_ssw_vei();
+                imp_ssw_mot();
+                $veiculosImportadosAuto = true;
+            } catch (Throwable $e) {
+                $veiculosImportadosAuto = false;
+            }
+        }
+    }
+} else {
+    $placasCheck = [];
+    foreach ($placas_ssw as $p) {
+        $p = strtoupper(trim((string)$p));
+        if ($p === '') continue;
+        if (!preg_match('/^[A-Z0-9]{7}$/', $p)) continue;
+        $placasCheck[$p] = true;
+    }
+    $placasCheck = array_keys($placasCheck);
+    if (count($placasCheck) > 0 && function_exists('imp_ssw_prop') && function_exists('imp_ssw_vei') && function_exists('imp_ssw_mot')) {
+        $found = [];
+        foreach (array_chunk($placasCheck, 500) as $chunk) {
+            $ph = [];
+            $params = [];
+            $i = 1;
+            foreach ($chunk as $placa) {
+                $ph[] = '$' . $i;
+                $params[] = $placa;
+                $i += 1;
+            }
+            if (empty($ph)) continue;
+            $q = "SELECT UPPER(placa) AS placa FROM {$tabelaVeiculo} WHERE UPPER(placa) IN (" . implode(',', $ph) . ")";
+            $r = @pg_query_params($conn, $q, $params);
+            if ($r) {
+                while ($row = pg_fetch_assoc($r)) {
+                    $pl = strtoupper(trim((string)($row['placa'] ?? '')));
+                    if ($pl !== '') $found[$pl] = true;
+                }
+            }
+        }
+        $missing = [];
+        foreach ($placasCheck as $placa) {
+            if (!isset($found[$placa])) $missing[] = $placa;
+        }
+        if (count($missing) > 0) {
+            $veiculosFaltantes = $missing;
+            try {
+                imp_ssw_prop();
+                imp_ssw_vei();
+                imp_ssw_mot();
+                $veiculosImportadosAuto = true;
+            } catch (Throwable $e) {
+                $veiculosImportadosAuto = false;
+            }
+        }
+    }
+}
 
 $unidadeEsc = pg_escape_string($conn, $unidade);
 $finalizadosSumiramSsw = 0;

@@ -11,9 +11,9 @@ $acao   = $input['acao'] ?? '';
 
 $currentUser = getCurrentUser();
 $unidade = strtoupper(trim(
-    $currentUser['unidade_atual']
+    $input['unidade']
+    ?? $currentUser['unidade_atual']
     ?? $currentUser['unidade']
-    ?? $input['unidade']
     ?? ''
 ));
 $login = $currentUser['username'] ?? $auth['user']['username'] ?? '';
@@ -756,6 +756,59 @@ if ($acao === 'deletar_carregamento') {
         );
     }
 
+    respondJson(['success' => true, 'deleted' => $deleted]);
+}
+
+// ─── Ação: deletar carregamento finalizado (exclusão física) ──────────────────
+if ($acao === 'deletar_carregamento_finalizado') {
+    $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+    $seqCarreg = (int)($input['seq_carregamento'] ?? 0);
+    if ($placa === '' && $seqCarreg <= 0) {
+        respondJson(['success' => false, 'message' => 'Placa ou seq_carregamento não informado.']);
+    }
+
+    if ($seqCarreg > 0) {
+        $resDel = sql(
+            "DELETE FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NOT NULL",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        if (!$resDel) {
+            respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento finalizado.']);
+        }
+        $deleted = pg_affected_rows($resDel);
+        sql(
+            "DELETE FROM {$tabelaCap}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        respondJson(['success' => true, 'deleted' => $deleted]);
+    }
+
+    $resDel = sql(
+        "DELETE FROM {$tabela}
+         WHERE unidade = \$1
+           AND placa_provisoria = \$2
+           AND data_finalizacao IS NOT NULL",
+        [$unidade, $placa],
+        $conn
+    );
+    if (!$resDel) {
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento finalizado.']);
+    }
+    $deleted = pg_affected_rows($resDel);
+    sql(
+        "DELETE FROM {$tabelaCap}
+         WHERE unidade = \$1
+           AND placa_provisoria = \$2",
+        [$unidade, $placa],
+        $conn
+    );
     respondJson(['success' => true, 'deleted' => $deleted]);
 }
 
