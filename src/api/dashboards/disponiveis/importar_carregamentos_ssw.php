@@ -145,6 +145,8 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
     }
 
+    $GLOBALS['g_sql'] = $conn;
+
     if (!function_exists('acento3')) {
         function acento3($str) {
             $s = (string)$str;
@@ -164,7 +166,11 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         imp_ssw_vei();
         imp_ssw_mot();
     } catch (Throwable $e) {
-        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: ' . $e->getMessage()]);
+        $pgErr = '';
+        try { $pgErr = (string)@pg_last_error($conn); } catch (Throwable $ee) {}
+        $msg = 'Erro ao importar veículos: ' . $e->getMessage();
+        if (trim($pgErr) !== '') $msg .= ' | pg_last_error: ' . $pgErr;
+        respondJson(['success' => false, 'message' => $msg]);
     }
 
     respondJson(['success' => true]);
