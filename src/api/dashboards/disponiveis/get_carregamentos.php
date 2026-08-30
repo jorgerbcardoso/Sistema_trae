@@ -10,9 +10,9 @@ $input   = getRequestInput();
 
 $currentUser = getCurrentUser();
 $unidade = strtoupper(trim(
-    $currentUser['unidade_atual']
+    $input['unidade']
+    ?? $currentUser['unidade_atual']
     ?? $currentUser['unidade']
-    ?? $input['unidade']
     ?? ''
 ));
 

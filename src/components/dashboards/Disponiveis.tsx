@@ -3859,16 +3859,46 @@ function CarregamentoArea({
   }, [calOpen]);
 
   const ultimosDias = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
+    let base = new Date();
+    base.setHours(0, 0, 0, 0);
+
+    const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
+    let maxTs = base.getTime();
+    for (const c of list) {
+      const keys = [String((c as any)?.data_criacao ?? ''), String((c as any)?.data_finalizacao ?? '')]
+        .map((s) => s.trim().slice(0, 10))
+        .filter(Boolean);
+      for (const k of keys) {
+        const m = k.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) continue;
+        const t = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 0, 0, 0, 0).getTime();
+        if (!Number.isNaN(t) && t > maxTs) maxTs = t;
+      }
+    }
+    if (maxTs > base.getTime()) base = new Date(maxTs);
+
     const arr: string[] = [];
     for (let i = 29; i >= 0; i -= 1) {
-      const x = new Date(d);
-      x.setDate(d.getDate() - i);
+      const x = new Date(base);
+      x.setDate(base.getDate() - i);
       arr.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`);
     }
     return arr;
-  }, []);
+  }, [carregamentosCalendario]);
+
+  useEffect(() => {
+    const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
+    if (list.length === 0) return;
+    const lastKey = ultimosDias[ultimosDias.length - 1];
+    if (!lastKey) return;
+    setDiaSel((prev) => {
+      const p = String(prev ?? '').trim();
+      if (!p) return lastKey;
+      const min = ultimosDias[0];
+      if (min && (p < min || p > lastKey)) return lastKey;
+      return p;
+    });
+  }, [carregamentosCalendario, ultimosDias]);
 
   const toKey = (v: any): string => {
     const s = String(v ?? '').trim();
