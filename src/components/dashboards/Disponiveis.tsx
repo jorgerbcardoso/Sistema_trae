@@ -5292,7 +5292,10 @@ export function Disponiveis() {
         ]);
         toast.success('Veículos importados com sucesso.');
       } else {
-        toast.error(res?.message || 'Erro ao importar veículos');
+        toast.error(res?.message ? String(res.message) : 'Erro ao importar veículos');
+        if (res?.details) {
+          try { console.error('IMPORTAR_VEICULOS details:', res.details); } catch {}
+        }
       }
       return res;
     } catch (e: any) {

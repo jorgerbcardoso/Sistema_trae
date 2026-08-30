@@ -156,17 +156,20 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Script imp_prop_veic.php não encontrado em /var/www/html.']);
     }
 
+    $tmpDir = sys_get_temp_dir();
+    if (!is_string($tmpDir) || trim($tmpDir) === '') $tmpDir = '/tmp';
+    $logFile = rtrim($tmpDir, '/') . '/imp_prop_veic_' . strtolower($dom) . '_' . date('Ymd_His') . '_' . mt_rand(1000, 9999) . '.log';
+
     $cmd = 'cd ' . escapeshellarg($cwd)
         . ' && ' . escapeshellarg($phpBin)
         . ' ' . escapeshellarg($script)
         . ' ' . escapeshellarg($dom)
-        . ' ' . escapeshellarg('RECENTE')
-        . ' 2>&1';
+        . ' ' . escapeshellarg('RECENTE');
 
     $descriptorspec = [
         0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
+        1 => ['file', $logFile, 'w'],
+        2 => ['file', $logFile, 'a'],
     ];
 
     $process = @proc_open($cmd, $descriptorspec, $pipes);
@@ -174,20 +177,16 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Falha ao iniciar processo de importação.']);
     }
     @fclose($pipes[0]);
-    @stream_set_blocking($pipes[1], false);
-    @stream_set_blocking($pipes[2], false);
 
-    $out = '';
-    $err = '';
     $timeoutSec = 120;
     $start = time();
+    $timedOut = false;
     while (true) {
-        $out .= (string)@stream_get_contents($pipes[1]);
-        $err .= (string)@stream_get_contents($pipes[2]);
         $status = @proc_get_status($process);
         $running = is_array($status) ? (bool)($status['running'] ?? false) : false;
         if (!$running) break;
         if ((time() - $start) > $timeoutSec) {
+            $timedOut = true;
             @proc_terminate($process);
             @usleep(200000);
             @proc_terminate($process, 9);
@@ -196,18 +195,30 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         @usleep(120000);
     }
 
-    $out .= (string)@stream_get_contents($pipes[1]);
-    $err .= (string)@stream_get_contents($pipes[2]);
-    @fclose($pipes[1]);
-    @fclose($pipes[2]);
     $exitCode = @proc_close($process);
 
-    $combined = trim($out . "\n" . $err);
-    if ((int)$exitCode !== 0) {
-        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: ' . ($combined !== '' ? $combined : ('exit_code=' . (int)$exitCode))]);
+    if ($timedOut) {
+        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: tempo excedido.', 'log_file' => $logFile]);
     }
 
-    respondJson(['success' => true, 'output' => $combined]);
+    if ((int)$exitCode !== 0) {
+        $tail = '';
+        if (is_file($logFile)) {
+            $content = @file_get_contents($logFile);
+            if (is_string($content) && $content !== '') {
+                $tail = trim(substr($content, max(0, strlen($content) - 1200)));
+            }
+        }
+        respondJson([
+            'success' => false,
+            'message' => 'Erro ao importar veículos.',
+            'exit_code' => (int)$exitCode,
+            'log_file' => $logFile,
+            'details' => $tail,
+        ]);
+    }
+
+    respondJson(['success' => true]);
 }
 
 ssw_login($domain);
