@@ -19,6 +19,85 @@ $input       = getRequestInput();
 
 $conn = connect();
 
+function runImpPropVeic(string $domain, string $modo = 'RECENTE'): array {
+    $dom = strtoupper(trim((string)$domain));
+    if ($dom === '' || !preg_match('/^[A-Z0-9_]+$/', $dom)) {
+        return ['success' => false, 'message' => 'Domínio inválido para importação.'];
+    }
+
+    $phpBin = '/usr/bin/php';
+    $script = '/var/www/html/imp_prop_veic.php';
+    $cwd = '/var/www/html';
+    if (!file_exists($phpBin)) return ['success' => false, 'message' => 'PHP bin não encontrado em /usr/bin/php.'];
+    if (!file_exists($script)) return ['success' => false, 'message' => 'Script imp_prop_veic.php não encontrado em /var/www/html.'];
+
+    $tmpDir = sys_get_temp_dir();
+    if (!is_string($tmpDir) || trim($tmpDir) === '') $tmpDir = '/tmp';
+    $logFile = rtrim($tmpDir, '/') . '/imp_prop_veic_' . strtolower($dom) . '_' . date('Ymd_His') . '_' . mt_rand(1000, 9999) . '.log';
+
+    $cmd = 'cd ' . escapeshellarg($cwd)
+        . ' && ' . escapeshellarg($phpBin)
+        . ' ' . escapeshellarg($script)
+        . ' ' . escapeshellarg($dom)
+        . ' ' . escapeshellarg($modo);
+
+    $descriptorspec = [
+        0 => ['pipe', 'r'],
+        1 => ['file', $logFile, 'w'],
+        2 => ['file', $logFile, 'a'],
+    ];
+
+    $process = @proc_open($cmd, $descriptorspec, $pipes);
+    if (!is_resource($process)) {
+        return ['success' => false, 'message' => 'Falha ao iniciar processo de importação.'];
+    }
+    @fclose($pipes[0]);
+
+    $timeoutSec = 120;
+    $start = time();
+    $timedOut = false;
+    while (true) {
+        $status = @proc_get_status($process);
+        $running = is_array($status) ? (bool)($status['running'] ?? false) : false;
+        if (!$running) break;
+        if ((time() - $start) > $timeoutSec) {
+            $timedOut = true;
+            @proc_terminate($process);
+            @usleep(200000);
+            @proc_terminate($process, 9);
+            break;
+        }
+        @usleep(120000);
+    }
+
+    $exitCode = @proc_close($process);
+
+    if ($timedOut) {
+        return ['success' => false, 'message' => 'Erro ao importar veículos: tempo excedido.', 'log_file' => $logFile];
+    }
+
+    $content = '';
+    if (is_file($logFile)) {
+        $c = @file_get_contents($logFile);
+        if (is_string($c)) $content = $c;
+    }
+
+    $upper = strtoupper($content);
+    $temFatal = (strpos($upper, 'PHP FATAL ERROR') !== false) || (strpos($upper, 'FATAL ERROR') !== false);
+    if ($temFatal) {
+        $tail = trim(substr($content, max(0, strlen($content) - 1200)));
+        return [
+            'success' => false,
+            'message' => 'Erro ao importar veículos.',
+            'exit_code' => (int)$exitCode,
+            'log_file' => $logFile,
+            'details' => $tail,
+        ];
+    }
+
+    return ['success' => true];
+}
+
 function tabelaExisteImport($conn, string $tableName): bool {
     $t = strtolower(trim($tableName));
     if ($t === '') return false;
@@ -139,86 +218,8 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
 
 if ($acao === 'IMPORTAR_VEICULOS') {
     set_time_limit(600);
-
-    $dom = strtoupper(trim((string)$domain));
-    if ($dom === '' || !preg_match('/^[A-Z0-9_]+$/', $dom)) {
-        respondJson(['success' => false, 'message' => 'Domínio inválido para importação.']);
-    }
-
-    $phpBin = '/usr/bin/php';
-    $script = '/var/www/html/imp_prop_veic.php';
-    $cwd = '/var/www/html';
-
-    if (!file_exists($phpBin)) {
-        respondJson(['success' => false, 'message' => 'PHP bin não encontrado em /usr/bin/php.']);
-    }
-    if (!file_exists($script)) {
-        respondJson(['success' => false, 'message' => 'Script imp_prop_veic.php não encontrado em /var/www/html.']);
-    }
-
-    $tmpDir = sys_get_temp_dir();
-    if (!is_string($tmpDir) || trim($tmpDir) === '') $tmpDir = '/tmp';
-    $logFile = rtrim($tmpDir, '/') . '/imp_prop_veic_' . strtolower($dom) . '_' . date('Ymd_His') . '_' . mt_rand(1000, 9999) . '.log';
-
-    $cmd = 'cd ' . escapeshellarg($cwd)
-        . ' && ' . escapeshellarg($phpBin)
-        . ' ' . escapeshellarg($script)
-        . ' ' . escapeshellarg($dom)
-        . ' ' . escapeshellarg('RECENTE');
-
-    $descriptorspec = [
-        0 => ['pipe', 'r'],
-        1 => ['file', $logFile, 'w'],
-        2 => ['file', $logFile, 'a'],
-    ];
-
-    $process = @proc_open($cmd, $descriptorspec, $pipes);
-    if (!is_resource($process)) {
-        respondJson(['success' => false, 'message' => 'Falha ao iniciar processo de importação.']);
-    }
-    @fclose($pipes[0]);
-
-    $timeoutSec = 120;
-    $start = time();
-    $timedOut = false;
-    while (true) {
-        $status = @proc_get_status($process);
-        $running = is_array($status) ? (bool)($status['running'] ?? false) : false;
-        if (!$running) break;
-        if ((time() - $start) > $timeoutSec) {
-            $timedOut = true;
-            @proc_terminate($process);
-            @usleep(200000);
-            @proc_terminate($process, 9);
-            break;
-        }
-        @usleep(120000);
-    }
-
-    $exitCode = @proc_close($process);
-
-    if ($timedOut) {
-        respondJson(['success' => false, 'message' => 'Erro ao importar veículos: tempo excedido.', 'log_file' => $logFile]);
-    }
-
-    if ((int)$exitCode !== 0) {
-        $tail = '';
-        if (is_file($logFile)) {
-            $content = @file_get_contents($logFile);
-            if (is_string($content) && $content !== '') {
-                $tail = trim(substr($content, max(0, strlen($content) - 1200)));
-            }
-        }
-        respondJson([
-            'success' => false,
-            'message' => 'Erro ao importar veículos.',
-            'exit_code' => (int)$exitCode,
-            'log_file' => $logFile,
-            'details' => $tail,
-        ]);
-    }
-
-    respondJson(['success' => true]);
+    $r = runImpPropVeic((string)$domain, 'RECENTE');
+    respondJson($r);
 }
 
 ssw_login($domain);
@@ -335,14 +336,8 @@ if ($domainUpper === 'RVE') {
         }
         if (count($missing) > 0) {
             $veiculosFaltantes = $missing;
-            try {
-                imp_ssw_prop();
-                imp_ssw_vei();
-                imp_ssw_mot();
-                $veiculosImportadosAuto = true;
-            } catch (Throwable $e) {
-                $veiculosImportadosAuto = false;
-            }
+            $rImp = runImpPropVeic((string)$domain, 'RECENTE');
+            $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
         }
     }
 } else {
@@ -381,14 +376,8 @@ if ($domainUpper === 'RVE') {
         }
         if (count($missing) > 0) {
             $veiculosFaltantes = $missing;
-            try {
-                imp_ssw_prop();
-                imp_ssw_vei();
-                imp_ssw_mot();
-                $veiculosImportadosAuto = true;
-            } catch (Throwable $e) {
-                $veiculosImportadosAuto = false;
-            }
+            $rImp = runImpPropVeic((string)$domain, 'RECENTE');
+            $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
         }
     }
 }
