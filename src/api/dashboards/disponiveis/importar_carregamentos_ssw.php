@@ -145,6 +145,14 @@ if ($acao === 'IMPORTAR_VEICULOS') {
         respondJson(['success' => false, 'message' => 'Funções de importação de veículos não disponíveis no ssw.php.']);
     }
 
+    if (!function_exists('acento3')) {
+        function acento3($str) {
+            $s = (string)$str;
+            $out = @iconv('UTF-8', 'ASCII//TRANSLIT', $s);
+            return ($out === false || $out === null) ? $s : $out;
+        }
+    }
+
     try {
         imp_ssw_prop();
         imp_ssw_vei();
