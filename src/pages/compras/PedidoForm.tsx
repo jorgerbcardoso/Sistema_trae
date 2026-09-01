@@ -171,6 +171,7 @@ export default function PedidoForm() {
 
   // Valores dos itens (editáveis)
   const [valoresItens, setValoresItens] = useState<Record<number, number>>({});
+  const [valoresItensTexto, setValoresItensTexto] = useState<Record<number, string>>({});
 
   // ✅ NOVO: Estados para envio de pedido ao fornecedor
   const [dialogEnviarFornecedor, setDialogEnviarFornecedor] = useState(false);
@@ -551,6 +552,10 @@ export default function PedidoForm() {
         ...prev,
         [item.seq_item]: 0
       }));
+      setValoresItensTexto(prev => ({
+        ...prev,
+        [item.seq_item]: '0'
+      }));
     });
 
     toast.success('Ordem de compra adicionada');
@@ -566,17 +571,57 @@ export default function PedidoForm() {
         delete novos[item.seq_item];
         return novos;
       });
+      setValoresItensTexto(prev => {
+        const novos = { ...prev };
+        delete novos[item.seq_item];
+        return novos;
+      });
     });
 
     setOrdensSelecionadas(ordensSelecionadas.filter(o => o.seq_ordem_compra !== seq_ordem_compra));
     toast.success('Ordem de compra removida');
   };
 
+  const parseValorMonetario = (valor: string): number => {
+    const v = (valor || '').trim();
+    if (!v) return 0;
+
+    const cleaned = v
+      .replace(/\s/g, '')
+      .replace(/R\$/gi, '')
+      .replace(/[^\d,.\-]/g, '');
+
+    if (cleaned.includes(',')) {
+      const normalized = cleaned.replace(/\./g, '').replace(/,/g, '.');
+      const n = Number.parseFloat(normalized);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    const normalized = cleaned.replace(/,/g, '');
+    const n = Number.parseFloat(normalized);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const atualizarValorItem = (seq_item: number, valor: string) => {
-    const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
+    const raw = (valor || '').replace(/[^\d,.\-]/g, '');
+    setValoresItensTexto(prev => ({
+      ...prev,
+      [seq_item]: raw
+    }));
+
+    const valorNumerico = parseValorMonetario(raw);
     setValoresItens(prev => ({
       ...prev,
       [seq_item]: valorNumerico
+    }));
+  };
+
+  const formatarValorItemTexto = (seq_item: number) => {
+    const n = valoresItens[seq_item] || 0;
+    const texto = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    setValoresItensTexto(prev => ({
+      ...prev,
+      [seq_item]: texto
     }));
   };
 
@@ -1960,8 +2005,10 @@ export default function PedidoForm() {
                                   <TableCell className="text-right">
                                     <Input
                                       type="text"
-                                      value={valoresItens[item.seq_item]?.toString().replace('.', ',') || '0,00'}
+                                      inputMode="decimal"
+                                      value={valoresItensTexto[item.seq_item] ?? '0'}
                                       onChange={(e) => atualizarValorItem(item.seq_item, e.target.value)}
+                                      onBlur={() => formatarValorItemTexto(item.seq_item)}
                                       className="w-28 text-right ml-auto"
                                       placeholder="0,00"
                                     />
