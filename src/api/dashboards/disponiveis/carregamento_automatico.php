@@ -36,11 +36,11 @@ $tabelaCap   = "{$domain}_carregamento_capacidade";
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
-@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS multi_carr_diario BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -936,13 +936,15 @@ if ($modoAutomatico) {
             cap_m3           NUMERIC,
             vlr_frete_carreteiro NUMERIC,
             simulado         BOOLEAN DEFAULT FALSE,
+            nro_linha        INT,
             PRIMARY KEY (unidade, seq_carregamento)
         )
     ");
+    $nroLinhaSql = ($nroLinha > 0) ? (string)$nroLinha : 'NULL';
     @pg_query($conn,
-        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', TRUE)
-         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE"
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', TRUE, {$nroLinhaSql})
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
     );
 
     $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados, $nroLinha, $seqCarreg);
@@ -1073,13 +1075,14 @@ pg_query($conn, 'BEGIN');
         cap_m3           NUMERIC,
         vlr_frete_carreteiro NUMERIC,
         simulado         BOOLEAN DEFAULT FALSE,
+        nro_linha        INT,
         PRIMARY KEY (unidade, seq_carregamento)
     )
 ");
 @pg_query($conn,
-    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado)
-     VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaFinal) . "', TRUE)
-     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE"
+    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
+     VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaFinal) . "', TRUE, NULL)
+     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
 );
 
 $inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados, 0, $seqCarreg);

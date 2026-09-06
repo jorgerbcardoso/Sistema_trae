@@ -37,11 +37,11 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
-@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS nro_linha INT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -182,13 +182,14 @@ if ($acao === 'criar') {
             cap_m3           NUMERIC,
             vlr_frete_carreteiro NUMERIC,
             simulado         BOOLEAN DEFAULT FALSE,
+            nro_linha        INT,
             PRIMARY KEY (unidade, seq_carregamento)
         )
     ");
     @pg_query($conn,
-        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', FALSE)
-         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE"
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', FALSE, NULL)
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
     );
 
     respondJson(['success' => true, 'seq_carregamento' => $seqCarreg]);
@@ -353,17 +354,17 @@ if ($acao === 'adicionar_ctes') {
                AND data_finalizacao IS NULL"
         );
         @pg_query($conn,
-            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "')
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria"
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', NULL)
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
         );
     }
 
     if ($seqCarreg > 0) {
         @pg_query($conn,
-            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "')
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria"
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', NULL)
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
         );
     }
 
@@ -880,6 +881,7 @@ if ($acao === 'atualizar_capacidade') {
     $vlrFreteCarreteiro = ($input['vlr_frete_carreteiro'] !== '' && $input['vlr_frete_carreteiro'] !== null) ? (float)$input['vlr_frete_carreteiro'] : null;
     $destinoLinha = strtoupper(trim((string)($input['destino'] ?? '')));
     $paradasLinha = strtoupper(trim((string)($input['paradas'] ?? $input['unidades'] ?? '')));
+    $nroLinha = ($input['nro_linha'] !== '' && $input['nro_linha'] !== null) ? (int)$input['nro_linha'] : null;
 
     if (empty($placa)) respondJson(['success' => false, 'message' => 'Placa não informada.']);
 
@@ -911,6 +913,8 @@ if ($acao === 'atualizar_capacidade') {
         );
     }
 
+    $nroLinhaSql = $nroLinha !== null ? $nroLinha : 'NULL';
+
     pg_query($conn, "
         CREATE TABLE IF NOT EXISTS {$tabelaCap} (
             unidade          VARCHAR(10) NOT NULL,
@@ -920,14 +924,15 @@ if ($acao === 'atualizar_capacidade') {
             cap_m3           NUMERIC,
             vlr_frete_carreteiro NUMERIC,
             simulado         BOOLEAN DEFAULT FALSE,
+            nro_linha        INT,
             PRIMARY KEY (unidade, seq_carregamento)
         )
     ");
 
     pg_query($conn,
-        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, cap_ton, cap_m3, vlr_frete_carreteiro)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql}, {$vlrTerSql})
-         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, vlr_frete_carreteiro = EXCLUDED.vlr_frete_carreteiro"
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, cap_ton, cap_m3, vlr_frete_carreteiro, nro_linha)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', {$capTonSql}, {$capM3Sql}, {$vlrTerSql}, {$nroLinhaSql})
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, vlr_frete_carreteiro = EXCLUDED.vlr_frete_carreteiro, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
     );
 
     if (strpos($placa, '-') === false) {

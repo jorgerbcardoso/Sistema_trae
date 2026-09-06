@@ -30,16 +30,17 @@ $tabelaCarregamento = "{$domain}_carregamento";
 $tabelaVeiculo      = "{$domain}_veiculo";
 $tabelaCap          = "{$domain}_carregamento_capacidade";
 $tabelaLinha        = "{$domain}_linha";
+$tabelaUnidade      = "{$domain}_unidade";
 
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
-@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS nro_linha INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -81,7 +82,7 @@ $sqlCarregamentos = "
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
         MAX(c.login_finalizacao)                AS login_finalizacao,
-        MAX(c.nro_linha)                        AS nro_linha,
+        MAX(cap.nro_linha)                      AS nro_linha,
         (SELECT destino  FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND destino  IS NOT NULL AND destino  <> '' LIMIT 1) AS destino,
         (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' LIMIT 1) AS paradas,
         v.capacidade_ton,
@@ -96,7 +97,7 @@ $sqlCarregamentos = "
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
     WHERE c.unidade = \$1
-    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado
+    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha
 ";
 
 if ($modo === 'calendario') {
@@ -194,6 +195,35 @@ if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
 }
 
+// ─── Construir mapa de unidades compartilhadas (hub intermediário) ──────────
+$mapDestinoCompart = [];
+try {
+    $resUnid = sql(
+        "SELECT sigla, COALESCE(unidades_compart, '') AS unidades_compart
+         FROM {$tabelaUnidade}
+         WHERE COALESCE(unidades_compart, '') <> ''",
+        [],
+        $conn
+    );
+    if ($resUnid) {
+        while ($ru = pg_fetch_assoc($resUnid)) {
+            $hubSigla = strtoupper(trim((string)($ru['sigla'] ?? '')));
+            if ($hubSigla === '') continue;
+            $csv = strtoupper(trim((string)($ru['unidades_compart'] ?? '')));
+            if ($csv === '') continue;
+            $parts = preg_split('/[,\s;]+/', $csv);
+            if (!is_array($parts)) continue;
+            foreach ($parts as $p) {
+                $u = strtoupper(trim((string)$p));
+                if ($u === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+                if (!isset($mapDestinoCompart[$u])) $mapDestinoCompart[$u] = $hubSigla;
+            }
+        }
+    }
+} catch (Exception $e) {
+    $mapDestinoCompart = [];
+}
+
 // ─── Enriquecer com dados da linha (left join por nro_linha) ───────────────────
 $linhasMap = [];
 $nros = [];
@@ -245,6 +275,10 @@ if (count($linhasMap) > 0) {
             $c['linha_nome'] = $linhasMap[$n]['linha_nome'];
             $c['linha_dest'] = $linhasMap[$n]['linha_dest'];
             $c['linha_unidades'] = $linhasMap[$n]['linha_unidades'];
+            $destLinha = strtoupper(trim((string)($linhasMap[$n]['linha_dest'] ?? '')));
+            if ($destLinha !== '') {
+                $c['destino'] = $destLinha;
+            }
         } else {
             $c['linha_nome'] = null;
             $c['linha_dest'] = null;
@@ -253,6 +287,17 @@ if (count($linhasMap) > 0) {
     }
     unset($c);
 }
+
+// ─── Calcular hub de destino compartilhado (ex: BH2 / BHZ) ──────────────────
+foreach ($carregamentos as &$c) {
+    $destinoFinal = strtoupper(trim((string)($c['destino'] ?? '')));
+    $hub = null;
+    if ($destinoFinal !== '' && isset($mapDestinoCompart[$destinoFinal])) {
+        $hub = (string)$mapDestinoCompart[$destinoFinal];
+    }
+    $c['hub_destino_compart'] = ($hub !== null && $hub !== '') ? $hub : null;
+}
+unset($c);
 
 if ($modo === 'calendario') {
     respondJson(['success' => true, 'carregamentos' => $carregamentos]);

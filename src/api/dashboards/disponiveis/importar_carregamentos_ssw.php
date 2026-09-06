@@ -160,6 +160,8 @@ function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
 }
 
 $acao = strtoupper(trim((string)($input['acao'] ?? '')));
+$autoImportarVeiculos = (bool)($input['auto_importar_veiculos'] ?? false);
+$ignorarVeiculosFaltantes = (bool)($input['ignorar_veiculos_faltantes'] ?? false);
 if ($acao === 'EXCLUIR_INEXISTENTES') {
     $tabela = "{$domain}_carregamento";
     $tabelaCap = "{$domain}_carregamento_capacidade";
@@ -167,6 +169,7 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
     @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+    @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
     $origens = $input['origens_ssw'] ?? [];
     if (!is_array($origens)) $origens = [];
     $origens = array_values(array_unique(array_filter(array_map(function ($v) {
@@ -241,6 +244,7 @@ $mapDestinoCompart = buildMapaDestinoCompartilhadoImport($conn, $tblUnidade);
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -336,8 +340,6 @@ if ($domainUpper === 'RVE') {
         }
         if (count($missing) > 0) {
             $veiculosFaltantes = $missing;
-            $rImp = runImpPropVeic((string)$domain, 'RECENTE');
-            $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
         }
     }
 } else {
@@ -376,9 +378,21 @@ if ($domainUpper === 'RVE') {
         }
         if (count($missing) > 0) {
             $veiculosFaltantes = $missing;
-            $rImp = runImpPropVeic((string)$domain, 'RECENTE');
-            $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
         }
+    }
+}
+
+if (count($veiculosFaltantes) > 0 && !$ignorarVeiculosFaltantes) {
+    if ($autoImportarVeiculos) {
+        $rImp = runImpPropVeic((string)$domain, 'RECENTE');
+        $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
+    } else {
+        respondJson([
+            'success' => false,
+            'code' => 'VEICULOS_FALTANTES',
+            'message' => 'Foram identificadas placas sem cadastro de veículo.',
+            'veiculos_faltantes' => $veiculosFaltantes,
+        ]);
     }
 }
 
@@ -427,6 +441,99 @@ try {
     }
 } catch (Exception $e) {
     $destinosLinhaSet = [];
+}
+
+function parseUnidadesCsvImportLinha($csv) {
+    $csv = strtoupper(trim((string)$csv));
+    if ($csv === '') return [];
+    $parts = preg_split('/[,\s;]+/', $csv);
+    if (!is_array($parts)) return [];
+    $out = [];
+    $seen = [];
+    foreach ($parts as $p) {
+        $u = strtoupper(trim((string)$p));
+        if ($u === '') continue;
+        if (!preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+        if (isset($seen[$u])) continue;
+        $seen[$u] = true;
+        $out[] = $u;
+    }
+    return $out;
+}
+
+function orderedUniqueImportLinha($arr) {
+    if (!is_array($arr)) return [];
+    $seen = [];
+    $out = [];
+    foreach ($arr as $v) {
+        $u = strtoupper(trim((string)$v));
+        if ($u === '') continue;
+        if (!preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+        if (isset($seen[$u])) continue;
+        $seen[$u] = true;
+        $out[] = $u;
+    }
+    return $out;
+}
+
+function encontrarLinhaParaDestinosImport($linhas, $destinosRaw) {
+    if (!is_array($linhas) || count($linhas) === 0) return null;
+    $destinosOrder = orderedUniqueImportLinha($destinosRaw);
+    if (count($destinosOrder) === 0) return null;
+
+    $best = null;
+    $bestScore = null;
+
+    foreach ($linhas as $l) {
+        $nro = (int)($l['nro_linha'] ?? 0);
+        if ($nro <= 0) continue;
+        $dest = strtoupper(trim((string)($l['sigla_dest'] ?? '')));
+        if ($dest === '') continue;
+        $inter = parseUnidadesCsvImportLinha((string)($l['unidades'] ?? ''));
+        $route = array_merge($inter, [$dest]);
+        $idx = [];
+        for ($i = 0; $i < count($route); $i++) $idx[$route[$i]] = $i;
+
+        $missing = 0;
+        $orderPenalty = 0;
+        $lastIdx = -1;
+        foreach ($destinosOrder as $u) {
+            if (!isset($idx[$u])) { $missing++; continue; }
+            $cur = (int)$idx[$u];
+            if ($lastIdx >= 0 && $cur < $lastIdx) $orderPenalty++;
+            $lastIdx = $cur;
+        }
+        if ($missing > 0) continue;
+
+        $extraStops = max(0, count($route) - count($destinosOrder));
+        $score = ($missing * 1000) + ($orderPenalty * 100) + ($extraStops * 10);
+
+        if ($bestScore === null || $score < $bestScore) {
+            $bestScore = $score;
+            $best = [
+                'nro_linha' => $nro,
+                'sigla_dest' => $dest,
+                'unidades' => implode(',', $inter),
+            ];
+        }
+    }
+    return $best;
+}
+
+$linhasOrigem = [];
+try {
+    $resLinhas = sql(
+        "SELECT nro_linha, UPPER(sigla_dest) AS sigla_dest, COALESCE(unidades, '') AS unidades
+         FROM {$tabelaLinha}
+         WHERE UPPER(sigla_emit) = UPPER(\$1)",
+        [$unidade],
+        $conn
+    );
+    while ($resLinhas && ($r = pg_fetch_assoc($resLinhas))) {
+        $linhasOrigem[] = $r;
+    }
+} catch (Exception $e) {
+    $linhasOrigem = [];
 }
 
 function normalizarNumero($v) {
@@ -800,12 +907,31 @@ foreach ($placas_ssw as $placa) {
     foreach ($destinosRaw as $d) {
         $k = strtoupper(trim((string)$d));
         if ($k === '') continue;
-        $destinos[] = (string)($mapDestinoCompart[$k] ?? $k);
+        $destinos[] = $k;
     }
     $destinoCar = null;
     $unidadesCarCsv = '';
+    $nroLinhaCar = 0;
     $destUnicos = array_values(array_unique(array_filter($destinos)));
-    if (count($destUnicos) === 1) {
+    $linhaDetectada = encontrarLinhaParaDestinosImport($linhasOrigem, $destinosRaw);
+    if (is_array($linhaDetectada) && (int)($linhaDetectada['nro_linha'] ?? 0) > 0) {
+        $nroLinhaCar = (int)$linhaDetectada['nro_linha'];
+        $destFinal = strtoupper(trim((string)($linhaDetectada['sigla_dest'] ?? '')));
+        $interFinal = parseUnidadesCsvImportLinha((string)($linhaDetectada['unidades'] ?? ''));
+
+        $interClean = [];
+        $seenInter = [];
+        foreach ($interFinal as $u) {
+            $um = strtoupper(trim((string)$u));
+            if ($um === '' || $um === $destFinal) continue;
+            if (isset($seenInter[$um])) continue;
+            $seenInter[$um] = true;
+            $interClean[] = $um;
+        }
+
+        $destinoCar = $destFinal !== '' ? $destFinal : null;
+        $unidadesCarCsv = count($interClean) > 0 ? implode(',', $interClean) : '';
+    } elseif (count($destUnicos) === 1) {
         $destinoCar = $destUnicos[0];
         $unidadesCarCsv = '';
     } elseif (count($destUnicos) > 1) {
@@ -846,6 +972,7 @@ foreach ($placas_ssw as $placa) {
 
     $destinoCarEsc = $destinoCar ? ("'" . pg_escape_string($conn, $destinoCar) . "'") : 'NULL';
     $unidadesCarEsc = ($unidadesCarCsv !== '') ? ("'" . pg_escape_string($conn, $unidadesCarCsv) . "'") : 'NULL';
+    $nroLinhaCarEsc = ($nroLinhaCar > 0) ? (string)$nroLinhaCar : 'NULL';
 
     pg_query($conn, 'BEGIN');
     try {
@@ -855,6 +982,7 @@ foreach ($placas_ssw as $placa) {
             "UPDATE {$tabela}
              SET placa_provisoria = '{$placaProvEsc}',
                  seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
+                 nro_linha = {$nroLinhaCarEsc},
                  destino = {$destinoCarEsc},
                  unidades = {$unidadesCarEsc},
                  origem_criacao = 'SSW',
@@ -874,13 +1002,15 @@ foreach ($placas_ssw as $placa) {
                 cap_ton          NUMERIC,
                 cap_m3           NUMERIC,
                 vlr_frete_carreteiro NUMERIC,
+                simulado         BOOLEAN DEFAULT FALSE,
+                nro_linha        INT,
                 PRIMARY KEY (unidade, seq_carregamento)
             )
         ");
         @pg_query($conn,
-            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria)
-             VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}')
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria"
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
+             VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', {$nroLinhaCarEsc})
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
         );
 
         if (empty($ctes)) {
@@ -890,10 +1020,10 @@ foreach ($placas_ssw as $placa) {
                     $conn,
                     "INSERT INTO {$tabela}
                      (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                      nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
+                      nro_cte, nro_linha, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                      0, {$nroLinhaCarEsc}, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
             }
@@ -926,6 +1056,7 @@ foreach ($placas_ssw as $placa) {
                         "UPDATE {$tabela}
                          SET placa_provisoria = '{$placaProvEsc}',
                              seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
+                             nro_linha = {$nroLinhaCarEsc},
                              destino = {$destinoCarEsc},
                              unidades = {$unidadesCarEsc},
                              destino_cte = '{$destinoCte}',
@@ -976,14 +1107,14 @@ foreach ($placas_ssw as $placa) {
                 $resIns = pg_query($conn,
                     "INSERT INTO {$tabela}
                      (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                      destino, unidades,
+                      nro_linha, destino, unidades,
                       ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                       remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      {$destinoCarEsc}, {$unidadesCarEsc},
+                      {$nroLinhaCarEsc}, {$destinoCarEsc}, {$unidadesCarEsc},
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
@@ -1038,3 +1169,107 @@ respondJson([
     'finalizados_sumiram_ssw' => $finalizadosSumiramSsw,
     'logs' => $logs,
 ]);
+
+/*
+ * =========================================================================
+ *  SCRIPT SQL DE CORREÇÃO — ITEM 7: UPDATE nro_linha EM [dominio]_carregamento
+ * =========================================================================
+ *
+ * Substitua [dominio] pelo prefixo do cliente (ex.: rve, acv, vix etc.)
+ * e execute os blocos abaixo SEPARADAMENTE no PostgreSQL (descomente cada
+ * bloco antes de rodar).
+ *
+ * -----------------------------------------------------------------------
+ * PASSO 1 — Atualizações por match exato (unidade, dest, CSV das paradas)
+ * -----------------------------------------------------------------------
+ * Atualiza nro_linha + destino para carregamentos SEM linha, onde
+ * conseguimos casar exatamente (sigla_emit, sigla_dest, unidades) com
+ * uma linha já cadastrada.
+ *
+ * UPDATE [dominio]_carregamento c
+ * SET nro_linha = l.nro_linha,
+ *     destino    = l.sigla_dest
+ * FROM [dominio]_linha l
+ * WHERE COALESCE(c.nro_linha, 0) = 0
+ *   AND UPPER(l.sigla_emit) = UPPER(c.unidade)
+ *   AND UPPER(l.sigla_dest) = UPPER(COALESCE(c.destino, ''))
+ *   AND COALESCE(NULLIF(UPPER(TRIM(BOTH ',' FROM l.unidades)), ''), '***')
+ *     = COALESCE(NULLIF(UPPER(TRIM(BOTH ',' FROM c.unidades)), ''), '***');
+ *
+ * -----------------------------------------------------------------------
+ * PASSO 2 — Heurística complementar (match por emit + dest, se CSV diferir)
+ * -----------------------------------------------------------------------
+ * Cobre carregamentos ainda sem linha após PASSO 1.
+ * Pega a linha mais recente (maior nro_linha) com mesma origem/destino.
+ *
+ * WITH matches AS (
+ *     SELECT
+ *         c.seq_carregamento,
+ *         c.placa_provisoria,
+ *         (
+ *             SELECT l.nro_linha
+ *             FROM [dominio]_linha l
+ *             WHERE UPPER(l.sigla_emit) = UPPER(c.unidade)
+ *               AND UPPER(l.sigla_dest) = UPPER(COALESCE(c.destino, ''))
+ *             ORDER BY l.nro_linha DESC
+ *             LIMIT 1
+ *         ) AS nro_linha_sugerida
+ *     FROM [dominio]_carregamento c
+ *     WHERE COALESCE(c.nro_linha, 0) = 0
+ *       AND COALESCE(c.destino, '') <> ''
+ *     GROUP BY c.seq_carregamento, c.placa_provisoria, c.unidade, c.destino
+ * )
+ * UPDATE [dominio]_carregamento c
+ * SET nro_linha = m.nro_linha_sugerida,
+ *     destino   = COALESCE((SELECT UPPER(l2.sigla_dest)
+ *                            FROM [dominio]_linha l2
+ *                            WHERE l2.nro_linha = m.nro_linha_sugerida), c.destino)
+ * FROM matches m
+ * WHERE COALESCE(c.nro_linha, 0) = 0
+ *   AND m.nro_linha_sugerida IS NOT NULL
+ *   AND c.seq_carregamento = m.seq_carregamento;
+ *
+ * -----------------------------------------------------------------------
+ * PASSO 3 — CASO ESPECÍFICO RVE: seq_carregamento = 71  (MTZ → SOR)
+ * -----------------------------------------------------------------------
+ * Força nro_linha para a linha MTZ→SOR e coluna destino = 'SOR',
+ * corrigindo o problema atual onde ele aparece com destino LVR.
+ *
+ * Use UMA das duas opções abaixo (deixe a outra comentada):
+ *
+ * -- Opção A: Se você sabe qual o nro_linha da linha MTZ → SOR:
+ * UPDATE rve_carregamento
+ * SET nro_linha = 9999,       -- ← COLOQUE AQUI o nro_linha REAL de MTZ→SOR
+ *     destino   = 'SOR'
+ * WHERE seq_carregamento = 71
+ *   AND unidade = 'MTZ';
+ *
+ * -- Opção B: Busca automaticamente a linha MTZ→SOR (maior nro_linha):
+ * UPDATE rve_carregamento c
+ * SET nro_linha = (
+ *         SELECT l.nro_linha
+ *         FROM rve_linha l
+ *         WHERE UPPER(l.sigla_emit) = 'MTZ'
+ *           AND UPPER(l.sigla_dest) = 'SOR'
+ *         ORDER BY l.nro_linha DESC
+ *         LIMIT 1
+ *     ),
+ *     destino = 'SOR'
+ * WHERE c.seq_carregamento = 71
+ *   AND c.unidade = 'MTZ';
+ *
+ * -----------------------------------------------------------------------
+ * PASSO 4 — OPCIONAL (pós-associação): sobrescreve destino usando SEMPRE
+ * a sigla_dest da linha associada (garante consistência histórica).
+ * -----------------------------------------------------------------------
+ *
+ * UPDATE [dominio]_carregamento c
+ * SET destino = (SELECT UPPER(l.sigla_dest)
+ *                FROM [dominio]_linha l
+ *                WHERE l.nro_linha = c.nro_linha
+ *                LIMIT 1)
+ * WHERE COALESCE(c.nro_linha, 0) > 0
+ *   AND EXISTS (SELECT 1 FROM [dominio]_linha l WHERE l.nro_linha = c.nro_linha);
+ *
+ * =========================================================================
+ */

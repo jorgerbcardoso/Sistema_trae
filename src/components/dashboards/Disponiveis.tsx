@@ -1447,7 +1447,7 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
-  onImportarCarregamentos: () => Promise<any>;
+  onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
   onImportarVeiculos: () => Promise<any>;
   importandoVeiculos: boolean;
@@ -1748,7 +1748,7 @@ function CardCarregamento({
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
-  onImportarCarregamentos: () => Promise<any>;
+  onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
 }) {
   const [editarPlacaDialogOpen, setEditarPlacaDialogOpen] = useState(false);
@@ -2017,7 +2017,7 @@ function CardCarregamento({
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, vlr_frete_carreteiro: vlrTerNum, destino, paradas: (paradasArray || []).join(',') }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, cap_ton: capTonNum, cap_m3: capM3Num, vlr_min_frete: vlrMinNum, vlr_frete_carreteiro: vlrTerNum, destino, paradas: (paradasArray || []).join(','), nro_linha: carregamento.nro_linha ?? null }) },
         true
       );
       if (res.success) {
@@ -2335,16 +2335,7 @@ function CardCarregamento({
           >
             <Search className="w-3.5 h-3.5 mr-1" />Lista
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-            onClick={() => void onExcluirCarregamento(carregamento.placa_provisoria)}
-            title="Excluir carregamento"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1" />Excl.
-          </Button>
+
         </div>
       </div>
       <Dialog open={editarPlacaDialogOpen} onOpenChange={setEditarPlacaDialogOpen}>
@@ -3658,7 +3649,7 @@ function ModalHub({
   );
 }
 
-function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () => void; onConcluir: () => Promise<void>; onExecutar: () => Promise<any> }) {
+function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () => void; onConcluir: () => Promise<void>; onExecutar: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any> }) {
   const [etapa, setEtapa] = useState<'confirmar' | 'carregando' | 'resultado'>('confirmar');
   const [logs, setLogs] = useState<LogImportacao[]>([]);
   const [placasSSW, setPlacasSSW] = useState<string[]>([]);
@@ -4359,7 +4350,21 @@ function CarregamentoArea({
                               <span>{String(c.placa_provisoria ?? '').toUpperCase()}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{String(c.destino ?? '').toUpperCase() || '-'}</td>
+                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                            {(() => {
+                              const dest = String(c.destino ?? '').toUpperCase() || '-';
+                              const anyC = c as any;
+                              const hubRaw = String(anyC.hub_destino_compart ?? '').toUpperCase();
+                              if (hubRaw === '') return dest;
+                              const hubLabel = hubRaw === 'BH2' ? 'BHZ' : hubRaw;
+                              return (
+                                <>
+                                  <span>{dest}</span>
+                                  <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">({hubLabel})</span>
+                                </>
+                              );
+                            })()}
+                          </td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTotal)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTer)}</td>
                           <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
@@ -4461,7 +4466,21 @@ function CarregamentoArea({
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Destino</div>
-                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{String(c.destino ?? '').toUpperCase() || '-'}</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">
+                              {(() => {
+                                const dest = String(c.destino ?? '').toUpperCase() || '-';
+                                const anyC = c as any;
+                                const hubRaw = String(anyC.hub_destino_compart ?? '').toUpperCase();
+                                if (hubRaw === '') return dest;
+                                const hubLabel = hubRaw === 'BH2' ? 'BHZ' : hubRaw;
+                                return (
+                                  <>
+                                    <span>{dest}</span>
+                                    <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">({hubLabel})</span>
+                                  </>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 sm:col-span-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Paradas (intermediárias)</div>
@@ -5250,14 +5269,17 @@ export function Disponiveis() {
     void carregarCarregamentosCalendario();
   }, [sigla, isMTZ, carregamentos, carregarCarregamentosCalendario]);
 
-  const handleImportarCarregamentos = useCallback(async () => {
+  const importarCarregamentosBase = useCallback(async (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => {
     if (importandoCarregamentosRef.current) return { success: false, message: 'Importação já em andamento.' };
     importandoCarregamentosRef.current = true;
     setImportandoCarregamentos(true);
     try {
+      const body: any = {};
+      if (opts?.auto_importar_veiculos) body.auto_importar_veiculos = true;
+      if (opts?.ignorar_veiculos_faltantes) body.ignorar_veiculos_faltantes = true;
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify(body) },
         true
       );
       if (res?.success) {
@@ -5271,6 +5293,25 @@ export function Disponiveis() {
       setImportandoCarregamentos(false);
     }
   }, [carregarCarregamentos]);
+
+  const handleImportarCarregamentos = useCallback(async (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => {
+    const res = await importarCarregamentosBase(opts);
+    if (!res?.success && (res as any)?.code === 'VEICULOS_FALTANTES') {
+      const faltantes = (res as any)?.veiculos_faltantes ?? [];
+      const lista = Array.isArray(faltantes) ? faltantes.slice(0, 10).join(', ') : '';
+      const resto = Array.isArray(faltantes) && faltantes.length > 10 ? ` (+${faltantes.length - 10} outras)` : '';
+      const ok = await confirmar({
+        title: 'Placas sem cadastro detectadas',
+        description: `Foram encontradas ${Array.isArray(faltantes) ? faltantes.length : 0} placa(s) sem cadastro de veículo:\n\n${lista}${resto}\n\nDeseja importar os veículos recentes do SSW e tentar novamente a importação dos carregamentos?`,
+        confirmText: 'Importar e tentar novamente',
+        cancelText: 'Cancelar',
+      });
+      if (ok) {
+        return importarCarregamentosBase({ auto_importar_veiculos: true });
+      }
+    }
+    return res;
+  }, [importarCarregamentosBase, confirmar]);
 
   const handleImportarVeiculos = useCallback(async () => {
     if (importandoVeiculosRef.current) return { success: false, message: 'Importação já em andamento.' };
