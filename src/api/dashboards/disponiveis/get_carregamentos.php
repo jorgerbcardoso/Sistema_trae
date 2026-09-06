@@ -52,6 +52,8 @@ if ($dias <= 0) $dias = 30;
 if ($dias > 90) $dias = 90;
 $dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
 
+$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+
 // ─── Busca carregamentos agrupados por placa ──────────────────────────────────
 // destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
@@ -83,8 +85,8 @@ $sqlCarregamentos = "
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
         MAX(c.login_finalizacao)                AS login_finalizacao,
         MAX(cap.nro_linha)                      AS nro_linha,
-        (SELECT destino  FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND destino  IS NOT NULL AND destino  <> '' LIMIT 1) AS destino,
-        (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' LIMIT 1) AS paradas,
+        (SELECT destino  FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND destino  IS NOT NULL AND destino  <> '' {$filtroSerieRve} LIMIT 1) AS destino,
+        (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' {$filtroSerieRve} LIMIT 1) AS paradas,
         v.capacidade_ton,
         v.capacidade_m3,
         cap.cap_ton,
@@ -96,7 +98,7 @@ $sqlCarregamentos = "
            ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
-    WHERE c.unidade = \$1
+    WHERE c.unidade = \$1 {$filtroSerieRve}
     GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha
 ";
 
@@ -380,6 +382,7 @@ $sqlCtes = "
     WHERE c.unidade = \$1
       AND c.data_finalizacao IS NULL
       AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
+      {$filtroSerieRve}
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
 ";
 

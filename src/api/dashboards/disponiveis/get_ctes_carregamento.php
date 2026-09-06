@@ -91,6 +91,8 @@ $tabela = "{$domain}_carregamento";
 $tblUnidade = getTabelaUnidadesDominioCtesCarreg($conn, $domain);
 $mapDestinoCompart = buildMapaDestinoCompartilhadoCtesCarreg($conn, $tblUnidade);
 
+$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+
 $whereSql = $seqCarreg > 0
     ? "unidade = \$1 AND seq_carregamento = \$2"
     : "unidade = \$1 AND UPPER(placa_provisoria) = \$2";
@@ -148,6 +150,7 @@ $sql = "
     FROM {$tabela}
     WHERE {$whereSql}
       AND nro_cte > 0
+      {$filtroSerieRve}
     ORDER BY data_inclusao ASC, hora_inclusao ASC
 ";
 
