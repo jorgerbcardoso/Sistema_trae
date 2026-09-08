@@ -162,6 +162,8 @@ function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
 $acao = strtoupper(trim((string)($input['acao'] ?? '')));
 $autoImportarVeiculos = (bool)($input['auto_importar_veiculos'] ?? false);
 $ignorarVeiculosFaltantes = (bool)($input['ignorar_veiculos_faltantes'] ?? false);
+$obrigarPlacasReaisRaw = $input['obrigar_placas_reais'] ?? false;
+$obrigarPlacasReais = ($obrigarPlacasReaisRaw === true || $obrigarPlacasReaisRaw === 1 || $obrigarPlacasReaisRaw === '1' || strtoupper(trim((string)$obrigarPlacasReaisRaw)) === 'S');
 if ($acao === 'EXCLUIR_INEXISTENTES') {
     $tabela = "{$domain}_carregamento";
     $tabelaCap = "{$domain}_carregamento_capacidade";
@@ -226,7 +228,11 @@ if ($acao === 'IMPORTAR_VEICULOS') {
 }
 
 ssw_login($domain);
-set_time_limit(300);
+set_time_limit(600);
+
+$importVeiculosRecentes = runImpPropVeic((string)$domain, 'RECENTE');
+$importVeiculosRecentesOk = (bool)($importVeiculosRecentes['success'] ?? false);
+$importVeiculosRecentesMsg = (string)($importVeiculosRecentes['message'] ?? '');
 
 $tabela = "{$domain}_carregamento";
 $tabelaVeiculo = "{$domain}_veiculo";
@@ -301,7 +307,6 @@ if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPla
 }
 $placas_ssw = array_values(array_unique($placas_ssw));
 
-$veiculosImportadosAuto = false;
 $veiculosFaltantes = [];
 if ($domainUpper === 'RVE') {
     $sufixos = [];
@@ -379,20 +384,6 @@ if ($domainUpper === 'RVE') {
         if (count($missing) > 0) {
             $veiculosFaltantes = $missing;
         }
-    }
-}
-
-if (count($veiculosFaltantes) > 0 && !$ignorarVeiculosFaltantes) {
-    if ($autoImportarVeiculos) {
-        $rImp = runImpPropVeic((string)$domain, 'RECENTE');
-        $veiculosImportadosAuto = (bool)($rImp['success'] ?? false);
-    } else {
-        respondJson([
-            'success' => false,
-            'code' => 'VEICULOS_FALTANTES',
-            'message' => 'Foram identificadas placas sem cadastro de veículo.',
-            'veiculos_faltantes' => $veiculosFaltantes,
-        ]);
     }
 }
 
@@ -752,6 +743,20 @@ $placas_ssw = array_values(array_unique(array_merge($placas_ssw, $placasDoRelato
 foreach ($placas_ssw as $placa) {
     $placa = strtoupper(trim((string)$placa));
     if ($placa === '') continue;
+
+    if ($obrigarPlacasReais && count($veiculosFaltantes) > 0) {
+        $isFaltante = false;
+        if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $placa)) {
+            $suf = substr($placa, 3, 4);
+            if ($suf !== '' && in_array($suf, $veiculosFaltantes, true)) $isFaltante = true;
+        } else {
+            if (in_array($placa, $veiculosFaltantes, true)) $isFaltante = true;
+        }
+        if ($isFaltante) {
+            $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Veículo não cadastrado. Placa ignorada (Obrigar placas reais).'];
+            continue;
+        }
+    }
     $placaEsc = pg_escape_string($conn, $placa);
 
     $placaProvisoriaSalvar = $placa;
@@ -1165,6 +1170,12 @@ if (count($placasUp) > 0) {
 
 respondJson([
     'success' => true,
+    'obrigar_placas_reais' => $obrigarPlacasReais,
+    'veiculos_faltantes' => $veiculosFaltantes,
+    'import_veiculos_recentes' => [
+        'success' => $importVeiculosRecentesOk,
+        'message' => $importVeiculosRecentesOk ? '' : ($importVeiculosRecentesMsg !== '' ? $importVeiculosRecentesMsg : 'Erro ao importar veículos recentes.'),
+    ],
     'placas_ssw' => $placas_ssw,
     'finalizados_sumiram_ssw' => $finalizadosSumiramSsw,
     'logs' => $logs,

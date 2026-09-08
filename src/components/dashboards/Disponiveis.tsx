@@ -1447,12 +1447,14 @@ interface CarregamentoAreaProps {
   loadingHub: boolean;
   hubCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
-  onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
+  onImportarCarregamentos: (opts?: { silent?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
   onImportarVeiculos: () => Promise<any>;
   importandoVeiculos: boolean;
   importacaoAutomatica: boolean;
   onToggleImportacaoAutomatica: (ativo: boolean) => void;
+  obrigarPlacasReais: boolean;
+  onToggleObrigarPlacasReais: (ativo: boolean) => void;
   onCarregamentoAutomatico: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
     ok: boolean;
     placa?: string;
@@ -3792,6 +3794,8 @@ function CarregamentoArea({
   importandoVeiculos,
   importacaoAutomatica,
   onToggleImportacaoAutomatica,
+  obrigarPlacasReais,
+  onToggleObrigarPlacasReais,
   onCarregamentoAutomatico,
   todosCtes,
 }: CarregamentoAreaProps) {
@@ -4797,6 +4801,10 @@ function CarregamentoArea({
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
                 <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
               </div>
+              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Obrigar placas reais</span>
+                <Switch checked={obrigarPlacasReais} onCheckedChange={onToggleObrigarPlacasReais} disabled={importandoCarregamentos} />
+              </div>
               <Button
                 size="sm"
                 variant="outline"
@@ -5053,6 +5061,9 @@ export function Disponiveis() {
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
+  const [obrigarPlacasReais, setObrigarPlacasReais] = useState(false);
+  const [placasFaltantesDialogOpen, setPlacasFaltantesDialogOpen] = useState(false);
+  const [placasFaltantesDialogList, setPlacasFaltantesDialogList] = useState<string[]>([]);
   const importandoCarregamentosRef = useRef(false);
   const [importandoVeiculos, setImportandoVeiculos] = useState(false);
   const importandoVeiculosRef = useRef(false);
@@ -5269,14 +5280,12 @@ export function Disponiveis() {
     void carregarCarregamentosCalendario();
   }, [sigla, isMTZ, carregamentos, carregarCarregamentosCalendario]);
 
-  const importarCarregamentosBase = useCallback(async (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => {
+  const importarCarregamentosBase = useCallback(async (opts?: { silent?: boolean }) => {
     if (importandoCarregamentosRef.current) return { success: false, message: 'Importação já em andamento.' };
     importandoCarregamentosRef.current = true;
     setImportandoCarregamentos(true);
     try {
-      const body: any = {};
-      if (opts?.auto_importar_veiculos) body.auto_importar_veiculos = true;
-      if (opts?.ignorar_veiculos_faltantes) body.ignorar_veiculos_faltantes = true;
+      const body: any = { obrigar_placas_reais: obrigarPlacasReais ? true : false };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
         { method: 'POST', body: JSON.stringify(body) },
@@ -5285,6 +5294,17 @@ export function Disponiveis() {
       if (res?.success) {
         await carregarCarregamentos();
       }
+      const faltantes = Array.isArray((res as any)?.veiculos_faltantes) ? (res as any).veiculos_faltantes : [];
+      if (obrigarPlacasReais && faltantes.length > 0) {
+        if (opts?.silent) {
+          const lista = faltantes.slice(0, 10).join(', ');
+          const resto = faltantes.length > 10 ? ` (+${faltantes.length - 10} outras)` : '';
+          toast.info(`Placas ignoradas por falta de cadastro: ${lista}${resto}`);
+        } else {
+          setPlacasFaltantesDialogList(faltantes);
+          setPlacasFaltantesDialogOpen(true);
+        }
+      }
       return res;
     } catch (e: any) {
       return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
@@ -5292,26 +5312,11 @@ export function Disponiveis() {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos]);
+  }, [carregarCarregamentos, obrigarPlacasReais]);
 
-  const handleImportarCarregamentos = useCallback(async (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => {
-    const res = await importarCarregamentosBase(opts);
-    if (!res?.success && (res as any)?.code === 'VEICULOS_FALTANTES') {
-      const faltantes = (res as any)?.veiculos_faltantes ?? [];
-      const lista = Array.isArray(faltantes) ? faltantes.slice(0, 10).join(', ') : '';
-      const resto = Array.isArray(faltantes) && faltantes.length > 10 ? ` (+${faltantes.length - 10} outras)` : '';
-      const ok = await confirmar({
-        title: 'Placas sem cadastro detectadas',
-        description: `Foram encontradas ${Array.isArray(faltantes) ? faltantes.length : 0} placa(s) sem cadastro de veículo:\n\n${lista}${resto}\n\nDeseja importar os veículos recentes do SSW e tentar novamente a importação dos carregamentos?`,
-        confirmText: 'Importar e tentar novamente',
-        cancelText: 'Cancelar',
-      });
-      if (ok) {
-        return importarCarregamentosBase({ auto_importar_veiculos: true });
-      }
-    }
-    return res;
-  }, [importarCarregamentosBase, confirmar]);
+  const handleImportarCarregamentos = useCallback(async (opts?: { silent?: boolean }) => {
+    return importarCarregamentosBase(opts);
+  }, [importarCarregamentosBase]);
 
   const handleImportarVeiculos = useCallback(async () => {
     if (importandoVeiculosRef.current) return { success: false, message: 'Importação já em andamento.' };
@@ -5358,7 +5363,7 @@ export function Disponiveis() {
 
   useEffect(() => {
     if (!importacaoAutomatica) return;
-    const id = setInterval(() => { void handleImportarCarregamentos(); }, 120000);
+    const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 120000);
     return () => clearInterval(id);
   }, [importacaoAutomatica, handleImportarCarregamentos]);
 
@@ -7715,6 +7720,8 @@ export function Disponiveis() {
             importandoVeiculos={importandoVeiculos}
             importacaoAutomatica={importacaoAutomatica}
             onToggleImportacaoAutomatica={setImportacaoAutomatica}
+            obrigarPlacasReais={obrigarPlacasReais}
+            onToggleObrigarPlacasReais={setObrigarPlacasReais}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
@@ -8134,6 +8141,31 @@ export function Disponiveis() {
           )}
         </div>
       ) : null}
+      <Dialog open={placasFaltantesDialogOpen} onOpenChange={setPlacasFaltantesDialogOpen}>
+        <DialogContent className="max-w-lg h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Placas não cadastradas</DialogTitle>
+            <DialogDescription>
+              As placas abaixo não estavam cadastradas como veículo no Presto e foram ignoradas na importação por estar ativo "Obrigar placas reais".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+            <div className="space-y-2">
+              {placasFaltantesDialogList.map((p) => (
+                <div key={p} className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-xs font-mono text-slate-700 dark:text-slate-200">
+                  {p}
+                </div>
+              ))}
+              {placasFaltantesDialogList.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Nenhuma placa para exibir.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="border-t border-slate-200 dark:border-slate-700 pt-4">
+            <Button variant="outline" onClick={() => setPlacasFaltantesDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {confirmarDialog}
       {perguntarTextoDialog}
     </DashboardLayout>
