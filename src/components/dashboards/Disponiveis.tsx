@@ -54,7 +54,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useTooltipStyle } from './CustomTooltip';
@@ -5068,6 +5068,28 @@ export function Disponiveis() {
   const [importandoVeiculos, setImportandoVeiculos] = useState(false);
   const importandoVeiculosRef = useRef(false);
 
+  const obrigarPlacasReaisStorageKey = React.useMemo(() => {
+    const dom = (dominioUsuario ?? '').trim().toUpperCase();
+    const userKey = String((user as any)?.id ?? (user as any)?.username ?? (user as any)?.login ?? '').trim();
+    if (!dom || !userKey) return '';
+    return `presto:${dom}:${userKey}:disponiveis:obrigar_placas_reais`;
+  }, [dominioUsuario, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!obrigarPlacasReaisStorageKey) { setObrigarPlacasReais(false); return; }
+    const raw = window.localStorage.getItem(obrigarPlacasReaisStorageKey);
+    const ativo = raw === '1' || raw === 'true' || raw === 'S';
+    setObrigarPlacasReais(ativo);
+  }, [obrigarPlacasReaisStorageKey]);
+
+  const handleToggleObrigarPlacasReais = useCallback((ativo: boolean) => {
+    setObrigarPlacasReais(ativo);
+    if (typeof window === 'undefined') return;
+    if (!obrigarPlacasReaisStorageKey) return;
+    window.localStorage.setItem(obrigarPlacasReaisStorageKey, ativo ? '1' : '0');
+  }, [obrigarPlacasReaisStorageKey]);
+
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
   const [dadosHub, setDadosHub] = useState<DadosHub | null>(null);
   const [loadingHub, setLoadingHub] = useState(false);
@@ -7721,7 +7743,7 @@ export function Disponiveis() {
             importacaoAutomatica={importacaoAutomatica}
             onToggleImportacaoAutomatica={setImportacaoAutomatica}
             obrigarPlacasReais={obrigarPlacasReais}
-            onToggleObrigarPlacasReais={setObrigarPlacasReais}
+            onToggleObrigarPlacasReais={handleToggleObrigarPlacasReais}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
           />
