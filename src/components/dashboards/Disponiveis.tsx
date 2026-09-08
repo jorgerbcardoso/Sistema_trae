@@ -7099,6 +7099,15 @@ export function Disponiveis() {
                           </div>
                         </div>
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Placas fictícias e “Obrigar placas reais”</p>
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Agora, por garantia, a rotina de importação de carregamentos SEMPRE lê os veículos criados de ontem pra hoje e importa.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Foi criada a chave “Obrigar placas reais”.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Com a chave DESATIVADA, caso, mesmo importando os veículos mais recentes, os carregamentos vêm com placas fictícias.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Com a chave ATIVADA, os carregamentos de placas reais serão importados e os com placas fictícias serão ignorados. Ao final do processo uma lista com as placas fictícias não importadas é exibida.</span></li>
+                          </ul>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                           <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática (SSW)</p>
                           <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                             Ao abrir o painel, o sistema pode verificar placas “em andamento” que já saíram para viagem no SSW e finalizar automaticamente com a data/hora informada.
