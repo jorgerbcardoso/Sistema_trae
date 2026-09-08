@@ -740,22 +740,47 @@ $placasDoRelatorio = array_map(function($p) {
 $placasDoRelatorio = array_values(array_filter($placasDoRelatorio, function($p) { return $p !== ''; }));
 $placas_ssw = array_values(array_unique(array_merge($placas_ssw, $placasDoRelatorio)));
 
+if ($obrigarPlacasReais) {
+    $placasCheck = array_values(array_unique(array_filter(array_map(function($p) {
+        $s = strtoupper(trim((string)$p));
+        return $s !== '' ? $s : null;
+    }, $placas_ssw))));
+
+    $found = [];
+    foreach (array_chunk($placasCheck, 500) as $chunk) {
+        $ph = [];
+        $params = [];
+        $i = 1;
+        foreach ($chunk as $placa) {
+            $ph[] = '$' . $i;
+            $params[] = $placa;
+            $i += 1;
+        }
+        if (empty($ph)) continue;
+        $q = "SELECT UPPER(placa) AS placa FROM {$tabelaVeiculo} WHERE UPPER(placa) IN (" . implode(',', $ph) . ")";
+        $r = sql($q, $params, $conn);
+        if ($r) {
+            while ($row = pg_fetch_assoc($r)) {
+                $pl = strtoupper(trim((string)($row['placa'] ?? '')));
+                if ($pl !== '') $found[$pl] = true;
+            }
+        }
+    }
+
+    $missing = [];
+    foreach ($placasCheck as $placa) {
+        if (!isset($found[$placa])) $missing[] = $placa;
+    }
+    $veiculosFaltantes = $missing;
+}
+
 foreach ($placas_ssw as $placa) {
     $placa = strtoupper(trim((string)$placa));
     if ($placa === '') continue;
 
-    if ($obrigarPlacasReais && count($veiculosFaltantes) > 0) {
-        $isFaltante = false;
-        if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $placa)) {
-            $suf = substr($placa, 3, 4);
-            if ($suf !== '' && in_array($suf, $veiculosFaltantes, true)) $isFaltante = true;
-        } else {
-            if (in_array($placa, $veiculosFaltantes, true)) $isFaltante = true;
-        }
-        if ($isFaltante) {
-            $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Veículo não cadastrado. Placa ignorada (Obrigar placas reais).'];
-            continue;
-        }
+    if ($obrigarPlacasReais && in_array($placa, $veiculosFaltantes, true)) {
+        $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Veículo não cadastrado. Placa ignorada (Obrigar placas reais).'];
+        continue;
     }
     $placaEsc = pg_escape_string($conn, $placa);
 
