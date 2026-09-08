@@ -708,34 +708,48 @@ if ($acao === 'excluir_carregamento') {
 // ─── Ação: deletar carregamento (exclusão física) ─────────────────────────────
 if ($acao === 'deletar_carregamento') {
     $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+    $seqCarregInput = (int)($input['seq_carregamento'] ?? 0);
     if ($placa === '') {
-        respondJson(['success' => false, 'message' => 'Placa não informada.']);
+        if ($seqCarregInput <= 0) respondJson(['success' => false, 'message' => 'Placa não informada.']);
     }
 
     $seqCarreg = 0;
-    $resSeq = sql(
-        "SELECT seq_carregamento
-         FROM {$tabela}
-         WHERE unidade = \$1
-           AND placa_provisoria = \$2
-           AND data_finalizacao IS NULL
-         ORDER BY COALESCE(seq_carregamento, 0) DESC
-         LIMIT 1",
-        [$unidade, $placa],
-        $conn
-    );
-    if ($resSeq && pg_num_rows($resSeq) > 0) {
-        $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
+    if ($seqCarregInput > 0) {
+        $seqCarreg = $seqCarregInput;
+    } else {
+        $resSeq = sql(
+            "SELECT seq_carregamento
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND placa_provisoria = \$2
+             ORDER BY COALESCE(seq_carregamento, 0) DESC
+             LIMIT 1",
+            [$unidade, $placa],
+            $conn
+        );
+        if ($resSeq && pg_num_rows($resSeq) > 0) {
+            $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
+        }
     }
 
-    $resDel = sql(
-        "DELETE FROM {$tabela}
-         WHERE unidade = \$1
-           AND placa_provisoria = \$2
-           AND data_finalizacao IS NULL",
-        [$unidade, $placa],
-        $conn
-    );
+    $resDel = null;
+    if ($seqCarreg > 0) {
+        $resDel = sql(
+            "DELETE FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+    } else {
+        $resDel = sql(
+            "DELETE FROM {$tabela}
+             WHERE unidade = \$1
+               AND placa_provisoria = \$2",
+            [$unidade, $placa],
+            $conn
+        );
+    }
     if (!$resDel) {
         respondJson(['success' => false, 'message' => 'Erro ao excluir carregamento.']);
     }

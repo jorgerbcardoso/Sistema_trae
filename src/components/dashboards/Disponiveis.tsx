@@ -1439,8 +1439,7 @@ interface CarregamentoAreaProps {
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
-  onExcluirCarregamento: (placa: string) => Promise<boolean>;
-  onExcluirCarregamentoFinalizado: (carregamento: Carregamento) => Promise<boolean>;
+  onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onCarregarHub: (carregamento: Carregamento) => void;
@@ -1743,7 +1742,7 @@ function CardCarregamento({
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
-  onExcluirCarregamento: (placa: string) => Promise<boolean>;
+  onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
   onCarregarHub: (carregamento: Carregamento) => void;
@@ -2318,6 +2317,15 @@ function CardCarregamento({
               : <Share2 className="w-3.5 h-3.5 mr-1" />
             }
             Hub
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs border-red-300 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            onClick={() => { void onExcluirCarregamento(carregamento); }}
+            title="Excluir carregamento"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />Excluir
           </Button>
           <Button
             size="sm"
@@ -3781,7 +3789,6 @@ function CarregamentoArea({
   onCriarCarregamento,
   onFinalizarCarregamento,
   onExcluirCarregamento,
-  onExcluirCarregamentoFinalizado,
   onRemoverCte,
   onCarregarSSW,
   onCarregarHub,
@@ -4379,19 +4386,17 @@ function CarregamentoArea({
                           <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabelSemAno(fimK, c.hora_finalizacao) : ''}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
                           <td className="px-2 py-2 text-center">
-                            {isFinalizado ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-red-200 dark:hover:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void onExcluirCarregamentoFinalizado(c);
-                                }}
-                                title="Excluir carregamento finalizado"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            ) : null}
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-red-200 dark:hover:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void onExcluirCarregamento(c);
+                              }}
+                              title="Excluir carregamento"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -4769,17 +4774,16 @@ function CarregamentoArea({
               <Truck className="w-4 h-4 text-emerald-500" />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
               {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-              {importandoCarregamentos && (
-                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs flex items-center gap-1">
+              {importandoCarregamentos ? (
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Atualizando do SSW...
+                  Atualizando...
                 </Badge>
-              )}
-              {carregamentos.length > 0 && (
+              ) : carregamentos.length > 0 ? (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
                   {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
                 </Badge>
-              )}
+              ) : null}
               {modoApontamento && (
                 <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
                   <CheckSquare className="w-3 h-3" />
@@ -4857,17 +4861,6 @@ function CarregamentoArea({
           </div>
         )}
       </div>
-
-      {importandoCarregamentos && (
-        <div className="absolute top-3 right-3 z-10 pointer-events-none">
-          <div className="rounded-full border border-indigo-200 dark:border-indigo-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Atualizando…
-            </div>
-          </div>
-        </div>
-      )}
 
       {modalAberto && (
         <ModalCriarCarregamento
@@ -4971,6 +4964,7 @@ export function Disponiveis() {
 
   const [dados, setDados] = useState<DadosTransferencia | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingInicial, setLoadingInicial] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
   const [countdown, setCountdown] = useState(300);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -5062,6 +5056,8 @@ export function Disponiveis() {
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const [obrigarPlacasReais, setObrigarPlacasReais] = useState(false);
+  const obrigarPlacasReaisRef = useRef(false);
+  useEffect(() => { obrigarPlacasReaisRef.current = obrigarPlacasReais; }, [obrigarPlacasReais]);
   const [placasFaltantesDialogOpen, setPlacasFaltantesDialogOpen] = useState(false);
   const [placasFaltantesDialogList, setPlacasFaltantesDialogList] = useState<string[]>([]);
   const importandoCarregamentosRef = useRef(false);
@@ -5307,7 +5303,8 @@ export function Disponiveis() {
     importandoCarregamentosRef.current = true;
     setImportandoCarregamentos(true);
     try {
-      const body: any = { obrigar_placas_reais: obrigarPlacasReais ? true : false };
+      const obrigarAtivo = obrigarPlacasReaisRef.current ? true : false;
+      const body: any = { obrigar_placas_reais: obrigarAtivo };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
         { method: 'POST', body: JSON.stringify(body) },
@@ -5317,7 +5314,7 @@ export function Disponiveis() {
         await carregarCarregamentos();
       }
       const faltantes = Array.isArray((res as any)?.veiculos_faltantes) ? (res as any).veiculos_faltantes : [];
-      if (obrigarPlacasReais && faltantes.length > 0) {
+      if (obrigarAtivo && faltantes.length > 0) {
         if (opts?.silent) {
           const lista = faltantes.slice(0, 10).join(', ');
           const resto = faltantes.length > 10 ? ` (+${faltantes.length - 10} outras)` : '';
@@ -5334,7 +5331,7 @@ export function Disponiveis() {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos, obrigarPlacasReais]);
+  }, [carregarCarregamentos]);
 
   const handleImportarCarregamentos = useCallback(async (opts?: { silent?: boolean }) => {
     return importarCarregamentosBase(opts);
@@ -5437,10 +5434,13 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
 
-  const handleExcluirCarregamento = useCallback(async (placa: string) => {
+  const handleExcluirCarregamento = useCallback(async (carregamento: Carregamento) => {
+    const placa = String(carregamento?.placa_provisoria ?? '').trim().toUpperCase();
+    const seqCarregamento = Number((carregamento as any)?.seq_carregamento ?? 0) || 0;
+    if (!placa && seqCarregamento <= 0) return false;
     const ok = await confirmar({
       title: 'Excluir carregamento?',
-      description: `Excluir o carregamento "${placa}" da base?\n\nEssa ação remove o carregamento (enquanto estiver em aberto) e não pode ser desfeita.`,
+      description: `Excluir o carregamento "${placa}" da base?\n\nEssa ação remove o carregamento e não pode ser desfeita.`,
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -5449,7 +5449,7 @@ export function Disponiveis() {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento', placa }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento', placa, seq_carregamento: seqCarregamento || undefined }) },
         true
       );
       if (res.success) {
@@ -5466,39 +5466,6 @@ export function Disponiveis() {
       return false;
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
-
-  const handleExcluirCarregamentoFinalizado = useCallback(async (carregamento: Carregamento) => {
-    const placa = String(carregamento?.placa_provisoria ?? '').trim().toUpperCase();
-    const seqCarregamento = Number((carregamento as any)?.seq_carregamento ?? 0) || 0;
-    if (!placa && seqCarregamento <= 0) return false;
-
-    const ok = await confirmar({
-      title: 'Excluir carregamento finalizado?',
-      description: `Excluir o carregamento finalizado "${placa}" da base?\n\nEssa ação remove o carregamento e não pode ser desfeita.`,
-      confirmText: 'Excluir',
-      cancelText: 'Cancelar',
-      variant: 'destructive',
-    });
-    if (!ok) return false;
-
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento_finalizado', unidade: sigla, placa, seq_carregamento: seqCarregamento || undefined }) },
-        true
-      );
-      if (res?.success) {
-        toast.success(`Carregamento ${placa} excluído.`);
-        await Promise.all([carregarCarregamentos(), carregarCarregamentosCalendario()]);
-        return true;
-      }
-      toast.error(res?.message || 'Erro ao excluir carregamento');
-      return false;
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao excluir carregamento');
-      return false;
-    }
-  }, [confirmar, carregarCarregamentos, carregarCarregamentosCalendario, sigla]);
 
   const handleCarregamentoAutomatico = useCallback(async (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }): Promise<{
     ok: boolean;
@@ -6039,8 +6006,13 @@ export function Disponiveis() {
 
   const handleAtualizarTransferencia = useCallback(async () => {
     if (!sigla) return;
-    await importarCarregamentosSSWObrigatorio();
-    await carregar();
+    setLoadingInicial(true);
+    try {
+      await importarCarregamentosSSWObrigatorio();
+      await carregar();
+    } finally {
+      setLoadingInicial(false);
+    }
   }, [sigla, importarCarregamentosSSWObrigatorio, carregar]);
 
   const verificarSaidasEmViagem = useCallback(async () => {
@@ -6065,12 +6037,14 @@ export function Disponiveis() {
     if (!sigla) return;
     let ativo = true;
     void (async () => {
+      setLoadingInicial(true);
       await importarCarregamentosSSWObrigatorio();
       if (!ativo) return;
       await verificarSaidasEmViagem();
       await carregarCarregamentos();
       await carregar();
       await carregarEntrega();
+      if (ativo) setLoadingInicial(false);
     })();
     return () => { ativo = false; };
   }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
@@ -7274,7 +7248,7 @@ export function Disponiveis() {
           <p className="text-lg font-medium">{isMTZ ? 'Acesso não disponível para a unidade MTZ' : 'Unidade não configurada para efetuar carregamentos'}</p>
           <p className="text-sm mt-1">{isMTZ ? 'Faça login em uma unidade específica para visualizar este painel.' : 'Verifique o CADASTRO DE UNIDADES.'}</p>
         </div>
-      ) : loading && !dados ? (
+      ) : (loadingInicial || loading) && !dados ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
           <Loader2 className="w-12 h-12 animate-spin mb-4 text-indigo-500" />
           <p className="text-base">Aguarde...</p>
@@ -7738,7 +7712,6 @@ export function Disponiveis() {
             onCriarCarregamento={handleCriarCarregamento}
             onFinalizarCarregamento={handleFinalizarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
-            onExcluirCarregamentoFinalizado={handleExcluirCarregamentoFinalizado}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
             onCarregarHub={abrirHub}
@@ -8173,14 +8146,14 @@ export function Disponiveis() {
         </div>
       ) : null}
       <Dialog open={placasFaltantesDialogOpen} onOpenChange={setPlacasFaltantesDialogOpen}>
-        <DialogContent className="max-w-lg h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-md overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Placas não cadastradas</DialogTitle>
             <DialogDescription>
               As placas abaixo não estavam cadastradas como veículo no Presto e foram ignoradas na importação por estar ativo "Obrigar placas reais".
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+          <div className="max-h-[45vh] overflow-y-auto overscroll-contain pr-1">
             <div className="space-y-2">
               {placasFaltantesDialogList.map((p) => (
                 <div key={p} className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-xs font-mono text-slate-700 dark:text-slate-200">

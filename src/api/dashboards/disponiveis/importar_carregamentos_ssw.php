@@ -854,6 +854,64 @@ foreach ($placas_ssw as $placa) {
             if ($seqCarreg > 0) $seqCarregRveAgrupado = $seqCarreg;
         }
     }
+    $reaproveitandoPorPlaca = false;
+    $origemCriacaoSalvar = 'SSW';
+    if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
+        $resSeqExist = sql(
+            "SELECT cap.seq_carregamento,
+                    COALESCE(cap.simulado, FALSE) AS simulado
+             FROM {$tabelaCap} cap
+             JOIN {$tabela} c
+               ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+             WHERE cap.unidade = \$1
+               AND UPPER(cap.placa_provisoria) = UPPER(\$2)
+               AND c.data_finalizacao IS NULL
+             ORDER BY COALESCE(cap.simulado, FALSE) DESC, cap.seq_carregamento DESC
+             LIMIT 1",
+            [$unidade, $placaProvisoriaSalvar],
+            $conn
+        );
+        if ($resSeqExist && pg_num_rows($resSeqExist) > 0) {
+            $seqCarreg = (int)pg_fetch_result($resSeqExist, 0, 0);
+            $reaproveitandoPorPlaca = $seqCarreg > 0;
+            if ($reaproveitandoPorPlaca) {
+                $resOrig = sql(
+                    "SELECT origem_criacao
+                     FROM {$tabela}
+                     WHERE unidade = \$1
+                       AND seq_carregamento = \$2
+                     ORDER BY data_inclusao ASC, hora_inclusao ASC
+                     LIMIT 1",
+                    [$unidade, $seqCarreg],
+                    $conn
+                );
+                if ($resOrig && pg_num_rows($resOrig) > 0) {
+                    $tmp = strtoupper(trim((string)pg_fetch_result($resOrig, 0, 0)));
+                    if ($tmp !== '') $origemCriacaoSalvar = $tmp;
+                }
+            }
+        }
+    }
+    if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
+        $resSeqCar = sql(
+            "SELECT seq_carregamento, origem_criacao
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND UPPER(placa_provisoria) = UPPER(\$2)
+               AND data_finalizacao IS NULL
+             ORDER BY COALESCE(seq_carregamento, 0) DESC
+             LIMIT 1",
+            [$unidade, $placaProvisoriaSalvar],
+            $conn
+        );
+        if ($resSeqCar && pg_num_rows($resSeqCar) > 0) {
+            $rowSeqCar = pg_fetch_assoc($resSeqCar);
+            $seqCarreg = (int)($rowSeqCar['seq_carregamento'] ?? 0);
+            $reaproveitandoPorPlaca = $seqCarreg > 0;
+            $tmp = strtoupper(trim((string)($rowSeqCar['origem_criacao'] ?? '')));
+            if ($tmp !== '') $origemCriacaoSalvar = $tmp;
+        }
+    }
     if ($seqCarreg <= 0) {
         $resSeq = @pg_query($conn, "SELECT seq_carregamento FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' AND seq_carregamento IS NOT NULL LIMIT 1");
         if ($resSeq && pg_num_rows($resSeq) > 0) {
@@ -983,18 +1041,40 @@ foreach ($placas_ssw as $placa) {
     try {
         $inseridos = 0;
         $ignoradosEmOutro = 0;
+        if ($reaproveitandoPorPlaca && $seqCarreg > 0) {
+            $resDup = sql(
+                "SELECT DISTINCT c.seq_carregamento
+                 FROM {$tabela} c
+                 WHERE c.unidade = \$1
+                   AND c.data_finalizacao IS NULL
+                   AND UPPER(COALESCE(c.origem_criacao, '')) = 'SSW'
+                   AND UPPER(COALESCE(c.origem_ssw, '')) = UPPER(\$2)
+                   AND COALESCE(c.seq_carregamento, 0) <> \$3",
+                [$unidade, $placa, $seqCarreg],
+                $conn
+            );
+            if ($resDup && pg_num_rows($resDup) > 0) {
+                while ($rowDup = pg_fetch_assoc($resDup)) {
+                    $seqDup = (int)($rowDup['seq_carregamento'] ?? 0);
+                    if ($seqDup <= 0) continue;
+                    sql("DELETE FROM {$tabela} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seqDup], $conn);
+                    sql("DELETE FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seqDup], $conn);
+                }
+            }
+        }
         $resHdr = pg_query($conn,
             "UPDATE {$tabela}
              SET placa_provisoria = '{$placaProvEsc}',
+                 origem_ssw = '{$placaEsc}',
                  seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                  destino = {$destinoCarEsc},
                  unidades = {$unidadesCarEsc},
-                 origem_criacao = 'SSW',
+                 origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
                  data_finalizacao = NULL,
                  hora_finalizacao = NULL,
                  login_finalizacao = NULL
              WHERE UPPER(unidade) = '{$unidadeEsc}'
-               AND origem_ssw = '{$placaEsc}'"
+               AND seq_carregamento = {$seqCarreg}"
         );
         if ($resHdr === false) throw new Exception(pg_last_error($conn));
 
@@ -1014,11 +1094,11 @@ foreach ($placas_ssw as $placa) {
         @pg_query($conn,
             "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
              VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', {$nroLinhaCarEsc})
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), simulado = FALSE"
         );
 
         if (empty($ctes)) {
-            $resAny = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' LIMIT 1");
+            $resAny = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND seq_carregamento = {$seqCarreg} LIMIT 1");
             if (!$resAny || pg_num_rows($resAny) === 0) {
                 $resInsSent = pg_query(
                     $conn,
@@ -1027,7 +1107,7 @@ foreach ($placas_ssw as $placa) {
                       nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
             }
@@ -1037,7 +1117,7 @@ foreach ($placas_ssw as $placa) {
                 $nro = (int)($cte_info['nro_cte'] ?? 0);
                 if ($ser === '' || $nro <= 0) continue;
 
-                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
+                $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND seq_carregamento = {$seqCarreg} AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
                 if ($check_dup && pg_num_rows($check_dup) > 0) {
                     $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
                     $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
@@ -1059,6 +1139,7 @@ foreach ($placas_ssw as $placa) {
                     $resUpdCte = pg_query($conn,
                         "UPDATE {$tabela}
                          SET placa_provisoria = '{$placaProvEsc}',
+                             origem_ssw = '{$placaEsc}',
                              seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
                              destino = {$destinoCarEsc},
                              unidades = {$unidadesCarEsc},
@@ -1074,12 +1155,12 @@ foreach ($placas_ssw as $placa) {
                              peso_cte = {$pesoVal},
                              cubagem_cte = {$cubVal},
                              qtde_vol_cte = {$qtdeVol},
-                             origem_criacao = 'SSW',
+                             origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
                              data_finalizacao = NULL,
                              hora_finalizacao = NULL,
                              login_finalizacao = NULL
                          WHERE UPPER(unidade) = '{$unidadeEsc}'
-                           AND origem_ssw = '{$placaEsc}'
+                           AND seq_carregamento = {$seqCarreg}
                            AND ser_cte = '{$ser}'
                            AND nro_cte = {$nro}"
                     );
@@ -1087,7 +1168,7 @@ foreach ($placas_ssw as $placa) {
                     continue;
                 }
 
-                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND data_finalizacao IS NULL AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND origem_ssw <> '{$placaEsc}' LIMIT 1");
+                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND data_finalizacao IS NULL AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND COALESCE(seq_carregamento, 0) <> {$seqCarreg} LIMIT 1");
                 if ($check_outro && pg_num_rows($check_outro) > 0) { $ignoradosEmOutro++; continue; }
 
                 $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
@@ -1121,7 +1202,7 @@ foreach ($placas_ssw as $placa) {
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
-                      '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                      '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
                 );
                 if (!$resIns) throw new Exception(pg_last_error($conn));
                 $inseridos++;
