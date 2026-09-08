@@ -716,13 +716,13 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
               ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-              destino, unidades, origem_ssw, origem_criacao, unidade_carregamento, nro_linha)
+              destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', {$seqCarregamento}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
               '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
               '{$remet}', '{$destin}', '{$pagad}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
-              '{$destEsc}', '{$unidEsc}', NULL, 'AUTO', '{$unidCar}', " . ($nroLinhaSql !== null ? (string)$nroLinhaSql : "NULL") . ")"
+              '{$destEsc}', '{$unidEsc}', NULL, 'AUTO', '{$unidCar}')"
         );
 
         if (!$res) {

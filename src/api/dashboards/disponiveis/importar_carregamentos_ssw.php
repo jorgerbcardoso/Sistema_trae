@@ -987,7 +987,6 @@ foreach ($placas_ssw as $placa) {
             "UPDATE {$tabela}
              SET placa_provisoria = '{$placaProvEsc}',
                  seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
-                 nro_linha = {$nroLinhaCarEsc},
                  destino = {$destinoCarEsc},
                  unidades = {$unidadesCarEsc},
                  origem_criacao = 'SSW',
@@ -1025,10 +1024,10 @@ foreach ($placas_ssw as $placa) {
                     $conn,
                     "INSERT INTO {$tabela}
                      (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                      nro_cte, nro_linha, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
+                      nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      0, {$nroLinhaCarEsc}, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
+                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', 'SSW', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
             }
@@ -1061,7 +1060,6 @@ foreach ($placas_ssw as $placa) {
                         "UPDATE {$tabela}
                          SET placa_provisoria = '{$placaProvEsc}',
                              seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
-                             nro_linha = {$nroLinhaCarEsc},
                              destino = {$destinoCarEsc},
                              unidades = {$unidadesCarEsc},
                              destino_cte = '{$destinoCte}',
@@ -1112,14 +1110,14 @@ foreach ($placas_ssw as $placa) {
                 $resIns = pg_query($conn,
                     "INSERT INTO {$tabela}
                      (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                      nro_linha, destino, unidades,
+                      destino, unidades,
                       ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                       remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      {$nroLinhaCarEsc}, {$destinoCarEsc}, {$unidadesCarEsc},
+                      {$destinoCarEsc}, {$unidadesCarEsc},
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
