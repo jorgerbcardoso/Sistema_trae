@@ -1238,7 +1238,7 @@ export function FretesExpedidosRecebidos() {
               </div>
             ) : (
               <div>
-            {!dataRecListView ? (
+            {!dataRecView ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
                   Nenhum dado de Recebidos carregado.
@@ -1441,12 +1441,12 @@ export function FretesExpedidosRecebidos() {
                         </tbody>
                         <tfoot>
                           <tr className="border-t font-semibold bg-slate-50/60 dark:bg-slate-900/30">
-                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataRecListView.rows.length)} unidades)</td>
+                            <td className="py-2 pr-3">TOTAL ({formatNumber(dataRecView.rows.length)} unidades)</td>
                             <td className="py-2 pr-3" />
-                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecListView.totals.quant_ctrc)}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecListView.totals.peso_ton) || 0))}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecListView.totals.val_merc)}</td>
-                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecListView.totals.frete_tot)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(dataRecView.totals.quant_ctrc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatNumber(Math.round(Number(dataRecView.totals.peso_ton) || 0))}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.val_merc)}</td>
+                            <td className="py-2 pr-3 text-right font-mono">{formatCurrency(dataRecView.totals.frete_tot)}</td>
                           </tr>
                         </tfoot>
                       </table>
