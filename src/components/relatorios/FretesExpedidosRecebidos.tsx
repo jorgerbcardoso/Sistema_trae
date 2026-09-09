@@ -384,14 +384,11 @@ export function FretesExpedidosRecebidos() {
 
   const dataExpView = useMemo<ApiData | null>(() => {
     if (!dataAbaExpedidos) return null;
+    if (filtroExpedidos === 'todos') return dataAbaExpedidos;
     const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
     const rowsBase = dataAbaExpedidos.rows || [];
     const rows0 =
-      filtroExpedidos === 'todos'
-        ? rowsBase
-        : filtroExpedidos === 'fec'
-          ? rowsBase.filter(isFec)
-          : rowsBase.filter((r) => !isFec(r));
+      filtroExpedidos === 'fec' ? rowsBase.filter(isFec) : rowsBase.filter((r) => !isFec(r));
 
     const rows = rows0;
 
@@ -432,6 +429,7 @@ export function FretesExpedidosRecebidos() {
     const isFecGroup = (g: any) => String(g?.unidade_base_sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
 
     if (groups.length === 0) {
+      if (filtroRecebidos === 'todos') return dataAbaRecebidos;
       const isFec = (r: RowAgg) => String(r.sigla ?? '').trim().substring(0, 3).toUpperCase() === 'FEC';
       const rowsBase = dataAbaRecebidos.rows || [];
       const rows =
@@ -545,11 +543,6 @@ export function FretesExpedidosRecebidos() {
     return { totals, rows };
   }, [dataAbaRecebidos, filtroRecebidos]);
 
-  const dataRecListView = useMemo<ApiData | null>(() => {
-    if (!dataAbaRecebidos) return null;
-    return dataAbaRecebidos;
-  }, [dataAbaRecebidos]);
-
   const rowsExpSorted = useMemo(() => {
     const rows = [...(dataExpView?.rows || [])];
     const { key, dir } = sortExp;
@@ -565,7 +558,7 @@ export function FretesExpedidosRecebidos() {
   }, [dataExpView, sortExp]);
 
   const rowsRecSorted = useMemo(() => {
-    const rows = [...(dataRecListView?.rows || [])];
+    const rows = [...(dataRecView?.rows || [])];
     const { key, dir } = sortRec;
     rows.sort((a, b) => {
       const av: any = (a as any)[key];
@@ -576,7 +569,7 @@ export function FretesExpedidosRecebidos() {
       return dir === 'asc' ? cmp : -cmp;
     });
     return rows;
-  }, [dataRecListView, sortRec]);
+  }, [dataRecView, sortRec]);
 
   const toggleSort = (kind: 'expedidos' | 'recebidos', key: keyof RowAgg) => {
     if (kind === 'expedidos') {
@@ -994,7 +987,7 @@ export function FretesExpedidosRecebidos() {
                   disabled={loading}
                   onClick={() => {
                     const isExp = tab === 'expedidos';
-                    const data = isExp ? dataExpView : dataRecListView;
+                    const data = isExp ? dataExpView : dataRecView;
                     if (!data) {
                       toast.info('Nenhum dado carregado para exportar.');
                       return;

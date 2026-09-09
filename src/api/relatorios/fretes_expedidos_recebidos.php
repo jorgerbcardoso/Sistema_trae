@@ -445,6 +445,7 @@ $parseTxt = static function(string $content, string $tipo) use ($deriveBreaks, $
 
         $sigla = strtoupper(substr($unLabel, 0, 3));
         if (!preg_match('/^[A-Z0-9]{3}$/', $sigla)) continue;
+        if (is_array($knownSiglas) && !isset($knownSiglas[$sigla])) continue;
 
         $current['rows'][] = [
             'sigla' => $sigla,
