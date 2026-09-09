@@ -180,6 +180,13 @@ $parseCompetencia = static function(string $ym, string $raw): array {
         return [$mmyy, $label];
     }
 
+    if ($raw !== '' && preg_match('/^(\d{2})[\/\-](\d{2})$/', $raw, $m)) {
+        $mmyy = $m[1] . $m[2];
+        $mmKey = array_search($m[1], $meses, true);
+        if ($mmKey !== false) $label = $mmKey . '/' . $m[2];
+        return [$mmyy, $label];
+    }
+
     if ($raw !== '' && preg_match('/^([a-z]{3})\/(\d{2})$/i', $raw, $m)) {
         $mon = strtolower($m[1]);
         $yy = $m[2];
@@ -621,8 +628,9 @@ foreach ($lines as $l) {
         if ($grupoNum === '' || (int)$grupoNum !== (int)$grupoEvento) continue;
     }
 
-    if ($mesCompLabel !== '') {
-        if (strtolower($mesCompetencia) !== strtolower($mesCompLabel)) continue;
+    if ($mesCompParam !== '') {
+        [$rowMesCompParam] = $parseCompetencia('', (string)$mesCompetencia);
+        if ($rowMesCompParam !== $mesCompParam) continue;
     }
 
     if ($startInclusaoTs !== null || $endInclusaoTs !== null) {

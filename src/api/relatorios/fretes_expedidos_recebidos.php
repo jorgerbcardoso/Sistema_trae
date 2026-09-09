@@ -626,8 +626,8 @@ if ($step === 'POLL') {
         ], 500);
     }
 
-    $best = null;
-    $bestSeq = -1;
+    $candidate = null;
+    $candidateSit = '';
 
     for ($i = 0; $i <= 200; $i++) {
         $seq = $xml1440->xpath('rs/r/f0')[$i] ?? null;
@@ -650,56 +650,70 @@ if ($step === 'POLL') {
         if (!in_array($usrNorm, $allowedSswUsers, true)) continue;
 
         $sitStr = (string)$sit;
-        if ($sitStr !== 'Conclu&iacute;do') continue;
-
-        $f8raw = (string)$f8;
-        if ($f8raw === '') continue;
 
         $okBySeq = ($seqVal > $baselineSeqIn);
         $f2ts = $parseF2Ts((string)$f2);
-        $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 120));
+        $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 5));
         if (!$okBySeq && !$okByTime) continue;
 
-        $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
-        if (!$hasLinksOrNone) continue;
-
-        if ($seqVal > $bestSeq) {
-            $bestSeq = $seqVal;
-            $best = [
-                'seq' => $seqVal,
-                'opc' => $opcStr,
-                'usr' => $usrStr,
-                'sit' => $sitStr,
-                'f8'  => $f8raw,
-                'f2'  => (string)$f2,
-            ];
-        }
+        $candidate = [
+            'seq' => $seqVal,
+            'opc' => (string)$opcStr,
+            'usr' => (string)$usrStr,
+            'sit' => (string)$sitStr,
+            'f8'  => (string)$f8,
+            'f2'  => (string)$f2,
+        ];
+        $candidateSit = $sitStr;
+        break;
     }
 
-    if (!$best) {
+    if (!$candidate) {
         respondJson([
             'success' => true,
             'status' => 'pending',
         ]);
     }
 
-    $f8dec = html_entity_decode((string)($best['f8'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if ($candidateSit !== 'Conclu&iacute;do') {
+        respondJson([
+            'success' => true,
+            'status' => 'pending',
+        ]);
+    }
+
+    $f8raw = (string)($candidate['f8'] ?? '');
+    if ($f8raw === '') {
+        respondJson([
+            'success' => true,
+            'status' => 'pending',
+        ]);
+    }
+
+    $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
+    if (!$hasLinksOrNone) {
+        respondJson([
+            'success' => true,
+            'status' => 'pending',
+        ]);
+    }
+
     if (stripos($f8dec, 'Nenhum registro encontrado') !== false) {
         respondJson([
             'success' => true,
             'status' => 'ready',
             'result' => 'empty',
-            'ssw_seq' => (int)($best['seq'] ?? 0),
+            'ssw_seq' => (int)($candidate['seq'] ?? 0),
         ]);
     }
 
-    $acts = $extractActsFromF8((string)($best['f8'] ?? ''));
+    $acts = $extractActsFromF8($f8raw);
     respondJson([
         'success' => true,
         'status' => 'ready',
         'result' => 'links',
-        'ssw_seq' => (int)($best['seq'] ?? 0),
+        'ssw_seq' => (int)($candidate['seq'] ?? 0),
         'acts' => $acts,
     ]);
 }
