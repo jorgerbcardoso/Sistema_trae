@@ -54,7 +54,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useTooltipStyle } from './CustomTooltip';
@@ -5058,8 +5058,6 @@ export function Disponiveis() {
   const [obrigarPlacasReais, setObrigarPlacasReais] = useState(false);
   const obrigarPlacasReaisRef = useRef(false);
   useEffect(() => { obrigarPlacasReaisRef.current = obrigarPlacasReais; }, [obrigarPlacasReais]);
-  const [placasFaltantesDialogOpen, setPlacasFaltantesDialogOpen] = useState(false);
-  const [placasFaltantesDialogList, setPlacasFaltantesDialogList] = useState<string[]>([]);
   const importandoCarregamentosRef = useRef(false);
   const [importandoVeiculos, setImportandoVeiculos] = useState(false);
   const importandoVeiculosRef = useRef(false);
@@ -5319,9 +5317,6 @@ export function Disponiveis() {
           const lista = faltantes.slice(0, 10).join(', ');
           const resto = faltantes.length > 10 ? ` (+${faltantes.length - 10} outras)` : '';
           toast.info(`Placas ignoradas por falta de cadastro: ${lista}${resto}`);
-        } else {
-          setPlacasFaltantesDialogList(faltantes);
-          setPlacasFaltantesDialogOpen(true);
         }
       }
       return res;
@@ -8145,31 +8140,6 @@ export function Disponiveis() {
           )}
         </div>
       ) : null}
-      <Dialog open={placasFaltantesDialogOpen} onOpenChange={setPlacasFaltantesDialogOpen}>
-        <DialogContent className="max-w-md overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Placas não cadastradas</DialogTitle>
-            <DialogDescription>
-              As placas abaixo não estavam cadastradas como veículo no Presto e foram ignoradas na importação por estar ativo "Obrigar placas reais".
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[45vh] overflow-y-auto overscroll-contain pr-1">
-            <div className="space-y-2">
-              {placasFaltantesDialogList.map((p) => (
-                <div key={p} className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-xs font-mono text-slate-700 dark:text-slate-200">
-                  {p}
-                </div>
-              ))}
-              {placasFaltantesDialogList.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-4">Nenhuma placa para exibir.</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter className="border-t border-slate-200 dark:border-slate-700 pt-4">
-            <Button variant="outline" onClick={() => setPlacasFaltantesDialogOpen(false)}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {confirmarDialog}
       {perguntarTextoDialog}
     </DashboardLayout>

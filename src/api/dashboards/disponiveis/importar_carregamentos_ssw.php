@@ -747,18 +747,14 @@ if ($obrigarPlacasReais) {
     }, $placas_ssw))));
 
     if ($domainUpper === 'RVE') {
-        $suffixByPlaca = [];
+        $placasSuf = [];
         $suffixes = [];
         foreach ($placasCheck as $p) {
             $p = strtoupper(trim((string)$p));
             if ($p === '') continue;
-            if (strlen($p) < 4) {
-                $suffixByPlaca[$p] = '';
-                continue;
-            }
-            $suf = strtoupper(substr($p, -4));
-            $suffixByPlaca[$p] = $suf;
-            $suffixes[$suf] = true;
+            $suf = strlen($p) >= 4 ? strtoupper(substr($p, -4)) : '';
+            $placasSuf[] = ['placa' => $p, 'suf' => $suf];
+            if ($suf !== '') $suffixes[$suf] = true;
         }
 
         $foundSuf = [];
@@ -786,7 +782,10 @@ if ($obrigarPlacasReais) {
         }
 
         $missing = [];
-        foreach ($suffixByPlaca as $placa => $suf) {
+        foreach ($placasSuf as $item) {
+            $placa = (string)($item['placa'] ?? '');
+            $suf = (string)($item['suf'] ?? '');
+            if ($placa === '') continue;
             if ($suf === '' || !isset($foundSuf[$suf])) $missing[] = $placa;
         }
         $veiculosFaltantes = $missing;
