@@ -746,32 +746,78 @@ if ($obrigarPlacasReais) {
         return $s !== '' ? $s : null;
     }, $placas_ssw))));
 
-    $found = [];
-    foreach (array_chunk($placasCheck, 500) as $chunk) {
-        $ph = [];
-        $params = [];
-        $i = 1;
-        foreach ($chunk as $placa) {
-            $ph[] = '$' . $i;
-            $params[] = $placa;
-            $i += 1;
+    if ($domainUpper === 'RVE') {
+        $suffixByPlaca = [];
+        $suffixes = [];
+        foreach ($placasCheck as $p) {
+            $p = strtoupper(trim((string)$p));
+            if ($p === '') continue;
+            if (strlen($p) < 4) {
+                $suffixByPlaca[$p] = '';
+                continue;
+            }
+            $suf = strtoupper(substr($p, -4));
+            $suffixByPlaca[$p] = $suf;
+            $suffixes[$suf] = true;
         }
-        if (empty($ph)) continue;
-        $q = "SELECT UPPER(placa) AS placa FROM {$tabelaVeiculo} WHERE UPPER(placa) IN (" . implode(',', $ph) . ")";
-        $r = sql($q, $params, $conn);
-        if ($r) {
-            while ($row = pg_fetch_assoc($r)) {
-                $pl = strtoupper(trim((string)($row['placa'] ?? '')));
-                if ($pl !== '') $found[$pl] = true;
+
+        $foundSuf = [];
+        $suffixList = array_keys($suffixes);
+        foreach (array_chunk($suffixList, 500) as $chunk) {
+            $ph = [];
+            $params = [];
+            $i = 1;
+            foreach ($chunk as $suf) {
+                $ph[] = '$' . $i;
+                $params[] = $suf;
+                $i += 1;
+            }
+            if (empty($ph)) continue;
+            $q = "SELECT DISTINCT RIGHT(UPPER(placa), 4) AS suf
+                  FROM {$tabelaVeiculo}
+                  WHERE RIGHT(UPPER(placa), 4) IN (" . implode(',', $ph) . ")";
+            $r = sql($q, $params, $conn);
+            if ($r) {
+                while ($row = pg_fetch_assoc($r)) {
+                    $s = strtoupper(trim((string)($row['suf'] ?? '')));
+                    if ($s !== '') $foundSuf[$s] = true;
+                }
             }
         }
-    }
 
-    $missing = [];
-    foreach ($placasCheck as $placa) {
-        if (!isset($found[$placa])) $missing[] = $placa;
+        $missing = [];
+        foreach ($suffixByPlaca as $placa => $suf) {
+            if ($suf === '' || !isset($foundSuf[$suf])) $missing[] = $placa;
+        }
+        $veiculosFaltantes = $missing;
+    } else {
+        $found = [];
+        foreach (array_chunk($placasCheck, 500) as $chunk) {
+            $ph = [];
+            $params = [];
+            $i = 1;
+            foreach ($chunk as $placa) {
+                $ph[] = '$' . $i;
+                $params[] = $placa;
+                $i += 1;
+            }
+            if (empty($ph)) continue;
+            $q = "SELECT UPPER(placa) AS placa FROM {$tabelaVeiculo} WHERE UPPER(placa) IN (" . implode(',', $ph) . ")";
+            $r = sql($q, $params, $conn);
+            if ($r) {
+                while ($row = pg_fetch_assoc($r)) {
+                    $pl = strtoupper(trim((string)($row['placa'] ?? '')));
+                    if ($pl !== '') $found[$pl] = true;
+                }
+            }
+        }
+
+        $missing = [];
+        foreach ($placasCheck as $placa) {
+            if (!isset($found[$placa])) $missing[] = $placa;
+        }
+        $veiculosFaltantes = $missing;
     }
-    $veiculosFaltantes = $missing;
 }
 
 foreach ($placas_ssw as $placa) {
