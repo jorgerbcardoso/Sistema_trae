@@ -171,6 +171,29 @@ function fmtNum(n: number | null | undefined, maxFractionDigits: number) {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: maxFractionDigits });
 }
 
+function parseDecimalLoose(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s0 = String(v ?? '').trim();
+  if (!s0) return null;
+  const s1 = s0.replace(/\s+/g, '');
+  const hasComma = s1.includes(',');
+  const hasDot = s1.includes('.');
+  const normalized = hasComma && hasDot ? s1.replace(/\./g, '').replace(',', '.') : hasComma ? s1.replace(',', '.') : s1;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtDecimalCsv(v: any): string {
+  const n = parseDecimalLoose(v);
+  if (n === null) return '';
+  return new Intl.NumberFormat('pt-BR', {
+    useGrouping: false,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
 function fmtCte(ser: string | null | undefined, nro: number | null | undefined) {
   const s = String(ser ?? '').trim();
   const n = String(nro ?? 0).padStart(6, '0');
@@ -479,10 +502,10 @@ export function CondicaoArmazens() {
         csvEscape(r.sigla_emit ?? ''),
         csvEscape(r.sigla_dest ?? ''),
         csvEscape(r.qtde_vol ?? ''),
-        csvEscape(r.peso ?? ''),
-        csvEscape(r.cubagem ?? ''),
-        csvEscape(r.vlr_merc ?? ''),
-        csvEscape(r.vlr_frete ?? ''),
+        csvEscape(fmtDecimalCsv(r.peso)),
+        csvEscape(fmtDecimalCsv(r.cubagem)),
+        csvEscape(fmtDecimalCsv(r.vlr_merc)),
+        csvEscape(fmtDecimalCsv(r.vlr_frete)),
         csvEscape(r.ult_ocor_codigo ?? ''),
         csvEscape(r.ult_ocor_tipo ?? ''),
         csvEscape(r.ult_ocor_descricao ?? ''),
@@ -531,8 +554,8 @@ export function CondicaoArmazens() {
         csvEscape(r.agendado ? 'SIM' : 'NÃO'),
         csvEscape(ultTxt),
         csvEscape(r.ult_ocor_complemento ?? ''),
-        csvEscape(vlrMerc !== null && Number.isFinite(vlrMerc) ? Number(vlrMerc).toFixed(2).replace('.', ',') : ''),
-        csvEscape(vlrFrete !== null && Number.isFinite(vlrFrete) ? Number(vlrFrete).toFixed(2).replace('.', ',') : ''),
+        csvEscape(fmtDecimalCsv(vlrMerc)),
+        csvEscape(fmtDecimalCsv(vlrFrete)),
       ];
     });
 
@@ -814,10 +837,10 @@ export function CondicaoArmazens() {
         csvEscape(r.sigla_emit ?? ''),
         csvEscape(r.sigla_dest ?? ''),
         csvEscape(r.qtde_vol ?? ''),
-        csvEscape(r.peso ?? ''),
-        csvEscape(r.cubagem ?? ''),
-        csvEscape(r.vlr_merc ?? ''),
-        csvEscape(r.vlr_frete ?? ''),
+        csvEscape(fmtDecimalCsv(r.peso)),
+        csvEscape(fmtDecimalCsv(r.cubagem)),
+        csvEscape(fmtDecimalCsv(r.vlr_merc)),
+        csvEscape(fmtDecimalCsv(r.vlr_frete)),
         csvEscape(r.ult_ocor_codigo ?? ''),
         csvEscape(r.ult_ocor_tipo ?? ''),
         csvEscape(r.ult_ocor_descricao ?? ''),
