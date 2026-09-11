@@ -61,6 +61,7 @@ export function FornecedorSearchInput({
   const [selectedFornecedor, setSelectedFornecedor] = useState<Fornecedor | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const prevValueRef = useRef<string>('');
 
   // 📥 BUSCAR FORNECEDORES DA API (COM DEBOUNCE)
   useEffect(() => {
@@ -112,6 +113,7 @@ export function FornecedorSearchInput({
 
   // 🎯 SINCRONIZAR FORNECEDOR SELECIONADO COM VALUE EXTERNO
   useEffect(() => {
+    const prevValue = prevValueRef.current;
     if (value) {
       const fornecedor = fornecedores.find((f) => f.seq_fornecedor.toString() === value);
       if (fornecedor) {
@@ -120,8 +122,9 @@ export function FornecedorSearchInput({
       }
     } else {
       setSelectedFornecedor(null);
-      setSearchTerm('');
+      if (prevValue) setSearchTerm('');
     }
+    prevValueRef.current = value;
   }, [value, fornecedores]);
 
   // 🖱️ FECHAR DROPDOWN AO CLICAR FORA
