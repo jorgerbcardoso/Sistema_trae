@@ -608,6 +608,8 @@ foreach ($lines as $l) {
     $cnpj = $normalizeDigits($get($arr, $headerIdx, 'CNPJ FORNECEDOR', 7));
     $nomeFornecedor = $get($arr, $headerIdx, 'NOME FORNECEDOR', 8);
     $valorParcela = $get($arr, $headerIdx, 'VLR PARCELA', 23);
+    $valorFinal = $getAny($arr, $headerIdx, ['VLR FINAL', 'VLR_FINAL', 'VLRFINAL'], 26);
+    if (trim((string)$valorFinal) === '') $valorFinal = $valorParcela;
     $dataInclusao = $get($arr, $headerIdx, 'INCLUSAO', 27);
     $dataVenc = $get($arr, $headerIdx, 'VENCIMEN', 29);
     $dataEmissao = $get($arr, $headerIdx, 'EMISSAO', 30);
@@ -650,7 +652,7 @@ foreach ($lines as $l) {
         if (!$inRangeTs($ts, $startProgTs, $endProgTs)) continue;
     }
 
-    $vlr = $parseMoney($valorParcela);
+    $vlr = $parseMoney($valorFinal);
     $sumTotal += $vlr;
     $countTotal += 1;
     if ($sitDes === 'LIQU') $sumLiqu += $vlr;
@@ -667,6 +669,7 @@ foreach ($lines as $l) {
             'fornecedor_cnpj' => $cnpj,
             'fornecedor_nome' => $nomeFornecedor,
             'vlr_parcela' => $valorParcela,
+            'vlr_final' => $valorFinal,
             'data_inclusao' => $dataInclusao,
             'data_vencimento' => $dataVenc,
             'data_emissao_nf' => $dataEmissao,

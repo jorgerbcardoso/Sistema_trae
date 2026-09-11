@@ -34,6 +34,7 @@ type RowDespesa = {
   fornecedor_cnpj: string;
   fornecedor_nome: string;
   vlr_parcela: string;
+  vlr_final: string;
   data_inclusao: string;
   data_vencimento: string;
   data_emissao_nf: string;
@@ -322,7 +323,7 @@ export function ContasPagar() {
     const today = new Date();
     const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0).getTime();
     return rows.map((r) => {
-      const valor = moedaToNumber(r.vlr_parcela);
+      const valor = moedaToNumber((r.vlr_final || r.vlr_parcela) ?? '');
       const venc = parseDateBR(r.data_vencimento);
       const pgto = parseDateBR(r.data_programacao_pgto);
       const incl = parseDateBR(r.data_inclusao);
@@ -986,7 +987,7 @@ export function ContasPagar() {
         ev,
         String(r.fornecedor_nome ?? ''),
         String(r.historico ?? ''),
-        String(r.vlr_parcela ?? ''),
+        String(r.vlr_final || r.vlr_parcela || ''),
         formatDateShort(String(r.data_inclusao ?? '')),
         formatDateShort(String(r.data_vencimento ?? '')),
         formatDateShort(String(r.data_programacao_pgto ?? '')),
@@ -1015,8 +1016,8 @@ export function ContasPagar() {
         const pa = safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null);
         const pb = safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null);
         if (pa !== pb) return pa - pb;
-        const xa = moedaToNumber(a.vlr_parcela);
-        const xb = moedaToNumber(b.vlr_parcela);
+        const xa = moedaToNumber(a.vlr_final || a.vlr_parcela);
+        const xb = moedaToNumber(b.vlr_final || b.vlr_parcela);
         if (xa !== xb) return xb - xa;
         return 0;
       }
@@ -1035,7 +1036,7 @@ export function ContasPagar() {
       }
       if (sortKey === 'fornecedor') return dir * cmpStr(String(a.fornecedor_nome ?? ''), String(b.fornecedor_nome ?? ''));
       if (sortKey === 'historico') return dir * cmpStr(String(a.historico ?? ''), String(b.historico ?? ''));
-      if (sortKey === 'valor') return dir * (moedaToNumber(String(a.vlr_parcela ?? '')) - moedaToNumber(String(b.vlr_parcela ?? '')));
+      if (sortKey === 'valor') return dir * (moedaToNumber(String(a.vlr_final || a.vlr_parcela || '')) - moedaToNumber(String(b.vlr_final || b.vlr_parcela || '')));
       if (sortKey === 'venc') return dir * (safeTs(parseDateBR(a.data_vencimento)?.getTime() ?? null) - safeTs(parseDateBR(b.data_vencimento)?.getTime() ?? null));
       if (sortKey === 'pgto') return dir * (safeTs(parseDateBR(a.data_programacao_pgto)?.getTime() ?? null) - safeTs(parseDateBR(b.data_programacao_pgto)?.getTime() ?? null));
       if (sortKey === 'status') return dir * cmpStr(statusLabel(String(a.sit_des ?? '')), statusLabel(String(b.sit_des ?? '')));
@@ -1047,7 +1048,7 @@ export function ContasPagar() {
 
   const drillTotals = useMemo(() => {
     let total = 0;
-    for (const r of drillRowsFiltradas) total += moedaToNumber(r.vlr_parcela);
+    for (const r of drillRowsFiltradas) total += moedaToNumber(r.vlr_final || r.vlr_parcela);
     return { total, rows: drillRowsFiltradas.length };
   }, [drillRowsFiltradas]);
 
@@ -1060,7 +1061,7 @@ export function ContasPagar() {
       'EVENTO',
       'FORNECEDOR',
       'HISTORICO',
-      'VALOR PARCELA',
+      'VLR FINAL',
       'VENCIMENTO',
       'PAGAMENTO',
       'STATUS',
@@ -1077,7 +1078,7 @@ export function ContasPagar() {
         evento,
         String(r.fornecedor_nome ?? ''),
         String(r.historico ?? ''),
-        String(r.vlr_parcela ?? ''),
+        String(r.vlr_final || r.vlr_parcela || ''),
         String(r.data_vencimento ?? ''),
         String(r.data_programacao_pgto ?? ''),
         status,
@@ -2709,7 +2710,7 @@ export function ContasPagar() {
                       >
                         <FileText className="w-4 h-4" />
                       </button>
-                      <div className="text-right font-mono pr-2">{formatCurrency(moedaToNumber(r.vlr_parcela))}</div>
+                      <div className="text-right font-mono pr-2">{formatCurrency(moedaToNumber(r.vlr_final || r.vlr_parcela))}</div>
                       <div className="font-mono">{dateShort(String(r.data_vencimento ?? '')) || '-'}</div>
                       <div className="font-mono">{dateShort(String(r.data_programacao_pgto ?? '')) || '-'}</div>
                       <div>
@@ -2786,7 +2787,7 @@ export function ContasPagar() {
                 </div>
                 <div className="space-y-1">
                   <div className="text-xs text-slate-500 dark:text-slate-400">Valor</div>
-                  <div className="font-mono text-slate-900 dark:text-slate-100">{formatCurrency(moedaToNumber(selectedDespesa.vlr_parcela))}</div>
+                  <div className="font-mono text-slate-900 dark:text-slate-100">{formatCurrency(moedaToNumber(selectedDespesa.vlr_final || selectedDespesa.vlr_parcela))}</div>
                 </div>
                 <div className="space-y-1">
                   <div className="text-xs text-slate-500 dark:text-slate-400">Competência</div>
