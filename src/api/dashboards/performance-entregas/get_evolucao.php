@@ -105,6 +105,9 @@ $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT I
 // ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
 $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar CT-es manuais (receitas manuais)
+$whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
+
 // ❌ NÃO APLICAR: Período de Emissão
 // ❌ NÃO APLICAR: Período de Previsão de Entrega
 

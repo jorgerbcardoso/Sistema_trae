@@ -82,6 +82,9 @@ try {
     // ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
     $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
 
+    // ✅ FILTRO OBRIGATÓRIO: Ignorar CT-es manuais (receitas manuais)
+    $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
+
     // Filtro: Período de Emissão
     if (!empty($filters['periodoEmissaoInicio'])) {
         $whereConditions[] = "cte.data_emissao >= $" . $paramIndex;
@@ -97,13 +100,13 @@ try {
 
     // Filtro: Período de Previsão de Entrega
     if (!empty($filters['periodoPrevisaoInicio'])) {
-        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) >= $" . $paramIndex;
+        $whereConditions[] = "cte.data_prev_ent::date >= $" . $paramIndex;
         $params[] = $filters['periodoPrevisaoInicio'];
         $paramIndex++;
     }
 
     if (!empty($filters['periodoPrevisaoFim'])) {
-        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE cte.data_prev_ent END) <= $" . $paramIndex;
+        $whereConditions[] = "cte.data_prev_ent::date <= $" . $paramIndex;
         $params[] = $filters['periodoPrevisaoFim'];
         $paramIndex++;
     }
