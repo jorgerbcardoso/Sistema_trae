@@ -1431,7 +1431,7 @@ interface CarregamentoAreaProps {
   loadingCarregamentosCalendario: boolean;
   linhasOrigem: LinhaCarregamento[];
   loadingLinhasOrigem: boolean;
-  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
+  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
   modoApontamento: string | null;
@@ -1704,19 +1704,40 @@ function escolherIntermediariasLinha(
   unidadesCsv: string | null | undefined,
   destino: string | null | undefined,
   intermediariasUsadas: Set<string>,
-  totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number }>,
+  totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>,
   limite: number
 ): string[] {
   const dest = (destino ?? '').trim().toUpperCase();
-  const base = parseUnidadesCsv(unidadesCsv).filter((u) => u !== dest && !intermediariasUsadas.has(u));
+  const base = parseUnidadesCsv(unidadesCsv).filter((u) => u !== dest);
   const unicas = Array.from(new Set(base));
-  unicas.sort((a, b) => {
+  const filtradas = unicas.filter((u) => {
+    const t = totalsPorUnidade[u] ?? { pesoKg: 0, cubagem: 0, frete: 0 };
+    return (t.pesoKg ?? 0) > 0 || (t.cubagem ?? 0) > 0 || (t.frete ?? 0) > 0;
+  });
+  filtradas.sort((a, b) => {
+    const aPrev = totalsPorUnidade[a]?.prevMinTs ?? Number.POSITIVE_INFINITY;
+    const bPrev = totalsPorUnidade[b]?.prevMinTs ?? Number.POSITIVE_INFINITY;
+    if (aPrev !== bPrev) return aPrev - bPrev;
+
+    const ca = totalsPorUnidade[a]?.cubagem ?? 0;
+    const cb = totalsPorUnidade[b]?.cubagem ?? 0;
+    if (ca !== cb) return cb - ca;
+
     const pa = totalsPorUnidade[a]?.pesoKg ?? 0;
     const pb = totalsPorUnidade[b]?.pesoKg ?? 0;
-    if (pa === pb) return a.localeCompare(b);
-    return pb - pa;
+    if (pa !== pb) return pb - pa;
+
+    const fa = totalsPorUnidade[a]?.frete ?? 0;
+    const fb = totalsPorUnidade[b]?.frete ?? 0;
+    if (fa !== fb) return fb - fa;
+
+    const aUsed = intermediariasUsadas.has(a) ? 1 : 0;
+    const bUsed = intermediariasUsadas.has(b) ? 1 : 0;
+    if (aUsed !== bUsed) return aUsed - bUsed;
+
+    return a.localeCompare(b);
   });
-  return unicas.slice(0, Math.max(0, limite));
+  return filtradas.slice(0, Math.max(0, limite));
 }
 
 function CardCarregamento({
@@ -2653,7 +2674,7 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
   loadingLinhasOrigem: boolean;
   carregamentos: Carregamento[];
   siglaUnidade: string;
-  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number }>;
+  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
 }) {
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
@@ -6190,7 +6211,7 @@ export function Disponiveis() {
   }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
-    const totals: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
+    const totals: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
     for (const cte of ctesTransferFiltrados) {
       if (cte.emTransito) continue;
       const dest = (cte.unidadeDest ?? '').trim().toUpperCase();
@@ -6199,6 +6220,12 @@ export function Disponiveis() {
       totals[dest].pesoKg += parsePeso(cte.peso);
       totals[dest].cubagem += parseCubagem(cte.cubagem);
       totals[dest].frete += parseMoeda(cte.frete);
+      const prev = parseDataBR(String((cte as any).prevEnt ?? ''));
+      if (prev) {
+        const ts = prev.getTime();
+        const cur = totals[dest].prevMinTs;
+        totals[dest].prevMinTs = cur === undefined ? ts : Math.min(cur, ts);
+      }
     }
     return totals;
   }, [ctesTransferFiltrados]);
@@ -6229,7 +6256,7 @@ export function Disponiveis() {
         if (!unidades) hasDiretaPorDestino.add(dest);
       }
 
-      const totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number }> = {};
+      const totalsPorUnidade: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
       for (const cte of ctesTransferFiltrados) {
         if (cte.emTransito) continue;
         const dest = (cte.unidadeDest ?? '').trim().toUpperCase();
@@ -6238,6 +6265,12 @@ export function Disponiveis() {
         totalsPorUnidade[dest].pesoKg += parsePeso(cte.peso);
         totalsPorUnidade[dest].cubagem += parseCubagem(cte.cubagem);
         totalsPorUnidade[dest].frete += parseMoeda(cte.frete);
+        const prev = parseDataBR(String((cte as any).prevEnt ?? ''));
+        if (prev) {
+          const ts = prev.getTime();
+          const cur = totalsPorUnidade[dest].prevMinTs;
+          totalsPorUnidade[dest].prevMinTs = cur === undefined ? ts : Math.min(cur, ts);
+        }
       }
 
       const diretaLotaPorDestino = new Set<string>();
