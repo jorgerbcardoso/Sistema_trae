@@ -880,21 +880,45 @@ export function PerformanceEntregas() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoEmissaoInicio}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoEmissaoInicio: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoEmissaoInicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodoEmissaoInicio: e.target.value })}
+                            className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!tempFilters.periodoEmissaoInicio}
+                            onClick={() => setTempFilters({ ...tempFilters, periodoEmissaoInicio: '' })}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoEmissaoFim}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoEmissaoFim: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoEmissaoFim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodoEmissaoFim: e.target.value })}
+                            className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!tempFilters.periodoEmissaoFim}
+                            onClick={() => setTempFilters({ ...tempFilters, periodoEmissaoFim: '' })}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -904,21 +928,45 @@ export function PerformanceEntregas() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoPrevisaoInicio}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoInicio: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoPrevisaoInicio}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodoPrevisaoInicio: e.target.value })}
+                            className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!tempFilters.periodoPrevisaoInicio}
+                            onClick={() => setTempFilters({ ...tempFilters, periodoPrevisaoInicio: '' })}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-slate-600 dark:text-slate-400">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={tempFilters.periodoPrevisaoFim}
-                          onChange={(e) => setTempFilters({...tempFilters, periodoPrevisaoFim: e.target.value})}
-                          className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={tempFilters.periodoPrevisaoFim}
+                            onChange={(e) => setTempFilters({ ...tempFilters, periodoPrevisaoFim: e.target.value })}
+                            className="dark:bg-slate-800 dark:border-slate-700 dark:[color-scheme:dark]"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!tempFilters.periodoPrevisaoFim}
+                            onClick={() => setTempFilters({ ...tempFilters, periodoPrevisaoFim: '' })}
+                            className="dark:hover:bg-slate-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

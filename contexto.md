@@ -120,6 +120,7 @@ REGRA GERAL PARA DIALOGS (CADASTROS/EDIÇÃO):
 - Para “Unidade(s)” com seleção múltipla, usar o mesmo padrão do cadastro de usuários:
   - `src/components/admin/UnidadesMultiSelect.tsx`
 - Para seleção de cliente (pagador/destinatário), usar `FilterSelectCliente` com botão “X” dentro do input.
+- Para filtros de data (inputs `type="date"`), sempre exibir um botão “X” para limpar o campo.
 
 5) REGRAS DE DOMÍNIO / UNIDADE (quando aplicável):
 - Se a tela exigir unidade fixa para não-MTZ, o filtro de unidade deve ficar travado:
