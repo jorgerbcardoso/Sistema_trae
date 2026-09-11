@@ -70,6 +70,7 @@ $where = [];
 
 $where[] = "cte.status <> 'C'";
 $where[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
+$where[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
 $where[] = "cte.data_entrega IS NULL";
 $where[] = "cte.unid_atual IS NOT NULL AND BTRIM(cte.unid_atual) <> ''";
 // Regra: não considerar CT-es já baixados/entregues (tipos de ocorrência B/E)

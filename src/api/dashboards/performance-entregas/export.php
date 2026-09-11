@@ -105,6 +105,9 @@ $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT I
 // ✅ FILTRO OBRIGATÓRIO: Ignorar REENTREGA
 $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
 
+// ✅ FILTRO OBRIGATÓRIO: Ignorar CT-es manuais (receitas manuais)
+$whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
+
 // ✅ FILTRO DE STATUS DE ENTREGA (dos cards ou da tabela)
 if ($statusEntrega) {
     switch ($statusEntrega) {
@@ -220,12 +223,12 @@ if (!$dataPrevisao && !$tipo) {
 
     // Filtro: Período de Previsão de Entrega
     if ($periodoPrevisaoInicio) {
-        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= $" . $paramIndex;
+        $whereConditions[] = "cte.data_prev_ent::date >= $" . $paramIndex;
         $params[] = $periodoPrevisaoInicio;
         $paramIndex++;
     }
     if ($periodoPrevisaoFim) {
-        $whereConditions[] = "(CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN ocor.tipo = 'C' OR UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'REENTREGA' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) <= $" . $paramIndex;
+        $whereConditions[] = "cte.data_prev_ent::date <= $" . $paramIndex;
         $params[] = $periodoPrevisaoFim;
         $paramIndex++;
     }
