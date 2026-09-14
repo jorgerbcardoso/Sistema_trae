@@ -55,8 +55,6 @@ $dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
 
 $filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
 
-// ─── Busca carregamentos agrupados por placa ──────────────────────────────────
-// destino e unidades vêm direto da tabela (primeira linha não-nula por placa)
 $sqlCarregamentos = "
     SELECT
         c.seq_carregamento,
@@ -81,7 +79,7 @@ $sqlCarregamentos = "
         COALESCE(SUM(COALESCE(c.cubagem_cte, 0)), 0)   AS total_cubagem,
         MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
         MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
-        MAX(COALESCE(c.adiado, FALSE))           AS adiado,
+        BOOL_OR(COALESCE(c.adiado, FALSE))       AS adiado,
         MIN(c.login_inclusao)                   AS login_criacao,
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
@@ -200,7 +198,6 @@ if (count($carregamentos) === 0) {
     respondJson(['success' => true, 'carregamentos' => []]);
 }
 
-// ─── Construir mapa de unidades compartilhadas (hub intermediário) ──────────
 $mapDestinoCompart = [];
 try {
     $resUnid = sql(
@@ -229,7 +226,6 @@ try {
     $mapDestinoCompart = [];
 }
 
-// ─── Enriquecer com dados da linha (left join por nro_linha) ───────────────────
 $linhasMap = [];
 $nros = [];
 foreach ($carregamentos as $c) {
@@ -292,11 +288,11 @@ if (count($linhasMap) > 0) {
     }
     unset($c);
 }
-// ─── Calcular hub de destino compartilhado (ex: BH2 / BHZ) ──────────────────
 foreach ($carregamentos as &$c) {
     $destinoFinal = strtoupper(trim((string)($c['destino'] ?? '')));
     $hub = null;
     if ($destinoFinal !== '' && isset($mapDestinoCompart[$destinoFinal])) {
+        $hub = (string)$mapDestinoCompart[$destinoFinal];
     }
     $c['hub_destino_compart'] = ($hub !== null && $hub !== '') ? $hub : null;
 }

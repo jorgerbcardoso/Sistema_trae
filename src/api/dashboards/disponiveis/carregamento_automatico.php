@@ -222,7 +222,7 @@ if ($acao === 'reativar_adiado') {
 
     $resCheck = sql(
         "SELECT
-            MAX(COALESCE(adiado, FALSE)) AS adiado,
+            BOOL_OR(COALESCE(adiado, FALSE)) AS adiado,
             SUM(CASE WHEN COALESCE(nro_cte, 0) > 0 THEN 1 ELSE 0 END) AS qtd_ctes
          FROM {$tabela}
          WHERE unidade = \$1 AND seq_carregamento = \$2 AND data_finalizacao IS NULL",
