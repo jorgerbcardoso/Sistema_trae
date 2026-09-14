@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../lib/ssw_loader.php';
 
 handleOptionsRequest();
 validateRequestMethod('POST');
@@ -1092,7 +1093,8 @@ if ($acao === 'verificar_saidas_ssw') {
 
     $html = '';
     try {
-        if (function_exists('ssw_login')) @ssw_login();
+        require_ssw();
+        ssw_login($domain);
         $html = ssw_go($url);
     } catch (Exception $e) {
         respondJson(['success' => true, 'updated' => 0, 'message' => 'Falha ao consultar o SSW.']);

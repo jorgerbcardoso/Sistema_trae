@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
-require_once '/var/www/html/lib/ssw.php';
+require_once __DIR__ . '/../../lib/ssw_loader.php';
 
 handleOptionsRequest();
 validateRequestMethod('POST');
@@ -18,6 +18,8 @@ if (empty($unidade) || empty($domain)) {
 $input       = getRequestInput();
 
 $conn = connect();
+global $g_sql;
+$g_sql = $conn;
 
 function runImpPropVeic(string $domain, string $modo = 'RECENTE'): array {
     $dom = strtoupper(trim((string)$domain));
@@ -227,7 +229,12 @@ if ($acao === 'IMPORTAR_VEICULOS') {
     respondJson($r);
 }
 
-ssw_login($domain);
+try {
+    require_ssw();
+    ssw_login($domain);
+} catch (Exception $e) {
+    respondJson(['success' => false, 'message' => 'Erro ao inicializar integração: ' . $e->getMessage()]);
+}
 set_time_limit(600);
 
 $importVeiculosRecentes = runImpPropVeic((string)$domain, 'RECENTE');
