@@ -37,6 +37,7 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -80,6 +81,7 @@ $sqlCarregamentos = "
         COALESCE(SUM(COALESCE(c.cubagem_cte, 0)), 0)   AS total_cubagem,
         MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
         MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
+        MAX(COALESCE(c.adiado, FALSE))           AS adiado,
         MIN(c.login_inclusao)                   AS login_criacao,
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
@@ -182,6 +184,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'data_finalizacao' => $dataFinal,
         'hora_finalizacao' => $horaFinal,
         'login_finalizacao' => $row['login_finalizacao'] ?? null,
+        'adiado'           => ((string)($row['adiado'] ?? '') === 't'),
         'nro_linha'        => ($row['nro_linha'] !== null && $row['nro_linha'] !== '') ? (int)$row['nro_linha'] : null,
         'capacidade_ton'   => $capTon,
         'capacidade_m3'    => $capM3,
@@ -289,15 +292,116 @@ if (count($linhasMap) > 0) {
     }
     unset($c);
 }
-
 // ─── Calcular hub de destino compartilhado (ex: BH2 / BHZ) ──────────────────
 foreach ($carregamentos as &$c) {
     $destinoFinal = strtoupper(trim((string)($c['destino'] ?? '')));
     $hub = null;
     if ($destinoFinal !== '' && isset($mapDestinoCompart[$destinoFinal])) {
-        $hub = (string)$mapDestinoCompart[$destinoFinal];
     }
     $c['hub_destino_compart'] = ($hub !== null && $hub !== '') ? $hub : null;
+}
+unset($c);
+
+$hubsSet = [];
+foreach ($mapDestinoCompart as $u => $hub) {
+    $hub = strtoupper(trim((string)$hub));
+    if ($hub !== '') $hubsSet[$hub] = true;
+}
+
+$seqs = [];
+foreach ($carregamentos as $c) {
+    $seq = (int)($c['seq_carregamento'] ?? 0);
+    if ($seq > 0) $seqs[$seq] = true;
+}
+
+$destinosPorSeq = [];
+if (count($seqs) > 0) {
+    $listaSeqs = array_keys($seqs);
+    foreach (array_chunk($listaSeqs, 500) as $chunk) {
+        $params = [$unidade];
+        $ph = [];
+        $p = 2;
+        foreach ($chunk as $seq) {
+            $ph[] = '$' . $p;
+            $params[] = (int)$seq;
+            $p += 1;
+        }
+        if (empty($ph)) continue;
+        $q = "
+            SELECT
+                seq_carregamento,
+                UPPER(COALESCE(NULLIF(destino_cte, ''), NULLIF(destino, ''))) AS dest
+            FROM {$tabelaCarregamento}
+            WHERE unidade = \$1
+              AND seq_carregamento IN (" . implode(',', $ph) . ")
+              AND COALESCE(nro_cte, 0) > 0
+              AND COALESCE(NULLIF(destino_cte, ''), NULLIF(destino, '')) IS NOT NULL
+            GROUP BY seq_carregamento, UPPER(COALESCE(NULLIF(destino_cte, ''), NULLIF(destino, '')))
+        ";
+        $res = sql($q, $params, $conn);
+        if ($res) {
+            while ($r = pg_fetch_assoc($res)) {
+                $seq = (int)($r['seq_carregamento'] ?? 0);
+                $dest = strtoupper(trim((string)($r['dest'] ?? '')));
+                if ($seq <= 0 || $dest === '') continue;
+                if (!isset($destinosPorSeq[$seq])) $destinosPorSeq[$seq] = [];
+                $destinosPorSeq[$seq][] = $dest;
+            }
+        }
+    }
+}
+
+foreach ($carregamentos as &$c) {
+    $seq = (int)($c['seq_carregamento'] ?? 0);
+    $destFinal = strtoupper(trim((string)($c['destino'] ?? '')));
+    $destinos = $seq > 0 && isset($destinosPorSeq[$seq]) ? $destinosPorSeq[$seq] : [];
+
+    $isCentralizadora = ($destFinal !== '' && isset($hubsSet[$destFinal]));
+    $origem = strtoupper(trim((string)($c['origem_criacao'] ?? '')));
+    $adiado = (bool)($c['adiado'] ?? false);
+    $forcarManual = ($origem === 'MANUAL') || $adiado;
+
+    $out = [];
+    $seen = [];
+
+    if (!$forcarManual) {
+        foreach ($destinos as $d) {
+            $d = strtoupper(trim((string)$d));
+            if ($d === '') continue;
+            if ($isCentralizadora && isset($mapDestinoCompart[$d]) && strtoupper((string)$mapDestinoCompart[$d]) === $destFinal) {
+                $d = $destFinal;
+            }
+            if ($d === '' || isset($seen[$d])) continue;
+            $seen[$d] = true;
+            $out[] = $d;
+        }
+    }
+
+    if ($forcarManual || count($out) === 0) {
+        $paradasStr = strtoupper(trim((string)($c['paradas'] ?? '')));
+        $parts = $paradasStr !== '' ? preg_split('/[,\s;]+/', $paradasStr) : [];
+        if (is_array($parts)) {
+            foreach ($parts as $p) {
+                $u = strtoupper(trim((string)$p));
+                if ($u === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+                if ($destFinal !== '' && $u === $destFinal) continue;
+                if ($isCentralizadora && isset($mapDestinoCompart[$u]) && strtoupper((string)$mapDestinoCompart[$u]) === $destFinal) {
+                    $u = $destFinal;
+                }
+                if ($u === '' || isset($seen[$u])) continue;
+                $seen[$u] = true;
+                $out[] = $u;
+            }
+        }
+    }
+
+    if ($destFinal !== '') {
+        $out = array_values(array_filter($out, function($d) use ($destFinal) { return $d !== $destFinal; }));
+        $out[] = $destFinal;
+    }
+
+    if (count($out) === 0 && $destFinal !== '') $out = [$destFinal];
+    $c['destinos_card'] = count($out) > 0 ? implode(', ', $out) : null;
 }
 unset($c);
 

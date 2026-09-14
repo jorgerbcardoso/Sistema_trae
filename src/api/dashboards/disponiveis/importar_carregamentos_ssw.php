@@ -600,6 +600,52 @@ function obterPrimeiraCapturaSsw($placaSsw) {
     ];
 }
 
+function listarSaidasAutorizadasSsw0125(string $siglaOrigem): array {
+    $siglaOrigem = strtoupper(trim($siglaOrigem));
+    if ($siglaOrigem === '') return [];
+
+    $ini = date('dmy', strtotime('-1 day'));
+    $fim = date('dmy');
+
+    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER"
+        . "&t_sigla_origem=" . rawurlencode($siglaOrigem)
+        . "&t_data_saida_ini=" . rawurlencode($ini)
+        . "&t_data_saida_fin=" . rawurlencode($fim);
+
+    $html = ssw_go($url);
+    $xmlStr = extrairXmlDoRetornoSsw($html);
+    if ($xmlStr === null) return [];
+
+    $xml = @simplexml_load_string($xmlStr);
+    if ($xml === false) return [];
+
+    $out = [];
+    $rows = $xml->xpath('//r');
+    if (!$rows) return [];
+
+    foreach ($rows as $r) {
+        $f2 = strtoupper(trim((string)($r->f2 ?? '')));
+        $f11 = trim((string)($r->f11 ?? ''));
+        $f16raw = (string)($r->f16 ?? '');
+        $f16 = strtoupper(trim(html_entity_decode($f16raw)));
+
+        if ($f2 === '' || $f11 === '') continue;
+        if (strpos($f16, 'AUTORIZADO') === false) continue;
+
+        $dt = DateTime::createFromFormat('d/m/y H:i', $f11);
+        if (!$dt) continue;
+
+        $out[] = [
+            'placa' => $f2,
+            'data' => $dt->format('Y-m-d'),
+            'hora' => $dt->format('H:i:s'),
+            'raw' => $f11,
+        ];
+    }
+
+    return $out;
+}
+
 function parseRelatorioCarregamentos($texto) {
     $texto = mb_convert_encoding($texto, 'UTF-8', 'ISO-8859-1');
     $texto = str_replace("\r\n", "\n", str_replace("\r", "\n", $texto));
@@ -838,8 +884,20 @@ foreach ($placas_ssw as $placa) {
         $destinoFromPlaca = substr($placa, 0, 3);
         $sufixoRve = substr($placa, 3, 4);
         if ($sufixoRve !== '') {
+            $placaRealRve = '';
+            $resVeic = sql(
+                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
+                [$sufixoRve],
+                $conn
+            );
+            if ($resVeic && pg_num_rows($resVeic) > 0) {
+                $rowV = pg_fetch_assoc($resVeic);
+                $cand = strtoupper(trim((string)($rowV['placa'] ?? '')));
+                if ($cand !== '') $placaRealRve = $cand;
+            }
+
             $resCapMatch = sql(
-                "SELECT cap.placa_provisoria
+                "SELECT cap.seq_carregamento, cap.placa_provisoria
                  FROM {$tabelaCap} cap
                  JOIN {$tabela} c
                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
@@ -853,19 +911,12 @@ foreach ($placas_ssw as $placa) {
                 $conn
             );
             if ($resCapMatch && pg_num_rows($resCapMatch) > 0) {
-                $cand = strtoupper(trim((string)pg_fetch_result($resCapMatch, 0, 0)));
-                if ($cand !== '') $placaProvisoriaSalvar = $cand;
-            } else {
-                $resVeic = sql(
-                    "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
-                    [$sufixoRve],
-                    $conn
-                );
-                if ($resVeic && pg_num_rows($resVeic) > 0) {
-                    $rowV = pg_fetch_assoc($resVeic);
-                    $cand = strtoupper(trim((string)($rowV['placa'] ?? '')));
-                    if ($cand !== '') $placaProvisoriaSalvar = $cand;
-                }
+                $seqCarregRveAgrupado = (int)pg_fetch_result($resCapMatch, 0, 0);
+                $cand = strtoupper(trim((string)pg_fetch_result($resCapMatch, 0, 1)));
+                if ($placaRealRve !== '') $placaProvisoriaSalvar = $placaRealRve;
+                else if ($cand !== '') $placaProvisoriaSalvar = $cand;
+            } else if ($placaRealRve !== '') {
+                $placaProvisoriaSalvar = $placaRealRve;
             }
         }
     }
@@ -886,11 +937,18 @@ foreach ($placas_ssw as $placa) {
         $captura = null;
     }
 
-    $res_check = pg_query($conn, "SELECT MIN(data_inclusao) AS data_inclusao, MIN(hora_inclusao) AS hora_inclusao, MAX(data_finalizacao) AS data_finalizacao FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}'");
+    $res_check = sql(
+        "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS inicio_ts, MAX(data_finalizacao) AS data_finalizacao
+         FROM {$tabela}
+         WHERE unidade = \$1 AND origem_ssw = \$2",
+        [$unidade, $placa],
+        $conn
+    );
     $row_check = ($res_check && pg_num_rows($res_check) > 0) ? pg_fetch_assoc($res_check) : null;
-    $ja_existe = $row_check && (($row_check['data_inclusao'] ?? null) !== null);
-    $dataInc = $row_check ? (string)($row_check['data_inclusao'] ?? '') : '';
-    $horaInc = $row_check ? (string)($row_check['hora_inclusao'] ?? '') : '';
+    $inicioTs = $row_check ? (string)($row_check['inicio_ts'] ?? '') : '';
+    $ja_existe = $inicioTs !== '';
+    $dataInc = $inicioTs !== '' ? substr($inicioTs, 0, 10) : '';
+    $horaInc = $inicioTs !== '' ? substr($inicioTs, 11, 8) : '';
 
     if (is_array($captura) && ($captura['data'] ?? '') !== '' && ($captura['hora'] ?? '') !== '') {
         $dataIncSql = "DATE '" . pg_escape_string($conn, (string)$captura['data']) . "'";
@@ -904,7 +962,9 @@ foreach ($placas_ssw as $placa) {
     }
 
     $seqCarreg = 0;
-    if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
+    if ($seqCarregRveAgrupado > 0) {
+        $seqCarreg = $seqCarregRveAgrupado;
+    } else if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
         $resSeqPlaca = sql(
             "SELECT cap.seq_carregamento
              FROM {$tabelaCap} cap
@@ -1299,6 +1359,65 @@ $placasUp = array_values(array_unique(array_filter(array_map(function($p) {
     return $s !== '' ? $s : null;
 }, $placas_ssw))));
 if (count($placasUp) > 0) {
+    $saidas = [];
+    try {
+        $saidas = listarSaidasAutorizadasSsw0125($unidade);
+    } catch (Exception $e) {
+        $saidas = [];
+    }
+
+    foreach ($saidas as $s) {
+        $p = strtoupper(trim((string)($s['placa'] ?? '')));
+        $d = (string)($s['data'] ?? '');
+        $h = (string)($s['hora'] ?? '');
+        $raw = (string)($s['raw'] ?? '');
+        if ($p === '' || $d === '' || $h === '') continue;
+
+        $affected = 0;
+        try {
+            $resUp = sql(
+                "UPDATE {$tabela}
+                 SET data_finalizacao = \$3,
+                     hora_finalizacao = \$4,
+                     login_finalizacao = \$5
+                 WHERE unidade = \$1
+                   AND data_finalizacao IS NULL
+                   AND UPPER(placa_provisoria) = UPPER(\$2)",
+                [$unidade, $p, $d, $h, $login],
+                $conn
+            );
+            if ($resUp) $affected = (int)pg_affected_rows($resUp);
+        } catch (Exception $e) {
+            $affected = 0;
+        }
+
+        if ($affected <= 0 && $domainUpper === 'RVE' && preg_match('/^[A-Z0-9]{4,10}$/', $p)) {
+            $suf = substr($p, -4);
+            if ($suf !== '') {
+                try {
+                    $resUp = sql(
+                        "UPDATE {$tabela}
+                         SET data_finalizacao = \$3,
+                             hora_finalizacao = \$4,
+                             login_finalizacao = \$5
+                         WHERE unidade = \$1
+                           AND data_finalizacao IS NULL
+                           AND RIGHT(UPPER(placa_provisoria), 4) = RIGHT(UPPER(\$2), 4)",
+                        [$unidade, $p, $d, $h, $login],
+                        $conn
+                    );
+                    if ($resUp) $affected = (int)pg_affected_rows($resUp);
+                } catch (Exception $e) {
+                    $affected = 0;
+                }
+            }
+        }
+
+        if ($affected > 0) {
+            $logs[] = ['placa' => $p, 'status' => 'aviso', 'msg' => "Carregamento finalizado automaticamente (manifesto autorizado em {$raw})."];
+        }
+    }
+
     $inUp = implode(',', array_map(function($p) use ($conn) {
         return "'" . pg_escape_string($conn, strtoupper(trim((string)$p))) . "'";
     }, $placasUp));

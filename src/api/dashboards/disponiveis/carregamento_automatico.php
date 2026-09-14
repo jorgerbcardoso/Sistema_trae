@@ -31,12 +31,14 @@ $tabela      = "{$domain}_carregamento";
 $tabelaLinha = "{$domain}_linha";
 $tabelaVeiculo = "{$domain}_veiculo";
 $tabelaCap   = "{$domain}_carregamento_capacidade";
+$tabelaUnidade = "{$domain}_unidade";
 
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS multi_carr_diario BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -62,8 +64,10 @@ if ($acao === 'listar_linhas') {
         $res = sql(
             "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
                     multi_carr_diario,
-                    carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                    carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                    (CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora
              FROM {$tabelaLinha}
+             LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)
              WHERE sigla_emit = \$1
              ORDER BY sigla_dest, nome, nro_linha",
             [$unidade], $conn
@@ -80,6 +84,7 @@ if ($acao === 'listar_linhas') {
                 'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
                 'vlr_min_frete' => $r['vlr_min_frete'] !== null ? (float)$r['vlr_min_frete'] : null,
                 'multi_carr_diario' => ((string)($r['multi_carr_diario'] ?? '') === 't'),
+                'destino_centralizadora' => ((string)($r['destino_centralizadora'] ?? '') === 't'),
                 'carrega_seg' => ((string)($r['carrega_seg'] ?? '') === 't'),
                 'carrega_ter' => ((string)($r['carrega_ter'] ?? '') === 't'),
                 'carrega_qua' => ((string)($r['carrega_qua'] ?? '') === 't'),
@@ -93,6 +98,162 @@ if ($acao === 'listar_linhas') {
     } catch (Exception $e) {
         respondJson(['success' => false, 'message' => 'Erro ao listar linhas.']);
     }
+}
+
+if ($acao === 'adiar_linha') {
+    if ($nroLinha <= 0) {
+        respondJson(['success' => false, 'message' => 'Linha não informada.']);
+    }
+
+    $resLinha = null;
+    try {
+        $resLinha = sql(
+            "SELECT sigla_dest, unidades
+             FROM {$tabelaLinha}
+             WHERE sigla_emit = \$1 AND nro_linha = \$2
+             LIMIT 1",
+            [$unidade, $nroLinha],
+            $conn
+        );
+    } catch (Exception $e) {}
+
+    if (!$resLinha || pg_num_rows($resLinha) === 0) {
+        respondJson(['success' => false, 'message' => 'Linha não encontrada para a unidade atual.']);
+    }
+
+    $linha = pg_fetch_assoc($resLinha);
+    $dest = strtoupper(trim((string)($linha['sigla_dest'] ?? '')));
+    if ($dest === '') {
+        respondJson(['success' => false, 'message' => 'Linha inválida: destino não informado.']);
+    }
+
+    $placaAuto = $unidade . '-' . $dest;
+
+    $check = sql("SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 AND data_finalizacao IS NULL LIMIT 1", [$unidade, $placaAuto], $conn);
+    if ($check && pg_num_rows($check) > 0) {
+        respondJson(['success' => true, 'message' => "Carregamento {$placaAuto} já existe."]);
+    }
+
+    $seqCarreg = nextSeqCarregamentoAuto($conn, $seqName);
+    if ($seqCarreg <= 0) {
+        respondJson(['success' => false, 'message' => 'Erro ao gerar seq_carregamento.']);
+    }
+
+    $unidadesCsv = strtoupper(trim((string)($linha['unidades'] ?? '')));
+
+    pg_query($conn, 'BEGIN');
+    try {
+        @pg_query($conn, "
+            CREATE TABLE IF NOT EXISTS {$tabelaCap} (
+                unidade          VARCHAR(10) NOT NULL,
+                seq_carregamento INT NOT NULL,
+                placa_provisoria VARCHAR(20) NOT NULL,
+                cap_ton          NUMERIC,
+                cap_m3           NUMERIC,
+                vlr_frete_carreteiro NUMERIC,
+                simulado         BOOLEAN DEFAULT FALSE,
+                nro_linha        INT,
+                PRIMARY KEY (unidade, seq_carregamento)
+            )
+        ");
+        $nroLinhaSql = ($nroLinha > 0) ? (string)$nroLinha : 'NULL';
+        @pg_query($conn,
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', FALSE, {$nroLinhaSql})
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
+        );
+
+        $ins = sql(
+            "INSERT INTO {$tabela}
+             (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+              ser_cte, nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento, adiado)
+             VALUES
+             (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME,
+              '', 0, \$5, \$6, NULL, 'MANUAL', \$7, TRUE)",
+            [$unidade, $seqCarreg, $placaAuto, $login, $dest, $unidadesCsv, $unidade],
+            $conn
+        );
+        if (!$ins) {
+            throw new Exception('Erro ao criar carregamento adiado.');
+        }
+
+        pg_query($conn, 'COMMIT');
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao adiar carregamento.']);
+    }
+
+    respondJson([
+        'success' => true,
+        'message' => 'Carregamento adiado criado.',
+        'placa' => $placaAuto,
+        'nro_linha' => $nroLinha,
+        'destino' => $dest,
+        'paradas' => $unidadesCsv !== '' ? preg_split('/[,\s;]+/', $unidadesCsv) : [],
+    ]);
+}
+
+if ($acao === 'reativar_adiado') {
+    $seqInput = (int)($input['seq_carregamento'] ?? $input['seqCarregamento'] ?? 0);
+    $placaInput = strtoupper(trim((string)($input['placa'] ?? '')));
+
+    if ($seqInput <= 0 && $placaInput === '') {
+        respondJson(['success' => false, 'message' => 'Informe o carregamento.']);
+    }
+
+    $seq = $seqInput;
+    if ($seq <= 0) {
+        $resSeq = sql(
+            "SELECT seq_carregamento
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND UPPER(placa_provisoria) = UPPER(\$2)
+               AND data_finalizacao IS NULL
+             ORDER BY seq_carregamento DESC
+             LIMIT 1",
+            [$unidade, $placaInput],
+            $conn
+        );
+        if (!$resSeq || pg_num_rows($resSeq) === 0) {
+            respondJson(['success' => false, 'message' => 'Carregamento não encontrado.']);
+        }
+        $seq = (int)pg_fetch_result($resSeq, 0, 0);
+    }
+
+    $resCheck = sql(
+        "SELECT
+            MAX(COALESCE(adiado, FALSE)) AS adiado,
+            SUM(CASE WHEN COALESCE(nro_cte, 0) > 0 THEN 1 ELSE 0 END) AS qtd_ctes
+         FROM {$tabela}
+         WHERE unidade = \$1 AND seq_carregamento = \$2 AND data_finalizacao IS NULL",
+        [$unidade, $seq],
+        $conn
+    );
+    if (!$resCheck || pg_num_rows($resCheck) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento não encontrado.']);
+    }
+
+    $row = pg_fetch_assoc($resCheck);
+    $isAdiado = ((string)($row['adiado'] ?? '') === 't');
+    $qtdCtes = (int)($row['qtd_ctes'] ?? 0);
+    if (!$isAdiado) {
+        respondJson(['success' => false, 'message' => 'Este carregamento não está marcado como adiado.']);
+    }
+    if ($qtdCtes > 0) {
+        respondJson(['success' => false, 'message' => 'Não é possível reativar: o carregamento já possui CT-es.']);
+    }
+
+    pg_query($conn, 'BEGIN');
+    try {
+        sql("DELETE FROM {$tabela} WHERE unidade = \$1 AND seq_carregamento = \$2 AND data_finalizacao IS NULL", [$unidade, $seq], $conn);
+        sql("DELETE FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seq], $conn);
+        pg_query($conn, 'COMMIT');
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao reativar carregamento.']);
+    }
+
+    respondJson(['success' => true, 'message' => 'Carregamento reativado.']);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -743,8 +904,10 @@ if ($modoAutomatico) {
         try {
             $resLinha = sql(
                 "SELECT sigla_dest, unidades, vlr_min_frete,
-                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom
+                        carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                        (CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora
                  FROM {$tabelaLinha}
+                 LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)
                  WHERE sigla_emit = \$1 AND nro_linha = \$2
                  LIMIT 1",
                 [$unidade, $nroLinha], $conn
@@ -757,6 +920,7 @@ if ($modoAutomatico) {
 
     $linha    = pg_fetch_assoc($resLinha);
     $dest     = strtoupper(trim($linha['sigla_dest'] ?? ''));
+    $destinoCentralizadora = ((string)($linha['destino_centralizadora'] ?? '') === 't');
     if ($dest === '') {
         respondJson(['success' => false, 'message' => 'Linha inválida: destino não informado.']);
     }
@@ -776,7 +940,10 @@ if ($modoAutomatico) {
     ];
     $diaKey = $diaKeyByW[$diaSemana] ?? 'carrega_seg';
     $carregaHoje = ((string)($linha[$diaKey] ?? '') === 't');
-    if (!$carregaHoje) {
+    $ontemW = ($diaSemana + 6) % 7;
+    $diaKeyOntem = $diaKeyByW[$ontemW] ?? 'carrega_seg';
+    $carregaOntem = ((string)($linha[$diaKeyOntem] ?? '') === 't');
+    if (!$carregaHoje && !$carregaOntem) {
         respondJson(['success' => false, 'message' => 'Esta linha não está configurada para carregar hoje.']);
     }
 
@@ -802,28 +969,38 @@ if ($modoAutomatico) {
     }
     $ctesDisponiveis = array_values($ctesUnicos);
 
-    $paradasLinhaBase = array_values(array_filter(array_map('strtoupper', array_map('trim', explode(',', $linha['unidades'] ?? '')))));
-    $usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
-    $usadasSet = [];
-    foreach ($usadasArr as $u) $usadasSet[$u] = true;
+    $paradasLinhaBase = array_values(array_filter(array_map('strtoupper', array_map('trim', preg_split('/[,\s;]+/', (string)($linha['unidades'] ?? ''))))));
 
-    $paradasLinha = array_values(array_filter($paradasLinhaBase, function($u) use ($usadasSet, $dest) {
-        $u = strtoupper(trim((string)$u));
-        if ($u === '') return false;
-        if ($u === $dest) return false;
-        if (isset($usadasSet[$u])) return false;
-        return true;
-    }));
-    $paradasLinha = array_values(array_unique($paradasLinha));
+    if ($destinoCentralizadora) {
+        $paradasLinha = array_values(array_unique(array_values(array_filter($paradasLinhaBase, function($u) use ($dest) {
+            $u = strtoupper(trim((string)$u));
+            if ($u === '') return false;
+            if ($u === $dest) return false;
+            return true;
+        }))));
+    } else {
+        $usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
+        $usadasSet = [];
+        foreach ($usadasArr as $u) $usadasSet[$u] = true;
 
-    $totaisPorDestino = calcularTotaisPorDestino($ctesDisponiveis, $unidade);
-    usort($paradasLinha, function($a, $b) use ($totaisPorDestino) {
-        $pa = (float)($totaisPorDestino[$a]['pesoKg'] ?? 0);
-        $pb = (float)($totaisPorDestino[$b]['pesoKg'] ?? 0);
-        if ($pa === $pb) return strcmp($a, $b);
-        return ($pb <=> $pa);
-    });
-    $paradasLinha = array_slice($paradasLinha, 0, 2);
+        $paradasLinha = array_values(array_filter($paradasLinhaBase, function($u) use ($usadasSet, $dest) {
+            $u = strtoupper(trim((string)$u));
+            if ($u === '') return false;
+            if ($u === $dest) return false;
+            if (isset($usadasSet[$u])) return false;
+            return true;
+        }));
+        $paradasLinha = array_values(array_unique($paradasLinha));
+
+        $totaisPorDestino = calcularTotaisPorDestino($ctesDisponiveis, $unidade);
+        usort($paradasLinha, function($a, $b) use ($totaisPorDestino) {
+            $pa = (float)($totaisPorDestino[$a]['pesoKg'] ?? 0);
+            $pb = (float)($totaisPorDestino[$b]['pesoKg'] ?? 0);
+            if ($pa === $pb) return strcmp($a, $b);
+            return ($pb <=> $pa);
+        });
+        $paradasLinha = array_slice($paradasLinha, 0, 2);
+    }
     $paradasCsv = implode(',', $paradasLinha);
 
     $temIntermediarias = count($paradasLinha) > 0;

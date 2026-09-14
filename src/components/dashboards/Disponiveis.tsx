@@ -52,6 +52,7 @@ import {
   Search,
   DollarSign,
   Wallet,
+  RotateCcw,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -229,6 +230,7 @@ interface Carregamento {
   seq_carregamento?: number | null;
   placa_provisoria: string;
   origem_criacao?: 'MANUAL' | 'AUTO' | 'SSW' | null;
+  adiado?: boolean | null;
   total_ctes: number;
   total_frete?: number;
   total_mercadoria?: number;
@@ -249,6 +251,7 @@ interface Carregamento {
   vlr_min_frete?: number | null;
   vlr_frete_carreteiro?: number | null;
   destino?: string | null;
+  destinos_card?: string | null;
   paradas?: string | null;
   ctes: CteCarregamento[];
 }
@@ -1691,7 +1694,10 @@ function formatData(d: string): string {
 function parseUnidadesCsv(csv?: string | null): string[] {
   const s = (csv ?? '').trim();
   if (!s) return [];
-  return s.split(',').map((u) => u.trim().toUpperCase()).filter(Boolean);
+  return s
+    .split(/[,\s;]+/)
+    .map((u) => u.trim().toUpperCase())
+    .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u));
 }
 
 function parseDestinoFromPlaca(placa?: string | null): string | null {
@@ -1784,6 +1790,7 @@ function CardCarregamento({
   const [novaVlrFreteCarreteiro, setNovaVlrFreteCarreteiro] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
+  const [reativandoAdiado, setReativandoAdiado] = useState(false);
   const [iniciarDialogOpen, setIniciarDialogOpen] = useState(false);
   const [placaVerdadeira, setPlacaVerdadeira] = useState('');
   const [iniciandoSimulacao, setIniciandoSimulacao] = useState(false);
@@ -1868,6 +1875,40 @@ function CardCarregamento({
       toast.error(e?.message || 'Erro ao finalizar carregamento.');
     } finally {
       setFinalizando(false);
+    }
+  };
+
+  const reativarCarregamentoAdiado = async () => {
+    if (reativandoAdiado) return;
+    const seq = Number((carregamento as any).seq_carregamento ?? 0) || 0;
+    if (seq <= 0) {
+      toast.error('Não foi possível identificar o seq_carregamento deste carregamento.');
+      return;
+    }
+    const ok = await confirmar({
+      title: 'Reativar carregamento?',
+      description: `Reativar o carregamento adiado ${carregamento.placa_provisoria}? Isso remove o registro adiado para que a linha volte a ficar disponível.`,
+      confirmText: 'Reativar',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+    try {
+      setReativandoAdiado(true);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'reativar_adiado', seq_carregamento: seq }) },
+        true
+      );
+      if (res?.success) {
+        toast.success('Carregamento reativado.');
+        await onRecarregarCarregamentos();
+      } else {
+        toast.error(res?.message || 'Erro ao reativar carregamento.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao reativar carregamento.');
+    } finally {
+      setReativandoAdiado(false);
     }
   };
 
@@ -2121,6 +2162,21 @@ function CardCarregamento({
   );
 
   const unidadesReais = (() => {
+    const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
+    if (destinosCard) {
+      const parts = destinosCard
+        .split(',')
+        .map((p) => p.trim().toUpperCase())
+        .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u));
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const u of parts) {
+        if (seen.has(u)) continue;
+        seen.add(u);
+        out.push(u);
+      }
+      return out;
+    }
     const out: string[] = [];
     const seen = new Set<string>();
     for (const u of todasUnidades) {
@@ -2144,6 +2200,8 @@ function CardCarregamento({
     if (o === 'MANUAL') return { label: 'Manual', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' };
     return null;
   })();
+
+  const isAdiado = Boolean((carregamento as any).adiado);
 
   const isSimulado = Boolean((carregamento as any).simulado);
   const carregamentoIniciado = !isSimulado && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
@@ -2200,6 +2258,9 @@ function CardCarregamento({
           <div className="col-span-2 mt-1 flex items-center gap-2 min-w-0">
             {origemTag ? (
               <Badge className={`${origemTag.className} text-[10px] h-5 px-2 w-fit shrink-0`}>{origemTag.label}</Badge>
+            ) : null}
+            {isAdiado ? (
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] h-5 px-2 w-fit shrink-0">Adiado</Badge>
             ) : null}
             <p className={`text-[10px] whitespace-nowrap truncate min-w-0 flex-1 ${infoCriacao ? 'text-slate-400 dark:text-slate-500' : 'text-slate-300 dark:text-slate-600 italic'}`}>
               {infoCriacao ?? 'Sem CT-es'}
@@ -2297,7 +2358,7 @@ function CardCarregamento({
               className={carregamentoIniciado ? 'h-8 bg-slate-300 hover:bg-slate-300 text-slate-600 text-xs' : 'h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs'}
               onClick={() => onIniciarApontamento(carregamento.placa_provisoria)}
               title="Apontar CT-es neste carregamento"
-              disabled={carregamentoIniciado}
+              disabled={carregamentoIniciado || isAdiado}
             >
               <CheckSquare className="w-3.5 h-3.5 mr-1" />Apont.
             </Button>
@@ -2317,9 +2378,22 @@ function CardCarregamento({
               {iniciandoSimulacao ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Iniciar
             </Button>
           ) : (
-            <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={finalizarELevarAoSSW} title="Finalizar o carregamento" disabled={finalizando || importandoCarregamentos}>
-              {finalizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Finalizar
-            </Button>
+            isAdiado ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs border-amber-300 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={reativarCarregamentoAdiado}
+                disabled={reativandoAdiado || importandoCarregamentos}
+                title="Reativar carregamento adiado"
+              >
+                {reativandoAdiado ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RotateCcw className="w-3.5 h-3.5 mr-1" />}Reativar
+              </Button>
+            ) : (
+              <Button size="sm" className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs" onClick={finalizarELevarAoSSW} title="Finalizar o carregamento" disabled={finalizando || importandoCarregamentos}>
+                {finalizando ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Truck className="w-3.5 h-3.5 mr-1" />}Finalizar
+              </Button>
+            )
           )}
           <Button
             size="sm"
@@ -2330,7 +2404,7 @@ function CardCarregamento({
                 : `h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`
             }
             onClick={() => onCarregarHub(carregamento)}
-            disabled={loadingHub || carregamentoIniciado}
+            disabled={loadingHub || carregamentoIniciado || isAdiado}
             title="Completar carregamento com CT-es via Hub"
           >
             {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
@@ -2612,6 +2686,7 @@ type LinhaCarregamento = {
   sigla_emit: string;
   sigla_dest: string;
   unidades: string;
+  destino_centralizadora?: boolean;
   km_ida: number | null;
   km_volta: number | null;
   vlr_min_frete?: number | null;
@@ -2686,20 +2761,37 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
   const [ordemLinhas, setOrdemLinhas] = useState<'destino' | 'intermediarias'>('destino');
   const [ordemDirLinhas, setOrdemDirLinhas] = useState<'asc' | 'desc'>('asc');
 
-  const diaCarregaKey = React.useMemo(() => {
+  const { diaCarregaKeyHoje, diaCarregaKeyOntem } = React.useMemo(() => {
     const d = new Date().getDay();
-    if (d === 0) return 'carrega_dom' as const;
-    if (d === 1) return 'carrega_seg' as const;
-    if (d === 2) return 'carrega_ter' as const;
-    if (d === 3) return 'carrega_qua' as const;
-    if (d === 4) return 'carrega_qui' as const;
-    if (d === 5) return 'carrega_sex' as const;
-    return 'carrega_sab' as const;
+    const map = [
+      'carrega_dom',
+      'carrega_seg',
+      'carrega_ter',
+      'carrega_qua',
+      'carrega_qui',
+      'carrega_sex',
+      'carrega_sab',
+    ] as const;
+    const hoje = map[d] ?? 'carrega_seg';
+    const ontem = map[(d + 6) % 7] ?? 'carrega_seg';
+    return { diaCarregaKeyHoje: hoje, diaCarregaKeyOntem: ontem };
   }, []);
 
   const linhasHoje = React.useMemo(() => {
-    return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
-  }, [linhasOrigem, diaCarregaKey]);
+    const filtradas = (linhasOrigem ?? []).filter((l) => {
+      const carregaHoje = ((l as any)[diaCarregaKeyHoje] ?? true) as any;
+      const carregaOntem = ((l as any)[diaCarregaKeyOntem] ?? true) as any;
+      return !!carregaHoje || !!carregaOntem;
+    });
+    const seen = new Set<number>();
+    return filtradas.filter((l) => {
+      const n = (l.nro_linha ?? 0) as number;
+      if (!Number.isFinite(n) || n <= 0) return true;
+      if (seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
+  }, [linhasOrigem, diaCarregaKeyHoje, diaCarregaKeyOntem]);
 
   const intermediariasUsadas = React.useMemo(() => {
     const set = new Set<string>();
@@ -2712,7 +2804,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
   }, [carregamentos]);
 
   const getIntermediariasEfetivas = React.useCallback((l: LinhaCarregamento): string[] => {
-    return escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
+    const limite = (l as any).destino_centralizadora ? 999 : 2;
+    return escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, limite);
   }, [intermediariasUsadas, totalsPorUnidadeParaLinhas]);
 
   const statusPorLinha = React.useMemo(() => {
@@ -2764,9 +2857,8 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
       const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
       const placaAuto = dest ? `${siglaUnidade}-${dest}` : '';
-      const multiCarr = !!(l as any).multi_carr_diario;
-      const jaExistePlaca = !multiCarr && placaAuto ? placasExistentes.has(placaAuto) : false;
-      const jaExisteLinha = !multiCarr && nro > 0 && linhasEmCarregamento.has(nro);
+      const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
+      const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
       const jaExiste = jaExistePlaca || jaExisteLinha;
       const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
 
@@ -2802,12 +2894,10 @@ function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, pergunt
     );
     return linhasHoje.filter((l) => {
       const nro = l.nro_linha ?? 0;
-      const multiCarr = !!(l as any).multi_carr_diario;
-      if (!multiCarr && nro > 0 && linhasEmCarregamento.has(nro)) return false;
+      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
-      if (multiCarr) return true;
       return !placasExistentes.has(placaAuto);
     });
   }, [carregamentos, linhasHoje, placasExistentes, siglaUnidade]);
@@ -4380,21 +4470,17 @@ function CarregamentoArea({
                                 </span>
                               ) : null}
                               <span>{String(c.placa_provisoria ?? '').toUpperCase()}</span>
+                              {(c as any).adiado ? (
+                                <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">ADIADO</span>
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
                             {(() => {
-                              const dest = String(c.destino ?? '').toUpperCase() || '-';
                               const anyC = c as any;
-                              const hubRaw = String(anyC.hub_destino_compart ?? '').toUpperCase();
-                              if (hubRaw === '') return dest;
-                              const hubLabel = hubRaw === 'BH2' ? 'BHZ' : hubRaw;
-                              return (
-                                <>
-                                  <span>{dest}</span>
-                                  <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">({hubLabel})</span>
-                                </>
-                              );
+                              const lista = String(anyC.destinos_card ?? c.destinos_card ?? '').toUpperCase();
+                              if (lista) return lista;
+                              return String(c.destino ?? '').toUpperCase() || '-';
                             })()}
                           </td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTotal)}</td>
@@ -4498,17 +4584,10 @@ function CarregamentoArea({
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Destino</div>
                             <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">
                               {(() => {
-                                const dest = String(c.destino ?? '').toUpperCase() || '-';
                                 const anyC = c as any;
-                                const hubRaw = String(anyC.hub_destino_compart ?? '').toUpperCase();
-                                if (hubRaw === '') return dest;
-                                const hubLabel = hubRaw === 'BH2' ? 'BHZ' : hubRaw;
-                                return (
-                                  <>
-                                    <span>{dest}</span>
-                                    <span className="ml-1 text-amber-600 dark:text-amber-400 font-semibold">({hubLabel})</span>
-                                  </>
-                                );
+                                const lista = String(anyC.destinos_card ?? c.destinos_card ?? '').toUpperCase();
+                                if (lista) return lista;
+                                return String(c.destino ?? '').toUpperCase() || '-';
                               })()}
                             </div>
                           </div>
@@ -4970,6 +5049,7 @@ export function Disponiveis() {
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
   const [carregandoNroLinhaHoje, setCarregandoNroLinhaHoje] = useState<number | null>(null);
+  const [adiandoNroLinhaHoje, setAdiandoNroLinhaHoje] = useState<number | null>(null);
   const [carregandoTodasLinhasHoje, setCarregandoTodasLinhasHoje] = useState(false);
   const [linhasHojeSortKey, setLinhasHojeSortKey] = useState<'nro' | 'nome' | 'dest' | 'inter' | 'km'>('nro');
   const [linhasHojeSortDir, setLinhasHojeSortDir] = useState<'asc' | 'desc'>('asc');
@@ -5017,20 +5097,37 @@ export function Disponiveis() {
     return () => { ativo = false; };
   }, []);
 
-  const diaCarregaKey = React.useMemo(() => {
+  const { diaCarregaKeyHoje, diaCarregaKeyOntem } = React.useMemo(() => {
     const d = new Date().getDay();
-    if (d === 0) return 'carrega_dom' as const;
-    if (d === 1) return 'carrega_seg' as const;
-    if (d === 2) return 'carrega_ter' as const;
-    if (d === 3) return 'carrega_qua' as const;
-    if (d === 4) return 'carrega_qui' as const;
-    if (d === 5) return 'carrega_sex' as const;
-    return 'carrega_sab' as const;
+    const map = [
+      'carrega_dom',
+      'carrega_seg',
+      'carrega_ter',
+      'carrega_qua',
+      'carrega_qui',
+      'carrega_sex',
+      'carrega_sab',
+    ] as const;
+    const hoje = map[d] ?? 'carrega_seg';
+    const ontem = map[(d + 6) % 7] ?? 'carrega_seg';
+    return { diaCarregaKeyHoje: hoje, diaCarregaKeyOntem: ontem };
   }, []);
 
   const linhasCarregamHoje = React.useMemo(() => {
-    return (linhasOrigem ?? []).filter((l) => (l as any)[diaCarregaKey] ?? true);
-  }, [linhasOrigem, diaCarregaKey]);
+    const filtradas = (linhasOrigem ?? []).filter((l) => {
+      const carregaHoje = ((l as any)[diaCarregaKeyHoje] ?? true) as any;
+      const carregaOntem = ((l as any)[diaCarregaKeyOntem] ?? true) as any;
+      return !!carregaHoje || !!carregaOntem;
+    });
+    const seen = new Set<number>();
+    return filtradas.filter((l) => {
+      const n = (l.nro_linha ?? 0) as number;
+      if (!Number.isFinite(n) || n <= 0) return true;
+      if (seen.has(n)) return false;
+      seen.add(n);
+      return true;
+    });
+  }, [linhasOrigem, diaCarregaKeyHoje, diaCarregaKeyOntem]);
 
   const linhasCarregamHojeOrdenadas = React.useMemo(() => {
     const dir = linhasHojeSortDir === 'asc' ? 1 : -1;
@@ -5606,6 +5703,36 @@ export function Disponiveis() {
     }
   }, [carregandoNroLinhaHoje, handleCarregamentoAutomatico, linhasHojeStatus, confirmar]);
 
+  const handleAdiarLinhaHoje = useCallback(async (nroLinha: number) => {
+    if (adiandoNroLinhaHoje !== null || carregandoNroLinhaHoje !== null || carregandoTodasLinhasHoje) return;
+    const ok = await confirmar({
+      title: 'Adiar carregamento',
+      description: `Atenção: isso irá criar um carregamento adiado (sem CT-es) para a linha ${String(nroLinha).padStart(3, '0')}. Continuar?`,
+      confirmText: 'Continuar',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+    try {
+      setAdiandoNroLinhaHoje(nroLinha);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'adiar_linha', nroLinha }) },
+        true
+      );
+      if (res?.success) {
+        toast.success('Carregamento adiado criado.');
+        await carregarCarregamentos();
+        await carregarCarregamentosCalendario();
+      } else {
+        toast.error(res?.message || 'Erro ao adiar carregamento.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao adiar carregamento.');
+    } finally {
+      setAdiandoNroLinhaHoje(null);
+    }
+  }, [adiandoNroLinhaHoje, carregandoNroLinhaHoje, carregandoTodasLinhasHoje, confirmar, carregarCarregamentos, carregarCarregamentosCalendario]);
+
   const carregamentosNaoSimulados = React.useMemo(() => {
     return (carregamentos ?? []).filter((c: any) => !c?.simulado);
   }, [carregamentos]);
@@ -5626,12 +5753,10 @@ export function Disponiveis() {
     const orig = (unidadeAtual ?? '').trim().toUpperCase();
     return linhasCarregamHojeOrdenadas.filter((l) => {
       const nro = l.nro_linha ?? 0;
-      const multiCarr = !!(l as any).multi_carr_diario;
-      if (!multiCarr && nro > 0 && linhasEmCarregamento.has(nro)) return false;
+      if (nro > 0 && linhasEmCarregamento.has(nro)) return false;
       const dest = (l.sigla_dest ?? '').trim().toUpperCase();
       const placaAuto = dest ? `${orig}-${dest}` : '';
       if (!placaAuto) return true;
-      if (multiCarr) return true;
       return !placasExistentes.has(placaAuto);
     });
   }, [linhasCarregamHojeOrdenadas, linhasEmCarregamento, placasExistentes, unidadeAtual]);
@@ -5674,7 +5799,8 @@ export function Disponiveis() {
         }
         const linha = porNro.get(nro);
         const destino = (linha?.sigla_dest ?? '').trim().toUpperCase();
-        const intermediarias = linha ? escolherIntermediariasLinha(linha.unidades, linha.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2).join(', ') : '';
+        const limiteInter = (linha as any)?.destino_centralizadora ? 999 : 2;
+        const intermediarias = linha ? escolherIntermediariasLinha(linha.unidades, linha.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, limiteInter).join(', ') : '';
         itens.push({
           nro_linha: nro,
           placa: result.placa ?? '',
@@ -6292,7 +6418,8 @@ export function Disponiveis() {
         const nro = l.nro_linha ?? 0;
         const dest = (l.sigla_dest ?? '').trim().toUpperCase();
         const unidades = (l.unidades ?? '').trim();
-        const intermediarias = escolherIntermediariasLinha(unidades, dest, intermediariasUsadas, totalsPorUnidade, 2);
+        const limiteInter = (l as any).destino_centralizadora ? 999 : 2;
+        const intermediarias = escolherIntermediariasLinha(unidades, dest, intermediariasUsadas, totalsPorUnidade, limiteInter);
         const unidadesRota = Array.from(new Set([dest, ...intermediarias].filter(Boolean)));
 
         const totals = unidadesRota.reduce(
@@ -6311,9 +6438,8 @@ export function Disponiveis() {
         const atingiuMinFrete = minFrete <= 0 ? true : totals.frete >= minFrete;
 
         const placaAuto = dest ? `${unidadeAtual}-${dest}` : '';
-        const multiCarr = !!(l as any).multi_carr_diario;
-        const jaExistePlaca = !multiCarr && placaAuto ? placasExistentes.has(placaAuto) : false;
-        const jaExisteLinha = !multiCarr && nro > 0 && linhasEmCarregamento.has(nro);
+        const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
+        const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
         const jaExiste = jaExistePlaca || jaExisteLinha;
 
         const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
@@ -7577,12 +7703,13 @@ export function Disponiveis() {
                         const freteAtual = s?.freteTotalDestino ?? 0;
                         const atingiuMin = s?.atingiuMinFrete ?? (minFrete ? freteAtual >= minFrete : true);
                         const motivo = s?.motivoBloqueio ?? '';
-                        const interEfetivas = escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, 2);
+                        const limiteInter = (l as any).destino_centralizadora ? 999 : 2;
+                        const interEfetivas = escolherIntermediariasLinha(l.unidades, l.sigla_dest, intermediariasUsadas, totalsPorUnidadeParaLinhas, limiteInter);
                         return (
                           <div
                             key={l.nro_linha}
                             title={!pode ? motivo : undefined}
-                            className={`grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_110px] gap-2 px-3 py-2 text-sm items-center ${!pode ? 'opacity-50' : ''}`}
+                            className={`grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_170px] gap-2 px-3 py-2 text-sm items-center ${!pode ? 'opacity-50' : ''}`}
                           >
                             <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
                             <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
@@ -7595,7 +7722,17 @@ export function Disponiveis() {
                             <span className={`text-right font-mono text-xs tabular-nums ${atingiuMin ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
                               {freteAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => handleAdiarLinhaHoje(nro)}
+                                disabled={adiandoNroLinhaHoje !== null || carregandoNroLinhaHoje !== null || carregandoTodasLinhasHoje}
+                              >
+                                {adiandoNroLinhaHoje === nro ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                                Adiar
+                              </Button>
                               <Button
                                 size="sm"
                                 className="h-8 text-xs bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"

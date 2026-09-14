@@ -203,6 +203,7 @@ base AS (
         cte.seq_cte,
         cte.ser_cte,
         cte.nro_cte,
+        cte.nfs,
         cte.tp_documento,
         COALESCE(cte.entrega_abonada, false) AS entrega_abonada,
         cte.data_emissao,
