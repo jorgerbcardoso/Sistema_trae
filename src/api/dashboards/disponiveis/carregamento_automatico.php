@@ -883,7 +883,8 @@ function inserirCtes($conn, $tabela, $unidade, $placa, $login, $destino, $unidad
         );
         if ($checkOutro && pg_num_rows($checkOutro) > 0) continue;
 
-        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $destCteBase = $cteData['unidadeDestOriginal'] ?? $cteData['unidade_dest_original'] ?? null;
+        $destCte  = pg_escape_string($conn, strtoupper(trim((string)($destCteBase ?? $cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? ''))));
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']
             ?? $cteData['unidade_carregamento']

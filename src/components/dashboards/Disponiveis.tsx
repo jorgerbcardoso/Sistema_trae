@@ -1802,6 +1802,9 @@ function CardCarregamento({
   const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
+  const [centralizadoraDialogOpen, setCentralizadoraDialogOpen] = useState(false);
+  const [centralizadoraSigla, setCentralizadoraSigla] = useState('');
+  const [centralizadoraUnidades, setCentralizadoraUnidades] = useState<string[]>([]);
 
   const abrirIniciarSimulacao = async () => {
     const ok = await confirmar({
@@ -2194,43 +2197,26 @@ function CardCarregamento({
 
   const unidadesDestinoTexto = (() => {
     if (unidadesReais.length === 0) return null;
-
     const last = unidadesReais[unidadesReais.length - 1];
-    const maxChars = 28;
+    if (unidadesReais.length === 1) return <span className="font-bold">{last}</span>;
 
-    if (unidadesDestinoFull.length <= maxChars) {
-      return unidadesReais.map((u, i) =>
-        i === unidadesReais.length - 1
-          ? <span key={i} className="font-bold">{u}</span>
-          : <span key={i}>{u}{i < unidadesReais.length - 1 ? ', ' : ''}</span>
-      );
-    }
-
-    const reserved = last.length + 4;
-    const maxPrefix = Math.max(0, maxChars - reserved);
-
-    let prefix = '';
-    for (let i = 0; i < unidadesReais.length - 1; i++) {
-      const next = unidadesReais[i];
-      const candidate = prefix ? `${prefix}, ${next}` : next;
-      if (candidate.length > maxPrefix) break;
-      prefix = candidate;
-    }
-
-    if (!prefix) {
+    const first = unidadesReais[0];
+    if (unidadesReais.length === 2) {
       return (
         <>
-          <span>… </span>
+          <span>{first}, </span>
           <span className="font-bold">{last}</span>
         </>
       );
     }
 
+    const prefix = unidadesReais.slice(0, -1).join(', ');
     return (
-      <>
-        <span>{prefix}, … </span>
-        <span className="font-bold">{last}</span>
-      </>
+      <span className="min-w-0 flex items-center">
+        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">{prefix}</span>
+        <span className="shrink-0">, … </span>
+        <span className="shrink-0 font-bold">{last}</span>
+      </span>
     );
   })();
 
@@ -2284,10 +2270,59 @@ function CardCarregamento({
             <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
-                ? <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1 overflow-hidden whitespace-nowrap" title={unidadesDestinoFull}>{unidadesDestinoTexto}</span>
+                ? (
+                  <span className="min-w-0 flex-1 flex items-center gap-1.5">
+                    <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={unidadesDestinoFull}>
+                      {unidadesDestinoTexto}
+                    </span>
+                    {Boolean((carregamento as any).destino_centralizadora) && (
+                      <button
+                        type="button"
+                        className="shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const sig = String(carregamento.destino ?? '').trim().toUpperCase();
+                          const raw = String((carregamento as any).unidades_compart ?? '').trim();
+                          const parts = raw
+                            .split(/[,\s;]+/)
+                            .map((p) => p.trim().toUpperCase())
+                            .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u));
+                          const uniq = Array.from(new Set(parts));
+                          setCentralizadoraSigla(sig);
+                          setCentralizadoraUnidades(uniq);
+                          setCentralizadoraDialogOpen(true);
+                        }}
+                      >
+                        <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-[10px] h-5 px-2 cursor-pointer">
+                          Centralizadora
+                        </Badge>
+                      </button>
+                    )}
+                  </span>
+                )
                 : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
               }
             </div>
+            <Dialog open={centralizadoraDialogOpen} onOpenChange={setCentralizadoraDialogOpen}>
+              <DialogContent className="sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle>Centralizadora · {centralizadoraSigla || '—'}</DialogTitle>
+                  <DialogDescription>Unidades envolvidas na centralização</DialogDescription>
+                </DialogHeader>
+                {centralizadoraUnidades.length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Nenhuma unidade encontrada.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {centralizadoraUnidades.map((u) => (
+                      <Badge key={u} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-mono">{u}</Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end pt-3">
+                  <Button variant="outline" size="sm" onClick={() => setCentralizadoraDialogOpen(false)}>Fechar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 justify-end">
@@ -5675,6 +5710,7 @@ export function Disponiveis() {
           cubagem: anyC.cubagem ?? '',
           qtdeVol: anyC.qtdeVol ?? anyC.qtde_vol ?? '',
           unidadeDest,
+          unidadeDestOriginal: anyC.unidadeDestOriginal ?? anyC.unidade_dest_original ?? anyC.unidadeDestOrig ?? anyC.unidade_dest_orig ?? '',
           unidadeCarregamento: anyC.unidadeCarregamento ?? anyC.unidade_carregamento ?? anyC.unidadeRelatorio ?? anyC.unidadeOrigem ?? anyC.sigla_emit ?? anyC.siglaEmit ?? anyC.unidOrig ?? anyC.origem ?? '',
         };
       });

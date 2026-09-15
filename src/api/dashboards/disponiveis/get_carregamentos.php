@@ -199,6 +199,7 @@ if (count($carregamentos) === 0) {
 }
 
 $mapDestinoCompart = [];
+$mapHubCompartCsv = [];
 try {
     $resUnid = sql(
         "SELECT sigla, COALESCE(unidades_compart, '') AS unidades_compart
@@ -213,6 +214,7 @@ try {
             if ($hubSigla === '') continue;
             $csv = strtoupper(trim((string)($ru['unidades_compart'] ?? '')));
             if ($csv === '') continue;
+            if (!isset($mapHubCompartCsv[$hubSigla])) $mapHubCompartCsv[$hubSigla] = $csv;
             $parts = preg_split('/[,\s;]+/', $csv);
             if (!is_array($parts)) continue;
             foreach ($parts as $p) {
@@ -224,6 +226,7 @@ try {
     }
 } catch (Exception $e) {
     $mapDestinoCompart = [];
+    $mapHubCompartCsv = [];
 }
 
 $linhasMap = [];
@@ -353,6 +356,8 @@ foreach ($carregamentos as &$c) {
     $destinos = $seq > 0 && isset($destinosPorSeq[$seq]) ? $destinosPorSeq[$seq] : [];
 
     $isCentralizadora = ($destFinal !== '' && isset($hubsSet[$destFinal]));
+    $c['destino_centralizadora'] = $isCentralizadora;
+    $c['unidades_compart'] = $isCentralizadora ? (string)($mapHubCompartCsv[$destFinal] ?? '') : '';
     $origem = strtoupper(trim((string)($c['origem_criacao'] ?? '')));
     $adiado = (bool)($c['adiado'] ?? false);
     $forcarManual = ($origem === 'MANUAL') || $adiado;
