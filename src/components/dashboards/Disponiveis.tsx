@@ -53,6 +53,7 @@ import {
   DollarSign,
   Wallet,
   RotateCcw,
+  CircleHelp,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -6180,13 +6181,15 @@ export function Disponiveis() {
     let ativo = true;
     void (async () => {
       setLoadingInicial(true);
-      await importarCarregamentosSSWObrigatorio();
+      await Promise.all([carregarCarregamentos(), carregar(), carregarEntrega()]);
       if (!ativo) return;
-      await verificarSaidasEmViagem();
-      await carregarCarregamentos();
-      await carregar();
-      await carregarEntrega();
-      if (ativo) setLoadingInicial(false);
+      setLoadingInicial(false);
+      void (async () => {
+        await importarCarregamentosSSWObrigatorio();
+        if (!ativo) return;
+        await verificarSaidasEmViagem();
+        await Promise.all([carregarCarregamentos(), carregar(), carregarEntrega()]);
+      })();
     })();
     return () => { ativo = false; };
   }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
@@ -7058,7 +7061,7 @@ export function Disponiveis() {
                           aria-label="Manual"
                           className="relative dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
                         >
-                          <span className="font-black text-slate-700 dark:text-slate-200">?</span>
+                          <CircleHelp className="w-4 h-4 text-slate-700 dark:text-slate-200" />
                         </Button>
                       </DialogTrigger>
                     </TooltipTrigger>

@@ -121,6 +121,8 @@ REGRA GERAL PARA DIALOGS (CADASTROS/EDIÇÃO):
   - `src/components/admin/UnidadesMultiSelect.tsx`
 - Para seleção de cliente (pagador/destinatário), usar `FilterSelectCliente` com botão “X” dentro do input.
 - Para filtros de data (inputs `type="date"`), sempre exibir um botão “X” para limpar o campo.
+- Para botão de ajuda/manual no topo (ao lado do botão de filtros), usar ícone `CircleHelp` do `lucide-react` com `w-4 h-4` (harmoniza com o ícone de filtros).
+- Loading em dashboards não deve bloquear o cabeçalho: evitar overlay `fixed inset-0` dentro da tela. Se precisar bloquear apenas o conteúdo, usar overlay `absolute inset-0` dentro do corpo.
 
 5) REGRAS DE DOMÍNIO / UNIDADE (quando aplicável):
 - Se a tela exigir unidade fixa para não-MTZ, o filtro de unidade deve ficar travado:

@@ -1485,7 +1485,7 @@ export function ContasPagar() {
     >
       <div className="relative">
         {loading && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/25 backdrop-blur-sm">
+          <div className="absolute inset-0 z-[10] flex items-center justify-center bg-slate-950/25 backdrop-blur-sm">
             <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-lg dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center gap-3">
                 <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
