@@ -1174,6 +1174,42 @@ foreach ($placas_ssw as $placa) {
         $unidadesCarCsv = '';
     }
 
+    if ($nroLinhaCar <= 0 && $destinoCar !== null && $destinoCar !== '') {
+        try {
+            $resLinhaB = null;
+            if (trim($unidadesCarCsv) !== '') {
+                $resLinhaB = sql(
+                    "SELECT nro_linha
+                     FROM {$tabelaLinha}
+                     WHERE UPPER(BTRIM(sigla_emit)) = \$1
+                       AND UPPER(BTRIM(sigla_dest)) = \$2
+                       AND regexp_replace(UPPER(COALESCE(unidades, '')), '\\s+', '', 'g') = regexp_replace(UPPER(\$3), '\\s+', '', 'g')
+                     ORDER BY nro_linha DESC
+                     LIMIT 1",
+                    [$unidade, $destinoCar, $unidadesCarCsv],
+                    $conn
+                );
+            }
+
+            if (!$resLinhaB || pg_num_rows($resLinhaB) === 0) {
+                $resLinhaB = sql(
+                    "SELECT nro_linha
+                     FROM {$tabelaLinha}
+                     WHERE UPPER(BTRIM(sigla_emit)) = \$1
+                       AND UPPER(BTRIM(sigla_dest)) = \$2
+                     ORDER BY nro_linha DESC
+                     LIMIT 1",
+                    [$unidade, $destinoCar],
+                    $conn
+                );
+            }
+
+            if ($resLinhaB && pg_num_rows($resLinhaB) > 0) {
+                $nroLinhaCar = (int)pg_fetch_result($resLinhaB, 0, 0);
+            }
+        } catch (Exception $e) {}
+    }
+
     $destinoCarEsc = $destinoCar ? ("'" . pg_escape_string($conn, $destinoCar) . "'") : 'NULL';
     $unidadesCarEsc = ($unidadesCarCsv !== '') ? ("'" . pg_escape_string($conn, $unidadesCarCsv) . "'") : 'NULL';
     $nroLinhaCarEsc = ($nroLinhaCar > 0) ? (string)$nroLinhaCar : 'NULL';

@@ -2190,9 +2190,49 @@ function CardCarregamento({
     return out;
   })();
 
-  const unidadesDestinoTexto = unidadesReais.length > 0
-    ? unidadesReais.map((u, i) => i === unidadesReais.length - 1 ? <span key={i} className="font-bold">{u}</span> : <span key={i}>{u}{i < unidadesReais.length - 1 ? ', ' : ''}</span>)
-    : null;
+  const unidadesDestinoFull = unidadesReais.join(', ');
+
+  const unidadesDestinoTexto = (() => {
+    if (unidadesReais.length === 0) return null;
+
+    const last = unidadesReais[unidadesReais.length - 1];
+    const maxChars = 28;
+
+    if (unidadesDestinoFull.length <= maxChars) {
+      return unidadesReais.map((u, i) =>
+        i === unidadesReais.length - 1
+          ? <span key={i} className="font-bold">{u}</span>
+          : <span key={i}>{u}{i < unidadesReais.length - 1 ? ', ' : ''}</span>
+      );
+    }
+
+    const reserved = last.length + 4;
+    const maxPrefix = Math.max(0, maxChars - reserved);
+
+    let prefix = '';
+    for (let i = 0; i < unidadesReais.length - 1; i++) {
+      const next = unidadesReais[i];
+      const candidate = prefix ? `${prefix}, ${next}` : next;
+      if (candidate.length > maxPrefix) break;
+      prefix = candidate;
+    }
+
+    if (!prefix) {
+      return (
+        <>
+          <span>… </span>
+          <span className="font-bold">{last}</span>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <span>{prefix}, … </span>
+        <span className="font-bold">{last}</span>
+      </>
+    );
+  })();
 
   const origemTag = (() => {
     const o = (carregamento.origem_criacao ?? null);
@@ -2241,10 +2281,10 @@ function CardCarregamento({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 whitespace-nowrap mt-0.5">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
-                ? <span className="font-mono text-slate-600 dark:text-slate-400">{unidadesDestinoTexto}</span>
+                ? <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1 overflow-hidden whitespace-nowrap" title={unidadesDestinoFull}>{unidadesDestinoTexto}</span>
                 : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
               }
             </div>
@@ -2645,7 +2685,12 @@ function CardCarregamento({
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest_display ?? cte.sigla_dest ?? '-'}</span>
+                        <span
+                          className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
+                          title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
+                        >
+                          {cte.sigla_dest ?? '-'}
+                        </span>
                         <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -4701,7 +4746,12 @@ function CarregamentoArea({
                           <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.sigla_dest_display ?? cte.sigla_dest ?? '-'}</span>
+                          <span
+                            className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
+                            title={(cte.sigla_dest_principal && cte.sigla_dest_principal !== cte.sigla_dest) ? `Hub: ${cte.sigla_dest_principal}` : undefined}
+                          >
+                            {cte.sigla_dest ?? '-'}
+                          </span>
                           <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                           <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{Number(cte.vlr_frete ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{Number(cte.peso ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
