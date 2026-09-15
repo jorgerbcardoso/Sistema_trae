@@ -150,7 +150,13 @@ if ($acao === 'listar_linhas') {
         }
         respondJson(['success' => true, 'linhas' => $linhas]);
     } catch (Exception $e) {
-        respondJson(['success' => false, 'message' => 'Erro ao listar linhas.']);
+        respondJson([
+            'success' => false,
+            'message' => 'Erro ao listar linhas.',
+            'details' => $e->getMessage(),
+            'domain' => $domain,
+            'unidade' => $unidade,
+        ]);
     }
 }
 

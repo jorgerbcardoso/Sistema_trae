@@ -14,6 +14,9 @@ $login       = $currentUser['username'] ?? '';
 if (empty($unidade) || empty($domain)) {
     respondJson(['success' => false, 'message' => 'Unidade ou domínio não identificados.']);
 }
+if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
+    respondJson(['success' => false, 'message' => 'Domínio inválido.']);
+}
 
 $input       = getRequestInput();
 
@@ -121,7 +124,7 @@ function getTabelaUnidadesDominioImport($conn, string $domain): string {
     $t2 = $domain . '_unidades';
     if (tabelaExisteImport($conn, $t1)) return $t1;
     if (tabelaExisteImport($conn, $t2)) return $t2;
-    return $t1;
+    return '';
 }
 
 function parseListaUnidadesCompartImport(string $csv): array {
@@ -142,10 +145,11 @@ function parseListaUnidadesCompartImport(string $csv): array {
 function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
     $map = [];
     $tblUnidade = trim((string)$tblUnidade);
-    if ($tblUnidade === '') return $map;
+    if ($tblUnidade === '' || !tabelaExisteImport($conn, $tblUnidade)) return $map;
+    $tblIdent = pg_escape_identifier($conn, $tblUnidade);
     $res = sql(
         "SELECT sigla, unidades_compart
-         FROM {$tblUnidade}
+         FROM {$tblIdent}
          WHERE COALESCE(TRIM(unidades_compart), '') <> ''",
         [],
         $conn
