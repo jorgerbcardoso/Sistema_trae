@@ -56,18 +56,31 @@ function nextSeqCarregamentoAuto($conn, $seqName) {
     return (int)pg_fetch_result($res, 0, 0);
 }
 
+$unidadeTableOk = false;
+try {
+    $resReg = sql("SELECT to_regclass($1) AS reg", [$tabelaUnidade], $conn);
+    $val = $resReg ? pg_fetch_result($resReg, 0, 0) : null;
+    $unidadeTableOk = ($val !== null && $val !== '');
+} catch (Exception $e) {
+    $unidadeTableOk = false;
+}
+
 $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 
 // ─── Listar linhas ────────────────────────────────────────────────────────────
 if ($acao === 'listar_linhas') {
     try {
+        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)" : "";
+        $selCentralizadora = $unidadeTableOk
+            ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
+            : "FALSE AS destino_centralizadora";
         $res = sql(
             "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
                     multi_carr_diario,
                     carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
-                    (CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora
+                    {$selCentralizadora}
              FROM {$tabelaLinha}
-             LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)
+             {$joinUnidade}
              WHERE sigla_emit = \$1
              ORDER BY sigla_dest, nome, nro_linha",
             [$unidade], $conn
@@ -902,12 +915,16 @@ if ($modoAutomatico) {
 
         $resLinha = null;
         try {
+        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)" : "";
+        $selCentralizadora = $unidadeTableOk
+            ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
+            : "FALSE AS destino_centralizadora";
             $resLinha = sql(
                 "SELECT sigla_dest, unidades, vlr_min_frete,
                         carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
-                        (CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora
+                        {$selCentralizadora}
                  FROM {$tabelaLinha}
-                 LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)
+                 {$joinUnidade}
                  WHERE sigla_emit = \$1 AND nro_linha = \$2
                  LIMIT 1",
                 [$unidade, $nroLinha], $conn
