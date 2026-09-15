@@ -9,14 +9,19 @@ $auth   = authenticateAndGetUser();
 $domain = $auth['domain'];
 
 $currentUser = getCurrentUser();
-$unidade     = strtoupper(trim($currentUser['unidade_atual'] ?? $currentUser['unidade'] ?? ''));
 $login       = $currentUser['username'] ?? '';
+
+$input          = getRequestInput();
+$unidadeRaw     = $input['unidade'] ?? ($currentUser['unidade_atual'] ?? ($currentUser['unidade'] ?? ''));
+$unidade        = strtoupper(trim((string)$unidadeRaw));
+if (preg_match('/^([A-Z0-9_]+)/', $unidade, $m)) {
+    $unidade = $m[1];
+}
 
 if (empty($unidade) || !preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Unidade ou domínio inválidos.']);
 }
 
-$input          = getRequestInput();
 $acao           = strtolower(trim($input['acao'] ?? ''));
 $placa          = strtoupper(trim($input['placa'] ?? ''));
 $unidadeDestino = strtoupper(trim($input['unidadeDestino'] ?? ''));
@@ -40,6 +45,7 @@ $tabelaUnidade = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS multi_carr_diario BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaLinha} ADD COLUMN IF NOT EXISTS vlr_min_frete NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
@@ -67,12 +73,28 @@ $isDayActive = function($v): bool {
 };
 
 $unidadeTableOk = false;
+$unidadeCompartColOk = false;
 try {
     $resReg = sql("SELECT to_regclass($1) AS reg", [$tabelaUnidade], $conn);
     $val = $resReg ? pg_fetch_result($resReg, 0, 0) : null;
     $unidadeTableOk = ($val !== null && $val !== '');
+    if ($unidadeTableOk) {
+        $tUnid = strtolower($tabelaUnidade);
+        $resCol = sql(
+            "SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = $1
+               AND column_name = 'unidades_compart'
+             LIMIT 1",
+            [$tUnid],
+            $conn
+        );
+        $unidadeCompartColOk = ($resCol && pg_num_rows($resCol) > 0);
+    }
 } catch (Exception $e) {
     $unidadeTableOk = false;
+    $unidadeCompartColOk = false;
 }
 
 $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
@@ -80,8 +102,8 @@ $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 // ─── Listar linhas ────────────────────────────────────────────────────────────
 if ($acao === 'listar_linhas') {
     try {
-        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
-        $selCentralizadora = $unidadeTableOk
+        $joinUnidade = ($unidadeTableOk && $unidadeCompartColOk) ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
+        $selCentralizadora = ($unidadeTableOk && $unidadeCompartColOk)
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
         $res = sql(
@@ -95,6 +117,15 @@ if ($acao === 'listar_linhas') {
              ORDER BY sigla_dest, nome, nro_linha",
             [$unidade], $conn
         );
+        if (!$res) {
+            respondJson([
+                'success' => false,
+                'message' => 'Erro ao listar linhas.',
+                'details' => pg_last_error($conn),
+                'domain' => $domain,
+                'unidade' => $unidade,
+            ]);
+        }
         $linhas = [];
         while ($res && ($r = pg_fetch_assoc($res))) {
             $linhas[] = [
@@ -925,8 +956,8 @@ if ($modoAutomatico) {
 
         $resLinha = null;
         try {
-        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
-        $selCentralizadora = $unidadeTableOk
+        $joinUnidade = ($unidadeTableOk && $unidadeCompartColOk) ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
+        $selCentralizadora = ($unidadeTableOk && $unidadeCompartColOk)
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
             $resLinha = sql(

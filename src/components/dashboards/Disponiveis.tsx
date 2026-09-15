@@ -5082,7 +5082,7 @@ export function Disponiveis() {
         setLoadingLinhasOrigem(true);
         const res = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-          { method: 'POST', body: JSON.stringify({ acao: 'listar_linhas' }) },
+          { method: 'POST', body: JSON.stringify({ acao: 'listar_linhas', unidade: unidadeAtual }) },
           true
         );
         if (!ativo) return;
