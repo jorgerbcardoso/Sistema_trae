@@ -56,6 +56,16 @@ function nextSeqCarregamentoAuto($conn, $seqName) {
     return (int)pg_fetch_result($res, 0, 0);
 }
 
+$isDayActive = function($v): bool {
+    if ($v === null) return false;
+    if (is_bool($v)) return $v;
+    $s = strtoupper(trim((string)$v));
+    if ($s === '' || $s === '.' || $s === '0' || $s === 'F' || $s === 'FALSE' || $s === 'N' || $s === 'NAO' || $s === 'NÃO') {
+        return false;
+    }
+    return true;
+};
+
 $unidadeTableOk = false;
 try {
     $resReg = sql("SELECT to_regclass($1) AS reg", [$tabelaUnidade], $conn);
@@ -81,7 +91,7 @@ if ($acao === 'listar_linhas') {
                     {$selCentralizadora}
              FROM {$tabelaLinha}
              {$joinUnidade}
-             WHERE sigla_emit = \$1
+             WHERE UPPER(sigla_emit) = \$1
              ORDER BY sigla_dest, nome, nro_linha",
             [$unidade], $conn
         );
@@ -98,13 +108,13 @@ if ($acao === 'listar_linhas') {
                 'vlr_min_frete' => $r['vlr_min_frete'] !== null ? (float)$r['vlr_min_frete'] : null,
                 'multi_carr_diario' => ((string)($r['multi_carr_diario'] ?? '') === 't'),
                 'destino_centralizadora' => ((string)($r['destino_centralizadora'] ?? '') === 't'),
-                'carrega_seg' => ((string)($r['carrega_seg'] ?? '') === 't'),
-                'carrega_ter' => ((string)($r['carrega_ter'] ?? '') === 't'),
-                'carrega_qua' => ((string)($r['carrega_qua'] ?? '') === 't'),
-                'carrega_qui' => ((string)($r['carrega_qui'] ?? '') === 't'),
-                'carrega_sex' => ((string)($r['carrega_sex'] ?? '') === 't'),
-                'carrega_sab' => ((string)($r['carrega_sab'] ?? '') === 't'),
-                'carrega_dom' => ((string)($r['carrega_dom'] ?? '') === 't'),
+                'carrega_seg' => $isDayActive($r['carrega_seg'] ?? null),
+                'carrega_ter' => $isDayActive($r['carrega_ter'] ?? null),
+                'carrega_qua' => $isDayActive($r['carrega_qua'] ?? null),
+                'carrega_qui' => $isDayActive($r['carrega_qui'] ?? null),
+                'carrega_sex' => $isDayActive($r['carrega_sex'] ?? null),
+                'carrega_sab' => $isDayActive($r['carrega_sab'] ?? null),
+                'carrega_dom' => $isDayActive($r['carrega_dom'] ?? null),
             ];
         }
         respondJson(['success' => true, 'linhas' => $linhas]);
@@ -123,7 +133,7 @@ if ($acao === 'adiar_linha') {
         $resLinha = sql(
             "SELECT sigla_dest, unidades
              FROM {$tabelaLinha}
-             WHERE sigla_emit = \$1 AND nro_linha = \$2
+             WHERE UPPER(sigla_emit) = \$1 AND nro_linha = \$2
              LIMIT 1",
             [$unidade, $nroLinha],
             $conn
@@ -925,7 +935,7 @@ if ($modoAutomatico) {
                         {$selCentralizadora}
                  FROM {$tabelaLinha}
                  {$joinUnidade}
-                 WHERE sigla_emit = \$1 AND nro_linha = \$2
+                 WHERE UPPER(sigla_emit) = \$1 AND nro_linha = \$2
                  LIMIT 1",
                 [$unidade, $nroLinha], $conn
             );
