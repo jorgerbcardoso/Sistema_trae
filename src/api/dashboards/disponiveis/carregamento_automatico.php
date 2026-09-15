@@ -107,14 +107,14 @@ if ($acao === 'listar_linhas') {
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
         $res = sql(
-            "SELECT nro_linha, nome, sigla_emit, sigla_dest, unidades, km_ida, km_volta, vlr_min_frete,
-                    multi_carr_diario,
-                    carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+            "SELECT {$tabelaLinha}.nro_linha, {$tabelaLinha}.nome, {$tabelaLinha}.sigla_emit, {$tabelaLinha}.sigla_dest, {$tabelaLinha}.unidades, {$tabelaLinha}.km_ida, {$tabelaLinha}.km_volta, {$tabelaLinha}.vlr_min_frete,
+                    {$tabelaLinha}.multi_carr_diario,
+                    {$tabelaLinha}.carrega_seg, {$tabelaLinha}.carrega_ter, {$tabelaLinha}.carrega_qua, {$tabelaLinha}.carrega_qui, {$tabelaLinha}.carrega_sex, {$tabelaLinha}.carrega_sab, {$tabelaLinha}.carrega_dom,
                     {$selCentralizadora}
              FROM {$tabelaLinha}
              {$joinUnidade}
-             WHERE UPPER(BTRIM(sigla_emit)) = \$1
-             ORDER BY sigla_dest, nome, nro_linha",
+             WHERE UPPER(BTRIM({$tabelaLinha}.sigla_emit)) = \$1
+             ORDER BY {$tabelaLinha}.sigla_dest, {$tabelaLinha}.nome, {$tabelaLinha}.nro_linha",
             [$unidade], $conn
         );
         if (!$res) {
