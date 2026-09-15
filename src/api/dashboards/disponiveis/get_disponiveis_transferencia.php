@@ -20,6 +20,22 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
 }
 
+$cacheDir = sys_get_temp_dir();
+if (!is_string($cacheDir) || trim($cacheDir) === '') $cacheDir = '/tmp';
+$cacheKey = 'presto_disponiveis_transferencia_' . strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', (string)$domain)) . '_' . strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', (string)$sigla)) . '.json';
+$cacheFile = rtrim($cacheDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $cacheKey;
+$cacheTtlSec = 120;
+if (is_file($cacheFile)) {
+    $mt = @filemtime($cacheFile);
+    if ($mt && (time() - $mt) <= $cacheTtlSec) {
+        $raw = @file_get_contents($cacheFile);
+        $cached = is_string($raw) ? json_decode($raw, true) : null;
+        if (is_array($cached) && (($cached['success'] ?? false) === true)) {
+            respondJson($cached);
+        }
+    }
+}
+
 function tabelaExiste($conn, string $tableName): bool {
     $t = strtolower(trim($tableName));
     if ($t === '') return false;
@@ -159,7 +175,7 @@ function downloadRelatorio019($sigla, $agora) {
         if (!empty($file) && strlen($file) >= 100) return $file;
     }
 
-    for ($try = 0; $try < 10; $try++) {
+    for ($try = 0; $try < 25; $try++) {
         $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
         $posXml = strpos($str1440, '<xml');
         if ($posXml !== false) {
@@ -185,9 +201,8 @@ function downloadRelatorio019($sigla, $agora) {
 
                 $unidF4 = strtoupper(trim((string)$f4));
                 if ($unidF4 !== $sigla) continue;
-                $usr = trim((string)$usr);
-                if (!(($usr === 'presto') || ($usr === 'damasce1') || ($usr === 'claraj'))) continue;
-                if ((string)$sit !== 'Conclu&iacute;do') continue;
+                $sitDec = strtoupper(trim(html_entity_decode((string)$sit)));
+                if ($sitDec === '' || strpos($sitDec, 'CONCLU') === false) continue;
                 if (substr((string)$opc, 0, 3) !== '019') continue;
 
                 $f8dec = html_entity_decode((string)$f8);
@@ -908,7 +923,7 @@ if (!empty($ctes)) {
     }
 }
 
-respondJson([
+$payload = [
     'success' => true,
     'data'    => [
         'ctes'           => $ctes,
@@ -916,4 +931,6 @@ respondJson([
         'sigla'          => $sigla,
         'geradoEm'       => date('d/m/Y H:i:s'),
     ],
-]);
+];
+@file_put_contents($cacheFile, json_encode($payload));
+respondJson($payload);
