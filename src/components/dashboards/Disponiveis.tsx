@@ -6181,14 +6181,26 @@ export function Disponiveis() {
     let ativo = true;
     void (async () => {
       setLoadingInicial(true);
-      await Promise.all([carregarCarregamentos(), carregar(), carregarEntrega()]);
-      if (!ativo) return;
-      setLoadingInicial(false);
+      try {
+        await carregarCarregamentos();
+        if (!ativo) return;
+        await carregar();
+        if (!ativo) return;
+        await carregarEntrega();
+      } finally {
+        if (ativo) setLoadingInicial(false);
+      }
+
       void (async () => {
         await importarCarregamentosSSWObrigatorio();
         if (!ativo) return;
         await verificarSaidasEmViagem();
-        await Promise.all([carregarCarregamentos(), carregar(), carregarEntrega()]);
+        if (!ativo) return;
+        await carregarCarregamentos();
+        if (!ativo) return;
+        await carregar();
+        if (!ativo) return;
+        await carregarEntrega();
       })();
     })();
     return () => { ativo = false; };
