@@ -80,7 +80,7 @@ $modoAutomatico = ($nroLinha > 0) && empty($unidadeDestino);
 // ─── Listar linhas ────────────────────────────────────────────────────────────
 if ($acao === 'listar_linhas') {
     try {
-        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)" : "";
+        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
         $selCentralizadora = $unidadeTableOk
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
@@ -91,7 +91,7 @@ if ($acao === 'listar_linhas') {
                     {$selCentralizadora}
              FROM {$tabelaLinha}
              {$joinUnidade}
-             WHERE UPPER(sigla_emit) = \$1
+             WHERE UPPER(BTRIM(sigla_emit)) = \$1
              ORDER BY sigla_dest, nome, nro_linha",
             [$unidade], $conn
         );
@@ -133,7 +133,7 @@ if ($acao === 'adiar_linha') {
         $resLinha = sql(
             "SELECT sigla_dest, unidades
              FROM {$tabelaLinha}
-             WHERE UPPER(sigla_emit) = \$1 AND nro_linha = \$2
+             WHERE UPPER(BTRIM(sigla_emit)) = \$1 AND nro_linha = \$2
              LIMIT 1",
             [$unidade, $nroLinha],
             $conn
@@ -925,7 +925,7 @@ if ($modoAutomatico) {
 
         $resLinha = null;
         try {
-        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(u.sigla) = UPPER({$tabelaLinha}.sigla_dest)" : "";
+        $joinUnidade = $unidadeTableOk ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
         $selCentralizadora = $unidadeTableOk
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
@@ -935,7 +935,7 @@ if ($modoAutomatico) {
                         {$selCentralizadora}
                  FROM {$tabelaLinha}
                  {$joinUnidade}
-                 WHERE UPPER(sigla_emit) = \$1 AND nro_linha = \$2
+                 WHERE UPPER(BTRIM(sigla_emit)) = \$1 AND nro_linha = \$2
                  LIMIT 1",
                 [$unidade, $nroLinha], $conn
             );
