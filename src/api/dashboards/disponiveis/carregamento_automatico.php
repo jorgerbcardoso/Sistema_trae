@@ -106,10 +106,14 @@ if ($acao === 'listar_linhas') {
         $selCentralizadora = ($unidadeTableOk && $unidadeCompartColOk)
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
+        $selUnidadesCompart = ($unidadeTableOk && $unidadeCompartColOk)
+            ? "COALESCE(u.unidades_compart, '') AS unidades_compart"
+            : "'' AS unidades_compart";
         $res = sql(
             "SELECT {$tabelaLinha}.nro_linha, {$tabelaLinha}.nome, {$tabelaLinha}.sigla_emit, {$tabelaLinha}.sigla_dest, {$tabelaLinha}.unidades, {$tabelaLinha}.km_ida, {$tabelaLinha}.km_volta, {$tabelaLinha}.vlr_min_frete,
                     {$tabelaLinha}.multi_carr_diario,
                     {$tabelaLinha}.carrega_seg, {$tabelaLinha}.carrega_ter, {$tabelaLinha}.carrega_qua, {$tabelaLinha}.carrega_qui, {$tabelaLinha}.carrega_sex, {$tabelaLinha}.carrega_sab, {$tabelaLinha}.carrega_dom,
+                    {$selUnidadesCompart},
                     {$selCentralizadora}
              FROM {$tabelaLinha}
              {$joinUnidade}
@@ -138,6 +142,7 @@ if ($acao === 'listar_linhas') {
                 'km_volta'   => $r['km_volta'] !== null ? (int)$r['km_volta'] : null,
                 'vlr_min_frete' => $r['vlr_min_frete'] !== null ? (float)$r['vlr_min_frete'] : null,
                 'multi_carr_diario' => ((string)($r['multi_carr_diario'] ?? '') === 't'),
+                'unidades_compart' => (string)($r['unidades_compart'] ?? ''),
                 'destino_centralizadora' => ((string)($r['destino_centralizadora'] ?? '') === 't'),
                 'carrega_seg' => $isDayActive($r['carrega_seg'] ?? null),
                 'carrega_ter' => $isDayActive($r['carrega_ter'] ?? null),

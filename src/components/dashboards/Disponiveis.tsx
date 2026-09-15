@@ -2733,6 +2733,7 @@ type LinhaCarregamento = {
   sigla_dest: string;
   unidades: string;
   destino_centralizadora?: boolean;
+  unidades_compart?: string;
   km_ida: number | null;
   km_volta: number | null;
   vlr_min_frete?: number | null;
@@ -5106,6 +5107,9 @@ export function Disponiveis() {
   const [linhasHojeSortDir, setLinhasHojeSortDir] = useState<'asc' | 'desc'>('asc');
   const [linhasHojeStatus, setLinhasHojeStatus] = useState<Record<number, LinhaHojeStatus>>({});
   const [loadingLinhasHojeStatus, setLoadingLinhasHojeStatus] = useState(false);
+  const [centralizadoraDialogOpen, setCentralizadoraDialogOpen] = useState(false);
+  const [centralizadoraSigla, setCentralizadoraSigla] = useState('');
+  const [centralizadoraUnidades, setCentralizadoraUnidades] = useState<string[]>([]);
 
   const [resumoHojeDialogOpen, setResumoHojeDialogOpen] = useState(false);
   const [resumoHojePlaca, setResumoHojePlaca] = useState('');
@@ -7670,6 +7674,26 @@ export function Disponiveis() {
                 <DialogTitle>Linhas que carregam hoje</DialogTitle>
                 <DialogDescription>Linhas com origem na unidade atual e frequência ativa para o dia de hoje</DialogDescription>
               </DialogHeader>
+              <Dialog open={centralizadoraDialogOpen} onOpenChange={setCentralizadoraDialogOpen}>
+                <DialogContent className="sm:max-w-[520px]">
+                  <DialogHeader>
+                    <DialogTitle>Centralizadora · {centralizadoraSigla || '—'}</DialogTitle>
+                    <DialogDescription>Unidades envolvidas na centralização</DialogDescription>
+                  </DialogHeader>
+                  {centralizadoraUnidades.length === 0 ? (
+                    <div className="text-sm text-slate-500 dark:text-slate-400">Nenhuma unidade encontrada.</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {centralizadoraUnidades.map((u) => (
+                        <Badge key={u} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-mono">{u}</Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end pt-3">
+                    <Button variant="outline" size="sm" onClick={() => setCentralizadoraDialogOpen(false)}>Fechar</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <div className="flex-1 overflow-y-auto pr-1">
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_170px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
@@ -7779,7 +7803,31 @@ export function Disponiveis() {
                             <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
                             <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
                             <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
-                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{interEfetivas.length ? interEfetivas.join(', ') : '-'}</span>
+                            {(l as any).destino_centralizadora ? (
+                              <button
+                                type="button"
+                                className="min-w-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const sig = String(l.sigla_dest ?? '').trim().toUpperCase();
+                                  const raw = String((l as any).unidades_compart ?? '').trim();
+                                  const parts = raw
+                                    .split(/[,\s;]+/)
+                                    .map((p) => p.trim().toUpperCase())
+                                    .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u));
+                                  const uniq = Array.from(new Set(parts));
+                                  setCentralizadoraSigla(sig);
+                                  setCentralizadoraUnidades(uniq);
+                                  setCentralizadoraDialogOpen(true);
+                                }}
+                              >
+                                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-[10px] h-5 px-2 cursor-pointer">
+                                  Centralizadora
+                                </Badge>
+                              </button>
+                            ) : (
+                              <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{interEfetivas.length ? interEfetivas.join(', ') : '-'}</span>
+                            )}
                             <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
                             <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
                               {minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
