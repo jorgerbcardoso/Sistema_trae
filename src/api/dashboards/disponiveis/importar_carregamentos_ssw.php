@@ -119,7 +119,7 @@ function tabelaExisteImport($conn, string $tableName): bool {
 }
 
 function getTabelaUnidadesDominioImport($conn, string $domain): string {
-    $domain = trim((string)$domain);
+    $domain = strtolower(trim((string)$domain));
     $t1 = $domain . '_unidade';
     $t2 = $domain . '_unidades';
     if (tabelaExisteImport($conn, $t1)) return $t1;
@@ -144,7 +144,7 @@ function parseListaUnidadesCompartImport(string $csv): array {
 
 function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
     $map = [];
-    $tblUnidade = trim((string)$tblUnidade);
+    $tblUnidade = strtolower(trim((string)$tblUnidade));
     if ($tblUnidade === '' || !tabelaExisteImport($conn, $tblUnidade)) return $map;
     $tblIdent = pg_escape_identifier($conn, $tblUnidade);
     $res = sql(
