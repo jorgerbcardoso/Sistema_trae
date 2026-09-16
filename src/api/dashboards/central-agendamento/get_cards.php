@@ -24,6 +24,8 @@ $whereConditions[] = "cte.status <> 'C'";
 
 $whereConditions[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 
+$whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
+
 $whereConditions[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
 
 if (!empty($filters['periodoEmissaoInicio'])) {

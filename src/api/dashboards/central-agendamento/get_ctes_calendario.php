@@ -47,6 +47,7 @@ $paramIndex = 1;
 $whereConditions = [
     "cte.status <> 'C'",
     "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')",
+    "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'",
     "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'",
     "cte.ult_ocor_agend = {$ocorAgendamento}",
     "cte.data_prev_ent::date = $" . $paramIndex++,

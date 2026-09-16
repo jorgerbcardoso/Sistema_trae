@@ -1805,6 +1805,54 @@ function CardCarregamento({
   const [centralizadoraDialogOpen, setCentralizadoraDialogOpen] = useState(false);
   const [centralizadoraSigla, setCentralizadoraSigla] = useState('');
   const [centralizadoraUnidades, setCentralizadoraUnidades] = useState<string[]>([]);
+  const [cteDetalheSortKey, setCteDetalheSortKey] = useState<'cte' | 'carr' | 'emissao' | 'prev' | 'dest' | 'pagador' | 'frete' | 'peso' | 'cub'>('cte');
+  const [cteDetalheSortDir, setCteDetalheSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const cteDetalheListaOrdenada = React.useMemo(() => {
+    const parseBrDate = (v: any): number => {
+      const s = String(v ?? '').trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return 0;
+      const dd = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      const yy = parseInt(m[3], 10);
+      const dt = new Date(yy, mm - 1, dd, 0, 0, 0, 0);
+      const t = dt.getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    const keyOf = (c: any): any => {
+      switch (cteDetalheSortKey) {
+        case 'cte': return String(c?.ctrc ?? '');
+        case 'carr': return String(c?.unidade_carregamento ?? '');
+        case 'emissao': return parseBrDate(c?.data_emissao);
+        case 'prev': return parseBrDate(c?.data_prev_ent);
+        case 'dest': return String(c?.sigla_dest ?? '');
+        case 'pagador': return String(c?.nome_pag ?? '');
+        case 'frete': return Number(c?.vlr_frete ?? 0) || 0;
+        case 'peso': return Number(c?.peso ?? 0) || 0;
+        case 'cub': return Number(c?.cubagem ?? 0) || 0;
+        default: return '';
+      }
+    };
+
+    const withIdx = (cteDetalheLista ?? []).map((c, i) => ({ c, i }));
+    withIdx.sort((a, b) => {
+      const va = keyOf(a.c);
+      const vb = keyOf(b.c);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb), 'pt-BR');
+      if (cmp === 0) cmp = a.i - b.i;
+      return cteDetalheSortDir === 'asc' ? cmp : -cmp;
+    });
+    return withIdx.map(x => x.c);
+  }, [cteDetalheLista, cteDetalheSortKey, cteDetalheSortDir]);
+
+  const toggleCteDetalheSort = (key: typeof cteDetalheSortKey) => {
+    if (cteDetalheSortKey === key) setCteDetalheSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setCteDetalheSortKey(key); setCteDetalheSortDir('asc'); }
+  };
 
   const abrirIniciarSimulacao = async () => {
     const ok = await confirmar({
@@ -2203,17 +2251,18 @@ function CardCarregamento({
     const first = unidadesReais[0];
     if (unidadesReais.length === 2) {
       return (
-        <>
-          <span>{first}, </span>
-          <span className="font-bold">{last}</span>
-        </>
+        <span className="min-w-0 flex items-center whitespace-nowrap">
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{first}</span>
+          <span className="shrink-0">, </span>
+          <span className="shrink-0 font-bold">{last}</span>
+        </span>
       );
     }
 
     const prefix = unidadesReais.slice(0, -1).join(', ');
     return (
-      <span className="min-w-0 flex items-center">
-        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">{prefix}</span>
+      <span className="min-w-0 flex items-center whitespace-nowrap">
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{prefix}</span>
         <span className="shrink-0">, … </span>
         <span className="shrink-0 font-bold">{last}</span>
       </span>
@@ -2267,7 +2316,7 @@ function CardCarregamento({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
               <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
               {unidadesDestinoTexto
                 ? (
@@ -2669,15 +2718,33 @@ function CardCarregamento({
                     });
                   }}
                 />
-                <span>CT-e</span>
-                <span>Carr.</span>
-                <span>Emissão</span>
-                <span>Prev. Entr..</span>
-                <span>Dest.</span>
-                <span>Pagador</span>
-                <span className="text-right">Frete (R$)</span>
-                <span className="text-right">Peso (Kg)</span>
-                <span className="text-right">Cub. (m³)</span>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('cte')}>
+                  CT-e{cteDetalheSortKey === 'cte' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('carr')}>
+                  Carr.{cteDetalheSortKey === 'carr' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('emissao')}>
+                  Emissão{cteDetalheSortKey === 'emissao' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('prev')}>
+                  Prev. Entr..{cteDetalheSortKey === 'prev' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('dest')}>
+                  Dest.{cteDetalheSortKey === 'dest' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('pagador')}>
+                  Pagador{cteDetalheSortKey === 'pagador' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('frete')}>
+                  Frete (R$){cteDetalheSortKey === 'frete' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('peso')}>
+                  Peso (Kg){cteDetalheSortKey === 'peso' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
+                <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('cub')}>
+                  Cub. (m³){cteDetalheSortKey === 'cub' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                </button>
               </div>
               <div className="min-h-0 overflow-y-auto">
                 {loadingCteDetalhe ? (
@@ -2692,7 +2759,7 @@ function CardCarregamento({
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {cteDetalheLista.map((cte, idx) => {
+                    {cteDetalheListaOrdenada.map((cte, idx) => {
                       const id = Number((cte as any).seq_cte ?? 0);
                       const checked = id > 0 && cteDetalheSelecionados.has(id);
                       return (
@@ -5585,7 +5652,7 @@ export function Disponiveis() {
 
   useEffect(() => {
     if (!importacaoAutomatica) return;
-    const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 120000);
+    const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 300000);
     return () => clearInterval(id);
   }, [importacaoAutomatica, handleImportarCarregamentos]);
 
@@ -7842,7 +7909,7 @@ export function Disponiveis() {
                             {(l as any).destino_centralizadora ? (
                               <button
                                 type="button"
-                                className="min-w-0"
+                                className="min-w-0 flex justify-start text-left"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const sig = String(l.sigla_dest ?? '').trim().toUpperCase();
