@@ -20,6 +20,7 @@ $tipo    = $input['tipo']    ?? '';
 $chave   = $input['chave']   ?? '';
 $mes     = $input['mes']     ?? '';
 $dia     = $input['dia']     ?? '';
+$exportCsv = (isset($input['export_csv']) && $input['export_csv']) ? true : false;
 $excluirCnpjs = (isset($input['excluir_cnpjs']) && is_array($input['excluir_cnpjs'])) ? $input['excluir_cnpjs'] : [];
 $excluirGrupos = (isset($input['excluir_grupos']) && is_array($input['excluir_grupos'])) ? $input['excluir_grupos'] : [];
 $excluirSiglas = (isset($input['excluir_siglas']) && is_array($input['excluir_siglas'])) ? $input['excluir_siglas'] : [];
@@ -185,6 +186,7 @@ $query = "
     FROM {$domain}_cte cte
     {$whereClause}
     ORDER BY cte.data_emissao DESC, cte.nro_cte DESC
+    " . ($exportCsv ? "" : "LIMIT 10000") . "
 ";
 
 $result = pg_query_params($conn, $query, $params);

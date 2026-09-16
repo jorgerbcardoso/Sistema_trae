@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -229,7 +229,6 @@ export function FaturamentoClientes() {
   const [evolUnidadesKeys, setEvolUnidadesKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [groupBy, setGroupBy] = useState<'grupos' | 'clientes'>('grupos');
-  const [visao, setVisao] = useState<'geral' | 'selecionados'>('selecionados');
 
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
   const [clienteOpcoes, setClienteOpcoes] = useState<ClienteOpcao[]>([]);
@@ -243,6 +242,8 @@ export function FaturamentoClientes() {
   const [cteDialogLista, setCteDialogLista] = useState<any[]>([]);
   const [cteDialogTotais, setCteDialogTotais] = useState<any>(null);
   const [loadingCtes, setLoadingCtes] = useState(false);
+  const [cteDialogPage, setCteDialogPage] = useState(1);
+  const [cteDialogSort, setCteDialogSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'data_emissao', dir: 'desc' });
 
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -573,33 +574,58 @@ export function FaturamentoClientes() {
 
   const cteDialogListaRef = useRef<any[]>([]);
   const cteDialogTituloRef = useRef<string>('');
+  const cteDialogRequestRef = useRef<any>(null);
 
-  const exportarCteCSV = () => {
-    const lista = cteDialogListaRef.current;
+  const exportarCteCSV = async () => {
+    const req = cteDialogRequestRef.current;
     const titulo = cteDialogTituloRef.current;
-    if (!lista.length) return;
-    const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete', 'Custos', 'Resultado'];
-    const rows = lista.map(c => [
-      `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
-      c.data_emissao,
-      `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
-      `"${(c.nome_dest || '').replace(/"/g, '""')}"`,
-      c.sigla_emit || '',
-      c.vlr_merc.toFixed(2).replace('.', ','),
-      c.peso_real.toFixed(2).replace('.', ','),
-      c.qtde_vol,
-      c.vlr_frete.toFixed(2).replace('.', ','),
-      (Number(c.total_custos ?? 0) || 0).toFixed(2).replace('.', ','),
-      (Number(c.resultado ?? 0) || 0).toFixed(2).replace('.', ','),
-    ]);
-    const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ctes_${titulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (!req) return;
+    const loadingId = toast.loading('Gerando CSV (sem limite)...');
+    try {
+      const response = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_ctes.php`,
+        { method: 'POST', body: JSON.stringify({ ...req, export_csv: true }) },
+        true
+      );
+      if (!response?.success) {
+        toast.dismiss(loadingId);
+        toast.error(response?.message || 'Erro ao exportar CSV');
+        return;
+      }
+      const lista = response.data?.ctes || [];
+      if (!lista.length) {
+        toast.dismiss(loadingId);
+        toast.warning('Nenhum CT-e para exportar.');
+        return;
+      }
+      const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete', 'Custos', 'Resultado'];
+      const rows = lista.map((c: any) => [
+        `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
+        c.data_emissao,
+        `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
+        `"${(c.nome_dest || '').replace(/"/g, '""')}"`,
+        c.sigla_emit || '',
+        Number(c.vlr_merc ?? 0).toFixed(2).replace('.', ','),
+        Number(c.peso_real ?? 0).toFixed(2).replace('.', ','),
+        Number(c.qtde_vol ?? 0),
+        Number(c.vlr_frete ?? 0).toFixed(2).replace('.', ','),
+        (Number(c.total_custos ?? 0) || 0).toFixed(2).replace('.', ','),
+        (Number(c.resultado ?? 0) || 0).toFixed(2).replace('.', ','),
+      ]);
+      const csv = [header.join(';'), ...rows.map((r: any[]) => r.join(';'))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ctes_${titulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.dismiss(loadingId);
+      toast.success('CSV gerado.');
+    } catch (e: any) {
+      toast.dismiss(loadingId);
+      toast.error(e?.message || 'Erro ao exportar CSV');
+    }
   };
 
   const abrirCteDialog = useCallback(async (
@@ -620,10 +646,13 @@ export function FaturamentoClientes() {
     setCteDialogLista([]);
     cteDialogListaRef.current = [];
     setCteDialogTotais(null);
+    setCteDialogPage(1);
+    setCteDialogSort({ key: 'data_emissao', dir: 'desc' });
     setCteDialogOpen(true);
     setLoadingCtes(true);
     try {
       const filtersToSend = opts?.filters ?? filters;
+      cteDialogRequestRef.current = { filters: filtersToSend, tipo, chave, mes: mes ?? '', ...(opts ?? {}) };
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_ctes.php`,
         { method: 'POST', body: JSON.stringify({ filters: filtersToSend, tipo, chave, mes: mes ?? '', ...(opts ?? {}) }) },
@@ -721,6 +750,64 @@ export function FaturamentoClientes() {
   const tooltipBg  = isDark ? '#1e293b' : '#ffffff';
   const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
 
+  const CTE_PAGE_SIZE = 100;
+  const cteDialogGridCols = 'grid-cols-[90px_84px_minmax(0,1fr)_100px_80px_55px_110px_110px_130px]';
+
+  const parseDDMMYYYY = (s: string) => {
+    const parts = String(s || '').split('/');
+    if (parts.length !== 3) return 0;
+    const d = Number(parts[0] || 0);
+    const m = Number(parts[1] || 0);
+    const y = Number(parts[2] || 0);
+    return y * 10000 + m * 100 + d;
+  };
+
+  const cteDialogSorted = useMemo(() => {
+    const dir = cteDialogSort.dir === 'asc' ? 1 : -1;
+    const key = cteDialogSort.key;
+    const list = [...cteDialogLista];
+    list.sort((a, b) => {
+      const av = a ?? {};
+      const bv = b ?? {};
+      let cmp = 0;
+      if (key === 'cte') {
+        const aa = `${av.ser_cte || ''}${String(av.nro_cte || '').padStart(6, '0')}`;
+        const bb = `${bv.ser_cte || ''}${String(bv.nro_cte || '').padStart(6, '0')}`;
+        cmp = aa.localeCompare(bb);
+      } else if (key === 'data_emissao') {
+        cmp = parseDDMMYYYY(String(av.data_emissao || '')) - parseDDMMYYYY(String(bv.data_emissao || ''));
+      } else if (key === 'destinatario') {
+        const aa = String(av.nome_dest || av.nome_pag || '').toUpperCase();
+        const bb = String(bv.nome_dest || bv.nome_pag || '').toUpperCase();
+        cmp = aa.localeCompare(bb);
+      } else {
+        cmp = (Number(av[key] ?? 0) || 0) - (Number(bv[key] ?? 0) || 0);
+      }
+      return cmp * dir;
+    });
+    return list;
+  }, [cteDialogLista, cteDialogSort]);
+
+  const cteDialogTotalPages = Math.max(1, Math.ceil(cteDialogSorted.length / CTE_PAGE_SIZE));
+
+  useEffect(() => {
+    if (cteDialogPage > cteDialogTotalPages) setCteDialogPage(cteDialogTotalPages);
+    if (cteDialogPage < 1) setCteDialogPage(1);
+  }, [cteDialogPage, cteDialogTotalPages]);
+
+  const cteDialogPageItems = useMemo(() => {
+    const start = (cteDialogPage - 1) * CTE_PAGE_SIZE;
+    return cteDialogSorted.slice(start, start + CTE_PAGE_SIZE);
+  }, [cteDialogSorted, cteDialogPage]);
+
+  const toggleCteSort = (key: string) => {
+    setCteDialogSort(prev => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      return { key, dir: key === 'data_emissao' ? 'desc' : 'asc' };
+    });
+    setCteDialogPage(1);
+  };
+
   const headerActions = (
     <div className="flex items-center gap-2 md:gap-4">
       <div className="text-right hidden md:block">
@@ -799,18 +886,11 @@ export function FaturamentoClientes() {
             {totais && (
               <div className="space-y-3">
                 {(() => {
-                  const t = visao === 'geral' ? totais : (totaisSelecionados ?? totais);
-                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
-                    ? { ...filters, cnpjsPagadores: [] }
-                    : filters;
+                  const t = totais;
                   const filtersGeral = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
                   const ticket = (t?.qtde_ctes ?? 0) > 0 ? (t?.total_frete ?? 0) / (t?.qtde_ctes ?? 1) : 0;
-                  const ticketGeral = (totais?.qtde_ctes ?? 0) > 0 ? (totais?.total_frete ?? 0) / (totais?.qtde_ctes ?? 1) : 0;
 
                   const abrirPeriodoAtual = (titulo: string) => {
-                    abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersToSend });
-                  };
-                  const abrirPeriodoGeral = (titulo: string) => {
                     abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersGeral });
                   };
 
@@ -818,28 +898,6 @@ export function FaturamentoClientes() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Resumo</div>
-                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
-                          <button
-                            onClick={() => setVisao('selecionados')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                              visao === 'selecionados'
-                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
-                          >
-                            Recorte
-                          </button>
-                          <button
-                            onClick={() => setVisao('geral')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                              visao === 'geral'
-                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                            }`}
-                          >
-                            Geral
-                          </button>
-                        </div>
                       </div>
 
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
@@ -935,81 +993,6 @@ export function FaturamentoClientes() {
                           </div>
                         </div>
                       </div>
-
-                      {visao === 'selecionados' && (
-                        <div className="space-y-2">
-                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Total da empresa</div>
-                          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Receita')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
-                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(totais?.total_frete ?? 0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Custos')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
-                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL((totais as any)?.total_custos ?? 0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Resultado')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
-                                    <div className={`text-sm font-bold ${(Number((totais as any)?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRL((totais as any)?.total_resultado ?? 0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — CT-es')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
-                                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(totais?.qtde_ctes ?? 0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Clientes')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
-                                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(totais?.qtde_clientes ?? 0)}</div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Ticket')}>
-                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
-                                <div className="relative flex items-center gap-3">
-                                  <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
-                                  <div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
-                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(ticketGeral)}</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })()}
@@ -1330,10 +1313,8 @@ export function FaturamentoClientes() {
                     Distribuição de Custos
                   </h3>
                   {(() => {
-                    const t = visao === 'geral' ? totais : (totaisSelecionados ?? totais);
-                    const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
-                      ? { ...filters, cnpjsPagadores: [] }
-                      : filters;
+                    const t = totais;
+                    const filtersToSend = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
                     const costItems = [
                       { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
                       { key: 'custo_icms', label: 'ICMS', color: '#f97316' },
@@ -1393,15 +1374,11 @@ export function FaturamentoClientes() {
             <div className="mt-6 space-y-6">
               <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
                 {(() => {
-                  const data = visao === 'geral'
-                    ? evolucao
-                    : (evolucaoSelecionados.length > 0 ? evolucaoSelecionados : evolucao);
+                  const data = evolucao;
 
                   const isDia = (data?.[0]?.mes?.length ?? 0) === 10;
                   const granLabel = isDia ? 'por dia' : 'por mês';
-                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
-                    ? { ...filters, cnpjsPagadores: [] }
-                    : filters;
+                  const filtersToSend = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
 
                   const openPeriodo = (mesIso: string, mesLabel: string) => {
                     if (!mesIso) return;
@@ -1537,15 +1514,11 @@ export function FaturamentoClientes() {
 
               <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
                 {(() => {
-                  const data = visao === 'geral'
-                    ? evolucao
-                    : (evolucaoSelecionados.length > 0 ? evolucaoSelecionados : evolucao);
+                  const data = evolucao;
 
                   const isDia = (data?.[0]?.mes?.length ?? 0) === 10;
                   const granLabel = isDia ? 'por dia' : 'por mês';
-                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
-                    ? { ...filters, cnpjsPagadores: [] }
-                    : filters;
+                  const filtersToSend = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
 
                   const costItems = [
                     { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
@@ -2019,20 +1992,83 @@ export function FaturamentoClientes() {
             </Button>
           )}
 
-          <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
+          <div className="grid grid-rows-[minmax(0,1fr)_auto_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
-                <span>CT-e</span>
-                <span>Emissão</span>
-                <span>Destinatário</span>
-                <span className="text-right">Vlr. Merc.</span>
-                <span className="text-right">Peso</span>
-                <span className="text-right">Vol.</span>
-                <span className="text-right">Frete</span>
-                <span className="text-right">Custos</span>
-                <span className="text-right">Resultado</span>
-              </div>
               <div className="min-h-0 overflow-y-auto">
+                <div className={`sticky top-0 z-10 grid ${cteDialogGridCols} items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('cte')}
+                    className="text-left flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    CT-e
+                    {cteDialogSort.key === 'cte' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('data_emissao')}
+                    className="text-left flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Emissão
+                    {cteDialogSort.key === 'data_emissao' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('destinatario')}
+                    className="text-left flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Destinatário
+                    {cteDialogSort.key === 'destinatario' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('vlr_merc')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Vlr. Merc.
+                    {cteDialogSort.key === 'vlr_merc' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('peso_real')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Peso
+                    {cteDialogSort.key === 'peso_real' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('qtde_vol')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Vol.
+                    {cteDialogSort.key === 'qtde_vol' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('vlr_frete')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Frete
+                    {cteDialogSort.key === 'vlr_frete' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('total_custos')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Custos
+                    {cteDialogSort.key === 'total_custos' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleCteSort('resultado')}
+                    className="text-right flex items-center justify-end gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+                  >
+                    Resultado
+                    {cteDialogSort.key === 'resultado' && <ChevronDown className={`w-3 h-3 ${cteDialogSort.dir === 'asc' ? 'rotate-180' : ''}`} />}
+                  </button>
+                </div>
                 {loadingCtes ? (
                   <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2045,20 +2081,20 @@ export function FaturamentoClientes() {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {cteDialogLista.map((cte, idx) => (
+                    {cteDialogPageItems.map((cte, idx) => (
                       <div
                           key={idx}
-                          className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                          className={`grid ${cteDialogGridCols} items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50`}
                         >
-                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
-                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
-                          <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_dest || cte.nome_pag || '-'}</span>
-                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.vlr_merc)}</span>
-                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKg(cte.peso_real)}</span>
-                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtNum(cte.qtde_vol)}</span>
-                          <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{fmtBRL(cte.vlr_frete)}</span>
-                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.total_custos ?? 0)}</span>
-                          <span className={`self-center text-right font-mono text-xs font-semibold ${(Number(cte.resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cte.resultado ?? 0)}</span>
+                          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                          <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</span>
+                          <span className="truncate text-slate-700 dark:text-slate-300">{cte.nome_dest || cte.nome_pag || '-'}</span>
+                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">{fmtBRL(cte.vlr_merc)}</span>
+                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">{fmtKg(cte.peso_real)}</span>
+                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">{fmtNum(cte.qtde_vol)}</span>
+                          <span className="text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap tabular-nums">{fmtBRL(cte.vlr_frete)}</span>
+                          <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">{fmtBRL(cte.total_custos ?? 0)}</span>
+                          <span className={`text-right font-mono text-xs font-semibold whitespace-nowrap tabular-nums ${(Number(cte.resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cte.resultado ?? 0)}</span>
                         </div>
                     ))}
                   </div>
@@ -2066,17 +2102,46 @@ export function FaturamentoClientes() {
               </div>
             </div>
 
+            {cteDialogSorted.length > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm shrink-0">
+                <div className="text-slate-600 dark:text-slate-300">
+                  {(() => {
+                    const start = (cteDialogPage - 1) * CTE_PAGE_SIZE + 1;
+                    const end = Math.min(cteDialogPage * CTE_PAGE_SIZE, cteDialogSorted.length);
+                    return `${start}-${end} de ${cteDialogSorted.length}`;
+                  })()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCteDialogPage(1)} disabled={cteDialogPage <= 1}>
+                    «
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCteDialogPage(p => Math.max(1, p - 1))} disabled={cteDialogPage <= 1}>
+                    Anterior
+                  </Button>
+                  <div className="text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                    Página {cteDialogPage} / {cteDialogTotalPages}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setCteDialogPage(p => Math.min(cteDialogTotalPages, p + 1))} disabled={cteDialogPage >= cteDialogTotalPages}>
+                    Próxima
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setCteDialogPage(cteDialogTotalPages)} disabled={cteDialogPage >= cteDialogTotalPages}>
+                    »
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {cteDialogTotais && (
-              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
-                <span className="text-slate-500 dark:text-slate-400">{cteDialogLista.length} CT-es</span>
+              <div className={`grid ${cteDialogGridCols} items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0`}>
+                <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{cteDialogSorted.length} CT-es</span>
                 <span />
                 <span />
-                <span className="text-right font-mono">{fmtBRL(cteDialogTotais.vlr_merc)}</span>
-                <span className="text-right font-mono">{fmtKg(cteDialogTotais.peso_real)}</span>
-                <span className="text-right font-mono">{fmtNum(cteDialogTotais.qtde_vol)}</span>
-                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{fmtBRL(cteDialogTotais.vlr_frete)}</span>
-                <span className="text-right font-mono">{fmtBRL(cteDialogTotais.total_custos ?? 0)}</span>
-                <span className={`text-right font-mono font-semibold ${(Number(cteDialogTotais.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cteDialogTotais.total_resultado ?? 0)}</span>
+                <span className="text-right font-mono whitespace-nowrap tabular-nums">{fmtBRL(cteDialogTotais.vlr_merc)}</span>
+                <span className="text-right font-mono whitespace-nowrap tabular-nums">{fmtKg(cteDialogTotais.peso_real)}</span>
+                <span className="text-right font-mono whitespace-nowrap tabular-nums">{fmtNum(cteDialogTotais.qtde_vol)}</span>
+                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300 whitespace-nowrap tabular-nums">{fmtBRL(cteDialogTotais.vlr_frete)}</span>
+                <span className="text-right font-mono whitespace-nowrap tabular-nums">{fmtBRL(cteDialogTotais.total_custos ?? 0)}</span>
+                <span className={`text-right font-mono font-semibold whitespace-nowrap tabular-nums ${(Number(cteDialogTotais.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cteDialogTotais.total_resultado ?? 0)}</span>
               </div>
             )}
           </div>
