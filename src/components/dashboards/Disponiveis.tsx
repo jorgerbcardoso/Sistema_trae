@@ -2286,7 +2286,7 @@ function CardCarregamento({
       const first = unidadesReais[0];
       return (
         <span className="min-w-0 flex items-center whitespace-nowrap">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{renderUnidade(first)}</span>
+          <span className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap">{renderUnidade(first)}</span>
           <span className="shrink-0">, </span>
           <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
         </span>
@@ -2302,7 +2302,7 @@ function CardCarregamento({
           <span className="shrink-0">, </span>
           {middle.length > 0 ? (
             <>
-              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{middle.join(', ')}</span>
+              <span className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap">{middle.join(', ')}</span>
               <span className="shrink-0">, </span>
             </>
           ) : null}
@@ -2314,7 +2314,7 @@ function CardCarregamento({
     const prefix = unidadesReais.slice(0, -1).join(', ');
     return (
       <span className="min-w-0 flex items-center whitespace-nowrap">
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{prefix}</span>
+        <span className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap">{prefix}</span>
         <span className="shrink-0">, </span>
         <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
       </span>
