@@ -868,6 +868,41 @@ if (
     }
 }
 
+if (!empty($coletas)) {
+    $unidadesColeta = [];
+    foreach ($coletas as $c) {
+        $u = strtoupper(trim((string)($c['unidadeDest'] ?? '')));
+        if ($u === '' || $u === '0') continue;
+        if (!preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+        $unidadesColeta[$u] = true;
+    }
+    $unidadesColeta = array_keys($unidadesColeta);
+
+    $mapNomeUnidade = [];
+    if (!empty($unidadesColeta)) {
+        $resNome = sql(
+            "SELECT UPPER(BTRIM(sigla)) AS sigla, nome
+             FROM {$tblUnidade}
+             WHERE UPPER(BTRIM(sigla)) = ANY($1::text[])",
+            [$unidadesColeta],
+            $g_sql
+        );
+        if ($resNome && pg_num_rows($resNome) > 0) {
+            while ($r = pg_fetch_assoc($resNome)) {
+                $s = strtoupper(trim((string)($r['sigla'] ?? '')));
+                $n = trim((string)($r['nome'] ?? ''));
+                if ($s !== '' && $n !== '') $mapNomeUnidade[$s] = $n;
+            }
+        }
+    }
+
+    foreach ($coletas as $i => $c) {
+        $u = strtoupper(trim((string)($c['unidadeDest'] ?? '')));
+        if ($u === '' || $u === '0') continue;
+        $coletas[$i]['nomeDest'] = $mapNomeUnidade[$u] ?? $u;
+    }
+}
+
 $placaColetaMap = [];
 if (!empty($ctes)) {
     $tableCte = strtolower($domain) . '_cte';

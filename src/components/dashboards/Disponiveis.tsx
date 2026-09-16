@@ -119,6 +119,7 @@ interface Coleta {
   cidadeDest: string;
   ufDest?: string;
   unidadeDest: string;
+  nomeDest?: string;
   paraEntrega: boolean;
   dataHoreLim: string;
   coletada: string;
@@ -6746,7 +6747,9 @@ export function Disponiveis() {
     for (const coleta of coletasTransferFiltradas.filter(c => !c.paraEntrega)) {
       const key = coleta.unidadeDest || 'SEM DESTINO';
       if (!map[key]) {
-        const nomeGrupo = key === 'SEM DESTINO' ? (coleta.cidadeDest || key) : key;
+        const nomeGrupo = key === 'SEM DESTINO'
+          ? (coleta.cidadeDest || key)
+          : (String((coleta as any).nomeDest ?? '').trim() || key);
         map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
       }
       map[key].coletas.push(coleta);
