@@ -19,6 +19,7 @@ $filters = $input['filters'] ?? [];
 $tipo    = $input['tipo']    ?? '';
 $chave   = $input['chave']   ?? '';
 $mes     = $input['mes']     ?? '';
+$dia     = $input['dia']     ?? '';
 $excluirCnpjs = (isset($input['excluir_cnpjs']) && is_array($input['excluir_cnpjs'])) ? $input['excluir_cnpjs'] : [];
 $excluirGrupos = (isset($input['excluir_grupos']) && is_array($input['excluir_grupos'])) ? $input['excluir_grupos'] : [];
 $excluirSiglas = (isset($input['excluir_siglas']) && is_array($input['excluir_siglas'])) ? $input['excluir_siglas'] : [];
@@ -62,11 +63,12 @@ if ($tipo === 'periodo' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo =
     }
 }
 
-if ($mes !== '' && ($tipo === 'evol_cliente' || $tipo === 'evol_unidade' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo')) {
-    if ($mes !== '') {
-        $whereConditions[] = "TO_CHAR(cte.data_emissao, 'YYYY-MM') = $" . $paramIndex++;
-        $params[] = $mes;
-    }
+if ($dia !== '' && ($tipo === 'evol_cliente' || $tipo === 'evol_unidade' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo' || $tipo === 'periodo')) {
+    $whereConditions[] = "cte.data_emissao = $" . $paramIndex++;
+    $params[] = $dia;
+} elseif ($mes !== '' && ($tipo === 'evol_cliente' || $tipo === 'evol_unidade' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo' || $tipo === 'periodo')) {
+    $whereConditions[] = "TO_CHAR(cte.data_emissao, 'YYYY-MM') = $" . $paramIndex++;
+    $params[] = $mes;
 }
 
 if (!empty($filters['tpFrete'])) {

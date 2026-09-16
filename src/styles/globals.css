@@ -115,6 +115,10 @@
   button, [role="button"], select, input[type="submit"] {
     cursor: pointer !important;
   }
+
+  :focus:not(:focus-visible) {
+    outline: none !important;
+  }
 }
 
 /* ✅ ESTILIZAÇÃO ESPECÍFICA (SISTEMA PRESTO) */

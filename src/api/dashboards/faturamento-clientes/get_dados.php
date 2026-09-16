@@ -17,6 +17,31 @@ $groupBy = isset($input['groupBy']) && $input['groupBy'] === 'clientes' ? 'clien
 
 $conn = connect();
 
+$periodoIniRaw = (string)($filters['periodoEmissaoInicio'] ?? '');
+$periodoFimRaw = (string)($filters['periodoEmissaoFim'] ?? '');
+$evolucaoGranInput = strtolower(trim((string)($input['evolucao_gran'] ?? '')));
+
+$evolucaoGran = 'mes';
+try {
+    $ini = $periodoIniRaw !== '' ? strtotime($periodoIniRaw) : null;
+    $fim = $periodoFimRaw !== '' ? strtotime($periodoFimRaw) : null;
+    if ($ini === null && $fim === null) {
+        $fim = strtotime(date('Y-m-d'));
+        $ini = strtotime('-30 days', $fim);
+    } elseif ($ini === null && $fim !== null) {
+        $ini = strtotime('-30 days', $fim);
+    } elseif ($ini !== null && $fim === null) {
+        $fim = strtotime(date('Y-m-d'));
+    }
+    if ($ini !== null && $fim !== null) {
+        $dias = (int)floor(($fim - $ini) / 86400) + 1;
+        if ($dias <= 62) $evolucaoGran = 'dia';
+    }
+} catch (Throwable $e) {
+}
+if ($evolucaoGranInput === 'dia' || $evolucaoGranInput === 'day') $evolucaoGran = 'dia';
+if ($evolucaoGranInput === 'mes' || $evolucaoGranInput === 'month') $evolucaoGran = 'mes';
+
 $costFields = [
     'custo_seguro',
     'custo_icms',
@@ -39,11 +64,16 @@ foreach ($costFields as $cf) {
 }
 $costExpr = '(' . implode(' + ', $costExprParts) . ')';
 
-$buildEvolucao = function(string $where, array $params) use ($conn, $domain, $costExpr): array {
+$buildEvolucao = function(string $where, array $params) use ($conn, $domain, $costExpr, $evolucaoGran): array {
+    $selPeriodo = ($evolucaoGran === 'dia')
+        ? "TO_CHAR(cte.data_emissao, 'YYYY-MM-DD') AS mes, TO_CHAR(cte.data_emissao, 'DD/MM') AS mes_label"
+        : "TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes, TO_CHAR(cte.data_emissao, 'Mon/YY') AS mes_label";
+    $grpPeriodo = ($evolucaoGran === 'dia')
+        ? "TO_CHAR(cte.data_emissao, 'YYYY-MM-DD'), TO_CHAR(cte.data_emissao, 'DD/MM')"
+        : "TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY')";
     $q = "
         SELECT
-            TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
-            TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
+            {$selPeriodo},
             SUM(cte.vlr_frete)                    AS total_frete,
             SUM({$costExpr})                      AS total_custos,
             SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
@@ -62,7 +92,7 @@ $buildEvolucao = function(string $where, array $params) use ($conn, $domain, $co
             COUNT(*)                                       AS qtde_ctes
         FROM {$domain}_cte cte
         {$where}
-        GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY')
+        GROUP BY {$grpPeriodo}
         ORDER BY mes ASC
     ";
     $res = pg_query_params($conn, $q, $params);
@@ -470,6 +500,7 @@ respondJson([
     'data' => [
         'clientes'           => $clientes,
         'group_by'           => $groupBy,
+      'evolucao_gran'      => $evolucaoGran,
         'totais'             => [
             'qtde_ctes'     => (int)($rowTotais['qtde_ctes'] ?? 0),
             'total_frete'   => (float)($rowTotais['total_frete'] ?? 0),

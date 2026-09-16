@@ -602,7 +602,19 @@ export function FaturamentoClientes() {
     URL.revokeObjectURL(url);
   };
 
-  const abrirCteDialog = useCallback(async (titulo: string, tipo: string, chave: string, mes?: string, opts?: { excluir_cnpjs?: string[]; excluir_grupos?: string[]; excluir_siglas?: string[] }) => {
+  const abrirCteDialog = useCallback(async (
+    titulo: string,
+    tipo: string,
+    chave: string,
+    mes?: string,
+    opts?: {
+      excluir_cnpjs?: string[];
+      excluir_grupos?: string[];
+      excluir_siglas?: string[];
+      filters?: Filters;
+      dia?: string;
+    }
+  ) => {
     setCteDialogTitulo(titulo);
     cteDialogTituloRef.current = titulo;
     setCteDialogLista([]);
@@ -611,9 +623,10 @@ export function FaturamentoClientes() {
     setCteDialogOpen(true);
     setLoadingCtes(true);
     try {
+      const filtersToSend = opts?.filters ?? filters;
       const response = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/get_ctes.php`,
-        { method: 'POST', body: JSON.stringify({ filters, tipo, chave, mes: mes ?? '', ...(opts ?? {}) }) },
+        { method: 'POST', body: JSON.stringify({ filters: filtersToSend, tipo, chave, mes: mes ?? '', ...(opts ?? {}) }) },
         true
       );
       if (response.success) {
@@ -787,44 +800,19 @@ export function FaturamentoClientes() {
               <div className="space-y-3">
                 {(() => {
                   const t = visao === 'geral' ? totais : (totaisSelecionados ?? totais);
-                  const evo = visao === 'geral' ? evolucao : (evolucaoSelecionados.length ? evolucaoSelecionados : evolucao);
+                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
+                    ? { ...filters, cnpjsPagadores: [] }
+                    : filters;
+                  const filtersGeral = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
                   const ticket = (t?.qtde_ctes ?? 0) > 0 ? (t?.total_frete ?? 0) / (t?.qtde_ctes ?? 1) : 0;
-                  const costItems = [
-                    { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
-                    { key: 'custo_icms', label: 'ICMS', color: '#f97316' },
-                    { key: 'custo_pis_cofins', label: 'PIS/COFINS', color: '#14b8a6' },
-                    { key: 'custo_gris', label: 'GRIS', color: '#8b5cf6' },
-                    { key: 'custo_pedagio', label: 'Pedágio', color: '#eab308' },
-                    { key: 'custo_expedicao', label: 'Expedição', color: '#0ea5e9' },
-                    { key: 'custo_transferencia', label: 'Transferência', color: '#f43f5e' },
-                    { key: 'custo_transbordo', label: 'Transbordo', color: '#22c55e' },
-                    { key: 'custo_vendedor', label: 'Vendedor', color: '#a855f7' },
-                    { key: 'custo_recepcao', label: 'Recepção', color: '#64748b' },
-                    { key: 'custo_desp_div', label: 'Desp. div.', color: '#ef4444' },
-                    { key: 'custo_transferencia_real', label: 'Transf. real', color: '#06b6d4' },
-                  ] as const;
+                  const ticketGeral = (totais?.qtde_ctes ?? 0) > 0 ? (totais?.total_frete ?? 0) / (totais?.qtde_ctes ?? 1) : 0;
 
-                  const dist = costItems
-                    .map((it) => ({ name: it.label, key: it.key, value: Number((t as any)?.[it.key] ?? 0) || 0, color: it.color }))
-                    .filter((d) => d.value > 0)
-                    .sort((a, b) => b.value - a.value);
-
-                  const topKeys = dist.slice(0, 6).map((d) => d.key);
-                  const evoCost = (evo ?? []).map((row: any) => {
-                    const out: any = { mes: row.mes, mes_label: row.mes_label, total_custos: Number(row.total_custos ?? 0) || 0 };
-                    let sumTop = 0;
-                    for (const k of topKeys) { const v = Number(row[k] ?? 0) || 0; out[k] = v; sumTop += v; }
-                    out.__outros__ = Math.max(0, out.total_custos - sumTop);
-                    return out;
-                  });
-
-                  const series = [
-                    ...topKeys.map((k) => {
-                      const meta = costItems.find((x) => x.key === k);
-                      return { key: k, label: meta?.label ?? k, color: meta?.color ?? '#94a3b8' };
-                    }),
-                    { key: '__outros__', label: 'Outros', color: '#94a3b8' },
-                  ];
+                  const abrirPeriodoAtual = (titulo: string) => {
+                    abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersToSend });
+                  };
+                  const abrirPeriodoGeral = (titulo: string) => {
+                    abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersGeral });
+                  };
 
                   return (
                     <div className="space-y-4">
@@ -856,7 +844,11 @@ export function FaturamentoClientes() {
 
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — Receita')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
@@ -867,7 +859,11 @@ export function FaturamentoClientes() {
                             </div>
                           </div>
 
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — Custos')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
@@ -878,7 +874,11 @@ export function FaturamentoClientes() {
                             </div>
                           </div>
 
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — Resultado')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
@@ -889,7 +889,11 @@ export function FaturamentoClientes() {
                             </div>
                           </div>
 
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — CT-es')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
@@ -900,7 +904,11 @@ export function FaturamentoClientes() {
                             </div>
                           </div>
 
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — Clientes')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
@@ -911,7 +919,11 @@ export function FaturamentoClientes() {
                             </div>
                           </div>
 
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                          <div
+                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer"
+                            role="button"
+                            onClick={() => abrirPeriodoAtual('Período — Ticket')}
+                          >
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
                             <div className="relative flex items-center gap-3">
                               <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
@@ -924,89 +936,80 @@ export function FaturamentoClientes() {
                         </div>
                       </div>
 
-                      <div className="grid lg:grid-cols-3 gap-4">
-                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-indigo-500" />
-                            Linha do Resultado
-                          </h3>
-                          <ResponsiveContainer width="100%" height={240}>
-                            <AreaChart data={evo} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                              <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                              <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                              <RechartsTooltip
-                                contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                                formatter={(v: number, n: string) => {
-                                  const map: any = { total_frete: 'Receita', total_custos: 'Custos', total_resultado: 'Resultado' };
-                                  return [fmtBRL(v), map[n] || n];
-                                }}
-                              />
-                              <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>} />
-                              <Area type="monotone" dataKey="total_frete" name="Receita" stroke="#6366f1" fillOpacity={0.08} fill="#6366f1" strokeWidth={2.5} dot={false} />
-                              <Area type="monotone" dataKey="total_custos" name="Custos" stroke="#f97316" fillOpacity={0.06} fill="#f97316" strokeWidth={2.5} dot={false} />
-                              <Area type="monotone" dataKey="total_resultado" name="Resultado" stroke="#22c55e" fillOpacity={0.04} fill="#22c55e" strokeWidth={2.5} dot={false} />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
+                      {visao === 'selecionados' && (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Total da empresa</div>
+                          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Receita')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(totais?.total_frete ?? 0)}</div>
+                                  </div>
+                                </div>
+                              </div>
 
-                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                            <Calculator className="w-5 h-5 text-orange-500" />
-                            Distribuição de Custos
-                          </h3>
-                          {dist.length === 0 ? (
-                            <div className="h-[240px] flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">Sem custos no período.</div>
-                          ) : (
-                            <ResponsiveContainer width="100%" height={240}>
-                              <PieChart>
-                                <RechartsTooltip
-                                  contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                                  formatter={(v: number, n: string) => [fmtBRL(v), n]}
-                                />
-                                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>} />
-                                <Pie data={dist} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                                  {dist.map((entry, idx) => (
-                                    <Cell key={`cell-${idx}`} fill={entry.color} />
-                                  ))}
-                                </Pie>
-                              </PieChart>
-                            </ResponsiveContainer>
-                          )}
-                        </div>
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Custos')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL((totais as any)?.total_custos ?? 0)}</div>
+                                  </div>
+                                </div>
+                              </div>
 
-                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                            <Calculator className="w-5 h-5 text-indigo-500" />
-                            Custos por Parcela (Tempo)
-                          </h3>
-                          <ResponsiveContainer width="100%" height={240}>
-                            <AreaChart data={evoCost} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                              <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} />
-                              <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                              <RechartsTooltip
-                                contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                                formatter={(v: number, k: string) => {
-                                  const s = series.find((x) => x.key === k);
-                                  return [fmtBRL(v), s?.label || k];
-                                }}
-                              />
-                              <Legend
-                                iconType="circle"
-                                iconSize={8}
-                                formatter={(v) => {
-                                  const s = series.find((x) => x.key === v);
-                                  return <span style={{ color: textColor, fontSize: 11 }}>{(s?.label || String(v)).substring(0, 10)}</span>;
-                                }}
-                              />
-                              {series.map((s) => (
-                                <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.18} dot={false} />
-                              ))}
-                            </AreaChart>
-                          </ResponsiveContainer>
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Resultado')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
+                                    <div className={`text-sm font-bold ${(Number((totais as any)?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRL((totais as any)?.total_resultado ?? 0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — CT-es')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
+                                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(totais?.qtde_ctes ?? 0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Clientes')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
+                                    <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(totais?.qtde_clientes ?? 0)}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer" role="button" onClick={() => abrirPeriodoGeral('Total da empresa — Ticket')}>
+                                <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                                <div className="relative flex items-center gap-3">
+                                  <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
+                                  <div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(ticketGeral)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -1321,7 +1324,340 @@ export function FaturamentoClientes() {
                   })()}
                 </div>
 
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                    <Calculator className="w-4 h-4 text-orange-500" />
+                    Distribuição de Custos
+                  </h3>
+                  {(() => {
+                    const t = visao === 'geral' ? totais : (totaisSelecionados ?? totais);
+                    const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
+                      ? { ...filters, cnpjsPagadores: [] }
+                      : filters;
+                    const costItems = [
+                      { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
+                      { key: 'custo_icms', label: 'ICMS', color: '#f97316' },
+                      { key: 'custo_pis_cofins', label: 'PIS/COFINS', color: '#14b8a6' },
+                      { key: 'custo_gris', label: 'GRIS', color: '#8b5cf6' },
+                      { key: 'custo_pedagio', label: 'Pedágio', color: '#eab308' },
+                      { key: 'custo_expedicao', label: 'Expedição', color: '#0ea5e9' },
+                      { key: 'custo_transferencia', label: 'Transferência', color: '#f43f5e' },
+                      { key: 'custo_transbordo', label: 'Transbordo', color: '#22c55e' },
+                      { key: 'custo_vendedor', label: 'Vendedor', color: '#a855f7' },
+                      { key: 'custo_recepcao', label: 'Recepção', color: '#64748b' },
+                      { key: 'custo_desp_div', label: 'Desp. div.', color: '#ef4444' },
+                      { key: 'custo_transferencia_real', label: 'Transf. real', color: '#06b6d4' },
+                    ] as const;
+                    const dist = costItems
+                      .map((it) => ({ name: it.label, key: it.key, value: Number((t as any)?.[it.key] ?? 0) || 0, color: it.color }))
+                      .filter((d) => d.value > 0)
+                      .sort((a, b) => b.value - a.value);
 
+                    if (dist.length === 0) {
+                      return <div className="h-[220px] flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">Sem custos no período.</div>;
+                    }
+                    return (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <RechartsTooltip
+                            contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                            formatter={(v: number, n: string) => [fmtBRL(v), n]}
+                          />
+                          <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>} />
+                          <Pie
+                            data={dist}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={55}
+                            outerRadius={85}
+                            paddingAngle={2}
+                            stroke="transparent"
+                            strokeWidth={0}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => abrirCteDialog('Período — Custos', 'periodo', '', undefined, { filters: filtersToSend })}
+                          >
+                            {dist.map((entry, idx) => (
+                              <Cell key={`cell-${idx}`} fill={entry.color} stroke="transparent" strokeWidth={0} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </div>
+
+
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-6">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                {(() => {
+                  const data = visao === 'geral'
+                    ? evolucao
+                    : (evolucaoSelecionados.length > 0 ? evolucaoSelecionados : evolucao);
+
+                  const isDia = (data?.[0]?.mes?.length ?? 0) === 10;
+                  const granLabel = isDia ? 'por dia' : 'por mês';
+                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
+                    ? { ...filters, cnpjsPagadores: [] }
+                    : filters;
+
+                  const openPeriodo = (mesIso: string, mesLabel: string) => {
+                    if (!mesIso) return;
+                    if (mesIso.length === 10) {
+                      abrirCteDialog(`Período — ${mesLabel}`, 'periodo', '', undefined, { dia: mesIso, filters: filtersToSend });
+                      return;
+                    }
+                    abrirCteDialog(`Período — ${mesLabel}`, 'periodo', '', mesIso, { filters: filtersToSend });
+                  };
+
+                  return (
+                    <>
+                      <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-emerald-500" />
+                            Linha do Resultado
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-0.5">{granLabel} (clique no ponto para abrir os CT-es)</p>
+                        </div>
+                      </div>
+
+                      {(!data || data.length === 0) ? (
+                        <div className="h-[320px] flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">Sem dados no período.</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={320}>
+                          <AreaChart
+                            data={data}
+                            margin={{ top: 8, right: 16, left: 0, bottom: 16 }}
+                            onClick={(e: any) => {
+                              if (!e?.activePayload?.[0]) {
+                                abrirCteDialog('Período', 'periodo', '', undefined, { filters: filtersToSend });
+                                return;
+                              }
+                              const mesLabel = String(e.activeLabel ?? '');
+                              const mesIso = data.find(d => d.mes_label === mesLabel)?.mes ?? '';
+                              if (!mesIso) {
+                                abrirCteDialog('Período', 'periodo', '', undefined, { filters: filtersToSend });
+                                return;
+                              }
+                              openPeriodo(mesIso, mesLabel);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                            <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={40} />
+                            <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                            <RechartsTooltip
+                              contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: number, key: string) => {
+                                if (key === 'total_frete') return [fmtBRL(v), 'Receita'];
+                                if (key === 'total_custos') return [fmtBRL(v), 'Custos'];
+                                if (key === 'total_resultado') return [fmtBRL(v), 'Resultado'];
+                                return [fmtBRL(v), key];
+                              }}
+                            />
+                            <Legend
+                              iconType="circle"
+                              iconSize={8}
+                              formatter={(v) => {
+                                const key = String(v);
+                                const label = key === 'total_frete'
+                                  ? 'Receita'
+                                  : key === 'total_custos'
+                                    ? 'Custos'
+                                    : key === 'total_resultado'
+                                      ? 'Resultado'
+                                      : key;
+                                return <span style={{ color: textColor, fontSize: 11 }}>{label}</span>;
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="total_frete"
+                              stroke="#3b82f6"
+                              fill="#3b82f6"
+                              fillOpacity={0.12}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{
+                                r: 5,
+                                cursor: 'pointer',
+                                onClick: (_: any, payload: any) => {
+                                  const mesIso = payload?.payload?.mes ?? '';
+                                  const mesLabel = payload?.payload?.mes_label ?? mesIso;
+                                  openPeriodo(mesIso, mesLabel);
+                                },
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="total_custos"
+                              stroke="#f97316"
+                              fill="#f97316"
+                              fillOpacity={0.10}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{
+                                r: 5,
+                                cursor: 'pointer',
+                                onClick: (_: any, payload: any) => {
+                                  const mesIso = payload?.payload?.mes ?? '';
+                                  const mesLabel = payload?.payload?.mes_label ?? mesIso;
+                                  openPeriodo(mesIso, mesLabel);
+                                },
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="total_resultado"
+                              stroke="#10b981"
+                              fill="#10b981"
+                              fillOpacity={0.10}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{
+                                r: 5,
+                                cursor: 'pointer',
+                                onClick: (_: any, payload: any) => {
+                                  const mesIso = payload?.payload?.mes ?? '';
+                                  const mesLabel = payload?.payload?.mes_label ?? mesIso;
+                                  openPeriodo(mesIso, mesLabel);
+                                },
+                              }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                {(() => {
+                  const data = visao === 'geral'
+                    ? evolucao
+                    : (evolucaoSelecionados.length > 0 ? evolucaoSelecionados : evolucao);
+
+                  const isDia = (data?.[0]?.mes?.length ?? 0) === 10;
+                  const granLabel = isDia ? 'por dia' : 'por mês';
+                  const filtersToSend = (visao === 'geral' && filters.cnpjsPagadores.length > 0)
+                    ? { ...filters, cnpjsPagadores: [] }
+                    : filters;
+
+                  const costItems = [
+                    { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
+                    { key: 'custo_icms', label: 'ICMS', color: '#f97316' },
+                    { key: 'custo_pis_cofins', label: 'PIS/COFINS', color: '#14b8a6' },
+                    { key: 'custo_gris', label: 'GRIS', color: '#8b5cf6' },
+                    { key: 'custo_pedagio', label: 'Pedágio', color: '#eab308' },
+                    { key: 'custo_expedicao', label: 'Expedição', color: '#0ea5e9' },
+                    { key: 'custo_transferencia', label: 'Transferência', color: '#f43f5e' },
+                    { key: 'custo_transbordo', label: 'Transbordo', color: '#22c55e' },
+                    { key: 'custo_vendedor', label: 'Vendedor', color: '#a855f7' },
+                    { key: 'custo_recepcao', label: 'Recepção', color: '#64748b' },
+                    { key: 'custo_desp_div', label: 'Desp. div.', color: '#ef4444' },
+                    { key: 'custo_transferencia_real', label: 'Transf. real', color: '#06b6d4' },
+                  ] as const;
+
+                  const series = costItems
+                    .map((it) => ({
+                      ...it,
+                      total: (data ?? []).reduce((s, row) => s + (Number((row as any)?.[it.key] ?? 0) || 0), 0),
+                    }))
+                    .filter(s => s.total > 0);
+
+                  const openPeriodo = (mesIso: string, mesLabel: string) => {
+                    if (!mesIso) return;
+                    if (mesIso.length === 10) {
+                      abrirCteDialog(`Período — ${mesLabel}`, 'periodo', '', undefined, { dia: mesIso, filters: filtersToSend });
+                      return;
+                    }
+                    abrirCteDialog(`Período — ${mesLabel}`, 'periodo', '', mesIso, { filters: filtersToSend });
+                  };
+
+                  return (
+                    <>
+                      <div className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+                        <div>
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-orange-500" />
+                            Custos por Parcela (Tempo)
+                          </h3>
+                          <p className="text-xs text-slate-400 mt-0.5">{granLabel} (clique no ponto para abrir os CT-es)</p>
+                        </div>
+                      </div>
+
+                      {(!data || data.length === 0 || series.length === 0) ? (
+                        <div className="h-[320px] flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">Sem custos no período.</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={320}>
+                          <AreaChart
+                            data={data}
+                            margin={{ top: 8, right: 16, left: 0, bottom: 16 }}
+                            onClick={(e: any) => {
+                              if (!e?.activePayload?.[0]) {
+                                abrirCteDialog('Período', 'periodo', '', undefined, { filters: filtersToSend });
+                                return;
+                              }
+                              const mesLabel = String(e.activeLabel ?? '');
+                              const mesIso = data.find(d => d.mes_label === mesLabel)?.mes ?? '';
+                              if (!mesIso) {
+                                abrirCteDialog('Período', 'periodo', '', undefined, { filters: filtersToSend });
+                                return;
+                              }
+                              openPeriodo(mesIso, mesLabel);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                            <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={40} />
+                            <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                            <RechartsTooltip
+                              contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                              formatter={(v: number, key: string) => {
+                                const s = series.find(x => x.key === key);
+                                return [fmtBRL(v), s?.label || key];
+                              }}
+                            />
+                            <Legend
+                              iconType="circle"
+                              iconSize={8}
+                              formatter={(v) => {
+                                const s = series.find(x => x.key === v);
+                                return <span style={{ color: textColor, fontSize: 11 }}>{(s?.label || String(v)).substring(0, 12)}</span>;
+                              }}
+                            />
+                            {series.map((s) => (
+                              <Area
+                                key={s.key}
+                                type="monotone"
+                                dataKey={s.key}
+                                stackId="1"
+                                stroke={s.color}
+                                fill={s.color}
+                                fillOpacity={0.14}
+                                strokeWidth={1.5}
+                                dot={false}
+                                activeDot={{
+                                  r: 5,
+                                  cursor: 'pointer',
+                                  onClick: (_: any, payload: any) => {
+                                    const mesIso = payload?.payload?.mes ?? '';
+                                    const mesLabel = payload?.payload?.mes_label ?? mesIso;
+                                    openPeriodo(mesIso, mesLabel);
+                                  },
+                                }}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
