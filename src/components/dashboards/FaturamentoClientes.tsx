@@ -80,7 +80,7 @@ function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
 }
 function fmtBRLCompact(v: number) {
-  if (v >= 1_000_000) return 'R$ ' + (v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Mi';
+  if (v >= 1_000_000) return 'R$ ' + (v / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' M';
   return fmtBRL(v);
 }
 function fmtNum(v: number) {
@@ -890,9 +890,92 @@ export function FaturamentoClientes() {
                   const filtersGeral = filters.cnpjsPagadores.length > 0 ? { ...filters, cnpjsPagadores: [] } : filters;
                   const ticket = (t?.qtde_ctes ?? 0) > 0 ? (t?.total_frete ?? 0) / (t?.qtde_ctes ?? 1) : 0;
 
+                  const rankBase = (filters.cnpjsPagadores.length > 0)
+                    ? clientes
+                    : clientes.slice(0, filters.topN);
+                  const rankTot = rankBase.reduce((acc, c) => {
+                    acc.qtde_ctes += Number(c.qtde_ctes ?? 0) || 0;
+                    acc.total_frete += Number(c.total_frete ?? 0) || 0;
+                    acc.total_custos += Number(c.total_custos ?? 0) || 0;
+                    acc.total_resultado += Number(c.total_resultado ?? 0) || 0;
+                    return acc;
+                  }, { qtde_ctes: 0, total_frete: 0, total_custos: 0, total_resultado: 0, qtde_clientes: rankBase.length });
+                  const rankTicket = rankTot.qtde_ctes > 0 ? rankTot.total_frete / rankTot.qtde_ctes : 0;
+                  const rankLabel = filters.cnpjsPagadores.length > 0 ? `Selecionados (${rankBase.length})` : `Top ${filters.topN}`;
+
                   const abrirPeriodoAtual = (titulo: string) => {
                     abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersGeral });
                   };
+
+                  const renderResumoRow = (titulo: string, tt: any, tk: number) => (
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{titulo}</div>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Receita`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
+                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(Number(tt?.total_frete ?? 0))}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Custos`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
+                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(Number(tt?.total_custos ?? 0))}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Resultado`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
+                                <div className={`text-base font-bold whitespace-nowrap ${(Number(tt?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRLCompact(Number(tt?.total_resultado ?? 0))}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — CT-es`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
+                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtNum(Number(tt?.qtde_ctes ?? 0))}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Clientes`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
+                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtNum(Number(tt?.qtde_clientes ?? 0))}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Ticket`)}>
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
+                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(tk)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
 
                   return (
                     <div className="space-y-4">
@@ -900,99 +983,8 @@ export function FaturamentoClientes() {
                         <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Resumo</div>
                       </div>
 
-                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — Receita')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
-                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(t?.total_frete ?? 0)}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — Custos')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
-                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL((t as any)?.total_custos ?? 0)}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — Resultado')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
-                                <div className={`text-sm font-bold ${(Number((t as any)?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRL((t as any)?.total_resultado ?? 0)}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — CT-es')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
-                                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(t?.qtde_ctes ?? 0)}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — Clientes')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
-                                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(t?.qtde_clientes ?? 0)}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer"
-                            role="button"
-                            onClick={() => abrirPeriodoAtual('Período — Ticket')}
-                          >
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
-                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(ticket)}</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      {renderResumoRow(rankLabel, rankTot, rankTicket)}
+                      {renderResumoRow('Total da empresa', t, ticket)}
                     </div>
                   );
                 })()}
