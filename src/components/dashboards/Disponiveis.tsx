@@ -2282,16 +2282,20 @@ function CardCarregamento({
 
     if (unidadesReais.length === 1) return renderUnidade(last, { bold: true });
 
-    const first = unidadesReais[0];
-    if (unidadesReais.length === 2) {
+    if (unidadesReais.length <= 4) {
       return (
         <span className="min-w-0 flex items-center whitespace-nowrap">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{renderUnidade(first)}</span>
-          <span className="shrink-0">, </span>
-          <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
+          {unidadesReais.map((u, idx) => (
+            <span key={`${u}-${idx}`} className="shrink-0">
+              {renderUnidade(u, { bold: idx === unidadesReais.length - 1 })}
+              {idx < unidadesReais.length - 1 ? <span>, </span> : null}
+            </span>
+          ))}
         </span>
       );
     }
+
+    const first = unidadesReais[0];
     return (
       <span className="min-w-0 flex items-center whitespace-nowrap">
         <span className="shrink-0">{renderUnidade(first)}</span>
@@ -2348,19 +2352,6 @@ function CardCarregamento({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
-              {unidadesDestinoTexto
-                ? (
-                  <span className="min-w-0 flex-1 flex items-center gap-1.5">
-                    <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={unidadesDestinoFull}>
-                      {unidadesDestinoTexto}
-                    </span>
-                  </span>
-                )
-                : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
-              }
-            </div>
             <Dialog open={centralizadoraDialogOpen} onOpenChange={setCentralizadoraDialogOpen}>
               <DialogContent className="sm:max-w-[520px]">
                 <DialogHeader>
@@ -2387,6 +2378,20 @@ function CardCarregamento({
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
+          </div>
+
+          <div className="col-span-2 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
+            <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
+            {unidadesDestinoTexto
+              ? (
+                <span className="min-w-0 flex-1 flex items-center gap-1.5">
+                  <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={unidadesDestinoFull}>
+                    {unidadesDestinoTexto}
+                  </span>
+                </span>
+              )
+              : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
+            }
           </div>
 
           <div className="col-span-2 mt-1 flex items-center gap-2 min-w-0">
