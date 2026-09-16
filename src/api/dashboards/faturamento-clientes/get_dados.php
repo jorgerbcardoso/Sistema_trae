@@ -39,6 +39,62 @@ foreach ($costFields as $cf) {
 }
 $costExpr = '(' . implode(' + ', $costExprParts) . ')';
 
+$buildEvolucao = function(string $where, array $params) use ($conn, $domain, $costExpr): array {
+    $q = "
+        SELECT
+            TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
+            TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
+            SUM(cte.vlr_frete)                    AS total_frete,
+            SUM({$costExpr})                      AS total_custos,
+            SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
+            SUM(COALESCE(cte.custo_seguro, 0))             AS custo_seguro,
+            SUM(COALESCE(cte.custo_icms, 0))               AS custo_icms,
+            SUM(COALESCE(cte.custo_pis_cofins, 0))         AS custo_pis_cofins,
+            SUM(COALESCE(cte.custo_gris, 0))               AS custo_gris,
+            SUM(COALESCE(cte.custo_pedagio, 0))            AS custo_pedagio,
+            SUM(COALESCE(cte.custo_expedicao, 0))          AS custo_expedicao,
+            SUM(COALESCE(cte.custo_transferencia, 0))      AS custo_transferencia,
+            SUM(COALESCE(cte.custo_transbordo, 0))         AS custo_transbordo,
+            SUM(COALESCE(cte.custo_vendedor, 0))           AS custo_vendedor,
+            SUM(COALESCE(cte.custo_recepcao, 0))           AS custo_recepcao,
+            SUM(COALESCE(cte.custo_desp_div, 0))           AS custo_desp_div,
+            SUM(COALESCE(cte.custo_transferencia_real, 0)) AS custo_transferencia_real,
+            COUNT(*)                                       AS qtde_ctes
+        FROM {$domain}_cte cte
+        {$where}
+        GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY')
+        ORDER BY mes ASC
+    ";
+    $res = pg_query_params($conn, $q, $params);
+    if (!$res) {
+        respondJson(['success' => false, 'message' => 'Erro na query evolução: ' . pg_last_error($conn)]);
+    }
+    $out = [];
+    while ($row = pg_fetch_assoc($res)) {
+        $out[] = [
+            'mes'         => $row['mes'],
+            'mes_label'   => $row['mes_label'],
+            'total_frete' => (float)($row['total_frete'] ?? 0),
+            'total_custos' => (float)($row['total_custos'] ?? 0),
+            'total_resultado' => (float)($row['total_resultado'] ?? 0),
+            'custo_seguro' => (float)($row['custo_seguro'] ?? 0),
+            'custo_icms' => (float)($row['custo_icms'] ?? 0),
+            'custo_pis_cofins' => (float)($row['custo_pis_cofins'] ?? 0),
+            'custo_gris' => (float)($row['custo_gris'] ?? 0),
+            'custo_pedagio' => (float)($row['custo_pedagio'] ?? 0),
+            'custo_expedicao' => (float)($row['custo_expedicao'] ?? 0),
+            'custo_transferencia' => (float)($row['custo_transferencia'] ?? 0),
+            'custo_transbordo' => (float)($row['custo_transbordo'] ?? 0),
+            'custo_vendedor' => (float)($row['custo_vendedor'] ?? 0),
+            'custo_recepcao' => (float)($row['custo_recepcao'] ?? 0),
+            'custo_desp_div' => (float)($row['custo_desp_div'] ?? 0),
+            'custo_transferencia_real' => (float)($row['custo_transferencia_real'] ?? 0),
+            'qtde_ctes'   => (int)($row['qtde_ctes'] ?? 0),
+        ];
+    }
+    return $out;
+};
+
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
@@ -216,30 +272,7 @@ if ($groupBy === 'grupos') {
     }
 }
 
-$totaisSelecionados = [
-    'qtde_ctes'     => 0,
-    'total_frete'   => 0.0,
-    'total_custos'  => 0.0,
-    'total_resultado' => 0.0,
-    'total_merc'    => 0.0,
-    'total_peso'    => 0.0,
-    'total_volumes' => 0,
-    'qtde_clientes' => 0,
-    'qtde_cif'      => 0,
-    'qtde_fob'      => 0,
-];
-foreach ($clientes as $c) {
-    $totaisSelecionados['qtde_ctes']     += (int)($c['qtde_ctes'] ?? 0);
-    $totaisSelecionados['total_frete']   += (float)($c['total_frete'] ?? 0);
-    $totaisSelecionados['total_custos']  += (float)($c['total_custos'] ?? 0);
-    $totaisSelecionados['total_resultado'] += (float)($c['total_resultado'] ?? 0);
-    $totaisSelecionados['total_merc']    += (float)($c['total_merc'] ?? 0);
-    $totaisSelecionados['total_peso']    += (float)($c['total_peso'] ?? 0);
-    $totaisSelecionados['total_volumes'] += (int)($c['total_volumes'] ?? 0);
-    $totaisSelecionados['qtde_clientes'] += 1;
-    $totaisSelecionados['qtde_cif']      += (int)($c['qtde_cif'] ?? 0);
-    $totaisSelecionados['qtde_fob']      += (int)($c['qtde_fob'] ?? 0);
-}
+$rowTotaisSel = null;
 
 // ============================================================
 // TOTAIS GERAIS
@@ -278,39 +311,17 @@ if (!$resultTotais) {
 }
 $rowTotais = pg_fetch_assoc($resultTotais);
 
-// ============================================================
-// EVOLUÇÃO MENSAL
-// ============================================================
-$queryEvolucao = "
-    SELECT
-        TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
-        TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
-        SUM(cte.vlr_frete)                    AS total_frete,
-        SUM({$costExpr})                      AS total_custos,
-        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
-        COUNT(*)                              AS qtde_ctes
-    FROM {$domain}_cte cte
-    {$whereClause}
-    GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY')
-    ORDER BY mes ASC
-";
-
-$resultEvolucao = pg_query_params($conn, $queryEvolucao, $queryParams);
-if (!$resultEvolucao) {
-    respondJson(['success' => false, 'message' => 'Erro na query evolução: ' . pg_last_error($conn)]);
+$resultTotaisSel = pg_query_params($conn, $queryTotais, $queryParams);
+if (!$resultTotaisSel) {
+    respondJson(['success' => false, 'message' => 'Erro na query totais selecionados: ' . pg_last_error($conn)]);
 }
+$rowTotaisSel = pg_fetch_assoc($resultTotaisSel);
 
-$evolucao = [];
-while ($row = pg_fetch_assoc($resultEvolucao)) {
-    $evolucao[] = [
-        'mes'         => $row['mes'],
-        'mes_label'   => $row['mes_label'],
-        'total_frete' => (float)$row['total_frete'],
-        'total_custos' => (float)($row['total_custos'] ?? 0),
-        'total_resultado' => (float)($row['total_resultado'] ?? 0),
-        'qtde_ctes'   => (int)$row['qtde_ctes'],
-    ];
-}
+// ============================================================
+// EVOLUÇÃO MENSAL (GERAL + SELECIONADOS)
+// ============================================================
+$evolucao = $buildEvolucao($whereClause, $queryParams);
+$evolucaoSelecionados = $buildEvolucao($whereClauseClientes, $queryParams);
 
 // ============================================================
 // UNIDADES
@@ -484,18 +495,31 @@ respondJson([
             'custo_transferencia_real' => (float)($rowTotais['custo_transferencia_real'] ?? 0),
         ],
         'totais_selecionados' => [
-            'qtde_ctes'     => (int)$totaisSelecionados['qtde_ctes'],
-            'total_frete'   => (float)$totaisSelecionados['total_frete'],
-            'total_custos'  => (float)$totaisSelecionados['total_custos'],
-            'total_resultado' => (float)$totaisSelecionados['total_resultado'],
-            'total_merc'    => (float)$totaisSelecionados['total_merc'],
-            'total_peso'    => (float)$totaisSelecionados['total_peso'],
-            'total_volumes' => (int)$totaisSelecionados['total_volumes'],
-            'qtde_clientes' => (int)$totaisSelecionados['qtde_clientes'],
-            'qtde_cif'      => (int)$totaisSelecionados['qtde_cif'],
-            'qtde_fob'      => (int)$totaisSelecionados['qtde_fob'],
+            'qtde_ctes'     => (int)($rowTotaisSel['qtde_ctes'] ?? 0),
+            'total_frete'   => (float)($rowTotaisSel['total_frete'] ?? 0),
+            'total_custos'  => (float)($rowTotaisSel['total_custos'] ?? 0),
+            'total_resultado' => (float)($rowTotaisSel['total_resultado'] ?? 0),
+            'total_merc'    => (float)($rowTotaisSel['total_merc'] ?? 0),
+            'total_peso'    => (float)($rowTotaisSel['total_peso'] ?? 0),
+            'total_volumes' => (int)($rowTotaisSel['total_volumes'] ?? 0),
+            'qtde_clientes' => (int)($rowTotaisSel['qtde_clientes'] ?? 0),
+            'qtde_cif'      => (int)($rowTotaisSel['qtde_cif'] ?? 0),
+            'qtde_fob'      => (int)($rowTotaisSel['qtde_fob'] ?? 0),
+            'custo_seguro'  => (float)($rowTotaisSel['custo_seguro'] ?? 0),
+            'custo_icms'    => (float)($rowTotaisSel['custo_icms'] ?? 0),
+            'custo_pis_cofins' => (float)($rowTotaisSel['custo_pis_cofins'] ?? 0),
+            'custo_gris'    => (float)($rowTotaisSel['custo_gris'] ?? 0),
+            'custo_pedagio' => (float)($rowTotaisSel['custo_pedagio'] ?? 0),
+            'custo_expedicao' => (float)($rowTotaisSel['custo_expedicao'] ?? 0),
+            'custo_transferencia' => (float)($rowTotaisSel['custo_transferencia'] ?? 0),
+            'custo_transbordo' => (float)($rowTotaisSel['custo_transbordo'] ?? 0),
+            'custo_vendedor' => (float)($rowTotaisSel['custo_vendedor'] ?? 0),
+            'custo_recepcao' => (float)($rowTotaisSel['custo_recepcao'] ?? 0),
+            'custo_desp_div' => (float)($rowTotaisSel['custo_desp_div'] ?? 0),
+            'custo_transferencia_real' => (float)($rowTotaisSel['custo_transferencia_real'] ?? 0),
         ],
         'evolucao'           => $evolucao,
+        'evolucao_selecionados' => $evolucaoSelecionados,
         'unidades'           => $unidades,
         'evol_clientes'      => array_values($evolClientesRaw),
         'evol_clientes_keys' => $clientesNomes,

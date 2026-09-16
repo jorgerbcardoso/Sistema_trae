@@ -18,6 +18,7 @@ import {
   Award,
   Check,
   ChevronDown,
+  ChevronRight,
   FileDown,
   Filter,
   Info,
@@ -164,6 +165,18 @@ interface EvolucaoMes {
   total_frete: number;
   total_custos?: number;
   total_resultado?: number;
+  custo_seguro?: number;
+  custo_icms?: number;
+  custo_pis_cofins?: number;
+  custo_gris?: number;
+  custo_pedagio?: number;
+  custo_expedicao?: number;
+  custo_transferencia?: number;
+  custo_transbordo?: number;
+  custo_vendedor?: number;
+  custo_recepcao?: number;
+  custo_desp_div?: number;
+  custo_transferencia_real?: number;
   qtde_ctes: number;
 }
 
@@ -208,6 +221,7 @@ export function FaturamentoClientes() {
   const [totais, setTotais] = useState<Totais | null>(null);
   const [totaisSelecionados, setTotaisSelecionados] = useState<Totais | null>(null);
   const [evolucao, setEvolucao] = useState<EvolucaoMes[]>([]);
+  const [evolucaoSelecionados, setEvolucaoSelecionados] = useState<EvolucaoMes[]>([]);
   const [unidades, setUnidades] = useState<UnidadeFat[]>([]);
   const [evolClientes, setEvolClientes] = useState<any[]>([]);
   const [evolClientesKeys, setEvolClientesKeys] = useState<Record<string, string>>({});
@@ -215,6 +229,7 @@ export function FaturamentoClientes() {
   const [evolUnidadesKeys, setEvolUnidadesKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [groupBy, setGroupBy] = useState<'grupos' | 'clientes'>('grupos');
+  const [visao, setVisao] = useState<'geral' | 'selecionados'>('selecionados');
 
   const [clienteDialogOpen, setClienteDialogOpen] = useState(false);
   const [clienteOpcoes, setClienteOpcoes] = useState<ClienteOpcao[]>([]);
@@ -536,6 +551,7 @@ export function FaturamentoClientes() {
         setTotais(response.data.totais || null);
         setTotaisSelecionados(response.data.totais_selecionados || null);
         setEvolucao(response.data.evolucao || []);
+        setEvolucaoSelecionados(response.data.evolucao_selecionados || []);
         setUnidades(response.data.unidades || []);
         setEvolClientes(response.data.evol_clientes || []);
         setEvolClientesKeys(response.data.evol_clientes_keys || {});
@@ -769,115 +785,231 @@ export function FaturamentoClientes() {
           <>
             {totais && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Geral (todos os clientes)</div>
-                  <Badge variant="outline" className="text-[10px] border-indigo-300 text-indigo-600 dark:border-indigo-700 dark:text-indigo-300">TOTAL</Badge>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {([
-                    { label: 'Receita (Frete)',     value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
-                    { label: 'Custos Totais',       value: fmtBRL(totais.total_custos ?? 0), icon: Calculator, bg: '#fff7ed', bgDark: '#2a1404', border: '#fed7aa', borderDark: '#9a3412', iconColor: '#ea580c', textLabel: '#c2410c', textValue: '#7c2d12' },
-                    { label: 'Resultado Total',     value: fmtBRL(totais.total_resultado ?? 0), icon: TrendingUp, bg: '#ecfdf5', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
-                    { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
-                    { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
-                    { label: 'Valor de Mercadoria', value: fmtBRLCompact(totais.total_merc), icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
-                    { label: 'Peso Total',          value: fmtKg(totais.total_peso),      icon: Weight,     bg: '#fffbeb', bgDark: '#1c1003', border: '#fde68a', borderDark: '#78350f', iconColor: '#d97706', textLabel: '#b45309', textValue: '#92400e' },
-                    { label: 'Volumes',             value: fmtNum(totais.total_volumes),  icon: Package,    bg: '#fff1f2', bgDark: '#1f0a0a', border: '#fecdd3', borderDark: '#9f1239', iconColor: '#e11d48', textLabel: '#be123c', textValue: '#881337' },
-                  ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
-                    <div
-                      key={`geral-${label}`}
-                      className="rounded-xl border p-4"
-                      style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Icon className="w-4 h-4" style={{ color: iconColor }} />
-                        <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
-                      </div>
-                      <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
-                    </div>
-                  ))}
-                </div>
+                {(() => {
+                  const t = visao === 'geral' ? totais : (totaisSelecionados ?? totais);
+                  const evo = visao === 'geral' ? evolucao : (evolucaoSelecionados.length ? evolucaoSelecionados : evolucao);
+                  const ticket = (t?.qtde_ctes ?? 0) > 0 ? (t?.total_frete ?? 0) / (t?.qtde_ctes ?? 1) : 0;
+                  const costItems = [
+                    { key: 'custo_seguro', label: 'Seguro', color: '#6366f1' },
+                    { key: 'custo_icms', label: 'ICMS', color: '#f97316' },
+                    { key: 'custo_pis_cofins', label: 'PIS/COFINS', color: '#14b8a6' },
+                    { key: 'custo_gris', label: 'GRIS', color: '#8b5cf6' },
+                    { key: 'custo_pedagio', label: 'Pedágio', color: '#eab308' },
+                    { key: 'custo_expedicao', label: 'Expedição', color: '#0ea5e9' },
+                    { key: 'custo_transferencia', label: 'Transferência', color: '#f43f5e' },
+                    { key: 'custo_transbordo', label: 'Transbordo', color: '#22c55e' },
+                    { key: 'custo_vendedor', label: 'Vendedor', color: '#a855f7' },
+                    { key: 'custo_recepcao', label: 'Recepção', color: '#64748b' },
+                    { key: 'custo_desp_div', label: 'Desp. div.', color: '#ef4444' },
+                    { key: 'custo_transferencia_real', label: 'Transf. real', color: '#06b6d4' },
+                  ] as const;
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {([
-                    { key: 'custo_seguro', label: 'Seguro' },
-                    { key: 'custo_icms', label: 'ICMS' },
-                    { key: 'custo_pis_cofins', label: 'PIS/COFINS' },
-                    { key: 'custo_gris', label: 'GRIS' },
-                    { key: 'custo_pedagio', label: 'Pedágio' },
-                    { key: 'custo_expedicao', label: 'Expedição' },
-                    { key: 'custo_transferencia', label: 'Transferência' },
-                    { key: 'custo_transbordo', label: 'Transbordo' },
-                    { key: 'custo_vendedor', label: 'Vendedor' },
-                    { key: 'custo_recepcao', label: 'Recepção' },
-                    { key: 'custo_desp_div', label: 'Desp. div.' },
-                    { key: 'custo_transferencia_real', label: 'Transf. real' },
-                  ] as const).map(({ key, label }) => (
-                    <div key={`geral-custo-${key}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
-                      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{label}</div>
-                      <div className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">{fmtBRL((totais as any)?.[key] ?? 0)}</div>
-                    </div>
-                  ))}
-                </div>
+                  const dist = costItems
+                    .map((it) => ({ name: it.label, key: it.key, value: Number((t as any)?.[it.key] ?? 0) || 0, color: it.color }))
+                    .filter((d) => d.value > 0)
+                    .sort((a, b) => b.value - a.value);
 
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    Selecionados ({filters.cnpjsPagadores.length > 0 ? `${filters.cnpjsPagadores.length} cliente(s)` : `top ${filters.topN}`})
-                  </div>
-                  <Badge variant="outline" className="text-[10px] border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300">RECORTE</Badge>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {(() => {
-                    const t = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0 };
-                    return ([
-                      { label: 'Receita (Frete)',     value: fmtBRL(t.total_frete),    icon: Wallet,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#4f46e5', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Custos Totais',       value: fmtBRL((t as any).total_custos ?? 0), icon: Calculator, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#ea580c', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Resultado Total',     value: fmtBRL((t as any).total_resultado ?? 0), icon: TrendingUp, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#16a34a', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Clientes Ativos',     value: fmtNum(t.qtde_clientes),  icon: Users,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#2563eb', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'CT-es Emitidos',      value: fmtNum(t.qtde_ctes),      icon: Truck,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#0891b2', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Valor de Mercadoria', value: fmtBRLCompact(t.total_merc), icon: TrendingUp, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#16a34a', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Peso Total',          value: fmtKg(t.total_peso),      icon: Weight,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#d97706', textLabel: '#64748b', textValue: '#0f172a' },
-                      { label: 'Volumes',             value: fmtNum(t.total_volumes),  icon: Package,    bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#e11d48', textLabel: '#64748b', textValue: '#0f172a' },
-                    ] as const).map(({ label, value, icon: Icon, bg, bgDark, border, borderDark, iconColor, textLabel, textValue }) => (
-                      <div
-                        key={`sel-${label}`}
-                        className="rounded-xl border p-4"
-                        style={{ backgroundColor: isDark ? bgDark : bg, borderColor: isDark ? borderDark : border }}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Icon className="w-4 h-4" style={{ color: iconColor }} />
-                          <span className="text-xs font-medium" style={{ color: isDark ? '#cbd5e1' : textLabel }}>{label}</span>
+                  const topKeys = dist.slice(0, 6).map((d) => d.key);
+                  const evoCost = (evo ?? []).map((row: any) => {
+                    const out: any = { mes: row.mes, mes_label: row.mes_label, total_custos: Number(row.total_custos ?? 0) || 0 };
+                    let sumTop = 0;
+                    for (const k of topKeys) { const v = Number(row[k] ?? 0) || 0; out[k] = v; sumTop += v; }
+                    out.__outros__ = Math.max(0, out.total_custos - sumTop);
+                    return out;
+                  });
+
+                  const series = [
+                    ...topKeys.map((k) => {
+                      const meta = costItems.find((x) => x.key === k);
+                      return { key: k, label: meta?.label ?? k, color: meta?.color ?? '#94a3b8' };
+                    }),
+                    { key: '__outros__', label: 'Outros', color: '#94a3b8' },
+                  ];
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Resumo</div>
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                          <button
+                            onClick={() => setVisao('selecionados')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              visao === 'selecionados'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            Recorte
+                          </button>
+                          <button
+                            onClick={() => setVisao('geral')}
+                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                              visao === 'geral'
+                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            Geral
+                          </button>
                         </div>
-                        <p className="text-lg font-bold leading-tight" style={{ color: isDark ? '#f1f5f9' : textValue }}>{value}</p>
                       </div>
-                    ));
-                  })()}
-                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {(() => {
-                    const t = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0 } as any;
-                    return ([
-                      { key: 'custo_seguro', label: 'Seguro' },
-                      { key: 'custo_icms', label: 'ICMS' },
-                      { key: 'custo_pis_cofins', label: 'PIS/COFINS' },
-                      { key: 'custo_gris', label: 'GRIS' },
-                      { key: 'custo_pedagio', label: 'Pedágio' },
-                      { key: 'custo_expedicao', label: 'Expedição' },
-                      { key: 'custo_transferencia', label: 'Transferência' },
-                      { key: 'custo_transbordo', label: 'Transbordo' },
-                      { key: 'custo_vendedor', label: 'Vendedor' },
-                      { key: 'custo_recepcao', label: 'Recepção' },
-                      { key: 'custo_desp_div', label: 'Desp. div.' },
-                      { key: 'custo_transferencia_real', label: 'Transf. real' },
-                    ] as const).map(({ key, label }) => (
-                      <div key={`sel-custo-${key}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
-                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{label}</div>
-                        <div className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">{fmtBRL((t as any)?.[key] ?? 0)}</div>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
+                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(t?.total_frete ?? 0)}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-orange-50 dark:from-slate-900/90 dark:to-orange-900/10">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-orange-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
+                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL((t as any)?.total_custos ?? 0)}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-emerald-50 dark:from-slate-900/90 dark:to-emerald-900/10">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-emerald-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
+                                <div className={`text-sm font-bold ${(Number((t as any)?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRL((t as any)?.total_resultado ?? 0)}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
+                                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(t?.qtde_ctes ?? 0)}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
+                                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{fmtNum(t?.qtde_clientes ?? 0)}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40">
+                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
+                            <div className="relative flex items-center gap-3">
+                              <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
+                              <div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
+                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(ticket)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ));
-                  })()}
-                </div>
+
+                      <div className="grid lg:grid-cols-3 gap-4">
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-indigo-500" />
+                            Linha do Resultado
+                          </h3>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <AreaChart data={evo} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                              <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
+                              <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                              <RechartsTooltip
+                                contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                                formatter={(v: number, n: string) => {
+                                  const map: any = { total_frete: 'Receita', total_custos: 'Custos', total_resultado: 'Resultado' };
+                                  return [fmtBRL(v), map[n] || n];
+                                }}
+                              />
+                              <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>} />
+                              <Area type="monotone" dataKey="total_frete" name="Receita" stroke="#6366f1" fillOpacity={0.08} fill="#6366f1" strokeWidth={2.5} dot={false} />
+                              <Area type="monotone" dataKey="total_custos" name="Custos" stroke="#f97316" fillOpacity={0.06} fill="#f97316" strokeWidth={2.5} dot={false} />
+                              <Area type="monotone" dataKey="total_resultado" name="Resultado" stroke="#22c55e" fillOpacity={0.04} fill="#22c55e" strokeWidth={2.5} dot={false} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-orange-500" />
+                            Distribuição de Custos
+                          </h3>
+                          {dist.length === 0 ? (
+                            <div className="h-[240px] flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">Sem custos no período.</div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height={240}>
+                              <PieChart>
+                                <RechartsTooltip
+                                  contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                                  formatter={(v: number, n: string) => [fmtBRL(v), n]}
+                                />
+                                <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>} />
+                                <Pie data={dist} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                                  {dist.map((entry, idx) => (
+                                    <Cell key={`cell-${idx}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-indigo-500" />
+                            Custos por Parcela (Tempo)
+                          </h3>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <AreaChart data={evoCost} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                              <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 10 }} />
+                              <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
+                              <RechartsTooltip
+                                contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                                formatter={(v: number, k: string) => {
+                                  const s = series.find((x) => x.key === k);
+                                  return [fmtBRL(v), s?.label || k];
+                                }}
+                              />
+                              <Legend
+                                iconType="circle"
+                                iconSize={8}
+                                formatter={(v) => {
+                                  const s = series.find((x) => x.key === v);
+                                  return <span style={{ color: textColor, fontSize: 11 }}>{(s?.label || String(v)).substring(0, 10)}</span>;
+                                }}
+                              />
+                              {series.map((s) => (
+                                <Area key={s.key} type="monotone" dataKey={s.key} stackId="1" stroke={s.color} fill={s.color} fillOpacity={0.18} dot={false} />
+                              ))}
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -1193,40 +1325,7 @@ export function FaturamentoClientes() {
               </div>
             </div>
 
-            {evolucao.length > 1 && (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-500" />
-                  Evolução Mensal do Faturamento
-                </h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={evolucao} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                    <XAxis dataKey="mes_label" tick={{ fill: textColor, fontSize: 11 }} />
-                    <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
-                    <RechartsTooltip
-                      contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                      formatter={(v: number) => [fmtBRL(v), 'Receita (Frete)']}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="total_frete"
-                      stroke="#6366f1"
-                      strokeWidth={2.5}
-                      fill="url(#gradFat)"
-                      dot={{ fill: '#6366f1', r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+            
 
             {evolClientes.length > 1 && (() => {
               const totaisPorCnpj: Record<string, number> = {};
