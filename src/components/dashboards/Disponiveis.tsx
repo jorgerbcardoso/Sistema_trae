@@ -2282,24 +2282,40 @@ function CardCarregamento({
 
     if (unidadesReais.length === 1) return renderUnidade(last, { bold: true });
 
-    if (unidadesReais.length <= 4) {
+    if (unidadesReais.length === 2) {
+      const first = unidadesReais[0];
       return (
         <span className="min-w-0 flex items-center whitespace-nowrap">
-          {unidadesReais.map((u, idx) => (
-            <span key={`${u}-${idx}`} className="shrink-0">
-              {renderUnidade(u, { bold: idx === unidadesReais.length - 1 })}
-              {idx < unidadesReais.length - 1 ? <span>, </span> : null}
-            </span>
-          ))}
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{renderUnidade(first)}</span>
+          <span className="shrink-0">, </span>
+          <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
         </span>
       );
     }
 
-    const first = unidadesReais[0];
+    const centralInList = !!centralSigla && unidadesReais[0] === centralSigla && isCentral(centralSigla);
+    if (centralInList) {
+      const middle = unidadesReais.slice(1, -1);
+      return (
+        <span className="min-w-0 flex items-center whitespace-nowrap">
+          <span className="shrink-0">{renderUnidade(centralSigla)}</span>
+          <span className="shrink-0">, </span>
+          {middle.length > 0 ? (
+            <>
+              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{middle.join(', ')}</span>
+              <span className="shrink-0">, </span>
+            </>
+          ) : null}
+          <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
+        </span>
+      );
+    }
+
+    const prefix = unidadesReais.slice(0, -1).join(', ');
     return (
       <span className="min-w-0 flex items-center whitespace-nowrap">
-        <span className="shrink-0">{renderUnidade(first)}</span>
-        <span className="shrink-0">, … </span>
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{prefix}</span>
+        <span className="shrink-0">, </span>
         <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
       </span>
     );
