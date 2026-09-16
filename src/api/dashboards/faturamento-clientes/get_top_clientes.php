@@ -17,6 +17,21 @@ $search  = trim($input['search'] ?? '');
 
 $conn = connect();
 
+$costExpr = "(
+    COALESCE(cte.custo_seguro, 0)
+  + COALESCE(cte.custo_icms, 0)
+  + COALESCE(cte.custo_pis_cofins, 0)
+  + COALESCE(cte.custo_gris, 0)
+  + COALESCE(cte.custo_pedagio, 0)
+  + COALESCE(cte.custo_expedicao, 0)
+  + COALESCE(cte.custo_transferencia, 0)
+  + COALESCE(cte.custo_transbordo, 0)
+  + COALESCE(cte.custo_vendedor, 0)
+  + COALESCE(cte.custo_recepcao, 0)
+  + COALESCE(cte.custo_desp_div, 0)
+  + COALESCE(cte.custo_transferencia_real, 0)
+)";
+
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
@@ -81,7 +96,9 @@ $query = "
     SELECT
         cte.cnpj_pag                AS cnpj,
         cte.nome_pag                AS nome,
-        SUM(cte.vlr_frete)          AS total_frete
+        SUM(cte.vlr_frete)          AS total_frete,
+        SUM({$costExpr})            AS total_custos,
+        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado
     FROM {$domain}_cte cte
     {$whereClause}
     GROUP BY cte.cnpj_pag, cte.nome_pag
@@ -100,6 +117,8 @@ while ($row = pg_fetch_assoc($result)) {
         'cnpj'        => $row['cnpj'],
         'nome'        => $row['nome'] ?: 'SEM NOME',
         'total_frete' => (float)$row['total_frete'],
+        'total_custos' => (float)($row['total_custos'] ?? 0),
+        'total_resultado' => (float)($row['total_resultado'] ?? 0),
     ];
 }
 

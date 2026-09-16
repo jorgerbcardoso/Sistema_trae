@@ -22,6 +22,7 @@ import {
   Filter,
   Info,
   Loader2,
+  Calculator,
   Package,
   Search,
   TrendingUp,
@@ -110,6 +111,8 @@ interface ClienteRanking {
   nome: string;
   qtde_ctes: number;
   total_frete: number;
+  total_custos?: number;
+  total_resultado?: number;
   total_merc: number;
   total_peso: number;
   total_volumes: number;
@@ -133,6 +136,20 @@ type PdfClienteItem = {
 interface Totais {
   qtde_ctes: number;
   total_frete: number;
+  total_custos?: number;
+  total_resultado?: number;
+  custo_seguro?: number;
+  custo_icms?: number;
+  custo_pis_cofins?: number;
+  custo_gris?: number;
+  custo_pedagio?: number;
+  custo_expedicao?: number;
+  custo_transferencia?: number;
+  custo_transbordo?: number;
+  custo_vendedor?: number;
+  custo_recepcao?: number;
+  custo_desp_div?: number;
+  custo_transferencia_real?: number;
   total_merc: number;
   total_peso: number;
   total_volumes: number;
@@ -145,12 +162,16 @@ interface EvolucaoMes {
   mes: string;
   mes_label: string;
   total_frete: number;
+  total_custos?: number;
+  total_resultado?: number;
   qtde_ctes: number;
 }
 
 interface UnidadeFat {
   sigla: string;
   total_frete: number;
+  total_custos?: number;
+  total_resultado?: number;
   qtde_ctes: number;
 }
 
@@ -158,12 +179,14 @@ interface ClienteOpcao {
   cnpj: string;
   nome: string;
   total_frete: number;
+  total_custos?: number;
+  total_resultado?: number;
 }
 
 export function FaturamentoClientes() {
   const { user, clientConfig } = useAuth();
   const { theme } = useTheme();
-  usePageTitle('Faturamento de Clientes');
+  usePageTitle('Resultado de Clientes');
 
   const defaultPeriod = getMesAtualFechadoPeriod();
   const userUnit = user?.unidade_atual || user?.unidade;
@@ -539,7 +562,7 @@ export function FaturamentoClientes() {
     const lista = cteDialogListaRef.current;
     const titulo = cteDialogTituloRef.current;
     if (!lista.length) return;
-    const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete'];
+    const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete', 'Custos', 'Resultado'];
     const rows = lista.map(c => [
       `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
       c.data_emissao,
@@ -550,6 +573,8 @@ export function FaturamentoClientes() {
       c.peso_real.toFixed(2).replace('.', ','),
       c.qtde_vol,
       c.vlr_frete.toFixed(2).replace('.', ','),
+      (Number(c.total_custos ?? 0) || 0).toFixed(2).replace('.', ','),
+      (Number(c.resultado ?? 0) || 0).toFixed(2).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -688,7 +713,7 @@ export function FaturamentoClientes() {
 
   return (
     <DashboardLayout
-      title="Faturamento de Clientes"
+      title="Resultado de Clientes"
       description={user?.client_name}
       headerActions={headerActions}
     >
@@ -697,12 +722,12 @@ export function FaturamentoClientes() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">
-              Faturamento de Clientes
+              Resultado de Clientes
             </h2>
             <p className="text-slate-500 dark:text-slate-400">
               {groupBy === 'grupos'
-                ? `Análise de faturamento por grupo de clientes — top ${filters.topN} por valor de frete`
-                : `Análise de faturamento por cliente pagador — top ${filters.topN} por valor de frete`}
+                ? `Análise de resultado por grupo de clientes — top ${filters.topN} por valor de frete`
+                : `Análise de resultado por cliente pagador — top ${filters.topN} por valor de frete`}
             </p>
           </div>
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
@@ -750,7 +775,9 @@ export function FaturamentoClientes() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   {([
-                    { label: 'Faturamento Total',   value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
+                    { label: 'Receita (Frete)',     value: fmtBRL(totais.total_frete),    icon: Wallet,     bg: '#eef2ff', bgDark: '#1e1b4b33', border: '#c7d2fe', borderDark: '#3730a3', iconColor: '#4f46e5', textLabel: '#4338ca', textValue: '#312e81' },
+                    { label: 'Custos Totais',       value: fmtBRL(totais.total_custos ?? 0), icon: Calculator, bg: '#fff7ed', bgDark: '#2a1404', border: '#fed7aa', borderDark: '#9a3412', iconColor: '#ea580c', textLabel: '#c2410c', textValue: '#7c2d12' },
+                    { label: 'Resultado Total',     value: fmtBRL(totais.total_resultado ?? 0), icon: TrendingUp, bg: '#ecfdf5', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
                     { label: 'Clientes Ativos',     value: fmtNum(totais.qtde_clientes),  icon: Users,      bg: '#eff6ff', bgDark: '#172554', border: '#bfdbfe', borderDark: '#1e40af', iconColor: '#2563eb', textLabel: '#1d4ed8', textValue: '#1e3a8a' },
                     { label: 'CT-es Emitidos',      value: fmtNum(totais.qtde_ctes),      icon: Truck,      bg: '#ecfeff', bgDark: '#083344', border: '#a5f3fc', borderDark: '#155e75', iconColor: '#0891b2', textLabel: '#0e7490', textValue: '#164e63' },
                     { label: 'Valor de Mercadoria', value: fmtBRLCompact(totais.total_merc), icon: TrendingUp, bg: '#f0fdf4', bgDark: '#052e16', border: '#bbf7d0', borderDark: '#14532d', iconColor: '#16a34a', textLabel: '#15803d', textValue: '#14532d' },
@@ -771,6 +798,28 @@ export function FaturamentoClientes() {
                   ))}
                 </div>
 
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {([
+                    { key: 'custo_seguro', label: 'Seguro' },
+                    { key: 'custo_icms', label: 'ICMS' },
+                    { key: 'custo_pis_cofins', label: 'PIS/COFINS' },
+                    { key: 'custo_gris', label: 'GRIS' },
+                    { key: 'custo_pedagio', label: 'Pedágio' },
+                    { key: 'custo_expedicao', label: 'Expedição' },
+                    { key: 'custo_transferencia', label: 'Transferência' },
+                    { key: 'custo_transbordo', label: 'Transbordo' },
+                    { key: 'custo_vendedor', label: 'Vendedor' },
+                    { key: 'custo_recepcao', label: 'Recepção' },
+                    { key: 'custo_desp_div', label: 'Desp. div.' },
+                    { key: 'custo_transferencia_real', label: 'Transf. real' },
+                  ] as const).map(({ key, label }) => (
+                    <div key={`geral-custo-${key}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+                      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{label}</div>
+                      <div className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">{fmtBRL((totais as any)?.[key] ?? 0)}</div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="flex items-center justify-between pt-2">
                   <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                     Selecionados ({filters.cnpjsPagadores.length > 0 ? `${filters.cnpjsPagadores.length} cliente(s)` : `top ${filters.topN}`})
@@ -781,7 +830,9 @@ export function FaturamentoClientes() {
                   {(() => {
                     const t = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0 };
                     return ([
-                      { label: 'Faturamento Total',   value: fmtBRL(t.total_frete),    icon: Wallet,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#4f46e5', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Receita (Frete)',     value: fmtBRL(t.total_frete),    icon: Wallet,     bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#4f46e5', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Custos Totais',       value: fmtBRL((t as any).total_custos ?? 0), icon: Calculator, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#ea580c', textLabel: '#64748b', textValue: '#0f172a' },
+                      { label: 'Resultado Total',     value: fmtBRL((t as any).total_resultado ?? 0), icon: TrendingUp, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#16a34a', textLabel: '#64748b', textValue: '#0f172a' },
                       { label: 'Clientes Ativos',     value: fmtNum(t.qtde_clientes),  icon: Users,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#2563eb', textLabel: '#64748b', textValue: '#0f172a' },
                       { label: 'CT-es Emitidos',      value: fmtNum(t.qtde_ctes),      icon: Truck,      bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#0891b2', textLabel: '#64748b', textValue: '#0f172a' },
                       { label: 'Valor de Mercadoria', value: fmtBRLCompact(t.total_merc), icon: TrendingUp, bg: '#f1f5f9', bgDark: '#0f172a', border: '#e2e8f0', borderDark: '#334155', iconColor: '#16a34a', textLabel: '#64748b', textValue: '#0f172a' },
@@ -802,6 +853,31 @@ export function FaturamentoClientes() {
                     ));
                   })()}
                 </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {(() => {
+                    const t = totaisSelecionados ?? { qtde_ctes: 0, total_frete: 0, total_merc: 0, total_peso: 0, total_volumes: 0, qtde_clientes: 0 } as any;
+                    return ([
+                      { key: 'custo_seguro', label: 'Seguro' },
+                      { key: 'custo_icms', label: 'ICMS' },
+                      { key: 'custo_pis_cofins', label: 'PIS/COFINS' },
+                      { key: 'custo_gris', label: 'GRIS' },
+                      { key: 'custo_pedagio', label: 'Pedágio' },
+                      { key: 'custo_expedicao', label: 'Expedição' },
+                      { key: 'custo_transferencia', label: 'Transferência' },
+                      { key: 'custo_transbordo', label: 'Transbordo' },
+                      { key: 'custo_vendedor', label: 'Vendedor' },
+                      { key: 'custo_recepcao', label: 'Recepção' },
+                      { key: 'custo_desp_div', label: 'Desp. div.' },
+                      { key: 'custo_transferencia_real', label: 'Transf. real' },
+                    ] as const).map(({ key, label }) => (
+                      <div key={`sel-custo-${key}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
+                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{label}</div>
+                        <div className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">{fmtBRL((t as any)?.[key] ?? 0)}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             )}
 
@@ -810,7 +886,7 @@ export function FaturamentoClientes() {
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
                   <Award className="w-5 h-5 text-indigo-500" />
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100">Ranking de Clientes</h3>
-                  <span className="ml-auto text-xs text-slate-400 hidden sm:inline">por faturamento de frete</span>
+                  <span className="ml-auto text-xs text-slate-400 hidden sm:inline">por receita (frete)</span>
                   <Button
                     onClick={abrirPdfDialog}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 ml-2"
@@ -852,7 +928,12 @@ export function FaturamentoClientes() {
                                     {c.nome}
                                     {c.is_grupo && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">Grupo</Badge>}
                                   </p>
-                                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 shrink-0">{fmtBRL(c.total_frete)}</p>
+                                  <div className="flex flex-col items-end shrink-0">
+                                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{fmtBRL(c.total_frete)}</p>
+                                    <p className={`text-xs font-mono font-semibold ${((c.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                                      {fmtBRL(c.total_resultado ?? 0)}
+                                    </p>
+                                  </div>
                                 </div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1.5">
                                   <div
@@ -1131,7 +1212,7 @@ export function FaturamentoClientes() {
                     <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} />
                     <RechartsTooltip
                       contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                      formatter={(v: number) => [fmtBRL(v), 'Faturamento']}
+                      formatter={(v: number) => [fmtBRL(v), 'Receita (Frete)']}
                     />
                     <Area
                       type="monotone"
@@ -1400,7 +1481,7 @@ export function FaturamentoClientes() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={pdfShowFaturamento} onCheckedChange={setPdfShowFaturamento} />
-                  <span className="text-sm text-slate-700 dark:text-slate-300">Exibir faturamento (R$)</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Exibir receita (frete)</span>
                 </div>
               </div>
             </div>
@@ -1505,7 +1586,7 @@ export function FaturamentoClientes() {
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <span>CT-e</span>
                 <span>Emissão</span>
                 <span>Destinatário</span>
@@ -1513,6 +1594,8 @@ export function FaturamentoClientes() {
                 <span className="text-right">Peso</span>
                 <span className="text-right">Vol.</span>
                 <span className="text-right">Frete</span>
+                <span className="text-right">Custos</span>
+                <span className="text-right">Resultado</span>
               </div>
               <div className="min-h-0 overflow-y-auto">
                 {loadingCtes ? (
@@ -1530,7 +1613,7 @@ export function FaturamentoClientes() {
                     {cteDialogLista.map((cte, idx) => (
                       <div
                           key={idx}
-                          className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                          className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
                         >
                           <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
@@ -1539,6 +1622,8 @@ export function FaturamentoClientes() {
                           <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKg(cte.peso_real)}</span>
                           <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtNum(cte.qtde_vol)}</span>
                           <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{fmtBRL(cte.vlr_frete)}</span>
+                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{fmtBRL(cte.total_custos ?? 0)}</span>
+                          <span className={`self-center text-right font-mono text-xs font-semibold ${(Number(cte.resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cte.resultado ?? 0)}</span>
                         </div>
                     ))}
                   </div>
@@ -1547,7 +1632,7 @@ export function FaturamentoClientes() {
             </div>
 
             {cteDialogTotais && (
-              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[110px_85px_minmax(0,1fr)_110px_90px_65px_100px_100px_100px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDialogLista.length} CT-es</span>
                 <span />
                 <span />
@@ -1555,6 +1640,8 @@ export function FaturamentoClientes() {
                 <span className="text-right font-mono">{fmtKg(cteDialogTotais.peso_real)}</span>
                 <span className="text-right font-mono">{fmtNum(cteDialogTotais.qtde_vol)}</span>
                 <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{fmtBRL(cteDialogTotais.vlr_frete)}</span>
+                <span className="text-right font-mono">{fmtBRL(cteDialogTotais.total_custos ?? 0)}</span>
+                <span className={`text-right font-mono font-semibold ${(Number(cteDialogTotais.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{fmtBRL(cteDialogTotais.total_resultado ?? 0)}</span>
               </div>
             )}
           </div>
@@ -1566,7 +1653,7 @@ export function FaturamentoClientes() {
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
             <DialogDescription className="text-slate-500 dark:text-slate-400">
-              Personalize a visualização do faturamento
+              Personalize a visualização do resultado
             </DialogDescription>
           </DialogHeader>
 
@@ -1717,7 +1804,7 @@ export function FaturamentoClientes() {
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-slate-900 dark:text-slate-100">Selecionar Clientes</DialogTitle>
             <DialogDescription className="text-slate-500 dark:text-slate-400">
-              Selecione até 10 clientes. Ordenados por faturamento no período.
+              Selecione até 10 clientes. Ordenados por receita (frete) no período.
             </DialogDescription>
           </DialogHeader>
 
@@ -1780,7 +1867,13 @@ export function FaturamentoClientes() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{c.nome}</p>
-                          <p className="text-xs text-slate-400">{fmtBRL(c.total_frete)}</p>
+                          <div className="text-xs text-slate-400 flex items-center gap-2">
+                            <span>{fmtBRL(c.total_frete)}</span>
+                            <span>•</span>
+                            <span className={`font-mono font-semibold ${((c.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                              {fmtBRL(c.total_resultado ?? 0)}
+                            </span>
+                          </div>
                         </div>
                         {selected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
                       </div>

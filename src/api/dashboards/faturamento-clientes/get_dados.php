@@ -17,6 +17,28 @@ $groupBy = isset($input['groupBy']) && $input['groupBy'] === 'clientes' ? 'clien
 
 $conn = connect();
 
+$costFields = [
+    'custo_seguro',
+    'custo_icms',
+    'custo_pis_cofins',
+    'custo_gris',
+    'custo_pedagio',
+    'custo_expedicao',
+    'custo_transferencia',
+    'custo_transbordo',
+    'custo_vendedor',
+    'custo_recepcao',
+    'custo_desp_div',
+    'custo_transferencia_real',
+];
+$costExprParts = [];
+foreach ($costFields as $cf) {
+    $col = preg_replace('/[^a-z0-9_]/i', '', (string)$cf);
+    if ($col === '') continue;
+    $costExprParts[] = "COALESCE(cte.{$col}, 0)";
+}
+$costExpr = '(' . implode(' + ', $costExprParts) . ')';
+
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
@@ -104,6 +126,8 @@ if ($groupBy === 'grupos') {
             COALESCE(MAX(cli.nome), MAX(cte.nome_pag), COALESCE(gc.cnpj_principal, cte.cnpj_pag)) AS nome,
             COUNT(*)                                                         AS qtde_ctes,
             SUM(cte.vlr_frete)                                               AS total_frete,
+            SUM({$costExpr})                                                 AS total_custos,
+            SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr})                    AS total_resultado,
             SUM(cte.vlr_merc)                                                AS total_merc,
             SUM(cte.peso_real)                                               AS total_peso,
             SUM(cte.qtde_vol)                                                AS total_volumes,
@@ -132,6 +156,8 @@ if ($groupBy === 'grupos') {
             'nome'          => $row['nome'] ?: 'SEM NOME',
             'qtde_ctes'     => (int)$row['qtde_ctes'],
             'total_frete'   => (float)$row['total_frete'],
+            'total_custos'  => (float)($row['total_custos'] ?? 0),
+            'total_resultado' => (float)($row['total_resultado'] ?? 0),
             'total_merc'    => (float)$row['total_merc'],
             'total_peso'    => (float)$row['total_peso'],
             'total_volumes' => (int)$row['total_volumes'],
@@ -150,6 +176,8 @@ if ($groupBy === 'grupos') {
             cte.nome_pag,
             COUNT(*)                                            AS qtde_ctes,
             SUM(cte.vlr_frete)                                  AS total_frete,
+            SUM({$costExpr})                                    AS total_custos,
+            SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr})       AS total_resultado,
             SUM(cte.vlr_merc)                                   AS total_merc,
             SUM(cte.peso_real)                                  AS total_peso,
             SUM(cte.qtde_vol)                                   AS total_volumes,
@@ -175,6 +203,8 @@ if ($groupBy === 'grupos') {
             'nome'          => $row['nome_pag'] ?: 'SEM NOME',
             'qtde_ctes'     => (int)$row['qtde_ctes'],
             'total_frete'   => (float)$row['total_frete'],
+            'total_custos'  => (float)($row['total_custos'] ?? 0),
+            'total_resultado' => (float)($row['total_resultado'] ?? 0),
             'total_merc'    => (float)$row['total_merc'],
             'total_peso'    => (float)$row['total_peso'],
             'total_volumes' => (int)$row['total_volumes'],
@@ -189,6 +219,8 @@ if ($groupBy === 'grupos') {
 $totaisSelecionados = [
     'qtde_ctes'     => 0,
     'total_frete'   => 0.0,
+    'total_custos'  => 0.0,
+    'total_resultado' => 0.0,
     'total_merc'    => 0.0,
     'total_peso'    => 0.0,
     'total_volumes' => 0,
@@ -199,6 +231,8 @@ $totaisSelecionados = [
 foreach ($clientes as $c) {
     $totaisSelecionados['qtde_ctes']     += (int)($c['qtde_ctes'] ?? 0);
     $totaisSelecionados['total_frete']   += (float)($c['total_frete'] ?? 0);
+    $totaisSelecionados['total_custos']  += (float)($c['total_custos'] ?? 0);
+    $totaisSelecionados['total_resultado'] += (float)($c['total_resultado'] ?? 0);
     $totaisSelecionados['total_merc']    += (float)($c['total_merc'] ?? 0);
     $totaisSelecionados['total_peso']    += (float)($c['total_peso'] ?? 0);
     $totaisSelecionados['total_volumes'] += (int)($c['total_volumes'] ?? 0);
@@ -214,12 +248,26 @@ $queryTotais = "
     SELECT
         COUNT(*)                        AS qtde_ctes,
         SUM(cte.vlr_frete)              AS total_frete,
+        SUM({$costExpr})                AS total_custos,
+        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
         SUM(cte.vlr_merc)               AS total_merc,
         SUM(cte.peso_real)              AS total_peso,
         SUM(cte.qtde_vol)               AS total_volumes,
         COUNT(DISTINCT cte.cnpj_pag)    AS qtde_clientes,
         COUNT(CASE WHEN cte.tp_frete = 'C' THEN 1 END) AS qtde_cif,
-        COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END) AS qtde_fob
+        COUNT(CASE WHEN cte.tp_frete = 'F' THEN 1 END) AS qtde_fob,
+        SUM(COALESCE(cte.custo_seguro, 0))             AS custo_seguro,
+        SUM(COALESCE(cte.custo_icms, 0))               AS custo_icms,
+        SUM(COALESCE(cte.custo_pis_cofins, 0))         AS custo_pis_cofins,
+        SUM(COALESCE(cte.custo_gris, 0))               AS custo_gris,
+        SUM(COALESCE(cte.custo_pedagio, 0))            AS custo_pedagio,
+        SUM(COALESCE(cte.custo_expedicao, 0))          AS custo_expedicao,
+        SUM(COALESCE(cte.custo_transferencia, 0))      AS custo_transferencia,
+        SUM(COALESCE(cte.custo_transbordo, 0))         AS custo_transbordo,
+        SUM(COALESCE(cte.custo_vendedor, 0))           AS custo_vendedor,
+        SUM(COALESCE(cte.custo_recepcao, 0))           AS custo_recepcao,
+        SUM(COALESCE(cte.custo_desp_div, 0))           AS custo_desp_div,
+        SUM(COALESCE(cte.custo_transferencia_real, 0)) AS custo_transferencia_real
     FROM {$domain}_cte cte
     {$whereClause}
 ";
@@ -238,6 +286,8 @@ $queryEvolucao = "
         TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
         TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
         SUM(cte.vlr_frete)                    AS total_frete,
+        SUM({$costExpr})                      AS total_custos,
+        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
         COUNT(*)                              AS qtde_ctes
     FROM {$domain}_cte cte
     {$whereClause}
@@ -256,6 +306,8 @@ while ($row = pg_fetch_assoc($resultEvolucao)) {
         'mes'         => $row['mes'],
         'mes_label'   => $row['mes_label'],
         'total_frete' => (float)$row['total_frete'],
+        'total_custos' => (float)($row['total_custos'] ?? 0),
+        'total_resultado' => (float)($row['total_resultado'] ?? 0),
         'qtde_ctes'   => (int)$row['qtde_ctes'],
     ];
 }
@@ -267,6 +319,8 @@ $queryUnidades = "
     SELECT
         cte.sigla_emit,
         SUM(cte.vlr_frete) AS total_frete,
+        SUM({$costExpr})   AS total_custos,
+        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado,
         COUNT(*)           AS qtde_ctes
     FROM {$domain}_cte cte
     {$whereClause}
@@ -285,6 +339,8 @@ while ($row = pg_fetch_assoc($resultUnidades)) {
     $unidades[] = [
         'sigla'       => $row['sigla_emit'] ?: '-',
         'total_frete' => (float)$row['total_frete'],
+        'total_custos' => (float)($row['total_custos'] ?? 0),
+        'total_resultado' => (float)($row['total_resultado'] ?? 0),
         'qtde_ctes'   => (int)$row['qtde_ctes'],
     ];
 }
@@ -326,7 +382,8 @@ if ($groupBy === 'grupos') {
             TO_CHAR(cte.data_emissao, 'Mon/YY')         AS mes_label,
             COALESCE(gc.cnpj_principal, cte.cnpj_pag)    AS chave,
             COALESCE(MAX(cli.nome), MAX(cte.nome_pag), COALESCE(gc.cnpj_principal, cte.cnpj_pag)) AS nome,
-            SUM(cte.vlr_frete)                           AS total_frete
+            SUM(cte.vlr_frete)                           AS total_frete,
+            SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado
         FROM {$domain}_cte cte
         LEFT JOIN {$domain}_grupo_cliente gc ON cte.cnpj_pag = gc.cnpj
         LEFT JOIN {$domain}_cliente cli      ON cli.cnpj = COALESCE(gc.cnpj_principal, cte.cnpj_pag)
@@ -341,7 +398,8 @@ if ($groupBy === 'grupos') {
             TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
             cte.cnpj_pag                          AS chave,
             cte.nome_pag                          AS nome,
-            SUM(cte.vlr_frete)                    AS total_frete
+            SUM(cte.vlr_frete)                    AS total_frete,
+            SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado
         FROM {$domain}_cte cte
         {$where12}
         GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), cte.cnpj_pag, cte.nome_pag
@@ -360,6 +418,7 @@ while ($row = pg_fetch_assoc($resultEvolClientes)) {
     $nome  = $row['nome'] ?: 'SEM NOME';
     if (!isset($evolClientesRaw[$mes])) $evolClientesRaw[$mes] = ['mes' => $mes, 'mes_label' => $row['mes_label']];
     $evolClientesRaw[$mes][$chave] = (float)$row['total_frete'];
+    $evolClientesRaw[$mes]["{$chave}__resultado"] = (float)($row['total_resultado'] ?? 0);
     $clientesNomes[$chave] = $nome;
 }
 
@@ -371,7 +430,8 @@ $queryEvolUnidades = "
         TO_CHAR(cte.data_emissao, 'YYYY-MM') AS mes,
         TO_CHAR(cte.data_emissao, 'Mon/YY')  AS mes_label,
         COALESCE(cte.sigla_emit, '-')         AS sigla,
-        SUM(cte.vlr_frete)                    AS total_frete
+        SUM(cte.vlr_frete)                    AS total_frete,
+        SUM(COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS total_resultado
     FROM {$domain}_cte cte
     {$where12}
     GROUP BY TO_CHAR(cte.data_emissao, 'YYYY-MM'), TO_CHAR(cte.data_emissao, 'Mon/YY'), COALESCE(cte.sigla_emit, '-')
@@ -390,6 +450,7 @@ while ($row = pg_fetch_assoc($resultEvolUnidades)) {
     $sigla = $row['sigla'];
     if (!isset($evolUnidadesRaw[$mes])) $evolUnidadesRaw[$mes] = ['mes' => $mes, 'mes_label' => $row['mes_label']];
     $evolUnidadesRaw[$mes][$sigla] = (float)$row['total_frete'];
+    $evolUnidadesRaw[$mes]["{$sigla}__resultado"] = (float)($row['total_resultado'] ?? 0);
     $unidadesSiglas[$sigla] = true;
 }
 
@@ -401,16 +462,32 @@ respondJson([
         'totais'             => [
             'qtde_ctes'     => (int)($rowTotais['qtde_ctes'] ?? 0),
             'total_frete'   => (float)($rowTotais['total_frete'] ?? 0),
+            'total_custos'  => (float)($rowTotais['total_custos'] ?? 0),
+            'total_resultado' => (float)($rowTotais['total_resultado'] ?? 0),
             'total_merc'    => (float)($rowTotais['total_merc'] ?? 0),
             'total_peso'    => (float)($rowTotais['total_peso'] ?? 0),
             'total_volumes' => (int)($rowTotais['total_volumes'] ?? 0),
             'qtde_clientes' => (int)($rowTotais['qtde_clientes'] ?? 0),
             'qtde_cif'      => (int)($rowTotais['qtde_cif'] ?? 0),
             'qtde_fob'      => (int)($rowTotais['qtde_fob'] ?? 0),
+            'custo_seguro'  => (float)($rowTotais['custo_seguro'] ?? 0),
+            'custo_icms'    => (float)($rowTotais['custo_icms'] ?? 0),
+            'custo_pis_cofins' => (float)($rowTotais['custo_pis_cofins'] ?? 0),
+            'custo_gris'    => (float)($rowTotais['custo_gris'] ?? 0),
+            'custo_pedagio' => (float)($rowTotais['custo_pedagio'] ?? 0),
+            'custo_expedicao' => (float)($rowTotais['custo_expedicao'] ?? 0),
+            'custo_transferencia' => (float)($rowTotais['custo_transferencia'] ?? 0),
+            'custo_transbordo' => (float)($rowTotais['custo_transbordo'] ?? 0),
+            'custo_vendedor' => (float)($rowTotais['custo_vendedor'] ?? 0),
+            'custo_recepcao' => (float)($rowTotais['custo_recepcao'] ?? 0),
+            'custo_desp_div' => (float)($rowTotais['custo_desp_div'] ?? 0),
+            'custo_transferencia_real' => (float)($rowTotais['custo_transferencia_real'] ?? 0),
         ],
         'totais_selecionados' => [
             'qtde_ctes'     => (int)$totaisSelecionados['qtde_ctes'],
             'total_frete'   => (float)$totaisSelecionados['total_frete'],
+            'total_custos'  => (float)$totaisSelecionados['total_custos'],
+            'total_resultado' => (float)$totaisSelecionados['total_resultado'],
             'total_merc'    => (float)$totaisSelecionados['total_merc'],
             'total_peso'    => (float)$totaisSelecionados['total_peso'],
             'total_volumes' => (int)$totaisSelecionados['total_volumes'],

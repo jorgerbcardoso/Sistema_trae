@@ -25,6 +25,28 @@ $excluirSiglas = (isset($input['excluir_siglas']) && is_array($input['excluir_si
 
 $conn = connect();
 
+$costFields = [
+    'custo_seguro',
+    'custo_icms',
+    'custo_pis_cofins',
+    'custo_gris',
+    'custo_pedagio',
+    'custo_expedicao',
+    'custo_transferencia',
+    'custo_transbordo',
+    'custo_vendedor',
+    'custo_recepcao',
+    'custo_desp_div',
+    'custo_transferencia_real',
+];
+$costExprParts = [];
+foreach ($costFields as $cf) {
+    $col = preg_replace('/[^a-z0-9_]/i', '', (string)$cf);
+    if ($col === '') continue;
+    $costExprParts[] = "COALESCE(cte.{$col}, 0)";
+}
+$costExpr = '(' . implode(' + ', $costExprParts) . ')';
+
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
@@ -141,6 +163,20 @@ $query = "
         COALESCE(cte.peso_real, 0)              AS peso_real,
         COALESCE(cte.qtde_vol, 0)               AS qtde_vol,
         COALESCE(cte.vlr_frete, 0)              AS vlr_frete,
+        COALESCE(cte.custo_seguro, 0)           AS custo_seguro,
+        COALESCE(cte.custo_icms, 0)             AS custo_icms,
+        COALESCE(cte.custo_pis_cofins, 0)       AS custo_pis_cofins,
+        COALESCE(cte.custo_gris, 0)             AS custo_gris,
+        COALESCE(cte.custo_pedagio, 0)          AS custo_pedagio,
+        COALESCE(cte.custo_expedicao, 0)        AS custo_expedicao,
+        COALESCE(cte.custo_transferencia, 0)    AS custo_transferencia,
+        COALESCE(cte.custo_transbordo, 0)       AS custo_transbordo,
+        COALESCE(cte.custo_vendedor, 0)         AS custo_vendedor,
+        COALESCE(cte.custo_recepcao, 0)         AS custo_recepcao,
+        COALESCE(cte.custo_desp_div, 0)         AS custo_desp_div,
+        COALESCE(cte.custo_transferencia_real, 0) AS custo_transferencia_real,
+        {$costExpr}                             AS total_custos,
+        (COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS resultado,
         cte.nome_pag,
         cte.nome_dest,
         cte.sigla_emit
@@ -159,6 +195,10 @@ $totVlrMerc  = 0;
 $totPeso     = 0;
 $totVol      = 0;
 $totFrete    = 0;
+$totCustos   = 0;
+$totResultado = 0;
+$totCostBreak = [];
+foreach ($costFields as $cf) { $totCostBreak[$cf] = 0.0; }
 
 while ($row = pg_fetch_assoc($result)) {
     $ctes[] = [
@@ -169,6 +209,20 @@ while ($row = pg_fetch_assoc($result)) {
         'peso_real'    => (float)$row['peso_real'],
         'qtde_vol'     => (int)$row['qtde_vol'],
         'vlr_frete'    => (float)$row['vlr_frete'],
+        'total_custos' => (float)($row['total_custos'] ?? 0),
+        'resultado'    => (float)($row['resultado'] ?? 0),
+        'custo_seguro' => (float)($row['custo_seguro'] ?? 0),
+        'custo_icms'   => (float)($row['custo_icms'] ?? 0),
+        'custo_pis_cofins' => (float)($row['custo_pis_cofins'] ?? 0),
+        'custo_gris'   => (float)($row['custo_gris'] ?? 0),
+        'custo_pedagio' => (float)($row['custo_pedagio'] ?? 0),
+        'custo_expedicao' => (float)($row['custo_expedicao'] ?? 0),
+        'custo_transferencia' => (float)($row['custo_transferencia'] ?? 0),
+        'custo_transbordo' => (float)($row['custo_transbordo'] ?? 0),
+        'custo_vendedor' => (float)($row['custo_vendedor'] ?? 0),
+        'custo_recepcao' => (float)($row['custo_recepcao'] ?? 0),
+        'custo_desp_div' => (float)($row['custo_desp_div'] ?? 0),
+        'custo_transferencia_real' => (float)($row['custo_transferencia_real'] ?? 0),
         'nome_pag'     => $row['nome_pag'],
         'nome_dest'    => $row['nome_dest'],
         'sigla_emit'   => $row['sigla_emit'],
@@ -177,6 +231,13 @@ while ($row = pg_fetch_assoc($result)) {
     $totPeso    += (float)$row['peso_real'];
     $totVol     += (int)$row['qtde_vol'];
     $totFrete   += (float)$row['vlr_frete'];
+    $totCustos  += (float)($row['total_custos'] ?? 0);
+    $totResultado += (float)($row['resultado'] ?? 0);
+    foreach ($costFields as $cf) {
+        $k = preg_replace('/[^a-z0-9_]/i', '', (string)$cf);
+        if ($k === '') continue;
+        $totCostBreak[$cf] += (float)($row[$k] ?? 0);
+    }
 }
 
 $payload = [
@@ -189,6 +250,20 @@ $payload = [
             'peso_real' => $totPeso,
             'qtde_vol'  => $totVol,
             'vlr_frete' => $totFrete,
+            'total_custos' => $totCustos,
+            'total_resultado' => $totResultado,
+            'custo_seguro' => (float)($totCostBreak['custo_seguro'] ?? 0),
+            'custo_icms' => (float)($totCostBreak['custo_icms'] ?? 0),
+            'custo_pis_cofins' => (float)($totCostBreak['custo_pis_cofins'] ?? 0),
+            'custo_gris' => (float)($totCostBreak['custo_gris'] ?? 0),
+            'custo_pedagio' => (float)($totCostBreak['custo_pedagio'] ?? 0),
+            'custo_expedicao' => (float)($totCostBreak['custo_expedicao'] ?? 0),
+            'custo_transferencia' => (float)($totCostBreak['custo_transferencia'] ?? 0),
+            'custo_transbordo' => (float)($totCostBreak['custo_transbordo'] ?? 0),
+            'custo_vendedor' => (float)($totCostBreak['custo_vendedor'] ?? 0),
+            'custo_recepcao' => (float)($totCostBreak['custo_recepcao'] ?? 0),
+            'custo_desp_div' => (float)($totCostBreak['custo_desp_div'] ?? 0),
+            'custo_transferencia_real' => (float)($totCostBreak['custo_transferencia_real'] ?? 0),
         ],
     ],
 ];
