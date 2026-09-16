@@ -2227,6 +2227,8 @@ function CardCarregamento({
         seen.add(u);
         out.push(u);
       }
+      const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
+      if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
       return out;
     }
     const out: string[] = [];
@@ -2238,6 +2240,8 @@ function CardCarregamento({
       if (!unidadesComCtes.has(u)) continue;
       out.push(u);
     }
+    const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
+    if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
     return out;
   })();
 
@@ -2246,25 +2250,53 @@ function CardCarregamento({
   const unidadesDestinoTexto = (() => {
     if (unidadesReais.length === 0) return null;
     const last = unidadesReais[unidadesReais.length - 1];
-    if (unidadesReais.length === 1) return <span className="font-bold">{last}</span>;
+    const centralSigla = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
+    const rawCentral = String((carregamento as any).unidades_compart ?? '').trim();
+    const centralUnidades = Array.from(new Set(
+      rawCentral
+        .split(/[,\s;]+/)
+        .map((p) => p.trim().toUpperCase())
+        .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u))
+    ));
+    const isCentral = (u: string) => !!centralSigla && u === centralSigla && centralUnidades.length > 0;
+    const renderUnidade = (u: string, opts?: { bold?: boolean }) => {
+      if (isCentral(u)) {
+        return (
+          <button
+            type="button"
+            className={`font-mono ${opts?.bold ? 'font-bold' : 'font-semibold'} text-indigo-700 dark:text-indigo-300 hover:underline shrink-0`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCentralizadoraSigla(u);
+              setCentralizadoraUnidades(centralUnidades);
+              setCentralizadoraDialogOpen(true);
+            }}
+            title="Clique para ver unidades compartilhadas"
+          >
+            {u}
+          </button>
+        );
+      }
+      return <span className={`font-mono ${opts?.bold ? 'font-bold' : ''}`}>{u}</span>;
+    };
+
+    if (unidadesReais.length === 1) return renderUnidade(last, { bold: true });
 
     const first = unidadesReais[0];
     if (unidadesReais.length === 2) {
       return (
         <span className="min-w-0 flex items-center whitespace-nowrap">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{first}</span>
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{renderUnidade(first)}</span>
           <span className="shrink-0">, </span>
-          <span className="shrink-0 font-bold">{last}</span>
+          <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
         </span>
       );
     }
-
-    const prefix = unidadesReais.slice(0, -1).join(', ');
     return (
       <span className="min-w-0 flex items-center whitespace-nowrap">
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{prefix}</span>
+        <span className="shrink-0">{renderUnidade(first)}</span>
         <span className="shrink-0">, … </span>
-        <span className="shrink-0 font-bold">{last}</span>
+        <span className="shrink-0">{renderUnidade(last, { bold: true })}</span>
       </span>
     );
   })();
@@ -2324,29 +2356,6 @@ function CardCarregamento({
                     <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={unidadesDestinoFull}>
                       {unidadesDestinoTexto}
                     </span>
-                    {Boolean((carregamento as any).destino_centralizadora) && (
-                      <button
-                        type="button"
-                        className="shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const sig = String(carregamento.destino ?? '').trim().toUpperCase();
-                          const raw = String((carregamento as any).unidades_compart ?? '').trim();
-                          const parts = raw
-                            .split(/[,\s;]+/)
-                            .map((p) => p.trim().toUpperCase())
-                            .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u));
-                          const uniq = Array.from(new Set(parts));
-                          setCentralizadoraSigla(sig);
-                          setCentralizadoraUnidades(uniq);
-                          setCentralizadoraDialogOpen(true);
-                        }}
-                      >
-                        <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-[10px] h-5 px-2 cursor-pointer">
-                          Centralizadora
-                        </Badge>
-                      </button>
-                    )}
                   </span>
                 )
                 : <span className="font-mono text-slate-400 dark:text-slate-500">-</span>
@@ -7905,11 +7914,10 @@ export function Disponiveis() {
                           >
                             <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{String(l.nro_linha ?? 0).padStart(3, '0')}</span>
                             <span className="truncate text-slate-800 dark:text-slate-200">{l.nome || '-'}</span>
-                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
                             {(l as any).destino_centralizadora ? (
                               <button
                                 type="button"
-                                className="min-w-0 flex justify-start text-left"
+                                className="font-mono font-semibold text-indigo-700 dark:text-indigo-300 hover:underline text-left"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const sig = String(l.sigla_dest ?? '').trim().toUpperCase();
@@ -7923,14 +7931,14 @@ export function Disponiveis() {
                                   setCentralizadoraUnidades(uniq);
                                   setCentralizadoraDialogOpen(true);
                                 }}
+                                title="Clique para ver unidades compartilhadas"
                               >
-                                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-[10px] h-5 px-2 cursor-pointer">
-                                  Centralizadora
-                                </Badge>
+                                {(l.sigla_dest ?? '').toUpperCase() || '-'}
                               </button>
                             ) : (
-                              <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{interEfetivas.length ? interEfetivas.join(', ') : '-'}</span>
+                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{(l.sigla_dest ?? '').toUpperCase() || '-'}</span>
                             )}
+                            <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">{interEfetivas.length ? interEfetivas.join(', ') : '-'}</span>
                             <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400">{(l.km_ida ?? 0).toLocaleString('pt-BR')}</span>
                             <span className="text-right font-mono text-xs text-slate-700 dark:text-slate-200 tabular-nums">
                               {minFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
