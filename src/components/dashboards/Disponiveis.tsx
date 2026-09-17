@@ -3987,6 +3987,26 @@ function ModalRotaCarregamento({
     if (t && t !== mapboxToken) setMapboxToken(t);
   }, [getToken]);
 
+  const carregarTokenServidor = useCallback(async () => {
+    try {
+      const resp = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_mapbox_token.php`,
+        { method: 'POST', body: JSON.stringify({}) },
+        true
+      );
+      const t = String(resp?.token ?? '').trim();
+      if (!t) return;
+      try { window.localStorage.setItem('mapbox_token', t); } catch {}
+      setMapboxToken(t);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (getToken()) return;
+    void carregarTokenServidor();
+  }, [carregarTokenServidor, getToken]);
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
@@ -4052,6 +4072,12 @@ function ModalRotaCarregamento({
       unidade: string;
       titulo: string;
       query: string;
+      destinatario: string;
+      endereco: string;
+      bairro: string;
+      cep: string;
+      cidade: string;
+      uf: string;
       ctes: { ser: string; nro: number; ctrc: string }[];
       lat: number | null;
       lng: number | null;
@@ -4103,6 +4129,12 @@ function ModalRotaCarregamento({
           unidade: unidadeDestino,
           titulo: baseTitulo || (unidadeDestino ? `Entrega (${unidadeDestino})` : 'Entrega'),
           query,
+          destinatario,
+          endereco,
+          bairro,
+          cep,
+          cidade,
+          uf,
           ctes: [],
           lat: null,
           lng: null,
@@ -4306,19 +4338,65 @@ function ModalRotaCarregamento({
     pontosOrdenados.forEach((p, idx) => {
       const bg = p.tipo === 'UNIDADE' ? '#2563eb' : '#059669';
       const icon = L.divIcon({
-        className: '',
-        html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9999px;background:${bg};border:2px solid white;color:white;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.25)">${idx + 1}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        className: 'custom-pin-icon',
+        html: `
+          <div style="position: relative; width: 30px; height: 40px;">
+            <svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <filter id="shadow-rota-${idx}" x="-50%" y="-50%" width="200%" height="200%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                </filter>
+              </defs>
+              <path d="M15 0C8.373 0 3 5.373 3 12c0 9 12 28 12 28s12-19 12-28c0-6.627-5.373-12-12-12z"
+                    fill="${bg}"
+                    stroke="white"
+                    stroke-width="2"
+                    filter="url(#shadow-rota-${idx})"/>
+              <circle cx="15" cy="12" r="7" fill="white"/>
+              <text x="15" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="${bg}">${idx + 1}</text>
+            </svg>
+          </div>
+        `,
+        iconSize: [30, 40],
+        iconAnchor: [15, 40],
+        popupAnchor: [0, -40],
       });
       const m = L.marker([p.lat, p.lng], { icon }).addTo(map);
-      m.bindPopup(p.titulo);
+      if (p.tipo === 'UNIDADE') {
+        const sigla = String(p.titulo ?? '').toUpperCase();
+        const nome = unidadesMap.get(sigla)?.nome ?? '';
+        m.bindPopup(`UNIDADE ${sigla}<br/>${nome}`);
+      } else {
+        const groupKey = String(p.key ?? '').startsWith('E:') ? String(p.key ?? '').slice(2) : '';
+        const g = grupos.entrega.find((x) => x.key === groupKey);
+        const tipo = (g?.unidade ?? '') === 'FEC' ? 'FEC' : 'ENTREGA';
+        const destinatario = g?.destinatario ?? '';
+        const endereco = g?.endereco ?? '';
+        const bairro = g?.bairro ?? '';
+        const cep = g?.cep ?? '';
+        const cidade = g?.cidade ?? '';
+        const uf = g?.uf ?? '';
+        const ctesTxt = Array.isArray(g?.ctes)
+          ? g!.ctes.slice(0, 6).map((c: any) => c?.ctrc).filter(Boolean).join(', ') + (g!.ctes.length > 6 ? '…' : '')
+          : '';
+        m.bindPopup(`
+          <div style="font-size:12px;line-height:1.35">
+            <div style="font-weight:700;margin-bottom:6px">${tipo}</div>
+            ${destinatario ? `<div><span style="color:#64748b">Destinatário:</span> ${destinatario}</div>` : ''}
+            ${endereco ? `<div><span style="color:#64748b">Endereço:</span> ${endereco}</div>` : ''}
+            ${bairro ? `<div><span style="color:#64748b">Bairro:</span> ${bairro}</div>` : ''}
+            ${cep ? `<div><span style="color:#64748b">CEP:</span> ${cep}</div>` : ''}
+            ${(cidade || uf) ? `<div><span style="color:#64748b">Cidade:</span> ${cidade}${cidade && uf ? '/' : ''}${uf}</div>` : ''}
+            ${Array.isArray(g?.ctes) ? `<div><span style="color:#64748b">CT-es:</span> ${g!.ctes.length}${ctesTxt ? ` · ${ctesTxt}` : ''}</div>` : ''}
+          </div>
+        `);
+      }
       markers.push(m);
     });
     layersRef.current.push(...markers);
 
     if (routeCoords.length >= 2) {
-      const poly = L.polyline(routeCoords.map((c) => [c.lat, c.lng]), { color: '#0f172a', weight: 4, opacity: 0.8 }).addTo(map);
+      const poly = L.polyline(routeCoords.map((c) => [c.lat, c.lng]), { color: '#1e3a8a', weight: 4, opacity: 0.85 }).addTo(map);
       layersRef.current.push(poly);
     }
 
@@ -4328,6 +4406,16 @@ function ModalRotaCarregamento({
       map.fitBounds(bounds, { padding: [30, 30] });
     }
   }, [leafletLoaded, pontosOrdenados, routeCoords]);
+
+  const focarRota = useCallback(() => {
+    const L = (window as any).L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    const all = [...pontosOrdenados.map((p) => [p.lat, p.lng] as [number, number]), ...routeCoords.map((c) => [c.lat, c.lng] as [number, number])];
+    if (all.length === 0) return;
+    const bounds = L.latLngBounds(all);
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }, [pontosOrdenados, routeCoords]);
 
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
@@ -4353,17 +4441,8 @@ function ModalRotaCarregamento({
 
   const iniciarGeocoding = async () => {
     if (geoRunning) return;
-    const token = getToken();
-    if (!token) {
-      const v = window.prompt('Cole o token do Mapbox (pk...)', '');
-      const t = (v ?? '').trim();
-      if (!t) { toast.error('Token Mapbox não configurado.'); return; }
-      try { window.localStorage.setItem('mapbox_token', t); } catch {}
-      setMapboxToken(t);
-    }
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
-    if (tokenNow !== mapboxToken) setMapboxToken(tokenNow);
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
     if (pendentes.length === 0) return;
     setGeoRunning(true);
@@ -4405,7 +4484,9 @@ function ModalRotaCarregamento({
   };
 
   useEffect(() => {
+    const token = getToken();
     const placa = carregamento.placa_provisoria;
+    if (!token) return;
     if (geoRunning) return;
     if (autoGeoRef.current === placa) return;
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
@@ -4496,6 +4577,16 @@ function ModalRotaCarregamento({
                   Calculando rota...
                 </div>
               )}
+              <Button
+                size="sm"
+                variant="secondary"
+                className="absolute top-2 left-2 z-10 h-8 text-xs"
+                onClick={focarRota}
+                disabled={!leafletLoaded || (pontosOrdenados.length === 0 && routeCoords.length === 0)}
+              >
+                <MapPin className="w-3.5 h-3.5 mr-1.5" />
+                Focar rota
+              </Button>
               <div ref={mapContainerRef} className="w-full h-full" />
             </div>
           </div>
