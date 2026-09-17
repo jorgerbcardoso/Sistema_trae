@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../ThemeProvider';
 import { useNavigate } from 'react-router';
@@ -38,10 +38,10 @@ import {
   Building2,
   CircleHelp,
   RefreshCw,
+  AlertTriangle,
   Ban
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { ENVIRONMENT } from '../../config/environment';
 import { FilterSelectUnidadeSingle } from '../cadastros/FilterSelectUnidadeSingle';
 import { FilterSelectCliente } from './FilterSelectCliente';
 import { FilterSelectVeiculo } from './FilterSelectVeiculo';
@@ -93,11 +93,13 @@ interface ColetaRaw {
 }
 
 interface ColetaGroup {
+  id: string;
   label: string;
   count: number;
   percentage: number;
   color: string;
   bgColor: string;
+  blobColor: string;
   chartColor: string;
   emptyColor: string;
   emptyColorDark: string;
@@ -148,6 +150,13 @@ export function PerformanceColetas() {
   const [evolucaoData, setEvolucaoData] = useState<any[]>([]);
   const [unitPerformances, setUnitPerformances] = useState<UnidadePerformanceColetas[]>([]);
   const [canceladas, setCanceladas] = useState(0);
+
+  const [listaOpen, setListaOpen] = useState(false);
+  const [listaTitle, setListaTitle] = useState('');
+  const [listaRows, setListaRows] = useState<ColetaRaw[]>([]);
+  const [listaSort, setListaSort] = useState<{ key: 'coleta' | 'inclusao' | 'cliente' | 'status' | 'vlr_merc' | 'peso' | 'limite' | 'efetivacao'; dir: 'asc' | 'desc' }>({ key: 'limite', dir: 'desc' });
+  const [listaPage, setListaPage] = useState(1);
+  const listaPageSize = 70;
   
   // Estados para ordenação da tabela de comparativo
   const [sortColumn, setSortColumn] = useState<keyof UnidadePerformanceColetas>('performance');
@@ -294,25 +303,33 @@ export function PerformanceColetas() {
       const comandadas     = Number(cardsData.comandadas)     || 0;
       const coletadas      = Number(cardsData.coletadas)      || 0;
       const total          = Number(cardsData.total)          || 0;
-      setCanceladas(Number(cardsData.canceladas) || 0);
+      const canceladasCount = Number(cardsData.canceladas) || 0;
+      setCanceladas(canceladasCount);
 
       const evolucaoArray = Array.isArray(dashboardData.evolucao) ? dashboardData.evolucao : [];
       const comparativoArray = Array.isArray(dashboardData.comparativo) ? dashboardData.comparativo : [];
+      const coletasList: ColetaRaw[] = Array.isArray(dashboardData.coletas) ? dashboardData.coletas : [];
+      const now = new Date();
       const performanceGeral = (() => {
         const totalColetas = comparativoArray.reduce((acc: number, u: any) => acc + (Number(u.qtdeColetas) || 0), 0);
         const totalNoPrazo = comparativoArray.reduce((acc: number, u: any) => acc + (Number(u.noPrazo) || 0), 0);
         if (totalColetas <= 0) return 0;
         return (totalNoPrazo / totalColetas) * 100;
       })();
+
+      const emAtraso = coletasList.reduce((acc, c) => acc + (isColetaAtrasada(c, now) ? 1 : 0), 0);
+      const totalAll = total + canceladasCount;
       
       // Criar grupos com cores específicas
       const groups: ColetaGroup[] = [
         {
+          id: 'performance',
           label: 'Performance',
           count: 0,
           percentage: performanceGeral,
           color: 'text-green-700 dark:text-green-300',
-          bgColor: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800',
+          bgColor: 'bg-gradient-to-br from-white to-green-50 dark:from-slate-900/90 dark:to-green-900/10',
+          blobColor: 'bg-green-400',
           chartColor: '#22c55e',
           emptyColor: '#dcfce7',
           emptyColorDark: '#064e3b',
@@ -322,11 +339,13 @@ export function PerformanceColetas() {
           showCsv: false,
         },
         {
+          id: 'pre',
           label: 'Pré-Cadastradas',
           count: preCadastradas,
           percentage: total > 0 ? (preCadastradas / total) * 100 : 0,
           color: 'text-slate-700 dark:text-slate-300',
-          bgColor: 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 border-slate-200 dark:border-slate-800',
+          bgColor: 'bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40',
+          blobColor: 'bg-slate-400',
           chartColor: '#64748b',
           emptyColor: '#f1f5f9',
           emptyColorDark: '#1e293b',
@@ -334,14 +353,16 @@ export function PerformanceColetas() {
           situacao: 'PRE-CADASTRADA',
           icon: <Clock className="w-4 h-4" />,
           showCount: true,
-          showCsv: true,
+          showCsv: false,
         },
         {
+          id: 'cad',
           label: 'Cadastradas',
           count: cadastradas,
           percentage: total > 0 ? (cadastradas / total) * 100 : 0,
           color: 'text-blue-700 dark:text-blue-300',
-          bgColor: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800',
+          bgColor: 'bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10',
+          blobColor: 'bg-blue-400',
           chartColor: '#3b82f6',
           emptyColor: '#dbeafe',
           emptyColorDark: '#1e3a8a',
@@ -349,14 +370,16 @@ export function PerformanceColetas() {
           situacao: 'CADASTRADA',
           icon: <List className="w-4 h-4" />,
           showCount: true,
-          showCsv: true,
+          showCsv: false,
         },
         {
+          id: 'com',
           label: 'Comandadas',
           count: comandadas,
           percentage: total > 0 ? (comandadas / total) * 100 : 0,
           color: 'text-yellow-700 dark:text-yellow-300',
-          bgColor: 'bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950 dark:to-yellow-900 border-yellow-200 dark:border-yellow-800',
+          bgColor: 'bg-gradient-to-br from-white to-yellow-50 dark:from-slate-900/90 dark:to-yellow-900/10',
+          blobColor: 'bg-yellow-400',
           chartColor: '#f59e0b',
           emptyColor: '#fef3c7',
           emptyColorDark: '#713f12',
@@ -364,14 +387,16 @@ export function PerformanceColetas() {
           situacao: 'COMANDADA',
           icon: <Truck className="w-4 h-4" />,
           showCount: true,
-          showCsv: true,
+          showCsv: false,
         },
         {
+          id: 'colet',
           label: 'Coletadas',
           count: coletadas,
           percentage: total > 0 ? (coletadas / total) * 100 : 0,
           color: 'text-teal-700 dark:text-teal-300',
-          bgColor: 'bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 border-teal-200 dark:border-teal-800',
+          bgColor: 'bg-gradient-to-br from-white to-teal-50 dark:from-slate-900/90 dark:to-teal-900/10',
+          blobColor: 'bg-teal-400',
           chartColor: '#14b8a6',
           emptyColor: '#ccfbf1',
           emptyColorDark: '#134e4a',
@@ -379,14 +404,64 @@ export function PerformanceColetas() {
           situacao: 'COLETADA',
           icon: <CheckCircle2 className="w-4 h-4" />,
           showCount: true,
-          showCsv: true,
+          showCsv: false,
         }
+        ,
+        {
+          id: 'atraso',
+          label: 'Em atraso',
+          count: emAtraso,
+          percentage: total > 0 ? (emAtraso / total) * 100 : 0,
+          color: 'text-red-700 dark:text-red-300',
+          bgColor: 'bg-gradient-to-br from-white to-red-50 dark:from-slate-900/90 dark:to-red-900/10',
+          blobColor: 'bg-red-400',
+          chartColor: '#ef4444',
+          emptyColor: '#fee2e2',
+          emptyColorDark: '#7f1d1d',
+          hoverColor: 'hover:bg-red-200 dark:hover:bg-red-800',
+          icon: <AlertTriangle className="w-4 h-4" />,
+          showCount: true,
+          showCsv: false,
+        },
+        {
+          id: 'total',
+          label: 'Total',
+          count: total,
+          percentage: 100,
+          color: 'text-purple-700 dark:text-purple-300',
+          bgColor: 'bg-gradient-to-br from-white to-purple-50 dark:from-slate-900/90 dark:to-purple-900/10',
+          blobColor: 'bg-purple-400',
+          chartColor: '#a855f7',
+          emptyColor: '#f3e8ff',
+          emptyColorDark: '#581c87',
+          hoverColor: 'hover:bg-purple-200 dark:hover:bg-purple-800',
+          icon: <Package className="w-4 h-4" />,
+          showCount: true,
+          showCsv: false,
+        },
+        {
+          id: 'cancel',
+          label: 'Canceladas',
+          count: canceladasCount,
+          percentage: totalAll > 0 ? (canceladasCount / totalAll) * 100 : 0,
+          color: 'text-zinc-700 dark:text-zinc-300',
+          bgColor: 'bg-gradient-to-br from-white to-zinc-50 dark:from-slate-900/90 dark:to-zinc-900/10',
+          blobColor: 'bg-zinc-400',
+          chartColor: '#71717a',
+          emptyColor: '#f4f4f5',
+          emptyColorDark: '#27272a',
+          hoverColor: 'hover:bg-zinc-200 dark:hover:bg-zinc-800',
+          situacao: 'CANCELADA',
+          icon: <Ban className="w-4 h-4" />,
+          showCount: true,
+          showCsv: false,
+        },
       ];
       
       setColetaGroups(groups);
       setEvolucaoData(evolucaoArray);
       setUnitPerformances(comparativoArray);
-      setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
+      setColetasRaw(coletasList);
       
       setLoading(false);
       setReprocessing(false);
@@ -539,28 +614,140 @@ export function PerformanceColetas() {
     URL.revokeObjectURL(url);
   };
 
-  const SITUACAO_MAP: Record<string, string> = {
-    '9': 'PRE-CADASTRADA', '0': 'CADASTRADA', '1': 'COMANDADA', '2': 'COLETADA', '3': 'CANCELADA'
-  };
-
-  const handleExportCard = (situacao: string, label: string) => {
-    const filtered = situacao === 'TODAS'
-      ? coletasRaw
-      : coletasRaw.filter(c => c.situacao === SITUACAO_MAP[situacao] || c.situacao === situacao);
-    downloadCSV(filtered, `coletas_${label.toLowerCase().replace(/\s+/g, '_')}.csv`);
-    if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
-  };
-
-  const handleExportCanceladas = () => {
-    const filtered = coletasRaw.filter(c => c.situacao === 'CANCELADA');
-    downloadCSV(filtered, 'coletas_canceladas.csv');
-    if (filtered.length > 0) toast.success('Planilha de canceladas gerada com sucesso');
+  const SITUACAO_BADGE: Record<string, { label: string; className: string }> = {
+    'PRE-CADASTRADA': { label: 'Pré-cadastrada', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' },
+    'CADASTRADA': { label: 'Cadastrada', className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' },
+    'COMANDADA': { label: 'Comandada', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300' },
+    'COLETADA': { label: 'Coletada', className: 'bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300' },
+    'CANCELADA': { label: 'Cancelada', className: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-200' },
   };
 
   const normDate = (d: string) => {
     if (!d) return '';
     if (d.includes('/')) { const [dd, mm, yyyy] = d.split('/'); return `${yyyy}-${mm}-${dd}`; }
     return d;
+  };
+
+  const parseDateTimeIso = (dateBr?: string, time?: string) => {
+    const iso = normDate(String(dateBr ?? ''));
+    if (!iso) return null;
+    const hhmm = String(time ?? '').slice(0, 5);
+    if (!hhmm || hhmm.length < 4) return new Date(`${iso}T00:00:00`);
+    return new Date(`${iso}T${hhmm}:00`);
+  };
+
+  const getLimiteDateTime = (c: ColetaRaw) => parseDateTimeIso(c.data_limite, c.hora_limite || '17:00');
+  const getEfetivacaoDateTime = (c: ColetaRaw) => parseDateTimeIso(c.data_efetivacao, c.hora_efetivacao);
+  const getInclusaoDateTime = (c: ColetaRaw) => parseDateTimeIso(c.data_inclusao, c.hora_inclusao);
+
+  const isColetaNoPrazo = (c: ColetaRaw) => {
+    if (c.situacao !== 'COLETADA') return false;
+    const limite = getLimiteDateTime(c);
+    const efet = getEfetivacaoDateTime(c);
+    if (!limite || !efet) return false;
+    return efet.getTime() <= limite.getTime();
+  };
+
+  const isColetaAtrasada = (c: ColetaRaw, now: Date) => {
+    if (c.situacao === 'CANCELADA') return false;
+    const limite = getLimiteDateTime(c);
+    if (!limite) return false;
+    if (c.situacao === 'COLETADA') {
+      const efet = getEfetivacaoDateTime(c);
+      if (!efet) return false;
+      return efet.getTime() > limite.getTime();
+    }
+    return now.getTime() > limite.getTime();
+  };
+
+  const parseBRNumber = (v: any) => {
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    const n = Number(s.replace(/\./g, '').replace(',', '.'));
+    if (Number.isNaN(n)) return null;
+    return n;
+  };
+
+  const fmtBRL = (v: any) => {
+    const n = typeof v === 'number' ? v : parseBRNumber(v);
+    if (n === null) return '—';
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const fmtKg = (v: any) => {
+    const n = typeof v === 'number' ? v : parseBRNumber(v);
+    if (n === null) return '—';
+    return n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' kg';
+  };
+
+  const fmtDateShort = (d?: string) => {
+    const s = String(d ?? '').trim();
+    if (!s) return '—';
+    const parts = s.split('/');
+    if (parts.length !== 3) return s;
+    const [dd, mm, yyyy] = parts;
+    return `${dd}/${mm}/${yyyy.slice(-2)}`;
+  };
+
+  const fmtTimeHHMM = (t?: string) => {
+    const s = String(t ?? '').trim();
+    if (!s) return '';
+    return s.slice(0, 5);
+  };
+
+  const openListaCustom = (title: string, rows: ColetaRaw[]) => {
+    setListaTitle(title);
+    setListaRows(rows);
+    setListaSort({ key: 'limite', dir: 'desc' });
+    setListaPage(1);
+    setListaOpen(true);
+  };
+
+  const openListaColetas = (cardId: string) => {
+    const now = new Date();
+    let title = '';
+    let rows: ColetaRaw[] = [];
+
+    switch (cardId) {
+      case 'performance':
+        title = 'Coletas no prazo';
+        rows = coletasRaw.filter(isColetaNoPrazo);
+        break;
+      case 'pre':
+        title = 'Pré-cadastradas';
+        rows = coletasRaw.filter((c) => c.situacao === 'PRE-CADASTRADA');
+        break;
+      case 'cad':
+        title = 'Cadastradas';
+        rows = coletasRaw.filter((c) => c.situacao === 'CADASTRADA');
+        break;
+      case 'com':
+        title = 'Comandadas';
+        rows = coletasRaw.filter((c) => c.situacao === 'COMANDADA');
+        break;
+      case 'colet':
+        title = 'Coletadas';
+        rows = coletasRaw.filter((c) => c.situacao === 'COLETADA');
+        break;
+      case 'atraso':
+        title = 'Em atraso';
+        rows = coletasRaw.filter((c) => isColetaAtrasada(c, now));
+        break;
+      case 'total':
+        title = 'Total';
+        rows = coletasRaw.filter((c) => c.situacao !== 'CANCELADA');
+        break;
+      case 'cancel':
+        title = 'Canceladas';
+        rows = coletasRaw.filter((c) => c.situacao === 'CANCELADA');
+        break;
+      default:
+        title = 'Coletas';
+        rows = [...coletasRaw];
+        break;
+    }
+
+    openListaCustom(title, rows);
   };
 
   const isAtrasadaCalendario = (c: ColetaRaw, iso: string, now: Date) => {
@@ -581,45 +768,37 @@ export function PerformanceColetas() {
   const handleExportColetasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso);
-    downloadCSV(filtered, `coletas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    openListaCustom(`Coletas — ${iso}`, filtered);
   };
 
   const handleExportProgramadasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && ['PRE-CADASTRADA','CADASTRADA','COMANDADA'].includes(c.situacao));
-    downloadCSV(filtered, `programadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    openListaCustom(`Programadas — ${iso}`, filtered);
   };
 
   const handleExportComandasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COMANDADA');
-    downloadCSV(filtered, `comandadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    openListaCustom(`Comandadas — ${iso}`, filtered);
   };
 
   const handleExportNoPrazoDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRaw.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
-    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
+    openListaCustom(`Coletadas — ${iso}`, filtered);
   };
 
   const handleExportCalendarioColetasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso && c.situacao === 'COLETADA');
-    downloadCSV(filtered, `coletadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
-    else toast.warning('Nenhuma coleta encontrada para este dia');
+    openListaCustom(`Coletadas — ${iso}`, filtered);
   };
 
   const handleExportCalendarioProgramadasDia = (data: string) => {
     const iso = normDate(data);
     const filtered = coletasRawCalendario.filter(c => normDate(c.data_limite) === iso);
-    downloadCSV(filtered, `programadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
-    else toast.warning('Nenhuma coleta programada encontrada para este dia');
+    openListaCustom(`Programadas — ${iso}`, filtered);
   };
 
   const handleExportCalendarioNoPrazoDia = (data: string) => {
@@ -631,18 +810,14 @@ export function PerformanceColetas() {
       const limite = iso + 'T' + (c.hora_limite || '17:00');
       return efet <= limite;
     });
-    downloadCSV(filtered, `no_prazo_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
-    else toast.warning('Nenhuma coleta no prazo encontrada para este dia');
+    openListaCustom(`No prazo — ${iso}`, filtered);
   };
 
   const handleExportCalendarioAtrasadasDia = (data: string) => {
     const iso = normDate(data);
     const now = new Date();
     const filtered = coletasRawCalendario.filter((c) => isAtrasadaCalendario(c, iso, now));
-    downloadCSV(filtered, `atrasadas_dia_${iso}.csv`);
-    if (filtered.length > 0) toast.success('Planilha gerada com sucesso');
-    else toast.warning('Nenhuma coleta atrasada encontrada para este dia');
+    openListaCustom(`Em atraso — ${iso}`, filtered);
   };
 
   const handleExportComparativo = (sigla: string, tipo: 'total' | 'programadas' | 'comandadas' | 'coletadas' | 'no_prazo', label: string) => {
@@ -651,137 +826,31 @@ export function PerformanceColetas() {
     else if (tipo === 'comandadas') filtered = filtered.filter(c => c.situacao === 'COMANDADA');
     else if (tipo === 'coletadas') filtered = filtered.filter(c => c.situacao === 'COLETADA');
     else if (tipo === 'no_prazo') filtered = filtered.filter(c => c.situacao === 'COLETADA' && c.data_efetivacao && c.data_efetivacao <= c.data_limite);
-    downloadCSV(filtered, `comparativo_${sigla}_${tipo}.csv`);
-    if (filtered.length > 0) toast.success(`Planilha de ${label} gerada com sucesso`);
+    openListaCustom(`${label} — ${sigla}`, filtered);
   };
 
-  // ✅ FUNÇÃO: Exportar CSV do Gráfico de Evolução (clique no dia)
-  const handleExportEvolucao = async (dataStr: string) => {
-    const toastId = toast.info('Gerando planilha...', {
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-
-    try {
-      const token = localStorage.getItem('auth_token');
-      
-      // A data vem no formato YYYY-MM-DD do backend
-      let dataLimite: string;
-      
-      if (dataStr.includes('-')) {
-        // Já está no formato YYYY-MM-DD
-        dataLimite = dataStr;
-      } else {
-        // Está no formato DD/MM - converter para YYYY-MM-DD
-        const [day, month] = dataStr.split('/');
-        
-        // Determinar o ano correto baseado na data atual
-        const hoje = new Date();
-        const anoAtual = hoje.getFullYear();
-        const mesAtual = hoje.getMonth() + 1;
-        
-        // Se o mês clicado for maior que o mês atual, é do ano anterior
-        const mesClicado = parseInt(month, 10);
-        const year = mesClicado > mesAtual ? anoAtual - 1 : anoAtual;
-        
-        dataLimite = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      }
-      
-      // Montar body com filtros aplicados
-      const body: any = {
-        tipo: 'evolucao_dia',
-        data: dataLimite
-      };
-
-      // Aplicar filtros (exceto períodos)
-      if (filters.cnpjRemetente) body.cnpjRemetente = filters.cnpjRemetente;
-      if (filters.placa) body.placa = filters.placa;
-      if (filters.situacao && filters.situacao.length > 0) body.situacao = filters.situacao;
-      if (filters.unidadeColeta && filters.unidadeColeta.length > 0) body.unidadeColeta = filters.unidadeColeta;
-
-      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-coletas/export.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        toast.dismiss(toastId);
-        
-        if (data.toast) {
-          const toastType = data.toast.type || 'info';
-          const message = data.toast.message;
-          
-          if (toastType === 'error') {
-            toast.error(message);
-          } else if (toastType === 'warning') {
-            toast.warning(message);
-          } else if (toastType === 'info') {
-            toast.info(message);
-          }
-        }
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Erro ao exportar coletas');
-      }
-
-      // Download do arquivo CSV
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      // Tentar extrair nome do arquivo do header
-      let filename = `coletas_programadas_${dataLimite}.csv`;
-      const disposition = response.headers.get('content-disposition');
-      if (disposition) {
-        const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-        }
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success('Planilha gerada com sucesso', { 
-        id: toastId,
-        description: undefined,
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar planilha';
-      toast.error(errorMessage, { 
-        id: toastId,
-        description: undefined,
-        duration: 5000
-      });
+  const handleExportEvolucao = (dataStr: string) => {
+    let iso = dataStr;
+    if (!iso.includes('-')) {
+      const [day, month] = dataStr.split('/');
+      const hoje = new Date();
+      const anoAtual = hoje.getFullYear();
+      const mesAtual = hoje.getMonth() + 1;
+      const mesClicado = parseInt(month, 10);
+      const year = mesClicado > mesAtual ? anoAtual - 1 : anoAtual;
+      iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
+    const filtered = coletasRaw.filter((c) => normDate(c.data_limite) === iso);
+    openListaCustom(`Coletas — ${iso}`, filtered);
   };
 
-  if (loading && coletaGroups.length === 0) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Carregando...</p>
-          <p className="text-slate-500 dark:text-slate-500 text-sm mt-1">Essa operação pode levar alguns segundos.</p>
-        </div>
-      </div>
-    );
-  }
+  const exportarListaCSV = () => {
+    if (listaRows.length === 0) return;
+    downloadCSV(listaRows, `coletas_${listaTitle.toLowerCase().replace(/\s+/g, '_')}.csv`);
+    toast.success('Planilha gerada com sucesso');
+  };
+
+  const isInitialLoading = loading && coletaGroups.length === 0;
 
   const countdownMin = Math.floor(countdown / 60);
   const countdownSec = String(countdown % 60).padStart(2, '0');
@@ -970,23 +1039,66 @@ export function PerformanceColetas() {
     </div>
   );
 
+  const listaSortedRows = useMemo(() => {
+    const sorted = [...listaRows];
+    const dirMult = listaSort.dir === 'asc' ? 1 : -1;
+
+    const cmp = (a: any, b: any) => {
+      if (a === b) return 0;
+      if (a == null) return -1;
+      if (b == null) return 1;
+      if (a instanceof Date || b instanceof Date) {
+        const at = a instanceof Date ? a.getTime() : new Date(a).getTime();
+        const bt = b instanceof Date ? b.getTime() : new Date(b).getTime();
+        return at === bt ? 0 : at > bt ? 1 : -1;
+      }
+      if (typeof a === 'number' || typeof b === 'number') {
+        const an = typeof a === 'number' ? a : Number(a);
+        const bn = typeof b === 'number' ? b : Number(b);
+        return an === bn ? 0 : an > bn ? 1 : -1;
+      }
+      return String(a).localeCompare(String(b), 'pt-BR');
+    };
+
+    const getVal = (c: ColetaRaw) => {
+      switch (listaSort.key) {
+        case 'coleta': return Number(String(c.nro_coleta ?? '').replace(/\D/g, '')) || 0;
+        case 'inclusao': return getInclusaoDateTime(c) ?? new Date(0);
+        case 'cliente': return c.nome_emit ?? '';
+        case 'status': return c.situacao ?? '';
+        case 'vlr_merc': return parseBRNumber(c.vlr_merc) ?? 0;
+        case 'peso': return parseBRNumber(c.peso) ?? 0;
+        case 'limite': return getLimiteDateTime(c) ?? new Date(0);
+        case 'efetivacao': return getEfetivacaoDateTime(c) ?? new Date(0);
+        default: return '';
+      }
+    };
+
+    sorted.sort((a, b) => cmp(getVal(a), getVal(b)) * dirMult);
+    return sorted;
+  }, [listaRows, listaSort]);
+
+  const listaTotalPages = Math.max(1, Math.ceil(listaSortedRows.length / listaPageSize));
+  const listaSafePage = Math.min(Math.max(listaPage, 1), listaTotalPages);
+  const listaPageRows = listaSortedRows.slice((listaSafePage - 1) * listaPageSize, listaSafePage * listaPageSize);
+
   return (
     <DashboardLayout 
       title="Performance de Coletas"
       description={user?.client_name}
       headerActions={headerActions}
     >
-      {reprocessing && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl px-10 py-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-slate-700 dark:text-slate-200 font-medium">Reprocessando...</p>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Essa operação pode levar alguns segundos.</p>
-          </div>
-        </div>
-      )}
       {/* Conteúdo */}
-      <main className="container mx-auto px-3 md:px-6 py-6 space-y-6">
+      <main className="container mx-auto px-3 md:px-6 py-6 space-y-6 relative">
+        {(isInitialLoading || reprocessing) && (
+          <div className="absolute inset-0 z-20 bg-white/70 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl px-10 py-8 text-center border border-slate-200 dark:border-slate-800">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-slate-700 dark:text-slate-200 font-medium">{reprocessing ? 'Reprocessando...' : 'Carregando...'}</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Essa operação pode levar alguns segundos.</p>
+            </div>
+          </div>
+        )}
         {/* Título e Subtítulo */}
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Análise de Performance de Coletas</h2>
@@ -995,58 +1107,46 @@ export function PerformanceColetas() {
           </p>
         </div>
 
-        {/* Cards de Status com Donuts */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {coletaGroups.map((group, index) => {
-            // ✅ GARANTIR que percentage seja um número válido
-            const percentage = isNaN(group.percentage) ? 0 : Number(group.percentage);
-            const count = Number(group.count) || 0;
-            
-            const donutData = [
-              { name: 'value', value: percentage },
-              { name: 'empty', value: 100 - percentage }
-            ];
-            
-            return (
-              <Card key={index} className={group.bgColor}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className={`text-sm ${group.color} flex items-center gap-2`}>
-                      {group.icon}
-                      {group.label}
-                    </CardTitle>
-                    {group.showCsv !== false ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`h-7 ${group.color} ${group.hoverColor} gap-1 px-2`}
-                        onClick={() => handleExportCard(group.situacao ?? 'TODAS', group.label)}
-                        title={`Exportar ${group.label}`}
-                        disabled={count === 0}
-                      >
-                        <FileSpreadsheet className="w-4 h-4" />
-                        <span className="text-xs font-medium">CSV</span>
-                      </Button>
-                    ) : (
-                      <div className="h-7 px-2" />
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className={`text-2xl font-bold ${group.color}`}>
-                        {percentage.toFixed(1)}%
+        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+          <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="text-sm font-semibold">Resumo</div>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
+            {coletaGroups.map((group) => {
+              const percentage = Number.isNaN(Number(group.percentage)) ? 0 : Number(group.percentage);
+              const count = Number(group.count) || 0;
+              const donutData = [
+                { name: 'value', value: percentage },
+                { name: 'empty', value: 100 - percentage }
+              ];
+
+              return (
+                <div
+                  key={group.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openListaColetas(group.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openListaColetas(group.id);
+                  }}
+                  className={`relative overflow-hidden p-4 ${group.bgColor} cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500`}
+                >
+                  <div className={`absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-20 ${group.blobColor}`} />
+                  <div className="relative flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className={group.color}>{group.icon}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{group.label}</div>
                       </div>
-                      {group.showCount !== false ? (
-                        <p className={`text-sm mt-1 ${group.color}`}>
+                      <div className={`text-2xl font-bold tabular-nums mt-2 ${group.color}`}>{percentage.toFixed(1)}%</div>
+                      {group.showCount !== false && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                           {count} coleta{count !== 1 ? 's' : ''}
-                        </p>
-                      ) : (
-                        <p className="text-sm mt-1 opacity-0 select-none">0 coletas</p>
+                        </div>
                       )}
                     </div>
-                    <div style={{ width: 80, height: 80 }}>
+                    <div className="shrink-0" style={{ width: 80, height: 80 }}>
                       <PieChart width={80} height={80}>
                         <Pie
                           data={donutData}
@@ -1068,38 +1168,11 @@ export function PerformanceColetas() {
                       </PieChart>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Card de Canceladas */}
-        {canceladas > 0 && (
-          <Card className="bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 border-zinc-200 dark:border-zinc-800">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Ban className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Canceladas</p>
-                    <p className="text-2xl font-bold text-zinc-700 dark:text-zinc-300">{canceladas}</p>
-                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 gap-1 px-2"
-                  onClick={handleExportCanceladas}
-                  title="Exportar canceladas"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span className="text-xs font-medium">CSV</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              );
+            })}
+          </div>
+        </div>
 
         {/* Comparativo por Unidades Coletadoras */}
         <Card className="dark:bg-slate-900 dark:border-slate-700">
@@ -1113,7 +1186,7 @@ export function PerformanceColetas() {
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
               <FileSpreadsheet className="w-3 h-3" />
-              Clique sobre os totais para imprimir as coletas
+              Clique sobre os totais para ver lista
             </p>
           </CardHeader>
           <CardContent>
@@ -1410,7 +1483,7 @@ export function PerformanceColetas() {
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                   <FileSpreadsheet className="w-3 h-3" />
-                  Clique sobre os dias para imprimir as coletas programadas
+                  Clique sobre os dias para ver lista
                 </p>
               </div>
 
@@ -1465,7 +1538,7 @@ export function PerformanceColetas() {
                             </p>
                             <p className="text-xs text-blue-500 dark:text-blue-300 mt-2 flex items-center gap-1">
                               <FileSpreadsheet className="w-3 h-3" />
-                              Clique para exportar CSV
+                              Clique para ver lista
                             </p>
                           </div>
                         );
@@ -1490,6 +1563,177 @@ export function PerformanceColetas() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={listaOpen} onOpenChange={setListaOpen}>
+        <DialogContent className="max-w-7xl h-[85vh] flex flex-col overflow-hidden bg-white dark:bg-slate-900">
+          <DialogHeader className="shrink-0 pr-16">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-slate-900 dark:text-slate-100 truncate">{listaTitle || 'Coletas'}</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-400">Lista de coletas que compõem o indicador.</DialogDescription>
+              </div>
+              {listaRows.length > 0 && (
+                <Button variant="outline" size="sm" onClick={exportarListaCSV} className="gap-2 shrink-0 dark:border-slate-700">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Exportar CSV
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
+                <table className="w-full text-sm table-fixed">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
+                    <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[13%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'coleta', dir: s.key === 'coleta' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                        >
+                          Coleta / Inclusão{listaSort.key === 'coleta' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[31%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'cliente', dir: s.key === 'cliente' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                        >
+                          Cliente{listaSort.key === 'cliente' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[12%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'status', dir: s.key === 'status' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
+                        >
+                          Status{listaSort.key === 'status' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[12%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Vlr Mercadoria{listaSort.key === 'vlr_merc' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[8%]">
+                        <button
+                          className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'peso', dir: s.key === 'peso' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Peso{listaSort.key === 'peso' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[12%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'limite', dir: s.key === 'limite' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Limite{listaSort.key === 'limite' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[12%]">
+                        <button
+                          className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+                          onClick={() => setListaSort((s) => ({ key: 'efetivacao', dir: s.key === 'efetivacao' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
+                        >
+                          Efetivação{listaSort.key === 'efetivacao' ? (listaSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {listaPageRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                          Nenhuma coleta neste grupo.
+                        </td>
+                      </tr>
+                    ) : (
+                      listaPageRows.map((r) => {
+                        const badge = SITUACAO_BADGE[String(r.situacao ?? '').toUpperCase()] ?? { label: String(r.situacao ?? '—'), className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' };
+                        const limite = `${fmtDateShort(r.data_limite)}${fmtTimeHHMM(r.hora_limite) ? ' ' + fmtTimeHHMM(r.hora_limite) : ''}`;
+                        const inclusao = `${fmtDateShort(r.data_inclusao)}${fmtTimeHHMM(r.hora_inclusao) ? ' ' + fmtTimeHHMM(r.hora_inclusao) : ''}`;
+                        const efet = r.data_efetivacao ? `${fmtDateShort(r.data_efetivacao)}${fmtTimeHHMM(r.hora_efetivacao) ? ' ' + fmtTimeHHMM(r.hora_efetivacao) : ''}` : '—';
+
+                        return (
+                          <tr key={`${r.unidade}-${r.nro_coleta}-${r.data_limite}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td className="px-3 py-2 align-top">
+                              <div className="font-semibold text-slate-900 dark:text-slate-100">{r.nro_coleta}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">{inclusao}</div>
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <div className="text-slate-900 dark:text-slate-100 truncate">{r.nome_emit || '—'}</div>
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>{badge.label}</span>
+                            </td>
+                            <td className="px-3 py-2 text-right align-top tabular-nums text-slate-900 dark:text-slate-100">{fmtBRL(r.vlr_merc)}</td>
+                            <td className="px-3 py-2 text-right align-top tabular-nums text-slate-900 dark:text-slate-100">{fmtKg(r.peso)}</td>
+                            <td className="px-3 py-2 align-top">
+                              <div className="text-slate-900 dark:text-slate-100">{limite}</div>
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <div className="text-slate-900 dark:text-slate-100">{efet}</div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Página {listaSafePage} de {listaTotalPages} · {listaSortedRows.length} registro{listaSortedRows.length !== 1 ? 's' : ''}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 dark:border-slate-700"
+                    onClick={() => setListaPage(1)}
+                    disabled={listaSafePage <= 1}
+                  >
+                    «
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 dark:border-slate-700"
+                    onClick={() => setListaPage((p) => Math.max(1, p - 1))}
+                    disabled={listaSafePage <= 1}
+                  >
+                    ‹
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 dark:border-slate-700"
+                    onClick={() => setListaPage((p) => Math.min(listaTotalPages, p + 1))}
+                    disabled={listaSafePage >= listaTotalPages}
+                  >
+                    ›
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 dark:border-slate-700"
+                    onClick={() => setListaPage(listaTotalPages)}
+                    disabled={listaSafePage >= listaTotalPages}
+                  >
+                    »
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
