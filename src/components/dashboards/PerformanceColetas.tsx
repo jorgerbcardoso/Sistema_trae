@@ -102,6 +102,10 @@ interface ColetaGroup {
   emptyColor: string;
   emptyColorDark: string;
   hoverColor: string;
+  situacao?: string;
+  icon?: React.ReactNode;
+  showCount?: boolean;
+  showCsv?: boolean;
 }
 
 export function PerformanceColetas() {
@@ -291,9 +295,32 @@ export function PerformanceColetas() {
       const coletadas      = Number(cardsData.coletadas)      || 0;
       const total          = Number(cardsData.total)          || 0;
       setCanceladas(Number(cardsData.canceladas) || 0);
+
+      const evolucaoArray = Array.isArray(dashboardData.evolucao) ? dashboardData.evolucao : [];
+      const comparativoArray = Array.isArray(dashboardData.comparativo) ? dashboardData.comparativo : [];
+      const performanceGeral = (() => {
+        const totalColetas = comparativoArray.reduce((acc: number, u: any) => acc + (Number(u.qtdeColetas) || 0), 0);
+        const totalNoPrazo = comparativoArray.reduce((acc: number, u: any) => acc + (Number(u.noPrazo) || 0), 0);
+        if (totalColetas <= 0) return 0;
+        return (totalNoPrazo / totalColetas) * 100;
+      })();
       
       // Criar grupos com cores específicas
       const groups: ColetaGroup[] = [
+        {
+          label: 'Performance',
+          count: 0,
+          percentage: performanceGeral,
+          color: 'text-green-700 dark:text-green-300',
+          bgColor: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800',
+          chartColor: '#22c55e',
+          emptyColor: '#dcfce7',
+          emptyColorDark: '#064e3b',
+          hoverColor: 'hover:bg-green-200 dark:hover:bg-green-800',
+          icon: <TrendingUp className="w-4 h-4" />,
+          showCount: false,
+          showCsv: false,
+        },
         {
           label: 'Pré-Cadastradas',
           count: preCadastradas,
@@ -303,7 +330,11 @@ export function PerformanceColetas() {
           chartColor: '#64748b',
           emptyColor: '#f1f5f9',
           emptyColorDark: '#1e293b',
-          hoverColor: 'hover:bg-slate-200 dark:hover:bg-slate-800'
+          hoverColor: 'hover:bg-slate-200 dark:hover:bg-slate-800',
+          situacao: 'PRE-CADASTRADA',
+          icon: <Clock className="w-4 h-4" />,
+          showCount: true,
+          showCsv: true,
         },
         {
           label: 'Cadastradas',
@@ -314,7 +345,11 @@ export function PerformanceColetas() {
           chartColor: '#3b82f6',
           emptyColor: '#dbeafe',
           emptyColorDark: '#1e3a8a',
-          hoverColor: 'hover:bg-blue-200 dark:hover:bg-blue-800'
+          hoverColor: 'hover:bg-blue-200 dark:hover:bg-blue-800',
+          situacao: 'CADASTRADA',
+          icon: <List className="w-4 h-4" />,
+          showCount: true,
+          showCsv: true,
         },
         {
           label: 'Comandadas',
@@ -325,37 +360,30 @@ export function PerformanceColetas() {
           chartColor: '#f59e0b',
           emptyColor: '#fef3c7',
           emptyColorDark: '#713f12',
-          hoverColor: 'hover:bg-yellow-200 dark:hover:bg-yellow-800'
+          hoverColor: 'hover:bg-yellow-200 dark:hover:bg-yellow-800',
+          situacao: 'COMANDADA',
+          icon: <Truck className="w-4 h-4" />,
+          showCount: true,
+          showCsv: true,
         },
         {
           label: 'Coletadas',
           count: coletadas,
           percentage: total > 0 ? (coletadas / total) * 100 : 0,
-          color: 'text-green-700 dark:text-green-300',
-          bgColor: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800',
-          chartColor: '#10b981',
-          emptyColor: '#dcfce7',
-          emptyColorDark: '#064e3b',
-          hoverColor: 'hover:bg-green-200 dark:hover:bg-green-800'
-        },
-        {
-          label: 'Total',
-          count: total,
-          percentage: 100,
-          color: 'text-purple-700 dark:text-purple-300',
-          bgColor: 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800',
-          chartColor: '#a855f7',
-          emptyColor: '#f3e8ff',
-          emptyColorDark: '#581c87',
-          hoverColor: 'hover:bg-purple-200 dark:hover:bg-purple-800'
+          color: 'text-teal-700 dark:text-teal-300',
+          bgColor: 'bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 border-teal-200 dark:border-teal-800',
+          chartColor: '#14b8a6',
+          emptyColor: '#ccfbf1',
+          emptyColorDark: '#134e4a',
+          hoverColor: 'hover:bg-teal-200 dark:hover:bg-teal-800',
+          situacao: 'COLETADA',
+          icon: <CheckCircle2 className="w-4 h-4" />,
+          showCount: true,
+          showCsv: true,
         }
       ];
       
       setColetaGroups(groups);
-      
-      const evolucaoArray = Array.isArray(dashboardData.evolucao) ? dashboardData.evolucao : [];
-      const comparativoArray = Array.isArray(dashboardData.comparativo) ? dashboardData.comparativo : [];
-      
       setEvolucaoData(evolucaoArray);
       setUnitPerformances(comparativoArray);
       setColetasRaw(Array.isArray(dashboardData.coletas) ? dashboardData.coletas : []);
@@ -979,32 +1007,27 @@ export function PerformanceColetas() {
               { name: 'empty', value: 100 - percentage }
             ];
             
-            // Mapeamento de índice para situação
-            const situacaoMap = ['PRE-CADASTRADA', 'CADASTRADA', 'COMANDADA', 'COLETADA', 'TODAS'];
-            
             return (
               <Card key={index} className={group.bgColor}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className={`text-sm ${group.color} flex items-center gap-2`}>
-                      {index === 0 && <Clock className="w-4 h-4" />}
-                      {index === 1 && <List className="w-4 h-4" />}
-                      {index === 2 && <Truck className="w-4 h-4" />}
-                      {index === 3 && <CheckCircle2 className="w-4 h-4" />}
-                      {index === 4 && <Package className="w-4 h-4" />}
+                      {group.icon}
                       {group.label}
                     </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-7 ${group.color} ${group.hoverColor} gap-1 px-2`}
-                      onClick={() => handleExportCard(situacaoMap[index], group.label)}
-                      title={`Exportar ${group.label}`}
-                      disabled={count === 0}
-                    >
-                      <FileSpreadsheet className="w-4 h-4" />
-                      <span className="text-xs font-medium">CSV</span>
-                    </Button>
+                    {group.showCsv !== false && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-7 ${group.color} ${group.hoverColor} gap-1 px-2`}
+                        onClick={() => handleExportCard(group.situacao ?? 'TODAS', group.label)}
+                        title={`Exportar ${group.label}`}
+                        disabled={count === 0}
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        <span className="text-xs font-medium">CSV</span>
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1013,9 +1036,11 @@ export function PerformanceColetas() {
                       <div className={`text-2xl font-bold ${group.color}`}>
                         {percentage.toFixed(1)}%
                       </div>
-                      <p className={`text-sm mt-1 ${group.color}`}>
-                        {count} coleta{count !== 1 ? 's' : ''}
-                      </p>
+                      {group.showCount !== false && (
+                        <p className={`text-sm mt-1 ${group.color}`}>
+                          {count} coleta{count !== 1 ? 's' : ''}
+                        </p>
+                      )}
                     </div>
                     <div style={{ width: 80, height: 80 }}>
                       <PieChart width={80} height={80}>

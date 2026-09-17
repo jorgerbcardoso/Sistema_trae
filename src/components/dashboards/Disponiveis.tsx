@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../ThemeProvider';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -5180,16 +5181,29 @@ function CarregamentoArea({
 
 export function Disponiveis() {
   usePageTitle('Disponíveis no Armazém');
+  const location = useLocation();
   const { user } = useAuth();
   const { theme } = useTheme();
   const { confirm: confirmar, dialog: confirmarDialog } = useConfirmDialog();
   const { prompt: perguntarTexto, dialog: perguntarTextoDialog } = usePromptDialog();
+
+  const [pageVisible, setPageVisible] = useState(() => {
+    if (typeof document === 'undefined') return true;
+    return document.visibilityState === 'visible';
+  });
+
+  useEffect(() => {
+    const onVis = () => setPageVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
   const sigla = unidadeLogada.trim().toUpperCase();
   const isMTZ = sigla === 'MTZ' || sigla === '';
   const dominioUsuario = (user?.domain ?? '').trim().toUpperCase();
   const unidadeAtual = sigla;
+  const painelAtivo = pageVisible && location.pathname.includes('/dashboards/disponiveis');
 
   const shouldIgnoreDestinoRVE = (destinoRaw: string | null | undefined) => {
     if (dominioUsuario !== 'RVE') return false;
@@ -5598,9 +5612,10 @@ export function Disponiveis() {
   }, [sigla]);
 
   useEffect(() => {
+    if (!painelAtivo) return;
     if (!sigla || isMTZ) return;
     void carregarCarregamentosCalendario();
-  }, [sigla, isMTZ, carregamentos, carregarCarregamentosCalendario]);
+  }, [painelAtivo, sigla, isMTZ, carregamentos, carregarCarregamentosCalendario]);
 
   const importarCarregamentosBase = useCallback(async (opts?: { silent?: boolean }) => {
     if (importandoCarregamentosRef.current) return { success: false, message: 'Importação já em andamento.' };
@@ -5682,10 +5697,11 @@ export function Disponiveis() {
   }, [handleImportarCarregamentos, carregarCarregamentos]);
 
   useEffect(() => {
+    if (!painelAtivo) return;
     if (!importacaoAutomatica) return;
     const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 300000);
     return () => clearInterval(id);
-  }, [importacaoAutomatica, handleImportarCarregamentos]);
+  }, [painelAtivo, importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {
@@ -6361,6 +6377,7 @@ export function Disponiveis() {
   }, []);
 
   useEffect(() => {
+    if (!painelAtivo) return;
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
       return;
@@ -6392,9 +6409,10 @@ export function Disponiveis() {
       })();
     })();
     return () => { ativo = false; };
-  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
+  }, [painelAtivo, sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
 
   useEffect(() => {
+    if (!painelAtivo) return;
     if (!sigla) return;
     timerRef.current = setInterval(() => {
       setCountdown(prev => {
@@ -6406,7 +6424,7 @@ export function Disponiveis() {
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [sigla, carregar, importarCarregamentosSSWObrigatorio]);
+  }, [painelAtivo, sigla, carregar, importarCarregamentosSSWObrigatorio]);
 
 
 
