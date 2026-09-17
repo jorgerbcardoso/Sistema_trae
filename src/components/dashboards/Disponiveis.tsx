@@ -3972,6 +3972,20 @@ function ModalRotaCarregamento({
     return typeof envToken === 'string' ? envToken : '';
   });
   const autoGeoRef = useRef<string | null>(null);
+  const getToken = useCallback((): string => {
+    try {
+      const v = window.localStorage.getItem('mapbox_token');
+      if (v && v.trim()) return v.trim();
+    } catch {}
+    const envToken = (import.meta as any)?.env?.VITE_MAPBOX_TOKEN;
+    if (typeof envToken === 'string' && envToken.trim()) return envToken.trim();
+    return mapboxToken.trim();
+  }, [mapboxToken]);
+
+  useEffect(() => {
+    const t = getToken();
+    if (t && t !== mapboxToken) setMapboxToken(t);
+  }, [getToken]);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -4292,7 +4306,7 @@ function ModalRotaCarregamento({
   }, [leafletLoaded, pontosOrdenados, routeCoords]);
 
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
-    const token = mapboxToken.trim();
+    const token = getToken();
     if (!token) return null;
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt`;
     const resp = await fetch(url);
@@ -4315,8 +4329,9 @@ function ModalRotaCarregamento({
 
   const iniciarGeocoding = async () => {
     if (geoRunning) return;
-    const token = mapboxToken.trim();
+    const token = getToken();
     if (!token) { toast.error('Token Mapbox não configurado.'); return; }
+    if (token !== mapboxToken) setMapboxToken(token);
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
     if (pendentes.length === 0) return;
     setGeoRunning(true);
@@ -4352,7 +4367,7 @@ function ModalRotaCarregamento({
   };
 
   useEffect(() => {
-    const token = mapboxToken.trim();
+    const token = getToken();
     const placa = carregamento.placa_provisoria;
     if (!token) return;
     if (geoRunning) return;
@@ -4361,7 +4376,7 @@ function ModalRotaCarregamento({
     if (pendentes.length === 0) return;
     autoGeoRef.current = placa;
     void iniciarGeocoding();
-  }, [carregamento.placa_provisoria, mapboxToken, geoRunning, grupos.entrega, coordsByKey]);
+  }, [carregamento.placa_provisoria, getToken, geoRunning, grupos.entrega, coordsByKey, iniciarGeocoding]);
 
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
@@ -4422,8 +4437,8 @@ function ModalRotaCarregamento({
               size="sm"
               className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => { void iniciarGeocoding(); }}
-              disabled={geoRunning || !mapboxToken.trim()}
-              title={!mapboxToken.trim() ? 'Token Mapbox não configurado' : undefined}
+              disabled={geoRunning}
+              title={!getToken() ? 'Token Mapbox não configurado' : undefined}
             >
               {geoRunning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5 mr-1.5" />}
               Geolocalizar
