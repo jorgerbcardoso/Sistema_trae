@@ -2557,14 +2557,14 @@ function CardCarregamento({
           <Button
             size="sm"
             variant="outline"
+            disabled={loadingRota || carregamento.ctes.length === 0}
             className={
-              carregamentoIniciado
+              (loadingRota || carregamento.ctes.length === 0)
                 ? 'h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 : `h-8 text-xs border-indigo-300 dark:border-indigo-700 ${loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria ? 'text-indigo-400' : 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'}`
             }
             onClick={() => onCarregarRota(carregamento)}
-            disabled={loadingRota || carregamentoIniciado || isAdiado}
-            title="Ver rota e pontos de entrega do carregamento"
+            title={carregamento.ctes.length === 0 ? 'Carregamento sem CT-es' : 'Ver rota e pontos de entrega do carregamento'}
           >
             {loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria
               ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
