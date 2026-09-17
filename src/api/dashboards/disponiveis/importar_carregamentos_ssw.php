@@ -635,19 +635,21 @@ function listarSaidasAutorizadasSsw0125(string $siglaOrigem): array {
     if (!$rows) return [];
 
     foreach ($rows as $r) {
+        $f3 = strtoupper(trim((string)($r->f3 ?? '')));
         $f2 = strtoupper(trim((string)($r->f2 ?? '')));
+        $placa = $f3 !== '' ? $f3 : $f2;
         $f11 = trim((string)($r->f11 ?? ''));
         $f16raw = (string)($r->f16 ?? '');
         $f16 = strtoupper(trim(html_entity_decode($f16raw)));
 
-        if ($f2 === '' || $f11 === '') continue;
+        if ($placa === '' || $f11 === '') continue;
         if (strpos($f16, 'AUTORIZADO') === false) continue;
 
         $dt = DateTime::createFromFormat('d/m/y H:i', $f11);
         if (!$dt) continue;
 
         $out[] = [
-            'placa' => $f2,
+            'placa' => $placa,
             'data' => $dt->format('Y-m-d'),
             'hora' => $dt->format('H:i:s'),
             'raw' => $f11,

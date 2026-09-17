@@ -1114,7 +1114,9 @@ if ($acao === 'verificar_saidas_ssw') {
     $rows = $xml->xpath('//r');
     if ($rows && count($rows) > 0) {
         foreach ($rows as $r) {
-            $placa = strtoupper(trim((string)($r->f2 ?? '')));
+            $f3 = strtoupper(trim((string)($r->f3 ?? '')));
+            $f2 = strtoupper(trim((string)($r->f2 ?? '')));
+            $placa = $f3 !== '' ? $f3 : $f2;
             if ($placa === '') continue;
             $f11 = trim((string)($r->f11 ?? ''));
             if ($f11 === '') continue;
