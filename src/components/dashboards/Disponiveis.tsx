@@ -4010,7 +4010,11 @@ function ModalRotaCarregamento({
       if (!sigla) continue;
       const lat = u?.latitude !== null && u?.latitude !== undefined && String(u.latitude) !== '' ? Number(u.latitude) : null;
       const lng = u?.longitude !== null && u?.longitude !== undefined && String(u.longitude) !== '' ? Number(u.longitude) : null;
-      m.set(sigla, { sigla, nome: String(u?.nome ?? ''), lat: Number.isFinite(lat as any) ? lat : null, lng: Number.isFinite(lng as any) ? lng : null });
+      const latN = Number.isFinite(lat as any) ? (lat as number) : null;
+      const lngN = Number.isFinite(lng as any) ? (lng as number) : null;
+      const latFinal = latN === 0 && lngN === 0 ? null : latN;
+      const lngFinal = latN === 0 && lngN === 0 ? null : lngN;
+      m.set(sigla, { sigla, nome: String(u?.nome ?? ''), lat: latFinal, lng: lngFinal });
     }
     return m;
   }, [dados]);
@@ -4137,7 +4141,7 @@ function ModalRotaCarregamento({
     const initial: Record<string, { lat: number; lng: number }> = {};
     const status: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
     for (const g of grupos.entrega) {
-      if (g.lat !== null && g.lng !== null) {
+      if (g.lat !== null && g.lng !== null && !(g.lat === 0 && g.lng === 0)) {
         initial[g.key] = { lat: g.lat, lng: g.lng };
         status[g.key] = 'ok';
       } else {
@@ -4191,6 +4195,7 @@ function ModalRotaCarregamento({
       const u = unidadesMap.get(sigla);
       if (!u) return null;
       if (!Number.isFinite(u.lat as any) || !Number.isFinite(u.lng as any)) return null;
+      if ((u.lat as number) === 0 && (u.lng as number) === 0) return null;
       return { lat: u.lat as number, lng: u.lng as number };
     };
 
@@ -4330,8 +4335,16 @@ function ModalRotaCarregamento({
   const iniciarGeocoding = async () => {
     if (geoRunning) return;
     const token = getToken();
-    if (!token) { toast.error('Token Mapbox não configurado.'); return; }
-    if (token !== mapboxToken) setMapboxToken(token);
+    if (!token) {
+      const v = window.prompt('Cole o token do Mapbox (pk...)', '');
+      const t = (v ?? '').trim();
+      if (!t) { toast.error('Token Mapbox não configurado.'); return; }
+      try { window.localStorage.setItem('mapbox_token', t); } catch {}
+      setMapboxToken(t);
+    }
+    const tokenNow = getToken();
+    if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
+    if (tokenNow !== mapboxToken) setMapboxToken(tokenNow);
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
     if (pendentes.length === 0) return;
     setGeoRunning(true);
