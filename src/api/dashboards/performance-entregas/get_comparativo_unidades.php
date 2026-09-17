@@ -178,9 +178,15 @@ $query = "
                     AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) < CURRENT_DATE
               THEN 1 END) as pendentes_em_atraso,
         ROUND(
-            CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
+            CAST((
+                COUNT(CASE WHEN cte.data_entrega IS NOT NULL
                               AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END)
-                  THEN 1 END) AS DECIMAL) /
+                  THEN 1 END)
+                +
+                COUNT(CASE WHEN cte.data_entrega IS NULL
+                              AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE
+                  THEN 1 END)
+            ) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1
         ) as percentage

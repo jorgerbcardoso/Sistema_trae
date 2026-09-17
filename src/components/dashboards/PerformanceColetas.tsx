@@ -1081,6 +1081,17 @@ export function PerformanceColetas() {
   const listaTotalPages = Math.max(1, Math.ceil(listaSortedRows.length / listaPageSize));
   const listaSafePage = Math.min(Math.max(listaPage, 1), listaTotalPages);
   const listaPageRows = listaSortedRows.slice((listaSafePage - 1) * listaPageSize, listaSafePage * listaPageSize);
+  const listaTotais = useMemo(() => {
+    const totals = listaSortedRows.reduce(
+      (acc, r) => {
+        acc.vlrMerc += parseBRNumber(r.vlr_merc) ?? 0;
+        acc.peso += parseBRNumber(r.peso) ?? 0;
+        return acc;
+      },
+      { vlrMerc: 0, peso: 0 }
+    );
+    return totals;
+  }, [listaSortedRows]);
 
   return (
     <DashboardLayout 
@@ -1687,9 +1698,14 @@ export function PerformanceColetas() {
                 </table>
               </div>
 
-              <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between">
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Página {listaSafePage} de {listaTotalPages} · {listaSortedRows.length} registro{listaSortedRows.length !== 1 ? 's' : ''}
+              <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div>
+                    Página {listaSafePage} de {listaTotalPages} · {listaSortedRows.length} registro{listaSortedRows.length !== 1 ? 's' : ''}
+                  </div>
+                  <div className="text-slate-600 dark:text-slate-300">
+                    Total merc.: {fmtBRL(listaTotais.vlrMerc)} · Peso: {fmtKg(listaTotais.peso)}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button

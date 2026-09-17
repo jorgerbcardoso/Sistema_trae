@@ -105,12 +105,12 @@ export async function getPerformanceCards(filters: PerformanceFilters): Promise<
   const colorSchemes = [
     {
       // Entregues no Prazo
-      color: 'text-green-700 dark:text-green-300',
-      bgColor: 'bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800',
-      chartColor: '#10b981',
-      emptyColor: '#dcfce7',
-      emptyColorDark: '#064e3b',
-      hoverColor: 'hover:bg-green-200 dark:hover:bg-green-800'
+      color: 'text-teal-700 dark:text-teal-300',
+      bgColor: 'bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 border-teal-200 dark:border-teal-800',
+      chartColor: '#14b8a6',
+      emptyColor: '#ccfbf1',
+      emptyColorDark: '#134e4a',
+      hoverColor: 'hover:bg-teal-200 dark:hover:bg-teal-800'
     },
     {
       // Entregues em Atraso

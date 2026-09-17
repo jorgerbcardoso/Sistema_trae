@@ -152,9 +152,16 @@ $query = "
         COUNT(*) as total,
         COUNT(CASE WHEN cte.data_entrega IS NOT NULL
               AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) THEN 1 END) as entregues_no_prazo,
+        COUNT(CASE WHEN cte.data_entrega IS NULL
+              AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE THEN 1 END) as pendentes_no_prazo,
         ROUND(
-            CAST(COUNT(CASE WHEN cte.data_entrega IS NOT NULL
-                  AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) THEN 1 END) AS DECIMAL) /
+            CAST((
+                COUNT(CASE WHEN cte.data_entrega IS NOT NULL
+                      AND cte.data_entrega <= (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) THEN 1 END)
+                +
+                COUNT(CASE WHEN cte.data_entrega IS NULL
+                      AND (CASE WHEN COALESCE(cte.entrega_abonada, false) THEN CURRENT_DATE ELSE (CASE WHEN oc.tipo = 'C' THEN CURRENT_DATE ELSE cte.data_prev_ent END) END) >= CURRENT_DATE THEN 1 END)
+            ) AS DECIMAL) /
             NULLIF(COUNT(*), 0) * 100,
             1
         ) as percentual
@@ -182,7 +189,7 @@ while ($row = pg_fetch_assoc($result)) {
     $performanceData[] = [
         'data' => $data,
         'total' => (int)$row['total'],
-        'onTime' => (int)$row['entregues_no_prazo'],
+        'onTime' => (int)$row['entregues_no_prazo'] + (int)$row['pendentes_no_prazo'],
         'percentage' => (float)$row['percentual']
     ];
 }

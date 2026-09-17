@@ -105,7 +105,7 @@ export function AnaliseDiaria({
                         <div>
                           <span className="font-semibold text-green-600 dark:text-green-400">No prazo:</span>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            Quantidade de conhecimentos, dentre os Previstos, que foram entregues dentro da previsão de entrega.
+                            Quantidade de conhecimentos, dentre os Previstos, que estão no prazo (entregues no prazo ou ainda pendentes dentro do prazo).
                           </p>
                         </div>
 
@@ -192,10 +192,9 @@ export function AnaliseDiaria({
               const isFuturo = diaMidday.getTime() > todayMidday.getTime();
               const temEntregasAntecipadas = isFuturo && (dia.entreguesDia > 0 || dia.entregasDia > 0);
 
-              const performanceDiaBase = dia.previstosDia > 0 
-                ? (dia.entreguesDia / dia.previstosDia) * 100 
-                : 0;
-              const performanceDia = temEntregasAntecipadas ? 100 : isFuturo ? 0 : performanceDiaBase;
+              const noPrazoDia = Math.max(0, (dia.previstosDia || 0) - (dia.atrasadasDia || 0));
+              const performanceDiaBase = dia.previstosDia > 0 ? (noPrazoDia / dia.previstosDia) * 100 : 0;
+              const performanceDia = temEntregasAntecipadas ? 100 : isFuturo ? (dia.previstosDia > 0 ? 100 : 0) : performanceDiaBase;
               
               // Cor baseada na performance
               const bgColor = performanceDia >= 90 
@@ -297,13 +296,13 @@ export function AnaliseDiaria({
                         <TooltipTrigger asChild>
                           <button
                             onClick={() => handleExportEntreguesDia(dia.data)}
-                            disabled={dia.entreguesDia === 0}
+                            disabled={noPrazoDia === 0}
                             className="w-full text-left px-2 py-1 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <div className="flex justify-between items-center">
                               <span className="text-slate-600 dark:text-slate-400">No prazo:</span>
                               <span className="font-semibold text-green-600 dark:text-green-400">
-                                {dia.entreguesDia}
+                                {noPrazoDia}
                               </span>
                             </div>
                           </button>
@@ -357,7 +356,7 @@ export function AnaliseDiaria({
                       <div className="text-center">
                         <p className="text-slate-600 dark:text-slate-400 text-[10px] mb-0.5">No prazo</p>
                         <p className="font-semibold text-green-600 dark:text-green-400">
-                          {dia.entreguesDia}/{dia.previstosDia}
+                          {noPrazoDia}/{dia.previstosDia}
                         </p>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -13,10 +13,6 @@ import {
   getPerformanceEvolucao,
   getPerformanceComparativo,
   getAnaliseDiaria,
-  exportEntregasDia,
-  exportPrevistosDia,
-  exportEntreguesDia,
-  exportAtrasadasDia,
   DayData,
   PerformanceFilters as ServiceFilters
 } from '../../services/performanceEntregasService';
@@ -91,6 +87,20 @@ interface UnitPerformance {
   pendentesNoPrazo: number;
   pendentesEmAtraso: number;
   performance: number;
+}
+
+interface DrillCteRow {
+  unid_atual: string;
+  ser_cte: string;
+  nro_cte: string;
+  prev: string;
+  entrega: string;
+  atraso: number;
+  ult_ocor: string;
+  data_ult_ocor: string;
+  vlr_merc: number;
+  vlr_frete: number;
+  peso_real: number;
 }
 
 // Função para obter primeiro e último dia do mês anterior
@@ -187,324 +197,224 @@ export function PerformanceEntregas() {
   // ✅ NOVO: Estados para Evolução da Performance
   const [evolucaoPeriodo, setEvolucaoPeriodo] = useState<7 | 15 | 30>(30);
   const [loadingEvolucao, setLoadingEvolucao] = useState(false);
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillRows, setDrillRows] = useState<DrillCteRow[]>([]);
+  const [drillTotals, setDrillTotals] = useState<{ count: number; vlr_merc: number; vlr_frete: number; peso_real: number }>({ count: 0, vlr_merc: 0, vlr_frete: 0, peso_real: 0 });
+  const [drillReq, setDrillReq] = useState<any>(null);
+  const [drillSort, setDrillSort] = useState<{ key: 'unid' | 'cte' | 'prev' | 'entrega' | 'atraso' | 'ult_ocor' | 'vlr_merc' | 'vlr_frete' | 'peso_real'; dir: 'asc' | 'desc' }>({ key: 'atraso', dir: 'desc' });
+  const [drillPage, setDrillPage] = useState(1);
+  const drillPageSize = 100;
 
   usePageTitle('Performance de Entregas');
 
-  // ✅ FUNÇÃO: Exportar CSV dos Cards
+  const fmtCte = (ser: string, nro: string) => `${String(ser ?? '').trim()} ${String(nro ?? '').trim()}`.trim();
+
+  const fmtBRL = (v: any) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (Number.isNaN(n)) return '—';
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const fmtKg = (v: any) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (Number.isNaN(n)) return '—';
+    return n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' kg';
+  };
+
+  const fmtDateISOToBR2y = (iso?: string) => {
+    const s = String(iso ?? '').trim();
+    if (!s) return '';
+    const parts = s.split('-');
+    if (parts.length < 3) return s;
+    const [y, m, d] = parts;
+    return `${d}/${m}/${String(y).slice(-2)}`;
+  };
+
+  const parseDateBR2y = (br?: string) => {
+    const s = String(br ?? '').trim();
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length < 3) return null;
+    const [dd, mm, yy] = parts;
+    const day = Number(dd);
+    const month = Number(mm);
+    const year = yy.length === 2 ? Number(`20${yy}`) : Number(yy);
+    if (!day || !month || !year) return null;
+    return new Date(year, month - 1, day).getTime();
+  };
+
+  const toggleDrillSort = (key: typeof drillSort.key, defaultDir: 'asc' | 'desc' = 'asc') => {
+    setDrillSort((s) => ({
+      key,
+      dir: s.key === key ? (s.dir === 'asc' ? 'desc' : 'asc') : defaultDir
+    }));
+  };
+
+  const drillSortedRows = useMemo(() => {
+    const rows = [...drillRows];
+    rows.sort((a, b) => {
+      const dir = drillSort.dir === 'asc' ? 1 : -1;
+      const key = drillSort.key;
+
+      const cmpNum = (aa: any, bb: any) => {
+        const na = typeof aa === 'number' ? aa : Number(aa);
+        const nb = typeof bb === 'number' ? bb : Number(bb);
+        if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+        if (Number.isNaN(na)) return 1;
+        if (Number.isNaN(nb)) return -1;
+        return na === nb ? 0 : na > nb ? 1 : -1;
+      };
+
+      const cmpStr = (aa: any, bb: any) => String(aa ?? '').localeCompare(String(bb ?? ''), 'pt-BR', { sensitivity: 'base' });
+
+      let c = 0;
+      if (key === 'unid') c = cmpStr(a.unid_atual, b.unid_atual);
+      else if (key === 'cte') c = cmpStr(fmtCte(a.ser_cte, a.nro_cte), fmtCte(b.ser_cte, b.nro_cte));
+      else if (key === 'prev') c = cmpNum(parseDateBR2y(a.prev) ?? Infinity, parseDateBR2y(b.prev) ?? Infinity);
+      else if (key === 'entrega') c = cmpNum(parseDateBR2y(a.entrega) ?? Infinity, parseDateBR2y(b.entrega) ?? Infinity);
+      else if (key === 'atraso') c = cmpNum(a.atraso, b.atraso);
+      else if (key === 'ult_ocor') c = cmpStr(a.ult_ocor, b.ult_ocor);
+      else if (key === 'vlr_merc') c = cmpNum(a.vlr_merc, b.vlr_merc);
+      else if (key === 'vlr_frete') c = cmpNum(a.vlr_frete, b.vlr_frete);
+      else if (key === 'peso_real') c = cmpNum(a.peso_real, b.peso_real);
+      return c * dir;
+    });
+    return rows;
+  }, [drillRows, drillSort, fmtCte]);
+
+  const drillTotalPages = useMemo(() => Math.max(1, Math.ceil(drillSortedRows.length / drillPageSize)), [drillSortedRows.length, drillPageSize]);
+  const drillSafePage = useMemo(() => Math.min(Math.max(1, drillPage), drillTotalPages), [drillPage, drillTotalPages]);
+  const drillPageRows = useMemo(() => {
+    const start = (drillSafePage - 1) * drillPageSize;
+    return drillSortedRows.slice(start, start + drillPageSize);
+  }, [drillSortedRows, drillSafePage, drillPageSize]);
+
+  useEffect(() => {
+    setDrillPage((p) => Math.min(Math.max(1, p), drillTotalPages));
+  }, [drillTotalPages]);
+
+  const buildReqBase = () => {
+    const body: any = {
+      periodoEmissaoInicio: filters.periodoEmissaoInicio,
+      periodoEmissaoFim: filters.periodoEmissaoFim,
+    };
+    if (filters.periodoPrevisaoInicio) body.periodoPrevisaoInicio = filters.periodoPrevisaoInicio;
+    if (filters.periodoPrevisaoFim) body.periodoPrevisaoFim = filters.periodoPrevisaoFim;
+    if (filters.unidadeDestino.length > 0) body.unidadeDestino = filters.unidadeDestino;
+    if (filters.cnpjPagador) body.cnpjPagador = filters.cnpjPagador;
+    if (filters.cnpjDestinatario) body.cnpjDestinatario = filters.cnpjDestinatario;
+    return body;
+  };
+
+  const carregarLista = async (req: any) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/get_ctes.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...buildReqBase(), ...req })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || 'Erro ao buscar CT-es');
+      }
+      setDrillRows(Array.isArray(data?.data?.rows) ? data.data.rows : []);
+      setDrillTotals(data?.data?.totals ?? { count: 0, vlr_merc: 0, vlr_frete: 0, peso_real: 0 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erro ao buscar CT-es';
+      toast.error(msg);
+      setDrillRows([]);
+      setDrillTotals({ count: 0, vlr_merc: 0, vlr_frete: 0, peso_real: 0 });
+    }
+  };
+
+  const abrirLista = async (title: string, req: any) => {
+    setDrillTitle(title);
+    setDrillReq(req);
+    setDrillSort({ key: 'atraso', dir: 'desc' });
+    setDrillPage(1);
+    setDrillOpen(true);
+    await carregarLista(req);
+  };
+
+  const exportarListaCSV = async () => {
+    if (!drillReq) return;
+    const loadingToastId = toast.info('Gerando planilha...', { description: 'Aguarde enquanto preparamos os dados.', duration: Infinity });
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/export.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ...buildReqBase(), ...drillReq })
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        toast.dismiss(loadingToastId);
+        if (data?.toast?.message) {
+          const t = data.toast.type || 'info';
+          if (t === 'error') toast.error(data.toast.message);
+          else if (t === 'warning') toast.warning(data.toast.message);
+          else toast.info(data.toast.message);
+          return;
+        }
+        if (data?.error || data?.success === false) {
+          toast.error('Erro ao gerar planilha', { description: data?.error || 'Erro desconhecido' });
+          return;
+        }
+        return;
+      }
+
+      if (!response.ok) throw new Error('Erro ao gerar planilha');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      let filename = 'performance_entregas.csv';
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=\"?(.+)\"?/i);
+        if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1].replace(/\"/g, '');
+      }
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.dismiss(loadingToastId);
+    } catch (e) {
+      toast.dismiss(loadingToastId);
+      toast.error('Erro ao gerar planilha', { description: 'Não foi possível gerar a planilha. Tente novamente.' });
+    }
+  };
+
   const handleExportCard = async (statusEntrega: string, label: string) => {
-    const loadingToastId = toast.info('Gerando planilha...', { 
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-
-    try {
-      const token = localStorage.getItem('auth_token');
-      
-      // Montar body com filtros aplicados
-      const body: any = {
-        statusEntrega,
-        periodoEmissaoInicio: filters.periodoEmissaoInicio,
-        periodoEmissaoFim: filters.periodoEmissaoFim,
-      };
-
-      if (filters.periodoPrevisaoInicio) body.periodoPrevisaoInicio = filters.periodoPrevisaoInicio;
-      if (filters.periodoPrevisaoFim) body.periodoPrevisaoFim = filters.periodoPrevisaoFim;
-      if (filters.unidadeDestino.length > 0) body.unidadeDestino = filters.unidadeDestino;
-      if (filters.cnpjPagador) body.cnpjPagador = filters.cnpjPagador;
-      if (filters.cnpjDestinatario) body.cnpjDestinatario = filters.cnpjDestinatario;
-
-      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/export.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        toast.dismiss(loadingToastId);
-        
-        if (data.toast) {
-          const toastType = data.toast.type || 'info';
-          const message = data.toast.message;
-          
-          switch (toastType) {
-            case 'error':
-              toast.error(message);
-              break;
-            case 'warning':
-              toast.warning(message);
-              break;
-            case 'info':
-            default:
-              toast.info(message);
-              break;
-          }
-          return;
-        }
-        
-        if (data.error || !data.success) {
-          toast.error('Erro ao gerar planilha', {
-            description: data.error || 'Erro desconhecido'
-          });
-          return;
-        }
-      }
-
-      if (!response.ok) {
-        toast.dismiss(loadingToastId);
-        throw new Error('Erro ao gerar planilha');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `performance_entregas_${statusEntrega}.csv`;
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename=\"?(.+)\"?/i);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/\"/g, '');
-        }
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.dismiss(loadingToastId);
-    } catch (error) {
-      toast.dismiss(loadingToastId);
-      toast.error('Erro ao gerar planilha', {
-        description: 'Não foi possível gerar a planilha. Tente novamente.'
-      });
-    }
+    await abrirLista(label, { statusEntrega });
   };
 
-  // ✅ FUNÇÃO: Exportar CSV do Gráfico de Evolução
   const handleExportEvolucao = async (dataStr: string) => {
-    const loadingToastId = toast.info('Gerando planilha...', { 
-      description: 'Aguarde enquindo preparamos os dados.',
-      duration: Infinity
-    });
-
-    try {
-      const token = localStorage.getItem('auth_token');
-      
-      // Converter DD/MM para YYYY-MM-DD
-      const [day, month] = dataStr.split('/');
-      
-      // ✅ CORREÇÃO: Determinar o ano correto baseado na data atual
-      // O gráfico mostra os últimos 30 dias, então precisamos verificar se a data é do ano atual ou anterior
-      const hoje = new Date();
-      const anoAtual = hoje.getFullYear();
-      const mesAtual = hoje.getMonth() + 1; // 0-11, então +1
-      
-      // Se o mês clicado for maior que o mês atual, é do ano anterior
-      // Exemplo: estamos em Janeiro (01) e clicamos em Dezembro (12) → ano anterior
-      const mesClicado = parseInt(month, 10);
-      const year = mesClicado > mesAtual ? anoAtual - 1 : anoAtual;
-      
-      const dataPrevisao = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-      
-      // Montar body com filtros aplicados
-      const body: any = {
-        dataPrevisao,
-        periodoEmissaoInicio: filters.periodoEmissaoInicio,
-        periodoEmissaoFim: filters.periodoEmissaoFim,
-      };
-
-      if (filters.periodoPrevisaoInicio) body.periodoPrevisaoInicio = filters.periodoPrevisaoInicio;
-      if (filters.periodoPrevisaoFim) body.periodoPrevisaoFim = filters.periodoPrevisaoFim;
-      if (filters.unidadeDestino.length > 0) body.unidadeDestino = filters.unidadeDestino;
-      if (filters.cnpjPagador) body.cnpjPagador = filters.cnpjPagador;
-      if (filters.cnpjDestinatario) body.cnpjDestinatario = filters.cnpjDestinatario;
-
-      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/export.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        toast.dismiss(loadingToastId);
-        
-        if (data.toast) {
-          const toastType = data.toast.type || 'info';
-          const message = data.toast.message;
-          
-          switch (toastType) {
-            case 'error':
-              toast.error(message);
-              break;
-            case 'warning':
-              toast.warning(message);
-              break;
-            case 'info':
-            default:
-              toast.info(message);
-              break;
-          }
-          return;
-        }
-        
-        if (data.error || !data.success) {
-          toast.error('Erro ao gerar planilha', {
-            description: data.error || 'Erro desconhecido'
-          });
-          return;
-        }
-      }
-
-      if (!response.ok) {
-        toast.dismiss(loadingToastId);
-        throw new Error('Erro ao gerar planilha');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `performance_entregas_previsao_${dataPrevisao}.csv`;
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename=\"?(.+)\"?/i);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/\"/g, '');
-        }
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.dismiss(loadingToastId);
-    } catch (error) {
-      toast.dismiss(loadingToastId);
-      toast.error('Erro ao gerar planilha', {
-        description: 'Não foi possível gerar a planilha. Tente novamente.'
-      });
-    }
+    const [day, month] = dataStr.split('/');
+    const hoje = new Date();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = hoje.getMonth() + 1;
+    const mesClicado = parseInt(month, 10);
+    const year = mesClicado > mesAtual ? anoAtual - 1 : anoAtual;
+    const dataPrevisao = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    await abrirLista(`Previsão ${dataStr}`, { dataPrevisao });
   };
 
-  // ✅ FUNÇÃO: Exportar CSV do Comparativo por Unidade
   const handleExportComparativo = async (unidade: string, coluna: string, label: string) => {
-    const loadingToastId = toast.info('Gerando planilha...', { 
-      description: 'Aguarde enquanto preparamos os dados.',
-      duration: Infinity
-    });
-
-    try {
-      const token = localStorage.getItem('auth_token');
-      
-      // Montar body com filtros aplicados
-      const body: any = {
-        unidade,
-        coluna,
-        periodoEmissaoInicio: filters.periodoEmissaoInicio,
-        periodoEmissaoFim: filters.periodoEmissaoFim,
-      };
-
-      if (filters.periodoPrevisaoInicio) body.periodoPrevisaoInicio = filters.periodoPrevisaoInicio;
-      if (filters.periodoPrevisaoFim) body.periodoPrevisaoFim = filters.periodoPrevisaoFim;
-      if (filters.unidadeDestino.length > 0) body.unidadeDestino = filters.unidadeDestino;
-      if (filters.cnpjPagador) body.cnpjPagador = filters.cnpjPagador;
-      if (filters.cnpjDestinatario) body.cnpjDestinatario = filters.cnpjDestinatario;
-
-      const response = await fetch(`${ENVIRONMENT.apiBaseUrl}/dashboards/performance-entregas/export.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        toast.dismiss(loadingToastId);
-        
-        if (data.toast) {
-          const toastType = data.toast.type || 'info';
-          const message = data.toast.message;
-          
-          switch (toastType) {
-            case 'error':
-              toast.error(message);
-              break;
-            case 'warning':
-              toast.warning(message);
-              break;
-            case 'info':
-            default:
-              toast.info(message);
-              break;
-          }
-          return;
-        }
-        
-        if (data.error || !data.success) {
-          toast.error('Erro ao gerar planilha', {
-            description: data.error || 'Erro desconhecido'
-          });
-          return;
-        }
-      }
-
-      if (!response.ok) {
-        toast.dismiss(loadingToastId);
-        throw new Error('Erro ao gerar planilha');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `performance_entregas_${unidade}_${coluna}.csv`;
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename=\"?(.+)\"?/i);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/\"/g, '');
-        }
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.dismiss(loadingToastId);
-    } catch (error) {
-      toast.dismiss(loadingToastId);
-      toast.error('Erro ao gerar planilha', {
-        description: 'Não foi possível gerar a planilha. Tente novamente.'
-      });
-    }
+    await abrirLista(`${unidade} · ${label}`, { unidade, coluna });
   };
 
   // ✅ FUNÇÃO: Manipular ordenação da tabela
@@ -661,55 +571,20 @@ export function PerformanceEntregas() {
     }
   };
 
-  // ✅ FUNÇÃO: Exportar entregas do dia
   const handleExportEntregasDia = async (data: string) => {
-    try {
-      await exportEntregasDia(data, {
-        unidadeDestino: filters.unidadeDestino,
-        cnpjPagador: filters.cnpjPagador,
-        cnpjDestinatario: filters.cnpjDestinatario
-      });
-    } catch (error) {
-      toast.error('Erro ao gerar planilha');
-    }
+    await abrirLista(`Entregas · ${fmtDateISOToBR2y(data) || data}`, { tipo: 'entregas_dia', data });
   };
 
-  // ✅ FUNÇÃO: Exportar previstos do dia
   const handleExportPrevistosDia = async (data: string) => {
-    try {
-      await exportPrevistosDia(data, {
-        unidadeDestino: filters.unidadeDestino,
-        cnpjPagador: filters.cnpjPagador,
-        cnpjDestinatario: filters.cnpjDestinatario
-      });
-    } catch (error) {
-      toast.error('Erro ao gerar planilha');
-    }
+    await abrirLista(`Previstos · ${fmtDateISOToBR2y(data) || data}`, { tipo: 'previstos_dia', data });
   };
 
-  // ✅ FUNÇÃO: Exportar entregues do dia
   const handleExportEntreguesDia = async (data: string) => {
-    try {
-      await exportEntreguesDia(data, {
-        unidadeDestino: filters.unidadeDestino,
-        cnpjPagador: filters.cnpjPagador,
-        cnpjDestinatario: filters.cnpjDestinatario
-      });
-    } catch (error) {
-      toast.error('Erro ao gerar planilha');
-    }
+    await abrirLista(`No prazo · ${fmtDateISOToBR2y(data) || data}`, { statusEntrega: 'prazo_total', dataPrevisao: data });
   };
 
   const handleExportAtrasadasDia = async (data: string) => {
-    try {
-      await exportAtrasadasDia(data, {
-        unidadeDestino: filters.unidadeDestino,
-        cnpjPagador: filters.cnpjPagador,
-        cnpjDestinatario: filters.cnpjDestinatario
-      });
-    } catch (error) {
-      toast.error('Erro ao gerar planilha');
-    }
+    await abrirLista(`Atrasadas · ${fmtDateISOToBR2y(data) || data}`, { tipo: 'atrasadas_dia', data });
   };
 
   const loadMockData = async () => {
@@ -1035,10 +910,8 @@ export function PerformanceEntregas() {
   );
 
   const noPrazoCount = (deliveryGroups[0]?.count ?? 0) + (deliveryGroups[2]?.count ?? 0);
-  const emAtrasoCount = (deliveryGroups[1]?.count ?? 0) + (deliveryGroups[3]?.count ?? 0);
-  const totalResumo = noPrazoCount + emAtrasoCount;
+  const totalResumo = deliveryGroups.reduce((acc, g) => acc + (g?.count ?? 0), 0);
   const noPrazoPct = totalResumo > 0 ? (noPrazoCount / totalResumo) * 100 : 0;
-  const emAtrasoPct = totalResumo > 0 ? (emAtrasoCount / totalResumo) * 100 : 0;
 
   return (
     <DashboardLayout 
@@ -1057,7 +930,61 @@ export function PerformanceEntregas() {
         </div>
 
         {/* Cards de Grupos com Donuts */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Performance
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 gap-1 px-2"
+                  onClick={() => handleExportCard('prazo_total', 'Performance')}
+                  title="Exportar Performance"
+                  disabled={noPrazoCount === 0}
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="text-xs font-medium">CSV</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                    {noPrazoPct.toFixed(1)}%
+                  </div>
+                  <p className="text-sm mt-1 text-green-700 dark:text-green-300">
+                    {noPrazoCount} CT-e{noPrazoCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div style={{ width: 80, height: 80 }}>
+                  <PieChart width={80} height={80}>
+                    <Pie
+                      data={[
+                        { name: 'value', value: noPrazoPct },
+                        { name: 'empty', value: 100 - noPrazoPct }
+                      ]}
+                      cx={40}
+                      cy={40}
+                      innerRadius={20}
+                      outerRadius={35}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      <Cell fill="#10b981" />
+                      <Cell fill={theme === 'dark' ? '#064e3b' : '#dcfce7'} />
+                    </Pie>
+                  </PieChart>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           {deliveryGroups.map((group, index) => {
             const donutData = [
               { name: 'value', value: group.percentage },
@@ -1130,56 +1057,6 @@ export function PerformanceEntregas() {
             );
           })}
         </div>
-
-        {totalResumo > 0 && (
-          <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-            <div className="flex h-12">
-              <button
-                type="button"
-                onClick={() => handleExportCard('prazo_total', 'No Prazo')}
-                disabled={noPrazoCount === 0}
-                className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ flex: noPrazoCount }}
-                title="Clique para exportar CSV"
-                aria-label="No Prazo - exportar CSV"
-              >
-                <div
-                  className="absolute inset-0"
-                  style={{ backgroundImage: 'linear-gradient(90deg, #073F1F, #192F72)' }}
-                />
-                <div className="relative z-10 px-2 text-sm font-semibold whitespace-nowrap">
-                  {noPrazoPct.toFixed(1)}%
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleExportCard('atraso_total', 'Em Atraso')}
-                disabled={emAtrasoCount === 0}
-                className="relative flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ flex: emAtrasoCount }}
-                title="Clique para exportar CSV"
-                aria-label="Em Atraso - exportar CSV"
-              >
-                <div
-                  className="absolute inset-0"
-                  style={{ backgroundImage: 'linear-gradient(90deg, #663608, #741416)' }}
-                />
-                <div className="relative z-10 px-2 text-sm font-semibold whitespace-nowrap">
-                  {emAtrasoPct.toFixed(1)}%
-                </div>
-              </button>
-            </div>
-            <div className="flex items-center justify-between px-4 py-2 text-xs bg-white dark:bg-slate-900">
-              <span className="text-slate-600 dark:text-slate-400">
-                No Prazo - {noPrazoCount} CT-e{noPrazoCount !== 1 ? 's' : ''}
-              </span>
-              <span className="text-slate-600 dark:text-slate-400">
-                Em Atraso - {emAtrasoCount} CT-e{emAtrasoCount !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* ✅ SEÇÃO: Comparativo por Unidade Entregadora */}
         <Card className="dark:bg-slate-900 dark:border-slate-700">
@@ -1355,7 +1232,7 @@ export function PerformanceEntregas() {
                         <div className="flex-1 bg-slate-300 dark:bg-slate-600 rounded-full h-6 overflow-hidden">
                           {(() => {
                             const totalCtes = unitPerformances.reduce((acc, u) => acc + u.total, 0) || 1;
-                            const totalNoPrazo = unitPerformances.reduce((acc, u) => acc + u.entreguesNoPrazo, 0);
+                            const totalNoPrazo = unitPerformances.reduce((acc, u) => acc + u.entreguesNoPrazo + u.pendentesNoPrazo, 0);
                             const performanceGeral = (totalNoPrazo / totalCtes) * 100;
                             const barColorGeral = performanceGeral >= 90 
                               ? 'bg-green-500 dark:bg-green-600' 
@@ -1377,7 +1254,7 @@ export function PerformanceEntregas() {
                         </div>
                         {(() => {
                           const totalCtes = unitPerformances.reduce((acc, u) => acc + u.total, 0) || 1;
-                          const totalNoPrazo = unitPerformances.reduce((acc, u) => acc + u.entreguesNoPrazo, 0);
+                          const totalNoPrazo = unitPerformances.reduce((acc, u) => acc + u.entreguesNoPrazo + u.pendentesNoPrazo, 0);
                           const performanceGeral = (totalNoPrazo / totalCtes) * 100;
                           
                           if (performanceGeral < 15) {
@@ -1475,16 +1352,16 @@ export function PerformanceEntregas() {
                             </div>
                             
                             <div>
-                              <span className="font-semibold text-green-600 dark:text-green-400">2. Entregues no prazo</span>
+                              <span className="font-semibold text-green-600 dark:text-green-400">2. No prazo</span>
                               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                                Destes previstos, o sistema verifica quantos foram efetivamente entregues dentro do prazo de entrega.
+                                Destes previstos, o sistema verifica quantos estão no prazo (entregues no prazo ou ainda pendentes dentro do prazo).
                               </p>
                             </div>
                             
                             <div>
                               <span className="font-semibold text-blue-600 dark:text-blue-400">3. Performance</span>
                               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                                A performance é calculada como o percentual que os entregues no prazo representam do total de previstos: <strong>(Entregues no prazo / Previstos) × 100</strong>.
+                                A performance é calculada como o percentual que os conhecimentos no prazo representam do total de previstos: <strong>(No prazo / Previstos) × 100</strong>.
                               </p>
                             </div>
                           </div>
@@ -1505,7 +1382,7 @@ export function PerformanceEntregas() {
                 </div>
                 
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Percentual de entregas realizadas no prazo por dia - clique em um ponto do gráfico para exportar CTRCs com aquela previsão de entrega
+                  Percentual de entregas no prazo (entregues + pendentes) por dia - clique em um ponto do gráfico para listar CT-es com aquela previsão de entrega
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                   <FileSpreadsheet className="w-3 h-3" />
@@ -1591,7 +1468,7 @@ export function PerformanceEntregas() {
                           </p>
                           <p className="text-xs text-blue-500 dark:text-blue-300 mt-2 flex items-center gap-1">
                             <FileSpreadsheet className="w-3 h-3" />
-                            Clique para exportar CSV
+                            Clique para listar CT-es
                           </p>
                         </div>
                       );
@@ -1616,6 +1493,148 @@ export function PerformanceEntregas() {
           </CardContent>
         </Card>
       </main>
+
+      <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
+        <DialogContent className="max-w-7xl h-[85vh] flex flex-col overflow-hidden bg-white dark:bg-slate-900">
+          <DialogHeader className="shrink-0 pr-16">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-slate-900 dark:text-slate-100 truncate">{drillTitle || 'CT-es'}</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-400">Lista de CT-es que compõem o indicador.</DialogDescription>
+              </div>
+              {drillRows.length > 0 && (
+                <Button variant="outline" size="sm" onClick={exportarListaCSV} className="gap-2 shrink-0 dark:border-slate-700">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Exportar CSV
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
+                <table className="w-full text-sm table-fixed">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
+                    <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[6%]">
+                        <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('unid', 'asc')}>
+                          Unid.{drillSort.key === 'unid' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[12%]">
+                        <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('cte', 'asc')}>
+                          CT-e{drillSort.key === 'cte' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">
+                        <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('prev', 'desc')}>
+                          Prev.{drillSort.key === 'prev' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">
+                        <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('entrega', 'desc')}>
+                          Entrega{drillSort.key === 'entrega' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[6%]">
+                        <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('atraso', 'desc')}>
+                          Atr.{drillSort.key === 'atraso' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[30%]">
+                        <button className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('ult_ocor', 'asc')}>
+                          Últ. ocor.{drillSort.key === 'ult_ocor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[12%]">
+                        <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('vlr_merc', 'desc')}>
+                          Vlr Merc.{drillSort.key === 'vlr_merc' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[12%]">
+                        <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('vlr_frete', 'desc')}>
+                          Frete{drillSort.key === 'vlr_frete' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[8%]">
+                        <button className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors" onClick={() => toggleDrillSort('peso_real', 'desc')}>
+                          Peso{drillSort.key === 'peso_real' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {drillPageRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                          Nenhum CT-e neste grupo.
+                        </td>
+                      </tr>
+                    ) : (
+                      drillPageRows.map((r) => {
+                        const cte = fmtCte(r.ser_cte, r.nro_cte);
+                        const sigla = String(r.unid_atual ?? '').toUpperCase() || '—';
+                        const atrasoRaw = typeof r.atraso === 'number' ? r.atraso : Number(r.atraso);
+                        const atraso = Number.isNaN(atrasoRaw) ? 0 : atrasoRaw;
+                        const atrasoShow = atraso > 0 ? atraso : 0;
+
+                        return (
+                          <tr key={`${sigla}-${cte}-${r.prev}-${r.entrega}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</span>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{cte}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{r.prev || '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{r.entrega || '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
+                              <span className={atrasoShow > 0 ? 'text-red-700 dark:text-red-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>
+                                {atrasoShow}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="text-slate-800 dark:text-slate-200 truncate">{r.ult_ocor || '—'}</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{r.data_ult_ocor || ''}</div>
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-800 dark:text-slate-200">{fmtBRL(r.vlr_merc)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-800 dark:text-slate-200">{fmtBRL(r.vlr_frete)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-800 dark:text-slate-200">{fmtKg(r.peso_real)}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 p-3 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div>
+                    Página {drillSafePage} de {drillTotalPages} · {drillSortedRows.length} registro{drillSortedRows.length !== 1 ? 's' : ''}
+                  </div>
+                  <div className="text-slate-600 dark:text-slate-300">
+                    Total merc.: {fmtBRL(drillTotals.vlr_merc)} · Frete: {fmtBRL(drillTotals.vlr_frete)} · Peso: {fmtKg(drillTotals.peso_real)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-8 px-2 dark:border-slate-700" onClick={() => setDrillPage(1)} disabled={drillSafePage <= 1}>
+                    «
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 px-2 dark:border-slate-700" onClick={() => setDrillPage((p) => Math.max(1, p - 1))} disabled={drillSafePage <= 1}>
+                    ‹
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 px-2 dark:border-slate-700" onClick={() => setDrillPage((p) => Math.min(drillTotalPages, p + 1))} disabled={drillSafePage >= drillTotalPages}>
+                    ›
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 px-2 dark:border-slate-700" onClick={() => setDrillPage(drillTotalPages)} disabled={drillSafePage >= drillTotalPages}>
+                    »
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
