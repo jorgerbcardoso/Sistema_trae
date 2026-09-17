@@ -2181,7 +2181,9 @@ function CardCarregamento({
   const primeiroCte = carregamento.ctes.length > 0 ? carregamento.ctes[0] : null;
   const infoCriacao = primeiroCte
     ? `${formatData(primeiroCte.data_inclusao)} ${primeiroCte.hora_inclusao?.slice(0, 5)} · ${primeiroCte.login_inclusao}`
-    : null;
+    : (carregamento.origem_criacao === 'MANUAL'
+      ? `Criado: ${formatData(carregamento.data_criacao)} ${String(carregamento.hora_criacao ?? '').slice(0, 5)}`
+      : null);
   const destino = (() => {
     if (carregamento.destino) return carregamento.destino;
     const m = carregamento.placa_provisoria.match(/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/);
@@ -2419,8 +2421,8 @@ function CardCarregamento({
             {isAdiado ? (
               <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] h-5 px-2 w-fit shrink-0">Adiado</Badge>
             ) : null}
-            <p className={`text-[10px] whitespace-nowrap truncate min-w-0 flex-1 ${infoCriacao ? 'text-slate-400 dark:text-slate-500' : 'text-slate-300 dark:text-slate-600 italic'}`}>
-              {infoCriacao ?? 'Sem CT-es'}
+            <p className="text-[10px] whitespace-nowrap truncate min-w-0 flex-1 text-slate-400 dark:text-slate-500">
+              {infoCriacao ?? ''}
             </p>
             {isSimulado ? (
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
