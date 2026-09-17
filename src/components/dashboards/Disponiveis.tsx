@@ -4012,8 +4012,8 @@ function ModalRotaCarregamento({
       const lng = u?.longitude !== null && u?.longitude !== undefined && String(u.longitude) !== '' ? Number(u.longitude) : null;
       const latN = Number.isFinite(lat as any) ? (lat as number) : null;
       const lngN = Number.isFinite(lng as any) ? (lng as number) : null;
-      const latFinal = latN === 0 && lngN === 0 ? null : latN;
-      const lngFinal = latN === 0 && lngN === 0 ? null : lngN;
+      const latFinal = sigla === 'FEC' ? null : (latN === 0 && lngN === 0 ? null : latN);
+      const lngFinal = sigla === 'FEC' ? null : (latN === 0 && lngN === 0 ? null : lngN);
       m.set(sigla, { sigla, nome: String(u?.nome ?? ''), lat: latFinal, lng: lngFinal });
     }
     return m;
@@ -4078,19 +4078,25 @@ function ModalRotaCarregamento({
       const cidade = normEnd(c?.cidade_entrega ?? '');
       const uf = normEnd(c?.uf_entrega ?? '');
       const destinatario = normEnd(c?.destinatario ?? '');
-      const hasEndereco = endereco !== '' || bairro !== '' || cep !== '' || cidade !== '' || uf !== '';
+      const isFec = unidadeDestino === 'FEC';
+      const hasEnderecoReal = endereco !== '' || bairro !== '' || cep !== '' || cidade !== '' || uf !== '';
+      const hasEndereco = hasEnderecoReal || isFec;
 
       const ctrc = padCte(ser, nro);
       const itemCte = { ser, nro, ctrc };
 
       if (hasEndereco) {
-        const baseTitulo = [
-          destinatario,
-          endereco ? `${endereco}${bairro ? `, ${bairro}` : ''}` : (bairro ? bairro : ''),
-          [cep, cidade && uf ? `${cidade}/${uf}` : (cidade || uf)].filter(Boolean).join(' · ')
-        ].filter(Boolean).join(' · ');
-        const query = [endereco, bairro, cep, cidade, uf].filter(Boolean).join(', ');
-        const key = `${unidadeDestino}|${destinatario}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
+        const baseTitulo = (isFec && !hasEnderecoReal)
+          ? [destinatario, ctrc ? `CT-e ${ctrc}` : '', 'Endereço incompleto'].filter(Boolean).join(' · ')
+          : [
+            destinatario,
+            endereco ? `${endereco}${bairro ? `, ${bairro}` : ''}` : (bairro ? bairro : ''),
+            [cep, cidade && uf ? `${cidade}/${uf}` : (cidade || uf)].filter(Boolean).join(' · ')
+          ].filter(Boolean).join(' · ');
+        const query = (isFec && !hasEnderecoReal) ? '' : [endereco, bairro, cep, cidade, uf].filter(Boolean).join(', ');
+        const key = (isFec && !hasEnderecoReal)
+          ? `${unidadeDestino}|${ctrc || `${ser}-${nro}`}`
+          : `${unidadeDestino}|${destinatario}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
         const g = destinosEntrega.get(key) ?? {
           key,
           tipo: 'ENTREGA' as const,
@@ -4109,7 +4115,7 @@ function ModalRotaCarregamento({
         }
         g.ctes.push(itemCte);
         destinosEntrega.set(key, g);
-      } else if (isValidSigla(unidadeDestino)) {
+      } else if (isValidSigla(unidadeDestino) && unidadeDestino !== 'FEC') {
         const key = unidadeDestino;
         const u = unidadesMap.get(unidadeDestino);
         const g = destinosTransfer.get(key) ?? {
@@ -4192,6 +4198,7 @@ function ModalRotaCarregamento({
 
   const pontosOrdenados = useMemo(() => {
     const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
+      if (sigla === 'FEC') return null;
       const u = unidadesMap.get(sigla);
       if (!u) return null;
       if (!Number.isFinite(u.lat as any) || !Number.isFinite(u.lng as any)) return null;
@@ -4202,12 +4209,16 @@ function ModalRotaCarregamento({
     const pontos: { key: string; tipo: 'UNIDADE' | 'ENTREGA'; titulo: string; lat: number; lng: number }[] = [];
 
     const origemCoord = getUnidCoord(origem);
+    let anchor: { lat: number; lng: number } | null = origemCoord;
     if (origemCoord) pontos.push({ key: `U:${origem}`, tipo: 'UNIDADE', titulo: origem, ...origemCoord });
 
     for (let i = 1; i < unidadesOrdem.length; i++) {
       const uSigla = unidadesOrdem[i];
       const uCoord = getUnidCoord(uSigla);
-      if (uCoord) pontos.push({ key: `U:${uSigla}`, tipo: 'UNIDADE', titulo: uSigla, ...uCoord });
+      if (uCoord) {
+        pontos.push({ key: `U:${uSigla}`, tipo: 'UNIDADE', titulo: uSigla, ...uCoord });
+        anchor = uCoord;
+      }
 
       const entregas = grupos.entrega
         .filter((g) => g.unidade === uSigla)
@@ -4217,11 +4228,18 @@ function ModalRotaCarregamento({
         })
         .filter(Boolean) as any[];
 
-      if (!uCoord || entregas.length === 0) continue;
+      if (entregas.length === 0) continue;
+      if (!anchor) {
+        for (const p of entregas) {
+          pontos.push({ key: p.key, tipo: p.tipo, titulo: p.titulo, lat: p.lat, lng: p.lng });
+          anchor = { lat: p.lat, lng: p.lng };
+        }
+        continue;
+      }
 
       const remaining = [...entregas];
       const ordered: any[] = [];
-      let cur = uCoord;
+      let cur = anchor;
       while (remaining.length > 0) {
         let bestIdx = 0;
         let bestDist = Number.POSITIVE_INFINITY;
@@ -4234,6 +4252,7 @@ function ModalRotaCarregamento({
         cur = { lat: pick.lat, lng: pick.lng };
       }
       for (const p of ordered) pontos.push({ key: p.key, tipo: p.tipo, titulo: p.titulo, lat: p.lat, lng: p.lng });
+      anchor = cur;
     }
 
     return pontos;
@@ -4357,7 +4376,13 @@ function ModalRotaCarregamento({
           return next;
         });
         try {
-          const coord = await geocodeEndereco(g.query || g.titulo);
+          const q = String(g.query ?? '').trim();
+          if (!q) {
+            setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'error' }));
+            setGeoErrorByKey((prev) => ({ ...prev, [g.key]: 'Endereço incompleto' }));
+            continue;
+          }
+          const coord = await geocodeEndereco(q);
           if (!coord) {
             setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'error' }));
             setGeoErrorByKey((prev) => ({ ...prev, [g.key]: 'Não encontrado' }));
@@ -4380,9 +4405,7 @@ function ModalRotaCarregamento({
   };
 
   useEffect(() => {
-    const token = getToken();
     const placa = carregamento.placa_provisoria;
-    if (!token) return;
     if (geoRunning) return;
     if (autoGeoRef.current === placa) return;
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
