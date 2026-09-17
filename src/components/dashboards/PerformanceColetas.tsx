@@ -1015,7 +1015,7 @@ export function PerformanceColetas() {
                       {group.icon}
                       {group.label}
                     </CardTitle>
-                    {group.showCsv !== false && (
+                    {group.showCsv !== false ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1027,6 +1027,8 @@ export function PerformanceColetas() {
                         <FileSpreadsheet className="w-4 h-4" />
                         <span className="text-xs font-medium">CSV</span>
                       </Button>
+                    ) : (
+                      <div className="h-7 px-2" />
                     )}
                   </div>
                 </CardHeader>
@@ -1036,10 +1038,12 @@ export function PerformanceColetas() {
                       <div className={`text-2xl font-bold ${group.color}`}>
                         {percentage.toFixed(1)}%
                       </div>
-                      {group.showCount !== false && (
+                      {group.showCount !== false ? (
                         <p className={`text-sm mt-1 ${group.color}`}>
                           {count} coleta{count !== 1 ? 's' : ''}
                         </p>
+                      ) : (
+                        <p className="text-sm mt-1 opacity-0 select-none">0 coletas</p>
                       )}
                     </div>
                     <div style={{ width: 80, height: 80 }}>
