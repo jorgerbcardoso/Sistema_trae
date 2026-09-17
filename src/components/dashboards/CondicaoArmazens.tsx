@@ -1117,6 +1117,9 @@ export function CondicaoArmazens() {
                       />
                     </div>
                   </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    CT-es com emissão há mais de 5 meses não são exibidos neste painel.
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

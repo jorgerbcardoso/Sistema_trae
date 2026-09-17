@@ -69,6 +69,9 @@ $paramIndex = 1;
 $where = [];
 
 $where[] = "cte.status <> 'C'";
+$cutoffEmissao = date('Y-m-d', strtotime('-5 months'));
+$where[] = 'cte.data_emissao >= $' . $paramIndex++;
+$params[] = $cutoffEmissao;
 $where[] = "(cte.tp_documento IS NULL OR LTRIM(cte.tp_documento) NOT ILIKE 'COMPLEMENTAR%')";
 $where[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
 $where[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
