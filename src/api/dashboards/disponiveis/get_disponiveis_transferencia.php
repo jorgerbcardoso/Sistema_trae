@@ -880,13 +880,22 @@ if (!empty($coletas)) {
 
     $mapNomeUnidade = [];
     if (!empty($unidadesColeta)) {
-        $resNome = sql(
-            "SELECT UPPER(BTRIM(sigla)) AS sigla, nome
-             FROM {$tblUnidade}
-             WHERE UPPER(BTRIM(sigla)) = ANY($1::text[])",
-            [$unidadesColeta],
-            $g_sql
-        );
+        $ph = [];
+        $paramsNome = [];
+        $pi = 1;
+        foreach ($unidadesColeta as $u) {
+            $ph[] = '$' . $pi++;
+            $paramsNome[] = $u;
+        }
+        $resNome = !empty($ph)
+            ? sql(
+                "SELECT UPPER(BTRIM(sigla)) AS sigla, nome
+                 FROM {$tblUnidade}
+                 WHERE UPPER(BTRIM(sigla)) IN (" . implode(',', $ph) . ")",
+                $paramsNome,
+                $g_sql
+            )
+            : false;
         if ($resNome && pg_num_rows($resNome) > 0) {
             while ($r = pg_fetch_assoc($resNome)) {
                 $s = strtoupper(trim((string)($r['sigla'] ?? '')));
