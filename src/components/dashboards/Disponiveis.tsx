@@ -3971,7 +3971,7 @@ function ModalRotaCarregamento({
     const envToken = (import.meta as any)?.env?.VITE_MAPBOX_TOKEN;
     return typeof envToken === 'string' ? envToken : '';
   });
-  const [tokenInput, setTokenInput] = useState(mapboxToken);
+  const autoGeoRef = useRef<string | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -4291,14 +4291,6 @@ function ModalRotaCarregamento({
     }
   }, [leafletLoaded, pontosOrdenados, routeCoords]);
 
-  const salvarToken = () => {
-    const v = tokenInput.trim();
-    setMapboxToken(v);
-    try {
-      if (v) window.localStorage.setItem('mapbox_token', v);
-    } catch {}
-  };
-
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = mapboxToken.trim();
     if (!token) return null;
@@ -4324,7 +4316,7 @@ function ModalRotaCarregamento({
   const iniciarGeocoding = async () => {
     if (geoRunning) return;
     const token = mapboxToken.trim();
-    if (!token) { toast.error('Informe o token do Mapbox para geolocalizar.'); return; }
+    if (!token) { toast.error('Token Mapbox não configurado.'); return; }
     const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
     if (pendentes.length === 0) return;
     setGeoRunning(true);
@@ -4358,6 +4350,18 @@ function ModalRotaCarregamento({
       setGeoRunning(false);
     }
   };
+
+  useEffect(() => {
+    const token = mapboxToken.trim();
+    const placa = carregamento.placa_provisoria;
+    if (!token) return;
+    if (geoRunning) return;
+    if (autoGeoRef.current === placa) return;
+    const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
+    if (pendentes.length === 0) return;
+    autoGeoRef.current = placa;
+    void iniciarGeocoding();
+  }, [carregamento.placa_provisoria, mapboxToken, geoRunning, grupos.entrega, coordsByKey]);
 
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
@@ -4414,17 +4418,13 @@ function ModalRotaCarregamento({
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="Token Mapbox"
-              className="h-8 w-[320px] max-w-[45vw] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-xs text-slate-900 dark:text-slate-100"
-              disabled={geoRunning}
-            />
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={salvarToken} disabled={geoRunning}>
-              Salvar
-            </Button>
-            <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { void iniciarGeocoding(); }} disabled={geoRunning || !tokenInput.trim()}>
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => { void iniciarGeocoding(); }}
+              disabled={geoRunning || !mapboxToken.trim()}
+              title={!mapboxToken.trim() ? 'Token Mapbox não configurado' : undefined}
+            >
               {geoRunning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5 mr-1.5" />}
               Geolocalizar
             </Button>
