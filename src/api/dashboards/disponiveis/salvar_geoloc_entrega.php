@@ -1,0 +1,58 @@
+<?php
+require_once __DIR__ . '/../../config.php';
+
+handleOptionsRequest();
+validateRequestMethod('POST');
+
+$auth = authenticateAndGetUser();
+$domain = $auth['domain'];
+
+if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
+    respondJson(['success' => false, 'message' => 'Domínio inválido.']);
+}
+
+$input = getRequestInput();
+$ser = strtoupper(trim((string)($input['ser_cte'] ?? '')));
+$nro = (int)($input['nro_cte'] ?? 0);
+$lat = $input['latitude'] ?? null;
+$lng = $input['longitude'] ?? null;
+
+if ($ser === '' || $nro <= 0) {
+    respondJson(['success' => false, 'message' => 'CT-e inválido.']);
+}
+if (!is_numeric($lat) || !is_numeric($lng)) {
+    respondJson(['success' => false, 'message' => 'Latitude/Longitude inválidas.']);
+}
+
+$lat = (float)$lat;
+$lng = (float)$lng;
+
+if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+    respondJson(['success' => false, 'message' => 'Latitude/Longitude fora do intervalo.']);
+}
+
+$conn = connect();
+$tblCte = "{$domain}_cte";
+
+@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS latitude_entrega NUMERIC");
+@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS longitude_entrega NUMERIC");
+
+try {
+    $res = sql(
+        "UPDATE {$tblCte}
+         SET latitude_entrega = $1,
+             longitude_entrega = $2
+         WHERE ser_cte = $3
+           AND nro_cte = $4",
+        [$lat, $lng, $ser, $nro],
+        $conn
+    );
+    if (!$res || pg_affected_rows($res) <= 0) {
+        respondJson(['success' => false, 'message' => 'CT-e não encontrado para atualizar geolocalização.']);
+    }
+} catch (Exception $e) {
+    respondJson(['success' => false, 'message' => 'Erro ao salvar geolocalização.']);
+}
+
+respondJson(['success' => true]);
+

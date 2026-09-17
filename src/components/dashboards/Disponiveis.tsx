@@ -1448,9 +1448,9 @@ interface CarregamentoAreaProps {
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onCarregarHub: (carregamento: Carregamento) => void;
-  loadingHub: boolean;
-  hubCarregamentoPlaca: string | null;
+  onCarregarRota: (carregamento: Carregamento) => void;
+  loadingRota: boolean;
+  rotaCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
   onImportarCarregamentos: (opts?: { silent?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
@@ -1759,9 +1759,9 @@ function CardCarregamento({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
-  onCarregarHub,
-  loadingHub,
-  hubCarregamentoPlaca,
+  onCarregarRota,
+  loadingRota,
+  rotaCarregamentoPlaca,
   onRecarregarCarregamentos,
   onImportarCarregamentos,
   importandoCarregamentos,
@@ -1775,9 +1775,9 @@ function CardCarregamento({
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onCarregarHub: (carregamento: Carregamento) => void;
-  loadingHub: boolean;
-  hubCarregamentoPlaca: string | null;
+  onCarregarRota: (carregamento: Carregamento) => void;
+  loadingRota: boolean;
+  rotaCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
   onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
@@ -2560,17 +2560,17 @@ function CardCarregamento({
             className={
               carregamentoIniciado
                 ? 'h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                : `h-8 text-xs border-violet-300 dark:border-violet-700 ${loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria ? 'text-violet-400' : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-950/30'}`
+                : `h-8 text-xs border-indigo-300 dark:border-indigo-700 ${loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria ? 'text-indigo-400' : 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'}`
             }
-            onClick={() => onCarregarHub(carregamento)}
-            disabled={loadingHub || carregamentoIniciado || isAdiado}
-            title="Completar carregamento com CT-es via Hub"
+            onClick={() => onCarregarRota(carregamento)}
+            disabled={loadingRota || carregamentoIniciado || isAdiado}
+            title="Ver rota e pontos de entrega do carregamento"
           >
-            {loadingHub && hubCarregamentoPlaca === carregamento.placa_provisoria
+            {loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria
               ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-              : <Share2 className="w-3.5 h-3.5 mr-1" />
+              : <MapPin className="w-3.5 h-3.5 mr-1" />
             }
-            Hub
+            Rota
           </Button>
           <Button
             size="sm"
@@ -3953,6 +3953,562 @@ function ModalHub({
   );
 }
 
+function ModalRotaCarregamento({
+  carregamento,
+  dados,
+  onFechar,
+}: {
+  carregamento: Carregamento;
+  dados: any;
+  onFechar: () => void;
+}) {
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState(() => {
+    try {
+      const fromStorage = window.localStorage.getItem('mapbox_token');
+      if (fromStorage && fromStorage.trim()) return fromStorage.trim();
+    } catch {}
+    const envToken = (import.meta as any)?.env?.VITE_MAPBOX_TOKEN;
+    return typeof envToken === 'string' ? envToken : '';
+  });
+  const [tokenInput, setTokenInput] = useState(mapboxToken);
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const layersRef = useRef<any[]>([]);
+
+  const [coordsByKey, setCoordsByKey] = useState<Record<string, { lat: number; lng: number }>>({});
+  const [geoStatusByKey, setGeoStatusByKey] = useState<Record<string, 'pending' | 'loading' | 'ok' | 'error'>>({});
+  const [geoErrorByKey, setGeoErrorByKey] = useState<Record<string, string>>({});
+  const [geoRunning, setGeoRunning] = useState(false);
+
+  const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
+
+  const carregarInfo = dados?.carregamento ?? {};
+  const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
+  const paradas = Array.isArray(carregarInfo?.paradas) ? (carregarInfo.paradas as string[]) : [];
+
+  const unidadesMap = useMemo(() => {
+    const m = new Map<string, { sigla: string; nome: string; lat: number | null; lng: number | null }>();
+    const arr = Array.isArray(dados?.unidades) ? dados.unidades : [];
+    for (const u of arr) {
+      const sigla = String(u?.sigla ?? '').toUpperCase();
+      if (!sigla) continue;
+      const lat = u?.latitude !== null && u?.latitude !== undefined && String(u.latitude) !== '' ? Number(u.latitude) : null;
+      const lng = u?.longitude !== null && u?.longitude !== undefined && String(u.longitude) !== '' ? Number(u.longitude) : null;
+      m.set(sigla, { sigla, nome: String(u?.nome ?? ''), lat: Number.isFinite(lat as any) ? lat : null, lng: Number.isFinite(lng as any) ? lng : null });
+    }
+    return m;
+  }, [dados]);
+
+  const unidadesOrdem = useMemo(() => {
+    const out: string[] = [];
+    const push = (u: string) => {
+      const s = u.trim().toUpperCase();
+      if (!s) return;
+      if (!/^[A-Z0-9]{2,5}$/.test(s)) return;
+      if (out.includes(s)) return;
+      out.push(s);
+    };
+    push(origem);
+    for (const p of paradas) push(p);
+    return out;
+  }, [origem, paradas]);
+
+  const grupos = useMemo(() => {
+    const ctes = Array.isArray(dados?.ctes) ? dados.ctes : [];
+
+    const padCte = (ser: string, nro: number) => {
+      const n = Number.isFinite(nro) && nro > 0 ? String(nro).padStart(6, '0') : '';
+      return ser && n ? `${ser}${n}` : '';
+    };
+
+    const norm = (s: any) => String(s ?? '').trim();
+    const normKey = (s: any) => norm(s).toUpperCase().replace(/\s+/g, ' ');
+    const normEnd = (s: any) => norm(s).toUpperCase().replace(/\s+/g, ' ');
+    const isValidSigla = (s: string) => /^[A-Z0-9]{2,5}$/.test(s);
+
+    const destinosEntrega = new Map<string, {
+      key: string;
+      tipo: 'ENTREGA';
+      unidade: string;
+      titulo: string;
+      query: string;
+      ctes: { ser: string; nro: number; ctrc: string }[];
+      lat: number | null;
+      lng: number | null;
+    }>();
+    const destinosTransfer = new Map<string, {
+      key: string;
+      tipo: 'TRANSFERENCIA';
+      unidade: string;
+      titulo: string;
+      ctes: { ser: string; nro: number; ctrc: string }[];
+      lat: number | null;
+      lng: number | null;
+    }>();
+
+    for (const c of ctes) {
+      const ser = normKey(c?.ser_cte ?? '');
+      const nro = Number(c?.nro_cte ?? 0);
+      const destinoCte = normKey(c?.destino_cte ?? '');
+      const unidadeDestino = (isValidSigla(destinoCte) ? destinoCte : (unidadesOrdem[unidadesOrdem.length - 1] ?? ''));
+
+      const endereco = normEnd(c?.endereco_entrega ?? '');
+      const bairro = normEnd(c?.bairro_entrega ?? '');
+      const cep = normEnd(c?.cep_entrega ?? '');
+      const cidade = normEnd(c?.cidade_entrega ?? '');
+      const uf = normEnd(c?.uf_entrega ?? '');
+      const destinatario = normEnd(c?.destinatario ?? '');
+      const hasEndereco = endereco !== '' || bairro !== '' || cep !== '' || cidade !== '' || uf !== '';
+
+      const ctrc = padCte(ser, nro);
+      const itemCte = { ser, nro, ctrc };
+
+      if (hasEndereco) {
+        const baseTitulo = [
+          destinatario,
+          endereco ? `${endereco}${bairro ? `, ${bairro}` : ''}` : (bairro ? bairro : ''),
+          [cep, cidade && uf ? `${cidade}/${uf}` : (cidade || uf)].filter(Boolean).join(' · ')
+        ].filter(Boolean).join(' · ');
+        const query = [endereco, bairro, cep, cidade, uf].filter(Boolean).join(', ');
+        const key = `${unidadeDestino}|${destinatario}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
+        const g = destinosEntrega.get(key) ?? {
+          key,
+          tipo: 'ENTREGA' as const,
+          unidade: unidadeDestino,
+          titulo: baseTitulo || (unidadeDestino ? `Entrega (${unidadeDestino})` : 'Entrega'),
+          query,
+          ctes: [],
+          lat: null,
+          lng: null,
+        };
+        const lat = c?.latitude_entrega !== null && c?.latitude_entrega !== undefined && String(c.latitude_entrega) !== '' ? Number(c.latitude_entrega) : null;
+        const lng = c?.longitude_entrega !== null && c?.longitude_entrega !== undefined && String(c.longitude_entrega) !== '' ? Number(c.longitude_entrega) : null;
+        if (g.lat === null && Number.isFinite(lat as any) && Number.isFinite(lng as any)) {
+          g.lat = lat as number;
+          g.lng = lng as number;
+        }
+        g.ctes.push(itemCte);
+        destinosEntrega.set(key, g);
+      } else if (isValidSigla(unidadeDestino)) {
+        const key = unidadeDestino;
+        const u = unidadesMap.get(unidadeDestino);
+        const g = destinosTransfer.get(key) ?? {
+          key,
+          tipo: 'TRANSFERENCIA' as const,
+          unidade: unidadeDestino,
+          titulo: unidadeDestino,
+          ctes: [],
+          lat: u?.lat ?? null,
+          lng: u?.lng ?? null,
+        };
+        g.ctes.push(itemCte);
+        destinosTransfer.set(key, g);
+      }
+    }
+
+    const listEntrega = Array.from(destinosEntrega.values()).sort((a, b) => (a.unidade || '').localeCompare(b.unidade || '') || a.titulo.localeCompare(b.titulo));
+    const listTransf = Array.from(destinosTransfer.values()).sort((a, b) => a.unidade.localeCompare(b.unidade));
+
+    const ordemIdx = new Map<string, number>();
+    unidadesOrdem.forEach((u, i) => ordemIdx.set(u, i));
+    listEntrega.sort((a, b) => ((ordemIdx.get(a.unidade) ?? 999) - (ordemIdx.get(b.unidade) ?? 999)) || a.titulo.localeCompare(b.titulo));
+    listTransf.sort((a, b) => ((ordemIdx.get(a.unidade) ?? 999) - (ordemIdx.get(b.unidade) ?? 999)) || a.titulo.localeCompare(b.titulo));
+
+    return { entrega: listEntrega, transferencia: listTransf };
+  }, [dados, unidadesMap, unidadesOrdem]);
+
+  useEffect(() => {
+    const initial: Record<string, { lat: number; lng: number }> = {};
+    const status: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
+    for (const g of grupos.entrega) {
+      if (g.lat !== null && g.lng !== null) {
+        initial[g.key] = { lat: g.lat, lng: g.lng };
+        status[g.key] = 'ok';
+      } else {
+        status[g.key] = 'pending';
+      }
+    }
+    setCoordsByKey(initial);
+    setGeoStatusByKey(status);
+    setGeoErrorByKey({});
+    setGeoRunning(false);
+    setAbertos(new Set());
+  }, [carregamento.placa_provisoria]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasCss = !!document.getElementById('leaflet-css');
+    const hasJs = !!document.getElementById('leaflet-js');
+
+    if (!hasCss) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (!hasJs) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => setLeafletLoaded(true);
+      document.body.appendChild(script);
+    } else {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
+  const calcDist = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const toRad = (n: number) => (n * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const la1 = toRad(a.lat);
+    const la2 = toRad(b.lat);
+    const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(la1) * Math.cos(la2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+  };
+
+  const pontosOrdenados = useMemo(() => {
+    const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
+      const u = unidadesMap.get(sigla);
+      if (!u) return null;
+      if (!Number.isFinite(u.lat as any) || !Number.isFinite(u.lng as any)) return null;
+      return { lat: u.lat as number, lng: u.lng as number };
+    };
+
+    const pontos: { key: string; tipo: 'UNIDADE' | 'ENTREGA'; titulo: string; lat: number; lng: number }[] = [];
+
+    const origemCoord = getUnidCoord(origem);
+    if (origemCoord) pontos.push({ key: `U:${origem}`, tipo: 'UNIDADE', titulo: origem, ...origemCoord });
+
+    for (let i = 1; i < unidadesOrdem.length; i++) {
+      const uSigla = unidadesOrdem[i];
+      const uCoord = getUnidCoord(uSigla);
+      if (uCoord) pontos.push({ key: `U:${uSigla}`, tipo: 'UNIDADE', titulo: uSigla, ...uCoord });
+
+      const entregas = grupos.entrega
+        .filter((g) => g.unidade === uSigla)
+        .map((g) => {
+          const c = coordsByKey[g.key];
+          return c ? { key: `E:${g.key}`, tipo: 'ENTREGA' as const, titulo: g.titulo, ...c, groupKey: g.key } : null;
+        })
+        .filter(Boolean) as any[];
+
+      if (!uCoord || entregas.length === 0) continue;
+
+      const remaining = [...entregas];
+      const ordered: any[] = [];
+      let cur = uCoord;
+      while (remaining.length > 0) {
+        let bestIdx = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let j = 0; j < remaining.length; j++) {
+          const d = calcDist(cur, remaining[j]);
+          if (d < bestDist) { bestDist = d; bestIdx = j; }
+        }
+        const pick = remaining.splice(bestIdx, 1)[0];
+        ordered.push(pick);
+        cur = { lat: pick.lat, lng: pick.lng };
+      }
+      for (const p of ordered) pontos.push({ key: p.key, tipo: p.tipo, titulo: p.titulo, lat: p.lat, lng: p.lng });
+    }
+
+    return pontos;
+  }, [coordsByKey, grupos.entrega, unidadesMap, unidadesOrdem, origem]);
+
+  const [routeCoords, setRouteCoords] = useState<{ lat: number; lng: number }[]>([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRoute = async () => {
+      if (pontosOrdenados.length < 2) { setRouteCoords([]); return; }
+      setRouteLoading(true);
+      try {
+        const coordsStr = pontosOrdenados.map((p) => `${p.lng},${p.lat}`).join(';');
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        const coordinates = data?.routes?.[0]?.geometry?.coordinates;
+        if (Array.isArray(coordinates) && coordinates.length > 0) {
+          const converted = coordinates.map((c: any) => ({ lat: c[1], lng: c[0] }));
+          setRouteCoords(converted);
+          return;
+        }
+      } catch {}
+      setRouteCoords(pontosOrdenados.map((p) => ({ lat: p.lat, lng: p.lng })));
+      setRouteLoading(false);
+    };
+    void fetchRoute().finally(() => setRouteLoading(false));
+  }, [pontosOrdenados]);
+
+  useEffect(() => {
+    if (!leafletLoaded) return;
+    if (!mapContainerRef.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView([-15, -55], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(mapRef.current);
+    }
+
+    const map = mapRef.current;
+    for (const l of layersRef.current) {
+      try { map.removeLayer(l); } catch {}
+    }
+    layersRef.current = [];
+
+    const markers: any[] = [];
+    pontosOrdenados.forEach((p, idx) => {
+      const bg = p.tipo === 'UNIDADE' ? '#2563eb' : '#059669';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9999px;background:${bg};border:2px solid white;color:white;font-weight:700;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.25)">${idx + 1}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+      const m = L.marker([p.lat, p.lng], { icon }).addTo(map);
+      m.bindPopup(p.titulo);
+      markers.push(m);
+    });
+    layersRef.current.push(...markers);
+
+    if (routeCoords.length >= 2) {
+      const poly = L.polyline(routeCoords.map((c) => [c.lat, c.lng]), { color: '#0f172a', weight: 4, opacity: 0.8 }).addTo(map);
+      layersRef.current.push(poly);
+    }
+
+    const all = [...pontosOrdenados.map((p) => [p.lat, p.lng] as [number, number]), ...routeCoords.map((c) => [c.lat, c.lng] as [number, number])];
+    if (all.length > 0) {
+      const bounds = L.latLngBounds(all);
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+  }, [leafletLoaded, pontosOrdenados, routeCoords]);
+
+  const salvarToken = () => {
+    const v = tokenInput.trim();
+    setMapboxToken(v);
+    try {
+      if (v) window.localStorage.setItem('mapbox_token', v);
+    } catch {}
+  };
+
+  const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
+    const token = mapboxToken.trim();
+    if (!token) return null;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt`;
+    const resp = await fetch(url);
+    const json = await resp.json();
+    const center = json?.features?.[0]?.center;
+    if (!Array.isArray(center) || center.length < 2) return null;
+    const lng = Number(center[0]);
+    const lat = Number(center[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  };
+
+  const persistirGeoloc = async (ser: string, nro: number, lat: number, lng: number) => {
+    await apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_geoloc_entrega.php`,
+      { method: 'POST', body: JSON.stringify({ ser_cte: ser, nro_cte: nro, latitude: lat, longitude: lng }) },
+      true
+    );
+  };
+
+  const iniciarGeocoding = async () => {
+    if (geoRunning) return;
+    const token = mapboxToken.trim();
+    if (!token) { toast.error('Informe o token do Mapbox para geolocalizar.'); return; }
+    const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
+    if (pendentes.length === 0) return;
+    setGeoRunning(true);
+    try {
+      for (const g of pendentes) {
+        setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'loading' }));
+        setGeoErrorByKey((prev) => {
+          const next = { ...prev };
+          delete next[g.key];
+          return next;
+        });
+        try {
+          const coord = await geocodeEndereco(g.query || g.titulo);
+          if (!coord) {
+            setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'error' }));
+            setGeoErrorByKey((prev) => ({ ...prev, [g.key]: 'Não encontrado' }));
+            continue;
+          }
+          for (const c of g.ctes) {
+            try { await persistirGeoloc(c.ser, c.nro, coord.lat, coord.lng); } catch {}
+          }
+          setCoordsByKey((prev) => ({ ...prev, [g.key]: coord }));
+          setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'ok' }));
+          await new Promise((r) => setTimeout(r, 150));
+        } catch (e: any) {
+          setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'error' }));
+          setGeoErrorByKey((prev) => ({ ...prev, [g.key]: (e?.message || 'Erro') }));
+        }
+      }
+    } finally {
+      setGeoRunning(false);
+    }
+  };
+
+  const totalEnt = grupos.entrega.length;
+  const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
+  const pct = totalEnt > 0 ? Math.round((okEnt / totalEnt) * 100) : 100;
+
+  const toggleAberto = (key: string) => {
+    setAbertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string }[]) => {
+    return (
+      <div className="mt-2 pl-6 space-y-1">
+        {items.map((c) => (
+          <div key={`${c.ser}-${c.nro}`} className="text-[11px] font-mono text-slate-600 dark:text-slate-300 truncate">
+            {c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(1100px,calc(100vw-32px))] h-[min(760px,calc(100vh-32px))] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">Rota · {carregamento.placa_provisoria}</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {unidadesOrdem.length > 1 ? `${unidadesOrdem[0]} → ${unidadesOrdem.slice(1).join(' → ')}` : unidadesOrdem[0]}
+              </p>
+            </div>
+          </div>
+          <button onClick={!geoRunning ? onFechar : undefined} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" disabled={geoRunning}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 mb-1">
+              <span className="font-semibold">Geolocalização</span>
+              <span>{okEnt}/{totalEnt} ({pct}%)</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div className="h-2 bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder="Token Mapbox"
+              className="h-8 w-[320px] max-w-[45vw] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-xs text-slate-900 dark:text-slate-100"
+              disabled={geoRunning}
+            />
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={salvarToken} disabled={geoRunning}>
+              Salvar
+            </Button>
+            <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { void iniciarGeocoding(); }} disabled={geoRunning || !tokenInput.trim()}>
+              {geoRunning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5 mr-1.5" />}
+              Geolocalizar
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-h-0 p-4">
+            <div className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden relative">
+              {!leafletLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />Carregando mapa...
+                </div>
+              )}
+              {routeLoading && (
+                <div className="absolute top-2 right-2 z-10 bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Calculando rota...
+                </div>
+              )}
+              <div ref={mapContainerRef} className="w-full h-full" />
+            </div>
+          </div>
+
+          <div className="min-h-0 border-l border-slate-200 dark:border-slate-700 p-4 overflow-y-auto">
+            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Destinos</div>
+
+            {grupos.transferencia.map((g) => {
+              const aberto = abertos.has(`T:${g.key}`);
+              const uNome = unidadesMap.get(g.unidade)?.nome ?? '';
+              return (
+                <div key={`T:${g.key}`} className="mb-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAberto(`T:${g.key}`)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                  >
+                    {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.unidade}{uNome ? ` · ${uNome}` : ''}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Transferência · {g.ctes.length} CT-e(s)</div>
+                    </div>
+                  </button>
+                  {aberto && renderCtes(g.ctes)}
+                </div>
+              );
+            })}
+
+            {grupos.entrega.map((g) => {
+              const aberto = abertos.has(`E:${g.key}`);
+              const status = geoStatusByKey[g.key] ?? 'pending';
+              const statusLabel = status === 'ok' ? 'ok' : status === 'loading' ? 'buscando...' : status === 'error' ? 'erro' : 'pendente';
+              const cor = status === 'ok'
+                ? 'text-emerald-700 dark:text-emerald-400'
+                : status === 'error'
+                  ? 'text-red-700 dark:text-red-400'
+                  : 'text-amber-700 dark:text-amber-400';
+              return (
+                <div key={`E:${g.key}`} className="mb-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAberto(`E:${g.key}`)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                  >
+                    {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.titulo}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        Entrega · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
+                        {status === 'error' && geoErrorByKey[g.key] ? ` (${geoErrorByKey[g.key]})` : ''}
+                      </div>
+                    </div>
+                  </button>
+                  {aberto && renderCtes(g.ctes)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () => void; onConcluir: () => Promise<void>; onExecutar: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any> }) {
   const [etapa, setEtapa] = useState<'confirmar' | 'carregando' | 'resultado'>('confirmar');
   const [logs, setLogs] = useState<LogImportacao[]>([]);
@@ -4085,9 +4641,9 @@ function CarregamentoArea({
   onExcluirCarregamento,
   onRemoverCte,
   onCarregarSSW,
-  onCarregarHub,
-  loadingHub,
-  hubCarregamentoPlaca,
+  onCarregarRota,
+  loadingRota,
+  rotaCarregamentoPlaca,
   onRecarregarCarregamentos,
   onImportarCarregamentos,
   importandoCarregamentos,
@@ -5138,9 +5694,9 @@ function CarregamentoArea({
                 onExcluirCarregamento={onExcluirCarregamento}
                 onRemoverCte={onRemoverCte}
                 onCarregarSSW={onCarregarSSW}
-                onCarregarHub={onCarregarHub}
-                loadingHub={loadingHub}
-                hubCarregamentoPlaca={hubCarregamentoPlaca}
+                onCarregarRota={onCarregarRota}
+                loadingRota={loadingRota}
+                rotaCarregamentoPlaca={rotaCarregamentoPlaca}
                 onRecarregarCarregamentos={onRecarregarCarregamentos}
                 onImportarCarregamentos={onImportarCarregamentos}
                 importandoCarregamentos={importandoCarregamentos}
@@ -5414,6 +5970,12 @@ export function Disponiveis() {
   const [hubModalCarregamento, setHubModalCarregamento] = useState<Carregamento | null>(null);
   const [hubModalDestino, setHubModalDestino] = useState('');
   const [hubModalUnidadesStr, setHubModalUnidadesStr] = useState('');
+
+  const [rotaModalAberto, setRotaModalAberto] = useState(false);
+  const [rotaCarregamento, setRotaCarregamento] = useState<Carregamento | null>(null);
+  const [rotaDados, setRotaDados] = useState<any>(null);
+  const [rotaCarregamentoPlaca, setRotaCarregamentoPlaca] = useState<string | null>(null);
+  const [loadingRota, setLoadingRota] = useState(false);
 
   const [unidadePermiteCarregamento, setUnidadePermiteCarregamento] = useState<boolean | null>(null);
 
@@ -6115,6 +6677,32 @@ export function Disponiveis() {
     }
     return best;
   }, []);
+
+  const abrirRota = useCallback(async (car: Carregamento) => {
+    if (!sigla) return;
+    if (loadingRota) return;
+    setRotaCarregamentoPlaca(car.placa_provisoria);
+    setLoadingRota(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_rota_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ placa: car.placa_provisoria, unidade: sigla }) },
+        true
+      );
+      if (res.success) {
+        setRotaDados(res);
+        setRotaCarregamento(car);
+        setRotaModalAberto(true);
+      } else {
+        toast.error(res.message || 'Erro ao carregar rota do carregamento.');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao carregar rota do carregamento.');
+    } finally {
+      setLoadingRota(false);
+      setRotaCarregamentoPlaca(null);
+    }
+  }, [sigla, loadingRota]);
 
   const abrirHub = useCallback(async (car: Carregamento) => {
     if (!sigla) return;
@@ -8147,9 +8735,9 @@ export function Disponiveis() {
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}
             onCarregarSSW={handleCarregarSSW}
-            onCarregarHub={abrirHub}
-            loadingHub={loadingHub}
-            hubCarregamentoPlaca={hubCarregamentoPlaca}
+            onCarregarRota={abrirRota}
+            loadingRota={loadingRota}
+            rotaCarregamentoPlaca={rotaCarregamentoPlaca}
             onRecarregarCarregamentos={carregarCarregamentos}
             onImportarCarregamentos={handleImportarCarregamentos}
             importandoCarregamentos={importandoCarregamentos}
@@ -8174,6 +8762,14 @@ export function Disponiveis() {
               onFechar={() => { if (!loadingHub) { setHubModalAberto(false); setHubModalCarregamento(null); setHubModalDestino(''); setHubModalUnidadesStr(''); } }}
               loadingSugestao={loadingHub && hubEtapa === 'sugestao'}
               loadingConfirmar={loadingHub && hubEtapa === 'confirmar'}
+            />
+          )}
+
+          {rotaModalAberto && rotaCarregamento && rotaDados && (
+            <ModalRotaCarregamento
+              carregamento={rotaCarregamento}
+              dados={rotaDados}
+              onFechar={() => { setRotaModalAberto(false); setRotaCarregamento(null); setRotaDados(null); }}
             />
           )}
 
