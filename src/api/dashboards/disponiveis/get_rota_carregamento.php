@@ -90,7 +90,7 @@ try {
             COALESCE(car.data_emissao_cte::text, '') AS data_emissao,
             COALESCE(car.data_prev_ent_cte::text, '') AS data_prev_ent,
             COALESCE(cte.seq_cidade_entr, NULL) AS seq_cidade_entr,
-            COALESCE(cte.cep_entrega, '') AS cep_entrega,
+            COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
             COALESCE(cte.endereco_entrega, '') AS endereco_entrega,
             COALESCE(cte.bairro_entrega, '') AS bairro_entrega,
             COALESCE(cid.nome, '') AS cidade_entrega,
@@ -182,4 +182,3 @@ respondJson([
     'unidades' => $unidades,
     'ctes' => $rows,
 ]);
-
