@@ -183,7 +183,17 @@ if ($acao === 'adiar_linha') {
     } catch (Exception $e) {}
 
     if (!$resLinha || pg_num_rows($resLinha) === 0) {
-        respondJson(['success' => false, 'message' => 'Linha não encontrada para a unidade atual.']);
+        $err = trim((string)@pg_last_error($conn));
+        respondJson([
+            'success' => false,
+            'message' => 'Linha não encontrada para a unidade atual.',
+            'debug' => [
+                'unidade' => $unidade,
+                'nroLinha' => $nroLinha,
+                'domain' => $domain,
+                'sql_error' => $err !== '' ? $err : null,
+            ],
+        ]);
     }
 
     $linha = pg_fetch_assoc($resLinha);
@@ -966,26 +976,60 @@ if ($modoAutomatico) {
         respondJson(['success' => false, 'message' => 'Linha não informada.']);
     }
 
-        $resLinha = null;
-        try {
+    $resLinha = null;
+    $sqlErroLinha = '';
+    try {
         $joinUnidade = ($unidadeTableOk && $unidadeCompartColOk) ? "LEFT JOIN {$tabelaUnidade} u ON UPPER(BTRIM(u.sigla)) = UPPER(BTRIM({$tabelaLinha}.sigla_dest))" : "";
         $selCentralizadora = ($unidadeTableOk && $unidadeCompartColOk)
             ? "(CASE WHEN COALESCE(u.unidades_compart, '') <> '' THEN TRUE ELSE FALSE END) AS destino_centralizadora"
             : "FALSE AS destino_centralizadora";
+        $resLinha = sql(
+            "SELECT sigla_dest, unidades, vlr_min_frete,
+                    carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
+                    {$selCentralizadora}
+             FROM {$tabelaLinha}
+             {$joinUnidade}
+             WHERE UPPER(BTRIM(sigla_emit)) = \$1 AND nro_linha = \$2
+             LIMIT 1",
+            [$unidade, $nroLinha],
+            $conn
+        );
+        if (!$resLinha) {
+            $sqlErroLinha = trim((string)@pg_last_error($conn));
+        }
+    } catch (Exception $e) {
+        $sqlErroLinha = $e->getMessage();
+        $resLinha = null;
+    }
+
+    if ((!$resLinha || pg_num_rows($resLinha) === 0) && $sqlErroLinha !== '') {
+        try {
             $resLinha = sql(
                 "SELECT sigla_dest, unidades, vlr_min_frete,
                         carrega_seg, carrega_ter, carrega_qua, carrega_qui, carrega_sex, carrega_sab, carrega_dom,
-                        {$selCentralizadora}
+                        FALSE AS destino_centralizadora
                  FROM {$tabelaLinha}
-                 {$joinUnidade}
                  WHERE UPPER(BTRIM(sigla_emit)) = \$1 AND nro_linha = \$2
                  LIMIT 1",
-                [$unidade, $nroLinha], $conn
+                [$unidade, $nroLinha],
+                $conn
             );
-        } catch (Exception $e) {}
+        } catch (Exception $e2) {
+        }
+    }
 
     if (!$resLinha || pg_num_rows($resLinha) === 0) {
-        respondJson(['success' => false, 'message' => 'Linha não encontrada para a unidade atual.']);
+        $err = $sqlErroLinha !== '' ? $sqlErroLinha : trim((string)@pg_last_error($conn));
+        respondJson([
+            'success' => false,
+            'message' => 'Linha não encontrada para a unidade atual.',
+            'debug' => [
+                'unidade' => $unidade,
+                'nroLinha' => $nroLinha,
+                'domain' => $domain,
+                'sql_error' => $err !== '' ? $err : null,
+            ],
+        ]);
     }
 
     $linha    = pg_fetch_assoc($resLinha);
