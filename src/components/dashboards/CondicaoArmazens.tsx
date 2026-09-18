@@ -460,10 +460,10 @@ export function CondicaoArmazens() {
     }
 
     const header = [
-      'Unidade atual',
+      'Loc.',
       'CT-e',
-      'NFs',
       'Emissão',
+      'NFs',
       'Chegada na unidade',
       'Dias no armazém',
       'Prev. entrega',
@@ -492,8 +492,8 @@ export function CondicaoArmazens() {
       return [
         csvEscape(r.unid_atual ?? ''),
         csvEscape(cte),
-        csvEscape(r.nfs ?? ''),
         csvEscape(r.data_emissao ?? ''),
+        csvEscape(r.nfs ?? ''),
         csvEscape(r.data_chegada_unid ?? ''),
         csvEscape(r.dias_armazem ?? ''),
         csvEscape(r.data_prev_ent ?? ''),
@@ -535,7 +535,7 @@ export function CondicaoArmazens() {
       return;
     }
 
-    const header = ['Unidade', 'CT-e', 'NFs', 'Chegada', 'Dias', 'Prev. Ent.', 'Atraso', 'Agendado', 'Últ. ocorrência', 'Complemento', 'Vlr Merc.', 'Frete'];
+    const header = ['Loc.', 'CT-e', 'Emissão', 'NFs', 'Chegada', 'Dias', 'Prev. Ent.', 'Atraso', 'Agendado', 'Últ. ocorrência', 'Complemento', 'Vlr Merc.', 'Frete'];
 
     const rowsCsv = lista.map((r) => {
       const sigla = String(r.unid_atual ?? '').trim().toUpperCase();
@@ -550,6 +550,7 @@ export function CondicaoArmazens() {
       return [
         csvEscape(sigla),
         csvEscape(cte),
+        csvEscape(fmtDateBR2y(r.data_emissao)),
         csvEscape(r.nfs ?? ''),
         csvEscape(fmtDateBR2y(r.data_chegada_unid)),
         csvEscape(r.dias_armazem ?? ''),
@@ -798,10 +799,10 @@ export function CondicaoArmazens() {
     }
 
     const header = [
-      'Unidade atual',
+      'Loc.',
       'CT-e',
-      'NFs',
       'Emissão',
+      'NFs',
       'Chegada na unidade',
       'Dias no armazém',
       'Prev. entrega',
@@ -830,8 +831,8 @@ export function CondicaoArmazens() {
       return [
         csvEscape(r.unid_atual ?? ''),
         csvEscape(cte),
-        csvEscape(r.nfs ?? ''),
         csvEscape(r.data_emissao ?? ''),
+        csvEscape(r.nfs ?? ''),
         csvEscape(r.data_chegada_unid ?? ''),
         csvEscape(r.dias_armazem ?? ''),
         csvEscape(r.data_prev_ent ?? ''),
@@ -2116,7 +2117,7 @@ export function CondicaoArmazens() {
                           className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                           onClick={() => setDrillSort((s) => ({ key: 'unidade', dir: s.key === 'unidade' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'asc' }))}
                         >
-                          Unid.{drillSort.key === 'unidade' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          Loc.{drillSort.key === 'unidade' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </button>
                       </th>
                       <th className="px-3 py-2 text-left whitespace-nowrap w-[10%]">
@@ -2127,6 +2128,7 @@ export function CondicaoArmazens() {
                           CT-e{drillSort.key === 'cte' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </button>
                       </th>
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">Emissão</th>
                       <th className="px-3 py-2 text-left whitespace-nowrap w-[9%]">
                         <button
                           className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
@@ -2167,7 +2169,7 @@ export function CondicaoArmazens() {
                           Ag.{drillSort.key === 'agendado' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </button>
                       </th>
-                      <th className="px-3 py-2 text-left whitespace-nowrap w-[20%]">
+                      <th className="px-3 py-2 text-left whitespace-nowrap w-[18%]">
                         <button
                           className="text-left hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                           onClick={() => setDrillSort((s) => ({ key: 'ult_ocor', dir: s.key === 'ult_ocor' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
@@ -2175,7 +2177,7 @@ export function CondicaoArmazens() {
                           Últ. ocor.{drillSort.key === 'ult_ocor' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </button>
                       </th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap w-[14%]">
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[10%]">
                         <button
                           className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                           onClick={() => setDrillSort((s) => ({ key: 'vlr_merc', dir: s.key === 'vlr_merc' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
@@ -2183,7 +2185,7 @@ export function CondicaoArmazens() {
                           Vlr Merc.{drillSort.key === 'vlr_merc' ? (drillSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
                         </button>
                       </th>
-                      <th className="px-3 py-2 text-right whitespace-nowrap w-[14%]">
+                      <th className="px-3 py-2 text-right whitespace-nowrap w-[11%]">
                         <button
                           className="text-right hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                           onClick={() => setDrillSort((s) => ({ key: 'vlr_frete', dir: s.key === 'vlr_frete' ? (s.dir === 'asc' ? 'desc' : 'asc') : 'desc' }))}
@@ -2196,7 +2198,7 @@ export function CondicaoArmazens() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {drillSortedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                        <td colSpan={11} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
                           Nenhum CT-e neste grupo.
                         </td>
                       </tr>
@@ -2223,6 +2225,7 @@ export function CondicaoArmazens() {
                               <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</span>
                             </td>
                             <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{cte}</td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{fmtDateBR2y(r.data_emissao)}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{fmtDateBR2y(r.data_chegada_unid)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">
                               <span className={dias >= 8 ? 'text-red-700 dark:text-red-300 font-bold' : dias >= 4 ? 'text-amber-700 dark:text-amber-300 font-bold' : 'text-slate-700 dark:text-slate-200'}>

@@ -828,9 +828,9 @@ if ($obrigarPlacasReais) {
                 $i += 1;
             }
             if (empty($ph)) continue;
-            $q = "SELECT DISTINCT RIGHT(UPPER(placa), 4) AS suf
+            $q = "SELECT DISTINCT RIGHT(UPPER(BTRIM(placa)), 4) AS suf
                   FROM {$tabelaVeiculo}
-                  WHERE RIGHT(UPPER(placa), 4) IN (" . implode(',', $ph) . ")";
+                  WHERE RIGHT(UPPER(BTRIM(placa)), 4) IN (" . implode(',', $ph) . ")";
             $r = sql($q, $params, $conn);
             if ($r) {
                 while ($row = pg_fetch_assoc($r)) {
@@ -893,13 +893,13 @@ foreach ($placas_ssw as $placa) {
     $sufixoRve = null;
     $seqCarregRveAgrupado = 0;
 
-    if ($domainUpper === 'RVE' && preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $placa)) {
+    if ($domainUpper === 'RVE' && preg_match('/^[A-Z0-9]{3}[A-Z0-9]{4}$/', $placa)) {
         $destinoFromPlaca = substr($placa, 0, 3);
         $sufixoRve = substr($placa, 3, 4);
         if ($sufixoRve !== '') {
             $placaRealRve = '';
             $resVeic = sql(
-                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) = \$1 ORDER BY LENGTH(placa) ASC LIMIT 1",
+                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(BTRIM(placa)), 4) = \$1 ORDER BY (CASE WHEN UPPER(BTRIM(COALESCE(tipo, ''))) IN ('CAMINHAO','CAMINHÃO','CAMINHONETE','TRUCK','CARRETA') THEN 0 ELSE 1 END), LENGTH(BTRIM(placa)) ASC, UPPER(BTRIM(placa)) ASC LIMIT 1",
                 [$sufixoRve],
                 $conn
             );
@@ -915,7 +915,7 @@ foreach ($placas_ssw as $placa) {
                  JOIN {$tabela} c
                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
                  WHERE cap.unidade = \$1
-                   AND RIGHT(UPPER(cap.placa_provisoria), 4) = \$2
+                   AND RIGHT(UPPER(BTRIM(cap.placa_provisoria)), 4) = \$2
                    AND COALESCE(cap.simulado, FALSE) = FALSE
                    AND c.data_finalizacao IS NULL
                  ORDER BY cap.seq_carregamento DESC
