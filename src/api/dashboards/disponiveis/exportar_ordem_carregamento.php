@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', '0');
+error_reporting(0);
+
 while (ob_get_level()) {
     ob_end_clean();
 }
@@ -19,7 +22,7 @@ $auth = authenticateAndGetUser();
 $domain = $auth['domain'];
 
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
-    respondJson(['success' => false, 'message' => 'Domínio inválido.']);
+    respondJson(['success' => false, 'message' => 'Domínio inválido.'], 400);
 }
 
 $input = getRequestInput();
@@ -35,10 +38,10 @@ $rotaTxt = (string)($input['rota'] ?? '');
 $linhas = $input['linhas'] ?? [];
 
 if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
-    respondJson(['success' => false, 'message' => 'Unidade inválida.']);
+    respondJson(['success' => false, 'message' => 'Unidade inválida.'], 400);
 }
 if ($placa === '') {
-    respondJson(['success' => false, 'message' => 'Placa inválida.']);
+    respondJson(['success' => false, 'message' => 'Placa inválida.'], 400);
 }
 if (!is_array($linhas)) $linhas = [];
 
@@ -107,15 +110,15 @@ if ($logoUrl !== '' && stripos($logoUrl, 'http') !== 0) {
     $logoUrl = "https://{$host}/" . ltrim($logoUrl, '/');
 }
 
-$templatePath = realpath(__DIR__ . '/../../../../../ordem_carregamento.xlsx');
+$templatePath = realpath(__DIR__ . '/../../../../ordem_carregamento.xlsx');
 if (!$templatePath || !is_file($templatePath)) {
-    respondJson(['success' => false, 'message' => 'Template ordem_carregamento.xlsx não encontrado.']);
+    respondJson(['success' => false, 'message' => 'Template ordem_carregamento.xlsx não encontrado.'], 404);
 }
 
 $spreadsheet = IOFactory::load($templatePath);
 $sheet = $spreadsheet->getSheetByName('ORDEM DE CARREGAMENTO');
 if (!$sheet) {
-    respondJson(['success' => false, 'message' => 'Aba ORDEM DE CARREGAMENTO não encontrada no template.']);
+    respondJson(['success' => false, 'message' => 'Aba ORDEM DE CARREGAMENTO não encontrada no template.'], 500);
 }
 
 $spreadsheet->setActiveSheetIndex($spreadsheet->getIndex($sheet));
@@ -215,7 +218,11 @@ header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetm
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Cache-Control: max-age=0');
 
+$out = ob_get_contents();
+if ($out !== false && $out !== '') {
+    ob_end_clean();
+}
+
 $writer = new Xlsx($spreadsheet);
 $writer->save('php://output');
 exit;
-
