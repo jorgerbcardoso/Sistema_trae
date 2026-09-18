@@ -264,6 +264,27 @@ interface Carregamento {
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
 const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
 
+const cteKey = (cte: any): string => {
+  const seq = Number(cte?.seqCte ?? cte?.seq_cte ?? 0) || 0;
+  if (seq > 0) return `seq:${seq}`;
+  const ctrc = String(cte?.ctrc ?? '').trim().toUpperCase();
+  if (ctrc) return `ctrc:${ctrc}`;
+  const ser = String(cte?.serCte ?? cte?.ser_cte ?? '').trim().toUpperCase();
+  const nro = Number(cte?.nroCte ?? cte?.nro_cte ?? 0) || 0;
+  if (ser && nro > 0) return `ser:${ser}|nro:${nro}`;
+  if (nro > 0) return `nro:${nro}`;
+  return '';
+};
+
+const primeiraNfNfs = (nfs: string): string => {
+  const raw = String(nfs ?? '').trim();
+  if (!raw) return '';
+  const first = raw.split(',')[0]?.trim() ?? '';
+  if (!first) return '';
+  const parts = first.split('/').map(s => s.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts[1] : parts[0];
+};
+
 const COR_INDICADOR: Record<string, string> = {
   verde:    'bg-green-500',
   amarelo:  'bg-yellow-400',
@@ -1469,6 +1490,8 @@ interface CarregamentoAreaProps {
     resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
   }>;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
+  cteKeysDisponiveisTransferencia: Set<string>;
+  cteKeysDisponiveisEntrega: Set<string>;
 }
 
 function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
@@ -1753,6 +1776,8 @@ function escolherIntermediariasLinha(
 function CardCarregamento({
   carregamento,
   todosCtes,
+  cteKeysDisponiveisTransferencia,
+  cteKeysDisponiveisEntrega,
   modoApontamento,
   confirmar,
   onIniciarApontamento,
@@ -1769,6 +1794,8 @@ function CardCarregamento({
 }: {
   carregamento: Carregamento;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
+  cteKeysDisponiveisTransferencia: Set<string>;
+  cteKeysDisponiveisEntrega: Set<string>;
   modoApontamento: string | null;
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   onIniciarApontamento: (placa: string) => void;
@@ -2043,9 +2070,10 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CTRC', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
+    const header = ['CTRC', 'NFs', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
     const rows = lista.map((c: any) => [
       c.ctrc,
+      `"${String(c.nfs ?? '').replace(/"/g, '""')}"`,
       `"${c.unidade_carregamento || ''}"`,
       c.data_emissao,
       c.data_prev_ent,
@@ -2339,13 +2367,46 @@ function CardCarregamento({
   const isSimulado = Boolean((carregamento as any).simulado);
   const carregamentoIniciado = !isSimulado && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
 
-  const bordaCardClass = ativo
-    ? 'border-emerald-400 dark:border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30'
-    : isSimulado
-      ? 'border-emerald-400 dark:border-emerald-600'
-      : carregamentoIniciado
-        ? 'border-indigo-300 dark:border-indigo-800 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/30'
-        : 'border-slate-200 dark:border-slate-700';
+  const tipoCounts = useMemo(() => {
+    let entrega = 0;
+    let transf = 0;
+    let indef = 0;
+    for (const c of carregamento.ctes) {
+      const key = cteKey(c);
+      if (!key) continue;
+      const isEnt = cteKeysDisponiveisEntrega.has(key);
+      const isTr = cteKeysDisponiveisTransferencia.has(key);
+      if (isEnt) entrega += 1;
+      if (isTr) transf += 1;
+      if (!isEnt && !isTr) indef += 1;
+    }
+    return { entrega, transf, indef };
+  }, [carregamento.ctes, cteKeysDisponiveisEntrega, cteKeysDisponiveisTransferencia, isSimulado]);
+
+  const temEntrega = tipoCounts.entrega > 0;
+  const temTransferencia = tipoCounts.transf > 0;
+  const temIndef = tipoCounts.indef > 0;
+  const dominante = (temEntrega || temTransferencia)
+    ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
+    : null;
+
+  const bordaBaseClass = dominante === 'ENTREGA'
+    ? 'border-emerald-400 dark:border-emerald-600'
+    : dominante === 'TRANSFERENCIA'
+      ? 'border-orange-300 dark:border-orange-800'
+      : isSimulado
+        ? 'border-emerald-400 dark:border-emerald-600'
+        : carregamentoIniciado
+          ? 'border-orange-300 dark:border-orange-800'
+          : 'border-slate-200 dark:border-slate-700';
+
+  const ativoRingClass = ativo
+    ? (dominante === 'ENTREGA'
+      ? 'ring-2 ring-emerald-300 dark:ring-emerald-800 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30'
+      : 'ring-2 ring-orange-300 dark:ring-orange-800 shadow-lg shadow-orange-100 dark:shadow-orange-900/30')
+    : '';
+
+  const bordaCardClass = `${bordaBaseClass} ${ativoRingClass}`;
 
   return (
     <div className={`rounded-xl border-2 transition-all duration-200 ${bordaCardClass} bg-white dark:bg-slate-900 overflow-hidden`}>
@@ -2395,10 +2456,25 @@ function CardCarregamento({
             </Dialog>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 justify-end">
+          <div className="flex items-center gap-1.5 shrink-0 justify-end flex-wrap">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
+            {temTransferencia ? (
+              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 text-xs">
+                Transferência{tipoCounts.transf > 0 ? ` ${tipoCounts.transf}` : ''}
+              </Badge>
+            ) : null}
+            {temEntrega ? (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-xs">
+                Entrega{tipoCounts.entrega > 0 ? ` ${tipoCounts.entrega}` : ''}
+              </Badge>
+            ) : null}
+            {temIndef ? (
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
+                Indef.{tipoCounts.indef > 0 ? ` ${tipoCounts.indef}` : ''}
+              </Badge>
+            ) : null}
           </div>
 
           <div className="col-span-2 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
@@ -2735,7 +2811,7 @@ function CardCarregamento({
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <input
                   type="checkbox"
                   className="self-center"
@@ -2756,6 +2832,7 @@ function CardCarregamento({
                 <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('cte')}>
                   CT-e{cteDetalheSortKey === 'cte' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
                 </button>
+                <span>NFs</span>
                 <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('carr')}>
                   Carr.{cteDetalheSortKey === 'carr' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
                 </button>
@@ -2800,7 +2877,7 @@ function CardCarregamento({
                       return (
                       <div
                         key={idx}
-                        className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
                       >
                         <input
                           type="checkbox"
@@ -2819,6 +2896,7 @@ function CardCarregamento({
                           }}
                         />
                         <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
+                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{primeiraNfNfs(String((cte as any).nfs ?? '')) || '-'}</span>
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
@@ -2841,9 +2919,10 @@ function CardCarregamento({
             </div>
 
             {cteDetalheTotais && (
-              <div className="grid grid-cols-[28px_105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheSelecionados.size > 0 ? `${cteDetalheSelecionados.size} selecionado(s)` : ''}</span>
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
+                <span />
                 <span />
                 <span />
                 <span />
@@ -4934,6 +5013,8 @@ function CarregamentoArea({
   onToggleObrigarPlacasReais,
   onCarregamentoAutomatico,
   todosCtes,
+  cteKeysDisponiveisTransferencia,
+  cteKeysDisponiveisEntrega,
 }: CarregamentoAreaProps) {
   const [modalAberto, setModalAberto] = useState(false);
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
@@ -5693,8 +5774,9 @@ function CarregamentoArea({
                     <DialogDescription>Lista de CT-es envolvidos no carregamento</DialogDescription>
                   </DialogHeader>
                   <div className="min-h-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-                    <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <div className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                       <span>CTRC</span>
+                      <span>NFs</span>
                       <span>Carr.</span>
                       <span>Emissão</span>
                       <span>Prev. Entr.</span>
@@ -5713,8 +5795,9 @@ function CarregamentoArea({
                       ) : calCtesLista.length === 0 ? (
                         <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 text-center">—</div>
                       ) : calCtesLista.map((cte: any, idx: number) => (
-                        <div key={`${cte.seq_cte ?? idx}-${idx}`} className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[11px] border-b border-slate-100 dark:border-slate-800">
+                        <div key={`${cte.seq_cte ?? idx}-${idx}`} className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[11px] border-b border-slate-100 dark:border-slate-800">
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{cte.ctrc}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{primeiraNfNfs(String(cte.nfs ?? '')) || '-'}</span>
                           <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                           <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
@@ -5732,9 +5815,10 @@ function CarregamentoArea({
                       ))}
                     </div>
                     {calCtesTotais && (
-                      <div className="grid grid-cols-[105px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      <div className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                         <span className="text-slate-600 dark:text-slate-300">Total</span>
                         <span className="text-slate-500 dark:text-slate-400">{calCtesLista.length} CT-es</span>
+                        <span />
                         <span />
                         <span />
                         <span />
@@ -5966,6 +6050,8 @@ function CarregamentoArea({
                 key={i}
                 carregamento={c}
                 todosCtes={todosCtes}
+                cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+                cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
                 modoApontamento={modoApontamento}
                 confirmar={confirmar}
                 onIniciarApontamento={onIniciarApontamento}
@@ -6316,6 +6402,28 @@ export function Disponiveis() {
     }
     return lista;
   }, [dados, dadosEntrega, carregamentos]);
+
+  const cteKeysDisponiveisTransferencia = React.useMemo(() => {
+    const s = new Set<string>();
+    if (dados?.ctes) {
+      for (const c of dados.ctes) {
+        const k = cteKey(c);
+        if (k) s.add(k);
+      }
+    }
+    return s;
+  }, [dados]);
+
+  const cteKeysDisponiveisEntrega = React.useMemo(() => {
+    const s = new Set<string>();
+    if (dadosEntrega?.ctes) {
+      for (const c of dadosEntrega.ctes) {
+        const k = cteKey(c);
+        if (k) s.add(k);
+      }
+    }
+    return s;
+  }, [dadosEntrega]);
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 
@@ -9028,6 +9136,8 @@ export function Disponiveis() {
             onToggleObrigarPlacasReais={handleToggleObrigarPlacasReais}
             onCarregamentoAutomatico={handleCarregamentoAutomatico}
             todosCtes={todosCtes}
+            cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+            cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
           />
 
           {hubModalAberto && hubModalCarregamento && (

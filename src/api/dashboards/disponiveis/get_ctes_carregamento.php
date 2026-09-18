@@ -88,70 +88,81 @@ $unidade = strtoupper(trim(
 
 $conn = connect();
 $tabela = "{$domain}_carregamento";
+$tblCte = "{$domain}_cte";
+$cteTableOk = tabelaExisteCtesCarreg($conn, $tblCte);
 $tblUnidade = getTabelaUnidadesDominioCtesCarreg($conn, $domain);
 $mapDestinoCompart = buildMapaDestinoCompartilhadoCtesCarreg($conn, $tblUnidade);
 
-$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(car.ser_cte, '')) <> 'SAS'" : "";
 
 $whereSql = $seqCarreg > 0
-    ? "unidade = \$1 AND seq_carregamento = \$2"
-    : "unidade = \$1 AND UPPER(placa_provisoria) = \$2";
+    ? "car.unidade = \$1 AND car.seq_carregamento = \$2"
+    : "car.unidade = \$1 AND UPPER(car.placa_provisoria) = \$2";
 $params = $seqCarreg > 0 ? [$unidade, $seqCarreg] : [$unidade, $placa];
+
+$joinCte = $cteTableOk
+    ? "LEFT JOIN {$tblCte} cte
+         ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
+        AND cte.nro_cte = car.nro_cte"
+    : "";
+$selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";
 
 $sql = "
     SELECT
-        nro_cte,
-        ser_cte,
-        COALESCE(NULLIF(unidade_carregamento, ''), unidade) AS unidade_carregamento,
-        destino_cte,
+        car.nro_cte,
+        car.ser_cte,
+        COALESCE(NULLIF(car.unidade_carregamento, ''), car.unidade) AS unidade_carregamento,
+        car.destino_cte,
+        {$selNfs}
         TO_CHAR(
             CASE
-                WHEN data_emissao_cte IS NULL THEN NULL
-                WHEN EXTRACT(YEAR FROM data_emissao_cte) = 1 THEN
-                    data_emissao_cte + make_interval(
+                WHEN car.data_emissao_cte IS NULL THEN NULL
+                WHEN EXTRACT(YEAR FROM car.data_emissao_cte) = 1 THEN
+                    car.data_emissao_cte + make_interval(
                         years => (
                             (CASE
-                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM data_emissao_cte) <= 2
+                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM car.data_emissao_cte) <= 2
                                     THEN EXTRACT(YEAR FROM CURRENT_DATE)::int + 1
                                 ELSE EXTRACT(YEAR FROM CURRENT_DATE)::int
                              END) - 1
                         )
                     )
-                ELSE data_emissao_cte
+                ELSE car.data_emissao_cte
             END,
             'DD/MM/YYYY'
         ) AS data_emissao,
         TO_CHAR(
             CASE
-                WHEN data_prev_ent_cte IS NULL THEN NULL
-                WHEN EXTRACT(YEAR FROM data_prev_ent_cte) = 1 THEN
-                    data_prev_ent_cte + make_interval(
+                WHEN car.data_prev_ent_cte IS NULL THEN NULL
+                WHEN EXTRACT(YEAR FROM car.data_prev_ent_cte) = 1 THEN
+                    car.data_prev_ent_cte + make_interval(
                         years => (
                             (CASE
-                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM data_prev_ent_cte) <= 2
+                                WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 11 AND EXTRACT(MONTH FROM car.data_prev_ent_cte) <= 2
                                     THEN EXTRACT(YEAR FROM CURRENT_DATE)::int + 1
                                 ELSE EXTRACT(YEAR FROM CURRENT_DATE)::int
                              END) - 1
                         )
                     )
-                ELSE data_prev_ent_cte
+                ELSE car.data_prev_ent_cte
             END,
             'DD/MM/YYYY'
         ) AS data_prev_ent,
-        remetente_cte,
-        destinatario_cte,
-        pagador_cte,
-        cidade_destino_cte,
-        COALESCE(vlr_merc_cte, 0)   AS vlr_merc,
-        COALESCE(vlr_frete_cte, 0)  AS vlr_frete,
-        COALESCE(peso_cte, 0)       AS peso,
-        COALESCE(cubagem_cte, 0)    AS cubagem,
-        COALESCE(qtde_vol_cte, 0)   AS qtde_vol
-    FROM {$tabela}
+        car.remetente_cte,
+        car.destinatario_cte,
+        car.pagador_cte,
+        car.cidade_destino_cte,
+        COALESCE(car.vlr_merc_cte, 0)   AS vlr_merc,
+        COALESCE(car.vlr_frete_cte, 0)  AS vlr_frete,
+        COALESCE(car.peso_cte, 0)       AS peso,
+        COALESCE(car.cubagem_cte, 0)    AS cubagem,
+        COALESCE(car.qtde_vol_cte, 0)   AS qtde_vol
+    FROM {$tabela} car
+    {$joinCte}
     WHERE {$whereSql}
-      AND nro_cte > 0
+      AND car.nro_cte > 0
       {$filtroSerieRve}
-    ORDER BY data_inclusao ASC, hora_inclusao ASC
+    ORDER BY car.data_inclusao ASC, car.hora_inclusao ASC
 ";
 
 $res = sql($sql, $params, $conn);
@@ -185,6 +196,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $ctes[] = [
         'seq_cte'       => $nroCte,   // compatibilidade com frontend
         'ctrc'          => $ctrc,
+        'nfs'           => $row['nfs'] ?? '',
         'unidade_carregamento' => strtoupper(trim($row['unidade_carregamento'] ?? '')),
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
