@@ -4015,6 +4015,7 @@ function ModalRotaCarregamento({
   const [geoStatusByKey, setGeoStatusByKey] = useState<Record<string, 'pending' | 'loading' | 'ok' | 'error'>>({});
   const [geoErrorByKey, setGeoErrorByKey] = useState<Record<string, string>>({});
   const [geoRunning, setGeoRunning] = useState(false);
+  const [geoHydrated, setGeoHydrated] = useState(false);
 
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
 
@@ -4078,7 +4079,7 @@ function ModalRotaCarregamento({
       cep: string;
       cidade: string;
       uf: string;
-      ctes: { ser: string; nro: number; ctrc: string }[];
+      ctes: { ser: string; nro: number; ctrc: string; peso: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -4087,7 +4088,7 @@ function ModalRotaCarregamento({
       tipo: 'TRANSFERENCIA';
       unidade: string;
       titulo: string;
-      ctes: { ser: string; nro: number; ctrc: string }[];
+      ctes: { ser: string; nro: number; ctrc: string; peso: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -4109,7 +4110,11 @@ function ModalRotaCarregamento({
       const hasEndereco = hasEnderecoReal || isFec;
 
       const ctrc = padCte(ser, nro);
-      const itemCte = { ser, nro, ctrc };
+      const peso = c?.peso !== null && c?.peso !== undefined && String(c.peso) !== '' ? Number(c.peso) : 0;
+      const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? Number(c.cubagem) : 0;
+      const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
+      const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '');
+      const itemCte = { ser, nro, ctrc, peso: Number.isFinite(peso) ? peso : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
 
       if (hasEndereco) {
         const baseTitulo = (isFec && !hasEnderecoReal)
@@ -4186,11 +4191,13 @@ function ModalRotaCarregamento({
         status[g.key] = 'pending';
       }
     }
+    setGeoHydrated(false);
     setCoordsByKey(initial);
     setGeoStatusByKey(status);
     setGeoErrorByKey({});
     setGeoRunning(false);
     setAbertos(new Set());
+    setGeoHydrated(true);
   }, [carregamento.placa_provisoria]);
 
   useEffect(() => {
@@ -4292,6 +4299,7 @@ function ModalRotaCarregamento({
 
   const [routeCoords, setRouteCoords] = useState<{ lat: number; lng: number }[]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [xlsxLoading, setXlsxLoading] = useState(false);
 
   useEffect(() => {
     const fetchRoute = async () => {
@@ -4417,6 +4425,112 @@ function ModalRotaCarregamento({
     map.fitBounds(bounds, { padding: [30, 30] });
   }, [pontosOrdenados, routeCoords]);
 
+  const exportarOrdemCarregamento = useCallback(async () => {
+    if (xlsxLoading) return;
+    setXlsxLoading(true);
+    try {
+      const entregaByKey = new Map(grupos.entrega.map((g) => [g.key, g]));
+      const entregaKeysEmOrdem: string[] = [];
+      for (const p of pontosOrdenados) {
+        if (p.tipo !== 'ENTREGA') continue;
+        const key = String(p.key ?? '');
+        const groupKey = key.startsWith('E:') ? key.slice(2) : '';
+        if (!groupKey) continue;
+        if (entregaKeysEmOrdem.includes(groupKey)) continue;
+        entregaKeysEmOrdem.push(groupKey);
+      }
+
+      const entregaKeysPorUnidade = new Map<string, string[]>();
+      for (const k of entregaKeysEmOrdem) {
+        const g = entregaByKey.get(k);
+        if (!g) continue;
+        const u = String(g.unidade ?? '').toUpperCase();
+        if (!entregaKeysPorUnidade.has(u)) entregaKeysPorUnidade.set(u, []);
+        entregaKeysPorUnidade.get(u)!.push(k);
+      }
+
+      const transfByUnidade = new Map(grupos.transferencia.map((g) => [String(g.unidade ?? '').toUpperCase(), g]));
+      const linhas: any[] = [];
+      const addLinhas = (setor: string, destinatario: string, cidade: string, ctes: any[]) => {
+        for (const c of ctes) {
+          linhas.push({
+            setor,
+            destinatario,
+            cidade,
+            ctrc: c?.ctrc ?? '',
+            peso: c?.peso ?? 0,
+            cubagem: c?.cubagem ?? 0,
+            volume: c?.qtde_vol ?? 0,
+            obs: '',
+          });
+        }
+      };
+
+      for (const uSigla of unidadesOrdem.slice(1)) {
+        const unidade = String(uSigla ?? '').toUpperCase();
+        if (unidade !== 'FEC') {
+          const tg = transfByUnidade.get(unidade);
+          if (tg) {
+            const uNome = unidadesMap.get(unidade)?.nome ?? '';
+            const destinatario = `UNIDADE ${unidade}${uNome ? ` - ${uNome}` : ''}`;
+            addLinhas(unidade, destinatario, uNome, tg.ctes);
+          }
+        }
+
+        const keys = entregaKeysPorUnidade.get(unidade) ?? [];
+        for (const k of keys) {
+          const g = entregaByKey.get(k);
+          if (!g) continue;
+          const cidade = [g.cidade, g.uf].filter(Boolean).join('/');
+          const destinatario = g.destinatario || g.titulo || 'ENTREGA';
+          addLinhas(unidade || g.unidade || '', destinatario, cidade, g.ctes);
+        }
+      }
+
+      for (const k of entregaKeysEmOrdem) {
+        const g = entregaByKey.get(k);
+        if (!g) continue;
+        const u = String(g.unidade ?? '').toUpperCase();
+        if (unidadesOrdem.includes(u)) continue;
+        const cidade = [g.cidade, g.uf].filter(Boolean).join('/');
+        const destinatario = g.destinatario || g.titulo || 'ENTREGA';
+        addLinhas(u || g.unidade || '', destinatario, cidade, g.ctes);
+      }
+
+      const rotaTxt = unidadesOrdem.filter(Boolean).join(' → ');
+
+      const token = localStorage.getItem('auth_token');
+      const resp = await fetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/exportar_ordem_carregamento.php`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, linhas }),
+        }
+      );
+      if (!resp.ok) {
+        const txt = await resp.text();
+        try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
+        catch { throw new Error('Erro ao exportar planilha'); }
+      }
+
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ordem_carregamento_${carregamento.placa_provisoria}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Planilha gerada com sucesso!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao gerar planilha.');
+    } finally {
+      setXlsxLoading(false);
+    }
+  }, [xlsxLoading, grupos.entrega, grupos.transferencia, pontosOrdenados, unidadesOrdem, unidadesMap, origem, carregamento.placa_provisoria]);
+
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
     if (!token) return null;
@@ -4443,7 +4557,7 @@ function ModalRotaCarregamento({
     if (geoRunning) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
-    const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
+    const pendentes = grupos.entrega.filter((g) => (geoStatusByKey[g.key] ?? 'pending') === 'pending');
     if (pendentes.length === 0) return;
     setGeoRunning(true);
     try {
@@ -4487,13 +4601,14 @@ function ModalRotaCarregamento({
     const token = getToken();
     const placa = carregamento.placa_provisoria;
     if (!token) return;
+    if (!geoHydrated) return;
     if (geoRunning) return;
     if (autoGeoRef.current === placa) return;
-    const pendentes = grupos.entrega.filter((g) => !coordsByKey[g.key]);
+    const pendentes = grupos.entrega.filter((g) => (geoStatusByKey[g.key] ?? 'pending') === 'pending');
     if (pendentes.length === 0) return;
     autoGeoRef.current = placa;
     void iniciarGeocoding();
-  }, [carregamento.placa_provisoria, getToken, geoRunning, grupos.entrega, coordsByKey, iniciarGeocoding]);
+  }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey, iniciarGeocoding]);
 
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
@@ -4508,7 +4623,7 @@ function ModalRotaCarregamento({
     });
   };
 
-  const renderCtes = (items: { ser: string; nro: number; ctrc: string }[]) => {
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string; peso?: number; cubagem?: number; qtde_vol?: number; cidade?: string; destinatario?: string }[]) => {
     return (
       <div className="mt-2 pl-6 space-y-1">
         {items.map((c) => (
@@ -4542,7 +4657,10 @@ function ModalRotaCarregamento({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 mb-1">
               <span className="font-semibold">Geolocalização</span>
-              <span>{okEnt}/{totalEnt} ({pct}%)</span>
+              <span>
+                {geoRunning ? `Processando… ${okEnt}/${totalEnt}` : (totalEnt > 0 && okEnt === totalEnt ? 'Concluída' : `${okEnt}/${totalEnt} (${pct}%)`)}
+                {routeLoading ? ' · Rota…' : ''}
+              </span>
             </div>
             <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
               <div className="h-2 bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
@@ -4559,6 +4677,15 @@ function ModalRotaCarregamento({
             >
               {geoRunning ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5 mr-1.5" />}
               Geolocalizar
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => { void exportarOrdemCarregamento(); }}
+              disabled={xlsxLoading}
+            >
+              {xlsxLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
+              Ordem de Carregamento
             </Button>
           </div>
         </div>
