@@ -6673,7 +6673,7 @@ export function Disponiveis() {
       });
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-        { method: 'POST', body: JSON.stringify({ placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis, forcar_min_frete: forcarMinFrete }) },
+        { method: 'POST', body: JSON.stringify({ unidade: unidadeAtual, placa, unidadeDestino, paradas, nroLinha, ctesDisponiveis, forcar_min_frete: forcarMinFrete }) },
         true
       );
       if (res.success) {
@@ -6721,7 +6721,7 @@ export function Disponiveis() {
       if (!silent) toast.error(e.message || 'Erro ao iniciar carregamento automático');
       return { ok: false, message: e?.message || 'Erro ao iniciar carregamento automático' };
     }
-  }, [carregarCarregamentos, dados, confirmar]);
+  }, [carregarCarregamentos, dados, confirmar, unidadeAtual]);
 
   const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
     if (carregandoNroLinhaHoje) return;
@@ -6764,7 +6764,7 @@ export function Disponiveis() {
       setAdiandoNroLinhaHoje(nroLinha);
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/carregamento_automatico.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adiar_linha', nroLinha }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'adiar_linha', unidade: unidadeAtual, nroLinha }) },
         true
       );
       if (res?.success) {
@@ -6779,7 +6779,7 @@ export function Disponiveis() {
     } finally {
       setAdiandoNroLinhaHoje(null);
     }
-  }, [adiandoNroLinhaHoje, carregandoNroLinhaHoje, carregandoTodasLinhasHoje, confirmar, carregarCarregamentos, carregarCarregamentosCalendario]);
+  }, [adiandoNroLinhaHoje, carregandoNroLinhaHoje, carregandoTodasLinhasHoje, confirmar, carregarCarregamentos, carregarCarregamentosCalendario, unidadeAtual]);
 
   const carregamentosNaoSimulados = React.useMemo(() => {
     return (carregamentos ?? []).filter((c: any) => !c?.simulado);
@@ -8692,7 +8692,7 @@ export function Disponiveis() {
           </div>
 
           <Dialog open={linhasHojeDialogOpen} onOpenChange={setLinhasHojeDialogOpen}>
-            <DialogContent className="sm:max-w-[1100px] h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+            <DialogContent className="sm:max-w-[1100px] max-h-[calc(100vh-80px)] overflow-hidden flex flex-col">
               <DialogHeader>
                 <DialogTitle>Linhas que carregam hoje</DialogTitle>
                 <DialogDescription>Linhas com origem na unidade atual e frequência ativa para o dia de hoje</DialogDescription>
@@ -8717,7 +8717,7 @@ export function Disponiveis() {
                   </div>
                 </DialogContent>
               </Dialog>
-              <div className="flex-1 overflow-y-auto pr-1">
+              <div className="overflow-y-auto pr-1 max-h-[calc(100vh-260px)]">
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                   <div className="grid grid-cols-[60px_minmax(0,1fr)_55px_minmax(0,1fr)_60px_120px_120px_170px] gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                     <button
