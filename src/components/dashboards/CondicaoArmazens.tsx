@@ -2272,13 +2272,14 @@ export function CondicaoArmazens() {
                       <td className="px-3 py-2 whitespace-nowrap w-[6%]">TOTAL</td>
                       <td className="px-3 py-2 whitespace-nowrap w-[10%]">{drillTotais.total.toLocaleString('pt-BR')}</td>
                       <td className="px-3 py-2 w-[9%]" />
+                      <td className="px-3 py-2 w-[9%]" />
                       <td className="px-3 py-2 w-[6%]" />
                       <td className="px-3 py-2 w-[9%]" />
                       <td className="px-3 py-2 w-[6%]" />
                       <td className="px-3 py-2 w-[6%]" />
-                      <td className="px-3 py-2 w-[20%]" />
-                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[14%]">{fmtMoney(drillTotais.vlrMerc)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[14%]">{fmtMoney(drillTotais.vlrFrete)}</td>
+                      <td className="px-3 py-2 w-[18%]" />
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[10%]">{fmtMoney(drillTotais.vlrMerc)}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap w-[11%]">{fmtMoney(drillTotais.vlrFrete)}</td>
                     </tr>
                   </tbody>
                 </table>
