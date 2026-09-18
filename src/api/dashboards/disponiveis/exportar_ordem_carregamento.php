@@ -116,6 +116,18 @@ if ($logoUrl !== '' && stripos($logoUrl, 'http') !== 0) {
     $logoUrl = "https://{$host}/" . ltrim($logoUrl, '/');
 }
 
+if (class_exists('\PhpOffice\PhpSpreadsheet\Settings') && class_exists('\PhpOffice\PhpSpreadsheet\CachedObjectStorageFactory')) {
+    try {
+        if (method_exists('\PhpOffice\PhpSpreadsheet\Settings', 'setCacheStorageMethod')) {
+            \PhpOffice\PhpSpreadsheet\Settings::setCacheStorageMethod(
+                \PhpOffice\PhpSpreadsheet\CachedObjectStorageFactory::cache_to_discISAM,
+                ['dir' => sys_get_temp_dir()]
+            );
+        }
+    } catch (Exception $e) {
+    }
+}
+
 $spreadsheet = new Spreadsheet();
 $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('ORDEM DE CARREGAMENTO');
@@ -243,8 +255,8 @@ $headers = [
 
 foreach ($headers as $col => $title) {
     $sheet->setCellValue($col . $headerRow, $title);
-    $sheet->getStyle($col . $headerRow)->applyFromArray($tableHeaderStyle);
 }
+$sheet->getStyle('A' . $headerRow . ':P' . $headerRow)->applyFromArray($tableHeaderStyle);
 $sheet->getRowDimension($headerRow)->setRowHeight(22);
 
 if ($logoUrl !== '') {
@@ -300,25 +312,23 @@ foreach ($linhas as $item) {
     $sheet->setCellValue('N' . $row, $volume);
     $sheet->setCellValue('P' . $row, $obs);
 
-    foreach (array_keys($headers) as $col) {
-        $sheet->getStyle($col . $row)->applyFromArray($tableCellBorder);
-    }
-    $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
-    $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
-    $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-    $sheet->getStyle('J' . $row . ':L' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-    $sheet->getStyle('N' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
-    $sheet->getStyle('J' . $row . ':L' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    $sheet->getStyle('N' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    $sheet->getStyle('P' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
-
     $row++;
     $ord++;
 }
 
 $lastRow = max($row - 1, $dataRowStart);
+$sheet->getStyle('A' . $dataRowStart . ':P' . $lastRow)->applyFromArray($tableCellBorder);
+$sheet->getStyle('A' . $dataRowStart . ':A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+$sheet->getStyle('B' . $dataRowStart . ':B' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+$sheet->getStyle('C' . $dataRowStart . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+$sheet->getStyle('F' . $dataRowStart . ':F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+$sheet->getStyle('H' . $dataRowStart . ':H' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+$sheet->getStyle('J' . $dataRowStart . ':L' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('N' . $dataRowStart . ':N' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
+$sheet->getStyle('J' . $dataRowStart . ':L' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle('N' . $dataRowStart . ':N' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle('P' . $dataRowStart . ':P' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+
 $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
 $sheet->freezePane('A' . $dataRowStart);
@@ -336,5 +346,12 @@ if ($out !== false && $out !== '') {
 }
 
 $writer = new Xlsx($spreadsheet);
+$writer->setPreCalculateFormulas(false);
+if (method_exists($writer, 'setUseDiskCaching')) {
+    try {
+        $writer->setUseDiskCaching(true, sys_get_temp_dir());
+    } catch (Exception $e) {
+    }
+}
 $writer->save('php://output');
 exit;
