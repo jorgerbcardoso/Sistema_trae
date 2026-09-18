@@ -332,7 +332,7 @@ $sheet->getStyle('P' . $dataRowStart . ':P' . $lastRow)->getAlignment()->setHori
 $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
 $sheet->freezePane('A' . $dataRowStart);
-$sheet->setPrintArea('A1:P' . $lastRow);
+$sheet->getPageSetup()->setPrintArea('A1:P' . $lastRow);
 
 $filename = 'ordem_carregamento_' . ($seqCar > 0 ? $seqCar : $placa) . '.xlsx';
 
