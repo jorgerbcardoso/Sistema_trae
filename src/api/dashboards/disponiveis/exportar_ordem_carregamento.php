@@ -133,7 +133,7 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('ORDEM DE CARREGAMENTO');
 
 $sheet->getDefaultRowDimension()->setRowHeight(16);
-$sheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
+$spreadsheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
 
 $colWidths = [
     'A' => 5,
