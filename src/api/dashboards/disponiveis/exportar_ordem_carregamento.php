@@ -138,126 +138,316 @@ $spreadsheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
 $colWidths = [
     'A' => 5,
     'B' => 7,
-    'C' => 36,
-    'D' => 10,
-    'E' => 12,
-    'F' => 18,
-    'G' => 3,
-    'H' => 14,
-    'I' => 3,
-    'J' => 11,
+    'C' => 42,
+    'D' => 20,
+    'E' => 14,
+    'F' => 12,
+    'G' => 12,
+    'H' => 12,
+    'I' => 12,
+    'J' => 10,
     'K' => 11,
-    'L' => 11,
-    'M' => 22,
-    'N' => 9,
-    'O' => 3,
-    'P' => 28,
+    'L' => 24,
 ];
 foreach ($colWidths as $col => $w) {
     $sheet->getColumnDimension($col)->setWidth($w);
 }
 
-$sheet->getRowDimension(1)->setRowHeight(42);
-$sheet->getRowDimension(2)->setRowHeight(22);
-$sheet->getRowDimension(3)->setRowHeight(18);
+$darkBlue = '1F4E79';
+$darkBlue2 = '17365D';
+$lightBlue = 'D9E2F3';
+$inputBg = 'FFF2CC';
+$gridBorder = 'A6A6A6';
+
+$sheet->getRowDimension(1)->setRowHeight(24);
+$sheet->getRowDimension(2)->setRowHeight(18);
+$sheet->getRowDimension(3)->setRowHeight(16);
 $sheet->getRowDimension(4)->setRowHeight(18);
 
-$titleStyle = [
-    'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => '0F172A']],
+$styleDarkBar = [
+    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $darkBlue]],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+];
+$styleDarkBarCenter = [
+    'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'FFFFFF']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $darkBlue]],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
 ];
-
-$subTitleStyle = [
-    'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '334155']],
+$styleDarkBarRight = [
+    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $darkBlue2]],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
+];
+$styleLabel = [
+    'font' => ['bold' => true, 'size' => 9, 'color' => ['rgb' => '000000']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $lightBlue]],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
 ];
-
-$metaLabelStyle = [
-    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '334155']],
+$styleValue = [
+    'font' => ['size' => 9, 'color' => ['rgb' => '000000']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $inputBg]],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
 ];
-
-$metaValueStyle = [
-    'font' => ['size' => 10, 'color' => ['rgb' => '0F172A']],
-    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+$styleGrid = [
+    'borders' => [
+        'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]],
+    ],
 ];
 
-$sheet->mergeCells('C1:P1');
+$sheet->mergeCells('C1:L2');
 $sheet->setCellValue('C1', 'ORDEM DE CARREGAMENTO');
-$sheet->getStyle('C1')->applyFromArray($titleStyle);
-
-$sheet->mergeCells('C2:P2');
-$sheet->setCellValue('C2', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
-$sheet->getStyle('C2')->applyFromArray($subTitleStyle);
-
-$sheet->mergeCells('C3:P3');
-$sheet->setCellValue('C3', 'Gerado em: ' . date('d/m/Y H:i'));
-$sheet->getStyle('C3')->applyFromArray([
-    'font' => ['size' => 9, 'italic' => true, 'color' => ['rgb' => '64748B']],
-    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+$sheet->getStyle('C1:L2')->applyFromArray([
+    'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '000000']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
 ]);
+
+$sheet->getStyle('A1:L3')->applyFromArray($styleGrid);
+
+$sheet->mergeCells('A4:J4');
+$sheet->mergeCells('K4:L4');
+$sheet->setCellValue('A4', '');
+$sheet->setCellValue('K4', $seqCar > 0 ? ('OC Nº ' . $seqCar) : 'OC Nº');
+$sheet->getStyle('A4:J4')->applyFromArray($styleDarkBar);
+$sheet->getStyle('K4:L4')->applyFromArray($styleDarkBarRight);
 
 $sheet->mergeCells('A5:C5');
-$sheet->setCellValue('A5', 'DATA');
-$sheet->getStyle('A5')->applyFromArray($metaLabelStyle);
 $sheet->mergeCells('D5:F5');
-$sheet->setCellValue('D5', date('d/m/Y'));
-$sheet->getStyle('D5')->applyFromArray($metaValueStyle);
+$sheet->mergeCells('G5:H5');
+$sheet->mergeCells('K5:L5');
+$sheet->setCellValue('A5', 'DATA DA EMISSÃO');
+$sheet->setCellValue('D5', 'DATA DO CARREGAMENTO');
+$sheet->setCellValue('G5', 'TIPO DE OPERAÇÃO');
+$sheet->setCellValue('I5', 'SIGLA');
+$sheet->setCellValue('J5', 'Nº:');
+$sheet->setCellValue('K5', 'UNIDADE / CD');
+$sheet->getStyle('A5:L5')->applyFromArray($styleLabel);
 
-$sheet->mergeCells('H5:J5');
-$sheet->setCellValue('H5', 'PLACA');
-$sheet->getStyle('H5')->applyFromArray($metaLabelStyle);
-$sheet->mergeCells('K5:M5');
-$sheet->setCellValue('K5', $placa);
-$sheet->getStyle('K5')->applyFromArray($metaValueStyle);
+$sheet->mergeCells('A6:C6');
+$sheet->mergeCells('D6:F6');
+$sheet->mergeCells('G6:H6');
+$sheet->mergeCells('K6:L6');
+$sheet->setCellValue('A6', '');
+$sheet->setCellValue('D6', date('d/m/Y'));
+$sheet->setCellValue('G6', 'ENTREGA');
+$sheet->setCellValue('I6', $unidade);
+$sheet->setCellValue('J6', $seqCar > 0 ? $seqCar : '');
+$sheet->setCellValue('K6', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+$sheet->getStyle('A6:L6')->applyFromArray($styleValue);
 
-$sheet->mergeCells('N5:P5');
-$sheet->setCellValue('N5', $seqCar > 0 ? ('OC Nº ' . $seqCar) : 'OC Nº');
-$sheet->getStyle('N5')->applyFromArray([
-    'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '0F172A']],
-    'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
-]);
+$sheet->getStyle('A5:L6')->applyFromArray($styleGrid);
 
-$sheet->mergeCells('A7:P7');
-$sheet->setCellValue('A7', $rotaTxt !== '' ? ('ROTA: ' . $rotaTxt) : 'ROTA:');
-$sheet->getStyle('A7')->applyFromArray([
-    'font' => ['size' => 10, 'color' => ['rgb' => '0F172A']],
+$sheet->mergeCells('A7:L7');
+$sheet->setCellValue('A7', 'DADOS DO VEÍCULO E MOTORISTA');
+$sheet->getStyle('A7:L7')->applyFromArray($styleDarkBar);
+
+$sheet->mergeCells('A8:F8');
+$sheet->mergeCells('G8:H8');
+$sheet->mergeCells('I8:L8');
+$sheet->setCellValue('A8', 'MOTORISTA');
+$sheet->setCellValue('G8', 'CPF');
+$sheet->setCellValue('I8', 'TELEFONE / CONTATO');
+$sheet->getStyle('A8:L8')->applyFromArray($styleLabel);
+
+$sheet->mergeCells('A9:F9');
+$sheet->mergeCells('G9:H9');
+$sheet->mergeCells('I9:L9');
+$sheet->setCellValue('A9', '');
+$sheet->setCellValue('G9', '');
+$sheet->setCellValue('I9', '');
+$sheet->getStyle('A9:L9')->applyFromArray($styleValue);
+
+$sheet->mergeCells('A10:B10');
+$sheet->mergeCells('C10:D10');
+$sheet->mergeCells('E10:F10');
+$sheet->mergeCells('G10:H10');
+$sheet->mergeCells('I10:J10');
+$sheet->mergeCells('K10:L10');
+$sheet->setCellValue('A10', 'PLACA CAVALO');
+$sheet->setCellValue('C10', 'PLACA CARRETA');
+$sheet->setCellValue('E10', 'TIPO DE VEÍCULO');
+$sheet->setCellValue('G10', 'CUBAGEM VEÍCULO');
+$sheet->setCellValue('I10', 'QTD. PALLETS');
+$sheet->setCellValue('K10', 'VÍNCULO');
+$sheet->getStyle('A10:L10')->applyFromArray($styleLabel);
+
+$sheet->mergeCells('A11:B11');
+$sheet->mergeCells('C11:D11');
+$sheet->mergeCells('E11:F11');
+$sheet->mergeCells('G11:H11');
+$sheet->mergeCells('I11:J11');
+$sheet->mergeCells('K11:L11');
+$sheet->setCellValue('A11', '');
+$sheet->setCellValue('C11', $placa);
+$sheet->setCellValue('E11', '');
+$sheet->setCellValue('G11', '');
+$sheet->setCellValue('I11', '');
+$sheet->setCellValue('K11', '');
+$sheet->getStyle('A11:L11')->applyFromArray($styleValue);
+
+$sheet->getStyle('A7:L11')->applyFromArray($styleGrid);
+
+$sheet->mergeCells('A12:L12');
+$sheet->setCellValue('A12', 'DADOS DO CARREGAMENTO');
+$sheet->getStyle('A12:L12')->applyFromArray($styleDarkBar);
+
+$sheet->mergeCells('A13:C13');
+$sheet->mergeCells('D13:F13');
+$sheet->mergeCells('G13:H13');
+$sheet->mergeCells('I13:J13');
+$sheet->setCellValue('A13', 'CONFERENTE RESPONSÁVEL');
+$sheet->setCellValue('D13', 'AJUDANTES');
+$sheet->setCellValue('G13', 'DOCA');
+$sheet->setCellValue('I13', 'TURNO');
+$sheet->setCellValue('K13', 'HORA INÍCIO');
+$sheet->setCellValue('L13', 'HORA FIM');
+$sheet->getStyle('A13:L13')->applyFromArray($styleLabel);
+
+$sheet->mergeCells('A14:C14');
+$sheet->mergeCells('D14:F14');
+$sheet->mergeCells('G14:H14');
+$sheet->mergeCells('I14:J14');
+$sheet->setCellValue('A14', '');
+$sheet->setCellValue('D14', '');
+$sheet->setCellValue('G14', '');
+$sheet->setCellValue('I14', '');
+$sheet->setCellValue('K14', '');
+$sheet->setCellValue('L14', '');
+$sheet->getStyle('A14:L14')->applyFromArray($styleValue);
+
+$sheet->mergeCells('A15:C15');
+$sheet->mergeCells('D15:F15');
+$sheet->mergeCells('G15:L15');
+$sheet->setCellValue('A15', 'QTD. VOLUMES CARREGADOS');
+$sheet->setCellValue('D15', 'QTD TOTAL DE PALETES');
+$sheet->setCellValue('G15', 'TIPO DE CARGA');
+$sheet->getStyle('A15:L15')->applyFromArray($styleLabel);
+
+$sheet->mergeCells('A16:C16');
+$sheet->mergeCells('D16:F16');
+$sheet->mergeCells('G16:L16');
+$sheet->setCellValue('A16', '');
+$sheet->setCellValue('D16', '');
+$sheet->setCellValue('G16', '☐ BATIDA     ☐ PALETIZADA     ☐ MISTA');
+$sheet->getStyle('A16:L16')->applyFromArray($styleValue);
+$sheet->getStyle('G16')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+$sheet->getStyle('A12:L16')->applyFromArray($styleGrid);
+
+$sheet->mergeCells('A17:L17');
+$sheet->setCellValue('A17', 'CHECKLIST DE CARREGAMENTO');
+$sheet->getStyle('A17:L17')->applyFromArray($styleDarkBarCenter);
+
+$sheet->setCellValue('A18', '☐ Documentação da carga conferida');
+$sheet->setCellValue('E18', '☐ Quantidade de paletes conferida');
+$sheet->setCellValue('I18', '☐ Lacre do veículo aplicado');
+$sheet->setCellValue('A19', '☐ Notas fiscais conferidas');
+$sheet->setCellValue('E19', '☐ Tipo de carga correto (batida/paletizada)');
+$sheet->setCellValue('I19', '☐ Veículo limpo e em condições');
+$sheet->setCellValue('A20', '☐ Quantidade de volumes conferida');
+$sheet->setCellValue('E20', '☐ Doca correta utilizada');
+$sheet->setCellValue('I20', '☐ Hora de saída registrada');
+$sheet->mergeCells('A18:D18');
+$sheet->mergeCells('E18:H18');
+$sheet->mergeCells('I18:L18');
+$sheet->mergeCells('A19:D19');
+$sheet->mergeCells('E19:H19');
+$sheet->mergeCells('I19:L19');
+$sheet->mergeCells('A20:D20');
+$sheet->mergeCells('E20:H20');
+$sheet->mergeCells('I20:L20');
+$sheet->getStyle('A18:L20')->applyFromArray([
+    'font' => ['size' => 9, 'color' => ['rgb' => '000000']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
 ]);
-$sheet->getRowDimension(7)->setRowHeight(20);
 
-$headerRow = 9;
-$dataRowStart = 10;
+$sheet->mergeCells('A21:D21');
+$sheet->mergeCells('E21:L21');
+$sheet->setCellValue('A21', 'NÚMERO DO LACRE:');
+$sheet->setCellValue('E21', '');
+$sheet->getStyle('A21:D21')->applyFromArray($styleLabel);
+$sheet->getStyle('E21:L21')->applyFromArray($styleValue);
+
+$sheet->getStyle('A17:L21')->applyFromArray($styleGrid);
+
+$totalCtrcs = count($linhas);
+$totalVolumes = 0;
+$totalPeso = 0.0;
+$totalCubagem = 0.0;
+foreach ($linhas as $it) {
+    if (!is_array($it)) continue;
+    $totalVolumes += (int)($it['volume'] ?? 0);
+    $totalPeso += (float)($it['peso'] ?? 0);
+    $totalCubagem += (float)($it['cubagem'] ?? 0);
+}
+
+$sheet->mergeCells('A22:L22');
+$sheet->setCellValue('A22', 'RESUMO DA CARGA');
+$sheet->getStyle('A22:L22')->applyFromArray($styleDarkBar);
+
+$sheet->mergeCells('A23:B23');
+$sheet->mergeCells('C23:D23');
+$sheet->mergeCells('E23:F23');
+$sheet->mergeCells('G23:H23');
+$sheet->mergeCells('I23:L23');
+$sheet->setCellValue('A23', 'TOTAL DE CTRCs');
+$sheet->setCellValue('C23', 'TOTAL DE VOLUMES');
+$sheet->setCellValue('E23', 'TOTAL PESO REAL');
+$sheet->setCellValue('G23', 'TOTAL CUBAGEM (m³)');
+$sheet->setCellValue('I23', 'TOTAL PESO CALC');
+$sheet->getStyle('A23:L23')->applyFromArray($styleLabel);
+$sheet->getStyle('A23:L23')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+$sheet->mergeCells('A24:B24');
+$sheet->mergeCells('C24:D24');
+$sheet->mergeCells('E24:F24');
+$sheet->mergeCells('G24:H24');
+$sheet->mergeCells('I24:L24');
+$sheet->setCellValue('A24', $totalCtrcs > 0 ? $totalCtrcs : '');
+$sheet->setCellValue('C24', $totalVolumes > 0 ? $totalVolumes : '');
+$sheet->setCellValue('E24', $totalPeso > 0 ? $totalPeso : '');
+$sheet->setCellValue('G24', $totalCubagem > 0 ? $totalCubagem : '');
+$sheet->setCellValue('I24', $totalPeso > 0 ? $totalPeso : '');
+$sheet->getStyle('A24:L24')->applyFromArray([
+    'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '0B2F5B']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+]);
+$sheet->getStyle('E24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('G24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('I24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+
+$sheet->getStyle('A22:L24')->applyFromArray($styleGrid);
+
+$sheet->mergeCells('A25:L25');
+$sheet->setCellValue('A25', 'NOTAS FISCAIS / ITENS CARREGADOS');
+$sheet->getStyle('A25:L25')->applyFromArray($styleDarkBar);
+
+$headerRow = 26;
+$dataRowStart = 27;
+$maxTableRows = max(count($linhas), 15);
+$lastRow = $dataRowStart + $maxTableRows - 1;
 
 $tableHeaderStyle = [
-    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
-    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
+    'font' => ['bold' => true, 'size' => 9, 'color' => ['rgb' => 'FFFFFF']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $darkBlue2]],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
 ];
-$tableCellBorder = [
-    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']]],
-    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-];
 
-$headers = [
-    'A' => 'ORD',
-    'B' => 'SETOR',
-    'C' => 'DESTINATÁRIO',
-    'F' => 'CIDADE',
-    'H' => 'CTRC',
-    'J' => 'PESO',
-    'K' => 'PESO',
-    'L' => 'CUBAGEM',
-    'N' => 'VOLUME',
-    'P' => 'OBS',
-];
-
-foreach ($headers as $col => $title) {
-    $sheet->setCellValue($col . $headerRow, $title);
-}
-$sheet->getStyle('A' . $headerRow . ':P' . $headerRow)->applyFromArray($tableHeaderStyle);
-$sheet->getRowDimension($headerRow)->setRowHeight(22);
+$sheet->setCellValue('A' . $headerRow, 'ORD.');
+$sheet->setCellValue('B' . $headerRow, 'SETOR');
+$sheet->setCellValue('C' . $headerRow, 'DESTINATÁRIO');
+$sheet->setCellValue('D' . $headerRow, 'CIDADE');
+$sheet->setCellValue('E' . $headerRow, 'NOTA FISCAL');
+$sheet->setCellValue('F' . $headerRow, 'AGENDA');
+$sheet->setCellValue('G' . $headerRow, "PESO\nREAL(KG)");
+$sheet->setCellValue('H' . $headerRow, "PESO\nCALC.(KG)");
+$sheet->setCellValue('I' . $headerRow, "CUBAGEM\n(M³)");
+$sheet->setCellValue('J' . $headerRow, 'VOLUME');
+$sheet->setCellValue('K' . $headerRow, "QTD\nPALETES");
+$sheet->setCellValue('L' . $headerRow, 'OBS.');
+$sheet->getStyle('A' . $headerRow . ':L' . $headerRow)->applyFromArray($tableHeaderStyle);
+$sheet->getRowDimension($headerRow)->setRowHeight(28);
 
 if ($logoUrl !== '') {
     $tmpFile = null;
@@ -279,7 +469,7 @@ if ($logoUrl !== '') {
             $drawing->setName('Logo');
             $drawing->setPath($tmpFile);
             $drawing->setCoordinates('A1');
-            $drawing->setHeight(46);
+            $drawing->setHeight(52);
             $drawing->setOffsetX(8);
             $drawing->setOffsetY(6);
             $drawing->setWorksheet($sheet);
@@ -292,6 +482,7 @@ $row = $dataRowStart;
 $ord = 1;
 foreach ($linhas as $item) {
     if (!is_array($item)) continue;
+    if ($row > $lastRow) break;
     $setor = strtoupper(trim((string)($item['setor'] ?? '')));
     $destinatario = trim((string)($item['destinatario'] ?? ''));
     $cidade = trim((string)($item['cidade'] ?? ''));
@@ -303,36 +494,93 @@ foreach ($linhas as $item) {
 
     $sheet->setCellValue('A' . $row, $ord);
     $sheet->setCellValue('B' . $row, $setor);
-    $sheet->setCellValue('C' . $row, $destinatario);
-    $sheet->setCellValue('F' . $row, $cidade);
-    $sheet->setCellValue('H' . $row, $ctrc);
-    $sheet->setCellValue('J' . $row, $peso);
-    $sheet->setCellValue('K' . $row, $peso);
-    $sheet->setCellValue('L' . $row, $cubagem);
-    $sheet->setCellValue('N' . $row, $volume);
-    $sheet->setCellValue('P' . $row, $obs);
+    $sheet->setCellValue('C' . $row, trim(($ctrc !== '' ? ($ctrc . ' ') : '') . $destinatario));
+    $sheet->setCellValue('D' . $row, $cidade);
+    $sheet->setCellValue('E' . $row, '');
+    $sheet->setCellValue('F' . $row, '');
+    $sheet->setCellValue('G' . $row, $peso > 0 ? $peso : '');
+    $sheet->setCellValue('H' . $row, $peso > 0 ? $peso : '');
+    $sheet->setCellValue('I' . $row, $cubagem > 0 ? $cubagem : '');
+    $sheet->setCellValue('J' . $row, $volume > 0 ? $volume : '');
+    $sheet->setCellValue('K' . $row, '');
+    $sheet->setCellValue('L' . $row, $obs);
 
     $row++;
     $ord++;
 }
 
-$lastRow = max($row - 1, $dataRowStart);
-$sheet->getStyle('A' . $dataRowStart . ':P' . $lastRow)->applyFromArray($tableCellBorder);
+$tableCellStyle = [
+    'font' => ['size' => 9, 'color' => ['rgb' => '000000']],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]]],
+    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+];
+$sheet->getStyle('A' . $dataRowStart . ':L' . $lastRow)->applyFromArray($tableCellStyle);
 $sheet->getStyle('A' . $dataRowStart . ':A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getStyle('B' . $dataRowStart . ':B' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getStyle('C' . $dataRowStart . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
-$sheet->getStyle('F' . $dataRowStart . ':F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
-$sheet->getStyle('H' . $dataRowStart . ':H' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-$sheet->getStyle('J' . $dataRowStart . ':L' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
-$sheet->getStyle('N' . $dataRowStart . ':N' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
-$sheet->getStyle('J' . $dataRowStart . ':L' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-$sheet->getStyle('N' . $dataRowStart . ':N' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-$sheet->getStyle('P' . $dataRowStart . ':P' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+$sheet->getStyle('D' . $dataRowStart . ':D' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+$sheet->getStyle('E' . $dataRowStart . ':F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+$sheet->getStyle('G' . $dataRowStart . ':I' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('J' . $dataRowStart . ':J' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
+$sheet->getStyle('G' . $dataRowStart . ':K' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle('L' . $dataRowStart . ':L' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+
+$afterTableRow = $lastRow + 2;
+
+$sheet->mergeCells('A' . $afterTableRow . ':L' . $afterTableRow);
+$sheet->setCellValue('A' . $afterTableRow, 'OBSERVAÇÕES GERAIS / OCORRÊNCIAS');
+$sheet->getStyle('A' . $afterTableRow . ':L' . $afterTableRow)->applyFromArray($styleDarkBar);
+
+$obsRowStart = $afterTableRow + 1;
+$obsRowEnd = $obsRowStart + 6;
+$sheet->mergeCells('A' . $obsRowStart . ':L' . $obsRowEnd);
+$sheet->setCellValue('A' . $obsRowStart, '');
+$sheet->getStyle('A' . $obsRowStart . ':L' . $obsRowEnd)->applyFromArray([
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $inputBg]],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]]],
+]);
+
+$confRow = $obsRowEnd + 2;
+$sheet->mergeCells('A' . $confRow . ':L' . $confRow);
+$sheet->setCellValue('A' . $confRow, 'CONFERÊNCIA E RESPONSÁVEIS');
+$sheet->getStyle('A' . $confRow . ':L' . $confRow)->applyFromArray($styleDarkBar);
+
+$sheet->mergeCells('A' . ($confRow + 1) . ':F' . ($confRow + 1));
+$sheet->mergeCells('G' . ($confRow + 1) . ':L' . ($confRow + 1));
+$sheet->setCellValue('A' . ($confRow + 1), 'CONFERENTE');
+$sheet->setCellValue('G' . ($confRow + 1), 'LÍDER OPERACIONAL');
+$sheet->getStyle('A' . ($confRow + 1) . ':L' . ($confRow + 1))->applyFromArray($styleLabel);
+$sheet->getStyle('A' . ($confRow + 1) . ':L' . ($confRow + 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+$sigStart = $confRow + 2;
+$sigEnd = $sigStart + 2;
+$sheet->mergeCells('A' . $sigStart . ':F' . $sigEnd);
+$sheet->mergeCells('G' . $sigStart . ':L' . $sigEnd);
+$sheet->setCellValue('A' . $sigStart, '');
+$sheet->setCellValue('G' . $sigStart, '');
+$sheet->getStyle('A' . $sigStart . ':L' . $sigEnd)->applyFromArray([
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $inputBg]],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]]],
+]);
+
+$dtRow = $sigEnd + 1;
+$sheet->mergeCells('A' . $dtRow . ':F' . $dtRow);
+$sheet->mergeCells('G' . $dtRow . ':L' . $dtRow);
+$sheet->setCellValue('A' . $dtRow, 'DATA: ____/____/______    HORA: ______');
+$sheet->setCellValue('G' . $dtRow, 'DATA: ____/____/______    HORA: ______');
+$sheet->getStyle('A' . $dtRow . ':L' . $dtRow)->applyFromArray([
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2F0D9']],
+    'font' => ['bold' => false, 'size' => 10, 'color' => ['rgb' => '000000']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]]],
+]);
+
+$finalRow = $dtRow + 1;
 
 $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
 $sheet->freezePane('A' . $dataRowStart);
-$sheet->getPageSetup()->setPrintArea('A1:P' . $lastRow);
+$sheet->getPageSetup()->setPrintArea('A1:L' . $finalRow);
 
 $filename = 'ordem_carregamento_' . ($seqCar > 0 ? $seqCar : $placa) . '.xlsx';
 
