@@ -1,6 +1,8 @@
 <?php
 ini_set('display_errors', '0');
 error_reporting(0);
+ini_set('memory_limit', '512M');
+set_time_limit(0);
 
 while (ob_get_level()) {
     ob_end_clean();
@@ -9,8 +11,12 @@ ob_start();
 
 require_once __DIR__ . '/../../config/phpspreadsheet_loader.php';
 
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
 require_once __DIR__ . '/../../config.php';
@@ -110,25 +116,136 @@ if ($logoUrl !== '' && stripos($logoUrl, 'http') !== 0) {
     $logoUrl = "https://{$host}/" . ltrim($logoUrl, '/');
 }
 
-$templatePath = realpath(__DIR__ . '/../../../../ordem_carregamento.xlsx');
-if (!$templatePath || !is_file($templatePath)) {
-    respondJson(['success' => false, 'message' => 'Template ordem_carregamento.xlsx não encontrado.'], 404);
+$spreadsheet = new Spreadsheet();
+$sheet = $spreadsheet->getActiveSheet();
+$sheet->setTitle('ORDEM DE CARREGAMENTO');
+
+$sheet->getDefaultRowDimension()->setRowHeight(16);
+$sheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
+
+$colWidths = [
+    'A' => 5,
+    'B' => 7,
+    'C' => 36,
+    'D' => 10,
+    'E' => 12,
+    'F' => 18,
+    'G' => 3,
+    'H' => 14,
+    'I' => 3,
+    'J' => 11,
+    'K' => 11,
+    'L' => 11,
+    'M' => 22,
+    'N' => 9,
+    'O' => 3,
+    'P' => 28,
+];
+foreach ($colWidths as $col => $w) {
+    $sheet->getColumnDimension($col)->setWidth($w);
 }
 
-$spreadsheet = IOFactory::load($templatePath);
-$sheet = $spreadsheet->getSheetByName('ORDEM DE CARREGAMENTO');
-if (!$sheet) {
-    respondJson(['success' => false, 'message' => 'Aba ORDEM DE CARREGAMENTO não encontrada no template.'], 500);
-}
+$sheet->getRowDimension(1)->setRowHeight(42);
+$sheet->getRowDimension(2)->setRowHeight(22);
+$sheet->getRowDimension(3)->setRowHeight(18);
+$sheet->getRowDimension(4)->setRowHeight(18);
 
-$spreadsheet->setActiveSheetIndex($spreadsheet->getIndex($sheet));
+$titleStyle = [
+    'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => '0F172A']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+];
 
-for ($i = $spreadsheet->getSheetCount() - 1; $i >= 0; $i--) {
-    $s = $spreadsheet->getSheet($i);
-    if ($s->getTitle() !== 'ORDEM DE CARREGAMENTO') {
-        $spreadsheet->removeSheetByIndex($i);
-    }
+$subTitleStyle = [
+    'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '334155']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+];
+
+$metaLabelStyle = [
+    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '334155']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+];
+
+$metaValueStyle = [
+    'font' => ['size' => 10, 'color' => ['rgb' => '0F172A']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+];
+
+$sheet->mergeCells('C1:P1');
+$sheet->setCellValue('C1', 'ORDEM DE CARREGAMENTO');
+$sheet->getStyle('C1')->applyFromArray($titleStyle);
+
+$sheet->mergeCells('C2:P2');
+$sheet->setCellValue('C2', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+$sheet->getStyle('C2')->applyFromArray($subTitleStyle);
+
+$sheet->mergeCells('C3:P3');
+$sheet->setCellValue('C3', 'Gerado em: ' . date('d/m/Y H:i'));
+$sheet->getStyle('C3')->applyFromArray([
+    'font' => ['size' => 9, 'italic' => true, 'color' => ['rgb' => '64748B']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+]);
+
+$sheet->mergeCells('A5:C5');
+$sheet->setCellValue('A5', 'DATA');
+$sheet->getStyle('A5')->applyFromArray($metaLabelStyle);
+$sheet->mergeCells('D5:F5');
+$sheet->setCellValue('D5', date('d/m/Y'));
+$sheet->getStyle('D5')->applyFromArray($metaValueStyle);
+
+$sheet->mergeCells('H5:J5');
+$sheet->setCellValue('H5', 'PLACA');
+$sheet->getStyle('H5')->applyFromArray($metaLabelStyle);
+$sheet->mergeCells('K5:M5');
+$sheet->setCellValue('K5', $placa);
+$sheet->getStyle('K5')->applyFromArray($metaValueStyle);
+
+$sheet->mergeCells('N5:P5');
+$sheet->setCellValue('N5', $seqCar > 0 ? ('OC Nº ' . $seqCar) : 'OC Nº');
+$sheet->getStyle('N5')->applyFromArray([
+    'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '0F172A']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
+]);
+
+$sheet->mergeCells('A7:P7');
+$sheet->setCellValue('A7', $rotaTxt !== '' ? ('ROTA: ' . $rotaTxt) : 'ROTA:');
+$sheet->getStyle('A7')->applyFromArray([
+    'font' => ['size' => 10, 'color' => ['rgb' => '0F172A']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+]);
+$sheet->getRowDimension(7)->setRowHeight(20);
+
+$headerRow = 9;
+$dataRowStart = 10;
+
+$tableHeaderStyle = [
+    'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
+];
+$tableCellBorder = [
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']]],
+    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+];
+
+$headers = [
+    'A' => 'ORD',
+    'B' => 'SETOR',
+    'C' => 'DESTINATÁRIO',
+    'F' => 'CIDADE',
+    'H' => 'CTRC',
+    'J' => 'PESO',
+    'K' => 'PESO',
+    'L' => 'CUBAGEM',
+    'N' => 'VOLUME',
+    'P' => 'OBS',
+];
+
+foreach ($headers as $col => $title) {
+    $sheet->setCellValue($col . $headerRow, $title);
+    $sheet->getStyle($col . $headerRow)->applyFromArray($tableHeaderStyle);
 }
+$sheet->getRowDimension($headerRow)->setRowHeight(22);
 
 if ($logoUrl !== '') {
     $tmpFile = null;
@@ -150,7 +267,7 @@ if ($logoUrl !== '') {
             $drawing->setName('Logo');
             $drawing->setPath($tmpFile);
             $drawing->setCoordinates('A1');
-            $drawing->setHeight(55);
+            $drawing->setHeight(46);
             $drawing->setOffsetX(8);
             $drawing->setOffsetY(6);
             $drawing->setWorksheet($sheet);
@@ -159,30 +276,7 @@ if ($logoUrl !== '') {
     }
 }
 
-if ($seqCar > 0) {
-    $sheet->setCellValue('N5', 'OC Nº ' . $seqCar);
-    $sheet->setCellValue('L8', $seqCar);
-}
-
-$sheet->setCellValue('E8', date('d/m/Y'));
-$sheet->setCellValue('A8', date('d/m/Y'));
-$sheet->setCellValue('D13', $placa);
-$sheet->setCellValue('K8', $unidade);
-$sheet->setCellValue('M8', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
-
-if ($rotaTxt !== '') {
-    $sheet->setCellValue('C29', $rotaTxt);
-}
-
-$colsToClear = ['A','B','C','F','H','I','J','K','L','N','O','P'];
-$highestRow = (int)$sheet->getHighestRow();
-for ($r = 30; $r <= $highestRow; $r++) {
-    foreach ($colsToClear as $col) {
-        $sheet->setCellValue($col . $r, null);
-    }
-}
-
-$row = 30;
+$row = $dataRowStart;
 $ord = 1;
 foreach ($linhas as $item) {
     if (!is_array($item)) continue;
@@ -196,21 +290,39 @@ foreach ($linhas as $item) {
     $obs = trim((string)($item['obs'] ?? ''));
 
     $sheet->setCellValue('A' . $row, $ord);
-    if ($setor !== '') $sheet->setCellValue('B' . $row, $setor);
-    if ($destinatario !== '') $sheet->setCellValue('C' . $row, $destinatario);
-    if ($cidade !== '') $sheet->setCellValue('F' . $row, $cidade);
-    if ($ctrc !== '') $sheet->setCellValue('H' . $row, $ctrc);
-    if ($peso > 0) {
-        $sheet->setCellValue('J' . $row, $peso);
-        $sheet->setCellValue('K' . $row, $peso);
+    $sheet->setCellValue('B' . $row, $setor);
+    $sheet->setCellValue('C' . $row, $destinatario);
+    $sheet->setCellValue('F' . $row, $cidade);
+    $sheet->setCellValue('H' . $row, $ctrc);
+    $sheet->setCellValue('J' . $row, $peso);
+    $sheet->setCellValue('K' . $row, $peso);
+    $sheet->setCellValue('L' . $row, $cubagem);
+    $sheet->setCellValue('N' . $row, $volume);
+    $sheet->setCellValue('P' . $row, $obs);
+
+    foreach (array_keys($headers) as $col) {
+        $sheet->getStyle($col . $row)->applyFromArray($tableCellBorder);
     }
-    if ($cubagem > 0) $sheet->setCellValue('L' . $row, $cubagem);
-    if ($volume > 0) $sheet->setCellValue('N' . $row, $volume);
-    if ($obs !== '') $sheet->setCellValue('P' . $row, $obs);
+    $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getStyle('C' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+    $sheet->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+    $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+    $sheet->getStyle('J' . $row . ':L' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+    $sheet->getStyle('N' . $row)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
+    $sheet->getStyle('J' . $row . ':L' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+    $sheet->getStyle('N' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+    $sheet->getStyle('P' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
 
     $row++;
     $ord++;
 }
+
+$lastRow = max($row - 1, $dataRowStart);
+$sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
+$sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
+$sheet->freezePane('A' . $dataRowStart);
+$sheet->setPrintArea('A1:P' . $lastRow);
 
 $filename = 'ordem_carregamento_' . ($seqCar > 0 ? $seqCar : $placa) . '.xlsx';
 
