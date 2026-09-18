@@ -77,8 +77,6 @@ $where[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'REENTREGA'";
 $where[] = "UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) <> 'MANUAL'";
 $where[] = "cte.data_entrega IS NULL";
 $where[] = "cte.unid_atual IS NOT NULL AND BTRIM(cte.unid_atual) <> ''";
-// Regra: não considerar CT-es já baixados/entregues (tipos de ocorrência B/E)
-$where[] = "(om.tipo IS NULL OR UPPER(BTRIM(om.tipo)) NOT IN ('B', 'E'))";
 // Regra: não considerar CT-es em trânsito (saída para transferência/entrega)
 if ($ocorSaidaTransf !== null || $ocorSaidaEntrega !== null) {
     $codes = [];
@@ -98,7 +96,7 @@ if (!empty($filters['unidadeAtual']) && is_array($filters['unidadeAtual']) && co
         $params[] = $sigla;
     }
     if (count($placeholders) > 0) {
-        $where[] = 'UPPER(cte.unid_atual) IN (' . implode(', ', $placeholders) . ')';
+        $where[] = 'UPPER(BTRIM(cte.unid_atual)) IN (' . implode(', ', $placeholders) . ')';
     }
 }
 
@@ -111,7 +109,7 @@ if (!empty($filters['unidadeDestino']) && is_array($filters['unidadeDestino']) &
         $params[] = $sigla;
     }
     if (count($placeholders) > 0) {
-        $where[] = 'UPPER(cte.sigla_dest) IN (' . implode(', ', $placeholders) . ')';
+        $where[] = 'UPPER(BTRIM(cte.sigla_dest)) IN (' . implode(', ', $placeholders) . ')';
     }
 }
 
