@@ -1085,6 +1085,8 @@ if ($modoAutomatico) {
 
     $paradasLinhaBase = array_values(array_filter(array_map('strtoupper', array_map('trim', preg_split('/[,\s;]+/', (string)($linha['unidades'] ?? ''))))));
 
+    $totaisPorDestino = calcularTotaisPorDestino($ctesDisponiveis, $unidade);
+
     if ($destinoCentralizadora) {
         $paradasLinha = array_values(array_unique(array_values(array_filter($paradasLinhaBase, function($u) use ($dest) {
             $u = strtoupper(trim((string)$u));
@@ -1092,6 +1094,10 @@ if ($modoAutomatico) {
             if ($u === $dest) return false;
             return true;
         }))));
+        $paradasLinha = array_values(array_filter($paradasLinha, function($u) use ($totaisPorDestino) {
+            $t = $totaisPorDestino[$u] ?? ['pesoKg' => 0, 'cubagem' => 0, 'frete' => 0];
+            return ((float)($t['pesoKg'] ?? 0) > 0) || ((float)($t['cubagem'] ?? 0) > 0) || ((float)($t['frete'] ?? 0) > 0);
+        }));
     } else {
         $usadasArr = getIntermediariasJaUsadas($conn, $tabela, $unidade);
         $usadasSet = [];
@@ -1106,7 +1112,10 @@ if ($modoAutomatico) {
         }));
         $paradasLinha = array_values(array_unique($paradasLinha));
 
-        $totaisPorDestino = calcularTotaisPorDestino($ctesDisponiveis, $unidade);
+        $paradasLinha = array_values(array_filter($paradasLinha, function($u) use ($totaisPorDestino) {
+            $t = $totaisPorDestino[$u] ?? ['pesoKg' => 0, 'cubagem' => 0, 'frete' => 0];
+            return ((float)($t['pesoKg'] ?? 0) > 0) || ((float)($t['cubagem'] ?? 0) > 0) || ((float)($t['frete'] ?? 0) > 0);
+        }));
         usort($paradasLinha, function($a, $b) use ($totaisPorDestino) {
             $pa = (float)($totaisPorDestino[$a]['pesoKg'] ?? 0);
             $pb = (float)($totaisPorDestino[$b]['pesoKg'] ?? 0);

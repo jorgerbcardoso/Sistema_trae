@@ -2247,6 +2247,10 @@ function CardCarregamento({
   );
 
   const unidadesReais = (() => {
+    if (carregamento.ctes.length === 0) {
+      const d = String(destino || '').trim().toUpperCase();
+      return d && /^[A-Z0-9]{2,5}$/.test(d) ? [d] : [];
+    }
     const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
     if (destinosCard) {
       const allowed = new Set(
