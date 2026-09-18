@@ -324,7 +324,7 @@ if ($domainUpper === 'RVE') {
     foreach ($placas_ssw as $p) {
         $p = strtoupper(trim((string)$p));
         if ($p === '') continue;
-        if (!preg_match('/^[A-Z]{3}[A-Z0-9]{4}$/', $p)) continue;
+        if (!preg_match('/^[A-Z0-9]{3}[A-Z0-9]{4}$/', $p)) continue;
         $suf = substr($p, 3, 4);
         if ($suf !== '') $sufixos[$suf] = true;
     }
@@ -341,7 +341,10 @@ if ($domainUpper === 'RVE') {
                 $i += 1;
             }
             if (empty($ph)) continue;
-            $q = "SELECT DISTINCT RIGHT(UPPER(placa), 4) AS suf FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(placa), 4) IN (" . implode(',', $ph) . ")";
+            $q = "SELECT DISTINCT RIGHT(UPPER(BTRIM(placa)), 4) AS suf
+                  FROM {$tabelaVeiculo}
+                  WHERE RIGHT(UPPER(BTRIM(placa)), 4) IN (" . implode(',', $ph) . ")
+                    AND UPPER(BTRIM(COALESCE(tipo, ''))) <> 'CAVALO'";
             $r = @pg_query_params($conn, $q, $params);
             if ($r) {
                 while ($row = pg_fetch_assoc($r)) {
@@ -899,7 +902,12 @@ foreach ($placas_ssw as $placa) {
         if ($sufixoRve !== '') {
             $placaRealRve = '';
             $resVeic = sql(
-                "SELECT placa FROM {$tabelaVeiculo} WHERE RIGHT(UPPER(BTRIM(placa)), 4) = \$1 ORDER BY (CASE WHEN UPPER(BTRIM(COALESCE(tipo, ''))) IN ('CAMINHAO','CAMINHÃO','CAMINHONETE','TRUCK','CARRETA') THEN 0 ELSE 1 END), LENGTH(BTRIM(placa)) ASC, UPPER(BTRIM(placa)) ASC LIMIT 1",
+                "SELECT placa
+                 FROM {$tabelaVeiculo}
+                 WHERE RIGHT(UPPER(BTRIM(placa)), 4) = \$1
+                   AND UPPER(BTRIM(COALESCE(tipo, ''))) <> 'CAVALO'
+                 ORDER BY (CASE WHEN UPPER(BTRIM(COALESCE(tipo, ''))) IN ('CAMINHAO','CAMINHÃO','CAMINHONETE','TRUCK','CARRETA') THEN 0 ELSE 1 END), LENGTH(BTRIM(placa)) ASC, UPPER(BTRIM(placa)) ASC
+                 LIMIT 1",
                 [$sufixoRve],
                 $conn
             );
