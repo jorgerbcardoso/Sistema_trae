@@ -2249,6 +2249,11 @@ function CardCarregamento({
   const unidadesReais = (() => {
     const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
     if (destinosCard) {
+      const allowed = new Set(
+        todasUnidades
+          .map((u) => String(u ?? '').trim().toUpperCase())
+          .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u))
+      );
       const parts = destinosCard
         .split(',')
         .map((p) => p.trim().toUpperCase())
@@ -2256,6 +2261,7 @@ function CardCarregamento({
       const out: string[] = [];
       const seen = new Set<string>();
       for (const u of parts) {
+        if (allowed.size > 0 && !allowed.has(u)) continue;
         if (seen.has(u)) continue;
         seen.add(u);
         out.push(u);
@@ -2388,22 +2394,22 @@ function CardCarregamento({
   const temIndef = tipoCounts.indef > 0;
   const dominante = (temEntrega || temTransferencia)
     ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
-    : null;
+    : (carregamentoIniciado ? 'TRANSFERENCIA' : null);
 
-  const bordaBaseClass = dominante === 'ENTREGA'
-    ? 'border-emerald-400 dark:border-emerald-600'
-    : dominante === 'TRANSFERENCIA'
-      ? 'border-orange-300 dark:border-orange-800'
-      : isSimulado
-        ? 'border-emerald-400 dark:border-emerald-600'
-        : carregamentoIniciado
-          ? 'border-orange-300 dark:border-orange-800'
-          : 'border-slate-200 dark:border-slate-700';
+  const bordaBaseClass = isSimulado
+    ? 'border-orange-300 dark:border-orange-800'
+    : dominante === 'ENTREGA'
+      ? 'border-emerald-400 dark:border-emerald-600'
+      : dominante === 'TRANSFERENCIA'
+        ? 'border-indigo-300 dark:border-indigo-800'
+        : 'border-slate-200 dark:border-slate-700';
 
   const ativoRingClass = ativo
-    ? (dominante === 'ENTREGA'
-      ? 'ring-2 ring-emerald-300 dark:ring-emerald-800 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30'
-      : 'ring-2 ring-orange-300 dark:ring-orange-800 shadow-lg shadow-orange-100 dark:shadow-orange-900/30')
+    ? (isSimulado
+      ? 'ring-2 ring-orange-300 dark:ring-orange-800 shadow-lg shadow-orange-100 dark:shadow-orange-900/30'
+      : dominante === 'ENTREGA'
+        ? 'ring-2 ring-emerald-300 dark:ring-emerald-800 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/30'
+        : 'ring-2 ring-indigo-300 dark:ring-indigo-800 shadow-lg shadow-indigo-100 dark:shadow-indigo-900/30')
     : '';
 
   const bordaCardClass = `${bordaBaseClass} ${ativoRingClass}`;
@@ -2461,7 +2467,7 @@ function CardCarregamento({
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
             {temTransferencia ? (
-              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200 text-xs">
+              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-xs">
                 Transferência{tipoCounts.transf > 0 ? ` ${tipoCounts.transf}` : ''}
               </Badge>
             ) : null}
@@ -2502,7 +2508,7 @@ function CardCarregamento({
               {infoCriacao ?? ''}
             </p>
             {isSimulado ? (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+              <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold shrink-0">
                 simulação
               </span>
             ) : null}
