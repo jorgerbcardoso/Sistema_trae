@@ -33,8 +33,33 @@ $tblCar = "{$domain}_carregamento";
 $tblUnid = "{$domain}_unidade";
 $tblCte = "{$domain}_cte";
 
-@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS latitude_entrega NUMERIC");
-@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS longitude_entrega NUMERIC");
+$parseCoord = function($v) {
+    if ($v === null) return null;
+    if (is_int($v) || is_float($v)) return (float)$v;
+    $s = trim((string)$v);
+    if ($s === '') return null;
+    $s = str_replace(',', '.', $s);
+    if (preg_match('/^-?\d+(\.\d+)?$/', $s)) return (float)$s;
+    if (preg_match('/^(-?)(\d{1,3})\D+(\d{1,2})\D+(\d{1,2}(\.\d+)?)\D*([NSEW])?/i', $s, $m)) {
+        $deg = (float)$m[2];
+        $min = (float)$m[3];
+        $sec = (float)$m[4];
+        $hem = strtoupper((string)($m[6] ?? ''));
+        $sign = ($m[1] === '-') ? -1 : 1;
+        if ($hem === 'S' || $hem === 'W') $sign = -1;
+        return $sign * ($deg + ($min / 60.0) + ($sec / 3600.0));
+    }
+    if (preg_match('/^(-?\d{1,3}(?:\.\d+)?)\s*([NSEW])$/i', $s, $m)) {
+        $val = (float)$m[1];
+        $hem = strtoupper($m[2]);
+        if ($hem === 'S' || $hem === 'W') $val = -abs($val);
+        return $val;
+    }
+    return null;
+};
+
+@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS latitude_entrega VARCHAR(32)");
+@pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS longitude_entrega VARCHAR(32)");
 
 $carRow = null;
 try {
@@ -138,8 +163,8 @@ try {
             'bairro_entrega' => (string)($r['bairro_entrega'] ?? ''),
             'cidade_entrega' => (string)($r['cidade_entrega'] ?? ''),
             'uf_entrega' => (string)($r['uf_entrega'] ?? ''),
-            'latitude_entrega' => ($r['latitude_entrega'] !== null && $r['latitude_entrega'] !== '') ? (float)$r['latitude_entrega'] : null,
-            'longitude_entrega' => ($r['longitude_entrega'] !== null && $r['longitude_entrega'] !== '') ? (float)$r['longitude_entrega'] : null,
+            'latitude_entrega' => $parseCoord($r['latitude_entrega'] ?? null),
+            'longitude_entrega' => $parseCoord($r['longitude_entrega'] ?? null),
         ];
     }
 } catch (Exception $e) {
@@ -171,8 +196,8 @@ if (count($siglas) > 0) {
             $unidades[] = [
                 'sigla' => $sig,
                 'nome' => (string)($ru['nome'] ?? ''),
-                'latitude' => ($ru['latitude'] !== null && $ru['latitude'] !== '') ? (float)$ru['latitude'] : null,
-                'longitude' => ($ru['longitude'] !== null && $ru['longitude'] !== '') ? (float)$ru['longitude'] : null,
+                'latitude' => $parseCoord($ru['latitude'] ?? null),
+                'longitude' => $parseCoord($ru['longitude'] ?? null),
             ];
         }
     } catch (Exception $e) {
