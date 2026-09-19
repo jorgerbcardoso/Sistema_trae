@@ -4558,10 +4558,66 @@ function ModalRotaCarregamento({
     map.fitBounds(bounds, { padding: [30, 30] });
   }, [pontosOrdenados, routeCoords]);
 
+  const ctesOrdem = useMemo(() => {
+    const out: { ser_cte: string; nro_cte: number }[] = [];
+    const seen = new Set<string>();
+    const push = (c: any) => {
+      const ser = String(c?.ser_cte ?? c?.ser ?? c?.serCte ?? '').trim().toUpperCase();
+      const nro = Number(c?.nro_cte ?? c?.nro ?? c?.nroCte ?? 0) || 0;
+      if (!ser || nro <= 0) return;
+      const k = `${ser}|${nro}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ ser_cte: ser, nro_cte: nro });
+    };
+    for (const k of paradasOrderEfetiva) {
+      if (k.startsWith('T:')) {
+        const sigla = k.slice(2);
+        const g = transfByUnidade.get(sigla);
+        if (!g?.ctes) continue;
+        for (const c of g.ctes) push(c);
+      } else if (k.startsWith('E:')) {
+        const gKey = k.slice(2);
+        const g = entregaByKey.get(gKey);
+        if (!g?.ctes) continue;
+        for (const c of g.ctes) push(c);
+      }
+    }
+    return out;
+  }, [entregaByKey, paradasOrderEfetiva, transfByUnidade]);
+
+  const ordemSyncRef = useRef<{ t: any; sig: string }>({ t: null, sig: '' });
+
+  const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number }[]) => {
+    if (!carregamento?.placa_provisoria) return;
+    if (!Array.isArray(ctes) || ctes.length === 0) return;
+    try {
+      await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_ordem_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, ctes }) },
+        true
+      );
+    } catch {
+    }
+  }, [carregamento?.placa_provisoria, origem]);
+
+  useEffect(() => {
+    const sig = ctesOrdem.map((c) => `${c.ser_cte}${String(c.nro_cte)}`).join('|');
+    if (!sig) return;
+    if (ordemSyncRef.current.sig === sig) return;
+    ordemSyncRef.current.sig = sig;
+    if (ordemSyncRef.current.t) clearTimeout(ordemSyncRef.current.t);
+    ordemSyncRef.current.t = setTimeout(() => { void salvarOrdemCtes(ctesOrdem); }, 650);
+    return () => {
+      if (ordemSyncRef.current.t) clearTimeout(ordemSyncRef.current.t);
+    };
+  }, [ctesOrdem, salvarOrdemCtes]);
+
   const exportarOrdemCarregamento = useCallback(async () => {
     if (xlsxLoading) return;
     setXlsxLoading(true);
     try {
+      await salvarOrdemCtes(ctesOrdem);
       const entregaByKey = new Map(grupos.entrega.map((g) => [g.key, g]));
       const entregaKeysEmOrdem: string[] = [];
       for (const p of pontosOrdenados) {
@@ -4817,8 +4873,8 @@ function ModalRotaCarregamento({
     const totFrete = list.reduce((s, c) => s + (Number(c.frete ?? 0) || 0), 0);
     return (
       <div className="mt-2 pl-6">
-        <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-x-auto">
-          <div className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+        <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
@@ -4837,7 +4893,7 @@ function ModalRotaCarregamento({
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.emissao ?? '')) || '-'}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.prev ?? '')) || '-'}</span>
@@ -4846,7 +4902,7 @@ function ModalRotaCarregamento({
               </div>
             ))}
           </div>
-          <div className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
             <span className="text-slate-600 dark:text-slate-300">Total</span>
             <span />
             <span />
@@ -4917,7 +4973,7 @@ function ModalRotaCarregamento({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_460px]">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_520px]">
           <div className="min-h-0 p-4">
             <div className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden relative">
               {!leafletLoaded && (

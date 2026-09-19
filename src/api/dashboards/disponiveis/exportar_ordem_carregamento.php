@@ -54,6 +54,10 @@ if (!is_array($linhas)) $linhas = [];
 $conn = connect();
 $tblCar = "{$domain}_carregamento";
 $tblUnid = "{$domain}_unidade";
+$tblCte = "{$domain}_cte";
+$tblEmpParam = "{$domain}_emp_param";
+
+@pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
 
 $seqCar = 0;
 try {
@@ -72,6 +76,117 @@ try {
     }
 } catch (Exception $e) {
     $seqCar = 0;
+}
+
+$ocorAgendamento = null;
+try {
+    $resParam = sql("SELECT ocor_agendamento FROM {$tblEmpParam} LIMIT 1", [], $conn);
+    if ($resParam && pg_num_rows($resParam) > 0) {
+        $rp = pg_fetch_assoc($resParam);
+        if (($rp['ocor_agendamento'] ?? null) !== null && ($rp['ocor_agendamento'] ?? '') !== '') {
+            $ocorAgendamento = (int)$rp['ocor_agendamento'];
+        }
+    }
+} catch (Exception $e) {
+    $ocorAgendamento = null;
+}
+
+$primeiraNf = function($nfs) {
+    $raw = trim((string)$nfs);
+    if ($raw === '') return '';
+    $first = trim(explode(',', $raw)[0] ?? '');
+    if ($first === '') return '';
+    $parts = array_values(array_filter(array_map('trim', explode('/', $first)), function($x) { return $x !== ''; }));
+    return count($parts) >= 2 ? $parts[1] : $parts[0];
+};
+
+$fmtDdMmYy = function($v) {
+    $s = trim((string)$v);
+    if ($s === '') return '';
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $s, $m)) {
+        return $m[3] . '/' . $m[2] . '/' . substr($m[1], -2);
+    }
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m)) {
+        return $m[1] . '/' . $m[2] . '/' . substr($m[3], -2);
+    }
+    return $s;
+};
+
+$linhasDb = [];
+try {
+    $qLinhas = "
+        SELECT
+            car.ordem,
+            car.ser_cte,
+            car.nro_cte,
+            UPPER(COALESCE(NULLIF(car.destino_cte, ''), NULLIF(car.destino, ''))) AS destino_cte,
+            COALESCE(cte.nome_dest, car.destinatario_cte, '') AS destinatario,
+            COALESCE(cid.nome, '') AS cidade_entrega,
+            COALESCE(cte.nfs, '') AS nfs,
+            COALESCE(cte.data_prev_ent::text, car.data_prev_ent_cte::text, '') AS data_prev_ent,
+            COALESCE(cte.ult_ocor_agend, 0) AS ult_ocor_agend,
+            COALESCE(cte.peso_real, 0) AS peso_real,
+            COALESCE(cte.peso_calc, 0) AS peso_calc,
+            COALESCE(cte.cubagem, car.cubagem_cte, 0) AS cubagem,
+            COALESCE(cte.qtde_vol, car.qtde_vol_cte, 0) AS qtde_vol,
+            COALESCE(cte.bairro_entrega, '') AS bairro_entrega
+        FROM {$tblCar} car
+        LEFT JOIN {$tblCte} cte
+               ON cte.ser_cte = car.ser_cte
+              AND cte.nro_cte = car.nro_cte
+        LEFT JOIN cidade cid
+               ON cid.seq_cidade = cte.seq_cidade_entr
+        WHERE car.unidade = $1
+          AND UPPER(car.placa_provisoria) = UPPER($2)
+          AND car.data_finalizacao IS NULL
+          AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
+        ORDER BY
+          CASE WHEN car.ordem IS NULL OR car.ordem <= 0 THEN 999999 ELSE car.ordem END,
+          car.data_inclusao,
+          car.hora_inclusao
+    ";
+    $resL = sql($qLinhas, [$unidade, $placa], $conn);
+    $idx = 1;
+    while ($resL && ($r = pg_fetch_assoc($resL))) {
+        $destCte = strtoupper(trim((string)($r['destino_cte'] ?? '')));
+        $ordem = (int)($r['ordem'] ?? 0);
+        if ($ordem <= 0) $ordem = $idx;
+        $idx++;
+
+        $isEntrega = ($destCte !== '' && $destCte === $unidade);
+        $setor = '';
+        if ($isEntrega) {
+            $setor = strtoupper(trim((string)($r['bairro_entrega'] ?? '')));
+            if ($setor === '') $setor = $destCte;
+        } else {
+            $setor = $destCte;
+        }
+
+        $ultOcorAgend = (int)($r['ult_ocor_agend'] ?? 0);
+        $agendado = ($ocorAgendamento !== null && $ultOcorAgend === (int)$ocorAgendamento);
+        $agendaTxt = $agendado ? $fmtDdMmYy($r['data_prev_ent'] ?? '') : '';
+
+        $linhasDb[] = [
+            'ordem' => $ordem,
+            'setor' => $setor,
+            'destinatario' => trim((string)($r['destinatario'] ?? '')),
+            'cidade' => trim((string)($r['cidade_entrega'] ?? '')),
+            'nf' => $primeiraNf($r['nfs'] ?? ''),
+            'agenda' => $agendaTxt,
+            'agenda_bold' => $agendado,
+            'kg_real' => (float)($r['peso_real'] ?? 0),
+            'kg_calc' => (float)($r['peso_calc'] ?? 0),
+            'cubagem' => (float)($r['cubagem'] ?? 0),
+            'qtde_vol' => (int)($r['qtde_vol'] ?? 0),
+            'obs' => '',
+        ];
+    }
+} catch (Exception $e) {
+    $linhasDb = [];
+}
+
+if (is_array($linhasDb)) {
+    $linhas = $linhasDb;
 }
 
 $unidNome = '';
@@ -136,8 +251,8 @@ $sheet->getDefaultRowDimension()->setRowHeight(16);
 $spreadsheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
 
 $colWidths = [
-    'A' => 5,
-    'B' => 7,
+    'A' => 7,
+    'B' => 12,
     'C' => 42,
     'D' => 20,
     'E' => 14,
@@ -424,7 +539,9 @@ $sheet->getStyle('A25:L25')->applyFromArray($styleDarkBar);
 
 $headerRow = 26;
 $dataRowStart = 27;
-$maxTableRows = max(count($linhas), 15);
+$dataRowsCount = max(count($linhas), 1);
+$totalRow = $dataRowStart + $dataRowsCount;
+$maxTableRows = max($dataRowsCount + 1 + 8, 20);
 $lastRow = $dataRowStart + $maxTableRows - 1;
 
 $tableHeaderStyle = [
@@ -434,20 +551,20 @@ $tableHeaderStyle = [
     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
 ];
 
-$sheet->setCellValue('A' . $headerRow, 'ORD.');
-$sheet->setCellValue('B' . $headerRow, 'SETOR');
-$sheet->setCellValue('C' . $headerRow, 'DESTINATÁRIO');
-$sheet->setCellValue('D' . $headerRow, 'CIDADE');
-$sheet->setCellValue('E' . $headerRow, 'NOTA FISCAL');
-$sheet->setCellValue('F' . $headerRow, 'AGENDA');
-$sheet->setCellValue('G' . $headerRow, "PESO\nREAL(KG)");
-$sheet->setCellValue('H' . $headerRow, "PESO\nCALC.(KG)");
-$sheet->setCellValue('I' . $headerRow, "CUBAGEM\n(M³)");
-$sheet->setCellValue('J' . $headerRow, 'VOLUME');
-$sheet->setCellValue('K' . $headerRow, "QTD\nPALETES");
-$sheet->setCellValue('L' . $headerRow, 'OBS.');
+$sheet->setCellValue('A' . $headerRow, 'Ord.');
+$sheet->setCellValue('B' . $headerRow, 'Setor');
+$sheet->setCellValue('C' . $headerRow, 'Destinatário');
+$sheet->setCellValue('D' . $headerRow, 'Cidade');
+$sheet->setCellValue('E' . $headerRow, 'NF');
+$sheet->setCellValue('F' . $headerRow, 'Agenda');
+$sheet->setCellValue('G' . $headerRow, 'Kg Real');
+$sheet->setCellValue('H' . $headerRow, 'Kg Calc.');
+$sheet->setCellValue('I' . $headerRow, 'Cub. m³');
+$sheet->setCellValue('J' . $headerRow, 'Qt. Vol.');
+$sheet->setCellValue('K' . $headerRow, 'Pallets');
+$sheet->setCellValue('L' . $headerRow, 'Observações');
 $sheet->getStyle('A' . $headerRow . ':L' . $headerRow)->applyFromArray($tableHeaderStyle);
-$sheet->getRowDimension($headerRow)->setRowHeight(28);
+$sheet->getRowDimension($headerRow)->setRowHeight(20);
 
 if ($logoUrl !== '') {
     $tmpFile = null;
@@ -479,34 +596,47 @@ if ($logoUrl !== '') {
 }
 
 $row = $dataRowStart;
-$ord = 1;
+$agendaRows = [];
+$totReal = 0.0;
+$totCalc = 0.0;
+$totCub = 0.0;
+$totVol = 0;
 foreach ($linhas as $item) {
     if (!is_array($item)) continue;
-    if ($row > $lastRow) break;
+    if ($row >= $totalRow) break;
+    $ordem = (int)($item['ordem'] ?? 0);
     $setor = strtoupper(trim((string)($item['setor'] ?? '')));
     $destinatario = trim((string)($item['destinatario'] ?? ''));
     $cidade = trim((string)($item['cidade'] ?? ''));
-    $ctrc = trim((string)($item['ctrc'] ?? ''));
-    $peso = (float)($item['peso'] ?? 0);
+    $nf = trim((string)($item['nf'] ?? ''));
+    $agenda = trim((string)($item['agenda'] ?? ''));
+    $agBold = (bool)($item['agenda_bold'] ?? false);
+    $kgReal = (float)($item['kg_real'] ?? 0);
+    $kgCalc = (float)($item['kg_calc'] ?? 0);
     $cubagem = (float)($item['cubagem'] ?? 0);
-    $volume = (int)($item['volume'] ?? 0);
+    $qtVol = (int)($item['qtde_vol'] ?? 0);
     $obs = trim((string)($item['obs'] ?? ''));
 
-    $sheet->setCellValue('A' . $row, $ord);
+    if ($kgReal > 0) $totReal += $kgReal;
+    if ($kgCalc > 0) $totCalc += $kgCalc;
+    if ($cubagem > 0) $totCub += $cubagem;
+    if ($qtVol > 0) $totVol += $qtVol;
+
+    $sheet->setCellValue('A' . $row, $ordem > 0 ? $ordem : '');
     $sheet->setCellValue('B' . $row, $setor);
-    $sheet->setCellValue('C' . $row, trim(($ctrc !== '' ? ($ctrc . ' ') : '') . $destinatario));
+    $sheet->setCellValue('C' . $row, $destinatario);
     $sheet->setCellValue('D' . $row, $cidade);
-    $sheet->setCellValue('E' . $row, '');
-    $sheet->setCellValue('F' . $row, '');
-    $sheet->setCellValue('G' . $row, $peso > 0 ? $peso : '');
-    $sheet->setCellValue('H' . $row, $peso > 0 ? $peso : '');
+    $sheet->setCellValue('E' . $row, $nf);
+    $sheet->setCellValue('F' . $row, $agenda);
+    $sheet->setCellValue('G' . $row, $kgReal > 0 ? $kgReal : '');
+    $sheet->setCellValue('H' . $row, $kgCalc > 0 ? $kgCalc : '');
     $sheet->setCellValue('I' . $row, $cubagem > 0 ? $cubagem : '');
-    $sheet->setCellValue('J' . $row, $volume > 0 ? $volume : '');
+    $sheet->setCellValue('J' . $row, $qtVol > 0 ? $qtVol : '');
     $sheet->setCellValue('K' . $row, '');
     $sheet->setCellValue('L' . $row, $obs);
+    if ($agBold && $agenda !== '') $agendaRows[] = $row;
 
     $row++;
-    $ord++;
 }
 
 $tableCellStyle = [
@@ -524,6 +654,26 @@ $sheet->getStyle('G' . $dataRowStart . ':I' . $lastRow)->getNumberFormat()->setF
 $sheet->getStyle('J' . $dataRowStart . ':J' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
 $sheet->getStyle('G' . $dataRowStart . ':K' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 $sheet->getStyle('L' . $dataRowStart . ':L' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+
+$sheet->setCellValue('C' . $totalRow, 'Total');
+$sheet->setCellValue('G' . $totalRow, $totReal > 0 ? $totReal : '');
+$sheet->setCellValue('H' . $totalRow, $totCalc > 0 ? $totCalc : '');
+$sheet->setCellValue('I' . $totalRow, $totCub > 0 ? $totCub : '');
+$sheet->setCellValue('J' . $totalRow, $totVol > 0 ? $totVol : '');
+$sheet->getStyle('A' . $totalRow . ':L' . $totalRow)->applyFromArray([
+    'font' => ['bold' => true, 'size' => 9, 'color' => ['rgb' => '000000']],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $lightBlue]],
+    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => $gridBorder]]],
+]);
+$sheet->getStyle('C' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+$sheet->getStyle('G' . $totalRow . ':J' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle('G' . $totalRow . ':I' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('J' . $totalRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER);
+
+foreach ($agendaRows as $r) {
+    $sheet->getStyle('F' . $r)->getFont()->setBold(true);
+}
 
 $afterTableRow = $lastRow + 2;
 
@@ -579,7 +729,6 @@ $finalRow = $dtRow + 1;
 
 $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
-$sheet->freezePane('A' . $dataRowStart);
 $sheet->getPageSetup()->setPrintArea('A1:L' . $finalRow);
 
 $filename = 'ordem_carregamento_' . ($seqCar > 0 ? $seqCar : $placa) . '.xlsx';
