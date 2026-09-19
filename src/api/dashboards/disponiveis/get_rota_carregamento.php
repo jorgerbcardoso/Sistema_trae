@@ -60,6 +60,7 @@ $parseCoord = function($v) {
 
 @pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS latitude_entrega VARCHAR(32)");
 @pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS longitude_entrega VARCHAR(32)");
+@pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
 
 $carRow = null;
 try {
@@ -107,6 +108,7 @@ try {
         SELECT
             car.ser_cte,
             car.nro_cte,
+            car.ordem,
             UPPER(COALESCE(NULLIF(car.destino_cte, ''), NULLIF(car.destino, ''))) AS destino_cte,
             COALESCE(car.remetente_cte, '') AS remetente_cte,
             COALESCE(car.destinatario_cte, '') AS destinatario_cte,
@@ -137,7 +139,10 @@ try {
           AND UPPER(car.placa_provisoria) = UPPER($2)
           AND car.data_finalizacao IS NULL
           AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
-        ORDER BY car.data_inclusao, car.hora_inclusao
+        ORDER BY
+          CASE WHEN car.ordem IS NULL OR car.ordem <= 0 THEN 999999 ELSE car.ordem END,
+          car.data_inclusao,
+          car.hora_inclusao
     ";
     $res = sql($q, [$unidade, $placa], $conn);
     while ($res && ($r = pg_fetch_assoc($res))) {
@@ -146,6 +151,7 @@ try {
         $rows[] = [
             'ser_cte' => (string)($r['ser_cte'] ?? ''),
             'nro_cte' => ($r['nro_cte'] !== null && $r['nro_cte'] !== '') ? (int)$r['nro_cte'] : 0,
+            'ordem' => ($r['ordem'] !== null && $r['ordem'] !== '') ? (int)$r['ordem'] : null,
             'destino_cte' => $destCte,
             'remetente' => (string)($r['remetente_cte'] ?? ''),
             'destinatario' => (string)($r['destinatario_cte'] ?? ''),

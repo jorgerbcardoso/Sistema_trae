@@ -169,6 +169,7 @@ try {
         $linhasDb[] = [
             'ordem' => $ordem,
             'op' => $isEntrega ? 'E' : 'T',
+            'destino_cte' => $destCte,
             'setor' => $setor,
             'destinatario' => trim((string)($r['destinatario'] ?? '')),
             'cidade' => trim((string)($r['cidade_entrega'] ?? '')),
@@ -275,6 +276,7 @@ $lightBlue = 'D9E2F3';
 $inputBg = 'FFF2CC';
 $bgEntrega = 'E2F0D9';
 $bgTransferencia = 'EDE9FE';
+$bgFec = 'FFEAD5';
 $gridBorder = 'A6A6A6';
 
 $sheet->getRowDimension(1)->setRowHeight(24);
@@ -609,6 +611,7 @@ foreach ($linhas as $item) {
     if ($row >= $totalRow) break;
     $ordem = (int)($item['ordem'] ?? 0);
     $op = strtoupper(trim((string)($item['op'] ?? '')));
+    $destinoCte = strtoupper(trim((string)($item['destino_cte'] ?? '')));
     $setor = strtoupper(trim((string)($item['setor'] ?? '')));
     $destinatario = trim((string)($item['destinatario'] ?? ''));
     $cidade = trim((string)($item['cidade'] ?? ''));
@@ -642,7 +645,7 @@ foreach ($linhas as $item) {
     $sheet->getStyle('A' . $row . ':L' . $row)->applyFromArray([
         'fill' => [
             'fillType' => Fill::FILL_SOLID,
-            'startColor' => ['rgb' => ($op === 'E' ? $bgEntrega : $bgTransferencia)],
+            'startColor' => ['rgb' => ($destinoCte === 'FEC' ? $bgFec : ($op === 'E' ? $bgEntrega : $bgTransferencia))],
         ],
     ]);
 

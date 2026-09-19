@@ -4104,7 +4104,7 @@ function ModalRotaCarregamento({
   const [geoHydrated, setGeoHydrated] = useState(false);
 
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
-  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'emissao' | 'prev' | 'peso' | 'frete'>('ctrc');
+  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete'>('ctrc');
   const [cteRotaSortDir, setCteRotaSortDir] = useState<'asc' | 'desc'>('asc');
 
   const carregarInfo = dados?.carregamento ?? {};
@@ -4167,7 +4167,7 @@ function ModalRotaCarregamento({
       cep: string;
       cidade: string;
       uf: string;
-      ctes: { ser: string; nro: number; ctrc: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -4176,7 +4176,7 @@ function ModalRotaCarregamento({
       tipo: 'TRANSFERENCIA';
       unidade: string;
       titulo: string;
-      ctes: { ser: string; nro: number; ctrc: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -4205,7 +4205,8 @@ function ModalRotaCarregamento({
       const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '');
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
-      const itemCte = { ser, nro, ctrc, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
+      const ordem = Number(c?.ordem ?? 0) || 0;
+      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
 
       if (hasEndereco) {
         const baseTitulo = (isFec && !hasEnderecoReal)
@@ -4303,8 +4304,41 @@ function ModalRotaCarregamento({
       used.add(k);
       out.push(k);
     }
-    return out;
-  }, [grupos.entrega, grupos.transferencia, transfByUnidade, unidadesOrdem]);
+    const minPorKey = new Map<string, number>();
+    for (const k of out) {
+      let min = Number.POSITIVE_INFINITY;
+      if (k.startsWith('T:')) {
+        const sigla = k.slice(2);
+        const g = transfByUnidade.get(sigla);
+        if (g?.ctes) {
+          for (const c of g.ctes as any[]) {
+            const o = Number((c as any).ordem ?? 0) || 0;
+            if (o > 0 && o < min) min = o;
+          }
+        }
+      } else if (k.startsWith('E:')) {
+        const gKey = k.slice(2);
+        const g = entregaByKey.get(gKey);
+        if (g?.ctes) {
+          for (const c of g.ctes as any[]) {
+            const o = Number((c as any).ordem ?? 0) || 0;
+            if (o > 0 && o < min) min = o;
+          }
+        }
+      }
+      if (Number.isFinite(min)) minPorKey.set(k, min);
+    }
+    const hasAny = Array.from(minPorKey.values()).some((v) => Number.isFinite(v));
+    if (!hasAny) return out;
+    const idxBase = new Map<string, number>();
+    out.forEach((k, i) => idxBase.set(k, i));
+    return [...out].sort((a, b) => {
+      const oa = minPorKey.get(a) ?? Number.POSITIVE_INFINITY;
+      const ob = minPorKey.get(b) ?? Number.POSITIVE_INFINITY;
+      if (oa !== ob) return oa - ob;
+      return (idxBase.get(a) ?? 0) - (idxBase.get(b) ?? 0);
+    });
+  }, [entregaByKey, grupos.entrega, grupos.transferencia, transfByUnidade, unidadesOrdem]);
 
   const [paradasOrder, setParadasOrder] = useState<string[]>([]);
 
@@ -4833,7 +4867,7 @@ function ModalRotaCarregamento({
     });
   }, [defaultParadasOrder]);
 
-  const toggleCteRotaSort = (key: 'ctrc' | 'emissao' | 'prev' | 'peso' | 'frete') => {
+  const toggleCteRotaSort = (key: 'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete') => {
     setCteRotaSortKey((prev) => {
       if (prev === key) {
         setCteRotaSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -4857,13 +4891,14 @@ function ModalRotaCarregamento({
     return { peso, frete };
   }, [grupos.entrega, grupos.transferencia]);
 
-  const renderCtes = (items: { ser: string; nro: number; ctrc: string; emissao: string; prev: string; peso?: number; frete?: number }[]) => {
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number }[]) => {
     const list = [...items];
     const dir = cteRotaSortDir === 'asc' ? 1 : -1;
     const cmpStr = (a: string, b: string) => a.localeCompare(b);
     const cmpNum = (a: number, b: number) => a - b;
     list.sort((a, b) => {
       if (cteRotaSortKey === 'ctrc') return cmpStr(String(a.ctrc ?? ''), String(b.ctrc ?? '')) * dir;
+      if (cteRotaSortKey === 'dest') return cmpStr(String(a.destino ?? ''), String(b.destino ?? '')) * dir;
       if (cteRotaSortKey === 'emissao') return cmpStr(String(a.emissao ?? ''), String(b.emissao ?? '')) * dir;
       if (cteRotaSortKey === 'prev') return cmpStr(String(a.prev ?? ''), String(b.prev ?? '')) * dir;
       if (cteRotaSortKey === 'frete') return cmpNum(Number(a.frete ?? 0) || 0, Number(b.frete ?? 0) || 0) * dir;
@@ -4874,9 +4909,12 @@ function ModalRotaCarregamento({
     return (
       <div className="mt-2 pl-6">
         <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+          <div className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('dest')}>
+              Dest.{cteRotaSortKey === 'dest' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
               Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
@@ -4893,8 +4931,9 @@ function ModalRotaCarregamento({
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400 truncate">{String(c.destino ?? '').toUpperCase()}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.emissao ?? '')) || '-'}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.prev ?? '')) || '-'}</span>
                 <span className="text-right font-mono text-slate-700 dark:text-slate-200">{(Number(c.peso ?? 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
@@ -4902,8 +4941,9 @@ function ModalRotaCarregamento({
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
             <span className="text-slate-600 dark:text-slate-300">Total</span>
+            <span />
             <span />
             <span />
             <span className="text-right font-mono">{totPeso.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
@@ -5017,6 +5057,9 @@ function ModalRotaCarregamento({
                   return (
                     <div key={k} className="mb-2">
                       <div className="flex gap-1 items-stretch">
+                        <div className="w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-200 flex items-center justify-center font-extrabold text-lg tabular-nums">
+                          {idx + 1}
+                        </div>
                         <button
                           type="button"
                           onClick={() => toggleAberto(k)}
@@ -5024,7 +5067,10 @@ function ModalRotaCarregamento({
                         >
                           {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.unidade}{uNome ? ` · ${uNome}` : ''}</div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.unidade}{uNome ? ` · ${uNome}` : ''}</div>
+                              <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">Transf.</span>
+                            </div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Transferência · {g.ctes.length} CT-e(s)</div>
                           </div>
                         </button>
@@ -5066,11 +5112,15 @@ function ModalRotaCarregamento({
                     : status === 'error'
                       ? 'text-red-700 dark:text-red-400'
                       : 'text-amber-700 dark:text-amber-400';
+                  const isFec = String(g.unidade ?? '').toUpperCase() === 'FEC';
                   const isFirst = idx === 0;
                   const isLast = idx === paradasOrderEfetiva.length - 1;
                   return (
                     <div key={k} className="mb-2">
                       <div className="flex gap-1 items-stretch">
+                        <div className={`w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 ${isFec ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-800 dark:text-orange-200' : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200'} flex items-center justify-center font-extrabold text-lg tabular-nums`}>
+                          {idx + 1}
+                        </div>
                         <button
                           type="button"
                           onClick={() => toggleAberto(k)}
@@ -5078,8 +5128,11 @@ function ModalRotaCarregamento({
                         >
                           {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-normal leading-snug">
-                              {g.destinatario || g.titulo}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-normal leading-snug">
+                                {g.destinatario || g.titulo}
+                              </div>
+                              <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${isFec ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'}`}>{isFec ? 'FEC' : 'Entrega'}</span>
                             </div>
                             <div className="text-[11px] text-slate-600 dark:text-slate-400 whitespace-normal leading-snug mt-0.5">
                               {[
@@ -5088,7 +5141,7 @@ function ModalRotaCarregamento({
                               ].filter(Boolean).join(' · ') || 'Endereço não informado'}
                             </div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                              Entrega · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
+                              {isFec ? 'FEC' : 'Entrega'} · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
                               {status === 'error' && geoErrorByKey[g.key] ? ` (${geoErrorByKey[g.key]})` : ''}
                             </div>
                           </div>
