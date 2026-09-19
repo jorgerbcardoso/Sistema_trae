@@ -168,6 +168,7 @@ try {
 
         $linhasDb[] = [
             'ordem' => $ordem,
+            'op' => $isEntrega ? 'E' : 'T',
             'setor' => $setor,
             'destinatario' => trim((string)($r['destinatario'] ?? '')),
             'cidade' => trim((string)($r['cidade_entrega'] ?? '')),
@@ -272,6 +273,8 @@ $darkBlue = '1F4E79';
 $darkBlue2 = '17365D';
 $lightBlue = 'D9E2F3';
 $inputBg = 'FFF2CC';
+$bgEntrega = 'E2F0D9';
+$bgTransferencia = 'EDE9FE';
 $gridBorder = 'A6A6A6';
 
 $sheet->getRowDimension(1)->setRowHeight(24);
@@ -605,6 +608,7 @@ foreach ($linhas as $item) {
     if (!is_array($item)) continue;
     if ($row >= $totalRow) break;
     $ordem = (int)($item['ordem'] ?? 0);
+    $op = strtoupper(trim((string)($item['op'] ?? '')));
     $setor = strtoupper(trim((string)($item['setor'] ?? '')));
     $destinatario = trim((string)($item['destinatario'] ?? ''));
     $cidade = trim((string)($item['cidade'] ?? ''));
@@ -635,6 +639,12 @@ foreach ($linhas as $item) {
     $sheet->setCellValue('K' . $row, '');
     $sheet->setCellValue('L' . $row, $obs);
     if ($agBold && $agenda !== '') $agendaRows[] = $row;
+    $sheet->getStyle('A' . $row . ':L' . $row)->applyFromArray([
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => ($op === 'E' ? $bgEntrega : $bgTransferencia)],
+        ],
+    ]);
 
     $row++;
 }
