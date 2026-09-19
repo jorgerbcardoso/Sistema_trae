@@ -122,6 +122,7 @@ try {
             UPPER(COALESCE(NULLIF(car.destino_cte, ''), NULLIF(car.destino, ''))) AS destino_cte,
             COALESCE(cte.nome_dest, car.destinatario_cte, '') AS destinatario,
             COALESCE(cid.nome, '') AS cidade_entrega,
+            COALESCE(cid.uf, '') AS uf_entrega,
             COALESCE(cte.nfs, '') AS nfs,
             COALESCE(cte.data_prev_ent::text, car.data_prev_ent_cte::text, '') AS data_prev_ent,
             COALESCE(cte.ult_ocor_agend, 0) AS ult_ocor_agend,
@@ -129,6 +130,8 @@ try {
             COALESCE(cte.peso_calc, 0) AS peso_calc,
             COALESCE(cte.cubagem, car.cubagem_cte, 0) AS cubagem,
             COALESCE(cte.qtde_vol, car.qtde_vol_cte, 0) AS qtde_vol,
+            COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
+            COALESCE(cte.endereco_entrega, '') AS endereco_entrega,
             COALESCE(cte.bairro_entrega, '') AS bairro_entrega
         FROM {$tblCar} car
         LEFT JOIN {$tblCte} cte
@@ -162,6 +165,16 @@ try {
             $setor = $destCte;
         }
 
+        $endLinha2 = '';
+        if ($isEntrega) {
+            $endereco = trim((string)($r['endereco_entrega'] ?? ''));
+            $bairro = trim((string)($r['bairro_entrega'] ?? ''));
+            $cep = trim((string)($r['cep_entrega'] ?? ''));
+            $street = $endereco;
+            if ($bairro !== '') $street = $street !== '' ? ($street . ', ' . $bairro) : $bairro;
+            $endLinha2 = implode(' · ', array_values(array_filter([$street, $cep], function($v) { return trim((string)$v) !== ''; })));
+        }
+
         $ultOcorAgend = (int)($r['ult_ocor_agend'] ?? 0);
         $agendado = ($ocorAgendamento !== null && $ultOcorAgend === (int)$ocorAgendamento);
         $agendaTxt = $agendado ? $fmtDdMmYy($r['data_prev_ent'] ?? '') : '';
@@ -172,6 +185,7 @@ try {
             'destino_cte' => $destCte,
             'setor' => $setor,
             'destinatario' => trim((string)($r['destinatario'] ?? '')),
+            'end_linha2' => $endLinha2,
             'cidade' => trim((string)($r['cidade_entrega'] ?? '')),
             'nf' => $primeiraNf($r['nfs'] ?? ''),
             'agenda' => $agendaTxt,
@@ -614,6 +628,7 @@ foreach ($linhas as $item) {
     $destinoCte = strtoupper(trim((string)($item['destino_cte'] ?? '')));
     $setor = strtoupper(trim((string)($item['setor'] ?? '')));
     $destinatario = trim((string)($item['destinatario'] ?? ''));
+    $endLinha2 = trim((string)($item['end_linha2'] ?? ''));
     $cidade = trim((string)($item['cidade'] ?? ''));
     $nf = trim((string)($item['nf'] ?? ''));
     $agenda = trim((string)($item['agenda'] ?? ''));
@@ -631,7 +646,7 @@ foreach ($linhas as $item) {
 
     $sheet->setCellValue('A' . $row, $ordem > 0 ? $ordem : '');
     $sheet->setCellValue('B' . $row, $setor);
-    $sheet->setCellValue('C' . $row, $destinatario);
+    $sheet->setCellValue('C' . $row, $destinatario . "\n" . $endLinha2);
     $sheet->setCellValue('D' . $row, $cidade);
     $sheet->setCellValue('E' . $row, $nf);
     $sheet->setCellValue('F' . $row, $agenda);
@@ -648,6 +663,7 @@ foreach ($linhas as $item) {
             'startColor' => ['rgb' => ($destinoCte === 'FEC' ? $bgFec : ($op === 'E' ? $bgEntrega : $bgTransferencia))],
         ],
     ]);
+    $sheet->getRowDimension($row)->setRowHeight(30);
 
     $row++;
 }
@@ -660,7 +676,7 @@ $tableCellStyle = [
 $sheet->getStyle('A' . $dataRowStart . ':L' . $lastRow)->applyFromArray($tableCellStyle);
 $sheet->getStyle('A' . $dataRowStart . ':A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getStyle('B' . $dataRowStart . ':B' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-$sheet->getStyle('C' . $dataRowStart . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
+$sheet->getStyle('C' . $dataRowStart . ':C' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
 $sheet->getStyle('D' . $dataRowStart . ':D' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setWrapText(true);
 $sheet->getStyle('E' . $dataRowStart . ':F' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->getStyle('G' . $dataRowStart . ':I' . $lastRow)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
