@@ -4867,7 +4867,9 @@ function ModalRotaCarregamento({
           <div className="flex items-center gap-2 min-w-0">
             <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">Rota · {carregamento.placa_provisoria}</h3>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
+                Rota · Carregamento{carregamento.seq_carregamento ? ` ${String(carregamento.seq_carregamento).padStart(6, '0')}` : ''} · {carregamento.placa_provisoria}
+              </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                 {unidadesOrdem.length > 1 ? `${unidadesOrdem[0]} → ${unidadesOrdem.slice(1).join(' → ')}` : unidadesOrdem[0]}
               </p>
@@ -6261,7 +6263,7 @@ function CarregamentoArea({
               <CardCarregamento
                 key={i}
                 carregamento={c}
-                unidadeAtual={unidadeAtual}
+                unidadeAtual={sigla}
                 todosCtes={todosCtes}
                 cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
                 cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
