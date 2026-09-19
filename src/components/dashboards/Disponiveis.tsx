@@ -21,6 +21,7 @@ import {
   Truck,
   PackageSearch,
   RefreshCw,
+  ChevronUp,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -1775,6 +1776,7 @@ function escolherIntermediariasLinha(
 
 function CardCarregamento({
   carregamento,
+  unidadeAtual,
   todosCtes,
   cteKeysDisponiveisTransferencia,
   cteKeysDisponiveisEntrega,
@@ -1793,6 +1795,7 @@ function CardCarregamento({
   importandoCarregamentos,
 }: {
   carregamento: Carregamento;
+  unidadeAtual: string;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   cteKeysDisponiveisTransferencia: Set<string>;
   cteKeysDisponiveisEntrega: Set<string>;
@@ -2378,24 +2381,20 @@ function CardCarregamento({
   const carregamentoIniciado = !isSimulado && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
 
   const tipoCounts = useMemo(() => {
+    const un = (unidadeAtual ?? '').trim().toUpperCase();
     let entrega = 0;
     let transf = 0;
-    let indef = 0;
     for (const c of carregamento.ctes) {
-      const key = cteKey(c);
-      if (!key) continue;
-      const isEnt = cteKeysDisponiveisEntrega.has(key);
-      const isTr = cteKeysDisponiveisTransferencia.has(key);
-      if (isEnt) entrega += 1;
-      if (isTr) transf += 1;
-      if (!isEnt && !isTr) indef += 1;
+      const d = (c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
+      if (!d) continue;
+      if (un && d === un) entrega += 1;
+      else transf += 1;
     }
-    return { entrega, transf, indef };
-  }, [carregamento.ctes, cteKeysDisponiveisEntrega, cteKeysDisponiveisTransferencia, isSimulado]);
+    return { entrega, transf };
+  }, [carregamento.ctes, unidadeAtual]);
 
   const temEntrega = tipoCounts.entrega > 0;
   const temTransferencia = tipoCounts.transf > 0;
-  const temIndef = tipoCounts.indef > 0;
   const dominante = (temEntrega || temTransferencia)
     ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
     : (carregamentoIniciado ? 'TRANSFERENCIA' : null);
@@ -2470,21 +2469,6 @@ function CardCarregamento({
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
               {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
             </Badge>
-            {temTransferencia ? (
-              <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-xs">
-                Transferência{tipoCounts.transf > 0 ? ` ${tipoCounts.transf}` : ''}
-              </Badge>
-            ) : null}
-            {temEntrega ? (
-              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-xs">
-                Entrega{tipoCounts.entrega > 0 ? ` ${tipoCounts.entrega}` : ''}
-              </Badge>
-            ) : null}
-            {temIndef ? (
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-                Indef.{tipoCounts.indef > 0 ? ` ${tipoCounts.indef}` : ''}
-              </Badge>
-            ) : null}
           </div>
 
           <div className="col-span-2 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
@@ -2551,6 +2535,18 @@ function CardCarregamento({
 
         {temCapacidade ? (
           <div className="flex flex-col gap-2 mb-3">
+            <div className="flex items-center gap-1.5">
+              {temTransferencia ? (
+                <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 text-[11px] h-5 px-2">
+                  Transferência
+                </Badge>
+              ) : null}
+              {temEntrega ? (
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] h-5 px-2">
+                  Entrega
+                </Badge>
+              ) : null}
+            </div>
             <BarraCapacidade
               valor={totalPeso / 1000}
               capacidade={carregamento.capacidade_ton!}
@@ -4275,6 +4271,64 @@ function ModalRotaCarregamento({
     return { entrega: listEntrega, transferencia: listTransf };
   }, [dados, unidadesMap, unidadesOrdem]);
 
+  const transfByUnidade = useMemo(() => new Map(grupos.transferencia.map((g) => [g.unidade, g])), [grupos.transferencia]);
+  const entregaByKey = useMemo(() => new Map(grupos.entrega.map((g) => [g.key, g])), [grupos.entrega]);
+
+  const defaultParadasOrder = useMemo(() => {
+    const out: string[] = [];
+    const used = new Set<string>();
+    for (let i = 1; i < unidadesOrdem.length; i++) {
+      const u = unidadesOrdem[i];
+      const t = transfByUnidade.get(u);
+      if (t) {
+        const k = `T:${t.unidade}`;
+        out.push(k);
+        used.add(k);
+      }
+      for (const e of grupos.entrega.filter((g) => g.unidade === u)) {
+        const k = `E:${e.key}`;
+        out.push(k);
+        used.add(k);
+      }
+    }
+    for (const t of grupos.transferencia) {
+      const k = `T:${t.unidade}`;
+      if (used.has(k)) continue;
+      used.add(k);
+      out.push(k);
+    }
+    for (const e of grupos.entrega) {
+      const k = `E:${e.key}`;
+      if (used.has(k)) continue;
+      used.add(k);
+      out.push(k);
+    }
+    return out;
+  }, [grupos.entrega, grupos.transferencia, transfByUnidade, unidadesOrdem]);
+
+  const [paradasOrder, setParadasOrder] = useState<string[]>([]);
+
+  const paradasOrderEfetiva = useMemo(() => {
+    const keysAll = new Set<string>([
+      ...grupos.transferencia.map((g) => `T:${g.unidade}`),
+      ...grupos.entrega.map((g) => `E:${g.key}`),
+    ]);
+    const base = (paradasOrder.length > 0 ? paradasOrder : defaultParadasOrder).filter((k) => keysAll.has(k));
+    const out: string[] = [];
+    const used = new Set<string>();
+    for (const k of base) {
+      if (used.has(k)) continue;
+      used.add(k);
+      out.push(k);
+    }
+    for (const k of defaultParadasOrder) {
+      if (!keysAll.has(k) || used.has(k)) continue;
+      used.add(k);
+      out.push(k);
+    }
+    return out;
+  }, [defaultParadasOrder, grupos.entrega, grupos.transferencia, paradasOrder]);
+
   useEffect(() => {
     const initial: Record<string, { lat: number; lng: number }> = {};
     const status: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
@@ -4292,8 +4346,9 @@ function ModalRotaCarregamento({
     setGeoErrorByKey({});
     setGeoRunning(false);
     setAbertos(new Set());
+    setParadasOrder(defaultParadasOrder);
     setGeoHydrated(true);
-  }, [carregamento.placa_provisoria]);
+  }, [carregamento.placa_provisoria, defaultParadasOrder]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -4343,54 +4398,37 @@ function ModalRotaCarregamento({
     const pontos: { key: string; tipo: 'UNIDADE' | 'ENTREGA'; titulo: string; lat: number; lng: number }[] = [];
 
     const origemCoord = getUnidCoord(origem);
-    let anchor: { lat: number; lng: number } | null = origemCoord;
     if (origemCoord) pontos.push({ key: `U:${origem}`, tipo: 'UNIDADE', titulo: origem, ...origemCoord });
 
-    for (let i = 1; i < unidadesOrdem.length; i++) {
-      const uSigla = unidadesOrdem[i];
-      const uCoord = getUnidCoord(uSigla);
-      if (uCoord) {
-        pontos.push({ key: `U:${uSigla}`, tipo: 'UNIDADE', titulo: uSigla, ...uCoord });
-        anchor = uCoord;
-      }
+    const usedUnit = new Set<string>();
+    if (origem) usedUnit.add(origem);
 
-      const entregas = grupos.entrega
-        .filter((g) => g.unidade === uSigla)
-        .map((g) => {
-          const c = coordsByKey[g.key];
-          return c ? { key: `E:${g.key}`, tipo: 'ENTREGA' as const, titulo: g.titulo, ...c, groupKey: g.key } : null;
-        })
-        .filter(Boolean) as any[];
+    const pushUnit = (sigla: string) => {
+      const s = String(sigla ?? '').trim().toUpperCase();
+      if (!s || usedUnit.has(s)) return;
+      const c = getUnidCoord(s);
+      if (!c) return;
+      pontos.push({ key: `U:${s}`, tipo: 'UNIDADE', titulo: s, ...c });
+      usedUnit.add(s);
+    };
 
-      if (entregas.length === 0) continue;
-      if (!anchor) {
-        for (const p of entregas) {
-          pontos.push({ key: p.key, tipo: p.tipo, titulo: p.titulo, lat: p.lat, lng: p.lng });
-          anchor = { lat: p.lat, lng: p.lng };
-        }
-        continue;
+    for (const k of paradasOrderEfetiva) {
+      if (k.startsWith('T:')) {
+        pushUnit(k.slice(2));
+      } else if (k.startsWith('E:')) {
+        const gKey = k.slice(2);
+        const g = entregaByKey.get(gKey);
+        const c = coordsByKey[gKey];
+        if (!g || !c) continue;
+        pontos.push({ key: `E:${gKey}`, tipo: 'ENTREGA', titulo: g.titulo, lat: c.lat, lng: c.lng });
       }
-
-      const remaining = [...entregas];
-      const ordered: any[] = [];
-      let cur = anchor;
-      while (remaining.length > 0) {
-        let bestIdx = 0;
-        let bestDist = Number.POSITIVE_INFINITY;
-        for (let j = 0; j < remaining.length; j++) {
-          const d = calcDist(cur, remaining[j]);
-          if (d < bestDist) { bestDist = d; bestIdx = j; }
-        }
-        const pick = remaining.splice(bestIdx, 1)[0];
-        ordered.push(pick);
-        cur = { lat: pick.lat, lng: pick.lng };
-      }
-      for (const p of ordered) pontos.push({ key: p.key, tipo: p.tipo, titulo: p.titulo, lat: p.lat, lng: p.lng });
-      anchor = cur;
     }
 
+    const finalSigla = unidadesOrdem[unidadesOrdem.length - 1];
+    if (finalSigla) pushUnit(finalSigla);
+
     return pontos;
-  }, [coordsByKey, grupos.entrega, unidadesMap, unidadesOrdem, origem]);
+  }, [coordsByKey, entregaByKey, origem, paradasOrderEfetiva, unidadesMap, unidadesOrdem]);
 
   const [routeCoords, setRouteCoords] = useState<{ lat: number; lng: number }[]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -4724,6 +4762,21 @@ function ModalRotaCarregamento({
     });
   };
 
+  const moverParada = useCallback((key: string, delta: -1 | 1) => {
+    setParadasOrder((prev) => {
+      const base = (prev.length > 0 ? [...prev] : [...defaultParadasOrder]);
+      const idx = base.indexOf(key);
+      if (idx < 0) return base;
+      const nextIdx = idx + delta;
+      if (nextIdx < 0 || nextIdx >= base.length) return base;
+      const next = [...base];
+      const tmp = next[idx];
+      next[idx] = next[nextIdx];
+      next[nextIdx] = tmp;
+      return next;
+    });
+  }, [defaultParadasOrder]);
+
   const toggleCteRotaSort = (key: 'ctrc' | 'emissao' | 'prev' | 'peso' | 'frete') => {
     setCteRotaSortKey((prev) => {
       if (prev === key) {
@@ -4764,17 +4817,27 @@ function ModalRotaCarregamento({
     const totFrete = list.reduce((s, c) => s + (Number(c.frete ?? 0) || 0), 0);
     return (
       <div className="mt-2 pl-6">
-        <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>CT-e</button>
-            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>Emissão</button>
-            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('prev')}>Prev</button>
-            <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('peso')}>Peso (kg)</button>
-            <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('frete')}>Frete (R$)</button>
+        <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-x-auto">
+          <div className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
+              CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
+              Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('prev')}>
+              Prev{cteRotaSortKey === 'prev' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('peso')}>
+              Peso (kg){cteRotaSortKey === 'peso' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('frete')}>
+              Frete (R$){cteRotaSortKey === 'frete' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 text-[11px]">
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.emissao ?? '')) || '-'}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.prev ?? '')) || '-'}</span>
@@ -4783,7 +4846,7 @@ function ModalRotaCarregamento({
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className="min-w-[440px] grid grid-cols-[96px_64px_64px_84px_96px] gap-2 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
             <span className="text-slate-600 dark:text-slate-300">Total</span>
             <span />
             <span />
@@ -4861,7 +4924,7 @@ function ModalRotaCarregamento({
                 </div>
               )}
               {routeLoading && (
-                <div className="absolute top-2 right-2 z-[1100] bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <div className="absolute top-12 right-2 z-[1100] bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Calculando rota...
                 </div>
@@ -4869,7 +4932,7 @@ function ModalRotaCarregamento({
               <Button
                 size="sm"
                 variant="secondary"
-                className="absolute top-2 left-2 z-[1100] h-8 text-xs"
+                className="absolute top-2 right-2 z-[1100] h-8 text-xs"
                 onClick={focarRota}
                 disabled={!leafletLoaded || (pontosOrdenados.length === 0 && routeCoords.length === 0)}
               >
@@ -4884,65 +4947,121 @@ function ModalRotaCarregamento({
             <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Destinos</div>
 
             <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-
-            {grupos.transferencia.map((g) => {
-              const aberto = abertos.has(`T:${g.key}`);
-              const uNome = unidadesMap.get(g.unidade)?.nome ?? '';
-              return (
-                <div key={`T:${g.key}`} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleAberto(`T:${g.key}`)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
-                  >
-                    {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.unidade}{uNome ? ` · ${uNome}` : ''}</div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Transferência · {g.ctes.length} CT-e(s)</div>
+              {paradasOrderEfetiva.map((k, idx) => {
+                if (k.startsWith('T:')) {
+                  const sigla = k.slice(2);
+                  const g = transfByUnidade.get(sigla);
+                  if (!g) return null;
+                  const aberto = abertos.has(k);
+                  const uNome = unidadesMap.get(g.unidade)?.nome ?? '';
+                  const isFirst = idx === 0;
+                  const isLast = idx === paradasOrderEfetiva.length - 1;
+                  return (
+                    <div key={k} className="mb-2">
+                      <div className="flex gap-1 items-stretch">
+                        <button
+                          type="button"
+                          onClick={() => toggleAberto(k)}
+                          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                        >
+                          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{g.unidade}{uNome ? ` · ${uNome}` : ''}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Transferência · {g.ctes.length} CT-e(s)</div>
+                          </div>
+                        </button>
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            className="h-[26px] w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-900 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); moverParada(k, -1); }}
+                            disabled={isFirst}
+                            title="Mover para cima"
+                          >
+                            <ChevronUp className="w-4 h-4 text-slate-500" />
+                          </button>
+                          <button
+                            type="button"
+                            className="mt-1 h-[26px] w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-900 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); moverParada(k, 1); }}
+                            disabled={isLast}
+                            title="Mover para baixo"
+                          >
+                            <ChevronDown className="w-4 h-4 text-slate-500" />
+                          </button>
+                        </div>
+                      </div>
+                      {aberto && renderCtes(g.ctes)}
                     </div>
-                  </button>
-                  {aberto && renderCtes(g.ctes)}
-                </div>
-              );
-            })}
+                  );
+                }
 
-            {grupos.entrega.map((g) => {
-              const aberto = abertos.has(`E:${g.key}`);
-              const status = geoStatusByKey[g.key] ?? 'pending';
-              const statusLabel = status === 'ok' ? 'ok' : status === 'loading' ? 'buscando...' : status === 'error' ? 'erro' : 'pendente';
-              const cor = status === 'ok'
-                ? 'text-emerald-700 dark:text-emerald-400'
-                : status === 'error'
-                  ? 'text-red-700 dark:text-red-400'
-                  : 'text-amber-700 dark:text-amber-400';
-              return (
-                <div key={`E:${g.key}`} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleAberto(`E:${g.key}`)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
-                  >
-                    {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-normal leading-snug">
-                        {g.destinatario || g.titulo}
+                if (k.startsWith('E:')) {
+                  const gKey = k.slice(2);
+                  const g = entregaByKey.get(gKey);
+                  if (!g) return null;
+                  const aberto = abertos.has(k);
+                  const status = geoStatusByKey[g.key] ?? 'pending';
+                  const statusLabel = status === 'ok' ? 'ok' : status === 'loading' ? 'buscando...' : status === 'error' ? 'erro' : 'pendente';
+                  const cor = status === 'ok'
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : status === 'error'
+                      ? 'text-red-700 dark:text-red-400'
+                      : 'text-amber-700 dark:text-amber-400';
+                  const isFirst = idx === 0;
+                  const isLast = idx === paradasOrderEfetiva.length - 1;
+                  return (
+                    <div key={k} className="mb-2">
+                      <div className="flex gap-1 items-stretch">
+                        <button
+                          type="button"
+                          onClick={() => toggleAberto(k)}
+                          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                        >
+                          {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 whitespace-normal leading-snug">
+                              {g.destinatario || g.titulo}
+                            </div>
+                            <div className="text-[11px] text-slate-600 dark:text-slate-400 whitespace-normal leading-snug mt-0.5">
+                              {[
+                                g.endereco ? `${g.endereco}${g.bairro ? `, ${g.bairro}` : ''}` : (g.bairro || ''),
+                                [g.cep, g.cidade && g.uf ? `${g.cidade}/${g.uf}` : (g.cidade || g.uf)].filter(Boolean).join(' · ')
+                              ].filter(Boolean).join(' · ') || 'Endereço não informado'}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              Entrega · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
+                              {status === 'error' && geoErrorByKey[g.key] ? ` (${geoErrorByKey[g.key]})` : ''}
+                            </div>
+                          </div>
+                        </button>
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            className="h-[26px] w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-900 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); moverParada(k, -1); }}
+                            disabled={isFirst}
+                            title="Mover para cima"
+                          >
+                            <ChevronUp className="w-4 h-4 text-slate-500" />
+                          </button>
+                          <button
+                            type="button"
+                            className="mt-1 h-[26px] w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-slate-900 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); moverParada(k, 1); }}
+                            disabled={isLast}
+                            title="Mover para baixo"
+                          >
+                            <ChevronDown className="w-4 h-4 text-slate-500" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-600 dark:text-slate-400 whitespace-normal leading-snug mt-0.5">
-                        {[
-                          g.endereco ? `${g.endereco}${g.bairro ? `, ${g.bairro}` : ''}` : (g.bairro || ''),
-                          [g.cep, g.cidade && g.uf ? `${g.cidade}/${g.uf}` : (g.cidade || g.uf)].filter(Boolean).join(' · ')
-                        ].filter(Boolean).join(' · ') || 'Endereço não informado'}
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Entrega · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
-                        {status === 'error' && geoErrorByKey[g.key] ? ` (${geoErrorByKey[g.key]})` : ''}
-                      </div>
+                      {aberto && renderCtes(g.ctes)}
                     </div>
-                  </button>
-                  {aberto && renderCtes(g.ctes)}
-                </div>
-              );
-            })}
+                  );
+                }
+                return null;
+              })}
             </div>
 
             <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200 flex items-center justify-between gap-3">
@@ -6142,6 +6261,7 @@ function CarregamentoArea({
               <CardCarregamento
                 key={i}
                 carregamento={c}
+                unidadeAtual={unidadeAtual}
                 todosCtes={todosCtes}
                 cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
                 cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
