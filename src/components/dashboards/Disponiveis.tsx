@@ -2290,11 +2290,15 @@ function CardCarregamento({
     }
     const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
     if (destinosCard) {
-      const allowed = new Set(
-        todasUnidades
-          .map((u) => String(u ?? '').trim().toUpperCase())
-          .filter((u) => !!u && /^[A-Z0-9]{2,5}$/.test(u))
-      );
+      const allowed = new Set<string>();
+      for (const u of todasUnidades) {
+        const x = String(u ?? '').trim().toUpperCase();
+        if (x && /^[A-Z0-9]{2,5}$/.test(x)) allowed.add(x);
+      }
+      for (const u of Array.from(unidadesComCtes)) {
+        const x = String(u ?? '').trim().toUpperCase();
+        if (x && /^[A-Z0-9]{2,5}$/.test(x)) allowed.add(x);
+      }
       const parts = destinosCard
         .split(',')
         .map((p) => p.trim().toUpperCase())
@@ -2318,6 +2322,12 @@ function CardCarregamento({
       if (seen.has(u)) continue;
       seen.add(u);
       if (!unidadesComCtes.has(u)) continue;
+      out.push(u);
+    }
+    for (const u of Array.from(unidadesComCtes)) {
+      if (!u) continue;
+      if (seen.has(u)) continue;
+      seen.add(u);
       out.push(u);
     }
     const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
@@ -2808,14 +2818,44 @@ function CardCarregamento({
 
             {/* Destinos do carregamento */}
             {(() => {
-              const paradasArr = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(Boolean);
-              const destFinal = carregamento.destino?.toUpperCase() || null;
-              const todas = [...paradasArr, destFinal].filter(Boolean) as string[];
-              if (todas.length === 0) return null;
+              const valid = (u: string) => !!u && /^[A-Z0-9]{2,5}$/.test(u);
+              const fromCtes = new Set(
+                (cteDetalheLista ?? [])
+                  .map((c) => String((c as any).sigla_dest ?? '').trim().toUpperCase())
+                  .filter(valid)
+              );
+
+              const paradasArr = (carregamento.paradas || '').split(',').map(p => p.trim().toUpperCase()).filter(valid);
+              const destFinal = String(carregamento.destino ?? '').trim().toUpperCase();
+              const base = [...paradasArr, destFinal].filter(valid);
+
+              const out: string[] = [];
+              const seen = new Set<string>();
+              for (const u of base) {
+                if (fromCtes.size > 0 && !fromCtes.has(u)) continue;
+                if (seen.has(u)) continue;
+                seen.add(u);
+                out.push(u);
+              }
+              if (fromCtes.size > 0) {
+                for (const u of Array.from(fromCtes)) {
+                  if (seen.has(u)) continue;
+                  seen.add(u);
+                  out.push(u);
+                }
+              } else {
+                for (const u of base) {
+                  if (seen.has(u)) continue;
+                  seen.add(u);
+                  out.push(u);
+                }
+              }
+
+              if (out.length === 0) return null;
               return (
                 <div className="flex flex-wrap gap-1.5">
-                  {todas.map((u, i) => (
-                    <span key={i} className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-mono ${i === todas.length - 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                  {out.map((u, i) => (
+                    <span key={`${u}-${i}`} className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-mono ${i === out.length - 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-bold' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                       {u}
                     </span>
                   ))}
