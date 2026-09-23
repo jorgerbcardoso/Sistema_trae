@@ -34,7 +34,6 @@ import {
   MapPin,
   Building2,
   Layers,
-  Timer,
   Loader2,
   CalendarDays,
   Home,
@@ -6715,8 +6714,6 @@ export function Disponiveis() {
   const [loading, setLoading] = useState(false);
   const [loadingInicial, setLoadingInicial] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
-  const [countdown, setCountdown] = useState(300);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [dadosEntrega, setDadosEntrega] = useState<DadosEntrega | null>(null);
   const [loadingEntrega, setLoadingEntrega] = useState(false);
@@ -8000,23 +7997,6 @@ export function Disponiveis() {
     return () => { ativo = false; };
   }, [painelAtivo, sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
 
-  useEffect(() => {
-    if (!painelAtivo) return;
-    if (!sigla) return;
-    timerRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          void importarCarregamentosSSWObrigatorio().finally(() => { void carregar(); });
-          return 300;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [painelAtivo, sigla, carregar, importarCarregamentosSSWObrigatorio]);
-
-
-
   const hasFiltrosAtivos =
     (filters.unidadeDestino?.length ?? 0) > 0 ||
     !!filters.periodoEmissaoInicio ||
@@ -8670,9 +8650,6 @@ export function Disponiveis() {
     URL.revokeObjectURL(url);
   };
 
-  const minutos = Math.floor(countdown / 60);
-  const segundos = countdown % 60;
-
   return (
     <DashboardLayout
       title="Disponíveis no Armazém"
@@ -8684,12 +8661,6 @@ export function Disponiveis() {
               <Building2 className="w-3.5 h-3.5 mr-1.5" />
               {sigla}
             </Badge>
-          )}
-          {ultimaAtualizacao && !isMTZ && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Timer className="w-3.5 h-3.5" />
-              <span>Atualiza em {minutos}:{String(segundos).padStart(2, '0')}</span>
-            </div>
           )}
           {(loading || loadingEntrega) && !isMTZ && (
             <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
