@@ -7205,6 +7205,20 @@ export function Disponiveis() {
     if (!placaOk) return { ok: false, message: 'Informe a placa/identificação.' };
 
     const ctesBase = (() => {
+      const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
+      const previsaoFim = parseDataISO(filters.periodoPrevisaoFim);
+      const tempoArmazemDe = (() => {
+        const s = (filters.tempoArmazemDe ?? '').trim();
+        if (!s) return null;
+        const n = parseInt(s, 10);
+        return Number.isFinite(n) ? Math.max(0, n) : null;
+      })();
+      const tempoArmazemAte = (() => {
+        const s = (filters.tempoArmazemAte ?? '').trim();
+        if (!s) return null;
+        const n = parseInt(s, 10);
+        return Number.isFinite(n) ? Math.max(0, n) : null;
+      })();
       const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
       return list.filter((cte) => {
         if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
@@ -7268,7 +7282,7 @@ export function Disponiveis() {
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
     }
-  }, [carregarCarregamentos, dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, unidadeAtual]);
+  }, [carregarCarregamentos, dadosEntrega, filters.periodoPrevisaoInicio, filters.periodoPrevisaoFim, filters.tempoArmazemDe, filters.tempoArmazemAte, unidadeAtual]);
 
   const handleFinalizarCarregamento = useCallback(async (placa: string) => {
     const ok = await confirmar({
