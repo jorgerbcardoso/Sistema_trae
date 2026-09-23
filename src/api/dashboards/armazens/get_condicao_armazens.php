@@ -23,6 +23,7 @@ $tableCteOcor = "{$domain}_cte_ocorrencia";
 $tableOcor = "{$domain}_ocorrencia";
 $tableEmpParam = "{$domain}_emp_param";
 $tableParam = "{$domain}_param";
+$tableMercadoria = "{$domain}_mercadoria";
 
 $defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
 $defaultOcorAgendamento = 15;
@@ -178,6 +179,17 @@ if ($apenasAgendados === true || $apenasAgendados === 1 || $apenasAgendados === 
 
 $whereClause = 'WHERE ' . implode(' AND ', $where);
 
+$hasMercadoria = false;
+try {
+    $resReg = sql('SELECT to_regclass($1) AS reg', [$tableMercadoria], $conn);
+    $rowReg = $resReg ? pg_fetch_assoc($resReg) : null;
+    $hasMercadoria = $rowReg && ($rowReg['reg'] ?? '') !== null && ($rowReg['reg'] ?? '') !== '';
+} catch (Exception $e) {
+}
+
+$mercJoin = $hasMercadoria ? "LEFT JOIN {$tableMercadoria} merc ON merc.cod_mercadoria = cte.cod_mercadoria" : '';
+$mercSelect = $hasMercadoria ? 'merc.descricao AS mercadoria_descricao,' : 'NULL::text AS mercadoria_descricao,';
+
 $baseQuery = "
 WITH last_ocor AS (
     SELECT DISTINCT ON (o.seq_cte)
@@ -206,6 +218,8 @@ base AS (
         cte.ser_cte,
         cte.nro_cte,
         cte.nfs,
+        cte.cod_mercadoria,
+        {$mercSelect}
         cte.tp_documento,
         COALESCE(cte.entrega_abonada, false) AS entrega_abonada,
         cte.data_emissao,
@@ -255,6 +269,7 @@ base AS (
     FROM {$tableCte} cte
     LEFT JOIN last_ocor lo ON lo.seq_cte = cte.seq_cte
     LEFT JOIN ocor_map om ON om.codigo = COALESCE(lo.codigo, cte.ult_ocor)
+    {$mercJoin}
     {$whereClause}
 )
 ";
@@ -265,6 +280,8 @@ SELECT
     ser_cte,
     nro_cte,
     nfs,
+    cod_mercadoria,
+    mercadoria_descricao,
     tp_documento,
     entrega_abonada,
     data_emissao,
@@ -314,6 +331,8 @@ while ($row = pg_fetch_assoc($result)) {
         'ser_cte' => (string)($row['ser_cte'] ?? ''),
         'nro_cte' => (int)($row['nro_cte'] ?? 0),
         'nfs' => $row['nfs'] ?? null,
+        'cod_mercadoria' => $row['cod_mercadoria'] !== null ? (int)$row['cod_mercadoria'] : null,
+        'mercadoria_descricao' => $row['mercadoria_descricao'] ?? null,
         'tp_documento' => $row['tp_documento'] ?? null,
         'entrega_abonada' => ($row['entrega_abonada'] ?? '') === 't',
         'data_emissao' => $row['data_emissao'] ?? null,

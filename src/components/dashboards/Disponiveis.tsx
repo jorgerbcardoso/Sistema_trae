@@ -1453,6 +1453,7 @@ function GrupoSetorCard({
 }
 
 interface CarregamentoAreaProps {
+  abaAtiva: 'transferencia' | 'entrega' | 'todos';
   sigla: string;
   carregamentos: Carregamento[];
   loadingCarregamentos: boolean;
@@ -1461,12 +1462,14 @@ interface CarregamentoAreaProps {
   linhasOrigem: LinhaCarregamento[];
   loadingLinhasOrigem: boolean;
   totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
+  gruposSetorEntrega: GrupoSetor[];
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
   modoApontamento: string | null;
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
+  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[]) => Promise<{ ok: boolean; message?: string; total?: number }>;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
@@ -1552,7 +1555,15 @@ function BarraFreteSegmentada({ cif, fob, minimo }: { cif: number; fob: number; 
   );
 }
 
-function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa: string, destino: string, paradas: string) => void; onFechar: () => void }) {
+function ModalCriarCarregamento({
+  modo,
+  onConfirmar,
+  onFechar,
+}: {
+  modo: 'transferencia' | 'entrega';
+  onConfirmar: (placa: string, destino: string, paradas: string) => void;
+  onFechar: () => void;
+}) {
   const [placa, setPlaca] = useState('');
   const [destino, setDestino] = useState('');
   const [paradas, setParadas] = useState('');
@@ -1591,7 +1602,9 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-emerald-500" />
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Novo Carregamento</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {modo === 'entrega' ? 'Novo Carregamento de Entrega' : 'Novo Carregamento'}
+            </h3>
           </div>
           <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
             <X className="w-5 h-5" />
@@ -1653,33 +1666,55 @@ function ModalCriarCarregamento({ onConfirmar, onFechar }: { onConfirmar: (placa
               )}
             </div>
           )}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Unid. destino <span className="text-red-400">*</span></label>
-            <input
-              type="text"
-              value={destino}
-              onChange={e => setDestino(e.target.value.toUpperCase())}
-              placeholder="Ex: SPO"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Paradas intermediárias <span className="font-normal text-slate-400">(opcional)</span></label>
-            <input
-              type="text"
-              value={paradas}
-              onChange={e => setParadas(e.target.value.toUpperCase())}
-              placeholder="Ex: CWB, LDA"
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
-          </div>
+          {modo !== 'entrega' ? (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Unid. destino <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={destino}
+                  onChange={e => setDestino(e.target.value.toUpperCase())}
+                  placeholder="Ex: SPO"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Paradas intermediárias <span className="font-normal text-slate-400">(opcional)</span></label>
+                <input
+                  type="text"
+                  value={paradas}
+                  onChange={e => setParadas(e.target.value.toUpperCase())}
+                  placeholder="Ex: CWB, LDA"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Setor(es) de entrega <span className="font-normal text-slate-400">(opcional)</span></label>
+              <input
+                type="text"
+                value={paradas}
+                onChange={e => setParadas(e.target.value.toUpperCase())}
+                placeholder="Ex: CENTRO, PITUBA"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Você poderá apontar documentos manualmente e até misturar com Transferência.
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" className="flex-1" onClick={onFechar}>Cancelar</Button>
           <Button
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-            disabled={!placaFinal.trim() || !destino.trim()}
-            onClick={() => { if (placaFinal.trim()) onConfirmar(placaFinal.trim(), destino.trim(), paradas.trim()); }}
+            disabled={modo === 'entrega' ? !placaFinal.trim() : (!placaFinal.trim() || !destino.trim())}
+            onClick={() => {
+              if (!placaFinal.trim()) return;
+              if (modo === 'entrega') onConfirmar(placaFinal.trim(), '', paradas.trim());
+              else onConfirmar(placaFinal.trim(), destino.trim(), paradas.trim());
+            }}
           >
             <Plus className="w-4 h-4 mr-1.5" />Carregamento Manual
           </Button>
@@ -5303,7 +5338,136 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
   );
 }
 
+function ModalCarregamentoAutomaticoEntrega({
+  setores,
+  onConfirmar,
+  onFechar,
+}: {
+  setores: GrupoSetor[];
+  onConfirmar: (placa: string, setores: string[]) => Promise<void>;
+  onFechar: () => void;
+}) {
+  const [placa, setPlaca] = useState('');
+  const [busca, setBusca] = useState('');
+  const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
+
+  const setoresFiltrados = useMemo(() => {
+    const b = busca.trim().toUpperCase();
+    const list = [...(setores ?? [])];
+    list.sort((a, b) => (b.totalCtes - a.totalCtes) || a.setor.localeCompare(b.setor));
+    if (!b) return list;
+    return list.filter((s) => String(s.setor ?? '').toUpperCase().includes(b));
+  }, [setores, busca]);
+
+  const toggleSel = (s: string) => {
+    const k = String(s ?? '').trim();
+    if (!k) return;
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const placaOk = placa.trim().toUpperCase();
+  const selected = Array.from(selecionados).map((s) => s.trim()).filter(Boolean);
+  const podeCarregarSelecionados = placaOk !== '' && selected.length > 0;
+  const podeCarregarTodos = placaOk !== '' && setoresFiltrados.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Carregamento Automático · Entrega</h3>
+          </div>
+          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placa / Identificação</label>
+              <input
+                type="text"
+                value={placa}
+                onChange={(e) => setPlaca(e.target.value.toUpperCase())}
+                placeholder="Ex: ENT-01"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar setor</label>
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value.toUpperCase())}
+                placeholder="Ex: CENTRO"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="grid grid-cols-[36px_minmax(0,1fr)_80px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <span />
+              <span>Setor</span>
+              <span className="text-right">CT-es</span>
+            </div>
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {setoresFiltrados.length === 0 ? (
+                <div className="px-3 py-6 text-xs text-slate-400 text-center">—</div>
+              ) : (
+                setoresFiltrados.map((s) => {
+                  const k = String(s.setor ?? '').trim();
+                  const checked = selecionados.has(k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => toggleSel(k)}
+                      className="w-full grid grid-cols-[36px_minmax(0,1fr)_80px] gap-2 px-3 py-2 text-xs items-center hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                    >
+                      <div className={`h-4 w-4 rounded border ${checked ? 'bg-emerald-500 border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'}`} />
+                      <span className="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate">{k || 'SEM SETOR'}</span>
+                      <span className="text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">{s.totalCtes}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 px-6 pb-5 justify-end">
+          <Button variant="outline" onClick={onFechar}>Cancelar</Button>
+          <Button
+            variant="outline"
+            disabled={!podeCarregarTodos}
+            onClick={() => onConfirmar(placaOk, setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean))}
+          >
+            Carregar todos
+          </Button>
+          <Button
+            className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={!podeCarregarSelecionados}
+            onClick={() => onConfirmar(placaOk, selected)}
+          >
+            Carregar selecionados
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CarregamentoArea({
+  abaAtiva,
   sigla,
   carregamentos,
   loadingCarregamentos,
@@ -5312,12 +5476,14 @@ function CarregamentoArea({
   linhasOrigem,
   loadingLinhasOrigem,
   totalsPorUnidadeParaLinhas,
+  gruposSetorEntrega,
   confirmar,
   perguntarTexto,
   modoApontamento,
   onIniciarApontamento,
   onCancelarApontamento,
   onCriarCarregamento,
+  onCarregamentoAutomaticoEntrega,
   onFinalizarCarregamento,
   onExcluirCarregamento,
   onRemoverCte,
@@ -5342,7 +5508,9 @@ function CarregamentoArea({
   const [modalAberto, setModalAberto] = useState(false);
   const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
+  const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
   const tooltipStyle = useTooltipStyle();
+  const isAbaEntrega = abaAtiva === 'entrega';
   const carregamentosNaoSimulados = React.useMemo(() => {
     return (carregamentos ?? []).filter((c: any) => !c?.simulado);
   }, [carregamentos]);
@@ -5350,6 +5518,22 @@ function CarregamentoArea({
   const handleCriar = (placa: string, destino: string, paradas: string) => {
     setModalAberto(false);
     onCriarCarregamento(placa, destino, paradas);
+  };
+
+  const handleCarregarAutomaticoEntrega = async (placa: string, setores: string[]) => {
+    if (loadingEntregaAuto) return;
+    try {
+      setLoadingEntregaAuto(true);
+      const res = await onCarregamentoAutomaticoEntrega(placa, setores);
+      if (res.ok) {
+        toast.success(res.message || `Carregamento ${placa} criado com ${res.total ?? 0} CT-e(s).`);
+        setModalAutomaticoAberto(false);
+      } else {
+        toast.error(res.message || 'Erro ao carregar setores');
+      }
+    } finally {
+      setLoadingEntregaAuto(false);
+    }
   };
 
   const handleExcluirTodos = async () => {
@@ -6302,7 +6486,9 @@ function CarregamentoArea({
           <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-emerald-500" />
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montagem de Carregamento</h3>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {isAbaEntrega ? 'Carregamentos de Entrega' : 'Carregamentos Transferência'}
+              </h3>
               {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
               {importandoCarregamentos ? (
                 <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-1">
@@ -6322,23 +6508,27 @@ function CarregamentoArea({
               )}
             </div>
             <div className="flex flex-wrap gap-2 justify-end">
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-                onClick={() => setModalImportarAberto(true)}
-              disabled={importandoCarregamentos || importandoVeiculos}
-              >
-                <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
-              </Button>
-              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
-                <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Obrigar placas reais</span>
-                <Switch checked={obrigarPlacasReais} onCheckedChange={onToggleObrigarPlacasReais} disabled={importandoCarregamentos} />
-              </div>
+              {!isAbaEntrega && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                    onClick={() => setModalImportarAberto(true)}
+                    disabled={importandoCarregamentos || importandoVeiculos}
+                  >
+                    <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
+                  </Button>
+                  <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
+                    <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Obrigar placas reais</span>
+                    <Switch checked={obrigarPlacasReais} onCheckedChange={onToggleObrigarPlacasReais} disabled={importandoCarregamentos} />
+                  </div>
+                </>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -6397,22 +6587,31 @@ function CarregamentoArea({
 
       {modalAberto && (
         <ModalCriarCarregamento
+          modo={isAbaEntrega ? 'entrega' : 'transferencia'}
           onConfirmar={handleCriar}
           onFechar={() => setModalAberto(false)}
         />
       )}
       {modalAutomaticoAberto && (
-        <ModalCarregamentoAutomatico
-          onConfirmar={onCarregamentoAutomatico}
-          onFechar={() => setModalAutomaticoAberto(false)}
-          confirmar={confirmar}
-          perguntarTexto={perguntarTexto}
-          linhasOrigem={linhasOrigem}
-          loadingLinhasOrigem={loadingLinhasOrigem}
-          carregamentos={carregamentosNaoSimulados}
-          siglaUnidade={sigla}
-          totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
-        />
+        isAbaEntrega ? (
+          <ModalCarregamentoAutomaticoEntrega
+            onFechar={() => setModalAutomaticoAberto(false)}
+            setores={gruposSetorEntrega}
+            onConfirmar={handleCarregarAutomaticoEntrega}
+          />
+        ) : (
+          <ModalCarregamentoAutomatico
+            onConfirmar={onCarregamentoAutomatico}
+            onFechar={() => setModalAutomaticoAberto(false)}
+            confirmar={confirmar}
+            perguntarTexto={perguntarTexto}
+            linhasOrigem={linhasOrigem}
+            loadingLinhasOrigem={loadingLinhasOrigem}
+            carregamentos={carregamentosNaoSimulados}
+            siglaUnidade={sigla}
+            totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
+          />
+        )
       )}
       {modalImportarAberto && (
         <ModalImportarSSW
@@ -6973,10 +7172,11 @@ export function Disponiveis() {
 
   useEffect(() => {
     if (!painelAtivo) return;
+    if (abaAtiva === 'entrega') return;
     if (!importacaoAutomatica) return;
     const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 300000);
     return () => clearInterval(id);
-  }, [painelAtivo, importacaoAutomatica, handleImportarCarregamentos]);
+  }, [abaAtiva, painelAtivo, importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {
@@ -6995,6 +7195,64 @@ export function Disponiveis() {
       toast.error(e.message || 'Erro ao criar carregamento');
     }
   }, [carregarCarregamentos]);
+
+  const handleCarregamentoAutomaticoEntrega = useCallback(async (placa: string, setores: string[]) => {
+    const placaOk = String(placa ?? '').trim().toUpperCase();
+    const setoresOk = (Array.isArray(setores) ? setores : [])
+      .map((s) => String(s ?? '').trim().toUpperCase())
+      .filter(Boolean);
+
+    if (!placaOk) return { ok: false, message: 'Informe a placa/identificação.' };
+
+    const ctesBase = [...(ctesEntregaFiltrados ?? [])];
+    const ctesSel = setoresOk.length === 0
+      ? ctesBase
+      : ctesBase.filter((c) => {
+        const setorCte = String(c.setor ?? '').trim().toUpperCase();
+        return setoresOk.some((s) => setorCte.includes(s));
+      });
+
+    if (ctesSel.length === 0) return { ok: false, message: 'Nenhum CT-e encontrado para os setores selecionados.' };
+
+    try {
+      const criar = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa: placaOk, destino: '', paradas: setoresOk.join(', ') }) },
+        true
+      );
+      if (!criar?.success) return { ok: false, message: criar?.message || 'Erro ao criar carregamento.' };
+
+      const ctesPayload = ctesSel.map((c) => ({
+        nroCte: c.nroCte,
+        serCte: c.serCte,
+        emissao: c.emissao ?? '',
+        prevEnt: c.prevEnt ?? '',
+        remetente: '',
+        destinatario: c.destinatario ?? '',
+        pagador: c.pagador ?? '',
+        cidade: c.cidade ?? '',
+        vlrNf: c.vlrMerc ?? '',
+        frete: c.frete ?? '',
+        peso: c.peso ?? '',
+        cubagem: c.cubagem ?? '',
+        qtdeVol: c.qtdeVol ?? '',
+        unidadeDest: unidadeAtual,
+        unidadeCarregamento: unidadeAtual,
+      }));
+
+      const add = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: placaOk, ctes: ctesPayload }) },
+        true
+      );
+      if (!add?.success) return { ok: false, message: add?.message || 'Erro ao adicionar CT-es.' };
+
+      await carregarCarregamentos();
+      return { ok: true, total: Number(add?.adicionados ?? ctesSel.length) || ctesSel.length };
+    } catch (e: any) {
+      return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
+    }
+  }, [carregarCarregamentos, ctesEntregaFiltrados, unidadeAtual]);
 
   const handleFinalizarCarregamento = useCallback(async (placa: string) => {
     const ok = await confirmar({
@@ -9428,6 +9686,7 @@ export function Disponiveis() {
           </Dialog>
 
           <CarregamentoArea
+            abaAtiva={abaAtiva}
             sigla={sigla}
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
@@ -9436,12 +9695,14 @@ export function Disponiveis() {
             linhasOrigem={linhasOrigem}
             loadingLinhasOrigem={loadingLinhasOrigem}
             totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
+            gruposSetorEntrega={gruposSetor}
             confirmar={confirmar}
             perguntarTexto={perguntarTexto}
             modoApontamento={modoApontamento}
             onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
             onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
             onCriarCarregamento={handleCriarCarregamento}
+            onCarregamentoAutomaticoEntrega={handleCarregamentoAutomaticoEntrega}
             onFinalizarCarregamento={handleFinalizarCarregamento}
             onExcluirCarregamento={handleExcluirCarregamento}
             onRemoverCte={handleRemoverCte}

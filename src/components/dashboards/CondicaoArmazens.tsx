@@ -58,6 +58,8 @@ type Row = {
   ser_cte: string;
   nro_cte: number;
   nfs?: string | null;
+  cod_mercadoria?: number | null;
+  mercadoria_descricao?: string | null;
   tp_documento?: string | null;
   entrega_abonada?: boolean;
   data_emissao: string | null;
@@ -464,6 +466,8 @@ export function CondicaoArmazens() {
       'CT-e',
       'Emissão',
       'NFs',
+      'Cod. Merc.',
+      'Mercadoria',
       'Chegada na unidade',
       'Dias no armazém',
       'Prev. entrega',
@@ -494,6 +498,8 @@ export function CondicaoArmazens() {
         csvEscape(cte),
         csvEscape(r.data_emissao ?? ''),
         csvEscape(r.nfs ?? ''),
+        csvEscape(r.cod_mercadoria ?? ''),
+        csvEscape(r.mercadoria_descricao ?? ''),
         csvEscape(r.data_chegada_unid ?? ''),
         csvEscape(r.dias_armazem ?? ''),
         csvEscape(r.data_prev_ent ?? ''),
@@ -535,7 +541,7 @@ export function CondicaoArmazens() {
       return;
     }
 
-    const header = ['Loc.', 'CT-e', 'Emissão', 'NFs', 'Chegada', 'Dias', 'Prev. Ent.', 'Atraso', 'Agendado', 'Últ. ocorrência', 'Complemento', 'Vlr Merc.', 'Frete'];
+    const header = ['Loc.', 'CT-e', 'Emissão', 'NFs', 'Cod. Merc.', 'Mercadoria', 'Chegada', 'Dias', 'Prev. Ent.', 'Atraso', 'Agendado', 'Últ. ocorrência', 'Complemento', 'Vlr Merc.', 'Frete'];
 
     const rowsCsv = lista.map((r) => {
       const sigla = String(r.unid_atual ?? '').trim().toUpperCase();
@@ -552,6 +558,8 @@ export function CondicaoArmazens() {
         csvEscape(cte),
         csvEscape(fmtDateBR2y(r.data_emissao)),
         csvEscape(r.nfs ?? ''),
+        csvEscape(r.cod_mercadoria ?? ''),
+        csvEscape(r.mercadoria_descricao ?? ''),
         csvEscape(fmtDateBR2y(r.data_chegada_unid)),
         csvEscape(r.dias_armazem ?? ''),
         csvEscape(fmtDateBR2y(r.data_prev_ent)),
@@ -803,6 +811,8 @@ export function CondicaoArmazens() {
       'CT-e',
       'Emissão',
       'NFs',
+      'Cod. Merc.',
+      'Mercadoria',
       'Chegada na unidade',
       'Dias no armazém',
       'Prev. entrega',
@@ -833,6 +843,8 @@ export function CondicaoArmazens() {
         csvEscape(cte),
         csvEscape(r.data_emissao ?? ''),
         csvEscape(r.nfs ?? ''),
+        csvEscape(r.cod_mercadoria ?? ''),
+        csvEscape(r.mercadoria_descricao ?? ''),
         csvEscape(r.data_chegada_unid ?? ''),
         csvEscape(r.dias_armazem ?? ''),
         csvEscape(r.data_prev_ent ?? ''),
