@@ -6976,7 +6976,6 @@ export function Disponiveis() {
           : [];
         setDados({ ...d, ctes });
         setUltimaAtualizacao(res.data.geradoEm);
-        setCountdown(300);
       } else {
         toast.error(res.message || 'Erro ao carregar dados');
       }
@@ -7981,21 +7980,9 @@ export function Disponiveis() {
       } finally {
         if (ativo) setLoadingInicial(false);
       }
-
-      void (async () => {
-        await importarCarregamentosSSWObrigatorio();
-        if (!ativo) return;
-        await verificarSaidasEmViagem();
-        if (!ativo) return;
-        await carregarCarregamentos();
-        if (!ativo) return;
-        await carregar();
-        if (!ativo) return;
-        await carregarEntrega();
-      })();
     })();
     return () => { ativo = false; };
-  }, [painelAtivo, sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio, verificarSaidasEmViagem, carregarCarregamentos]);
+  }, [painelAtivo, sigla, isMTZ, carregar, carregarEntrega, carregarCarregamentos]);
 
   const hasFiltrosAtivos =
     (filters.unidadeDestino?.length ?? 0) > 0 ||
