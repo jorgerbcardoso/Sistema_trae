@@ -22,7 +22,6 @@ $tableCte = "{$domain}_cte";
 $tableCteOcor = "{$domain}_cte_ocorrencia";
 $tableOcor = "{$domain}_ocorrencia";
 $tableEmpParam = "{$domain}_emp_param";
-$tableParam = "{$domain}_param";
 $tableMercadoria = "{$domain}_mercadoria";
 
 $defaultOcorAguardando = (strtoupper($domain) === 'RVE') ? 35 : 14;
@@ -45,8 +44,8 @@ try {
 } catch (Exception $e) {
 }
 
-$readSaidas = function(string $table) use ($conn): array {
-    $res = sql("SELECT ocor_saida_transf, ocor_saida_entrega FROM {$table} LIMIT 1", [], $conn);
+$readSaidas = function() use ($conn, $tableEmpParam): array {
+    $res = sql("SELECT ocor_saida_transf, ocor_saida_entrega FROM {$tableEmpParam} LIMIT 1", [], $conn);
     $row = $res ? pg_fetch_assoc($res) : null;
     $transf = null;
     $entrega = null;
@@ -57,12 +56,8 @@ $readSaidas = function(string $table) use ($conn): array {
     return [$transf, $entrega];
 };
 try {
-    [$ocorSaidaTransf, $ocorSaidaEntrega] = $readSaidas($tableParam);
+    [$ocorSaidaTransf, $ocorSaidaEntrega] = $readSaidas();
 } catch (Exception $e) {
-    try {
-        [$ocorSaidaTransf, $ocorSaidaEntrega] = $readSaidas($tableEmpParam);
-    } catch (Exception $e2) {
-    }
 }
 
 $params = [];
@@ -187,7 +182,7 @@ try {
 } catch (Exception $e) {
 }
 
-$mercJoin = $hasMercadoria ? "LEFT JOIN {$tableMercadoria} merc ON merc.cod_mercadoria = cte.cod_mercadoria" : '';
+$mercJoin = $hasMercadoria ? "LEFT JOIN {$tableMercadoria} merc ON merc.codigo = cte.cod_mercadoria" : '';
 $mercSelect = $hasMercadoria ? 'merc.descricao AS mercadoria_descricao,' : 'NULL::text AS mercadoria_descricao,';
 
 $baseQuery = "
