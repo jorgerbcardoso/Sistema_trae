@@ -1277,7 +1277,8 @@ if ($acao === 'verificar_saidas_ssw') {
                 foreach ($rowsMan as $rm) {
                     $f0 = strtoupper(trim((string)($rm->f0 ?? '')));
                     if ($f0 === '') continue;
-                    if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0, $mC)) continue;
+                    $f0Clean = preg_replace('/[^A-Z0-9]/', '', $f0);
+                    if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0Clean, $mC)) continue;
                     $ser = strtoupper($mC[1]);
                     $nro = (int)$mC[2];
                     if ($nro <= 0) continue;
@@ -1548,7 +1549,18 @@ if ($acao === 'atualizar_ctes_ssw') {
                 if ($inicio !== false) $html = $dec;
             }
         }
-        if ($inicio === false) return null;
+        if ($inicio === false) {
+            $iniR = strpos($html, '<r>');
+            if ($iniR === false) $iniR = strpos($html, '<r ');
+            if ($iniR !== false) {
+                $fimR = strrpos($html, '</r>');
+                if ($fimR !== false) {
+                    $frag = substr($html, $iniR, ($fimR + 4) - $iniR);
+                    return "<xml>{$frag}</xml>";
+                }
+            }
+            return null;
+        }
         $fim = strrpos($html, '</xml>');
         $tagFim = '</xml>';
         if ($fim === false) {
@@ -1701,6 +1713,10 @@ if ($acao === 'atualizar_ctes_ssw') {
     };
 
     $added = 0;
+    $manifestosCount = count($manifestos);
+    $manifestosXmlOk = 0;
+    $pairsCount = 0;
+    $cteFoundCount = 0;
     if ($qtdSsw > 0 && $qtdPresto !== $qtdSsw && count($manifestos) > 0) {
         $pairs = [];
         foreach ($manifestos as $seqMan) {
@@ -1715,10 +1731,12 @@ if ($acao === 'atualizar_ctes_ssw') {
             if ($xmlMan === false) continue;
             $rowsMan = $xmlMan->xpath('//r');
             if (!$rowsMan || count($rowsMan) === 0) continue;
+            $manifestosXmlOk += 1;
             foreach ($rowsMan as $rm) {
                 $f0 = strtoupper(trim((string)($rm->f0 ?? '')));
                 if ($f0 === '') continue;
-                if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0, $mC)) continue;
+                $f0Clean = preg_replace('/[^A-Z0-9]/', '', $f0);
+                if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0Clean, $mC)) continue;
                 $ser = strtoupper($mC[1]);
                 $nro = (int)$mC[2];
                 if ($nro <= 0) continue;
@@ -1727,6 +1745,7 @@ if ($acao === 'atualizar_ctes_ssw') {
         }
 
         if (count($pairs) > 0) {
+            $pairsCount = count($pairs);
             if ($seqCarreg <= 0) {
                 $seqCarreg = nextSeqCarregamento($conn, $seqName);
                 if ($seqCarreg > 0) {
@@ -1803,6 +1822,7 @@ if ($acao === 'atualizar_ctes_ssw') {
                         }
                     }
                 }
+                $cteFoundCount = count($cteInfo);
 
                 if (count($cteInfo) > 0) {
                     pg_query($conn, 'BEGIN');
@@ -1878,6 +1898,12 @@ if ($acao === 'atualizar_ctes_ssw') {
         'qtd_ssw' => $qtdSsw,
         'qtd_presto' => $qtdPresto,
         'added' => $added,
+        'debug' => [
+            'manifestos_count' => $manifestosCount,
+            'manifestos_xml_ok' => $manifestosXmlOk,
+            'pairs_count' => $pairsCount,
+            'cte_found_count' => $cteFoundCount,
+        ],
     ]);
 }
 

@@ -5926,7 +5926,16 @@ function CarregamentoArea({
         const qtdSsw = Number(res.qtd_ssw ?? 0) || 0;
         const qtdPresto = Number(res.qtd_presto ?? 0) || 0;
         const added = Number(res.added ?? 0) || 0;
-        toast.success(`CT-es atualizados: +${added} (SSW ${qtdSsw} · Presto ${qtdPresto}).`);
+        if (qtdSsw > 0 && qtdPresto !== qtdSsw && added === 0) {
+          const dbg = res?.debug ?? {};
+          const manCount = Number(dbg.manifestos_count ?? 0) || 0;
+          const manOk = Number(dbg.manifestos_xml_ok ?? 0) || 0;
+          const pairs = Number(dbg.pairs_count ?? 0) || 0;
+          const found = Number(dbg.cte_found_count ?? 0) || 0;
+          toast.error(`SSW ${qtdSsw} · Presto ${qtdPresto} · +0. Debug: manifestos ${manCount} (ok ${manOk}) · chaves ${pairs} · CT-es no banco ${found}.`);
+        } else {
+          toast.success(`CT-es atualizados: +${added} (SSW ${qtdSsw} · Presto ${qtdPresto}).`);
+        }
         await onRecarregarCarregamentos();
         if (calCtesOpen) {
           await abrirCtesCarregamento(placa, (c as any)?.seq_carregamento ?? null);
