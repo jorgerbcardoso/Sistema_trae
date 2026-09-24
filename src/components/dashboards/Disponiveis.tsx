@@ -2451,6 +2451,50 @@ function CardCarregamento({
   const isEntregaCarreg = modoDeclarado === 'ENTREGA' || (setoresEntrega !== '' && String(carregamento.destino ?? '').trim() === '');
   const isTransferCarreg = modoDeclarado === 'TRANSFERENCIA' || (!isEntregaCarreg && !setoresEntrega);
 
+  const setoresReais = useMemo(() => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const add = (s: string) => {
+      const x = String(s ?? '').trim().toUpperCase();
+      if (!x) return;
+      if (seen.has(x)) return;
+      seen.add(x);
+      out.push(x);
+    };
+    for (const c of (carregamento.ctes ?? [])) {
+      const setor = String((c as any).setor ?? (c as any).setor_cte ?? '').trim();
+      if (setor) add(setor);
+    }
+    if (out.length === 0) {
+      for (const s of String(setoresEntrega ?? '').split(',')) add(s);
+    }
+    return out;
+  }, [carregamento.ctes, setoresEntrega]);
+
+  const setoresFull = setoresReais.join(', ');
+  const setoresTexto = (() => {
+    if (setoresReais.length === 0) return null;
+    const last = setoresReais[setoresReais.length - 1];
+    if (setoresReais.length === 1) return <span className="font-mono font-bold">{last}</span>;
+    if (setoresReais.length === 2) {
+      return (
+        <span className="min-w-0 flex items-center whitespace-nowrap">
+          <span className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap font-mono">{setoresReais[0]}</span>
+          <span className="shrink-0">, </span>
+          <span className="shrink-0 font-mono font-bold">{last}</span>
+        </span>
+      );
+    }
+    const prefix = setoresReais.slice(0, -1).join(', ');
+    return (
+      <span className="min-w-0 flex items-center whitespace-nowrap">
+        <span className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap font-mono">{prefix}</span>
+        <span className="shrink-0">, </span>
+        <span className="shrink-0 font-mono font-bold">{last}</span>
+      </span>
+    );
+  })();
+
   const carregamentoIniciado = !isSimulado && !isEntregaCarreg && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
 
   const tipoCounts = useMemo(() => {
@@ -2568,12 +2612,12 @@ function CardCarregamento({
           </div>
 
           <div className="col-span-2 flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 flex-nowrap">
-            <span className="font-semibold text-slate-600 dark:text-slate-300">Destino(s):</span>
-            {unidadesDestinoTexto
+            <span className="font-semibold text-slate-600 dark:text-slate-300">{isEntregaCarreg ? 'Setor(es):' : 'Destino(s):'}</span>
+            {(isEntregaCarreg ? setoresTexto : unidadesDestinoTexto)
               ? (
                 <span className="min-w-0 flex-1 flex items-center gap-1.5">
-                  <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={unidadesDestinoFull}>
-                    {unidadesDestinoTexto}
+                  <span className="font-mono text-slate-600 dark:text-slate-400 min-w-0 flex-1" title={isEntregaCarreg ? setoresFull : unidadesDestinoFull}>
+                    {isEntregaCarreg ? setoresTexto : unidadesDestinoTexto}
                   </span>
                 </span>
               )
@@ -5624,6 +5668,7 @@ function CarregamentoArea({
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
+  const [excluindoTodosEntrega, setExcluindoTodosEntrega] = useState(false);
   const [capDialogOpen, setCapDialogOpen] = useState(false);
   const [capLoading, setCapLoading] = useState(false);
   const [capSaving, setCapSaving] = useState(false);
@@ -5670,6 +5715,7 @@ function CarregamentoArea({
       let okCount = 0;
       let errCount = 0;
       let totalCtes = 0;
+      let vazioCount = 0;
       const erros: string[] = [];
 
       for (const setor of setoresOk) {
@@ -5684,8 +5730,13 @@ function CarregamentoArea({
 
         const res = await onCarregamentoAutomaticoEntrega(placa, [setor]);
         if (res.ok) {
-          okCount += 1;
-          totalCtes += (res.total ?? 0);
+          const add = Number(res.total ?? 0) || 0;
+          if (add > 0) {
+            okCount += 1;
+            totalCtes += add;
+          } else {
+            vazioCount += 1;
+          }
         } else {
           errCount += 1;
           erros.push(`${setor}: ${res.message || 'Erro ao gerar carregamento'}`);
@@ -5812,6 +5863,38 @@ function CarregamentoArea({
       await onRecarregarCarregamentos();
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao fundir carregamentos.');
+    }
+  };
+
+  const handleExcluirTodosEntrega = async () => {
+    if (excluindoTodosEntrega) return;
+    const qtd = carregamentosEntrega.length;
+    if (qtd <= 0) return;
+    const ok = await confirmar({
+      title: 'Excluir todos os carregamentos de entrega?',
+      description: `Excluir TODOS os ${qtd} carregamento(s) de entrega em andamento da unidade ${sigla}?`,
+      confirmText: 'Excluir todos',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      setExcluindoTodosEntrega(true);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'deletar_todos_entrega' }) },
+        true
+      );
+      if (res?.success) {
+        toast.success('Carregamentos de entrega excluídos.');
+        await onRecarregarCarregamentos();
+      } else {
+        toast.error(res?.message || 'Erro ao excluir carregamentos de entrega.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao excluir carregamentos de entrega.');
+    } finally {
+      setExcluindoTodosEntrega(false);
     }
   };
 
@@ -6979,6 +7062,17 @@ function CarregamentoArea({
               <Button
                 size="sm"
                 variant="outline"
+                className="text-xs h-8 border-red-300 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                onClick={() => { void handleExcluirTodosEntrega(); }}
+                disabled={excluindoTodosEntrega || carregamentosEntrega.length === 0}
+                title={carregamentosEntrega.length === 0 ? 'Nenhum carregamento de entrega em andamento' : 'Excluir todos os carregamentos de entrega'}
+              >
+                {excluindoTodosEntrega ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+                Excluir todos
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                 onClick={() => setModalCriarModo('entrega')}
               >
@@ -7809,14 +7903,16 @@ export function Disponiveis() {
     try {
       const criar = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa: placaOk, destino: '', paradas: setoresOk.join(', ') }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'criar', placa: placaOk, destino: '', paradas: setoresOk.join(', '), origem_criacao: 'AUTO' }) },
         true
       );
       if (!criar?.success) return { ok: false, message: criar?.message || 'Erro ao criar carregamento.' };
+      const seqCarregamento = Number(criar?.seq_carregamento ?? 0) || 0;
 
       const ctesPayload = ctesSel.map((c) => ({
         nroCte: c.nroCte,
         serCte: c.serCte,
+        setor: (c as any).setor ?? '',
         emissao: c.emissao ?? '',
         prevEnt: c.prevEnt ?? '',
         remetente: '',
@@ -7838,9 +7934,20 @@ export function Disponiveis() {
         true
       );
       if (!add?.success) return { ok: false, message: add?.message || 'Erro ao adicionar CT-es.' };
+      const adicionados = Number(add?.adicionados ?? 0) || 0;
+
+      if (adicionados <= 0) {
+        await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento', placa: placaOk, seq_carregamento: seqCarregamento || undefined }) },
+          true
+        );
+        await carregarCarregamentos();
+        return { ok: true, total: 0 };
+      }
 
       await carregarCarregamentos();
-      return { ok: true, total: Number(add?.adicionados ?? ctesSel.length) || ctesSel.length };
+      return { ok: true, total: adicionados };
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
     }
@@ -8175,6 +8282,7 @@ export function Disponiveis() {
         seqCte: c.seqCte ?? 0,
         nroCte: c.nroCte,
         serCte: c.serCte,
+        setor: (c as any).setor ?? '',
         emissao: c.emissao,
         prevEnt: c.prevEnt,
         remetente: c.remetente,

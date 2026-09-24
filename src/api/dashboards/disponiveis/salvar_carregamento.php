@@ -40,6 +40,7 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -115,6 +116,8 @@ if ($acao === 'criar') {
     $destino = strtoupper(trim($input['destino'] ?? ''));
     $paradas = strtoupper(trim($input['paradas'] ?? ''));
     $setoresEntrega = '';
+    $origemCriacao = strtoupper(trim((string)($input['origem_criacao'] ?? 'MANUAL')));
+    if (!in_array($origemCriacao, ['MANUAL', 'AUTO', 'SSW'], true)) $origemCriacao = 'MANUAL';
     if ($destino === '') {
         $setoresEntrega = $paradas;
         $paradas = '';
@@ -179,7 +182,7 @@ if ($acao === 'criar') {
 
     $res = pg_query($conn,
         "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, 'MANUAL', '" . pg_escape_string($conn, $unidade) . "')"
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
     );
 
     if (!$res) {
@@ -385,6 +388,7 @@ if ($acao === 'adicionar_ctes') {
 
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
+    $ignorados = 0;
 
     foreach ($cteList as $cteData) {
         $nroCte = (int)($cteData['nroCte'] ?? 0);
@@ -411,16 +415,17 @@ if ($acao === 'adicionar_ctes') {
                AND ser_cte = '{$serCte}'
                AND nro_cte = {$nroCte}
                AND placa_provisoria <> '" . pg_escape_string($conn, $placa) . "'
+               AND data_finalizacao IS NULL
              LIMIT 1"
         );
         if ($checkOutro && pg_num_rows($checkOutro) > 0) {
-            $rowOutro = pg_fetch_assoc($checkOutro);
-            $placaOutro = (string)($rowOutro['placa_provisoria'] ?? '');
-            pg_query($conn, 'ROLLBACK');
-            respondJson(['success' => false, 'message' => "CT-e {$serCteRaw}{$nroCte} já está no carregamento {$placaOutro}."]);
+            $ignorados++;
+            continue;
         }
 
         $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $setorCteRaw = strtoupper(trim((string)($cteData['setor'] ?? $cteData['setor_cte'] ?? '')));
+        $setorCteEsc = pg_escape_string($conn, $setorCteRaw);
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']
             ?? $cteData['unidade_carregamento']
@@ -488,13 +493,13 @@ if ($acao === 'adicionar_ctes') {
         $res = pg_query($conn,
             "INSERT INTO {$tabela}
              (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-              ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+              ser_cte, nro_cte, destino_cte, setor_cte, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
               destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
-              '{$serCte}', {$nroCte}, '{$destCte}', {$emissaoSql}, {$prevEntSql},
+              '{$serCte}', {$nroCte}, '{$destCte}', '{$setorCteEsc}', {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
               '{$destEsc}', '{$unidEsc}', '{$setoresEsc}', NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '{$unidCar}')"
@@ -518,7 +523,7 @@ if ($acao === 'adicionar_ctes') {
     }
 
     pg_query($conn, 'COMMIT');
-    respondJson(['success' => true, 'adicionados' => $adicionados]);
+    respondJson(['success' => true, 'adicionados' => $adicionados, 'ignorados' => $ignorados]);
 }
 
 // ─── Ação: remover CT-e ───────────────────────────────────────────────────────
@@ -812,6 +817,67 @@ if ($acao === 'deletar_carregamento') {
     }
 
     respondJson(['success' => true, 'deleted' => $deleted]);
+}
+
+if ($acao === 'deletar_todos_entrega') {
+    $resSeq = sql(
+        "SELECT DISTINCT COALESCE(seq_carregamento, 0) AS seq_carregamento
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND data_finalizacao IS NULL
+           AND COALESCE(destino, '') = ''
+           AND COALESCE(setores_entrega, '') <> ''",
+        [$unidade],
+        $conn
+    );
+    $seqs = [];
+    if ($resSeq) {
+        while ($r = pg_fetch_assoc($resSeq)) {
+            $s = (int)($r['seq_carregamento'] ?? 0);
+            if ($s > 0) $seqs[] = $s;
+        }
+    }
+    $seqs = array_values(array_unique($seqs));
+
+    pg_query($conn, 'BEGIN');
+    try {
+        $resDel = sql(
+            "DELETE FROM {$tabela}
+             WHERE unidade = \$1
+               AND data_finalizacao IS NULL
+               AND COALESCE(destino, '') = ''
+               AND COALESCE(setores_entrega, '') <> ''",
+            [$unidade],
+            $conn
+        );
+        if (!$resDel) {
+            pg_query($conn, 'ROLLBACK');
+            respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos de entrega.']);
+        }
+        $deleted = pg_affected_rows($resDel);
+
+        $deletedCap = 0;
+        if (!empty($seqs)) {
+            $in = implode(',', array_map('intval', $seqs));
+            $capRes = @pg_query($conn,
+                "DELETE FROM {$tabelaCap}
+                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                   AND seq_carregamento IN ({$in})"
+            );
+            if ($capRes) $deletedCap = pg_affected_rows($capRes);
+        }
+
+        pg_query($conn, 'COMMIT');
+        respondJson([
+            'success' => true,
+            'deleted' => $deleted,
+            'deleted_cap' => $deletedCap,
+            'carregamentos' => count($seqs),
+        ]);
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao excluir carregamentos de entrega.']);
+    }
 }
 
 // ─── Ação: deletar carregamento finalizado (exclusão física) ──────────────────

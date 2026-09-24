@@ -39,6 +39,7 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -474,6 +475,7 @@ $sqlCtes = "
         c.nro_cte,
         c.ser_cte,
         c.destino_cte,
+        c.setor_cte,
         c.data_emissao_cte,
         c.data_prev_ent_cte,
         c.remetente_cte,
@@ -512,6 +514,7 @@ try {
             'ser_cte'        => $serCte,
             'ctrc'           => $ctrc,
             'destino_cte'    => strtoupper(trim($cteRow['destino_cte'] ?? '')),
+            'setor'          => strtoupper(trim($cteRow['setor_cte'] ?? '')),
             'data_emissao'   => $cteRow['data_emissao_cte'] ?? '',
             'data_prev_ent'  => $cteRow['data_prev_ent_cte'] ?? '',
             'remetente'      => $cteRow['remetente_cte'] ?? '',
