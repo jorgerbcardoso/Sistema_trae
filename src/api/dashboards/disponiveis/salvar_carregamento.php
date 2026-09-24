@@ -129,7 +129,7 @@ if ($acao === 'criar') {
            FROM {$tabela}
           WHERE unidade = \$1
             AND placa_provisoria = \$2
-            AND COALESCE(data_finalizacao, '') = ''
+            AND data_finalizacao IS NULL
           LIMIT 1",
         [$unidade, $placa], $conn
     );
