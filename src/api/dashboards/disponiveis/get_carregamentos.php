@@ -38,6 +38,7 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -80,6 +81,7 @@ $sqlCarregamentos = "
         MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
         MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
         BOOL_OR(COALESCE(c.adiado, FALSE))       AS adiado,
+        BOOL_OR(TRIM(COALESCE(c.destino, '')) = '') AS destino_vazio,
         MIN(c.login_inclusao)                   AS login_criacao,
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,
@@ -87,6 +89,7 @@ $sqlCarregamentos = "
         MAX(cap.nro_linha)                      AS nro_linha,
         (SELECT destino  FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND destino  IS NOT NULL AND destino  <> '' {$filtroSerieRve} LIMIT 1) AS destino,
         (SELECT unidades FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND unidades IS NOT NULL AND unidades <> '' {$filtroSerieRve} LIMIT 1) AS paradas,
+        (SELECT setores_entrega FROM {$tabelaCarregamento} WHERE unidade = \$1 AND placa_provisoria = c.placa_provisoria AND setores_entrega IS NOT NULL AND setores_entrega <> '' {$filtroSerieRve} LIMIT 1) AS setores_entrega,
         v.capacidade_ton,
         v.capacidade_m3,
         cap.cap_ton,
@@ -170,6 +173,8 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'seq_carregamento'  => $seqCarreg,
         'placa_provisoria' => $placa,
         'origem_criacao'   => $origemCriacao,
+        'modo_carregamento' => (((string)($row['destino_vazio'] ?? '')) === 't') ? 'ENTREGA' : 'TRANSFERENCIA',
+        'setores_entrega'  => ($row['setores_entrega'] ?? null),
         'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
         'total_frete'      => (float)($row['total_frete'] ?? 0),

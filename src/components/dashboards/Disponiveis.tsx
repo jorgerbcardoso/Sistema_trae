@@ -234,6 +234,8 @@ interface Carregamento {
   seq_carregamento?: number | null;
   placa_provisoria: string;
   origem_criacao?: 'MANUAL' | 'AUTO' | 'SSW' | null;
+  modo_carregamento?: 'ENTREGA' | 'TRANSFERENCIA' | null;
+  setores_entrega?: string | null;
   adiado?: boolean | null;
   total_ctes: number;
   total_frete?: number;
@@ -5393,10 +5395,9 @@ function ModalCarregamentoAutomaticoEntrega({
   onFechar,
 }: {
   setores: GrupoSetor[];
-  onConfirmar: (placa: string, setores: string[]) => Promise<void>;
+  onConfirmar: (setores: string[]) => Promise<void>;
   onFechar: () => void;
 }) {
-  const [placa, setPlaca] = useState('');
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
 
@@ -5419,10 +5420,9 @@ function ModalCarregamentoAutomaticoEntrega({
     });
   };
 
-  const placaOk = placa.trim().toUpperCase();
   const selected = Array.from(selecionados).map((s) => s.trim()).filter(Boolean);
-  const podeCarregarSelecionados = placaOk !== '' && selected.length > 0;
-  const podeCarregarTodos = placaOk !== '' && setoresFiltrados.length > 0;
+  const podeCarregarSelecionados = selected.length > 0;
+  const podeCarregarTodos = setoresFiltrados.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -5438,28 +5438,19 @@ function ModalCarregamentoAutomaticoEntrega({
         </div>
 
         <div className="px-6 py-5 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placa / Identificação</label>
-              <input
-                type="text"
-                value={placa}
-                onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-                placeholder="Ex: ENT-01"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar setor</label>
-              <input
-                type="text"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value.toUpperCase())}
-                placeholder="Ex: CENTRO"
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar setor</label>
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value.toUpperCase())}
+              placeholder="Ex: CENTRO"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              autoFocus
+            />
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Será gerado 1 carregamento por setor. A placa será preenchida automaticamente com a sigla do setor (você pode editar depois).
+            </p>
           </div>
 
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -5498,14 +5489,14 @@ function ModalCarregamentoAutomaticoEntrega({
           <Button
             variant="outline"
             disabled={!podeCarregarTodos}
-            onClick={() => onConfirmar(placaOk, setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean))}
+            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean))}
           >
             Carregar todos
           </Button>
           <Button
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
             disabled={!podeCarregarSelecionados}
-            onClick={() => onConfirmar(placaOk, selected)}
+            onClick={() => onConfirmar(selected)}
           >
             Carregar selecionados
           </Button>
@@ -5554,32 +5545,84 @@ function CarregamentoArea({
   cteKeysDisponiveisTransferencia,
   cteKeysDisponiveisEntrega,
 }: CarregamentoAreaProps) {
-  const [modalAberto, setModalAberto] = useState(false);
-  const [modalAutomaticoAberto, setModalAutomaticoAberto] = useState(false);
+  const [modalCriarModo, setModalCriarModo] = useState<'transferencia' | 'entrega' | null>(null);
+  const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
+  const [carregamentosTransferOpen, setCarregamentosTransferOpen] = useState(true);
+  const [carregamentosEntregaOpen, setCarregamentosEntregaOpen] = useState(true);
   const tooltipStyle = useTooltipStyle();
-  const isAbaEntrega = abaAtiva === 'entrega';
-  const carregamentosNaoSimulados = React.useMemo(() => {
-    return (carregamentos ?? []).filter((c: any) => !c?.simulado);
-  }, [carregamentos]);
+  const isEntregaCarregamento = useCallback((c: Carregamento) => {
+    const modo = String((c as any)?.modo_carregamento ?? (c as any)?.modoCarregamento ?? '').trim().toUpperCase();
+    if (modo === 'ENTREGA') return true;
+    const setores = String((c as any)?.setores_entrega ?? (c as any)?.setoresEntrega ?? '').trim();
+    if (setores) return true;
+    return false;
+  }, []);
+
+  const carregamentosEntrega = React.useMemo(() => {
+    return (carregamentos ?? []).filter((c) => isEntregaCarregamento(c));
+  }, [carregamentos, isEntregaCarregamento]);
+
+  const carregamentosTransferencia = React.useMemo(() => {
+    return (carregamentos ?? []).filter((c) => !isEntregaCarregamento(c));
+  }, [carregamentos, isEntregaCarregamento]);
+
+  const carregamentosTransferNaoSimulados = React.useMemo(() => {
+    return carregamentosTransferencia.filter((c: any) => !c?.simulado);
+  }, [carregamentosTransferencia]);
 
   const handleCriar = (placa: string, destino: string, paradas: string) => {
-    setModalAberto(false);
+    setModalCriarModo(null);
     onCriarCarregamento(placa, destino, paradas);
   };
 
-  const handleCarregarAutomaticoEntrega = async (placa: string, setores: string[]) => {
+  const handleCarregarAutomaticoEntrega = async (setores: string[]) => {
     if (loadingEntregaAuto) return;
     try {
       setLoadingEntregaAuto(true);
-      const res = await onCarregamentoAutomaticoEntrega(placa, setores);
-      if (res.ok) {
-        toast.success(res.message || `Carregamento ${placa} criado com ${res.total ?? 0} CT-e(s).`);
-        setModalAutomaticoAberto(false);
-      } else {
-        toast.error(res.message || 'Erro ao carregar setores');
+      const setoresOk = (setores ?? []).map((s) => String(s ?? '').trim().toUpperCase()).filter(Boolean);
+      if (setoresOk.length === 0) return;
+
+      const placasUsadas = new Set(
+        (carregamentos ?? [])
+          .map((c) => String(c.placa_provisoria ?? '').trim().toUpperCase())
+          .filter(Boolean)
+      );
+
+      let okCount = 0;
+      let errCount = 0;
+      let totalCtes = 0;
+      const erros: string[] = [];
+
+      for (const setor of setoresOk) {
+        let placa = setor;
+        if (placasUsadas.has(placa)) {
+          for (let i = 2; i <= 99; i += 1) {
+            const p = `${setor}-${i}`;
+            if (!placasUsadas.has(p)) { placa = p; break; }
+          }
+        }
+        placasUsadas.add(placa);
+
+        const res = await onCarregamentoAutomaticoEntrega(placa, [setor]);
+        if (res.ok) {
+          okCount += 1;
+          totalCtes += (res.total ?? 0);
+        } else {
+          errCount += 1;
+          erros.push(`${setor}: ${res.message || 'Erro ao gerar carregamento'}`);
+        }
       }
+
+      if (okCount > 0) {
+        toast.success(`Gerado(s) ${okCount} carregamento(s) de entrega (${totalCtes} CT-e(s)).`);
+      }
+      if (errCount > 0) {
+        toast.error(erros.slice(0, 3).join(' · ') + (erros.length > 3 ? ` (+${erros.length - 3})` : ''));
+      }
+
+      setModalAutomaticoModo(null);
     } finally {
       setLoadingEntregaAuto(false);
     }
@@ -5834,6 +5877,7 @@ function CarregamentoArea({
   const [calCtesLoading, setCalCtesLoading] = useState(false);
   const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
   const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
+  const [calAtualizandoCtes, setCalAtualizandoCtes] = useState(false);
   const [calVolMode, setCalVolMode] = useState<'frete' | 'peso' | 'cub' | 'merc'>('frete');
 
   const abrirDetalheCarregamento = (c: Carregamento) => {
@@ -5864,6 +5908,36 @@ function CarregamentoArea({
       toast.error(e?.message || 'Erro ao carregar CT-es');
     } finally {
       setCalCtesLoading(false);
+    }
+  };
+
+  const atualizarCtesCarregamento = async (c: Carregamento) => {
+    const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
+    if (!placa || calAtualizandoCtes) return;
+    const dataRef = toKey((c as any)?.data_finalizacao ?? '');
+    setCalAtualizandoCtes(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_ctes_ssw', placa, data_ref: dataRef || null }) },
+        true
+      );
+      if (res?.success) {
+        const qtdSsw = Number(res.qtd_ssw ?? 0) || 0;
+        const qtdPresto = Number(res.qtd_presto ?? 0) || 0;
+        const added = Number(res.added ?? 0) || 0;
+        toast.success(`CT-es atualizados: +${added} (SSW ${qtdSsw} · Presto ${qtdPresto}).`);
+        await onRecarregarCarregamentos();
+        if (calCtesOpen) {
+          await abrirCtesCarregamento(placa, (c as any)?.seq_carregamento ?? null);
+        }
+      } else {
+        toast.error(res?.message || 'Falha ao atualizar CT-es');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao atualizar CT-es');
+    } finally {
+      setCalAtualizandoCtes(false);
     }
   };
 
@@ -6307,6 +6381,18 @@ function CarregamentoArea({
                                 Finalizar
                               </Button>
                             ) : null}
+                            {fimK ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={calAtualizandoCtes}
+                                onClick={() => void atualizarCtesCarregamento(c)}
+                              >
+                                {calAtualizandoCtes ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                                Atualizar CT-es
+                              </Button>
+                            ) : null}
                             <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''), (c as any).seq_carregamento ?? null)}>
                               Ver CT-es
                             </Button>
@@ -6531,58 +6617,60 @@ function CarregamentoArea({
         {importandoCarregamentos && (
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-500 animate-pulse" />
         )}
-        <div>
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-emerald-500" />
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {isAbaEntrega ? 'Carregamentos de Entrega' : 'Carregamentos Transferência'}
-              </h3>
-              {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-              {importandoCarregamentos ? (
-                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Atualizando...
-                </Badge>
-              ) : carregamentos.length > 0 ? (
-                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-                  {carregamentos.length} carregamento{carregamentos.length !== 1 ? 's' : ''}
-                </Badge>
-              ) : null}
-              {modoApontamento && (
-                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
-                  <CheckSquare className="w-3 h-3" />
-                  Apontando para: <strong>{modoApontamento}</strong>
-                </Badge>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 justify-end">
-              {!isAbaEntrega && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-                    onClick={() => setModalImportarAberto(true)}
-                    disabled={importandoCarregamentos || importandoVeiculos}
-                  >
-                    <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
-                  </Button>
-                  <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
-                    <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Obrigar placas reais</span>
-                    <Switch checked={obrigarPlacasReais} onCheckedChange={onToggleObrigarPlacasReais} disabled={importandoCarregamentos} />
-                  </div>
-                </>
-              )}
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+          onClick={() => setCarregamentosTransferOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregamentos Transferência</h3>
+            {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+            {importandoCarregamentos ? (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Atualizando...
+              </Badge>
+            ) : carregamentosTransferencia.length > 0 ? (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                {carregamentosTransferencia.length} carregamento{carregamentosTransferencia.length !== 1 ? 's' : ''}
+              </Badge>
+            ) : null}
+            {modoApontamento && (
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs flex items-center gap-1">
+                <CheckSquare className="w-3 h-3" />
+                Apontando para: <strong>{modoApontamento}</strong>
+              </Badge>
+            )}
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${carregamentosTransferOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {carregamentosTransferOpen && (
+          <>
+            <div className="flex flex-wrap gap-2 justify-end px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                onClick={() => setModalImportarAberto(true)}
+                disabled={importandoCarregamentos || importandoVeiculos}
+              >
+                <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
+              </Button>
+              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Auto</span>
+                <Switch checked={importacaoAutomatica} onCheckedChange={onToggleImportacaoAutomatica} disabled={importandoCarregamentos} />
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">Obrigar placas reais</span>
+                <Switch checked={obrigarPlacasReais} onCheckedChange={onToggleObrigarPlacasReais} disabled={importandoCarregamentos} />
+              </div>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                onClick={() => setModalAberto(true)}
+                onClick={() => setModalCriarModo('transferencia')}
                 disabled={importandoCarregamentos}
               >
                 <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
@@ -6591,76 +6679,155 @@ function CarregamentoArea({
                 size="sm"
                 variant="outline"
                 className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
-                onClick={() => setModalAutomaticoAberto(true)}
+                onClick={() => setModalAutomaticoModo('transferencia')}
                 disabled={importandoCarregamentos}
               >
                 <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
               </Button>
             </div>
-          </div>
 
-        {carregamentos.length === 0 && !loadingCarregamentos ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
-            <Truck className="w-10 h-10 mb-2 opacity-20" />
-            <p className="text-sm">Nenhum carregamento em andamento</p>
-            <p className="text-xs mt-0.5">Clique em "Carregamento Manual" para começar</p>
-          </div>
-        ) : (
-          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {carregamentos.map((c, i) => (
-              <CardCarregamento
-                key={i}
-                carregamento={c}
-                unidadeAtual={sigla}
-                todosCtes={todosCtes}
-                cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
-                cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
-                modoApontamento={modoApontamento}
-                confirmar={confirmar}
-                onIniciarApontamento={onIniciarApontamento}
-                onCancelarApontamento={onCancelarApontamento}
-                onExcluirCarregamento={onExcluirCarregamento}
-                onRemoverCte={onRemoverCte}
-                onCarregarSSW={onCarregarSSW}
-                onCarregarRota={onCarregarRota}
-                loadingRota={loadingRota}
-                rotaCarregamentoPlaca={rotaCarregamentoPlaca}
-                onRecarregarCarregamentos={onRecarregarCarregamentos}
-                onImportarCarregamentos={onImportarCarregamentos}
-                importandoCarregamentos={importandoCarregamentos}
-              />
-            ))}
-          </div>
+            {carregamentosTransferencia.length === 0 && !loadingCarregamentos ? (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
+                <Truck className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-sm">Nenhum carregamento de transferência em andamento</p>
+                <p className="text-xs mt-0.5">Clique em "Carr. Manual" para começar</p>
+              </div>
+            ) : (
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {carregamentosTransferencia.map((c, i) => (
+                  <CardCarregamento
+                    key={i}
+                    carregamento={c}
+                    unidadeAtual={sigla}
+                    todosCtes={todosCtes}
+                    cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+                    cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+                    modoApontamento={modoApontamento}
+                    confirmar={confirmar}
+                    onIniciarApontamento={onIniciarApontamento}
+                    onCancelarApontamento={onCancelarApontamento}
+                    onExcluirCarregamento={onExcluirCarregamento}
+                    onRemoverCte={onRemoverCte}
+                    onCarregarSSW={onCarregarSSW}
+                    onCarregarRota={onCarregarRota}
+                    loadingRota={loadingRota}
+                    rotaCarregamentoPlaca={rotaCarregamentoPlaca}
+                    onRecarregarCarregamentos={onRecarregarCarregamentos}
+                    onImportarCarregamentos={onImportarCarregamentos}
+                    importandoCarregamentos={importandoCarregamentos}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {modalAberto && (
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+          onClick={() => setCarregamentosEntregaOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregamentos de Entrega</h3>
+            {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+            {carregamentosEntrega.length > 0 ? (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
+                {carregamentosEntrega.length} carregamento{carregamentosEntrega.length !== 1 ? 's' : ''}
+              </Badge>
+            ) : null}
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${carregamentosEntregaOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {carregamentosEntregaOpen && (
+          <>
+            <div className="flex flex-wrap gap-2 justify-end px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                onClick={() => setModalCriarModo('entrega')}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1.5" />Carr. Manual
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-indigo-300 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                onClick={() => setModalAutomaticoModo('entrega')}
+                disabled={loadingEntregaAuto}
+              >
+                {loadingEntregaAuto ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
+                Carr. Automático
+              </Button>
+            </div>
+
+            {carregamentosEntrega.length === 0 && !loadingCarregamentos ? (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
+                <Truck className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-sm">Nenhum carregamento de entrega em andamento</p>
+                <p className="text-xs mt-0.5">Clique em "Carr. Manual" para começar</p>
+              </div>
+            ) : (
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {carregamentosEntrega.map((c, i) => (
+                  <CardCarregamento
+                    key={i}
+                    carregamento={c}
+                    unidadeAtual={sigla}
+                    todosCtes={todosCtes}
+                    cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+                    cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+                    modoApontamento={modoApontamento}
+                    confirmar={confirmar}
+                    onIniciarApontamento={onIniciarApontamento}
+                    onCancelarApontamento={onCancelarApontamento}
+                    onExcluirCarregamento={onExcluirCarregamento}
+                    onRemoverCte={onRemoverCte}
+                    onCarregarSSW={onCarregarSSW}
+                    onCarregarRota={onCarregarRota}
+                    loadingRota={loadingRota}
+                    rotaCarregamentoPlaca={rotaCarregamentoPlaca}
+                    onRecarregarCarregamentos={onRecarregarCarregamentos}
+                    onImportarCarregamentos={onImportarCarregamentos}
+                    importandoCarregamentos={importandoCarregamentos}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {modalCriarModo && (
         <ModalCriarCarregamento
-          modo={isAbaEntrega ? 'entrega' : 'transferencia'}
+          modo={modalCriarModo}
           onConfirmar={handleCriar}
-          onFechar={() => setModalAberto(false)}
+          onFechar={() => setModalCriarModo(null)}
         />
       )}
-      {modalAutomaticoAberto && (
-        isAbaEntrega ? (
-          <ModalCarregamentoAutomaticoEntrega
-            onFechar={() => setModalAutomaticoAberto(false)}
-            setores={gruposSetorEntrega}
-            onConfirmar={handleCarregarAutomaticoEntrega}
-          />
-        ) : (
-          <ModalCarregamentoAutomatico
-            onConfirmar={onCarregamentoAutomatico}
-            onFechar={() => setModalAutomaticoAberto(false)}
-            confirmar={confirmar}
-            perguntarTexto={perguntarTexto}
-            linhasOrigem={linhasOrigem}
-            loadingLinhasOrigem={loadingLinhasOrigem}
-            carregamentos={carregamentosNaoSimulados}
-            siglaUnidade={sigla}
-            totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
-          />
-        )
+      {modalAutomaticoModo === 'entrega' && (
+        <ModalCarregamentoAutomaticoEntrega
+          onFechar={() => setModalAutomaticoModo(null)}
+          setores={gruposSetorEntrega}
+          onConfirmar={handleCarregarAutomaticoEntrega}
+        />
+      )}
+      {modalAutomaticoModo === 'transferencia' && (
+        <ModalCarregamentoAutomatico
+          onConfirmar={onCarregamentoAutomatico}
+          onFechar={() => setModalAutomaticoModo(null)}
+          confirmar={confirmar}
+          perguntarTexto={perguntarTexto}
+          linhasOrigem={linhasOrigem}
+          loadingLinhasOrigem={loadingLinhasOrigem}
+          carregamentos={carregamentosTransferNaoSimulados}
+          siglaUnidade={sigla}
+          totalsPorUnidadeParaLinhas={totalsPorUnidadeParaLinhas}
+        />
       )}
       {modalImportarAberto && (
         <ModalImportarSSW
@@ -6669,7 +6836,6 @@ function CarregamentoArea({
           onExecutar={onImportarCarregamentos}
         />
       )}
-      </div>
     </div>
   );
 }
