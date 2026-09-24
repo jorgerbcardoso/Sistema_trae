@@ -1888,6 +1888,9 @@ function CardCarregamento({
   const [centralizadoraUnidades, setCentralizadoraUnidades] = useState<string[]>([]);
   const [cteDetalheSortKey, setCteDetalheSortKey] = useState<'cte' | 'carr' | 'emissao' | 'prev' | 'dest' | 'pagador' | 'frete' | 'peso' | 'cub'>('cte');
   const [cteDetalheSortDir, setCteDetalheSortDir] = useState<'asc' | 'desc'>('asc');
+  const modoCarregCteDetalhe = String((carregamento as any).modo_carregamento ?? (carregamento as any).modoCarregamento ?? '').trim().toUpperCase();
+  const setoresEntregaCteDetalhe = String((carregamento as any).setores_entrega ?? (carregamento as any).setoresEntrega ?? '').trim();
+  const isEntregaCteDetalhe = modoCarregCteDetalhe === 'ENTREGA' || (setoresEntregaCteDetalhe !== '' && String(carregamento.destino ?? '').trim() === '');
 
   const cteDetalheListaOrdenada = React.useMemo(() => {
     const parseBrDate = (v: any): number => {
@@ -1908,8 +1911,8 @@ function CardCarregamento({
         case 'carr': return String(c?.unidade_carregamento ?? '');
         case 'emissao': return parseBrDate(c?.data_emissao);
         case 'prev': return parseBrDate(c?.data_prev_ent);
-        case 'dest': return String(c?.sigla_dest ?? '');
-        case 'pagador': return String(c?.nome_pag ?? '');
+        case 'dest': return isEntregaCteDetalhe ? String(c?.setor ?? '') : String(c?.sigla_dest ?? '');
+        case 'pagador': return isEntregaCteDetalhe ? String(c?.destinatario ?? '') : String(c?.nome_pag ?? '');
         case 'frete': return Number(c?.vlr_frete ?? 0) || 0;
         case 'peso': return Number(c?.peso ?? 0) || 0;
         case 'cub': return Number(c?.cubagem ?? 0) || 0;
@@ -2536,7 +2539,7 @@ function CardCarregamento({
     if (norm.length === 0) return 'Ajustar capacidades';
     const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
     if (ok) return ok.tipo;
-    return `Acima de ${norm[norm.length - 1].tipo}`;
+    return norm[norm.length - 1].tipo;
   }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
 
   const capacidadeSugerida = useMemo(() => {
@@ -2933,7 +2936,7 @@ function CardCarregamento({
         </DialogContent>
       </Dialog>
       <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
-        <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+        <DialogContent className="w-[96vw] max-w-6xl h-[82vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
               <DialogTitle>
@@ -3017,7 +3020,7 @@ function CardCarregamento({
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <input
                   type="checkbox"
                   className="self-center"
@@ -3049,10 +3052,10 @@ function CardCarregamento({
                   Prev. Entr..{cteDetalheSortKey === 'prev' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
                 </button>
                 <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('dest')}>
-                  Dest.{cteDetalheSortKey === 'dest' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                  {isEntregaCteDetalhe ? 'Setor' : 'Dest.'}{cteDetalheSortKey === 'dest' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
                 </button>
                 <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('pagador')}>
-                  Pagador{cteDetalheSortKey === 'pagador' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+                  {isEntregaCteDetalhe ? 'Destinatário' : 'Pagador'}{cteDetalheSortKey === 'pagador' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
                 </button>
                 <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteDetalheSort('frete')}>
                   Frete (R$){cteDetalheSortKey === 'frete' ? (cteDetalheSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
@@ -3083,7 +3086,7 @@ function CardCarregamento({
                       return (
                       <div
                         key={idx}
-                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
                       >
                         <input
                           type="checkbox"
@@ -3106,13 +3109,21 @@ function CardCarregamento({
                         <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                        <span
-                          className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
-                          title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
-                        >
-                          {cte.sigla_dest ?? '-'}
+                        {isEntregaCteDetalhe ? (
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">
+                            {String((cte as any).setor ?? '').trim() || '-'}
+                          </span>
+                        ) : (
+                          <span
+                            className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
+                            title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
+                          >
+                            {cte.sigla_dest ?? '-'}
+                          </span>
+                        )}
+                        <span className="self-center truncate text-slate-600 dark:text-slate-300">
+                          {(isEntregaCteDetalhe ? (cte as any).destinatario : cte.nome_pag) || '-'}
                         </span>
-                        <span className="self-center truncate text-slate-600 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
@@ -3125,7 +3136,7 @@ function CardCarregamento({
             </div>
 
             {cteDetalheTotais && (
-              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheSelecionados.size > 0 ? `${cteDetalheSelecionados.size} selecionado(s)` : ''}</span>
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
                 <span />
@@ -4666,6 +4677,7 @@ function ModalRotaCarregamento({
 
   const [routeCoords, setRouteCoords] = useState<{ lat: number; lng: number }[]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const [xlsxLoading, setXlsxLoading] = useState(false);
 
   useEffect(() => {
@@ -4677,6 +4689,8 @@ function ModalRotaCarregamento({
         const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
         const resp = await fetch(url);
         const data = await resp.json();
+        const distM = Number(data?.routes?.[0]?.distance ?? 0) || 0;
+        setRouteDistanceKm(distM > 0 ? (distM / 1000) : null);
         const coordinates = data?.routes?.[0]?.geometry?.coordinates;
         if (Array.isArray(coordinates) && coordinates.length > 0) {
           const converted = coordinates.map((c: any) => ({ lat: c[1], lng: c[0] }));
@@ -4685,6 +4699,7 @@ function ModalRotaCarregamento({
         }
       } catch {}
       setRouteCoords(pontosOrdenados.map((p) => ({ lat: p.lat, lng: p.lng })));
+      setRouteDistanceKm(null);
       setRouteLoading(false);
     };
     void fetchRoute().finally(() => setRouteLoading(false));
@@ -4962,6 +4977,15 @@ function ModalRotaCarregamento({
             const cloned = svgEl.cloneNode(true) as SVGSVGElement;
             cloned.setAttribute('width', String(width));
             cloned.setAttribute('height', String(height));
+            const rawStyle = cloned.getAttribute('style') || '';
+            const cleanStyle = rawStyle
+              .replace(/transform\s*:[^;]+;?/gi, '')
+              .replace(/translate3d\s*\([^)]*\)/gi, '')
+              .replace(/translate\s*\([^)]*\)/gi, '')
+              .trim();
+            if (cleanStyle !== rawStyle) cloned.setAttribute('style', cleanStyle);
+            cloned.removeAttribute('transform');
+            (cloned as any).style && ((cloned as any).style.transform = '');
             const svg = new XMLSerializer().serializeToString(cloned);
             const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -5006,7 +5030,7 @@ function ModalRotaCarregamento({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, linhas, map_image: mapImage }),
+          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, rota_km: routeDistanceKm, linhas, map_image: mapImage }),
         }
       );
       if (!resp.ok) {
@@ -5036,7 +5060,7 @@ function ModalRotaCarregamento({
     } finally {
       setXlsxLoading(false);
     }
-  }, [xlsxLoading, grupos.entrega, grupos.transferencia, pontosOrdenados, unidadesOrdem, unidadesMap, origem, carregamento.placa_provisoria]);
+  }, [xlsxLoading, grupos.entrega, grupos.transferencia, pontosOrdenados, unidadesOrdem, unidadesMap, origem, carregamento.placa_provisoria, routeDistanceKm]);
 
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
@@ -8126,7 +8150,7 @@ export function Disponiveis() {
         const novoCub = cubM3 + (Number.isFinite(vM3) ? vM3 : 0);
         const okPeso = capMaxKg === null ? true : novoPeso <= (capMaxKg + 0.0001);
         const okCub = capMaxM3 === null ? true : novoCub <= (capMaxM3 + 0.0001);
-        if (ctesDentro.length === 0 || (okPeso && okCub)) {
+        if (okPeso && okCub) {
           ctesDentro.push(c);
           pesoKg = novoPeso;
           cubM3 = novoCub;
@@ -8142,7 +8166,7 @@ export function Disponiveis() {
       const capAplicada = capEscolhida ?? maxCap;
       const capTipoResumo = capEscolhida
         ? capEscolhida.tipo
-        : (maxCap ? `Acima de ${maxCap.tipo}` : '');
+        : (maxCap ? maxCap.tipo : '');
 
       const criar = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,

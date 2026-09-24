@@ -42,6 +42,7 @@ $unidade = strtoupper(trim(
 $placa = strtoupper(trim((string)($input['placa'] ?? '')));
 $rotaTxt = (string)($input['rota'] ?? '');
 $mapImage = (string)($input['map_image'] ?? '');
+$rotaKm = ($input['rota_km'] ?? null);
 $linhas = $input['linhas'] ?? [];
 
 if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
@@ -77,6 +78,21 @@ try {
     }
 } catch (Exception $e) {
     $seqCar = 0;
+}
+
+$freteTotal = 0.0;
+try {
+    $qFrete = $seqCar > 0
+        ? "SELECT COALESCE(SUM(COALESCE(vlr_frete_cte, 0)), 0) AS total FROM {$tblCar} WHERE unidade = $1 AND seq_carregamento = $2 AND data_finalizacao IS NULL AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)"
+        : "SELECT COALESCE(SUM(COALESCE(vlr_frete_cte, 0)), 0) AS total FROM {$tblCar} WHERE unidade = $1 AND UPPER(placa_provisoria) = UPPER($2) AND data_finalizacao IS NULL AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)";
+    $pFrete = $seqCar > 0 ? [$unidade, $seqCar] : [$unidade, $placa];
+    $resFrete = sql($qFrete, $pFrete, $conn);
+    if ($resFrete && pg_num_rows($resFrete) > 0) {
+        $rf = pg_fetch_assoc($resFrete);
+        $freteTotal = (float)($rf['total'] ?? 0);
+    }
+} catch (Exception $e) {
+    $freteTotal = 0.0;
 }
 
 $ocorAgendamento = null;
@@ -639,9 +655,9 @@ if ($logoPrestoUrl !== '') {
             $drawing = new Drawing();
             $drawing->setName('Logo Presto');
             $drawing->setPath($tmpFile);
-            $drawing->setCoordinates('K1');
+            $drawing->setCoordinates('L1');
             $drawing->setHeight(40);
-            $drawing->setOffsetX(10);
+            $drawing->setOffsetX(140);
             $drawing->setOffsetY(10);
             $drawing->setWorksheet($sheet);
         } catch (Exception $e) {
@@ -825,10 +841,56 @@ if ($mapImage !== '') {
                     $sheet2->setCellValue('A2', $rotaTxt);
                     $sheet2->getStyle('A2:F2')->applyFromArray($styleValue);
 
+                    $fmtMoeda = function($v) {
+                        $n = (float)($v ?? 0);
+                        return number_format($n, 2, ',', '.');
+                    };
+
+                    $sheet2->mergeCells('A3:B3');
+                    $sheet2->mergeCells('C3:F3');
+                    $sheet2->setCellValue('A3', 'Carregamento');
+                    $sheet2->setCellValue('C3', ($seqCar > 0 ? str_pad((string)$seqCar, 6, '0', STR_PAD_LEFT) : '') . ($seqCar > 0 ? ' · ' : '') . $placa);
+                    $sheet2->getStyle('A3:B3')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('C3:F3')->applyFromArray($styleValue);
+
+                    $sheet2->mergeCells('A4:B4');
+                    $sheet2->mergeCells('C4:D4');
+                    $sheet2->setCellValue('A4', 'Peso Real (kg)');
+                    $sheet2->setCellValue('C4', number_format((float)$totalPesoReal, 2, ',', '.'));
+                    $sheet2->setCellValue('E4', 'Peso Calc (kg)');
+                    $sheet2->setCellValue('F4', number_format((float)$totalPesoCalc, 2, ',', '.'));
+                    $sheet2->getStyle('A4:B4')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('C4:D4')->applyFromArray($styleValue);
+                    $sheet2->getStyle('E4')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('F4')->applyFromArray($styleValue);
+
+                    $sheet2->mergeCells('A5:B5');
+                    $sheet2->mergeCells('C5:D5');
+                    $sheet2->setCellValue('A5', 'Cubagem (m³)');
+                    $sheet2->setCellValue('C5', number_format((float)$totalCubagem, 3, ',', '.'));
+                    $sheet2->setCellValue('E5', 'Frete (R$)');
+                    $sheet2->setCellValue('F5', $freteTotal > 0 ? $fmtMoeda($freteTotal) : '');
+                    $sheet2->getStyle('A5:B5')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('C5:D5')->applyFromArray($styleValue);
+                    $sheet2->getStyle('E5')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('F5')->applyFromArray($styleValue);
+
+                    $sheet2->mergeCells('A6:B6');
+                    $sheet2->mergeCells('C6:D6');
+                    $sheet2->setCellValue('A6', 'Km (aprox.)');
+                    $kmNum = is_numeric($rotaKm) ? (float)$rotaKm : 0.0;
+                    $sheet2->setCellValue('C6', $kmNum > 0 ? number_format($kmNum, 1, ',', '.') : '');
+                    $sheet2->setCellValue('E6', 'Qt. Vol.');
+                    $sheet2->setCellValue('F6', $totalVolumes > 0 ? (int)$totalVolumes : '');
+                    $sheet2->getStyle('A6:B6')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('C6:D6')->applyFromArray($styleValue);
+                    $sheet2->getStyle('E6')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('F6')->applyFromArray($styleValue);
+
                     $drawing = new Drawing();
                     $drawing->setName('Mapa Rota');
                     $drawing->setPath($tmpPng);
-                    $drawing->setCoordinates('A4');
+                    $drawing->setCoordinates('A8');
                     $drawing->setHeight(430);
                     $drawing->setOffsetX(5);
                     $drawing->setOffsetY(5);
@@ -836,7 +898,7 @@ if ($mapImage !== '') {
 
                     $sheet2->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
                     $sheet2->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
-                    $sheet2->getPageSetup()->setPrintArea('A1:F32');
+                    $sheet2->getPageSetup()->setPrintArea('A1:F40');
                 } catch (Exception $e) {
                 }
             }

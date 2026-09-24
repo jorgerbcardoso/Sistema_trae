@@ -113,6 +113,7 @@ $sql = "
         car.ser_cte,
         COALESCE(NULLIF(car.unidade_carregamento, ''), car.unidade) AS unidade_carregamento,
         car.destino_cte,
+        COALESCE(car.setor_cte, '') AS setor_cte,
         {$selNfs}
         TO_CHAR(
             CASE
@@ -201,6 +202,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
         'sigla_dest'    => $destOrig,
+        'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
         'sigla_dest_principal' => $destMain,
         'sigla_dest_display' => $destDisplay,
         'nome_pag'      => $row['pagador_cte'] ?? '',
