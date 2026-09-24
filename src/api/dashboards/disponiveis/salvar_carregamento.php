@@ -125,7 +125,12 @@ if ($acao === 'criar') {
     }
 
     $check = sql(
-        "SELECT 1 FROM {$tabela} WHERE unidade = \$1 AND placa_provisoria = \$2 LIMIT 1",
+        "SELECT 1
+           FROM {$tabela}
+          WHERE unidade = \$1
+            AND placa_provisoria = \$2
+            AND COALESCE(data_finalizacao, '') = ''
+          LIMIT 1",
         [$unidade, $placa], $conn
     );
     if ($check && pg_num_rows($check) > 0) {
