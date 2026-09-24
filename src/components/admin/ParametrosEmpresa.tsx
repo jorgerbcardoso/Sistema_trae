@@ -25,6 +25,7 @@ type EmpParam = {
   ocor_chegada_unid: number | null;
   ocor_chegada_unid_dest: number | null;
   ocor_cte_retido: number | null;
+  ocor_estorno_baixa: number | null;
 };
 
 type FieldKey = keyof EmpParam;
@@ -171,6 +172,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: null,
     ocor_chegada_unid_dest: null,
     ocor_cte_retido: null,
+    ocor_estorno_baixa: null,
   });
 
   const [ocorrenciasOpen, setOcorrenciasOpen] = useState<Record<FieldKey, boolean>>({
@@ -181,6 +183,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: false,
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
+    ocor_estorno_baixa: false,
   });
 
   const [searchTerm, setSearchTerm] = useState<Record<FieldKey, string>>({
@@ -191,6 +194,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: '',
     ocor_chegada_unid_dest: '',
     ocor_cte_retido: '',
+    ocor_estorno_baixa: '',
   });
 
   const debouncedSearch = {
@@ -201,6 +205,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: useDebouncedValue(searchTerm.ocor_chegada_unid, 250),
     ocor_chegada_unid_dest: useDebouncedValue(searchTerm.ocor_chegada_unid_dest, 250),
     ocor_cte_retido: useDebouncedValue(searchTerm.ocor_cte_retido, 250),
+    ocor_estorno_baixa: useDebouncedValue(searchTerm.ocor_estorno_baixa, 250),
   };
 
   const [loadingOcor, setLoadingOcor] = useState<Record<FieldKey, boolean>>({
@@ -211,6 +216,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: false,
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
+    ocor_estorno_baixa: false,
   });
 
   const [ocorrencias, setOcorrencias] = useState<Record<FieldKey, Ocorrencia[]>>({
@@ -221,6 +227,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid: [],
     ocor_chegada_unid_dest: [],
     ocor_cte_retido: [],
+    ocor_estorno_baixa: [],
   });
 
   const occurrenceMap = useMemo(() => {
@@ -247,6 +254,7 @@ export function ParametrosEmpresa() {
         'ocor_chegada_unid',
         'ocor_chegada_unid_dest',
         'ocor_cte_retido',
+        'ocor_estorno_baixa',
       ];
       await Promise.all(
         fields
@@ -292,6 +300,7 @@ export function ParametrosEmpresa() {
       'ocor_chegada_unid',
       'ocor_chegada_unid_dest',
       'ocor_cte_retido',
+      'ocor_estorno_baixa',
     ];
     fields.forEach((field) => {
       if (ocorrenciasOpen[field]) {
@@ -307,6 +316,7 @@ export function ParametrosEmpresa() {
     debouncedSearch.ocor_chegada_unid,
     debouncedSearch.ocor_chegada_unid_dest,
     debouncedSearch.ocor_cte_retido,
+    debouncedSearch.ocor_estorno_baixa,
   ]);
 
   const save = async () => {
@@ -475,6 +485,25 @@ export function ParametrosEmpresa() {
               selectedLabel={
                 params.ocor_cte_retido != null
                   ? `${formatOcorCodigo(params.ocor_cte_retido)}. ${occurrenceMap.get(params.ocor_cte_retido)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
+            />
+            <OcorrenciaPicker
+              field="ocor_estorno_baixa"
+              label="Estorno de Baixa/Entrega"
+              placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_estorno_baixa}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_estorno_baixa}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_estorno_baixa}
+              isLoadingList={loadingOcor.ocor_estorno_baixa}
+              selectedCode={params.ocor_estorno_baixa}
+              selectedLabel={
+                params.ocor_estorno_baixa != null
+                  ? `${formatOcorCodigo(params.ocor_estorno_baixa)}. ${occurrenceMap.get(params.ocor_estorno_baixa)?.descricao ?? ''}`.trim()
                   : 'Selecionar ocorrência'
               }
               onSelect={handleSelect}
