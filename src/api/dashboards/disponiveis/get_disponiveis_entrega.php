@@ -367,6 +367,107 @@ foreach ($ctes as &$c) {
 }
 unset($c);
 
+$tblSetor = "{$domain}_setor";
+$setorInfo = [];
+try {
+    $tblSetorCheck = strtolower($tblSetor);
+    $regRes = @pg_query_params($g_sql, "SELECT to_regclass($1) AS reg", ['public.' . $tblSetorCheck]);
+    $regRow = $regRes ? pg_fetch_assoc($regRes) : null;
+    $tblExists = $regRow && !empty($regRow['reg']);
+
+    if ($tblExists && !empty($ctes)) {
+        $cols = [];
+        $colRes = @pg_query_params(
+            $g_sql,
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1",
+            [$tblSetorCheck]
+        );
+        if ($colRes) {
+            while ($r = pg_fetch_assoc($colRes)) {
+                $cols[strtolower((string)($r['column_name'] ?? ''))] = true;
+            }
+        }
+
+        $colKey = null;
+        foreach (['sigla', 'setor', 'codigo', 'cod_setor', 'id'] as $cand) {
+            if (!empty($cols[$cand])) { $colKey = $cand; break; }
+        }
+        $colNome = null;
+        foreach (['nome', 'descricao', 'desc'] as $cand) {
+            if (!empty($cols[$cand])) { $colNome = $cand; break; }
+        }
+
+        if ($colKey !== null) {
+            $keys = [];
+            $seen = [];
+            foreach ($ctes as $c) {
+                $k = strtoupper(trim((string)($c['setor'] ?? '')));
+                if ($k === '' || $k === 'SEM SETOR') continue;
+                if (isset($seen[$k])) continue;
+                $seen[$k] = true;
+                $keys[] = $k;
+            }
+
+            if (!empty($keys)) {
+                $params = [];
+                $ph = [];
+                $p = 1;
+                foreach ($keys as $k) {
+                    $ph[] = '$' . $p;
+                    $params[] = $k;
+                    $p += 1;
+                }
+
+                $selNome = $colNome !== null
+                    ? "COALESCE(s.{$colNome}, '') AS nome"
+                    : "'' AS nome";
+
+                $selCepIni = !empty($cols['cep_ini']) ? "COALESCE(s.cep_ini, '') AS cep_ini" : "'' AS cep_ini";
+                $selCepFin = !empty($cols['cep_fin']) ? "COALESCE(s.cep_fin, '') AS cep_fin" : "'' AS cep_fin";
+
+                $qSet = "
+                    SELECT
+                        UPPER(BTRIM(s.{$colKey})) AS setor_key,
+                        {$selNome},
+                        {$selCepIni},
+                        {$selCepFin}
+                    FROM {$tblSetor} s
+                    WHERE UPPER(BTRIM(s.{$colKey})) IN (" . implode(',', $ph) . ")
+                ";
+                $resSet = @pg_query_params($g_sql, $qSet, $params);
+                if ($resSet) {
+                    while ($row = pg_fetch_assoc($resSet)) {
+                        $k = strtoupper(trim((string)($row['setor_key'] ?? '')));
+                        if ($k === '') continue;
+                        $setorInfo[$k] = [
+                            'nome' => (string)($row['nome'] ?? ''),
+                            'cep_ini' => (string)($row['cep_ini'] ?? ''),
+                            'cep_fin' => (string)($row['cep_fin'] ?? ''),
+                        ];
+                    }
+                }
+            }
+        }
+    }
+} catch (Exception $e) {
+}
+
+if (!empty($setorInfo)) {
+    foreach ($ctes as &$c) {
+        $k = strtoupper(trim((string)($c['setor'] ?? '')));
+        if ($k !== '' && isset($setorInfo[$k])) {
+            $c['setorNome'] = $setorInfo[$k]['nome'];
+            $c['setorCepIni'] = $setorInfo[$k]['cep_ini'];
+            $c['setorCepFin'] = $setorInfo[$k]['cep_fin'];
+        } else {
+            $c['setorNome'] = '';
+            $c['setorCepIni'] = '';
+            $c['setorCepFin'] = '';
+        }
+    }
+    unset($c);
+}
+
 respondJson([
     'success' => true,
     'data'    => [

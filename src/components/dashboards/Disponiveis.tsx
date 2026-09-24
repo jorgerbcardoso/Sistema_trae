@@ -147,6 +147,9 @@ interface CteEntrega {
   chegadaUnid?: string;
   unidAtual?: string;
   setor: string;
+  setorNome?: string;
+  setorCepIni?: string;
+  setorCepFin?: string;
   nfiscal: string;
   pagador: string;
   destinatario: string;
@@ -181,6 +184,9 @@ interface DadosEntrega {
 
 interface GrupoSetor {
   setor: string;
+  nome?: string;
+  cepIni?: string;
+  cepFin?: string;
   armazem: CteEntrega[];
   transito: CteEntrega[];
   totalCtes: number;
@@ -5410,7 +5416,18 @@ function ModalCarregamentoAutomaticoEntrega({
     const list = [...(setores ?? [])];
     list.sort((a, b) => (b.totalCtes - a.totalCtes) || a.setor.localeCompare(b.setor));
     if (!b) return list;
-    return list.filter((s) => String(s.setor ?? '').toUpperCase().includes(b));
+    return list.filter((s) => {
+      const alvo = [
+        String(s.setor ?? ''),
+        String(s.nome ?? ''),
+        String(s.cepIni ?? ''),
+        String(s.cepFin ?? ''),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toUpperCase();
+      return alvo.includes(b);
+    });
   }, [setores, busca]);
 
   const toggleSel = (s: string) => {
@@ -5470,6 +5487,11 @@ function ModalCarregamentoAutomaticoEntrega({
                 setoresFiltrados.map((s) => {
                   const k = String(s.setor ?? '').trim();
                   const checked = selecionados.has(k);
+                  const nome = String(s.nome ?? '').trim();
+                  const cepIni = String(s.cepIni ?? '').trim();
+                  const cepFin = String(s.cepFin ?? '').trim();
+                  const cepLabel =
+                    cepIni && cepFin ? `CEP ${cepIni}–${cepFin}` : (cepIni ? `CEP ini ${cepIni}` : (cepFin ? `CEP fin ${cepFin}` : ''));
                   return (
                     <button
                       key={k}
@@ -5478,7 +5500,14 @@ function ModalCarregamentoAutomaticoEntrega({
                       className="w-full grid grid-cols-[36px_minmax(0,1fr)_80px] gap-2 px-3 py-2 text-xs items-center hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
                     >
                       <div className={`h-4 w-4 rounded border ${checked ? 'bg-emerald-500 border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'}`} />
-                      <span className="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate">{k || 'SEM SETOR'}</span>
+                      <div className="min-w-0">
+                        <div className="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate">{k || 'SEM SETOR'}</div>
+                        {nome || cepLabel ? (
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            {[nome, cepLabel].filter(Boolean).join(' · ')}
+                          </div>
+                        ) : null}
+                      </div>
                       <span className="text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">{s.totalCtes}</span>
                     </button>
                   );
@@ -8778,7 +8807,20 @@ export function Disponiveis() {
     for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
-        map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
+        map[key] = {
+          setor: key,
+          nome: String(cte.setorNome ?? '').trim() || undefined,
+          cepIni: String(cte.setorCepIni ?? '').trim() || undefined,
+          cepFin: String(cte.setorCepFin ?? '').trim() || undefined,
+          armazem: [],
+          transito: [],
+          totalCtes: 0,
+          totalVol: 0,
+          totalPeso: 0,
+          totalCubagem: 0,
+          totalFrete: 0,
+          totalVlrNf: 0,
+        };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
