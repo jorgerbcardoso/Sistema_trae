@@ -1257,7 +1257,25 @@ if ($acao === 'verificar_saidas_ssw') {
         } catch (Exception $e) {}
 
         if ($cteTableOk && $qtdSsw > 0 && $qtdPresto !== $qtdSsw && count($manifestos) > 0) {
+            $toFloat = function ($v) {
+                $s = trim((string)$v);
+                if ($s === '') return 0.0;
+                $s = str_replace(['.', ' '], ['', ''], $s);
+                $s = str_replace(',', '.', $s);
+                $n = (float)$s;
+                return (float)$n;
+            };
+            $parseDateBr = function ($v) {
+                $s = trim((string)$v);
+                if ($s === '') return null;
+                $dt = DateTime::createFromFormat('d/m/y', $s);
+                if ($dt !== false) return $dt->format('Y-m-d');
+                $dt = DateTime::createFromFormat('d/m/Y', $s);
+                if ($dt !== false) return $dt->format('Y-m-d');
+                return null;
+            };
             $pairs = [];
+            $cteXml = [];
             foreach ($manifestos as $seqMan) {
                 $seqMan = trim((string)$seqMan);
                 if ($seqMan === '') continue;
@@ -1282,7 +1300,26 @@ if ($acao === 'verificar_saidas_ssw') {
                     $ser = strtoupper($mC[1]);
                     $nro = (int)$mC[2];
                     if ($nro <= 0) continue;
-                    $pairs[$ser . '|' . $nro] = ['ser' => $ser, 'nro' => $nro];
+                    $k = $ser . '|' . $nro;
+                    $pairs[$k] = ['ser' => $ser, 'nro' => $nro];
+                    if (!isset($cteXml[$k])) {
+                        $cteXml[$k] = [
+                            'ser_cte' => $ser,
+                            'nro_cte' => $nro,
+                            'destino_cte' => '',
+                            'cidade_destino' => trim((string)($rm->f5 ?? '')),
+                            'remetente' => trim((string)($rm->f3 ?? '')),
+                            'destinatario' => trim((string)($rm->f4 ?? '')),
+                            'pagador' => '',
+                            'data_emissao' => $parseDateBr((string)($rm->f2 ?? '')),
+                            'data_prev_ent' => $parseDateBr((string)($rm->f12 ?? '')),
+                            'vlr_merc' => $toFloat((string)($rm->f9 ?? '')),
+                            'vlr_frete' => $toFloat((string)($rm->f10 ?? '')),
+                            'peso' => $toFloat((string)($rm->f8 ?? '')),
+                            'cubagem' => 0.0,
+                            'qtde_vol' => (int)preg_replace('/[^\d]/', '', (string)($rm->f7 ?? '')),
+                        ];
+                    }
                 }
             }
 
@@ -1380,8 +1417,8 @@ if ($acao === 'verificar_saidas_ssw') {
                                 {$selVol} AS qtde_vol
                             FROM req
                             JOIN {$tblCte} cte
-                              ON UPPER(BTRIM(cte.ser_cte)) = req.ser_cte
-                             AND cte.nro_cte = req.nro_cte
+                              ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
+                             AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
                             {$joinCidade}
                         ";
                         $resC = @pg_query_params($conn, $q, $params);
@@ -1393,11 +1430,31 @@ if ($acao === 'verificar_saidas_ssw') {
                         }
                     }
 
-                    if (count($cteInfo) > 0) {
+                    $cteAll = $cteXml;
+                    foreach ($cteInfo as $k => $rowC) {
+                        $cteAll[$k] = [
+                            'ser_cte' => (string)($rowC['ser_cte'] ?? ''),
+                            'nro_cte' => (int)($rowC['nro_cte'] ?? 0),
+                            'destino_cte' => (string)($rowC['destino_cte'] ?? ''),
+                            'cidade_destino' => (string)($rowC['cidade_destino'] ?? ($cteXml[$k]['cidade_destino'] ?? '')),
+                            'remetente' => (string)($rowC['remetente'] ?? ($cteXml[$k]['remetente'] ?? '')),
+                            'destinatario' => (string)($rowC['destinatario'] ?? ($cteXml[$k]['destinatario'] ?? '')),
+                            'pagador' => (string)($rowC['pagador'] ?? ''),
+                            'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
+                            'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
+                            'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                            'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                            'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                            'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                            'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
+                        ];
+                    }
+
+                    if (count($cteAll) > 0) {
                         pg_query($conn, 'BEGIN');
                         try {
                             $add = 0;
-                            foreach ($cteInfo as $k => $rowC) {
+                            foreach ($cteAll as $rowC) {
                                 $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
                                 $nro = (int)($rowC['nro_cte'] ?? 0);
                                 if ($ser === '' || $nro <= 0) continue;
@@ -1413,8 +1470,10 @@ if ($acao === 'verificar_saidas_ssw') {
 
                                 $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
                                 $destCteEsc = pg_escape_string($conn, $destCte);
-                                $emissaoSql = ($rowC['data_emissao'] ?? null) ? ("'" . pg_escape_string($conn, (string)$rowC['data_emissao']) . "'::date") : 'NULL';
-                                $prevSql = ($rowC['data_prev_ent'] ?? null) ? ("'" . pg_escape_string($conn, (string)$rowC['data_prev_ent']) . "'::date") : 'NULL';
+                                $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
+                                $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
+                                $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
+                                $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
                                 $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
                                 $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
                                 $peso = (float)($rowC['peso'] ?? 0);
@@ -1718,7 +1777,25 @@ if ($acao === 'atualizar_ctes_ssw') {
     $pairsCount = 0;
     $cteFoundCount = 0;
     if ($qtdSsw > 0 && $qtdPresto !== $qtdSsw && count($manifestos) > 0) {
+        $toFloat = function ($v) {
+            $s = trim((string)$v);
+            if ($s === '') return 0.0;
+            $s = str_replace(['.', ' '], ['', ''], $s);
+            $s = str_replace(',', '.', $s);
+            $n = (float)$s;
+            return (float)$n;
+        };
+        $parseDateBr = function ($v) {
+            $s = trim((string)$v);
+            if ($s === '') return null;
+            $dt = DateTime::createFromFormat('d/m/y', $s);
+            if ($dt !== false) return $dt->format('Y-m-d');
+            $dt = DateTime::createFromFormat('d/m/Y', $s);
+            if ($dt !== false) return $dt->format('Y-m-d');
+            return null;
+        };
         $pairs = [];
+        $cteXml = [];
         foreach ($manifestos as $seqMan) {
             $seqMan = trim((string)$seqMan);
             if ($seqMan === '') continue;
@@ -1740,7 +1817,26 @@ if ($acao === 'atualizar_ctes_ssw') {
                 $ser = strtoupper($mC[1]);
                 $nro = (int)$mC[2];
                 if ($nro <= 0) continue;
-                $pairs[$ser . '|' . $nro] = ['ser' => $ser, 'nro' => $nro];
+                $k = $ser . '|' . $nro;
+                $pairs[$k] = ['ser' => $ser, 'nro' => $nro];
+                if (!isset($cteXml[$k])) {
+                    $cteXml[$k] = [
+                        'ser_cte' => $ser,
+                        'nro_cte' => $nro,
+                        'destino_cte' => '',
+                        'cidade_destino' => trim((string)($rm->f5 ?? '')),
+                        'remetente' => trim((string)($rm->f3 ?? '')),
+                        'destinatario' => trim((string)($rm->f4 ?? '')),
+                        'pagador' => '',
+                        'data_emissao' => $parseDateBr((string)($rm->f2 ?? '')),
+                        'data_prev_ent' => $parseDateBr((string)($rm->f12 ?? '')),
+                        'vlr_merc' => $toFloat((string)($rm->f9 ?? '')),
+                        'vlr_frete' => $toFloat((string)($rm->f10 ?? '')),
+                        'peso' => $toFloat((string)($rm->f8 ?? '')),
+                        'cubagem' => 0.0,
+                        'qtde_vol' => (int)preg_replace('/[^\d]/', '', (string)($rm->f7 ?? '')),
+                    ];
+                }
             }
         }
 
@@ -1810,8 +1906,8 @@ if ($acao === 'atualizar_ctes_ssw') {
                             {$selVol} AS qtde_vol
                         FROM req
                         JOIN {$tblCte} cte
-                          ON UPPER(BTRIM(cte.ser_cte)) = req.ser_cte
-                         AND cte.nro_cte = req.nro_cte
+                          ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
+                         AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
                         {$joinCidade}
                     ";
                     $resC = @pg_query_params($conn, $q, $params);
@@ -1823,11 +1919,30 @@ if ($acao === 'atualizar_ctes_ssw') {
                     }
                 }
                 $cteFoundCount = count($cteInfo);
+                $cteAll = $cteXml;
+                foreach ($cteInfo as $k => $rowC) {
+                    $cteAll[$k] = [
+                        'ser_cte' => (string)($rowC['ser_cte'] ?? ''),
+                        'nro_cte' => (int)($rowC['nro_cte'] ?? 0),
+                        'destino_cte' => (string)($rowC['destino_cte'] ?? ''),
+                        'cidade_destino' => (string)($rowC['cidade_destino'] ?? ($cteXml[$k]['cidade_destino'] ?? '')),
+                        'remetente' => (string)($rowC['remetente'] ?? ($cteXml[$k]['remetente'] ?? '')),
+                        'destinatario' => (string)($rowC['destinatario'] ?? ($cteXml[$k]['destinatario'] ?? '')),
+                        'pagador' => (string)($rowC['pagador'] ?? ''),
+                        'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
+                        'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
+                        'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                        'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                        'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                        'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                        'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
+                    ];
+                }
 
-                if (count($cteInfo) > 0) {
+                if (count($cteAll) > 0) {
                     pg_query($conn, 'BEGIN');
                     try {
-                        foreach ($cteInfo as $rowC) {
+                        foreach ($cteAll as $rowC) {
                             $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
                             $nro = (int)($rowC['nro_cte'] ?? 0);
                             if ($ser === '' || $nro <= 0) continue;
@@ -1843,8 +1958,10 @@ if ($acao === 'atualizar_ctes_ssw') {
 
                             $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
                             $destCteEsc = pg_escape_string($conn, $destCte);
-                            $emissaoSql = ($rowC['data_emissao'] ?? null) ? ("'" . pg_escape_string($conn, (string)$rowC['data_emissao']) . "'::date") : 'NULL';
-                            $prevSql = ($rowC['data_prev_ent'] ?? null) ? ("'" . pg_escape_string($conn, (string)$rowC['data_prev_ent']) . "'::date") : 'NULL';
+                            $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
+                            $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
+                            $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
+                            $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
                             $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
                             $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
                             $peso = (float)($rowC['peso'] ?? 0);
