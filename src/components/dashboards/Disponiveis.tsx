@@ -5557,6 +5557,10 @@ function CarregamentoArea({
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
+  const [capDialogOpen, setCapDialogOpen] = useState(false);
+  const [capLoading, setCapLoading] = useState(false);
+  const [capSaving, setCapSaving] = useState(false);
+  const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
   const tooltipStyle = useTooltipStyle();
   const isEntregaCarregamento = useCallback((c: Carregamento) => {
     const modo = String((c as any)?.modo_carregamento ?? (c as any)?.modoCarregamento ?? '').trim().toUpperCase();
@@ -5633,6 +5637,65 @@ function CarregamentoArea({
       setLoadingEntregaAuto(false);
     }
   };
+
+  const loadCapacidades = async () => {
+    try {
+      setCapLoading(true);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message ? String(res.message) : 'Erro ao carregar capacidades');
+        setCapItems([]);
+        return;
+      }
+      const items = Array.isArray(res.items) ? res.items : [];
+      setCapItems(items.map((it: any) => ({
+        tipo: String(it?.tipo ?? '').trim(),
+        capacidade_ton: it?.capacidade_ton == null ? '' : String(it.capacidade_ton),
+        capacidade_m3: it?.capacidade_m3 == null ? '' : String(it.capacidade_m3),
+      })));
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar capacidades');
+      setCapItems([]);
+    } finally {
+      setCapLoading(false);
+    }
+  };
+
+  const salvarCapacidades = async () => {
+    if (capSaving) return;
+    try {
+      setCapSaving(true);
+      const payload = capItems.map((it) => ({
+        tipo: String(it.tipo ?? '').trim().toUpperCase(),
+        capacidade_ton: String(it.capacidade_ton ?? '').trim() === '' ? null : Number(it.capacidade_ton),
+        capacidade_m3: String(it.capacidade_m3 ?? '').trim() === '' ? null : Number(it.capacidade_m3),
+      }));
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'salvar', items: payload }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message ? String(res.message) : 'Erro ao salvar capacidades');
+        return;
+      }
+      toast.success('Capacidades atualizadas.');
+      setCapDialogOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar capacidades');
+    } finally {
+      setCapSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!capDialogOpen) return;
+    void loadCapacidades();
+  }, [capDialogOpen]);
 
   const handleExcluirTodos = async () => {
     const ok = await confirmar({
@@ -6812,6 +6875,14 @@ function CarregamentoArea({
                 {loadingEntregaAuto ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ListTree className="w-3.5 h-3.5 mr-1.5" />}
                 Carr. Automático
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-slate-300 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => setCapDialogOpen(true)}
+              >
+                <Gauge className="w-3.5 h-3.5 mr-1.5" />Ajustar capacidades
+              </Button>
             </div>
 
             {carregamentosEntrega.length === 0 && !loadingCarregamentos ? (
@@ -6850,6 +6921,77 @@ function CarregamentoArea({
           </>
         )}
       </div>
+
+      <Dialog open={capDialogOpen} onOpenChange={setCapDialogOpen}>
+        <DialogContent className="sm:max-w-[720px]">
+          <DialogHeader>
+            <DialogTitle>Ajustar capacidades por tipo</DialogTitle>
+            <DialogDescription>Define a capacidade padrão (Ton / m³) para cada tipo de veículo.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {capLoading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando...
+              </div>
+            ) : capItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-500">Nenhum tipo de veículo encontrado.</div>
+            ) : (
+              <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">Tipo</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[160px]">Capacidade (Ton)</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[160px]">Capacidade (m³)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {capItems.map((it, idx) => (
+                      <tr key={it.tipo} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{it.tipo}</td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={it.capacidade_ton}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setCapItems((prev) => prev.map((p, i) => (i === idx ? { ...p, capacidade_ton: v } : p)));
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={it.capacidade_m3}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setCapItems((prev) => prev.map((p, i) => (i === idx ? { ...p, capacidade_m3: v } : p)));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setCapDialogOpen(false)} disabled={capSaving}>
+              Fechar
+            </Button>
+            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={salvarCapacidades} disabled={capLoading || capSaving}>
+              {capSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {modalCriarModo && (
         <ModalCriarCarregamento
