@@ -8806,12 +8806,15 @@ export function Disponiveis() {
     const map: Record<string, GrupoSetor> = {};
     for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
+      const nomeSetor = String(cte.setorNome ?? '').trim();
+      const cepIni = String(cte.setorCepIni ?? '').trim();
+      const cepFin = String(cte.setorCepFin ?? '').trim();
       if (!map[key]) {
         map[key] = {
           setor: key,
-          nome: String(cte.setorNome ?? '').trim() || undefined,
-          cepIni: String(cte.setorCepIni ?? '').trim() || undefined,
-          cepFin: String(cte.setorCepFin ?? '').trim() || undefined,
+          nome: nomeSetor || undefined,
+          cepIni: cepIni || undefined,
+          cepFin: cepFin || undefined,
           armazem: [],
           transito: [],
           totalCtes: 0,
@@ -8821,6 +8824,10 @@ export function Disponiveis() {
           totalFrete: 0,
           totalVlrNf: 0,
         };
+      } else {
+        if (!map[key].nome && nomeSetor) map[key].nome = nomeSetor;
+        if (!map[key].cepIni && cepIni) map[key].cepIni = cepIni;
+        if (!map[key].cepFin && cepFin) map[key].cepFin = cepFin;
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
