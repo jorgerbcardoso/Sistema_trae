@@ -1480,7 +1480,7 @@ interface CarregamentoAreaProps {
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
-  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[]) => Promise<{ ok: boolean; message?: string; total?: number }>;
+  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[]) => Promise<{ ok: boolean; message?: string; total?: number; fora?: number; cap_tipo?: string }>;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
@@ -2521,6 +2521,27 @@ function CardCarregamento({
   const sugestaoVeiculo = useMemo(() => {
     if (!isEntregaCarreg) return null;
     const caps = Array.isArray(veiculoCapacidades) ? veiculoCapacidades : [];
+    if (caps.length === 0) return 'Ajustar capacidades';
+    const pesoTon = (Number(totalPeso) || 0) / 1000;
+    const cub = Number(totalCubagem) || 0;
+    if (pesoTon <= 0 && cub <= 0) return null;
+    const norm = caps
+      .map((c) => ({
+        tipo: String(c.tipo ?? '').trim(),
+        ton: Number((c as any).capacidade_ton ?? (c as any).ton ?? 0) || 0,
+        m3: Number((c as any).capacidade_m3 ?? (c as any).m3 ?? 0) || 0,
+      }))
+      .filter((c) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
+      .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
+    if (norm.length === 0) return 'Ajustar capacidades';
+    const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
+    if (ok) return ok.tipo;
+    return `Acima de ${norm[norm.length - 1].tipo}`;
+  }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
+
+  const capacidadeSugerida = useMemo(() => {
+    if (!isEntregaCarreg) return null;
+    const caps = Array.isArray(veiculoCapacidades) ? veiculoCapacidades : [];
     if (caps.length === 0) return null;
     const pesoTon = (Number(totalPeso) || 0) / 1000;
     const cub = Number(totalCubagem) || 0;
@@ -2535,8 +2556,9 @@ function CardCarregamento({
       .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
     if (norm.length === 0) return null;
     const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
-    if (ok) return ok.tipo;
-    return `Acima de ${norm[norm.length - 1].tipo}`;
+    if (ok) return { ton: ok.ton, m3: ok.m3 };
+    const max = norm[norm.length - 1];
+    return { ton: max.ton, m3: max.m3 };
   }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
 
   const bordaBaseClass = isSimulado
@@ -2697,13 +2719,13 @@ function CardCarregamento({
             </div>
             <BarraCapacidade
               valor={totalPeso / 1000}
-              capacidade={carregamento.capacidade_ton!}
+              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? carregamento.capacidade_ton!}
               corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
               label="Peso (ton)"
             />
             <BarraCapacidade
               valor={totalCubagem}
-              capacidade={carregamento.capacidade_m3!}
+              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.m3 ?? null) : null) ?? carregamento.capacidade_m3!}
               corGradient="linear-gradient(90deg, #0369a1, #0ea5e9)"
               label="Cubagem (m³)"
             />
@@ -4676,7 +4698,7 @@ function ModalRotaCarregamento({
 
     if (!mapRef.current) {
       mapRef.current = L.map(mapContainerRef.current).setView([-15, -55], 4);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer(`${ENVIRONMENT.apiBaseUrl}/map/osm_tile.php?z={z}&x={x}&y={y}`, {
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(mapRef.current);
     }
@@ -4899,6 +4921,84 @@ function ModalRotaCarregamento({
       }
 
       const rotaTxt = unidadesOrdem.filter(Boolean).join(' → ');
+      const mapImage = await (async () => {
+        try {
+          const map = mapRef.current;
+          if (!map || !map.getContainer) return null;
+          const container = map.getContainer() as HTMLElement;
+          if (!container) return null;
+          const cRect = container.getBoundingClientRect();
+          const w = Math.max(1, Math.floor(cRect.width));
+          const h = Math.max(1, Math.floor(cRect.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          const waitLoaded = async (img: HTMLImageElement) => {
+            if (img.complete && img.naturalWidth > 0) return;
+            await new Promise<void>((resolve) => {
+              const onDone = () => { cleanup(); resolve(); };
+              const cleanup = () => {
+                img.removeEventListener('load', onDone);
+                img.removeEventListener('error', onDone);
+              };
+              img.addEventListener('load', onDone);
+              img.addEventListener('error', onDone);
+            });
+          };
+
+          const tiles = Array.from(container.querySelectorAll('img.leaflet-tile')) as HTMLImageElement[];
+          await Promise.all(tiles.map(waitLoaded));
+          for (const img of tiles) {
+            if (!img.complete || img.naturalWidth <= 0) continue;
+            const r = img.getBoundingClientRect();
+            const x = r.left - cRect.left;
+            const y = r.top - cRect.top;
+            ctx.drawImage(img, x, y, r.width, r.height);
+          }
+
+          const drawSvgEl = async (svgEl: SVGSVGElement, x: number, y: number, width: number, height: number) => {
+            const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+            cloned.setAttribute('width', String(width));
+            cloned.setAttribute('height', String(height));
+            const svg = new XMLSerializer().serializeToString(cloned);
+            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            try {
+              const img = new Image();
+              await new Promise<void>((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = url;
+              });
+              if (img.width > 0 && img.height > 0) {
+                ctx.drawImage(img, x, y, width, height);
+              }
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          };
+
+          const overlaySvg = container.querySelector('.leaflet-overlay-pane svg') as SVGSVGElement | null;
+          if (overlaySvg) {
+            const r = overlaySvg.getBoundingClientRect();
+            await drawSvgEl(overlaySvg, r.left - cRect.left, r.top - cRect.top, r.width, r.height);
+          }
+
+          const markerSvgs = Array.from(container.querySelectorAll('.leaflet-marker-pane .leaflet-marker-icon svg')) as SVGSVGElement[];
+          for (const svgEl of markerSvgs) {
+            const iconEl = svgEl.closest('.leaflet-marker-icon') as HTMLElement | null;
+            if (!iconEl) continue;
+            const r = iconEl.getBoundingClientRect();
+            await drawSvgEl(svgEl, r.left - cRect.left, r.top - cRect.top, r.width, r.height);
+          }
+
+          return canvas.toDataURL('image/png');
+        } catch {
+          return null;
+        }
+      })();
 
       const token = localStorage.getItem('auth_token');
       const resp = await fetch(
@@ -4906,7 +5006,7 @@ function ModalRotaCarregamento({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, linhas }),
+          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, linhas, map_image: mapImage }),
         }
       );
       if (!resp.ok) {
@@ -5669,11 +5769,17 @@ function CarregamentoArea({
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
   const [excluindoTodosEntrega, setExcluindoTodosEntrega] = useState(false);
+  const [resumoEntregaOpen, setResumoEntregaOpen] = useState(false);
+  const [resumoEntregaItens, setResumoEntregaItens] = useState<{ setor: string; placa: string; inseridos: number; fora: number; cap_tipo?: string }[]>([]);
   const [capDialogOpen, setCapDialogOpen] = useState(false);
   const [capLoading, setCapLoading] = useState(false);
   const [capSaving, setCapSaving] = useState(false);
   const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
   const tooltipStyle = useTooltipStyle();
+  const isAtivoCarregamento = useCallback((c: Carregamento) => {
+    const dt = String((c as any)?.data_finalizacao ?? (c as any)?.dataFinalizacao ?? '').trim();
+    return dt === '';
+  }, []);
   const isEntregaCarregamento = useCallback((c: Carregamento) => {
     const modo = String((c as any)?.modo_carregamento ?? (c as any)?.modoCarregamento ?? '').trim().toUpperCase();
     if (modo === 'ENTREGA') return true;
@@ -5683,12 +5789,12 @@ function CarregamentoArea({
   }, []);
 
   const carregamentosEntrega = React.useMemo(() => {
-    return (carregamentos ?? []).filter((c) => isEntregaCarregamento(c));
-  }, [carregamentos, isEntregaCarregamento]);
+    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && isEntregaCarregamento(c));
+  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento]);
 
   const carregamentosTransferencia = React.useMemo(() => {
-    return (carregamentos ?? []).filter((c) => !isEntregaCarregamento(c));
-  }, [carregamentos, isEntregaCarregamento]);
+    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && !isEntregaCarregamento(c));
+  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento]);
 
   const carregamentosTransferNaoSimulados = React.useMemo(() => {
     return carregamentosTransferencia.filter((c: any) => !c?.simulado);
@@ -5715,7 +5821,8 @@ function CarregamentoArea({
       let okCount = 0;
       let errCount = 0;
       let totalCtes = 0;
-      let vazioCount = 0;
+      let totalFora = 0;
+      const resumo: { setor: string; placa: string; inseridos: number; fora: number; cap_tipo?: string }[] = [];
       const erros: string[] = [];
 
       for (const setor of setoresOk) {
@@ -5731,11 +5838,15 @@ function CarregamentoArea({
         const res = await onCarregamentoAutomaticoEntrega(placa, [setor]);
         if (res.ok) {
           const add = Number(res.total ?? 0) || 0;
+          const fora = Number(res.fora ?? 0) || 0;
           if (add > 0) {
             okCount += 1;
             totalCtes += add;
+            totalFora += fora;
+            resumo.push({ setor, placa, inseridos: add, fora, cap_tipo: res.cap_tipo });
           } else {
-            vazioCount += 1;
+            totalFora += fora;
+            resumo.push({ setor, placa, inseridos: 0, fora, cap_tipo: res.cap_tipo });
           }
         } else {
           errCount += 1;
@@ -5743,9 +5854,8 @@ function CarregamentoArea({
         }
       }
 
-      if (okCount > 0) {
-        toast.success(`Gerado(s) ${okCount} carregamento(s) de entrega (${totalCtes} CT-e(s)).`);
-      }
+      setResumoEntregaItens(resumo);
+      setResumoEntregaOpen(true);
       if (errCount > 0) {
         toast.error(erros.slice(0, 3).join(' · ') + (erros.length > 3 ? ` (+${erros.length - 3})` : ''));
       }
@@ -7109,40 +7219,42 @@ function CarregamentoArea({
               </div>
             ) : (
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {carregamentosEntrega.map((c, i) => (
-                  <div
-                    key={i}
-                    draggable
-                    onDragStart={(e) => {
-                      const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
-                      setDragEntregaOrigem(placa || null);
-                      setDragEntregaOver(null);
-                      try { e.dataTransfer.setData('text/plain', placa); } catch {}
-                      try { e.dataTransfer.effectAllowed = 'move'; } catch {}
-                    }}
-                    onDragEnd={() => {
-                      setDragEntregaOrigem(null);
-                      setDragEntregaOver(null);
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
-                      if (!placa) return;
-                      if (dragEntregaOrigem && placa !== dragEntregaOrigem) setDragEntregaOver(placa);
-                    }}
-                    onDragLeave={() => setDragEntregaOver(null)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const placaDest = String(c.placa_provisoria ?? '').trim().toUpperCase();
-                      const placaOrig = String(dragEntregaOrigem ?? '').trim().toUpperCase() || String(e.dataTransfer.getData('text/plain') ?? '').trim().toUpperCase();
-                      setDragEntregaOver(null);
-                      setDragEntregaOrigem(null);
-                      if (!placaOrig || !placaDest || placaOrig === placaDest) return;
-                      void fundirEntrega(placaOrig, placaDest);
-                    }}
-                    className={dragEntregaOver && String(c.placa_provisoria ?? '').trim().toUpperCase() === dragEntregaOver ? 'ring-2 ring-emerald-400 rounded-xl' : ''}
-                    title="Arraste e solte sobre outro carregamento para juntar setores"
-                  >
+                {carregamentosEntrega.map((c, i) => {
+                  const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                  const isOver = !!dragEntregaOver && placa === dragEntregaOver;
+                  const isDragging = !!dragEntregaOrigem && placa === dragEntregaOrigem;
+                  return (
+                    <div
+                      key={i}
+                      draggable
+                      onDragStart={(e) => {
+                        setDragEntregaOrigem(placa || null);
+                        setDragEntregaOver(null);
+                        try { e.dataTransfer.setData('text/plain', placa); } catch {}
+                        try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+                      }}
+                      onDragEnd={() => {
+                        setDragEntregaOrigem(null);
+                        setDragEntregaOver(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (!placa) return;
+                        if (dragEntregaOrigem && placa !== dragEntregaOrigem) setDragEntregaOver(placa);
+                      }}
+                      onDragLeave={() => setDragEntregaOver(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const placaDest = placa;
+                        const placaOrig = String(dragEntregaOrigem ?? '').trim().toUpperCase() || String(e.dataTransfer.getData('text/plain') ?? '').trim().toUpperCase();
+                        setDragEntregaOver(null);
+                        setDragEntregaOrigem(null);
+                        if (!placaOrig || !placaDest || placaOrig === placaDest) return;
+                        void fundirEntrega(placaOrig, placaDest);
+                      }}
+                      className={`${isOver ? 'ring-2 ring-emerald-400 rounded-xl' : ''} ${isDragging ? 'opacity-50' : ''}`}
+                      title="Arraste e solte sobre outro carregamento para juntar setores"
+                    >
                     <CardCarregamento
                       carregamento={c}
                       unidadeAtual={sigla}
@@ -7165,7 +7277,8 @@ function CarregamentoArea({
                       importandoCarregamentos={importandoCarregamentos}
                     />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
@@ -7239,6 +7352,61 @@ function CarregamentoArea({
               {capSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Salvar
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resumoEntregaOpen} onOpenChange={setResumoEntregaOpen}>
+        <DialogContent className="sm:max-w-[760px]">
+          <DialogHeader>
+            <DialogTitle>Resumo · Carregamentos de Entrega</DialogTitle>
+            <DialogDescription>Resultado da geração automática por setor.</DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const itens = Array.isArray(resumoEntregaItens) ? resumoEntregaItens : [];
+            const totCar = itens.length;
+            const totIns = itens.reduce((s, it) => s + (Number(it.inseridos ?? 0) || 0), 0);
+            const totFora = itens.reduce((s, it) => s + (Number(it.fora ?? 0) || 0), 0);
+            return (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">Carregamentos: {totCar}</Badge>
+                  <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">Inseridos: {totIns}</Badge>
+                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Fora: {totFora}</Badge>
+                </div>
+                {itens.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-500">Nenhum resultado.</div>
+                ) : (
+                  <div className="max-h-[55vh] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">Setor</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300">Placa</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[110px]">Inseridos</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[90px]">Fora</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[200px]">Veículo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itens.map((it, idx) => (
+                          <tr key={`${it.setor}-${it.placa}-${idx}`} className="border-b border-slate-100 dark:border-slate-800">
+                            <td className="px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{String(it.setor ?? '').trim().toUpperCase()}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">{String(it.placa ?? '').trim().toUpperCase()}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-800 dark:text-slate-200">{Number(it.inseridos ?? 0) || 0}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-700 dark:text-amber-300">{Number(it.fora ?? 0) || 0}</td>
+                            <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{String(it.cap_tipo ?? '')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setResumoEntregaOpen(false)}>Fechar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -7860,6 +8028,22 @@ export function Disponiveis() {
 
     if (!placaOk) return { ok: false, message: 'Informe a placa/identificação.' };
 
+    const parsePrevEntTs = (v: string): number => {
+      const s = String(v ?? '').trim();
+      if (!s || s === '—') return Number.POSITIVE_INFINITY;
+      const m = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
+      if (!m) return Number.POSITIVE_INFINITY;
+      const dia = parseInt(m[1], 10);
+      const mes = parseInt(m[2], 10);
+      const anoRaw = m[3];
+      const ano = !anoRaw
+        ? new Date().getFullYear()
+        : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
+      const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+      const ts = d.getTime();
+      return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
+    };
+
     const ctesBase = (() => {
       const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
       const previsaoFim = parseDataISO(filters.periodoPrevisaoFim);
@@ -7901,6 +8085,65 @@ export function Disponiveis() {
     if (ctesSel.length === 0) return { ok: false, message: 'Nenhum CT-e encontrado para os setores selecionados.' };
 
     try {
+      let capsNorm: { tipo: string; ton: number; m3: number }[] = [];
+      try {
+        const capsRes = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
+          true
+        );
+        if (capsRes?.success && Array.isArray(capsRes.items)) {
+          capsNorm = capsRes.items
+            .map((it: any) => ({
+              tipo: String(it?.tipo ?? '').trim().toUpperCase(),
+              ton: Number(String(it?.capacidade_ton ?? it?.ton ?? '').replace(',', '.')) || 0,
+              m3: Number(String(it?.capacidade_m3 ?? it?.m3 ?? '').replace(',', '.')) || 0,
+            }))
+            .filter((c: any) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
+            .sort((a: any, b: any) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
+        }
+      } catch (e: any) {
+      }
+
+      const maxCap = capsNorm.length > 0 ? capsNorm[capsNorm.length - 1] : null;
+      const capMaxKg = maxCap && maxCap.ton > 0 ? maxCap.ton * 1000 : null;
+      const capMaxM3 = maxCap && maxCap.m3 > 0 ? maxCap.m3 : null;
+
+      const ctesOrdenados = [...ctesSel].sort((a, b) => {
+        const ta = parsePrevEntTs(String((a as any).prevEnt ?? ''));
+        const tb = parsePrevEntTs(String((b as any).prevEnt ?? ''));
+        return (ta - tb) || (Number(a.nroCte ?? 0) - Number(b.nroCte ?? 0));
+      });
+
+      const ctesDentro: any[] = [];
+      const ctesFora: any[] = [];
+      let pesoKg = 0;
+      let cubM3 = 0;
+      for (const c of ctesOrdenados) {
+        const wKg = parsePeso(String((c as any).peso ?? '0'));
+        const vM3 = parseCubagem(String((c as any).cubagem ?? '0'));
+        const novoPeso = pesoKg + (Number.isFinite(wKg) ? wKg : 0);
+        const novoCub = cubM3 + (Number.isFinite(vM3) ? vM3 : 0);
+        const okPeso = capMaxKg === null ? true : novoPeso <= (capMaxKg + 0.0001);
+        const okCub = capMaxM3 === null ? true : novoCub <= (capMaxM3 + 0.0001);
+        if (ctesDentro.length === 0 || (okPeso && okCub)) {
+          ctesDentro.push(c);
+          pesoKg = novoPeso;
+          cubM3 = novoCub;
+        } else {
+          ctesFora.push(c);
+        }
+      }
+
+      const pesoTonSel = pesoKg / 1000;
+      const capEscolhida = capsNorm.length > 0
+        ? (capsNorm.find((c) => (c.ton <= 0 || c.ton >= pesoTonSel) && (c.m3 <= 0 || c.m3 >= cubM3)) ?? null)
+        : null;
+      const capAplicada = capEscolhida ?? maxCap;
+      const capTipoResumo = capEscolhida
+        ? capEscolhida.tipo
+        : (maxCap ? `Acima de ${maxCap.tipo}` : '');
+
       const criar = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
         { method: 'POST', body: JSON.stringify({ acao: 'criar', placa: placaOk, destino: '', paradas: setoresOk.join(', '), origem_criacao: 'AUTO' }) },
@@ -7909,7 +8152,7 @@ export function Disponiveis() {
       if (!criar?.success) return { ok: false, message: criar?.message || 'Erro ao criar carregamento.' };
       const seqCarregamento = Number(criar?.seq_carregamento ?? 0) || 0;
 
-      const ctesPayload = ctesSel.map((c) => ({
+      const ctesPayload = ctesDentro.map((c) => ({
         nroCte: c.nroCte,
         serCte: c.serCte,
         setor: (c as any).setor ?? '',
@@ -7935,6 +8178,7 @@ export function Disponiveis() {
       );
       if (!add?.success) return { ok: false, message: add?.message || 'Erro ao adicionar CT-es.' };
       const adicionados = Number(add?.adicionados ?? 0) || 0;
+      const ignorados = Number(add?.ignorados ?? 0) || 0;
 
       if (adicionados <= 0) {
         await apiFetch(
@@ -7943,11 +8187,22 @@ export function Disponiveis() {
           true
         );
         await carregarCarregamentos();
-        return { ok: true, total: 0 };
+        return { ok: true, total: 0, fora: ctesSel.length, cap_tipo: capTipoResumo };
+      }
+
+      if (capAplicada && (capAplicada.ton > 0 || capAplicada.m3 > 0)) {
+        try {
+          await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+            { method: 'POST', body: JSON.stringify({ acao: 'atualizar_capacidade', placa: placaOk, seq_carregamento: seqCarregamento || undefined, cap_ton: capAplicada.ton || null, cap_m3: capAplicada.m3 || null, destino: '', paradas: setoresOk.join(', '), nro_linha: null }) },
+            true
+          );
+        } catch (e: any) {
+        }
       }
 
       await carregarCarregamentos();
-      return { ok: true, total: adicionados };
+      return { ok: true, total: adicionados, fora: ctesFora.length + ignorados, cap_tipo: capTipoResumo };
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
     }

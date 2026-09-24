@@ -127,47 +127,50 @@ if ($acao === 'criar') {
         respondJson(['success' => false, 'message' => 'Placa não informada.']);
     }
 
-    $check = sql(
-        "SELECT 1
-           FROM {$tabela}
-          WHERE unidade = \$1
-            AND placa_provisoria = \$2
-            AND data_finalizacao IS NULL
-          LIMIT 1",
-        [$unidade, $placa], $conn
-    );
-    if ($check && pg_num_rows($check) > 0) {
-        respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
-    }
-
-    $ocupadas = getUnidadesOcupadasCarregamentos($conn, $tabela, $tabelaCap, $unidade);
-    $invalid = [];
-    foreach (parseCsvSiglas($paradas) as $p) {
-        if (isset($ocupadas[$p])) $invalid[] = $p;
-    }
-    if (!empty($invalid)) {
-        $det = [];
-        foreach ($invalid as $u) {
-            $occsMap = $ocupadas[$u] ?? null;
-            if (!$occsMap || !is_array($occsMap) || count($occsMap) === 0) { $det[] = $u; continue; }
-            $occs = array_values($occsMap);
-            $destPlacas = [];
-            $interPlacas = [];
-            foreach ($occs as $o) {
-                $tp = strtoupper(trim((string)($o['tipo'] ?? '')));
-                $pl = strtoupper(trim((string)($o['placa'] ?? '')));
-                if ($pl === '') continue;
-                if ($tp === 'DESTINO') $destPlacas[] = $pl;
-                else $interPlacas[] = $pl;
-            }
-            $destPlacas = array_values(array_unique($destPlacas));
-            $interPlacas = array_values(array_unique($interPlacas));
-            $parts = [];
-            if (!empty($destPlacas)) $parts[] = 'destino: ' . implode(', ', $destPlacas);
-            if (!empty($interPlacas)) $parts[] = 'intermediária: ' . implode(', ', $interPlacas);
-            $det[] = $u . (empty($parts) ? '' : ' (' . implode('; ', $parts) . ')');
+    $ignorarTravas = ($origemCriacao === 'MANUAL' && $destino !== '');
+    if (!$ignorarTravas) {
+        $check = sql(
+            "SELECT 1
+               FROM {$tabela}
+              WHERE unidade = \$1
+                AND placa_provisoria = \$2
+                AND data_finalizacao IS NULL
+              LIMIT 1",
+            [$unidade, $placa], $conn
+        );
+        if ($check && pg_num_rows($check) > 0) {
+            respondJson(['success' => false, 'message' => 'Já existe um carregamento com esta placa para sua unidade.']);
         }
-        respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $det) . '.']);
+
+        $ocupadas = getUnidadesOcupadasCarregamentos($conn, $tabela, $tabelaCap, $unidade);
+        $invalid = [];
+        foreach (parseCsvSiglas($paradas) as $p) {
+            if (isset($ocupadas[$p])) $invalid[] = $p;
+        }
+        if (!empty($invalid)) {
+            $det = [];
+            foreach ($invalid as $u) {
+                $occsMap = $ocupadas[$u] ?? null;
+                if (!$occsMap || !is_array($occsMap) || count($occsMap) === 0) { $det[] = $u; continue; }
+                $occs = array_values($occsMap);
+                $destPlacas = [];
+                $interPlacas = [];
+                foreach ($occs as $o) {
+                    $tp = strtoupper(trim((string)($o['tipo'] ?? '')));
+                    $pl = strtoupper(trim((string)($o['placa'] ?? '')));
+                    if ($pl === '') continue;
+                    if ($tp === 'DESTINO') $destPlacas[] = $pl;
+                    else $interPlacas[] = $pl;
+                }
+                $destPlacas = array_values(array_unique($destPlacas));
+                $interPlacas = array_values(array_unique($interPlacas));
+                $parts = [];
+                if (!empty($destPlacas)) $parts[] = 'destino: ' . implode(', ', $destPlacas);
+                if (!empty($interPlacas)) $parts[] = 'intermediária: ' . implode(', ', $interPlacas);
+                $det[] = $u . (empty($parts) ? '' : ' (' . implode('; ', $parts) . ')');
+            }
+            respondJson(['success' => false, 'message' => 'Parada(s) inválida(s): ' . implode(', ', $det) . '.']);
+        }
     }
 
     // Linha sentinela: nro_cte = 0 indica carregamento sem CT-es ainda
@@ -1055,7 +1058,12 @@ if ($acao === 'atualizar_capacidade') {
          ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, cap_ton = EXCLUDED.cap_ton, cap_m3 = EXCLUDED.cap_m3, vlr_frete_carreteiro = EXCLUDED.vlr_frete_carreteiro, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
     );
 
-    if (strpos($placa, '-') === false) {
+    $placaNorm = strtoupper(trim($placa));
+    $isPlacaReal = (bool)(
+        preg_match('/^[A-Z]{3}[0-9]{4}$/', $placaNorm)
+        || preg_match('/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $placaNorm)
+    );
+    if ($isPlacaReal) {
         $resVeic = @pg_query($conn,
             "UPDATE {$tabelaVeiculo}
              SET capacidade_ton = {$capTonSql},

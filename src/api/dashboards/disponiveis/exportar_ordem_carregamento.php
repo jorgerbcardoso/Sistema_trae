@@ -41,6 +41,7 @@ $unidade = strtoupper(trim(
 ));
 $placa = strtoupper(trim((string)($input['placa'] ?? '')));
 $rotaTxt = (string)($input['rota'] ?? '');
+$mapImage = (string)($input['map_image'] ?? '');
 $linhas = $input['linhas'] ?? [];
 
 if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
@@ -506,14 +507,18 @@ $sheet->getStyle('A17:L21')->applyFromArray($styleGrid);
 
 $totalCtrcs = count($linhas);
 $totalVolumes = 0;
-$totalPeso = 0.0;
+$totalPesoReal = 0.0;
+$totalPesoCalc = 0.0;
 $totalCubagem = 0.0;
 foreach ($linhas as $it) {
     if (!is_array($it)) continue;
-    $totalVolumes += (int)($it['volume'] ?? 0);
-    $totalPeso += (float)($it['peso'] ?? 0);
+    $totalVolumes += (int)($it['qtde_vol'] ?? $it['qtdeVol'] ?? $it['volume'] ?? 0);
+    $totalPesoReal += (float)($it['kg_real'] ?? $it['peso_real'] ?? $it['pesoReal'] ?? $it['peso'] ?? 0);
+    $totalPesoCalc += (float)($it['kg_calc'] ?? $it['peso_calc'] ?? $it['pesoCalc'] ?? 0);
     $totalCubagem += (float)($it['cubagem'] ?? 0);
 }
+
+$sheet->setCellValue('A16', $totalVolumes > 0 ? $totalVolumes : '');
 
 $sheet->mergeCells('A22:L22');
 $sheet->setCellValue('A22', 'RESUMO DA CARGA');
@@ -539,9 +544,9 @@ $sheet->mergeCells('G24:H24');
 $sheet->mergeCells('I24:L24');
 $sheet->setCellValue('A24', $totalCtrcs > 0 ? $totalCtrcs : '');
 $sheet->setCellValue('C24', $totalVolumes > 0 ? $totalVolumes : '');
-$sheet->setCellValue('E24', $totalPeso > 0 ? $totalPeso : '');
+$sheet->setCellValue('E24', $totalPesoReal > 0 ? $totalPesoReal : '');
 $sheet->setCellValue('G24', $totalCubagem > 0 ? $totalCubagem : '');
-$sheet->setCellValue('I24', $totalPeso > 0 ? $totalPeso : '');
+$sheet->setCellValue('I24', $totalPesoCalc > 0 ? $totalPesoCalc : '');
 $sheet->getStyle('A24:L24')->applyFromArray([
     'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '0B2F5B']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
@@ -608,6 +613,36 @@ if ($logoUrl !== '') {
             $drawing->setHeight(52);
             $drawing->setOffsetX(8);
             $drawing->setOffsetY(6);
+            $drawing->setWorksheet($sheet);
+        } catch (Exception $e) {
+        }
+    }
+}
+
+$logoPrestoUrl = 'https://webpresto.com.br/images/logo_rel.png';
+if ($logoPrestoUrl !== '') {
+    $tmpFile = null;
+    try {
+        $imgBin = @file_get_contents($logoPrestoUrl);
+        if ($imgBin !== false && $imgBin !== '') {
+            $tmpFile = tempnam(sys_get_temp_dir(), 'presto_logo_rel_');
+            $tmpPng = $tmpFile . '.png';
+            @file_put_contents($tmpPng, $imgBin);
+            $tmpFile = $tmpPng;
+        }
+    } catch (Exception $e) {
+        $tmpFile = null;
+    }
+
+    if ($tmpFile && is_file($tmpFile)) {
+        try {
+            $drawing = new Drawing();
+            $drawing->setName('Logo Presto');
+            $drawing->setPath($tmpFile);
+            $drawing->setCoordinates('K1');
+            $drawing->setHeight(40);
+            $drawing->setOffsetX(10);
+            $drawing->setOffsetY(10);
             $drawing->setWorksheet($sheet);
         } catch (Exception $e) {
         }
@@ -759,6 +794,55 @@ $finalRow = $dtRow + 1;
 $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
 $sheet->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
 $sheet->getPageSetup()->setPrintArea('A1:L' . $finalRow);
+
+$mapImage = trim((string)$mapImage);
+if ($mapImage !== '') {
+    $data = $mapImage;
+    if (stripos($data, 'base64,') !== false) {
+        $data = substr($data, strpos($data, 'base64,') + 7);
+    }
+    $bin = base64_decode($data, true);
+    if ($bin !== false && $bin !== '') {
+        $tmp = tempnam(sys_get_temp_dir(), 'presto_map_');
+        $tmpPng = $tmp ? ($tmp . '.png') : null;
+        if ($tmpPng) {
+            @file_put_contents($tmpPng, $bin);
+            if (is_file($tmpPng) && filesize($tmpPng) > 1000) {
+                try {
+                    $sheet2 = $spreadsheet->createSheet();
+                    $sheet2->setTitle('Rota');
+                    $sheet2->getDefaultRowDimension()->setRowHeight(16);
+                    $sheet2->getColumnDimension('A')->setWidth(18);
+                    $sheet2->getColumnDimension('B')->setWidth(18);
+                    $sheet2->getColumnDimension('C')->setWidth(18);
+                    $sheet2->getColumnDimension('D')->setWidth(18);
+                    $sheet2->getColumnDimension('E')->setWidth(18);
+                    $sheet2->getColumnDimension('F')->setWidth(18);
+                    $sheet2->mergeCells('A1:F1');
+                    $sheet2->setCellValue('A1', 'ROTA');
+                    $sheet2->getStyle('A1:F1')->applyFromArray($styleDarkBarCenter);
+                    $sheet2->mergeCells('A2:F2');
+                    $sheet2->setCellValue('A2', $rotaTxt);
+                    $sheet2->getStyle('A2:F2')->applyFromArray($styleValue);
+
+                    $drawing = new Drawing();
+                    $drawing->setName('Mapa Rota');
+                    $drawing->setPath($tmpPng);
+                    $drawing->setCoordinates('A4');
+                    $drawing->setHeight(430);
+                    $drawing->setOffsetX(5);
+                    $drawing->setOffsetY(5);
+                    $drawing->setWorksheet($sheet2);
+
+                    $sheet2->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
+                    $sheet2->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
+                    $sheet2->getPageSetup()->setPrintArea('A1:F32');
+                } catch (Exception $e) {
+                }
+            }
+        }
+    }
+}
 
 $filename = 'ordem_carregamento_' . ($seqCar > 0 ? $seqCar : $placa) . '.xlsx';
 
