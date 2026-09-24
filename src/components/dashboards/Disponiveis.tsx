@@ -1458,6 +1458,10 @@ interface CarregamentoAreaProps {
   sigla: string;
   carregamentos: Carregamento[];
   loadingCarregamentos: boolean;
+  carregamentosTransferOpen: boolean;
+  setCarregamentosTransferOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  carregamentosEntregaOpen: boolean;
+  setCarregamentosEntregaOpen: React.Dispatch<React.SetStateAction<boolean>>;
   carregamentosCalendario: Carregamento[];
   loadingCarregamentosCalendario: boolean;
   linhasOrigem: LinhaCarregamento[];
@@ -5511,6 +5515,10 @@ function CarregamentoArea({
   sigla,
   carregamentos,
   loadingCarregamentos,
+  carregamentosTransferOpen,
+  setCarregamentosTransferOpen,
+  carregamentosEntregaOpen,
+  setCarregamentosEntregaOpen,
   carregamentosCalendario,
   loadingCarregamentosCalendario,
   linhasOrigem,
@@ -5549,8 +5557,6 @@ function CarregamentoArea({
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
-  const [carregamentosTransferOpen, setCarregamentosTransferOpen] = useState(true);
-  const [carregamentosEntregaOpen, setCarregamentosEntregaOpen] = useState(true);
   const tooltipStyle = useTooltipStyle();
   const isEntregaCarregamento = useCallback((c: Carregamento) => {
     const modo = String((c as any)?.modo_carregamento ?? (c as any)?.modoCarregamento ?? '').trim().toUpperCase();
@@ -5655,6 +5661,7 @@ function CarregamentoArea({
   };
 
   const [calOpen, setCalOpen] = useState(false);
+  const [calTipo, setCalTipo] = useState<'todos' | 'transferencia' | 'entrega'>('todos');
   const [diaSel, setDiaSel] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -5773,14 +5780,20 @@ function CarregamentoArea({
     return `${h}h${String(m).padStart(2, '0')}`;
   };
 
-  const calNorm = React.useMemo(() => {
+  const calList = React.useMemo(() => {
     const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
-    return list.map((c) => {
+    if (calTipo === 'todos') return list;
+    if (calTipo === 'entrega') return list.filter((c) => isEntregaCarregamento(c));
+    return list.filter((c) => !isEntregaCarregamento(c));
+  }, [carregamentosCalendario, calTipo, isEntregaCarregamento]);
+
+  const calNorm = React.useMemo(() => {
+    return calList.map((c) => {
       const iniKey = toKey((c as any).data_criacao);
       const fimKey = toKey((c as any).data_finalizacao);
       return { c, iniKey, fimKey };
     });
-  }, [carregamentosCalendario]);
+  }, [calList]);
 
   const isPresentOnDay = (x: { iniKey: string; fimKey: string }, dayKey: string): boolean => {
     if (!x.iniKey) return false;
@@ -6106,6 +6119,33 @@ function CarregamentoArea({
             <CalendarDays className="w-4 h-4 text-indigo-500" />
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Calendário de carregamentos</h3>
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs">30 dias</Badge>
+            <div
+              className="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className={`h-7 px-2 text-[11px] font-semibold ${calTipo === 'transferencia' ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                onClick={() => setCalTipo('transferencia')}
+              >
+                Transferência
+              </button>
+              <button
+                type="button"
+                className={`h-7 px-2 text-[11px] font-semibold border-l border-slate-200 dark:border-slate-700 ${calTipo === 'entrega' ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                onClick={() => setCalTipo('entrega')}
+              >
+                Entrega
+              </button>
+              <button
+                type="button"
+                className={`h-7 px-2 text-[11px] font-semibold border-l border-slate-200 dark:border-slate-700 ${calTipo === 'todos' ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                onClick={() => setCalTipo('todos')}
+              >
+                Todos
+              </button>
+            </div>
             {loadingCarregamentosCalendario ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : null}
           </div>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${calOpen ? 'rotate-180' : ''}`} />
@@ -7044,6 +7084,8 @@ export function Disponiveis() {
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const [obrigarPlacasReais, setObrigarPlacasReais] = useState(false);
+  const [carregamentosTransferOpen, setCarregamentosTransferOpen] = useState(false);
+  const [carregamentosEntregaOpen, setCarregamentosEntregaOpen] = useState(false);
   const obrigarPlacasReaisRef = useRef(false);
   useEffect(() => { obrigarPlacasReaisRef.current = obrigarPlacasReais; }, [obrigarPlacasReais]);
   const importandoCarregamentosRef = useRef(false);
@@ -7394,10 +7436,11 @@ export function Disponiveis() {
   useEffect(() => {
     if (!painelAtivo) return;
     if (abaAtiva === 'entrega') return;
+    if (!carregamentosTransferOpen) return;
     if (!importacaoAutomatica) return;
     const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 300000);
     return () => clearInterval(id);
-  }, [abaAtiva, painelAtivo, importacaoAutomatica, handleImportarCarregamentos]);
+  }, [abaAtiva, painelAtivo, carregamentosTransferOpen, importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {
@@ -8165,12 +8208,14 @@ export function Disponiveis() {
     if (!sigla) return;
     setLoadingInicial(true);
     try {
-      await importarCarregamentosSSWObrigatorio();
+      if (carregamentosTransferOpen) {
+        await importarCarregamentosSSWObrigatorio();
+      }
       await carregar();
     } finally {
       setLoadingInicial(false);
     }
-  }, [sigla, importarCarregamentosSSWObrigatorio, carregar]);
+  }, [sigla, carregamentosTransferOpen, importarCarregamentosSSWObrigatorio, carregar]);
 
   const verificarSaidasEmViagem = useCallback(async () => {
     try {
@@ -9903,6 +9948,10 @@ export function Disponiveis() {
             sigla={sigla}
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
+            carregamentosTransferOpen={carregamentosTransferOpen}
+            setCarregamentosTransferOpen={setCarregamentosTransferOpen}
+            carregamentosEntregaOpen={carregamentosEntregaOpen}
+            setCarregamentosEntregaOpen={setCarregamentosEntregaOpen}
             carregamentosCalendario={carregamentosCalendario}
             loadingCarregamentosCalendario={loadingCarregamentosCalendario}
             linhasOrigem={linhasOrigem}
