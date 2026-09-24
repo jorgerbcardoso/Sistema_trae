@@ -2285,8 +2285,18 @@ function CardCarregamento({
 
   const unidadesReais = (() => {
     if (carregamento.ctes.length === 0) {
-      const d = String(destino || '').trim().toUpperCase();
-      return d && /^[A-Z0-9]{2,5}$/.test(d) ? [d] : [];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const u of todasUnidades) {
+        const x = String(u ?? '').trim().toUpperCase();
+        if (!x || !/^[A-Z0-9]{2,5}$/.test(x)) continue;
+        if (seen.has(x)) continue;
+        seen.add(x);
+        out.push(x);
+      }
+      const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
+      if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
+      return out;
     }
     const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
     if (destinosCard) {
