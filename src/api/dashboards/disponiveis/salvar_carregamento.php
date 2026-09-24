@@ -2029,4 +2029,138 @@ if ($acao === 'atualizar_ctes_ssw') {
     ]);
 }
 
+// ─── Ação: fundir carregamentos de entrega (juntar setores em um único carregamento) ───
+if ($acao === 'fundir_entrega') {
+    $placaOrig = strtoupper(trim((string)($input['placa_origem'] ?? '')));
+    $placaDest = strtoupper(trim((string)($input['placa_destino'] ?? '')));
+
+    if ($placaOrig === '' || $placaDest === '' || $placaOrig === $placaDest) {
+        respondJson(['success' => false, 'message' => 'Placas inválidas para fusão.']);
+    }
+
+    $resDest = sql(
+        "SELECT seq_carregamento, COALESCE(setores_entrega, '') AS setores_entrega, COALESCE(destino, '') AS destino
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND UPPER(placa_provisoria) = UPPER(\$2)
+           AND data_finalizacao IS NULL
+         ORDER BY data_inclusao ASC, hora_inclusao ASC
+         LIMIT 1",
+        [$unidade, $placaDest],
+        $conn
+    );
+    $resOrig = sql(
+        "SELECT seq_carregamento, COALESCE(setores_entrega, '') AS setores_entrega, COALESCE(destino, '') AS destino
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND UPPER(placa_provisoria) = UPPER(\$2)
+           AND data_finalizacao IS NULL
+         ORDER BY data_inclusao ASC, hora_inclusao ASC
+         LIMIT 1",
+        [$unidade, $placaOrig],
+        $conn
+    );
+
+    if (!$resDest || pg_num_rows($resDest) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento de destino não encontrado (ou finalizado).']);
+    }
+    if (!$resOrig || pg_num_rows($resOrig) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento de origem não encontrado (ou finalizado).']);
+    }
+
+    $rowDest = pg_fetch_assoc($resDest);
+    $rowOrig = pg_fetch_assoc($resOrig);
+    $seqDest = (int)($rowDest['seq_carregamento'] ?? 0);
+    $seqOrig = (int)($rowOrig['seq_carregamento'] ?? 0);
+    if ($seqDest <= 0 || $seqOrig <= 0) {
+        respondJson(['success' => false, 'message' => 'seq_carregamento inválido para fusão.']);
+    }
+
+    $destinoDest = strtoupper(trim((string)($rowDest['destino'] ?? '')));
+    $destinoOrig = strtoupper(trim((string)($rowOrig['destino'] ?? '')));
+    $setDest = strtoupper(trim((string)($rowDest['setores_entrega'] ?? '')));
+    $setOrig = strtoupper(trim((string)($rowOrig['setores_entrega'] ?? '')));
+
+    $isEntregaDest = ($destinoDest === '' && $setDest !== '');
+    $isEntregaOrig = ($destinoOrig === '' && $setOrig !== '');
+    if (!$isEntregaDest || !$isEntregaOrig) {
+        respondJson(['success' => false, 'message' => 'Fusão permitida apenas entre carregamentos de entrega.']);
+    }
+
+    $setores = array_values(array_unique(array_merge(parseCsvSiglas($setDest), parseCsvSiglas($setOrig))));
+    $setoresCsv = implode(',', $setores);
+
+    pg_query($conn, 'BEGIN');
+    try {
+        $moved = 0;
+
+        @pg_query_params(
+            $conn,
+            "DELETE FROM {$tabela} o
+             USING {$tabela} d
+             WHERE o.unidade = \$1
+               AND UPPER(o.placa_provisoria) = UPPER(\$2)
+               AND o.data_finalizacao IS NULL
+               AND o.nro_cte <> 0
+               AND d.unidade = \$1
+               AND UPPER(d.placa_provisoria) = UPPER(\$3)
+               AND d.data_finalizacao IS NULL
+               AND COALESCE(UPPER(o.ser_cte), '') = COALESCE(UPPER(d.ser_cte), '')
+               AND o.nro_cte = d.nro_cte",
+            [$unidade, $placaOrig, $placaDest]
+        );
+
+        $up = @pg_query_params(
+            $conn,
+            "UPDATE {$tabela}
+             SET placa_provisoria = \$1,
+                 seq_carregamento = \$2,
+                 setores_entrega = \$3,
+                 destino = '',
+                 unidades = ''
+             WHERE unidade = \$4
+               AND UPPER(placa_provisoria) = UPPER(\$5)
+               AND data_finalizacao IS NULL
+               AND nro_cte <> 0",
+            [$placaDest, $seqDest, $setoresCsv, $unidade, $placaOrig]
+        );
+        if ($up) $moved = pg_affected_rows($up);
+
+        @pg_query_params(
+            $conn,
+            "DELETE FROM {$tabela}
+             WHERE unidade = \$1
+               AND UPPER(placa_provisoria) = UPPER(\$2)
+               AND data_finalizacao IS NULL",
+            [$unidade, $placaOrig]
+        );
+
+        @pg_query_params(
+            $conn,
+            "UPDATE {$tabela}
+             SET setores_entrega = \$1,
+                 destino = '',
+                 unidades = ''
+             WHERE unidade = \$2
+               AND UPPER(placa_provisoria) = UPPER(\$3)
+               AND data_finalizacao IS NULL",
+            [$setoresCsv, $unidade, $placaDest]
+        );
+
+        @pg_query_params(
+            $conn,
+            "DELETE FROM {$tabelaCap}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2",
+            [$unidade, $seqOrig]
+        );
+
+        pg_query($conn, 'COMMIT');
+        respondJson(['success' => true, 'moved' => $moved, 'setores' => $setoresCsv]);
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao fundir carregamentos.']);
+    }
+}
+
 respondJson(['success' => false, 'message' => 'Ação inválida.']);

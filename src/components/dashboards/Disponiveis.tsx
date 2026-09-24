@@ -1826,6 +1826,7 @@ function CardCarregamento({
   todosCtes,
   cteKeysDisponiveisTransferencia,
   cteKeysDisponiveisEntrega,
+  veiculoCapacidades,
   modoApontamento,
   confirmar,
   onIniciarApontamento,
@@ -1845,6 +1846,7 @@ function CardCarregamento({
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   cteKeysDisponiveisTransferencia: Set<string>;
   cteKeysDisponiveisEntrega: Set<string>;
+  veiculoCapacidades?: { tipo: string; capacidade_ton: number; capacidade_m3: number }[];
   modoApontamento: string | null;
   confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
   onIniciarApontamento: (placa: string) => void;
@@ -2444,7 +2446,12 @@ function CardCarregamento({
   const isAdiado = Boolean((carregamento as any).adiado);
 
   const isSimulado = Boolean((carregamento as any).simulado);
-  const carregamentoIniciado = !isSimulado && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
+  const modoDeclarado = String((carregamento as any).modo_carregamento ?? '').trim().toUpperCase();
+  const setoresEntrega = String((carregamento as any).setores_entrega ?? '').trim();
+  const isEntregaCarreg = modoDeclarado === 'ENTREGA' || (setoresEntrega !== '' && String(carregamento.destino ?? '').trim() === '');
+  const isTransferCarreg = modoDeclarado === 'TRANSFERENCIA' || (!isEntregaCarreg && !setoresEntrega);
+
+  const carregamentoIniciado = !isSimulado && !isEntregaCarreg && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
 
   const tipoCounts = useMemo(() => {
     const un = (unidadeAtual ?? '').trim().toUpperCase();
@@ -2459,11 +2466,34 @@ function CardCarregamento({
     return { entrega, transf };
   }, [carregamento.ctes, unidadeAtual]);
 
-  const temEntrega = tipoCounts.entrega > 0;
-  const temTransferencia = tipoCounts.transf > 0;
-  const dominante = (temEntrega || temTransferencia)
-    ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
-    : (carregamentoIniciado ? 'TRANSFERENCIA' : null);
+  const temEntrega = isEntregaCarreg || tipoCounts.entrega > 0;
+  const temTransferencia = (!isEntregaCarreg && (isTransferCarreg || tipoCounts.transf > 0));
+  const dominante = isEntregaCarreg
+    ? 'ENTREGA'
+    : temEntrega || temTransferencia
+      ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
+      : (carregamentoIniciado ? 'TRANSFERENCIA' : null);
+
+  const sugestaoVeiculo = useMemo(() => {
+    if (!isEntregaCarreg) return null;
+    const caps = Array.isArray(veiculoCapacidades) ? veiculoCapacidades : [];
+    if (caps.length === 0) return null;
+    const pesoTon = (Number(totalPeso) || 0) / 1000;
+    const cub = Number(totalCubagem) || 0;
+    if (pesoTon <= 0 && cub <= 0) return null;
+    const norm = caps
+      .map((c) => ({
+        tipo: String(c.tipo ?? '').trim(),
+        ton: Number((c as any).capacidade_ton ?? (c as any).ton ?? 0) || 0,
+        m3: Number((c as any).capacidade_m3 ?? (c as any).m3 ?? 0) || 0,
+      }))
+      .filter((c) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
+      .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
+    if (norm.length === 0) return null;
+    const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
+    if (ok) return ok.tipo;
+    return `Acima de ${norm[norm.length - 1].tipo}`;
+  }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
 
   const bordaBaseClass = isSimulado
     ? 'border-orange-300 dark:border-orange-800'
@@ -2612,6 +2642,14 @@ function CardCarregamento({
                   Entrega
                 </Badge>
               ) : null}
+              {sugestaoVeiculo ? (
+                <Badge
+                  className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-5 px-2"
+                  title="Tipo de veículo sugerido pela capacidade configurada"
+                >
+                  Veículo: <span className="font-mono font-semibold ml-1">{sugestaoVeiculo}</span>
+                </Badge>
+              ) : null}
             </div>
             <BarraCapacidade
               valor={totalPeso / 1000}
@@ -2675,7 +2713,7 @@ function CardCarregamento({
               <X className="w-3.5 h-3.5 mr-1" />Canc.
             </Button>
           )}
-          {!!(carregamento as any).simulado ? (
+          {!!(carregamento as any).simulado && !isEntregaCarreg ? (
             <Button
               size="sm"
               className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs"
@@ -5726,6 +5764,57 @@ function CarregamentoArea({
     void loadCapacidades();
   }, [capDialogOpen]);
 
+  useEffect(() => {
+    if (!carregamentosEntregaOpen) return;
+    if (capLoading) return;
+    if (capItems.length > 0) return;
+    void loadCapacidades();
+  }, [carregamentosEntregaOpen, capLoading, capItems.length]);
+
+  const veiculoCapacidades = React.useMemo(() => {
+    return capItems
+      .map((it) => ({
+        tipo: String(it.tipo ?? '').trim(),
+        capacidade_ton: Number(String(it.capacidade_ton ?? '').replace(',', '.')) || 0,
+        capacidade_m3: Number(String(it.capacidade_m3 ?? '').replace(',', '.')) || 0,
+      }))
+      .filter((it) => !!it.tipo);
+  }, [capItems]);
+
+  const [dragEntregaOrigem, setDragEntregaOrigem] = useState<string | null>(null);
+  const [dragEntregaOver, setDragEntregaOver] = useState<string | null>(null);
+
+  const fundirEntrega = async (placaOrig: string, placaDest: string) => {
+    const orig = String(placaOrig ?? '').trim().toUpperCase();
+    const dest = String(placaDest ?? '').trim().toUpperCase();
+    if (!orig || !dest || orig === dest) return;
+
+    const ok = await confirmar({
+      title: 'Fundir carregamentos de entrega?',
+      description: `Mover os CT-es do carregamento ${orig} para ${dest} (juntando setores)?`,
+      confirmText: 'Fundir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'fundir_entrega', placa_origem: orig, placa_destino: dest }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message || 'Erro ao fundir carregamentos.');
+        return;
+      }
+      toast.success(`Carregamentos fundidos. Setores: ${String(res.setores ?? '').trim() || '-'}`);
+      await onRecarregarCarregamentos();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao fundir carregamentos.');
+    }
+  };
+
   const handleExcluirTodos = async () => {
     const ok = await confirmar({
       title: 'Finalizar todos os carregamentos?',
@@ -6843,6 +6932,7 @@ function CarregamentoArea({
                     todosCtes={todosCtes}
                     cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
                     cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+                    veiculoCapacidades={undefined}
                     modoApontamento={modoApontamento}
                     confirmar={confirmar}
                     onIniciarApontamento={onIniciarApontamento}
@@ -6912,6 +7002,9 @@ function CarregamentoArea({
               >
                 <Gauge className="w-3.5 h-3.5 mr-1.5" />Ajustar capacidades
               </Button>
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-8 px-2 flex items-center">
+                Arraste um card e solte em outro para juntar setores
+              </Badge>
             </div>
 
             {carregamentosEntrega.length === 0 && !loadingCarregamentos ? (
@@ -6923,27 +7016,61 @@ function CarregamentoArea({
             ) : (
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {carregamentosEntrega.map((c, i) => (
-                  <CardCarregamento
+                  <div
                     key={i}
-                    carregamento={c}
-                    unidadeAtual={sigla}
-                    todosCtes={todosCtes}
-                    cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
-                    cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
-                    modoApontamento={modoApontamento}
-                    confirmar={confirmar}
-                    onIniciarApontamento={onIniciarApontamento}
-                    onCancelarApontamento={onCancelarApontamento}
-                    onExcluirCarregamento={onExcluirCarregamento}
-                    onRemoverCte={onRemoverCte}
-                    onCarregarSSW={onCarregarSSW}
-                    onCarregarRota={onCarregarRota}
-                    loadingRota={loadingRota}
-                    rotaCarregamentoPlaca={rotaCarregamentoPlaca}
-                    onRecarregarCarregamentos={onRecarregarCarregamentos}
-                    onImportarCarregamentos={onImportarCarregamentos}
-                    importandoCarregamentos={importandoCarregamentos}
-                  />
+                    draggable
+                    onDragStart={(e) => {
+                      const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                      setDragEntregaOrigem(placa || null);
+                      setDragEntregaOver(null);
+                      try { e.dataTransfer.setData('text/plain', placa); } catch {}
+                      try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+                    }}
+                    onDragEnd={() => {
+                      setDragEntregaOrigem(null);
+                      setDragEntregaOver(null);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                      if (!placa) return;
+                      if (dragEntregaOrigem && placa !== dragEntregaOrigem) setDragEntregaOver(placa);
+                    }}
+                    onDragLeave={() => setDragEntregaOver(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const placaDest = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                      const placaOrig = String(dragEntregaOrigem ?? '').trim().toUpperCase() || String(e.dataTransfer.getData('text/plain') ?? '').trim().toUpperCase();
+                      setDragEntregaOver(null);
+                      setDragEntregaOrigem(null);
+                      if (!placaOrig || !placaDest || placaOrig === placaDest) return;
+                      void fundirEntrega(placaOrig, placaDest);
+                    }}
+                    className={dragEntregaOver && String(c.placa_provisoria ?? '').trim().toUpperCase() === dragEntregaOver ? 'ring-2 ring-emerald-400 rounded-xl' : ''}
+                    title="Arraste e solte sobre outro carregamento para juntar setores"
+                  >
+                    <CardCarregamento
+                      carregamento={c}
+                      unidadeAtual={sigla}
+                      todosCtes={todosCtes}
+                      cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+                      cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+                      veiculoCapacidades={veiculoCapacidades}
+                      modoApontamento={modoApontamento}
+                      confirmar={confirmar}
+                      onIniciarApontamento={onIniciarApontamento}
+                      onCancelarApontamento={onCancelarApontamento}
+                      onExcluirCarregamento={onExcluirCarregamento}
+                      onRemoverCte={onRemoverCte}
+                      onCarregarSSW={onCarregarSSW}
+                      onCarregarRota={onCarregarRota}
+                      loadingRota={loadingRota}
+                      rotaCarregamentoPlaca={rotaCarregamentoPlaca}
+                      onRecarregarCarregamentos={onRecarregarCarregamentos}
+                      onImportarCarregamentos={onImportarCarregamentos}
+                      importandoCarregamentos={importandoCarregamentos}
+                    />
+                  </div>
                 ))}
               </div>
             )}
