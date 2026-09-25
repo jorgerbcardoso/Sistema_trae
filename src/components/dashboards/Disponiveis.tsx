@@ -2936,7 +2936,7 @@ function CardCarregamento({
         </DialogContent>
       </Dialog>
       <Dialog open={cteDetalheDialogOpen} onOpenChange={setCteDetalheDialogOpen}>
-        <DialogContent className="w-[96vw] max-w-6xl h-[82vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+        <DialogContent className="w-[96vw] max-w-7xl h-[82vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
               <DialogTitle>
@@ -3020,7 +3020,7 @@ function CardCarregamento({
 
           <div className="grid grid-rows-[minmax(0,1fr)_auto] gap-3 min-h-0 overflow-hidden">
             <div className="rounded-lg border border-slate-200 dark:border-slate-800 grid grid-rows-[auto_minmax(0,1fr)] min-h-0 overflow-hidden">
-              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <input
                   type="checkbox"
                   className="self-center"
@@ -3086,7 +3086,7 @@ function CardCarregamento({
                       return (
                       <div
                         key={idx}
-                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
                       >
                         <input
                           type="checkbox"
@@ -3136,7 +3136,7 @@ function CardCarregamento({
             </div>
 
             {cteDetalheTotais && (
-              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(320px,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+              <div className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shrink-0">
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheSelecionados.size > 0 ? `${cteDetalheSelecionados.size} selecionado(s)` : ''}</span>
                 <span className="text-slate-500 dark:text-slate-400">{cteDetalheLista.length} CT-es</span>
                 <span />
