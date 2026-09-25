@@ -454,6 +454,11 @@ export function CondicaoArmazens() {
     });
   }, [rows, busca]);
 
+  const rowsDashboard = useMemo(() => {
+    if (busca.trim()) return viewRows;
+    return rows;
+  }, [busca, viewRows, rows]);
+
   const exportarCSV = () => {
     const lista = viewRows;
     if (!lista.length) {
@@ -583,7 +588,7 @@ export function CondicaoArmazens() {
   };
 
   const totais = useMemo(() => {
-    if (summary) {
+    if (summary && !busca.trim()) {
       return {
         total: summary.total,
         agendados: summary.agendados,
@@ -599,23 +604,23 @@ export function CondicaoArmazens() {
         avgHorasUltOcor: summary.avg_horas_ult_ocor,
       };
     }
-    const total = rows.length;
-    const agendados = rows.filter((r) => r.agendado).length;
-    const atrasoPrev = rows.filter((r) => (r.dias_atraso_prev ?? 0) > 0).length;
-    const parados4 = rows.filter((r) => (r.dias_armazem ?? 0) >= 4).length;
-    const parados8 = rows.filter((r) => (r.dias_armazem ?? 0) >= 8).length;
-    const pendCliente = rows.filter((r) => (r.ult_ocor_tipo ?? '').toUpperCase() === 'C').length;
-    const pendTransp = rows.filter((r) => (r.ult_ocor_tipo ?? '').toUpperCase() === 'P').length;
-    const semOcorrencia = rows.filter((r) => (r.ult_ocor_codigo ?? 0) === 0 || r.ult_ocor_codigo === null).length;
-    const totalVlrMerc = rows.reduce((s, r) => s + (r.vlr_merc ?? 0), 0);
-    const totalVlrFrete = rows.reduce((s, r) => s + (r.vlr_frete ?? 0), 0);
-    const avgDias = total > 0 ? rows.reduce((s, r) => s + (r.dias_armazem ?? 0), 0) / total : 0;
-    const avgHorasUltOcor = total > 0 ? rows.reduce((s, r) => s + (r.horas_desde_ult_ocor ?? 0), 0) / total : 0;
+    const total = rowsDashboard.length;
+    const agendados = rowsDashboard.filter((r) => r.agendado).length;
+    const atrasoPrev = rowsDashboard.filter((r) => (r.dias_atraso_prev ?? 0) > 0).length;
+    const parados4 = rowsDashboard.filter((r) => (r.dias_armazem ?? 0) >= 4).length;
+    const parados8 = rowsDashboard.filter((r) => (r.dias_armazem ?? 0) >= 8).length;
+    const pendCliente = rowsDashboard.filter((r) => (r.ult_ocor_tipo ?? '').toUpperCase() === 'C').length;
+    const pendTransp = rowsDashboard.filter((r) => (r.ult_ocor_tipo ?? '').toUpperCase() === 'P').length;
+    const semOcorrencia = rowsDashboard.filter((r) => (r.ult_ocor_codigo ?? 0) === 0 || r.ult_ocor_codigo === null).length;
+    const totalVlrMerc = rowsDashboard.reduce((s, r) => s + (r.vlr_merc ?? 0), 0);
+    const totalVlrFrete = rowsDashboard.reduce((s, r) => s + (r.vlr_frete ?? 0), 0);
+    const avgDias = total > 0 ? rowsDashboard.reduce((s, r) => s + (r.dias_armazem ?? 0), 0) / total : 0;
+    const avgHorasUltOcor = total > 0 ? rowsDashboard.reduce((s, r) => s + (r.horas_desde_ult_ocor ?? 0), 0) / total : 0;
     return { total, agendados, atrasoPrev, parados4, parados8, pendCliente, pendTransp, semOcorrencia, totalVlrMerc, totalVlrFrete, avgDias, avgHorasUltOcor };
-  }, [rows, summary]);
+  }, [rowsDashboard, summary, busca]);
 
   const buckets = useMemo(() => {
-    if (unitStats.length > 0) {
+    if (unitStats.length > 0 && !busca.trim()) {
       return [...unitStats]
         .map((u) => ({
           unidade: u.unid_atual || '—',
@@ -632,7 +637,7 @@ export function CondicaoArmazens() {
 
     const init = { '0-1': 0, '2-3': 0, '4-7': 0, '8-15': 0, '16+': 0 };
     const byUnid: Record<string, typeof init> = {};
-    rows.forEach((r) => {
+    rowsDashboard.forEach((r) => {
       const un = String(r.unid_atual ?? '').trim().toUpperCase() || '—';
       const d = r.dias_armazem ?? 0;
       const bucket = d <= 1 ? '0-1' : d <= 3 ? '2-3' : d <= 7 ? '4-7' : d <= 15 ? '8-15' : '16+';
@@ -643,7 +648,7 @@ export function CondicaoArmazens() {
       .map(([unidade, b]) => ({ unidade, ...b, total: (b['0-1'] + b['2-3'] + b['4-7'] + b['8-15'] + b['16+']) }))
       .sort((a, b) => (b.total ?? 0) - (a.total ?? 0))
       .slice(0, 18);
-  }, [rows, unitStats]);
+  }, [rowsDashboard, unitStats, busca]);
 
   const pieMotivos = useMemo(() => {
     const label = (tipoKey: string) => {
@@ -651,7 +656,7 @@ export function CondicaoArmazens() {
       if (!t || t === '—') return 'Sem tipo';
       return TIPOS_OCOR[t]?.label ?? t;
     };
-    if (unitMotivos.length > 0) {
+    if (unitMotivos.length > 0 && !busca.trim()) {
       const counts: Record<string, number> = {};
       unitMotivos.forEach((m) => {
         const t = String(m.tipo ?? '').trim().toUpperCase() || '—';
@@ -663,7 +668,7 @@ export function CondicaoArmazens() {
         .slice(0, 10);
     }
     const counts: Record<string, number> = {};
-    rows.forEach((r) => {
+    rowsDashboard.forEach((r) => {
       const t = String(r.ult_ocor_tipo ?? '').trim().toUpperCase() || '—';
       counts[t] = (counts[t] ?? 0) + 1;
     });
@@ -671,11 +676,11 @@ export function CondicaoArmazens() {
       .map(([tipoKey, count]) => ({ tipoKey, tipo: label(tipoKey), count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-  }, [rows, unitMotivos]);
+  }, [rowsDashboard, unitMotivos, busca]);
 
   const topOcorrencias = useMemo(() => {
     const isPendencia = (t: string) => t === 'C' || t === 'P';
-    if (unitTopOcorrencias.length > 0) {
+    if (unitTopOcorrencias.length > 0 && !busca.trim()) {
       const counts: Record<string, { codigo: string; tipo: string; desc: string; count: number }> = {};
       unitTopOcorrencias.forEach((r) => {
         const cod = r.codigo ? String(r.codigo) : '';
@@ -691,7 +696,7 @@ export function CondicaoArmazens() {
       return Object.values(counts).sort((a, b) => b.count - a.count);
     }
     const counts: Record<string, { codigo: string; tipo: string; desc: string; count: number }> = {};
-    rows.forEach((r) => {
+    rowsDashboard.forEach((r) => {
       const cod = r.ult_ocor_codigo !== null ? String(r.ult_ocor_codigo) : '';
       if (!cod) return;
       const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
@@ -703,7 +708,7 @@ export function CondicaoArmazens() {
       counts[key].count += 1;
     });
     return Object.values(counts).sort((a, b) => b.count - a.count);
-  }, [rows, unitTopOcorrencias]);
+  }, [rowsDashboard, unitTopOcorrencias, busca]);
 
   const sortedRows = useMemo(() => {
     const copy = [...viewRows];
@@ -1301,6 +1306,12 @@ export function CondicaoArmazens() {
             <Input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                setPage(1);
+                setViewMode('lista');
+              }}
               placeholder="Buscar CT-e, unidade, pagador, ocorrência..."
               className="h-9 w-full lg:w-[420px] dark:bg-slate-900 dark:border-slate-700"
             />
