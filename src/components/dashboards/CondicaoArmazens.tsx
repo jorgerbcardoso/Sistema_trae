@@ -435,6 +435,7 @@ export function CondicaoArmazens() {
     if (!q) return rows;
     return rows.filter((r) => {
       const cte = fmtCte(r.ser_cte, r.nro_cte).toUpperCase();
+      const nfs = String((r as any).nfs ?? '');
       const campos = [
         String(r.unid_atual ?? ''),
         String(r.sigla_emit ?? ''),
@@ -442,6 +443,8 @@ export function CondicaoArmazens() {
         String(r.nome_emit ?? ''),
         String(r.nome_dest ?? ''),
         String(r.nome_pag ?? ''),
+        nfs,
+        nfs.replace(/[^0-9]/g, ''),
         String(r.ult_ocor_descricao ?? ''),
         String(r.ult_ocor_complemento ?? ''),
         String(r.ult_ocor_codigo ?? ''),

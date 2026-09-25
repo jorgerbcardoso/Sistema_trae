@@ -1335,7 +1335,7 @@ if ($acao === 'verificar_saidas_ssw') {
             if ($resQtd && pg_num_rows($resQtd) > 0) $qtdPresto = (int)pg_fetch_result($resQtd, 0, 0);
         } catch (Exception $e) {}
 
-        if ($cteTableOk && $qtdSsw > 0 && $qtdPresto !== $qtdSsw && count($manifestos) > 0) {
+        if (count($manifestos) > 0) {
             $toFloat = function ($v) {
                 $s = trim((string)$v);
                 if ($s === '') return 0.0;
@@ -1450,61 +1450,63 @@ if ($acao === 'verificar_saidas_ssw') {
                 }
 
                 if ($seqCarreg > 0) {
-                    $selDest = $cteCol('sigla_dest') ? "UPPER(BTRIM(cte.sigla_dest))" : "''";
-                    $joinCidade = $cteCol('seq_cidade_dest') ? "LEFT JOIN cidade cid_dest ON cte.seq_cidade_dest = cid_dest.seq_cidade" : "";
-                    $selCidade = $cteCol('seq_cidade_dest') ? "COALESCE(cid_dest.nome, '')" : "''";
-                    $selRemet = $cteCol('nome_emit') ? "COALESCE(cte.nome_emit, '')" : "''";
-                    $selDestinat = $cteCol('nome_dest') ? "COALESCE(cte.nome_dest, '')" : "''";
-                    $selPagador = $cteCol('nome_pag') ? "COALESCE(cte.nome_pag, '')" : "''";
-                    $selEmissao = $cteCol('data_emissao') ? "cte.data_emissao::date" : "NULL::date";
-                    $selPrev = $cteCol('data_prev_ent') ? "cte.data_prev_ent::date" : "NULL::date";
-                    $selMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, 0)" : "0";
-                    $selFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, 0)" : "0";
-                    $selPeso = $cteCol('peso_real') ? "COALESCE(cte.peso_real, 0)" : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, 0)" : "0");
-                    $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
-                    $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, 0)" : "0";
-
-                    $pairsArr = array_values($pairs);
                     $cteInfo = [];
-                    foreach (array_chunk($pairsArr, 400) as $chunk) {
-                        $params = [];
-                        $vals = [];
-                        $p = 1;
-                        foreach ($chunk as $it) {
-                            $vals[] = "($" . $p . ", $" . ($p + 1) . ")";
-                            $params[] = (string)$it['ser'];
-                            $params[] = (int)$it['nro'];
-                            $p += 2;
-                        }
-                        if (count($vals) === 0) continue;
-                        $q = "
-                            WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $vals) . ")
-                            SELECT
-                                req.ser_cte,
-                                req.nro_cte,
-                                {$selDest} AS destino_cte,
-                                {$selCidade} AS cidade_destino,
-                                {$selRemet} AS remetente,
-                                {$selDestinat} AS destinatario,
-                                {$selPagador} AS pagador,
-                                {$selEmissao} AS data_emissao,
-                                {$selPrev} AS data_prev_ent,
-                                {$selMerc} AS vlr_merc,
-                                {$selFrete} AS vlr_frete,
-                                {$selPeso} AS peso,
-                                {$selCub} AS cubagem,
-                                {$selVol} AS qtde_vol
-                            FROM req
-                            JOIN {$tblCte} cte
-                              ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
-                             AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
-                            {$joinCidade}
-                        ";
-                        $resC = @pg_query_params($conn, $q, $params);
-                        if ($resC) {
-                            while ($rowC = pg_fetch_assoc($resC)) {
-                                $k = (string)($rowC['ser_cte'] ?? '') . '|' . (int)($rowC['nro_cte'] ?? 0);
-                                $cteInfo[$k] = $rowC;
+                    if ($cteTableOk) {
+                        $selDest = $cteCol('sigla_dest') ? "UPPER(BTRIM(cte.sigla_dest))" : "''";
+                        $joinCidade = $cteCol('seq_cidade_dest') ? "LEFT JOIN cidade cid_dest ON cte.seq_cidade_dest = cid_dest.seq_cidade" : "";
+                        $selCidade = $cteCol('seq_cidade_dest') ? "COALESCE(cid_dest.nome, '')" : "''";
+                        $selRemet = $cteCol('nome_emit') ? "COALESCE(cte.nome_emit, '')" : "''";
+                        $selDestinat = $cteCol('nome_dest') ? "COALESCE(cte.nome_dest, '')" : "''";
+                        $selPagador = $cteCol('nome_pag') ? "COALESCE(cte.nome_pag, '')" : "''";
+                        $selEmissao = $cteCol('data_emissao') ? "cte.data_emissao::date" : "NULL::date";
+                        $selPrev = $cteCol('data_prev_ent') ? "cte.data_prev_ent::date" : "NULL::date";
+                        $selMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, 0)" : "0";
+                        $selFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, 0)" : "0";
+                        $selPeso = $cteCol('peso_real') ? "COALESCE(cte.peso_real, 0)" : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, 0)" : "0");
+                        $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
+                        $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, 0)" : "0";
+
+                        $pairsArr = array_values($pairs);
+                        foreach (array_chunk($pairsArr, 400) as $chunk) {
+                            $params = [];
+                            $vals = [];
+                            $p = 1;
+                            foreach ($chunk as $it) {
+                                $vals[] = "($" . $p . ", $" . ($p + 1) . ")";
+                                $params[] = (string)$it['ser'];
+                                $params[] = (int)$it['nro'];
+                                $p += 2;
+                            }
+                            if (count($vals) === 0) continue;
+                            $q = "
+                                WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $vals) . ")
+                                SELECT
+                                    req.ser_cte,
+                                    req.nro_cte,
+                                    {$selDest} AS destino_cte,
+                                    {$selCidade} AS cidade_destino,
+                                    {$selRemet} AS remetente,
+                                    {$selDestinat} AS destinatario,
+                                    {$selPagador} AS pagador,
+                                    {$selEmissao} AS data_emissao,
+                                    {$selPrev} AS data_prev_ent,
+                                    {$selMerc} AS vlr_merc,
+                                    {$selFrete} AS vlr_frete,
+                                    {$selPeso} AS peso,
+                                    {$selCub} AS cubagem,
+                                    {$selVol} AS qtde_vol
+                                FROM req
+                                JOIN {$tblCte} cte
+                                  ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
+                                 AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
+                                {$joinCidade}
+                            ";
+                            $resC = @pg_query_params($conn, $q, $params);
+                            if ($resC) {
+                                while ($rowC = pg_fetch_assoc($resC)) {
+                                    $k = (string)($rowC['ser_cte'] ?? '') . '|' . (int)($rowC['nro_cte'] ?? 0);
+                                    $cteInfo[$k] = $rowC;
+                                }
                             }
                         }
                     }
