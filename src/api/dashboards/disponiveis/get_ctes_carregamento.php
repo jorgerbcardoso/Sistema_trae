@@ -90,6 +90,9 @@ $conn = connect();
 $tabela = "{$domain}_carregamento";
 $tblCte = "{$domain}_cte";
 $cteTableOk = tabelaExisteCtesCarreg($conn, $tblCte);
+$domainUpper = strtoupper($domain);
+$tblCidParam = "{$domain}_cid_param";
+$cidParamOk = ($domainUpper === 'RVE') && $cteTableOk && tabelaExisteCtesCarreg($conn, $tblCidParam);
 $tblUnidade = getTabelaUnidadesDominioCtesCarreg($conn, $domain);
 $mapDestinoCompart = buildMapaDestinoCompartilhadoCtesCarreg($conn, $tblUnidade);
 
@@ -105,7 +108,9 @@ $joinCte = $cteTableOk
          ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
         AND cte.nro_cte = car.nro_cte"
     : "";
+$joinCidParam = $cidParamOk ? "LEFT JOIN {$tblCidParam} cidp ON cidp.seq_cidade = cte.seq_cidade_entr" : "";
 $selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";
+$selUnidFec = $cidParamOk ? "COALESCE(cidp.unidade, '') AS unidade_fec," : "'' AS unidade_fec,";
 
 $sql = "
     SELECT
@@ -115,6 +120,7 @@ $sql = "
         car.destino_cte,
         COALESCE(car.setor_cte, '') AS setor_cte,
         {$selNfs}
+        {$selUnidFec}
         TO_CHAR(
             CASE
                 WHEN car.data_emissao_cte IS NULL THEN NULL
@@ -160,6 +166,7 @@ $sql = "
         COALESCE(car.qtde_vol_cte, 0)   AS qtde_vol
     FROM {$tabela} car
     {$joinCte}
+    {$joinCidParam}
     WHERE {$whereSql}
       AND car.nro_cte > 0
       {$filtroSerieRve}
@@ -185,9 +192,11 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $qtdeVol  = (int)($row['qtde_vol'] ?? 0);
 
     $destOrig = strtoupper(trim($row['destino_cte'] ?? ''));
-    $destMain = $destOrig !== '' ? (string)($mapDestinoCompart[$destOrig] ?? $destOrig) : '';
+    $unidFec = strtoupper(trim((string)($row['unidade_fec'] ?? '')));
+    $destPainel = ($domainUpper === 'RVE' && $destOrig === 'FEC' && $unidFec !== '') ? $unidFec : $destOrig;
+    $destMain = $destPainel !== '' ? (string)($mapDestinoCompart[$destPainel] ?? $destPainel) : '';
     $destMain = strtoupper(trim((string)$destMain));
-    $destDisplay = ($destMain !== '' && $destOrig !== '' && $destMain !== $destOrig) ? ($destMain . ' (' . $destOrig . ')') : $destOrig;
+    $destDisplay = ($destMain !== '' && $destPainel !== '' && $destMain !== $destPainel) ? ($destMain . ' (' . $destPainel . ')') : $destPainel;
 
     $totFrete += $vlrFrete;
     $totPeso  += $pesoNum;
@@ -202,6 +211,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'data_emissao'  => $row['data_emissao'] ?? '',
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
         'sigla_dest'    => $destOrig,
+        'sigla_dest_painel' => $destPainel,
         'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
         'sigla_dest_principal' => $destMain,
         'sigla_dest_display' => $destDisplay,

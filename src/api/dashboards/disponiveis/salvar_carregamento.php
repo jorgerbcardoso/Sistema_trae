@@ -173,6 +173,33 @@ if ($acao === 'criar') {
         }
     }
 
+    pg_query($conn, 'BEGIN');
+    $dupKey = $unidade . '|' . $placa . '|' . $destino . '|' . $paradas . '|' . $setoresEntrega;
+    sql(
+        "SELECT pg_advisory_xact_lock((('x'||substr(md5(\$1),1,16))::bit(64)::bigint))",
+        [$dupKey],
+        $conn
+    );
+    $resDup = sql(
+        "SELECT seq_carregamento
+           FROM {$tabela}
+          WHERE unidade = \$1
+            AND placa_provisoria = \$2
+            AND COALESCE(destino, '') = \$3
+            AND COALESCE(unidades, '') = \$4
+            AND COALESCE(setores_entrega, '') = \$5
+            AND data_finalizacao IS NULL
+          ORDER BY seq_carregamento DESC
+          LIMIT 1",
+        [$unidade, $placa, $destino, $paradas, $setoresEntrega],
+        $conn
+    );
+    if ($resDup && pg_num_rows($resDup) > 0) {
+        $seqExist = (int)pg_fetch_result($resDup, 0, 0);
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => true, 'seq_carregamento' => $seqExist, 'duplicado' => true]);
+    }
+
     // Linha sentinela: nro_cte = 0 indica carregamento sem CT-es ainda
     $destinoSql = $destino !== '' ? "'" . pg_escape_string($conn, $destino) . "'" : 'NULL';
     $unidadesSql = $paradas !== '' ? "'" . pg_escape_string($conn, $paradas) . "'" : 'NULL';
@@ -180,6 +207,7 @@ if ($acao === 'criar') {
 
     $seqCarreg = nextSeqCarregamento($conn, $seqName);
     if ($seqCarreg <= 0) {
+        pg_query($conn, 'ROLLBACK');
         respondJson(['success' => false, 'message' => 'Erro ao gerar seq_carregamento.']);
     }
 
@@ -189,6 +217,7 @@ if ($acao === 'criar') {
     );
 
     if (!$res) {
+        pg_query($conn, 'ROLLBACK');
         respondJson(['success' => false, 'message' => 'Erro ao criar carregamento: ' . pg_last_error($conn)]);
     }
 
@@ -211,6 +240,7 @@ if ($acao === 'criar') {
          ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
     );
 
+    pg_query($conn, 'COMMIT');
     respondJson(['success' => true, 'seq_carregamento' => $seqCarreg]);
 }
 

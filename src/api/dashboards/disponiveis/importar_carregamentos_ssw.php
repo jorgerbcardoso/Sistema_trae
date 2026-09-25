@@ -983,6 +983,7 @@ foreach ($placas_ssw as $placa) {
     }
 
     $seqCarreg = 0;
+    $preservarCabecalhoRve = false;
     if ($seqCarregRveAgrupado > 0) {
         $seqCarreg = $seqCarregRveAgrupado;
     } else if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
@@ -1007,6 +1008,29 @@ foreach ($placas_ssw as $placa) {
     }
     $reaproveitandoPorPlaca = false;
     $origemCriacaoSalvar = 'SSW';
+    if ($seqCarregRveAgrupado > 0 && $seqCarreg > 0) {
+        $resOrig = sql(
+            "SELECT origem_criacao, placa_provisoria
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+             ORDER BY data_inclusao ASC, hora_inclusao ASC
+             LIMIT 1",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        if ($resOrig && pg_num_rows($resOrig) > 0) {
+            $rowOrig = pg_fetch_assoc($resOrig);
+            $tmpOrig = strtoupper(trim((string)($rowOrig['origem_criacao'] ?? '')));
+            if ($tmpOrig !== '') $origemCriacaoSalvar = $tmpOrig;
+            $tmpPlaca = strtoupper(trim((string)($rowOrig['placa_provisoria'] ?? '')));
+            if ($tmpPlaca !== '') $placaProvisoriaSalvar = $tmpPlaca;
+        }
+        $reaproveitandoPorPlaca = true;
+        if ($domainUpper === 'RVE' && $origemCriacaoSalvar === 'MANUAL') {
+            $preservarCabecalhoRve = true;
+        }
+    }
     if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
         $resSeqExist = sql(
             "SELECT cap.seq_carregamento,
@@ -1222,7 +1246,9 @@ foreach ($placas_ssw as $placa) {
 
     $destinoCarEsc = $destinoCar ? ("'" . pg_escape_string($conn, $destinoCar) . "'") : 'NULL';
     $unidadesCarEsc = ($unidadesCarCsv !== '') ? ("'" . pg_escape_string($conn, $unidadesCarCsv) . "'") : 'NULL';
-    $nroLinhaCarEsc = ($nroLinhaCar > 0) ? (string)$nroLinhaCar : 'NULL';
+    $nroLinhaCarEsc = ($preservarCabecalhoRve ? 'NULL' : (($nroLinhaCar > 0) ? (string)$nroLinhaCar : 'NULL'));
+    $destinoInsertEsc = $preservarCabecalhoRve ? 'NULL' : $destinoCarEsc;
+    $unidadesInsertEsc = $preservarCabecalhoRve ? 'NULL' : $unidadesCarEsc;
 
     pg_query($conn, 'BEGIN');
     try {
@@ -1254,8 +1280,8 @@ foreach ($placas_ssw as $placa) {
              SET placa_provisoria = '{$placaProvEsc}',
                  origem_ssw = '{$placaEsc}',
                  seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
-                 destino = {$destinoCarEsc},
-                 unidades = {$unidadesCarEsc},
+                 destino = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(destino, ''), {$destinoCarEsc})" : $destinoCarEsc) . ",
+                 unidades = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(unidades, ''), {$unidadesCarEsc})" : $unidadesCarEsc) . ",
                  origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
                  data_finalizacao = NULL,
                  hora_finalizacao = NULL,
@@ -1294,7 +1320,7 @@ foreach ($placas_ssw as $placa) {
                       nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      0, {$destinoCarEsc}, {$unidadesCarEsc}, '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
+                      0, {$destinoInsertEsc}, {$unidadesInsertEsc}, '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
                 );
                 if (!$resInsSent) throw new Exception(pg_last_error($conn));
             }
@@ -1328,8 +1354,8 @@ foreach ($placas_ssw as $placa) {
                          SET placa_provisoria = '{$placaProvEsc}',
                              origem_ssw = '{$placaEsc}',
                              seq_carregamento = " . ($seqCarregRveAgrupado > 0 ? (string)$seqCarreg : "CASE WHEN seq_carregamento IS NULL OR seq_carregamento = 0 THEN {$seqCarreg} ELSE seq_carregamento END") . ",
-                             destino = {$destinoCarEsc},
-                             unidades = {$unidadesCarEsc},
+                             destino = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(destino, ''), {$destinoCarEsc})" : $destinoCarEsc) . ",
+                             unidades = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(unidades, ''), {$unidadesCarEsc})" : $unidadesCarEsc) . ",
                              destino_cte = '{$destinoCte}',
                              data_emissao_cte = {$emissaoSql},
                              data_prev_ent_cte = {$prevEntSql},
@@ -1385,7 +1411,7 @@ foreach ($placas_ssw as $placa) {
                       origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
-                      {$destinoCarEsc}, {$unidadesCarEsc},
+                      {$destinoInsertEsc}, {$unidadesInsertEsc},
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},

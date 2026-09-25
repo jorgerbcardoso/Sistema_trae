@@ -2291,7 +2291,7 @@ function CardCarregamento({
   const unidadesComCtes = new Set<string>(
     carregamento.ctes
       .map((c) => {
-        const d = (c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
+        const d = ((c as any).destino_cte_painel ?? c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
         if (d) return d;
         const cidade = (c.cidade ?? '').trim().toUpperCase();
         if (cidade && /^[A-Z0-9]{2,5}$/.test(cidade)) return cidade;
@@ -2505,7 +2505,7 @@ function CardCarregamento({
     let entrega = 0;
     let transf = 0;
     for (const c of carregamento.ctes) {
-      const d = (c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
+      const d = ((c as any).destino_cte_painel ?? c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
       if (!d) continue;
       if (un && d === un) entrega += 1;
       else transf += 1;
@@ -2950,7 +2950,7 @@ function CardCarregamento({
               const valid = (u: string) => !!u && /^[A-Z0-9]{2,5}$/.test(u);
               const fromCtes = new Set(
                 (cteDetalheLista ?? [])
-                  .map((c) => String((c as any).sigla_dest ?? '').trim().toUpperCase())
+                  .map((c) => String((c as any).sigla_dest_painel ?? (c as any).sigla_dest ?? '').trim().toUpperCase())
                   .filter(valid)
               );
 
@@ -3118,7 +3118,7 @@ function CardCarregamento({
                             className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
                             title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
                           >
-                            {cte.sigla_dest ?? '-'}
+                            {(cte as any).sigla_dest_painel ?? cte.sigla_dest ?? '-'}
                           </span>
                         )}
                         <span className="self-center truncate text-slate-600 dark:text-slate-300">
@@ -4395,7 +4395,7 @@ function ModalRotaCarregamento({
     for (const c of ctes) {
       const ser = normKey(c?.ser_cte ?? '');
       const nro = Number(c?.nro_cte ?? 0);
-      const destinoCte = normKey(c?.destino_cte ?? '');
+      const destinoCte = normKey((c as any)?.destino_cte_painel ?? c?.destino_cte ?? '');
       const unidadeDestino = (isValidSigla(destinoCte) ? destinoCte : (unidadesOrdem[unidadesOrdem.length - 1] ?? ''));
 
       const endereco = normEnd(c?.endereco_entrega ?? '');
@@ -6186,12 +6186,69 @@ function CarregamentoArea({
   }, [carregamentosCalendario, calTipo, isEntregaCarregamento]);
 
   const calNorm = React.useMemo(() => {
+    const mapLinhas = new Map<number, LinhaCarregamento>();
+    for (const l of (linhasOrigem ?? [])) {
+      const n = Number((l as any).nro_linha ?? 0);
+      if (n > 0) mapLinhas.set(n, l as any);
+    }
+
+    const parseKeyToDate = (key: string): Date | null => {
+      const m = String(key ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return null;
+      const dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0, 0);
+      const t = dt.getTime();
+      return Number.isNaN(t) ? null : dt;
+    };
+
+    const hasAgendaLinha = (linha: LinhaCarregamento): boolean => {
+      return Boolean(
+        (linha as any).carrega_seg ||
+        (linha as any).carrega_ter ||
+        (linha as any).carrega_qua ||
+        (linha as any).carrega_qui ||
+        (linha as any).carrega_sex ||
+        (linha as any).carrega_sab ||
+        (linha as any).carrega_dom
+      );
+    };
+
+    const linhaCarregaNoDia = (linha: LinhaCarregamento, dow: number): boolean => {
+      if (!hasAgendaLinha(linha)) return true;
+      if (dow === 0) return Boolean((linha as any).carrega_dom);
+      if (dow === 1) return Boolean((linha as any).carrega_seg);
+      if (dow === 2) return Boolean((linha as any).carrega_ter);
+      if (dow === 3) return Boolean((linha as any).carrega_qua);
+      if (dow === 4) return Boolean((linha as any).carrega_qui);
+      if (dow === 5) return Boolean((linha as any).carrega_sex);
+      if (dow === 6) return Boolean((linha as any).carrega_sab);
+      return true;
+    };
+
+    const proximoDiaProgramado = (nroLinha: number, baseKey: string): string => {
+      const linha = mapLinhas.get(nroLinha);
+      const baseDt = parseKeyToDate(baseKey);
+      if (!linha || !baseDt) return baseKey;
+      for (let i = 1; i <= 21; i++) {
+        const dt = new Date(baseDt.getTime());
+        dt.setDate(dt.getDate() + i);
+        if (linhaCarregaNoDia(linha, dt.getDay())) return toKey(dt);
+      }
+      const dt = new Date(baseDt.getTime());
+      dt.setDate(dt.getDate() + 1);
+      return toKey(dt);
+    };
+
     return calList.map((c) => {
-      const iniKey = toKey((c as any).data_criacao);
+      let iniKey = toKey((c as any).data_criacao);
       const fimKey = toKey((c as any).data_finalizacao);
+      const adiado = Boolean((c as any).adiado);
+      if (adiado && iniKey) {
+        const nroLinha = Number((c as any).nro_linha ?? 0);
+        if (nroLinha > 0) iniKey = proximoDiaProgramado(nroLinha, iniKey);
+      }
       return { c, iniKey, fimKey };
     });
-  }, [calList]);
+  }, [calList, linhasOrigem]);
 
   const isPresentOnDay = (x: { iniKey: string; fimKey: string }, dayKey: string): boolean => {
     if (!x.iniKey) return false;

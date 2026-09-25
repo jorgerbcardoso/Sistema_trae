@@ -469,12 +469,31 @@ if (count($rotas) > 0) {
 }
 
 // ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
+$joinCteDest = '';
+$selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
+if (strtoupper($domain) === 'RVE') {
+    $tblCte = "{$domain}_cte";
+    $tblCidParam = "{$domain}_cid_param";
+    $joinCteDest = "
+        LEFT JOIN {$tblCte} cte
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte.nro_cte = c.nro_cte
+        LEFT JOIN {$tblCidParam} cidp
+               ON cidp.seq_cidade = cte.seq_cidade_entr
+    ";
+    $selDestPainel = "CASE
+        WHEN UPPER(BTRIM(COALESCE(c.destino_cte, ''))) = 'FEC' AND COALESCE(cidp.unidade, '') <> '' THEN UPPER(BTRIM(cidp.unidade))
+        ELSE UPPER(BTRIM(COALESCE(c.destino_cte, '')))
+    END AS destino_cte_painel,";
+}
+
 $sqlCtes = "
     SELECT
         c.placa_provisoria,
         c.nro_cte,
         c.ser_cte,
         c.destino_cte,
+        {$selDestPainel}
         c.setor_cte,
         c.data_emissao_cte,
         c.data_prev_ent_cte,
@@ -491,6 +510,7 @@ $sqlCtes = "
         c.data_inclusao,
         c.hora_inclusao
     FROM {$tabelaCarregamento} c
+    {$joinCteDest}
     WHERE c.unidade = \$1
       AND c.data_finalizacao IS NULL
       AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
@@ -514,6 +534,7 @@ try {
             'ser_cte'        => $serCte,
             'ctrc'           => $ctrc,
             'destino_cte'    => strtoupper(trim($cteRow['destino_cte'] ?? '')),
+            'destino_cte_painel' => strtoupper(trim($cteRow['destino_cte_painel'] ?? '')),
             'setor'          => strtoupper(trim($cteRow['setor_cte'] ?? '')),
             'data_emissao'   => $cteRow['data_emissao_cte'] ?? '',
             'data_prev_ent'  => $cteRow['data_prev_ent_cte'] ?? '',
