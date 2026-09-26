@@ -1756,10 +1756,10 @@ function parsePeso(s: any): number {
   if (!cleaned) return 0;
   const hasComma = cleaned.includes(',');
   const hasDot = cleaned.includes('.');
-  const normalized = hasComma && hasDot
+  const normalized = hasComma
     ? cleaned.replace(/\./g, '').replace(',', '.')
-    : hasComma
-      ? cleaned.replace(',', '.')
+    : (hasDot && /^\-?\d{1,3}(\.\d{3})+$/.test(cleaned))
+      ? cleaned.replace(/\./g, '')
       : cleaned;
   return parseFloat(normalized) || 0;
 }
@@ -1770,10 +1770,10 @@ function parseCubagem(s: any): number {
   if (!cleaned) return 0;
   const hasComma = cleaned.includes(',');
   const hasDot = cleaned.includes('.');
-  const normalized = hasComma && hasDot
+  const normalized = hasComma
     ? cleaned.replace(/\./g, '').replace(',', '.')
-    : hasComma
-      ? cleaned.replace(',', '.')
+    : (hasDot && /^\-?\d{1,3}(\.\d{3})+$/.test(cleaned))
+      ? cleaned.replace(/\./g, '')
       : cleaned;
   return parseFloat(normalized) || 0;
 }
