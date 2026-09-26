@@ -2293,13 +2293,13 @@ function CardCarregamento({
     return { ...c, det };
   });
 
-  const totalPesoLocal = ctesDetalhados.reduce((s, c) => s + parsePeso(c.det?.peso ?? ''), 0);
-  const totalCubagemLocal = ctesDetalhados.reduce((s, c) => s + parseCubagem(c.det?.cubagem ?? ''), 0);
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-  const freteTotalsLocal = ctesDetalhados.reduce((acc: { cif: number; fob: number }, c) => {
-    const v = parseMoeda(String(c.vlr_frete ?? c.frete ?? ''));
-    const rem = normalizePessoa(String(c.remetente ?? ''));
-    const pag = normalizePessoa(String(c.pagador ?? ''));
+  const totalPesoLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
+  const totalCubagemLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
+  const freteTotalsLocal = (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
+    const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
+    const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
+    const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
     if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
     else acc.fob += v;
     return acc;
