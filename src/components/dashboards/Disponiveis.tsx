@@ -1777,6 +1777,8 @@ function parseCubagem(s: any): number {
       : cleaned;
   return parseFloat(normalized) || 0;
 }
+
+const totaisCarregamentoCache = new Map<string, { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number }>();
 function parseMoeda(s: string): number {
   if (!s) return 0;
   const raw = String(s).trim();
@@ -2212,9 +2214,53 @@ function CardCarregamento({
   };
 
   const ativo = modoApontamento === carregamento.placa_provisoria;
-
-  const [totaisCard, setTotaisCard] = useState<null | { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number }>(null);
   const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${carregamento.placa_provisoria ?? ''}`;
+
+  const pesoDoCarregamento = Number(carregamento.total_peso ?? 0) || 0;
+  const cubagemDoCarregamento = Number(carregamento.total_cubagem ?? 0) || 0;
+  const freteDoCarregamento = Number(carregamento.total_frete ?? 0) || 0;
+
+  const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+  const totalPesoLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
+  const totalCubagemLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
+  const freteTotalsLocal = (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
+    const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
+    const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
+    const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
+    if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
+    else acc.fob += v;
+    return acc;
+  }, { cif: 0, fob: 0 });
+  const freteCifLocal = freteTotalsLocal.cif;
+  const freteFobLocal = freteTotalsLocal.fob;
+
+  const pesoInicial = pesoDoCarregamento > 0 ? pesoDoCarregamento : totalPesoLocal;
+  const cubagemInicial = cubagemDoCarregamento > 0 ? cubagemDoCarregamento : totalCubagemLocal;
+  const freteCalcLocalInicial = freteCifLocal + freteFobLocal;
+  let cifInicial: number;
+  let fobInicial: number;
+  if (freteDoCarregamento > 0 && freteCalcLocalInicial <= 0) {
+    cifInicial = 0;
+    fobInicial = freteDoCarregamento;
+  } else {
+    cifInicial = freteCifLocal;
+    fobInicial = freteFobLocal;
+  }
+
+  const totaisCardInicial = (pesoInicial > 0 || cubagemInicial > 0 || (cifInicial + fobInicial) > 0) ? {
+    peso: pesoInicial,
+    cubagem: cubagemInicial,
+    vlr_frete: freteDoCarregamento > 0 ? freteDoCarregamento : (cifInicial + fobInicial),
+    cif: cifInicial,
+    fob: fobInicial,
+  } : null;
+
+  const [totaisCard, setTotaisCard] = useState<null | { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number }>(totaisCardInicial);
+  const normalizeCapTon = (v: any) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n > 1000 ? (n / 1000) : n;
+  };
 
   const abrirEditarPlaca = () => {
     setEditarPlacaDialogOpen(true);
@@ -2313,29 +2359,11 @@ function CardCarregamento({
     return { ...c, det };
   });
 
-  const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-  const totalPesoLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
-  const totalCubagemLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
-  const freteTotalsLocal = (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
-    const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
-    const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
-    const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
-    if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-    else acc.fob += v;
-    return acc;
-  }, { cif: 0, fob: 0 });
-  const freteCifLocal = freteTotalsLocal.cif;
-  const freteFobLocal = freteTotalsLocal.fob;
-
-  const precisaTotaisDoListar =
-    (carregamento.ctes?.length ?? 0) > 0
-    && totalPesoLocal === 0
-    && totalCubagemLocal === 0
-    && freteCifLocal === 0
-    && freteFobLocal === 0;
-
   useEffect(() => {
-    if (!precisaTotaisDoListar) return;
+    if ((carregamento.ctes?.length ?? 0) <= 0) return;
+    if (totaisCard) return;
+    const cached = totaisCarregamentoCache.get(carregamentoKey);
+    if (cached) { setTotaisCard(cached); return; }
     let alive = true;
     (async () => {
       try {
@@ -2356,23 +2384,47 @@ function CardCarregamento({
           else acc.fob += v;
           return acc;
         }, { cif: 0, fob: 0 });
-        setTotaisCard({
+        const next = {
           peso: Number(totais?.peso ?? 0) || 0,
           cubagem: Number(totais?.cubagem ?? 0) || 0,
           vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
           cif: frete.cif,
           fob: frete.fob,
-        });
+        };
+        totaisCarregamentoCache.set(carregamentoKey, next);
+        setTotaisCard(next);
       } catch {}
     })();
     return () => { alive = false; };
-  }, [carregamentoKey, precisaTotaisDoListar]);
+  }, [carregamentoKey, totaisCard]);
 
-  const totalPeso = totaisCard ? totaisCard.peso : totalPesoLocal;
-  const totalCubagem = totaisCard ? totaisCard.cubagem : totalCubagemLocal;
-  const freteCif = totaisCard ? totaisCard.cif : freteCifLocal;
-  const freteFob = totaisCard ? totaisCard.fob : freteFobLocal;
-  const temCapacidade = carregamento.capacidade_ton !== null && carregamento.capacidade_m3 !== null;
+  const totalPeso =
+    (totaisCard && totaisCard.peso > 0) ? totaisCard.peso :
+    pesoDoCarregamento > 0 ? pesoDoCarregamento :
+    totalPesoLocal;
+
+  const totalCubagem =
+    (totaisCard && totaisCard.cubagem > 0) ? totaisCard.cubagem :
+    cubagemDoCarregamento > 0 ? cubagemDoCarregamento :
+    totalCubagemLocal;
+
+  let freteCif: number;
+  let freteFob: number;
+  if (totaisCard) {
+    freteCif = totaisCard.cif;
+    freteFob = totaisCard.fob;
+  } else {
+    const freteCalcLocal = freteCifLocal + freteFobLocal;
+    if (freteDoCarregamento > 0 && freteCalcLocal <= 0) {
+      freteCif = 0;
+      freteFob = freteDoCarregamento;
+    } else {
+      freteCif = freteCifLocal;
+      freteFob = freteFobLocal;
+    }
+  }
+  const capacidadeTonExib = normalizeCapTon(carregamento.capacidade_ton);
+  const temCapacidade = capacidadeTonExib !== null && carregamento.capacidade_m3 !== null;
 
   const primeiroCte = carregamento.ctes.length > 0 ? carregamento.ctes[0] : null;
   const infoCriacao = primeiroCte
@@ -2835,7 +2887,7 @@ function CardCarregamento({
             </div>
             <BarraCapacidade
               valor={totalPeso / 1000}
-              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? carregamento.capacidade_ton!}
+              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? capacidadeTonExib!}
               corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
               label="Peso (ton)"
             />
@@ -2954,7 +3006,7 @@ function CardCarregamento({
             size="sm"
             variant="outline"
             className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-            onClick={() => { setNovaCapTon(carregamento.capacidade_ton?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setNovaVlrFreteCarreteiro(carregamento.vlr_frete_carreteiro?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
+            onClick={() => { setNovaCapTon(normalizeCapTon(carregamento.capacidade_ton)?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setNovaVlrFreteCarreteiro(carregamento.vlr_frete_carreteiro?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
             title="Editar Parâmetros do Carregamento."
           >
             <Gauge className="w-3.5 h-3.5 mr-1" />Param.
