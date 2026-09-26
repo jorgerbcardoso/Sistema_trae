@@ -2111,6 +2111,26 @@ function CardCarregamento({
         setCteDetalheLista(res.ctes ?? []);
         cteDetalheListaRef.current = res.ctes ?? [];
         setCteDetalheTotais(res.totais ?? null);
+        try {
+          const totais = res?.totais ?? null;
+          const lista = Array.isArray(res?.ctes) ? res.ctes : [];
+          const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+          const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
+            const v = Number(c?.vlr_frete ?? 0) || 0;
+            const rem = normalizePessoa(String(c?.remetente ?? ''));
+            const pag = normalizePessoa(String(c?.nome_pag ?? ''));
+            if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
+            else acc.fob += v;
+            return acc;
+          }, { cif: 0, fob: 0 });
+          setTotaisCard({
+            peso: Number(totais?.peso ?? 0) || 0,
+            cubagem: Number(totais?.cubagem ?? 0) || 0,
+            vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
+            cif: frete.cif,
+            fob: frete.fob,
+          });
+        } catch {}
       } else {
         toast.error(res.message || 'Erro ao carregar CT-es');
       }
