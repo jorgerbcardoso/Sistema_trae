@@ -1749,13 +1749,33 @@ function ModalCriarCarregamento({
   );
 }
 
-function parsePeso(s: string): number {
-  if (!s) return 0;
-  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+function parsePeso(s: any): number {
+  const raw = String(s ?? '').trim();
+  if (!raw) return 0;
+  const cleaned = raw.replace(/[^\d,.\-]/g, '');
+  if (!cleaned) return 0;
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+  const normalized = hasComma && hasDot
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : hasComma
+      ? cleaned.replace(',', '.')
+      : cleaned;
+  return parseFloat(normalized) || 0;
 }
-function parseCubagem(s: string): number {
-  if (!s) return 0;
-  return parseFloat(s.replace(',', '.')) || 0;
+function parseCubagem(s: any): number {
+  const raw = String(s ?? '').trim();
+  if (!raw) return 0;
+  const cleaned = raw.replace(/[^\d,.\-]/g, '');
+  if (!cleaned) return 0;
+  const hasComma = cleaned.includes(',');
+  const hasDot = cleaned.includes('.');
+  const normalized = hasComma && hasDot
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : hasComma
+      ? cleaned.replace(',', '.')
+      : cleaned;
+  return parseFloat(normalized) || 0;
 }
 function parseMoeda(s: string): number {
   if (!s) return 0;
@@ -2264,8 +2284,8 @@ function CardCarregamento({
       nroCte: c.nroCte ?? 0,
       destinatario: c.destinatario || '',
       cidade: c.cidade || '',
-      peso: c.peso || '',
-      cubagem: c.cubagem || '',
+      peso: String((c as any).peso ?? ''),
+      cubagem: String((c as any).cubagem ?? ''),
     };
     return { ...c, det };
   });
