@@ -241,6 +241,29 @@ try {
 }
 set_time_limit(600);
 
+// #region debug-point A:init
+$__dbgSession = 'ssw-import-empty-ctes';
+$__dbgRunId = 'pre-fix';
+$__dbgTraceId = bin2hex(random_bytes(8));
+$__dbgOutDir = __DIR__ . '/../../../..' . '/.dbg';
+$__dbgFile = $__dbgOutDir . '/trae-debug-log-' . $__dbgSession . '.ndjson';
+if (!is_dir($__dbgOutDir)) { @mkdir($__dbgOutDir, 0777, true); }
+$__dbg = static function(string $hypothesisId, string $msg, array $data = []) use ($__dbgSession, $__dbgRunId, $__dbgFile, $__dbgTraceId) {
+    $ev = [
+        'sessionId' => $__dbgSession,
+        'runId' => $__dbgRunId,
+        'hypothesisId' => $hypothesisId,
+        'ts' => (int)floor(microtime(true) * 1000),
+        'location' => basename(__FILE__),
+        'msg' => '[DEBUG] ' . $msg,
+        'data' => $data,
+        'traceId' => $__dbgTraceId,
+    ];
+    @file_put_contents($__dbgFile, json_encode($ev, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+};
+$__dbg('A', 'start', ['php' => PHP_VERSION]);
+// #endregion
+
 $importVeiculosRecentes = runImpPropVeic((string)$domain, 'RECENTE');
 $importVeiculosRecentesOk = (bool)($importVeiculosRecentes['success'] ?? false);
 $importVeiculosRecentesMsg = (string)($importVeiculosRecentes['message'] ?? '');
@@ -276,7 +299,9 @@ function nextSeqCarregamentoSsw($conn, $seqName) {
 }
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
+$__dbg('E', 'ssw TRO unidade', ['unidade' => $unidade]);
 $html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PREP_IMP&prioritario=N&restrito=");
+$__dbg('A', 'ssw0194 PREP_IMP raw', ['len' => is_string($html_placas) ? strlen($html_placas) : null, 'head' => substr((string)$html_placas, 0, 120)]);
 
 $inicio_xml = strpos($html_placas, '<?xml');
 if ($inicio_xml === false) {
@@ -299,6 +324,7 @@ $xml_string = substr($html_placas, $inicio_xml, ($fim_xml + strlen($tag_fim)) - 
 
 $xml = @simplexml_load_string($xml_string);
 if ($xml === false) {
+    $__dbg('A', 'xml parse failed', ['xml_head' => substr((string)$xml_string, 0, 200)]);
     respondJson(['success' => false, 'message' => 'Falha ao parsear o XML das placas do SSW.']);
 }
 
@@ -323,6 +349,7 @@ foreach ($xml->xpath('//r') as $r) {
         $placaPorSeq[$seqNode] = $placa;
     }
 }
+$__dbg('A', 'xml placas extraidas', ['placas' => count($placas_ssw), 'seqs' => count($seqs_ssw), 'amostraPlacas' => array_slice($placas_ssw, 0, 5), 'amostraSeqs' => array_slice($seqs_ssw, 0, 5)]);
 $placas_ssw_fallback = [];
 if (empty($placas_ssw)) {
     foreach ($xml->xpath('//f8') as $f8) {
@@ -342,6 +369,7 @@ if (empty($placas_ssw)) {
 }
 $placas_ssw = array_values(array_unique($placas_ssw));
 $seqs_ssw = array_values(array_unique($seqs_ssw));
+$__dbg('A', 'placas/seqs final', ['placas' => count($placas_ssw), 'seqs' => count($seqs_ssw)]);
 
 $veiculosFaltantes = [];
 if ($domainUpper === 'RVE') {
@@ -793,10 +821,12 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
     if (empty($chunk)) continue;
 
     $act = 'SR_IMP|' . implode('|', array_map('rawurlencode', $chunk));
+$__dbg('B', 'ssw0194 SR_IMP request', ['modo' => !empty($seqs_ssw) ? 'seq' : 'placa', 'chunk' => count($chunk), 'act_head' => substr($act, 0, 80)]);
     $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act={$act}");
     $str_decodificada = urldecode($str_retorno);
     $act_download = ssw_get_act($str_decodificada);
     $arq_download = ssw_get_arq($str_decodificada);
+$__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strlen($str_retorno) : null, 'act' => $act_download, 'arq' => $arq_download, 'head' => substr((string)$str_decodificada, 0, 160)]);
 
     if (empty($act_download) || empty($arq_download)) {
         foreach ($chunk as $p) {
@@ -807,6 +837,7 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
     }
 
     $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=1");
+    $__dbg('B', 'ssw0424 download', ['len' => is_string($relatorio) ? strlen($relatorio) : null, 'head' => substr((string)$relatorio, 0, 160)]);
     if (empty($relatorio) || strlen($relatorio) < 50) {
         foreach ($chunk as $p) {
             $placaLog = !empty($seqs_ssw) ? (string)($placaPorSeq[$p] ?? '') : (string)$p;
@@ -816,6 +847,9 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
     }
 
     $parsed = parseRelatorioCarregamentos($relatorio);
+    $totCtes = 0;
+    foreach ($parsed as $k => $v) { $totCtes += is_array($v) ? count(($v['ctes'] ?? [])) : 0; }
+    $__dbg('C', 'parseRelatorioCarregamentos', ['placas' => count($parsed), 'ctes_total' => $totCtes, 'placas_sample' => array_slice(array_keys($parsed), 0, 5)]);
     foreach ($parsed as $placa => $data) {
         if (!isset($carregamentos[$placa])) $carregamentos[$placa] = ['ctes' => [], 'destinos' => []];
         $carregamentos[$placa]['ctes'] = array_merge($carregamentos[$placa]['ctes'], $data['ctes'] ?? []);
@@ -911,6 +945,8 @@ if ($obrigarPlacasReais) {
 foreach ($placas_ssw as $placa) {
     $placa = strtoupper(trim((string)$placa));
     if ($placa === '') continue;
+
+    $__dbg('C', 'placa loop', ['placa' => $placa, 'temInfo' => isset($carregamentos[$placa]), 'ctes_info' => isset($carregamentos[$placa]) ? count(($carregamentos[$placa]['ctes'] ?? [])) : null]);
 
     if ($obrigarPlacasReais && in_array($placa, $veiculosFaltantes, true)) {
         $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Veículo não cadastrado. Placa ignorada (Obrigar placas reais).'];
@@ -1197,6 +1233,7 @@ foreach ($placas_ssw as $placa) {
 
     $info = $carregamentos[$placa] ?? null;
     $ctes = $info['ctes'] ?? [];
+    $__dbg('C', 'ctes por placa', ['placa' => $placa, 'ctes' => is_array($ctes) ? count($ctes) : null]);
 
     $destinosRaw = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
     $destinos = [];
@@ -1369,6 +1406,7 @@ foreach ($placas_ssw as $placa) {
         );
 
         if (empty($ctes)) {
+            $__dbg('C', 'ctes vazio -> sentinela', ['placa' => $placa, 'seq' => $seqCarreg, 'placaProvisoriaSalvar' => $placaProvisoriaSalvar]);
             $resAny = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND seq_carregamento = {$seqCarreg} LIMIT 1");
             if (!$resAny || pg_num_rows($resAny) === 0) {
                 $resInsSent = pg_query(
@@ -1481,6 +1519,7 @@ foreach ($placas_ssw as $placa) {
         }
 
         pg_query($conn, 'COMMIT');
+        $__dbg('D', 'commit', ['placa' => $placa, 'seq' => $seqCarreg, 'placaProvisoriaSalvar' => $placaProvisoriaSalvar, 'inseridos' => $inseridos, 'ignoradosEmOutro' => $ignoradosEmOutro, 'ctes_input' => is_array($ctes) ? count($ctes) : null]);
         $status = $ja_existe ? 'atualizado' : 'importado';
         $msg = ($placaProvisoriaSalvar !== $placa)
             ? "{$inseridos} CT-e(s) importado(s). Agrupado em {$placaProvisoriaSalvar}."
@@ -1491,6 +1530,7 @@ foreach ($placas_ssw as $placa) {
         $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => $msg];
     } catch (Exception $e) {
         pg_query($conn, 'ROLLBACK');
+        $__dbg('D', 'rollback', ['placa' => $placa, 'seq' => $seqCarreg, 'err' => $e->getMessage()]);
         $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Erro ao salvar: ' . $e->getMessage()];
     }
 }
