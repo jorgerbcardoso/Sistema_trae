@@ -469,10 +469,47 @@ if (count($rotas) > 0) {
 }
 
 // ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
-$joinCteDest = '';
+$tblCte = "{$domain}_cte";
+$cteCols = null;
+$cteCol = function(string $col) use ($conn, $tblCte, &$cteCols): bool {
+    if ($cteCols === null) {
+        $cteCols = [];
+        try {
+            $resCols = sql(
+                "SELECT column_name
+                 FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND lower(table_name) = lower(\$1)",
+                [$tblCte],
+                $conn
+            );
+            while ($resCols && ($r = pg_fetch_assoc($resCols))) {
+                $name = strtolower(trim((string)($r['column_name'] ?? '')));
+                if ($name !== '') $cteCols[$name] = true;
+            }
+        } catch (Exception $e) {
+            $cteCols = [];
+        }
+    }
+    return isset($cteCols[strtolower($col)]);
+};
+
+$joinCteDest = "
+    LEFT JOIN {$tblCte} cte
+           ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+          AND cte.nro_cte = c.nro_cte
+";
+
+$selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
+$selVlrFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, c.vlr_frete_cte)" : "c.vlr_frete_cte";
+$selPeso = $cteCol('peso_real')
+    ? ("COALESCE(cte.peso_real" . ($cteCol('peso_calc') ? ", cte.peso_calc" : "") . ", c.peso_cte)")
+    : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, c.peso_cte)" : "c.peso_cte");
+$selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, c.cubagem_cte)" : "c.cubagem_cte";
+$selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, c.qtde_vol_cte)" : "c.qtde_vol_cte";
+
 $selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
 if (strtoupper($domain) === 'RVE') {
-    $tblCte = "{$domain}_cte";
     $tblCidParam = "{$domain}_cid_param";
     $joinCteDest = "
         LEFT JOIN {$tblCte} cte
@@ -501,11 +538,11 @@ $sqlCtes = "
         c.destinatario_cte,
         c.pagador_cte,
         c.cidade_destino_cte,
-        c.vlr_merc_cte,
-        c.vlr_frete_cte,
-        c.peso_cte,
-        c.cubagem_cte,
-        c.qtde_vol_cte,
+        {$selVlrMerc} AS vlr_merc_cte,
+        {$selVlrFrete} AS vlr_frete_cte,
+        {$selPeso} AS peso_cte,
+        {$selCub} AS cubagem_cte,
+        {$selVol} AS qtde_vol_cte,
         c.login_inclusao,
         c.data_inclusao,
         c.hora_inclusao
