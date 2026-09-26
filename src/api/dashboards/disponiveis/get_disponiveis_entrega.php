@@ -173,6 +173,12 @@ foreach ($linhas as $linha) {
     $cep         = trim($arr[12] ?? '');
     $previ       = trim($arr[13] ?? '');
     $agendamento = trim($arr[14] ?? '');
+    $agendamento = preg_replace('/\s+/', ' ', (string)$agendamento);
+    if (preg_match('/^(\d{2}\/\d{2})(\d{2}:\d{2}(?::\d{2})?)$/', $agendamento, $mAg)) {
+        $agendamento = $mAg[1] . ' ' . $mAg[2];
+    } elseif (preg_match('/^(\d{2}\/\d{2}\/\d{2,4})(\d{2}:\d{2}(?::\d{2})?)$/', $agendamento, $mAg)) {
+        $agendamento = $mAg[1] . ' ' . $mAg[2];
+    }
     $nfiscal     = trim($arr[15] ?? '');
     $valMerc     = trim($arr[16] ?? '');
     $kgRea       = trim($arr[17] ?? '');
@@ -188,6 +194,11 @@ foreach ($linhas as $linha) {
     $cnpjDest    = trim($arr[30] ?? '');
 
     if ($setor == 'SETOR') continue;
+
+    if (strtoupper($domain) === 'BNR') {
+        $cod = preg_replace('/\D/', '', (string)$codUltOcor);
+        if ($cod !== '' && in_array((int)$cod, [52, 25, 34, 11], true)) continue;
+    }
 
     $isEmTransito = !empty($prevChegada) && strpos(strtoupper($prevChegada), 'HOJE') !== false;
 

@@ -111,6 +111,9 @@ interface Cte {
   atrasoTransf: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
   unidadeCarregamento?: string;
   unidadeOrigem?: string;
+  codUltOcor?: string;
+  descUltOcor?: string;
+  dataUltOcor?: string;
 }
 
 interface Coleta {
@@ -407,6 +410,7 @@ function TabelaCtes({
     | 'prevEnt'
     | 'remetente'
     | 'destinatario'
+    | 'ultOcor'
     | 'cidadeUf'
     | 'vlrNf'
     | 'frete'
@@ -473,6 +477,7 @@ function TabelaCtes({
         case 'nfiscal': return getStr(a.nfiscal).localeCompare(getStr(b.nfiscal));
         case 'remetente': return getStr(a.remetente).localeCompare(getStr(b.remetente));
         case 'destinatario': return getStr(a.destinatario).localeCompare(getStr(b.destinatario));
+        case 'ultOcor': return getStr(a.descUltOcor ?? a.codUltOcor ?? '').localeCompare(getStr(b.descUltOcor ?? b.codUltOcor ?? ''));
         case 'cidadeUf': return `${getStr(a.cidade)}/${getStr(a.uf)}`.localeCompare(`${getStr(b.cidade)}/${getStr(b.uf)}`);
         case 'manifesto': return getStr(a.manifesto).localeCompare(getStr(b.manifesto));
         case 'emissao':
@@ -603,7 +608,7 @@ function TabelaCtes({
             <th className="px-3 py-2 text-left"><ThBtn col="chegadaUnid">Chegada na Unid.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="destinatario">Destinatário</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="ultOcor">Últ. Ocor.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="cidadeUf">Cidade/UF</ThBtn></th>
             <th className="px-3 py-2 text-right"><ThBtn col="vlrNf" align="right">Vlr. NF</ThBtn></th>
             <th className="px-3 py-2 text-right"><ThBtn col="frete" align="right">Frete</ThBtn></th>
@@ -689,10 +694,19 @@ function TabelaCtes({
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.destinatario}</td>
+                <td
+                  className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[110px] truncate"
+                  title={
+                    cte.descUltOcor
+                      ? `${(cte.codUltOcor ?? '').trim() ? `${String(cte.codUltOcor ?? '').trim()} - ` : ''}${cte.descUltOcor}${(cte.dataUltOcor ?? '').trim() ? ` (${String(cte.dataUltOcor ?? '').trim()})` : ''}`
+                      : ''
+                  }
+                >
+                  {cte.descUltOcor || '-'}
+                </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
+                <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
@@ -784,7 +798,7 @@ function GrupoDestinoCard({
       'Parado (dias)',
       'Prev. Ent.',
       'Pagador',
-      'Destinatário',
+      'Últ. Ocor.',
       'Cidade/UF',
       'Vlr. NF',
       'Frete (R$)',
@@ -807,7 +821,7 @@ function GrupoDestinoCard({
         esc(diasParado(c.chegadaUnid || '')),
         esc(c.prevEnt),
         esc(c.pagador),
-        esc(c.destinatario),
+        esc(c.descUltOcor ? `${(c.codUltOcor ?? '').trim() ? `${String(c.codUltOcor ?? '').trim()} - ` : ''}${c.descUltOcor}` : ''),
         esc(`${c.cidade}/${c.uf}`),
         fmtMoeda(parseMoeda(c.vlrNf)),
         fmtMoeda(parseMoeda(c.frete)),
@@ -1204,10 +1218,10 @@ function TabelaEntrega({
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.agendamento || '-'}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatAgendamento(cte.agendamento)}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.frete}</td>
+                <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
                 {tipo === 'transito' && (
                   <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
@@ -1757,6 +1771,16 @@ function parseMoeda(s: string): number {
       ? cleaned.replace(',', '.')
       : cleaned;
   return parseFloat(normalized) || 0;
+}
+function formatAgendamento(s: string): string {
+  const raw = String(s ?? '').trim();
+  if (!raw) return '-';
+  const norm = raw.replace(/\s+/g, ' ');
+  const m1 = norm.match(/^(\d{2}\/\d{2})(\d{2}:\d{2}(?::\d{2})?)$/);
+  if (m1) return `${m1[1]} ${m1[2]}`;
+  const m2 = norm.match(/^(\d{2}\/\d{2}\/\d{2,4})(\d{2}:\d{2}(?::\d{2})?)$/);
+  if (m2) return `${m2[1]} ${m2[2]}`;
+  return norm;
 }
 function formatData(d: string): string {
   if (!d) return '';

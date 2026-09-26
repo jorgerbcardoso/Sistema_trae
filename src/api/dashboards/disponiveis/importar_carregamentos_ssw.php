@@ -276,7 +276,7 @@ function nextSeqCarregamentoSsw($conn, $seqName) {
 }
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
-$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PLACAS&prioritario=N");
+$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PREP_IMP&prioritario=N&restrito=");
 
 $inicio_xml = strpos($html_placas, '<?xml');
 if ($inicio_xml === false) {
@@ -303,20 +303,45 @@ if ($xml === false) {
 }
 
 $placas_ssw = [];
-foreach ($xml->xpath('//f8') as $f8) {
-    $placa = strtoupper(trim((string)$f8));
-    if (!empty($placa)) {
-        $placas_ssw[] = $placa;
+$seqs_ssw = [];
+$placaPorSeq = [];
+foreach ($xml->xpath('//r') as $r) {
+    $placa = strtoupper(trim((string)($r->f0 ?? '')));
+    if ($placa === '') {
+        $placa = strtoupper(trim((string)($r->f8 ?? '')));
+    }
+    if ($placa === '') continue;
+    $placas_ssw[] = $placa;
+
+    $seqNode = '';
+    foreach ($r->children() as $c) {
+        $seqNode = (string)$c;
+    }
+    $seqNode = trim((string)$seqNode);
+    if ($seqNode !== '') {
+        $seqs_ssw[] = $seqNode;
+        $placaPorSeq[$seqNode] = $placa;
     }
 }
-$matchesPlacas = [];
-if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPlacas)) {
-    foreach (($matchesPlacas[1] ?? []) as $p) {
-        $p = strtoupper(trim((string)$p));
-        if ($p !== '') $placas_ssw[] = $p;
+$placas_ssw_fallback = [];
+if (empty($placas_ssw)) {
+    foreach ($xml->xpath('//f8') as $f8) {
+        $placa = strtoupper(trim((string)$f8));
+        if ($placa !== '') $placas_ssw_fallback[] = $placa;
+    }
+    $matchesPlacas = [];
+    if (preg_match_all("/SR_IMP\\|([A-Z]{3}[A-Z0-9]{4})/i", $xml_string, $matchesPlacas)) {
+        foreach (($matchesPlacas[1] ?? []) as $p) {
+            $p = strtoupper(trim((string)$p));
+            if ($p !== '') $placas_ssw_fallback[] = $p;
+        }
+    }
+    if (!empty($placas_ssw_fallback)) {
+        $placas_ssw = $placas_ssw_fallback;
     }
 }
 $placas_ssw = array_values(array_unique($placas_ssw));
+$seqs_ssw = array_values(array_unique($seqs_ssw));
 
 $veiculosFaltantes = [];
 if ($domainUpper === 'RVE') {
@@ -759,12 +784,12 @@ function parseRelatorioCarregamentos($texto) {
     return $porPlaca;
 }
 
-$placasLote = array_values(array_unique($placas_ssw));
-$tamanhoLote = 25;
+$loteIds = !empty($seqs_ssw) ? $seqs_ssw : $placas_ssw;
+$tamanhoLote = !empty($seqs_ssw) ? 60 : 25;
 $carregamentos = [];
 
-for ($i = 0; $i < count($placasLote); $i += $tamanhoLote) {
-    $chunk = array_slice($placasLote, $i, $tamanhoLote);
+for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
+    $chunk = array_slice($loteIds, $i, $tamanhoLote);
     if (empty($chunk)) continue;
 
     $act = 'SR_IMP|' . implode('|', array_map('rawurlencode', $chunk));
@@ -775,15 +800,17 @@ for ($i = 0; $i < count($placasLote); $i += $tamanhoLote) {
 
     if (empty($act_download) || empty($arq_download)) {
         foreach ($chunk as $p) {
-            $logs[] = ['placa' => $p, 'status' => 'erro', 'msg' => 'Não foi possível obter os parâmetros de download do relatório.'];
+            $placaLog = !empty($seqs_ssw) ? (string)($placaPorSeq[$p] ?? '') : (string)$p;
+            $logs[] = ['placa' => $placaLog !== '' ? $placaLog : (string)$p, 'status' => 'erro', 'msg' => 'Não foi possível obter os parâmetros de download do relatório.'];
         }
         continue;
     }
 
-    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0");
+    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=1");
     if (empty($relatorio) || strlen($relatorio) < 50) {
         foreach ($chunk as $p) {
-            $logs[] = ['placa' => $p, 'status' => 'erro', 'msg' => 'Relatório vazio ou inválido.'];
+            $placaLog = !empty($seqs_ssw) ? (string)($placaPorSeq[$p] ?? '') : (string)$p;
+            $logs[] = ['placa' => $placaLog !== '' ? $placaLog : (string)$p, 'status' => 'erro', 'msg' => 'Relatório vazio ou inválido.'];
         }
         continue;
     }
@@ -1032,6 +1059,7 @@ foreach ($placas_ssw as $placa) {
         }
     }
     if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
+        $placaProvisoriaNorm = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placaProvisoriaSalvar)));
         $resSeqExist = sql(
             "SELECT cap.seq_carregamento,
                     COALESCE(cap.simulado, FALSE) AS simulado
@@ -1046,6 +1074,22 @@ foreach ($placas_ssw as $placa) {
             [$unidade, $placaProvisoriaSalvar],
             $conn
         );
+        if ((!$resSeqExist || pg_num_rows($resSeqExist) === 0) && $placaProvisoriaNorm !== '' && $placaProvisoriaNorm !== strtoupper(trim((string)$placaProvisoriaSalvar))) {
+            $resSeqExist = sql(
+                "SELECT cap.seq_carregamento,
+                        COALESCE(cap.simulado, FALSE) AS simulado
+                 FROM {$tabelaCap} cap
+                 JOIN {$tabela} c
+                   ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+                 WHERE cap.unidade = \$1
+                   AND regexp_replace(UPPER(BTRIM(cap.placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
+                   AND c.data_finalizacao IS NULL
+                 ORDER BY COALESCE(cap.simulado, FALSE) DESC, cap.seq_carregamento DESC
+                 LIMIT 1",
+                [$unidade, $placaProvisoriaNorm],
+                $conn
+            );
+        }
         if ($resSeqExist && pg_num_rows($resSeqExist) > 0) {
             $seqCarreg = (int)pg_fetch_result($resSeqExist, 0, 0);
             $reaproveitandoPorPlaca = $seqCarreg > 0;
@@ -1068,6 +1112,7 @@ foreach ($placas_ssw as $placa) {
         }
     }
     if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
+        $placaProvisoriaNorm2 = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placaProvisoriaSalvar)));
         $resSeqCar = sql(
             "SELECT seq_carregamento, origem_criacao
              FROM {$tabela}
@@ -1079,6 +1124,19 @@ foreach ($placas_ssw as $placa) {
             [$unidade, $placaProvisoriaSalvar],
             $conn
         );
+        if ((!$resSeqCar || pg_num_rows($resSeqCar) === 0) && $placaProvisoriaNorm2 !== '' && $placaProvisoriaNorm2 !== strtoupper(trim((string)$placaProvisoriaSalvar))) {
+            $resSeqCar = sql(
+                "SELECT seq_carregamento, origem_criacao
+                 FROM {$tabela}
+                 WHERE unidade = \$1
+                   AND regexp_replace(UPPER(BTRIM(placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
+                   AND data_finalizacao IS NULL
+                 ORDER BY COALESCE(seq_carregamento, 0) DESC
+                 LIMIT 1",
+                [$unidade, $placaProvisoriaNorm2],
+                $conn
+            );
+        }
         if ($resSeqCar && pg_num_rows($resSeqCar) > 0) {
             $rowSeqCar = pg_fetch_assoc($resSeqCar);
             $seqCarreg = (int)($rowSeqCar['seq_carregamento'] ?? 0);

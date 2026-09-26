@@ -1,0 +1,311 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: DRD1857                                                                              26/09/2026 18:19
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO163623-5  24/09 06/10       4011                         2             VISTHO MEIAS E ARTIG VISTHO MEIAS E ARTIG RUBENS BASSO VALOTTA AMAMBAI        DRD       5.239,86      205,71      24    0,2 80
+SAO163716-9  24/09 06/10     397431                         4             MOAS IND E COM IMP E MOAS IND E COM IMP E DONALDSON DIEGO DE L CAARAPO        DRD       3.253,50      145,23      25    0,2 80
+SAO164752-1  25/09 07/10     397548                         3             MOAS IND E COM IMP E MOAS IND E COM IMP E LARISSA VARNIER EIRE CAARAPO        DRD       3.525,99      146,39      21    0,3 80
+SJP163273-6  24/09 08/10    1137893                         3             CASSINI E MOREIRA CO CASSINI E MOREIRA CO 574854 - PATRICIA GE DEODAPOLIS     DRD       1.095,11      210,47      94    0,0 83
+SAO163562-0  24/09 06/10     140595                         1             CPAD COM E DIST LTDA CPAD COM E DIST LTDA IGREJA ASSEMBLEIA DE DOURADINA      DRD         865,12      197,09       7    0,0 80
+SAO161640-4  22/09 29/09     119628                        30             BELA VISTA PROD ENZI BELA VISTA PROD ENZI SENDAS DISTRIBUIDORA DOURADOS       DRD       4.170,00      737,39     255    0,4 95
+CWB012675-6  21/09 01/10       5417                        19             BF LIMP COM DE PRODS BF LIMP COM DE PRODS FLAVIO DA HORA SILVA DOURADOS       DRD       2.176,80      501,09     339    1,0 83
+SAO163750-9  24/09 01/10     585911                        18             ECOLAB QUIMICA LTDA  ECOLAB QUIMICA LTDA  SESI SERVICO SOCIAL  DOURADOS       DRD       5.632,84      238,26     138    0,2 80
+                             585912
+SAO160256-0  20/09 25/09    1399998                        13             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C BANCO MERCANTIL DO B DOURADOS       DRD       1.103,03      105,04      55    0,4 80
+SAO163140-3  24/09 01/10     108095                         9             FUCHS LUBRIFICANTES  FUCHS LUBRIFICANTES  AHO ORIENTE LTDA     DOURADOS       DRD       5.546,42      285,99     107    0,0 80
+                             108096
+SAO163672-3  24/09 01/10      25087              NYTHI      1             BAJAJ DO BRASIL COME SUPPLOG ARMAZENS GER MOTONEXA MOTOS LTDA  DOURADOS       DRD          24,48       73,78       0    0,0 80
+SAO162292-7  23/09 30/09     307619                         3             SIER MOVEIS LTDA     SIER MOVEIS LTDA     IRMAOS MICHELINI LTD DOURADOS       DRD       3.181,13      570,09      32    1,2 80
+SAO162998-1  24/09 01/10      94396                         2             TIRRENO IND E COM DE TIRRENO IND E COM DE 060363/01 - BMQ VEIC DOURADOS       DRD       1.404,52      116,49      27    0,1 80
+SAO164546-3  25/09 02/10     204319                        20             SANTA HELENA IND DE  SANTA HELENA IND DE  COMERCIO DE BEBIDAS  DOURADOS       DRD       3.154,80      465,53     187    0,5 80
+SAO163539-5  24/09 01/10     450246                        13             BRALIMPIA IND E COM  BRALIMPIA IND E COM  ASSOCIACAO DE GESTAO DOURADOS       DRD      30.308,96    1.124,37      62    1,2 80
+VIX034597-1  22/09 30/09    3351284                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  CRISTIAN MENDES CARV DOURADOS       DRD         518,90      155,82      12    0,3 83
+VIX034606-3  22/09 30/09    3353972                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  MAIKO OLIVEIRA NULL  DOURADOS       DRD       1.202,97      146,19      19    0,2 83
+SAO164555-2  25/09 02/10     204326                       167             SANTA HELENA IND DE  SANTA HELENA IND DE  SENDAS DISTRIBUIDORA DOURADOS       DRD      30.846,85    2.138,12   1.398    3,7 80
+SJP163148-9  24/09 05/10    1138158                         1             CASSINI E MOREIRA CO CASSINI E MOREIRA CO PEDRO DIAGONE        DOURADOS       DRD         958,60      172,94      44    0,0 83
+SAO164170-1  25/09 02/10     275527              ERWRD      1             BREMEN IMPORTADORA D HB TRANSPORTES E LOG MARCOS DOS SANTOS BA DOURADOS       DRD         566,65      126,85       1    0,0 80
+SAO163880-7  24/09 01/10    3059176                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B DOURADOS HIDRAULICA  DOURADOS       DRD       1.207,57      124,23      19    0,2 80
+                            3059956
+SAO161190-9  22/09 29/09    1396014                         1             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C RI HAPPY BRINQUEDOS  DOURADOS       DRD          43,22       93,52       3    0,0 80
+SAO161453-3  22/09 29/09       1691              ERWRD      2             A. M. MOVEIS LTDA    HB TRANSPORTES E LOG ALISON VITOR FAUSTIN DOURADOS       DRD         726,12      127,89      30    0,1 95
+SAO163877-7  24/09 07/10     361995                        16             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU BRF SA               DOURADOS       DRD       5.799,33      603,46     416    0,3 15
+SAO162902-6  23/09 30/09    3058884                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B DOURADOS HIDRAULICA  DOURADOS       DRD         845,97       81,48       2    0,0 80
+SAO163138-1  24/09 01/10       1063              BYPWC      7             METAL LUX COMERCIO D 1 ACAO SP TRANSPORTE TAURUS DISTRIBUIDORA DOURADOS       DRD       3.605,00      226,72      94    0,0 80
+SAO161473-8  22/09 29/09       4146              ERWRD      2             MG PRODUTOS PARA LAB HB TRANSPORTES E LOG AGROINDUSTRIAL SAO F DOURADOS       DRD         540,00      126,68     100    0,1 80
+VIX034589-0  22/09 30/09    3353775                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  VANESSA DOS SANTOS N DOURADOS       DRD       3.759,20      517,58      80    1,2 83
+VIX034563-6  22/09 30/09    3353720                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  PATRIK LUIZ PASTORI  DOURADOS       DRD       1.968,90      116,01      26    0,0 83
+SAO164542-1  25/09 02/10    1259841                         1             INFINITY CABOS ESPEC INFINITY CABOS ESPEC SATPRO COMERCIO E SE DOURADOS       DRD         309,94      300,83     105    0,5 80
+SAO163558-1  24/09 01/10       2567                         1             KIBICHINHOS INDUSTRI GOFRETES INTERMEDIAC MAYHALLA OLIVEIRA LO DOURADOS       DRD         874,05      171,65      12    0,4 80
+SAO160241-1  20/09 25/09    1398534                         2             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C MOTTU LOCACAO DE VEI DOURADOS       DRD         280,20       93,52       9    0,1 80
+CWB012570-9  18/09 30/09    7459377                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  PEDRO SEGUNDO PEREIR DOURADOS       DRD       2.645,29      356,14      52    0,7 83
+CWB012771-0  23/09 05/10    7469033                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  CRISTINO ABE         DOURADOS       DRD       1.325,28      164,37      25    0,2 83
+SAO163876-9  24/09 01/10     361999                        16             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU SEARA ALIMENTOS LTDA DOURADOS       DRD       2.806,88      426,85     232    0,3 80
+FND159391-9  18/09 29/09      13806                         2             DE MARCHI COMERCIO D DE MARCHI COMERCIO D SANDRA REGINA MOISES DOURADOS       DRD         320,79      215,18      30    0,3 83
+SAO161788-5  22/09 29/09       6446                         3             SUELEN RODRIGUES DEL CENTRAL DO FRETE INT LUX SUN PARK HOTEL L DOURADOS       DRD       1.994,21      214,27      76    0,2 80
+CWB012594-6  18/09 30/09    7459405                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  ALINE ROCHA          DOURADOS       DRD       4.166,09      443,25      72    1,0 83
+SAO163756-8  24/09 01/10     585909                         1             ECOLAB QUIMICA LTDA  ECOLAB QUIMICA LTDA  SESI SERVICO SOCIAL  DOURADOS       DRD         464,63      107,76       6    0,0 80
+JOI002283-7  23/09 02/10    1021211                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S BUNGE ALIMENTOS S/A  DOURADOS       DRD          39,38       84,86       0    0,0 83
+SAO162994-8  24/09 01/10      94548                         5             TIRRENO IND E COM DE TIRRENO IND E COM DE ENDO COMERCIO VEICUL DOURADOS       DRD       3.260,31      131,46      19    0,0 80
+SAO161211-5  22/09 29/09    1401478                         9             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C CLARO NXT TELECOM SA DOURADOS       DRD       1.352,62      107,19      53    0,3 80
+CWB012689-6  22/09 02/10      27329                        13             DMH HIGIENE E COM DE DMH HIGIENE E COM DE L Q NUNES COM PROD L DOURADOS       DRD       1.890,72      251,99     151    0,4 83
+FRA162670-1  23/09 02/10    4411799                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN FINANCEIRO HECTARES  DOURADOS       DRD         356,07      104,13       4    0,1 83
+VIX034619-5  22/09 30/09    3354193                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  LADY MARA ALMEIDA AN DOURADOS       DRD         518,90      155,82      12    0,3 83
+CWB012691-8  22/09 02/10       5446                       100             BF LIMP COM DE PRODS BF LIMP COM DE PRODS EFICAZ ATACADAO DA L DOURADOS       DRD       5.188,00      774,48     531    1,5 83
+SAO163917-0  24/09 01/10    3059351                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B DOURADOS HIDRAULICA  DOURADOS       DRD         786,19       81,05       1    0,0 80
+CWB012637-3  21/09 01/10    7461043                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  MARIA ALICE MORALES  DOURADOS       DRD       2.742,86      385,72      53    0,9 51
+BNU002260-8  22/09 07/10        540                         1             REFINAR EMPRESARIAL  REFINAR EMPRESARIAL  FUNDO MUNICIPAL DE S ELDORADO       DRD      14.579,97      651,55     125    1,2 83
+SAO162942-5  24/09 06/10    1404432                         8             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C COOPERATIVA DE CREDI FATIMA DO SUL  DRD       1.996,59      107,82      28    0,4 80
+SAO163519-1  24/09 06/10     292349                         2             NIPO CENTER IMPORT L NIPO CENTER IMPORT L MARIANA KILL DE SOUZ FATIMA DO SUL  DRD       1.990,67      172,09      86    0,3 80
+VIX034416-8  21/09 02/10    3347889                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  CESAR AURELIO BIFARO ITAPORA        DRD       1.952,70      207,42      33    0,4 83
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: DRD1857                                                                              26/09/2026 18:19
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164446-7  25/09 07/10        692                         2             H E E ARTEFTATOS MDF H E E ARTEFTATOS MDF JOCIKELI LIRA FONTES ITAPORA        DRD       2.450,00      401,49      70    0,8 80
+SAO161851-2  22/09 02/10     809016                         5             DGI IMPORTACAO E EXP DGI IMPORTACAO E EXP ELIFAS RODRIGUES DOS IVINHEMA       DRD       3.100,00      186,80     130    0,3 80
+SAO162177-7  23/09 05/10       1316                         5             CARLA CHINELLATO DE  CASA LAR SAO GERALDO CASA LAR SAO GERALDO JUTI           DRD       1.798,00      277,66      63    0,8 80
+FRA162371-1  23/09 07/10    4411026                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN HAYDN PACHECO        JUTI           DRD       1.384,78      110,76      24    0,1 83
+VIX034304-8  18/09 01/10    3344212                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  EDINEIA APARECIDA DE MARACAJU       DRD       4.160,68      372,43      64    0,8 83
+SAO162919-1  23/09 05/10    3058930                        19             LORENZETTI SA INDS B LORENZETTI SA INDS B NAYARA C R LOPES-MAT MUNDO NOVO     DRD       9.332,27      301,29      47    0,6 80
+SAO164184-1  25/09 07/10      12865                        23             JVL IMPORTS LTDA     MILENE CRISTINA DE A MILENE CRISTINA DE A MUNDO NOVO     DRD       4.242,56    1.835,86     204    2,7 95
+VIX034497-4  21/09 02/10    2864353                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LUANA SOARES         MUNDO NOVO     DRD       2.308,27      335,92      44    0,4 83
+VIX034428-1  21/09 02/10    3344725                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  KATHELY TRINDADE DE  NAVIRAI        DRD         529,00      155,91      14    0,3 83
+SAO160243-8  20/09 30/09    1398682                         1             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C ITAU UNIBANCO S.A    NAVIRAI        DRD         408,87       94,16       6    0,0 80
+CWB012639-0  21/09 06/10    7461062                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  CARLOS ALBERTO MARQU NAVIRAI        DRD       2.964,97      451,00      68    1,0 83
+VIX034305-6  18/09 01/10    3344211                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  MARCILENE FROIS FIAU NAVIRAI        DRD       3.866,75      289,74      53    0,6 83
+VIX034546-6  22/09 05/10    3348466                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  EDNALVA MARQUES DA S NAVIRAI        DRD       1.893,04      115,32      10    0,1 83
+CWB012638-1  21/09 06/10    7461052                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  KEILA MARCIA RESENDE NAVIRAI        DRD       3.980,83      442,63      72    1,0 83
+VIX034605-5  22/09 05/10    3351867                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  VILMA BARBOSA DA SIL NAVIRAI        DRD       2.176,90      186,74      50    0,4 83
+SAO162300-1  23/09 02/10     271197              XFKEV      3             MOVEIS CASTRO        HB TRANSPORTES E LOG JULIANA GOMES DE SOU NOVA ALVORADA  DRD       1.008,23      129,72      63    0,1 80
+SAO163725-8  24/09 05/10     586302                         1             ECOLAB QUIMICA LTDA  ECOLAB QUIMICA LTDA  PL REFEICOES LTDA    NOVA ALVORADA  DRD         837,11      143,87       9    0,2 80
+SAO161463-1  22/09 02/10     166456                         6             ABC ARTEFATOS DE BOR ABC ARTEFATOS DE BOR CAIADO PNEUS LTDA    NOVA ANDRADINA DRD       9.418,70      448,45     242    0,6 80
+                             166457
+VIX034545-8  22/09 05/10    3350027                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  DEISE CRISTIANE ANTU NOVA ANDRADINA DRD         518,90      155,82      12    0,3 83
+VIX034514-8  21/09 02/10    3348152                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  DAIANA SILVA LIMA NU NOVA ANDRADINA DRD         934,78      151,67      21    0,2 83
+VIX034418-4  21/09 02/10    3347458                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  FERNANDO MACHADO REA NOVA ANDRADINA DRD       3.858,51      380,58      66    0,8 83
+VIX034182-7  17/09 30/09    3340766                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  EDSON ARCE FLORES    PONTA PORA     DRD       1.413,23      156,02      24    0,3 83
+CWB012728-1  22/09 07/10    7466069                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  RENATO DE MAGALHAES  PONTA PORA     DRD       3.515,46      548,14      61    1,2 83
+SAO162625-6  23/09 05/10     295570                        23             MONTANA QUIMICA LTDA MONTANA QUIMICA LTDA R G RAMOS TRANSPORTE PONTA PORA     DRD       9.414,92      380,88     216    0,4 80
+SAO164750-4  25/09 07/10      35056                        50             INTERNEED INDUSTRIAL INTERNEED INDUSTRIAL FABIANO DA SILVA BAR PONTA PORA     DRD       5.694,51      711,35     212    1,4 80
+CWB012595-4  18/09 05/10    7459406                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  LEONARDO  RIBEIRO    PONTA PORA     DRD       6.815,10      605,52     100    1,4 83
+CWB012746-9  23/09 08/10    7468985                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  EDSON ARCE FLORES    PONTA PORA     DRD       1.231,25      170,85      25    0,3 83
+FRA160871-1  21/09 05/10    4406016                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN ALEXANDRE GONZALEZ D PONTA PORA     DRD       1.617,64      155,61      40    0,3 83
+VIX034265-3  18/09 01/10    3342353                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  ARNALDO ORTIZ NULL   PONTA PORA     DRD       1.824,24      222,41      35    0,5 83
+SAO162293-5  23/09 05/10     307614                         2             SIER MOVEIS LTDA     SIER MOVEIS LTDA     IMPORTADORA E EXPORT PONTA PORA     DRD       2.629,46      396,18      26    0,8 80
+VIX034185-1  17/09 30/09    3338855                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  CRISLAINE RAMIRES NU PONTA PORA     DRD       1.021,28      121,18      48    0,2 83
+SAO162940-9  24/09 06/10    1404409                        16             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C CALCENTER CALCADOS C PONTA PORA     DRD       1.585,88      180,23     124    0,5 80
+SAO163359-7  24/09 06/10     823456                         4             H P COMERCIO INTERNA H P COMERCIO INTERNA FAUSTAO PNEUS LTDA   PONTA PORA     DRD      10.850,00    1.324,06     316    3,1 80
+                             823528
+VIX034363-3  18/09 01/10        814                         1             MRN DISTRIBUIDORA LT MRN DISTRIBUIDORA LT IYOBE E CIA LTDA     PONTA PORA     DRD      11.807,28    1.421,35     242    1,7 83
+                                816,        817
+VIX034278-5  18/09 01/10    3341496                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  VITOR ARAUJO NULL    PONTA PORA     DRD       2.018,68      123,35      24    0,1 83
+SAO162996-4  24/09 06/10      94417                         2             TIRRENO IND E COM DE TIRRENO IND E COM DE MASTTER COM DE PECAS PONTA PORA     DRD       1.127,56      114,27       8    0,0 80
+SJP162161-1  23/09 07/10       1208                         3             ADMILSON ADAO PEREIR ADMILSON ADAO PEREIR COOPERAI COOP.PROD.D PONTA PORA     DRD       2.630,00      187,53      54    0,1 83
+FND160328-1  20/09 02/10       4492                         3             GD INDUSTRIA E COMER GD INDUSTRIA E COMER WESLEY CRISTALDO ORT RIO BRILHANTE  DRD       1.610,99      221,56      75    0,2 51
+TOTAIS:                                 90 CTRCS          712                                                                                                   303.094,81   29.598,12   8.291   45,6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: ESTEIO                                                                               26/09/2026 18:19
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164210-3  25/09 30/10     918982                         2             BANDEIRANTE QUIMICA  BOESSIO TRANSPORTES  BOESSIO TRANSPORTES  ESTEIO         FEC     120.000,00    9.800,00   6.000    0,0 80
+                             918983
+TOTAIS:                                  1 CTRCS            2                                                                                                   120.000,00    9.800,00   6.000    0,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   4
+ssw0194                                                                                     PLACA: RVD8D36                                                                              26/09/2026 18:19
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO163541-7  24/09 02/10       1402                         4             RADIAL DO BRASIL MET ADELINO ABADIO DE AL ADELINO ABADIO DE AL ACREUNA        RVD       1.664,18      374,84      53    0,4 80
+SAO164423-8  25/09 05/10     203566                         6             COMERCIAL HUTLON DO  GILIARDE XAVIER RODR GILIARDE XAVIER RODR ACREUNA        RVD       1.285,45      141,46      66    0,1 80
+SAO164425-4  25/09 05/10      89535                         5             COMERCIAL LELONG DO  GILIARDE XAVIER RODR GILIARDE XAVIER RODR ACREUNA        RVD       1.866,44      151,47     110    0,3 80
+SAO163688-0  24/09 02/10     373605                         4             MAGGION INDUSTRIAS D COOPERATIVA AGROINDU COOPERATIVA AGROINDU CACU           RVD       3.285,91      448,91      63    0,4 80
+PSA158355-7  16/09 25/09     588653                         2             FORCE LINE IND COM C FORCE LINE IND COM C CASA DOS PARAFUSOS G INDIARA        RVD       3.778,12      266,76     179    0,6 83
+SAO163687-1  24/09 02/10     373512                         7             MAGGION INDUSTRIAS D COOP AGROIND DOS PRO COOP AGROIND DOS PRO JANDAIA        RVD       2.277,95      335,97      46    0,4 80
+SAO163690-1  24/09 02/10     373606                         8             MAGGION INDUSTRIAS D COOP AGROINDUSTRIAL  COOP AGROINDUSTRIAL  MONTIVIDIU     RVD       5.499,55      407,11     122    0,8 80
+CAM428839-4  22/09 30/09       1516                        18             ESPIRAL FLEX COMERCI W A MANGUEIRAS PARAF W A MANGUEIRAS PARAF MONTIVIDIU     RVD       2.487,00      363,80     109    1,0 83
+SAO163895-5  24/09 02/10    3059294                         6             LORENZETTI SA INDS B LORENZETTI SA INDS B 53.547.533 JOYCE MAR QUIRINOPOLIS   RVD       3.082,94      147,09      25    0,3 80
+VIX034502-4  21/09 30/09    2866706                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  CHARLLES ALEXANDRE   QUIRINOPOLIS   RVD       1.108,24      141,90      26    0,3 83
+SAO164191-3  25/09 05/10     134081                        19             OFF PAPER INDUSTRIA  JOSE RIVALDO E CAETA JOSE RIVALDO E CAETA QUIRINOPOLIS   RVD       2.059,47      189,26     121    0,2 80
+SAS028195-6  25/09 31/12     167471              TIT        1             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH SV SERVAL DISTRIBUID QUIRINOPOLIS   RVD           0,01        0,01     100    0,0 80
+SAO164085-2  25/09 02/10     137106                         1             BZ AUTOMOTIVE LTDA   MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       2.556,47      272,90     184    0,5 80
+SAO164154-9  25/09 02/10     110778                         6             ZUCOLLO AUTO PARTS I MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       4.946,71      231,08     133    0,2 80
+SAO164321-5  25/09 02/10       8643                        20             ALLIANCE SOLUCOES IN MARCIO NUNES BORGES  MARCIO NUNES BORGES  RIO VERDE      RVD       3.000,00      132,27      39    0,3 80
+SAO161445-2  22/09 29/09      20678                        64             RENATO CAETANO - ME  SINERGIA IND MONT EL SINERGIA IND MONT EL RIO VERDE      RVD      77.101,29    5.623,78   2.485   14,9 95
+SAO164238-3  25/09 02/10     144758                         3             METALURGICA INCA LTD NOVA LUZ MATS ELETR  NOVA LUZ MATS ELETR  RIO VERDE      RVD       2.614,50      119,33      68    0,2 80
+SAO164094-1  25/09 02/10     358830                        24             ROJEMAC IMP E EXPORT THE CASA HOME UTILID THE CASA HOME UTILID RIO VERDE      RVD       8.046,05      636,91     276    1,7 80
+SAO164259-6  25/09 02/10     287797                        10             INDUSCABOS CONDUTORE CONTROLTECH AUTOMACA CONTROLTECH AUTOMACA RIO VERDE      RVD     181.942,80    5.234,26   3.010    0,0 80
+                             287798
+CAM429378-9  24/09 01/10     884800                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL POLIPECAS DISTRIBUID RIO VERDE      RVD       1.744,32      108,31      40    0,2 83
+CAM429315-1  23/09 30/09     210839                         5             WALSYWA IND E COM DE WALSYWA IND E COM DE 66.266.683 FRANCISCO RIO VERDE      RVD       5.618,32      105,55      30    0,1 83
+CAM429162-0  23/09 30/09     884168                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ELETROTURBO ELETRICA RIO VERDE      RVD         547,47      105,35       3    0,2 83
+SAO164303-7  25/09 02/10      80672                         3             CONTEC IND.  E COM.  MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       3.772,69      213,15      43    0,0 80
+CAM428750-9  21/09 28/09     106238                         2             COPESPUMA INDL LTDA  COPESPUMA INDL LTDA  ML BABY LTDA         RIO VERDE      RVD       2.316,78      152,57      15    0,1 83
+SAO164533-1  25/09 02/10         55                        40             TED SOLUCOES EM EMBA GOFRETES INTERMEDIAC RIO VERDE PRODUTOS C RIO VERDE      RVD      10.439,83      396,34     207    0,8 80
+CAM429374-6  24/09 01/10     884834                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ELETROTURBO ELETRICA RIO VERDE      RVD       5.287,42      117,08       4    0,2 83
+SAO164467-0  25/09 02/10        835                        15             ECOLAB QUIMICA LTDA  ECOLAB QUIMICA LTDA  BRF S.A.             RIO VERDE      RVD       4.377,40      513,57     460    0,5 80
+                                836
+SAO163591-3  24/09 01/10      16943              EXSHA      4             TDEC REDES DE COMPUT EXPRESSO ELSHADAI TR KLABIN S/A           RIO VERDE      RVD      20.143,59      656,88      17    0,0 80
+                              16944
+SAS028193-0  25/09 31/12     402329              TIT        1             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH FABIO EMILIO CLEMENT RIO VERDE      RVD           0,01        0,01       7    0,0 80
+SAO164503-0  25/09 02/10      39910                        10             CHL COMERCIO DE PAPE DESENHAR COPIADORA L DESENHAR COPIADORA L RIO VERDE      RVD       2.985,00      196,41     170    0,2 80
+SAO164374-6  25/09 02/10        932                         1             FN CAPITAL DISTRIBUI FN CAPITAL DISTRIBUI COOP DE SUINOCULTORE RIO VERDE      RVD       1.840,00      199,23      27    0,2 80
+SAO164248-1  25/09 02/10       6370                        48             ANDALUZ ATACADISTA L NOVA LUZ MATS ELETR  NOVA LUZ MATS ELETR  RIO VERDE      RVD       5.631,62      196,89     120    0,6 80
+SAO164456-4  25/09 02/10     207779                        13             AL IND E COM DE PUXA DELTA INDUSTRIA DIST DELTA INDUSTRIA DIST RIO VERDE      RVD       6.637,00      347,87      94    0,3 80
+SAO162459-8  23/09 30/09      20703                         7             RENATO CAETANO - ME  SINERGIA IND MONT EL SINERGIA IND MONT EL RIO VERDE      RVD       8.558,90    1.729,61     720    4,8 80
+SAO164198-1  25/09 02/10     451585                         4             IBIRA INDUSTRIA E CO COOPERATIVA AGROIND  COOPERATIVA AGROIND  RIO VERDE      RVD       3.118,15      279,27     150    1,0 80
+SAO164329-1  25/09 02/10      35470              MARSH     32             PERFECTA IND COM E S MARSHIPPING TRANSPOR SENDAS DISTRIBUIDORA RIO VERDE      RVD       3.524,64      165,48      88    0,4 80
+VIX034741-8  23/09 01/10        281                         1             REDEX TELECOMUNICACO REDEX TELECOMUNICACO TEIXEIRA ATACADO E C RIO VERDE      RVD       4.440,92      187,41       6    0,0 83
+VIX034797-3  23/09 01/10    2870393                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  MARCELLA LAET MAGALH RIO VERDE      RVD       2.235,50      128,60      27    0,2 83
+RAO005103-9  21/09 28/09     445142                         5             CONDUMAX - ELETRO ME CONDUMAX - ELETRO ME HIDRO VOLT MATERIAIS RIO VERDE      RVD      27.972,00    1.422,40     979    3,3 83
+PSA161997-7  22/09 30/09    3661332                        18             GRUPO MULTI S A      GRUPO MULTI S A      G S COMERCIO DE PROD RIO VERDE      RVD      14.583,14      666,36     146    1,4 83
+VIX034472-9  21/09 29/09     722663                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  PROSPERITATEM COMERC RIO VERDE      RVD       2.765,95      242,05      43    0,4 83
+SAO163552-2  24/09 01/10       1750              UETAB      1             LIDERVAC MAQUINAS E  TRANSPORTES DE CARGA VIVA RIO ATACADISTA  RIO VERDE      RVD      17.900,00      313,51      80    0,5 80
+SAO164377-1  25/09 02/10      48084                         1             PICHU ACESSORIOS PAR ALUMINIOS E METAIS M ALUMINIOS E METAIS M RIO VERDE      RVD       1.859,76      118,82      16    0,1 80
+CAM428782-7  21/09 28/09     210506                        14             WALSYWA IND E COM DE WALSYWA IND E COM DE CENTRAL GESSO EIRELL RIO VERDE      RVD       4.850,61      216,96     206    0,7 83
+TIT157689-5  16/09 25/09     146069                         4             CERAMICA STRUFALDI L SANTOS KUHN MATERIAL SANTOS KUHN MATERIAL RIO VERDE      RVD         271,76      346,69      84    0,1 83
+SAO164311-8  25/09 02/10     295639                        16             MONTANA QUIMICA LTDA MONTANA QUIMICA LTDA MULTICORES TINTAS LT RIO VERDE      RVD      12.345,38      336,95     182    0,3 80
+VIX034879-1  24/09 05/10    2868998                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  THIAGO PEREIRA DA CU SANTA HELENA D RVD       1.862,03      125,63      28    0,2 83
+SAO163939-1  24/09 02/10    3059414                        15             LORENZETTI SA INDS B LORENZETTI SA INDS B NOVALUZ MAT ELETRICO SANTA HELENA D RVD       7.433,77      236,82      60    0,6 80
+                            3059416
+SAO163936-6  24/09 02/10    3059406                        14             LORENZETTI SA INDS B LORENZETTI SA INDS B NIDAW CONSTRUCAO E I SANTA HELENA D RVD       6.806,27      216,46      47    0,5 80
+                            3059408
+TOTAIS:                                 49 CTRCS          492                                                                                                   500.473,31   25.261,34  11.310   40,2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   5
+ssw0194                                                                                     PLACA: UDI4A00                                                                              26/09/2026 18:19
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CAM428605-7  21/09 28/09      55857                        26             KTELI INDUSTRIA E CO KTELI INDUSTRIA E CO RB BORRACHAS FERRAME PATROCINIO     UDI       6.024,16      664,41     298    1,5 83
+VIX034746-9  23/09 30/09       3821                        18             CASTRO EQUIPAMENTOS  CASTRO EQUIPAMENTOS  MUNICIPIO DE PARACAT PARACATU       UDT      52.144,20    5.313,06   1.004   17,9 83
+TOTAIS:                                  2 CTRCS           44                                                                                                    58.168,36    5.977,47   1.303   19,4
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                            142 CTRCS        1.250                                                                                                   981.736,48   70.636,93  26.904  105,2
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
