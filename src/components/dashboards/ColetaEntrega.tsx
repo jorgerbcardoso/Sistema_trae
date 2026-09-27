@@ -364,57 +364,11 @@ export function ColetaEntrega() {
     mesesProgresso.reduce((s, m) => s + m.duracaoSeg, 0);
 
   const setPeriodoIni = (nextBr: string) => {
-    const nextIni = parseDateBR(nextBr);
-    const curFin = parseDateBR(dataFin);
-
-    if (!nextIni) {
-      setDataIni(nextBr);
-      return;
-    }
-
-    let nextFinBr = dataFin;
-    let ajustou = false;
-
-    if (curFin) {
-      if (curFin < nextIni) {
-        nextFinBr = formatDateBR(nextIni);
-        ajustou = true;
-      } else if (diffDaysUTC(nextIni, curFin) > 186) {
-        nextFinBr = formatDateBR(addDays(nextIni, 186));
-        ajustou = true;
-      }
-    }
-
     setDataIni(nextBr);
-    if (nextFinBr !== dataFin) setDataFin(nextFinBr);
-    if (ajustou) toast.info('Período limitado a ~6 meses. Ajustei a data final.');
   };
 
   const setPeriodoFin = (nextBr: string) => {
-    const nextFin = parseDateBR(nextBr);
-    const curIni = parseDateBR(dataIni);
-
-    if (!nextFin) {
-      setDataFin(nextBr);
-      return;
-    }
-
-    let nextIniBr = dataIni;
-    let ajustou = false;
-
-    if (curIni) {
-      if (nextFin < curIni) {
-        nextIniBr = formatDateBR(nextFin);
-        ajustou = true;
-      } else if (diffDaysUTC(curIni, nextFin) > 186) {
-        nextIniBr = formatDateBR(addDays(nextFin, -186));
-        ajustou = true;
-      }
-    }
-
     setDataFin(nextBr);
-    if (nextIniBr !== dataIni) setDataIni(nextIniBr);
-    if (ajustou) toast.info('Período limitado a ~6 meses. Ajustei a data inicial.');
   };
 
   const handleSort = (field: SortField) => {
@@ -657,16 +611,27 @@ export function ColetaEntrega() {
     };
   };
 
-  const handleGerar = async () => {
-    if (!dataIni || !dataFin) { toast.error('Informe o período.'); return; }
+  const handleGerar = async (iniOverride?: string, finOverride?: string) => {
+    const dataIniUso = iniOverride ?? dataIni;
+    const dataFinUso = finOverride ?? dataFin;
 
-    const dtIni = parseDateBR(dataIni);
-    const dtFin = parseDateBR(dataFin);
+    if (!dataIniUso || !dataFinUso) { toast.error('Informe o período.'); return; }
+
+    let dtIni = parseDateBR(dataIniUso);
+    let dtFin = parseDateBR(dataFinUso);
     if (!dtIni || !dtFin) { toast.error('Data inválida. Use o formato DD/MM/AA.'); return; }
-    if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
-    const diffDias = diffDaysUTC(dtIni, dtFin);
-    if (diffDias > 186) { toast.error('O período não pode ser maior que ~6 meses.'); return; }
 
+    if (dtFin < dtIni) {
+      const t = dtIni;
+      dtIni = dtFin;
+      dtFin = t;
+    }
+
+    if (diffDaysUTC(dtIni, dtFin) > 186) {
+      dtFin = addDays(dtIni, 186);
+    }
+
+    const diffDias = diffDaysUTC(dtIni, dtFin);
     const chunks = dividirEmMeses(dtIni, dtFin);
     if (chunks.length === 0) { toast.error('Período inválido.'); return; }
     const multiMes = chunks.length > 1;
@@ -788,22 +753,49 @@ export function ColetaEntrega() {
   };
 
   const handleGerarClick = () => {
-    const dtIni = parseDateBR(dataIni);
-    const dtFin = parseDateBR(dataFin);
+    let dtIni = parseDateBR(dataIni);
+    let dtFin = parseDateBR(dataFin);
+
     if (!dtIni || !dtFin) {
       handleGerar();
       return;
     }
+
+    const ajustes: string[] = [];
+
     if (dtFin < dtIni) {
-      handleGerar();
-      return;
+      const t = dtIni;
+      dtIni = dtFin;
+      dtFin = t;
+      ajustes.push('datas invertidas foram trocadas automaticamente');
     }
+
+    if (diffDaysUTC(dtIni, dtFin) > 186) {
+      dtFin = addDays(dtIni, 186);
+      ajustes.push('período limitado a ~6 meses');
+    }
+
+    const dataIniNova = formatDateBR(dtIni);
+    const dataFinNova = formatDateBR(dtFin);
+    let dadosAlterados = false;
+    if (dataIniNova !== dataIni) { setDataIni(dataIniNova); dadosAlterados = true; }
+    if (dataFinNova !== dataFin) { setDataFin(dataFinNova); dadosAlterados = true; }
+
     const diffDias = diffDaysUTC(dtIni, dtFin);
     const chunks = dividirEmMeses(dtIni, dtFin);
     const qtdMeses = chunks.length || 1;
     setConfirmGerarDiffDias(diffDias + 1);
     setConfirmGerarQtdMeses(qtdMeses);
-    setConfirmGerarOpen(true);
+
+    if (ajustes.length > 0) {
+      toast.info(`Ajustes: ${ajustes.join('; ')}.`);
+    }
+
+    if (dadosAlterados) {
+      setTimeout(() => setConfirmGerarOpen(true), 0);
+    } else {
+      setConfirmGerarOpen(true);
+    }
   };
 
   const handleCarregarAndamento = async () => {
@@ -1168,8 +1160,6 @@ export function ColetaEntrega() {
                       <CalendarInput
                         value={dataFinISO}
                         onChange={e => setPeriodoFin(isoToBR(e.target.value))}
-                        min={dtIniParsed ? dataIniISO : undefined}
-                        max={dtIniParsed ? formatISODate(addDays(dtIniParsed, 186)) : undefined}
                         className="dark:bg-slate-800 dark:border-slate-700 font-mono"
                       />
                     </div>
@@ -1420,7 +1410,6 @@ export function ColetaEntrega() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Placas terceiros</div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.placas}</div>
                   </div>
                 </div>
@@ -1447,7 +1436,6 @@ export function ColetaEntrega() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Entregas terceiros</div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totaisTerceiros.entregas}</div>
                   </div>
                 </div>
@@ -1474,7 +1462,6 @@ export function ColetaEntrega() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Frete terceiros</div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.frete)}</div>
                   </div>
                 </div>
@@ -1488,7 +1475,6 @@ export function ColetaEntrega() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remuneração terceiros</div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500">Veículos terceiros</div>
                     <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{formatMoeda(totaisTerceiros.remuneracao)}</div>
                   </div>
                 </div>
