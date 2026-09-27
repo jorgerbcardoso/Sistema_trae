@@ -308,10 +308,60 @@ export function ColetaEntrega() {
   const [sortAndamentoDir, setSortAndamentoDir] = useState<SortDir>('desc');
   const [expandedPlacas, setExpandedPlacas] = useState<Set<string>>(new Set());
 
+  type MesStatus = 'pendente' | 'fila' | 'iniciando' | 'gerando' | 'pronto_baixar' | 'baixando' | 'processando' | 'concluido' | 'erro' | 'ignorado';
+
+  interface MesProgresso {
+    idx: number;
+    rotulo: string;
+    dataIniBr: string;
+    dataFinBr: string;
+    status: MesStatus;
+    stage: string;
+    duracaoSeg: number;
+    erro?: string | null;
+  }
+
+  const [mesesProgresso, setMesesProgresso] = useState<MesProgresso[]>([]);
+  const [confirmGerarQtdMeses, setConfirmGerarQtdMeses] = useState<number>(1);
+
   const dtIniParsed = parseDateBR(dataIni);
   const dtFinParsed = parseDateBR(dataFin);
   const dataIniISO = dtIniParsed ? formatISODate(dtIniParsed) : '';
   const dataFinISO = dtFinParsed ? formatISODate(dtFinParsed) : '';
+
+  const ultimoDiaMes = (ano: number, mes: number) => new Date(ano, mes + 1, 0);
+
+  const dividirEmMeses = (ini: Date, fin: Date): { ini: Date; fin: Date }[] => {
+    const out: { ini: Date; fin: Date }[] = [];
+    if (fin < ini) return out;
+    let cur = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate());
+    const fimAbs = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
+    while (cur <= fimAbs) {
+      const ultimoDiaDoMes = ultimoDiaMes(cur.getFullYear(), cur.getMonth()).getDate();
+      const ultimoDia =
+        (cur.getFullYear() === fimAbs.getFullYear() && cur.getMonth() === fimAbs.getMonth())
+          ? fimAbs.getDate()
+          : ultimoDiaDoMes;
+      const chunkFim = new Date(cur.getFullYear(), cur.getMonth(), ultimoDia);
+      out.push({ ini: new Date(cur), fin: chunkFim });
+      cur = new Date(cur.getFullYear(), cur.getMonth(), ultimoDia);
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  };
+
+  const rotuloMes = (d: Date) => {
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const aa = String(d.getFullYear()).slice(-2);
+    return `${mm}/${aa}`;
+  };
+
+  const atualizarMes = (idx: number, patch: Partial<MesProgresso>) => {
+    setMesesProgresso(prev => prev.map((m, i) => i === idx ? { ...m, ...patch } : m));
+  };
+
+  const somarSegundosDecorrido = () =>
+    mesesProgresso.reduce((s, m) => s + m.duracaoSeg, 0);
 
   const setPeriodoIni = (nextBr: string) => {
     const nextIni = parseDateBR(nextBr);
@@ -329,15 +379,15 @@ export function ColetaEntrega() {
       if (curFin < nextIni) {
         nextFinBr = formatDateBR(nextIni);
         ajustou = true;
-      } else if (diffDaysUTC(nextIni, curFin) > 30) {
-        nextFinBr = formatDateBR(addDays(nextIni, 30));
+      } else if (diffDaysUTC(nextIni, curFin) > 186) {
+        nextFinBr = formatDateBR(addDays(nextIni, 186));
         ajustou = true;
       }
     }
 
     setDataIni(nextBr);
     if (nextFinBr !== dataFin) setDataFin(nextFinBr);
-    if (ajustou) toast.info('Período limitado a 31 dias. Ajustei a data final.');
+    if (ajustou) toast.info('Período limitado a ~6 meses. Ajustei a data final.');
   };
 
   const setPeriodoFin = (nextBr: string) => {
@@ -356,15 +406,15 @@ export function ColetaEntrega() {
       if (nextFin < curIni) {
         nextIniBr = formatDateBR(nextFin);
         ajustou = true;
-      } else if (diffDaysUTC(curIni, nextFin) > 30) {
-        nextIniBr = formatDateBR(addDays(nextFin, -30));
+      } else if (diffDaysUTC(curIni, nextFin) > 186) {
+        nextIniBr = formatDateBR(addDays(nextFin, -186));
         ajustou = true;
       }
     }
 
     setDataFin(nextBr);
     if (nextIniBr !== dataIni) setDataIni(nextIniBr);
-    if (ajustou) toast.info('Período limitado a 31 dias. Ajustei a data inicial.');
+    if (ajustou) toast.info('Período limitado a ~6 meses. Ajustei a data inicial.');
   };
 
   const handleSort = (field: SortField) => {
@@ -432,6 +482,181 @@ export function ColetaEntrega() {
     return va.localeCompare(vb, 'pt-BR', { sensitivity: 'base' }) * dir;
   });
 
+  type RespostaMes = {
+    grupos: GrupoPlaca[];
+    serieCronologica: SerieDia[];
+    totais: Totais | null;
+    contratados: GrupoContratado[];
+    mode: string;
+  };
+
+  const mergeGrupos = (lista: GrupoPlaca[][]): GrupoPlaca[] => {
+    const mapa = new Map<string, GrupoPlaca>();
+    for (const arr of lista) {
+      for (const g of arr) {
+        const key = String(g.placa ?? '').trim().toUpperCase();
+        if (!key) continue;
+        const cur = mapa.get(key);
+        if (!cur) {
+          mapa.set(key, { ...g, ctrcs: [...(g.ctrcs ?? [])] });
+          continue;
+        }
+        cur.coletas += Number(g.coletas ?? 0) || 0;
+        cur.entregas += Number(g.entregas ?? 0) || 0;
+        cur.total += Number(g.total ?? 0) || 0;
+        cur.peso += Number(g.peso ?? 0) || 0;
+        cur.frete += Number(g.frete ?? 0) || 0;
+        cur.valMerc += Number(g.valMerc ?? 0) || 0;
+        cur.vol += Number(g.vol ?? 0) || 0;
+        cur.remuneracao = (Number(cur.remuneracao ?? 0) || 0) + (Number(g.remuneracao ?? 0) || 0);
+        if (!cur.contratado && g.contratado) cur.contratado = g.contratado;
+        if (cur.tpPropriedade === undefined || cur.tpPropriedade === null) cur.tpPropriedade = g.tpPropriedade ?? null;
+        if (cur.proprietarioNome === undefined || cur.proprietarioNome === null) cur.proprietarioNome = g.proprietarioNome ?? null;
+        if (cur.isFrota === undefined || cur.isFrota === null) cur.isFrota = g.isFrota ?? null;
+        if (Array.isArray(g.ctrcs)) cur.ctrcs.push(...g.ctrcs);
+      }
+    }
+    return Array.from(mapa.values());
+  };
+
+  const mergeSerie = (lista: SerieDia[][]): SerieDia[] => {
+    const mapa = new Map<string, SerieDia>();
+    for (const arr of lista) {
+      for (const s of arr) {
+        const key = String(s.data ?? '');
+        if (!key) continue;
+        const cur = mapa.get(key);
+        if (!cur) { mapa.set(key, { ...s }); continue; }
+        cur.coletas += Number(s.coletas ?? 0) || 0;
+        cur.entregas += Number(s.entregas ?? 0) || 0;
+        cur.frete += Number(s.frete ?? 0) || 0;
+        cur.peso += Number(s.peso ?? 0) || 0;
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => {
+      const da = parseDateBR(a.data);
+      const db = parseDateBR(b.data);
+      const ta = da ? da.getTime() : 0;
+      const tb = db ? db.getTime() : 0;
+      return ta - tb;
+    });
+  };
+
+  const mergeContratados = (lista: GrupoContratado[][]): GrupoContratado[] => {
+    const mapa = new Map<string, GrupoContratado>();
+    for (const arr of lista) {
+      for (const c of arr) {
+        const key = String(c.contratado ?? '').trim().toUpperCase();
+        if (!key) continue;
+        const cur = mapa.get(key);
+        if (!cur) { mapa.set(key, { ...c }); continue; }
+        cur.placas += Number(c.placas ?? 0) || 0;
+        cur.coletas += Number(c.coletas ?? 0) || 0;
+        cur.entregas += Number(c.entregas ?? 0) || 0;
+        cur.total += Number(c.total ?? 0) || 0;
+        cur.peso += Number(c.peso ?? 0) || 0;
+        cur.frete += Number(c.frete ?? 0) || 0;
+        cur.valMerc += Number(c.valMerc ?? 0) || 0;
+        cur.vol += Number(c.vol ?? 0) || 0;
+        cur.remuneracao += Number(c.remuneracao ?? 0) || 0;
+      }
+    }
+    return Array.from(mapa.values());
+  };
+
+  const mergeTotais = (lista: (Totais | null)[]): Totais | null => {
+    const validos = lista.filter((t): t is Totais => !!t);
+    if (validos.length === 0) return null;
+    const placasSet = new Set<string>();
+    const proprietariosSet = new Set<string>();
+    let total = 0, coletas = 0, entregas = 0, peso = 0, frete = 0, valMerc = 0, vol = 0, remuneracao = 0, placas = 0, proprietarios = 0;
+    for (const t of validos) {
+      total += Number(t.total ?? 0) || 0;
+      coletas += Number(t.coletas ?? 0) || 0;
+      entregas += Number(t.entregas ?? 0) || 0;
+      peso += Number(t.peso ?? 0) || 0;
+      frete += Number(t.frete ?? 0) || 0;
+      valMerc += Number(t.valMerc ?? 0) || 0;
+      vol += Number(t.vol ?? 0) || 0;
+      remuneracao += Number(t.remuneracao ?? 0) || 0;
+      placas += Number(t.placas ?? 0) || 0;
+      proprietarios += Number(t.proprietarios ?? 0) || 0;
+    }
+    return { total, coletas, entregas, peso, frete, valMerc, vol, remuneracao, placas, proprietarios };
+  };
+
+  const gerarUmMes = async (
+    idx: number,
+    mesIniBr: string,
+    mesFinBr: string,
+    placaArg: string,
+    onStage: (stage: string) => void,
+    onStatus: (s: MesStatus, stage?: string) => void,
+  ): Promise<RespostaMes> => {
+    const modo = 'RESUMO';
+    onStatus('iniciando', 'Iniciando geração do relatório...');
+    const start = await apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+      { method: 'POST', body: JSON.stringify({ step: 'START', data_ini: mesIniBr, data_fin: mesFinBr, placa: placaArg }) },
+      true
+    );
+    if (!start?.success) {
+      throw new Error(start?.message || 'Erro ao solicitar relatório.');
+    }
+    const baselineSeq = start.baseline_seq ?? 0;
+    const requestStartTs = start.request_start_ts ?? 0;
+
+    onStatus('gerando', 'Aguardando geração do relatório no TMS...');
+    let downloadAct: string | null = null;
+    const pollStart = Date.now();
+    const pollMaxMs = 12 * 60 * 1000;
+    while (Date.now() - pollStart < pollMaxMs) {
+      await new Promise(r => setTimeout(r, 1500));
+      const poll = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+        { method: 'POST', body: JSON.stringify({ step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }) },
+        true
+      );
+      if (!poll?.success) {
+        onStage(poll?.message || 'Aguardando geração do relatório no TMS...');
+        continue;
+      }
+      if (poll.status === 'ready') {
+        downloadAct = poll.download_act || null;
+        onStatus('pronto_baixar', 'Relatório pronto. Baixando arquivo...');
+        break;
+      }
+      if (poll.status === 'running') {
+        const sit = String(poll.sit ?? '').trim();
+        const sitLimpo = sit.replace(/\(seq\s*\d+\)/i, '').replace(/\s{2,}/g, ' ').trim();
+        onStage(`Gerando no TMS... ${sitLimpo || ''}`.trim());
+        continue;
+      }
+      onStage('Aguardando geração do relatório no TMS...');
+    }
+    if (!downloadAct) {
+      throw new Error('Relatório não ficou pronto no tempo esperado. Tente novamente.');
+    }
+
+    onStatus('baixando', 'Baixando arquivo do TMS...');
+    const res = await apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
+      { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
+      true
+    );
+    if (!res?.success) {
+      throw new Error(res?.message || 'Erro ao processar arquivo.');
+    }
+    onStatus('processando', 'Processando arquivo...');
+    return {
+      grupos: res.grupos ?? [],
+      serieCronologica: res.serieCronologica ?? [],
+      totais: res.totais ?? null,
+      contratados: res.contratados ?? [],
+      mode: res.mode ?? '',
+    };
+  };
+
   const handleGerar = async () => {
     if (!dataIni || !dataFin) { toast.error('Informe o período.'); return; }
 
@@ -440,7 +665,11 @@ export function ColetaEntrega() {
     if (!dtIni || !dtFin) { toast.error('Data inválida. Use o formato DD/MM/AA.'); return; }
     if (dtFin < dtIni) { toast.error('A data final não pode ser anterior à data inicial.'); return; }
     const diffDias = diffDaysUTC(dtIni, dtFin);
-    if (diffDias > 30) { toast.error('O período não pode ser maior que 31 dias.'); return; }
+    if (diffDias > 186) { toast.error('O período não pode ser maior que ~6 meses.'); return; }
+
+    const chunks = dividirEmMeses(dtIni, dtFin);
+    if (chunks.length === 0) { toast.error('Período inválido.'); return; }
+    const multiMes = chunks.length > 1;
     const modo = 'RESUMO';
 
     setLoading(true);
@@ -454,77 +683,100 @@ export function ColetaEntrega() {
     setIsResumo(false);
     setExpandedPlacas(new Set());
 
-    const timer = setInterval(() => setElapsed(e => e + 1), 1000);
+    const progressoInicial: MesProgresso[] = chunks.map((c, idx) => ({
+      idx,
+      rotulo: rotuloMes(c.ini),
+      dataIniBr: formatDateBR(c.ini),
+      dataFinBr: formatDateBR(c.fin),
+      status: idx === 0 ? 'fila' : 'pendente',
+      stage: idx === 0 ? 'Aguardando vez...' : 'Pendente',
+      duracaoSeg: 0,
+      erro: null,
+    }));
+    setMesesProgresso(progressoInicial);
+
+    const totalStartTs = Date.now();
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - totalStartTs) / 1000));
+      setMesesProgresso(prev => {
+        const now = Date.now();
+        return prev.map((m, i) => {
+          if (m.status === 'gerando' || m.status === 'iniciando' || m.status === 'baixando' || m.status === 'processando') {
+            return { ...m, duracaoSeg: Math.max(m.duracaoSeg, Math.floor((now - totalStartTs) / 1000) - prev.slice(0, i).reduce((s, x) => s + x.duracaoSeg, 0)) };
+          }
+          return m;
+        });
+      });
+    }, 1000);
 
     try {
-      const start = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ step: 'START', data_ini: dataIni, data_fin: dataFin, placa }) },
-        true
-      );
+      const respostas: RespostaMes[] = [];
 
-      if (!start?.success) {
-        throw new Error(start?.message || 'Erro ao solicitar relatório.');
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const mesIniBr = formatDateBR(chunk.ini);
+        const mesFinBr = formatDateBR(chunk.fin);
+        const mesStartTs = Date.now();
+        atualizarMes(i, { status: 'fila', stage: 'Aguardando início...', erro: null });
+
+        try {
+          const resp = await gerarUmMes(
+            i,
+            mesIniBr,
+            mesFinBr,
+            placa,
+            (stage) => atualizarMes(i, { stage }),
+            (status, stage) => atualizarMes(i, { status, stage: stage ?? '' })
+          );
+          const durSeg = Math.max(1, Math.floor((Date.now() - mesStartTs) / 1000));
+          atualizarMes(i, { status: 'concluido', stage: `Concluído em ${durSeg}s`, duracaoSeg: durSeg });
+          respostas.push(resp);
+        } catch (err: any) {
+          const durSeg = Math.max(1, Math.floor((Date.now() - mesStartTs) / 1000));
+          atualizarMes(i, { status: 'erro', stage: err?.message || 'Erro', duracaoSeg: durSeg, erro: err?.message || 'Erro' });
+          if (multiMes) {
+            toast.error(`${rotuloMes(chunk.ini)} falhou: ${err?.message || 'Erro'}. Continuando os demais meses...`);
+            continue;
+          }
+          throw err;
+        }
+        if (i + 1 < chunks.length) atualizarMes(i + 1, { status: 'fila', stage: 'Próximo na fila...' });
       }
 
-      const baselineSeq = start.baseline_seq ?? 0;
-      const requestStartTs = start.request_start_ts ?? 0;
-
-      setLoadingStage('Aguardando geração do relatório...');
-
-      let downloadAct: string | null = null;
-      const pollStart = Date.now();
-      const pollMaxMs = 12 * 60 * 1000;
-      while (Date.now() - pollStart < pollMaxMs) {
-        await new Promise(r => setTimeout(r, 1500));
-        const poll = await apiFetch(
-          `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-          { method: 'POST', body: JSON.stringify({ step: 'POLL', baseline_seq: baselineSeq, request_start_ts: requestStartTs }) },
-          true
-        );
-        if (!poll?.success) {
-          setLoadingStage(poll?.message || 'Aguardando geração do relatório...');
-          continue;
-        }
-        if (poll.status === 'ready') {
-          downloadAct = poll.download_act || null;
-          setLoadingStage('Relatório pronto. Baixando arquivo...');
-          break;
-        }
-        if (poll.status === 'running') {
-          const sit = String(poll.sit ?? '').trim();
-          const sitLimpo = sit.replace(/\(seq\s*\d+\)/i, '').replace(/\s{2,}/g, ' ').trim();
-          setLoadingStage(`Gerando relatório... ${sitLimpo || ''}`.trim());
-          continue;
-        }
-        setLoadingStage('Aguardando geração do relatório...');
-      }
-
-      if (!downloadAct) {
-        throw new Error('Relatório 076 não ficou pronto no tempo esperado. Tente novamente.');
-      }
-
-      setLoadingStage('Processando arquivo...');
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/coleta-entrega/get_coleta_entrega.php`,
-        { method: 'POST', body: JSON.stringify({ step: 'DOWNLOAD', download_act: downloadAct, modo }) },
-        true
-      );
       clearInterval(timer);
+
+      if (respostas.length === 0) {
+        toast.error('Nenhum mês foi processado com sucesso.');
+        setLoading(false);
+        setLoadingStage('');
+        return;
+      }
+
+      setLoadingStage('Consolidando resultados...');
+      const gruposMergeados = mergeGrupos(respostas.map(r => r.grupos));
+      const serieMergeada = mergeSerie(respostas.map(r => r.serieCronologica));
+      const contratadosMergeados = mergeContratados(respostas.map(r => r.contratados));
+      const totaisMergeados = mergeTotais(respostas.map(r => r.totais));
+
+      setGrupos(gruposMergeados);
+      setSerie(serieMergeada);
+      setTotais(totaisMergeados);
+      setContratados(contratadosMergeados);
+      setIsResumo((respostas[0].mode ?? '') === 'RESUMO');
+      setHasSearched(true);
+
+      const qtdOk = respostas.length;
+      const qtdTotal = chunks.length;
+      const qtdFalhas = qtdTotal - qtdOk;
+
+      if (gruposMergeados.length === 0) {
+        toast.info('Nenhuma operação encontrada para o período.');
+      } else if (multiMes) {
+        toast.success(`Relatórios consolidados: ${qtdOk}/${qtdTotal} meses processados${qtdFalhas > 0 ? ` (${qtdFalhas} falha(s))` : ''}.`);
+      }
+
       setElapsed(0);
       setLoadingStage('');
-
-      if (res.success) {
-        setGrupos(res.grupos ?? []);
-        setSerie(res.serieCronologica ?? []);
-        setTotais(res.totais ?? null);
-        setContratados(res.contratados ?? []);
-        setIsResumo((res.mode ?? '') === 'RESUMO');
-        setHasSearched(true);
-        if ((res.grupos ?? []).length === 0) toast.info('Nenhuma operação encontrada para o período.');
-      } else {
-        toast.error(res.message || 'Erro ao gerar relatório.');
-      }
     } catch (e: any) {
       clearInterval(timer);
       setElapsed(0);
@@ -547,11 +799,10 @@ export function ColetaEntrega() {
       return;
     }
     const diffDias = diffDaysUTC(dtIni, dtFin);
-    if (diffDias > 30) {
-      handleGerar();
-      return;
-    }
+    const chunks = dividirEmMeses(dtIni, dtFin);
+    const qtdMeses = chunks.length || 1;
     setConfirmGerarDiffDias(diffDias + 1);
+    setConfirmGerarQtdMeses(qtdMeses);
     setConfirmGerarOpen(true);
   };
 
@@ -794,6 +1045,44 @@ export function ColetaEntrega() {
     .sort((a, b) => b.ctrcs - a.ctrcs)
     .slice(0, 8);
 
+  const statusCor = (s: MesStatus) => {
+    switch (s) {
+      case 'concluido': return 'text-emerald-600 dark:text-emerald-400';
+      case 'erro': return 'text-red-600 dark:text-red-400';
+      case 'ignorado': return 'text-slate-400';
+      case 'pendente': return 'text-slate-400';
+      case 'fila': return 'text-amber-500 dark:text-amber-400';
+      case 'iniciando':
+      case 'gerando':
+      case 'pronto_baixar':
+      case 'baixando':
+      case 'processando':
+        return 'text-blue-600 dark:text-blue-400';
+      default: return 'text-slate-500';
+    }
+  };
+
+  const statusLabel = (s: MesStatus) => {
+    switch (s) {
+      case 'concluido': return 'Concluído';
+      case 'erro': return 'Erro';
+      case 'ignorado': return 'Ignorado';
+      case 'pendente': return 'Pendente';
+      case 'fila': return 'Na fila';
+      case 'iniciando': return 'Iniciando';
+      case 'gerando': return 'Gerando no TMS';
+      case 'pronto_baixar': return 'Pronto para baixar';
+      case 'baixando': return 'Baixando';
+      case 'processando': return 'Processando';
+      default: return '';
+    }
+  };
+
+  const mesesConcluidosCount = mesesProgresso.filter(m => m.status === 'concluido' || m.status === 'erro').length;
+  const mesesTotalCount = mesesProgresso.length || 1;
+  const pctGlobalMeses = mesesTotalCount > 0 ? (mesesConcluidosCount / mesesTotalCount) : 0;
+  const isMultiMes = mesesProgresso.length > 1;
+
   return (
     <DashboardLayout
       user={user} logout={logout} theme={theme} toggleTheme={toggleTheme}
@@ -820,15 +1109,23 @@ export function ColetaEntrega() {
               <Dialog open={confirmGerarOpen} onOpenChange={setConfirmGerarOpen}>
                 <DialogContent className="sm:max-w-lg">
                   <DialogHeader>
-                    <DialogTitle>Processamento demorado</DialogTitle>
+                    <DialogTitle>{confirmGerarQtdMeses > 1 ? `Relatórios TMS (${confirmGerarQtdMeses} meses)` : 'Processamento demorado'}</DialogTitle>
                     <DialogDescription>
-                      {confirmGerarDiffDias === 0
-                        ? 'A geração pode demorar alguns minutos e ainda assim ocorrer timeout.'
+                      {confirmGerarQtdMeses > 1
+                        ? `Período de ${confirmGerarDiffDias ?? 0} dias (${confirmGerarQtdMeses} meses). Para evitar falhas, geraremos 1 relatório no TMS por mês e consolidaremos tudo ao final.`
                         : 'A geração pode demorar alguns minutos e ainda assim ocorrer timeout.'}
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">
-                    Evite sair da tela durante o processamento.
+                  <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
+                    {confirmGerarQtdMeses > 1 && (
+                      <ul className="list-disc ml-5 space-y-1">
+                        <li>Cada mês será solicitado ao TMS individualmente, em sequência.</li>
+                        <li>O progresso de cada mês aparecerá na tela durante o processamento.</li>
+                        <li>Caso algum mês falhe, os demais continuarão normalmente.</li>
+                        <li>Ao final, os resultados serão unificados nos indicadores e listas.</li>
+                      </ul>
+                    )}
+                    <div>Evite sair da tela durante o processamento.</div>
                   </div>
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setConfirmGerarOpen(false)} disabled={loading}>
@@ -872,7 +1169,7 @@ export function ColetaEntrega() {
                         value={dataFinISO}
                         onChange={e => setPeriodoFin(isoToBR(e.target.value))}
                         min={dtIniParsed ? dataIniISO : undefined}
-                        max={dtIniParsed ? formatISODate(addDays(dtIniParsed, 30)) : undefined}
+                        max={dtIniParsed ? formatISODate(addDays(dtIniParsed, 186)) : undefined}
                         className="dark:bg-slate-800 dark:border-slate-700 font-mono"
                       />
                     </div>
@@ -883,7 +1180,7 @@ export function ColetaEntrega() {
                     <div className="flex gap-2">
                       <Button onClick={handleGerarClick} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
                         {loading ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando arquivo{elapsed > 0 ? ` (${elapsed}s)` : ''}</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando{isMultiMes ? ` (${mesesConcluidosCount}/${mesesTotalCount})` : ` arquivo${elapsed > 0 ? ` (${elapsed}s)` : ''}`}</>
                         ) : (
                           <><RefreshCw className="h-4 w-4 mr-2" />Gerar Relatório</>
                         )}
@@ -900,11 +1197,78 @@ export function ColetaEntrega() {
                             {loadingStage || 'Gerando arquivo...'}
                           </p>
                           <div className="mt-2 bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
-                            <div className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full animate-pulse w-full" />
+                            <div
+                              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${isMultiMes ? Math.round(pctGlobalMeses * 100) : 100}%`, opacity: isMultiMes ? 1 : undefined }}
+                            />
                           </div>
+                          {isMultiMes && (
+                            <p className="mt-1 text-xs text-blue-700/80 dark:text-blue-300/80">
+                              {mesesConcluidosCount} de {mesesTotalCount} meses concluídos
+                            </p>
+                          )}
                         </div>
                         <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300 min-w-[3rem] text-right">{elapsed}s</span>
                       </div>
+
+                      {isMultiMes && mesesProgresso.length > 0 && (
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {mesesProgresso.map(m => {
+                            const emProcessamento =
+                              m.status === 'iniciando' ||
+                              m.status === 'gerando' ||
+                              m.status === 'pronto_baixar' ||
+                              m.status === 'baixando' ||
+                              m.status === 'processando';
+                            const mCor = statusCor(m.status);
+                            const mLabel = statusLabel(m.status);
+                            return (
+                              <div
+                                key={m.idx}
+                                className={`rounded-lg border p-2.5 transition-colors ${
+                                  m.status === 'erro'
+                                    ? 'border-red-300 dark:border-red-800 bg-red-50/60 dark:bg-red-950/30'
+                                    : m.status === 'concluido'
+                                    ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20'
+                                    : emProcessamento
+                                    ? 'border-blue-300 dark:border-blue-700 bg-white/70 dark:bg-slate-800/60'
+                                    : 'border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {emProcessamento && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />}
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+                                      {m.rotulo}
+                                    </div>
+                                  </div>
+                                  <div className={`text-[11px] font-semibold tabular-nums shrink-0 ${mCor}`}>
+                                    {mLabel}
+                                  </div>
+                                </div>
+                                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
+                                  {m.dataIniBr} → {m.dataFinBr}
+                                </div>
+                                <div
+                                  className={`mt-1.5 text-[11px] truncate ${
+                                    m.status === 'erro'
+                                      ? 'text-red-700 dark:text-red-400'
+                                      : 'text-slate-600 dark:text-slate-400'
+                                  }`}
+                                  title={m.stage}
+                                >
+                                  {m.stage || '—'}
+                                </div>
+                                {m.duracaoSeg > 0 && (
+                                  <div className="mt-1 text-[10px] font-mono text-slate-400 dark:text-slate-500 tabular-nums text-right">
+                                    {m.duracaoSeg}s
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
