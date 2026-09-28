@@ -56,6 +56,7 @@ import {
   Wallet,
   RotateCcw,
   CircleHelp,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -1064,6 +1065,90 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
   );
 }
 
+type ColunaOrdemEntrega =
+  | 'ctrc' | 'emissao' | 'chegadaUnid' | 'nf' | 'pagador' | 'destinatario' | 'cidade'
+  | 'prevEnt' | 'agendamento' | 'peso' | 'cubagem' | 'frete' | 'ultOcor' | 'prevChegada' | 'atraso' | 'volumes';
+
+const ORDEM_INDICADOR: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
+
+const parseDataBR = (s: string | null | undefined): number | null => {
+  const v = String(s ?? '').trim();
+  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+  if (!m) return null;
+  const yy = m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10);
+  const dt = new Date(yy, parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.getTime();
+};
+
+const parseDataHoraBR = (s: string | null | undefined, def?: string | null): number | null => {
+  let v = formatAgendamento(String(s ?? ''), def ?? undefined);
+  if (v === '-') v = String(s ?? '').trim();
+  const m = v.match(/^(\d{2})\/(\d{2})(?:\/(\d{2,4}))?(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (!m) return parseDataBR(v);
+  const yy = m[3] ? (m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10)) : 1970;
+  const MM = parseInt(m[2], 10) - 1;
+  const dd = parseInt(m[1], 10);
+  const hh = m[4] ? parseInt(m[4], 10) : 0;
+  const mm = m[5] ? parseInt(m[5], 10) : 0;
+  const ss = m[6] ? parseInt(m[6], 10) : 0;
+  const dt = new Date(yy, MM, dd, hh, mm, ss, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.getTime();
+};
+
+function compararCteEntrega(a: CteEntrega, b: CteEntrega, col: ColunaOrdemEntrega, desc: boolean): number {
+  let va: any = 0, vb: any = 0;
+  switch (col) {
+    case 'ctrc': va = a.ctrc ?? ''; vb = b.ctrc ?? ''; break;
+    case 'emissao': va = parseDataBR(a.emissao) ?? 0; vb = parseDataBR(b.emissao) ?? 0; break;
+    case 'chegadaUnid': va = parseDataBR(a.chegadaUnid) ?? 0; vb = parseDataBR(b.chegadaUnid) ?? 0; break;
+    case 'nf': va = Number(String(a.nfiscal ?? '').replace(/\D/g, '')) || 0; vb = Number(String(b.nfiscal ?? '').replace(/\D/g, '')) || 0; if (va === vb) { va = a.nfiscal ?? ''; vb = b.nfiscal ?? ''; } break;
+    case 'pagador': va = a.pagador ?? ''; vb = b.pagador ?? ''; break;
+    case 'destinatario': va = a.destinatario ?? ''; vb = b.destinatario ?? ''; break;
+    case 'cidade': va = a.cidade ?? ''; vb = b.cidade ?? ''; break;
+    case 'prevEnt': va = parseDataBR(a.prevEnt) ?? 0; vb = parseDataBR(b.prevEnt) ?? 0; break;
+    case 'agendamento': va = parseDataHoraBR(a.agendamento, (a as any).data_prev_ent) ?? 0; vb = parseDataHoraBR(b.agendamento, (b as any).data_prev_ent) ?? 0; break;
+    case 'peso': va = parsePeso(a.peso); vb = parsePeso(b.peso); break;
+    case 'cubagem': va = parseCubagem(a.cubagem); vb = parseCubagem(b.cubagem); break;
+    case 'volumes': va = Number(String(a.qtdeVol ?? '0').replace(/\D/g, '')) || 0; vb = Number(String(b.qtdeVol ?? '0').replace(/\D/g, '')) || 0; break;
+    case 'frete': va = parseMoeda(a.frete); vb = parseMoeda(b.frete); break;
+    case 'ultOcor': va = a.descUltOcor ?? ''; vb = b.descUltOcor ?? ''; break;
+    case 'prevChegada': va = parseDataBR(a.prevChegada) ?? 0; vb = parseDataBR(b.prevChegada) ?? 0; break;
+    case 'atraso':
+      va = (ORDEM_INDICADOR[a.atrasoEntrega ?? ''] ?? 0) * 100000 - (Number(a.diasAtraso ?? 0) || 0);
+      vb = (ORDEM_INDICADOR[b.atrasoEntrega ?? ''] ?? 0) * 100000 - (Number(b.diasAtraso ?? 0) || 0);
+      break;
+    default: va = 0; vb = 0;
+  }
+  let cmp = 0;
+  if (typeof va === 'number' && typeof vb === 'number') {
+    cmp = va - vb;
+  } else {
+    cmp = String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' });
+  }
+  return desc ? -cmp : cmp;
+}
+
+const TabelaEntregaColunas: { key: ColunaOrdemEntrega | null; label: string; align?: 'left' | 'right' | 'center'; cond?: boolean }[] = [
+  { key: null, label: '' },
+  { key: 'ctrc', label: 'CTRC' },
+  { key: 'emissao', label: 'Emissão' },
+  { key: 'chegadaUnid', label: 'Chegada na Unid.' },
+  { key: 'nf', label: 'NF' },
+  { key: 'pagador', label: 'Pagador' },
+  { key: 'destinatario', label: 'Destinatário' },
+  { key: 'cidade', label: 'Cidade' },
+  { key: 'prevEnt', label: 'Prev. Ent.' },
+  { key: 'agendamento', label: 'Agendamento' },
+  { key: 'peso', label: 'Peso', align: 'right' },
+  { key: 'cubagem', label: 'M³', align: 'right' },
+  { key: 'frete', label: 'Frete', align: 'right' },
+  { key: 'ultOcor', label: 'Últ. Ocorrência' },
+  { key: 'prevChegada', label: 'Prev. Chegada', cond: false },
+  { key: 'atraso', label: 'Atraso', align: 'center' },
+];
+
 function TabelaEntrega({
   ctes,
   tipo,
@@ -1085,6 +1170,27 @@ function TabelaEntrega({
 }) {
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
+  const [ordemCol, setOrdemCol] = useState<ColunaOrdemEntrega | null>(null);
+  const [ordemDesc, setOrdemDesc] = useState(false);
+
+  const ctesOrdenados = useMemo(() => {
+    if (!ordemCol) return ctes;
+    return [...ctes].sort((a, b) => compararCteEntrega(a, b, ordemCol, ordemDesc));
+  }, [ctes, ordemCol, ordemDesc]);
+
+  const trocarOrdem = (col: ColunaOrdemEntrega) => {
+    if (ordemCol === col) {
+      setOrdemDesc(d => !d);
+    } else {
+      setOrdemCol(col);
+      setOrdemDesc(false);
+    }
+  };
+
+  const resetarOrdem = () => {
+    setOrdemCol(null);
+    setOrdemDesc(false);
+  };
 
   // Converte CteEntrega para Cte (campos disponíveis) para envio ao backend
   const toCteFull = (c: CteEntrega): Cte => ({
@@ -1116,7 +1222,7 @@ function TabelaEntrega({
     atrasoTransf: null,
   });
 
-  const selecionaveis = ctes.filter(c => {
+  const selecionaveis = ctesOrdenados.filter(c => {
     if (ctesNoCarregamento?.has(cteId(c))) return false;
     if (ctesJaCarregados?.has(cteId(c))) return false;
     return true;
@@ -1129,6 +1235,14 @@ function TabelaEntrega({
     onToggleTodos(selecionaveis.map(toCteFull), !todosSelecionados);
   };
 
+  const seta = (col: ColunaOrdemEntrega) => {
+    if (ordemCol !== col) return <span className="text-slate-300 dark:text-slate-600 select-none ml-1">↕</span>;
+    return <span className={`ml-1 select-none ${ordemDesc ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{ordemDesc ? '↓' : '↑'}</span>;
+  };
+
+  const thClass = (align?: 'left' | 'right' | 'center') =>
+    `px-3 py-2 font-semibold select-none hover:text-slate-900 dark:hover:text-slate-200 transition-colors ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`;
+
   return (
     <div className="overflow-x-auto">
       {emApontamento && (
@@ -1137,6 +1251,19 @@ function TabelaEntrega({
           Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
         </div>
       )}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <ArrowUpDown className="w-3 h-3" />
+          {ordemCol
+            ? <span>Ordenado por <strong className="text-slate-700 dark:text-slate-200">{TabelaEntregaColunas.find(c => c.key === ordemCol)?.label ?? String(ordemCol)}</strong> ({ordemDesc ? 'decrescente' : 'crescente'})</span>
+            : <span>Clique no título da coluna para ordenar esta lista</span>}
+        </span>
+        {ordemCol && (
+          <button onClick={resetarOrdem} className="flex items-center gap-1 hover:text-slate-800 dark:hover:text-slate-200 font-medium">
+            <XCircle className="w-3 h-3" /> Limpar
+          </button>
+        )}
+      </div>
       <table className="w-full text-[11px]">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
@@ -1155,25 +1282,27 @@ function TabelaEntrega({
                 </button>
               </th>
             )}
-            <th className="px-3 py-2 text-left font-semibold">CTRC</th>
-            <th className="px-3 py-2 text-left font-semibold">Emissão</th>
-            <th className="px-3 py-2 text-left font-semibold">Chegada na Unid.</th>
-            <th className="px-3 py-2 text-left font-semibold">NF</th>
-            <th className="px-3 py-2 text-left font-semibold">Pagador</th>
-            <th className="px-3 py-2 text-left font-semibold">Destinatário</th>
-            <th className="px-3 py-2 text-left font-semibold">Cidade</th>
-            <th className="px-3 py-2 text-left font-semibold">Prev. Ent.</th>
-            <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
-            <th className="px-3 py-2 text-right font-semibold">Peso</th>
-            <th className="px-3 py-2 text-right font-semibold">M³</th>
-            <th className="px-3 py-2 text-right font-semibold">Frete</th>
-            <th className="px-3 py-2 text-left font-semibold">Últ. Ocorrência</th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-left font-semibold">Prev. Chegada</th>}
-            <th className="px-3 py-2 text-center font-semibold">Atraso</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('ctrc')} title="Ordenar por CTRC">CTRC{seta('ctrc')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('emissao')} title="Ordenar por Emissão">Emissão{seta('emissao')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('chegadaUnid')} title="Ordenar por Chegada na Unid.">Chegada na Unid.{seta('chegadaUnid')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('nf')} title="Ordenar por NF">NF{seta('nf')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('pagador')} title="Ordenar por Pagador">Pagador{seta('pagador')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('destinatario')} title="Ordenar por Destinatário">Destinatário{seta('destinatario')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('cidade')} title="Ordenar por Cidade">Cidade{seta('cidade')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('prevEnt')} title="Ordenar por Previsão de Entrega">Prev. Ent.{seta('prevEnt')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('agendamento')} title="Ordenar por Agendamento">Agendamento{seta('agendamento')}</th>
+            <th className={thClass('right')} onClick={() => trocarOrdem('peso')} title="Ordenar por Peso">Peso{seta('peso')}</th>
+            <th className={thClass('right')} onClick={() => trocarOrdem('cubagem')} title="Ordenar por Cubagem">M³{seta('cubagem')}</th>
+            <th className={thClass('right')} onClick={() => trocarOrdem('frete')} title="Ordenar por Frete">Frete{seta('frete')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('ultOcor')} title="Ordenar por Última Ocorrência">Últ. Ocorrência{seta('ultOcor')}</th>
+            {tipo === 'transito' && (
+              <th className={thClass('left')} onClick={() => trocarOrdem('prevChegada')} title="Ordenar por Previsão de Chegada">Prev. Chegada{seta('prevChegada')}</th>
+            )}
+            <th className={thClass('center')} onClick={() => trocarOrdem('atraso')} title="Ordenar por Atraso">Atraso{seta('atraso')}</th>
           </tr>
         </thead>
         <tbody>
-          {ctes.map((cte, i) => {
+          {ctesOrdenados.map((cte, i) => {
             const jaNoCarregamento = ctesNoCarregamento?.has(cteId(cte)) ?? false;
             const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
