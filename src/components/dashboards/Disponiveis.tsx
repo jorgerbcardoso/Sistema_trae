@@ -1218,7 +1218,7 @@ function TabelaEntrega({
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatAgendamento(cte.agendamento)}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatAgendamento(cte.agendamento, (cte as any).data_prev_ent)}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
@@ -1346,7 +1346,7 @@ function GrupoSetorCard({
         esc(c.cep || ''),
         esc(c.endereco || ''),
         esc(c.prevEnt || ''),
-        esc(c.agendamento || ''),
+        esc(formatAgendamento(c.agendamento || '', (c as any).data_prev_ent)),
         fmtMoeda(parseMoeda(c.vlrMerc)),
         fmtMoeda(parseMoeda(c.frete)),
         fmtNum(parsePeso(c.peso), 2),
@@ -1794,7 +1794,7 @@ function parseMoeda(s: string): number {
       : cleaned;
   return parseFloat(normalized) || 0;
 }
-function formatAgendamento(s: string): string {
+function formatAgendamento(s: string, dataPrevEnt?: string | null | undefined): string {
   const raw = String(s ?? '').trim();
   if (!raw) return '-';
   const norm = raw.replace(/\s+/g, ' ');
@@ -1802,6 +1802,22 @@ function formatAgendamento(s: string): string {
   if (m1) return `${m1[1]} ${m1[2]}`;
   const m2 = norm.match(/^(\d{2}\/\d{2}\/\d{2,4})(\d{2}:\d{2}(?::\d{2})?)$/);
   if (m2) return `${m2[1]} ${m2[2]}`;
+  const m3 = norm.match(/^(\d{2}:\d{2}(?::\d{2})?)$/);
+  if (m3 && dataPrevEnt) {
+    const dt = String(dataPrevEnt).trim();
+    let dtBr = '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(dt)) {
+      const [y, m, d] = dt.split('-');
+      if (y && m && d) dtBr = `${d}/${m}/${y.slice(-2)}`;
+    } else if (/^\d{2}\/\d{2}\/\d{2,4}/.test(dt)) {
+      const [d, m, y] = dt.split('/');
+      if (d && m && y) dtBr = `${d}/${m}/${y.slice(-2)}`;
+    } else if (/^\d{2}\/\d{2}/.test(dt)) {
+      dtBr = dt;
+    }
+    if (dtBr) return `${dtBr} ${m3[1]}`;
+    return norm;
+  }
   return norm;
 }
 function formatData(d: string): string {
@@ -9826,7 +9842,7 @@ export function Disponiveis() {
         esc(c.cep || ''),
         esc(c.endereco || ''),
         esc(c.prevEnt || ''),
-        esc(c.agendamento || ''),
+        esc(formatAgendamento(c.agendamento || '', (c as any).data_prev_ent)),
         fmtMoeda(parseMoeda(c.vlrMerc)),
         fmtMoeda(parseMoeda(c.frete)),
         fmtNum(parsePeso(c.peso), 2),
