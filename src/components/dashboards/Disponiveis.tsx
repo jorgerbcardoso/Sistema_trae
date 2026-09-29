@@ -1130,6 +1130,65 @@ function compararCteEntrega(a: CteEntrega, b: CteEntrega, col: ColunaOrdemEntreg
   return desc ? -cmp : cmp;
 }
 
+type ColunaOrdemSetor =
+  | 'setor' | 'atraso' | 'armazem' | 'transito' | 'totalVol' | 'totalPeso' | 'totalCubagem' | 'totalFrete' | 'totalVlrNf' | 'totalCtes';
+
+const piorIndicadorAtrasoEntrega = (ctes: CteEntrega[]): string | null => {
+  let pior: string | null = null;
+  for (const c of ctes) {
+    const v = c.atrasoEntrega;
+    if (!v) continue;
+    if (!pior) { pior = v; continue; }
+    pior = (ORDEM_INDICADOR[v] ?? 0) > (ORDEM_INDICADOR[pior] ?? 0) ? v : pior;
+  }
+  return pior;
+};
+
+function compararGrupoSetor(a: GrupoSetor, b: GrupoSetor, col: ColunaOrdemSetor, desc: boolean): number {
+  let va: any = 0, vb: any = 0;
+  switch (col) {
+    case 'setor': va = a.setor ?? ''; vb = b.setor ?? ''; break;
+    case 'totalCtes': va = a.totalCtes; vb = b.totalCtes; break;
+    case 'armazem': va = a.armazem.length; vb = b.armazem.length; break;
+    case 'transito': va = a.transito.length; vb = b.transito.length; break;
+    case 'totalVol': va = a.totalVol; vb = b.totalVol; break;
+    case 'totalPeso': va = a.totalPeso; vb = b.totalPeso; break;
+    case 'totalCubagem': va = a.totalCubagem; vb = b.totalCubagem; break;
+    case 'totalFrete': va = a.totalFrete; vb = b.totalFrete; break;
+    case 'totalVlrNf': va = a.totalVlrNf; vb = b.totalVlrNf; break;
+    case 'atraso': {
+      const pa = piorIndicadorAtrasoEntrega([...a.armazem, ...a.transito]);
+      const pb = piorIndicadorAtrasoEntrega([...b.armazem, ...b.transito]);
+      va = (ORDEM_INDICADOR[pa ?? ''] ?? 0);
+      vb = (ORDEM_INDICADOR[pb ?? ''] ?? 0);
+      break;
+    }
+    default: va = 0; vb = 0;
+  }
+  let cmp = 0;
+  if (typeof va === 'number' && typeof vb === 'number') {
+    cmp = va - vb;
+  } else {
+    cmp = String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base' });
+  }
+  return desc ? -cmp : cmp;
+}
+
+const TabelaSetorColunasEntrega: { key: ColunaOrdemSetor | null; label: string; align?: 'left' | 'right' | 'center' }[] = [
+  { key: null, label: '' },
+  { key: 'setor', label: 'Setor' },
+  { key: null, label: '' },
+  { key: 'atraso', label: 'Atraso', align: 'center' },
+  { key: 'armazem', label: 'Piso', align: 'center' },
+  { key: 'transito', label: 'A caminho', align: 'center' },
+  { key: 'totalVol', label: 'Volumes', align: 'center' },
+  { key: 'totalPeso', label: 'Peso', align: 'center' },
+  { key: 'totalCubagem', label: 'Cubagem', align: 'center' },
+  { key: 'totalFrete', label: 'Frete (R$)', align: 'right' },
+  { key: 'totalVlrNf', label: 'Vlr NF (R$)', align: 'right' },
+  { key: null, label: 'CSV' },
+];
+
 const TabelaEntregaColunas: { key: ColunaOrdemEntrega | null; label: string; align?: 'left' | 'right' | 'center'; cond?: boolean }[] = [
   { key: null, label: '' },
   { key: 'ctrc', label: 'CTRC' },
@@ -2161,9 +2220,9 @@ function CardCarregamento({
         true
       );
       if (res?.success) {
-        toast.success(`Carregamento ${placa} iniciado no modo TMS.`);
+        toast.success(`Carregamento ${placa} iniciado. Aguardando conferência no TMS para preenchimento dos CT-es.`);
         setIniciarDialogOpen(false);
-        await onImportarCarregamentos();
+        await onRecarregarCarregamentos();
       } else {
         toast.error(res?.message || 'Erro ao iniciar carregamento.');
       }
@@ -8185,6 +8244,9 @@ export function Disponiveis() {
   const [ordemCol, setOrdemCol]   = useState<OrdemCol>('totalCtes');
   const [ordemDir, setOrdemDir]   = useState<'asc' | 'desc'>('desc');
 
+  const [ordemColSetor, setOrdemColSetor] = useState<ColunaOrdemSetor | null>(null);
+  const [ordemDirSetor, setOrdemDirSetor] = useState<'asc' | 'desc'>('desc');
+
   const carregar = useCallback(async (siglaParam?: string) => {
     const s = siglaParam ?? sigla;
     if (!s) return;
@@ -9738,8 +9800,10 @@ export function Disponiveis() {
       map[key].totalFrete   += parseMoeda(cte.frete);
       map[key].totalVlrNf   += parseMoeda(cte.vlrMerc);
     }
-    return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
-  }, [dadosEntrega, ctesEntregaFiltrados]);
+    const lista = Object.values(map);
+    if (ordemColSetor === null) return lista.sort((a, b) => b.totalCtes - a.totalCtes);
+    return lista.sort((a, b) => compararGrupoSetor(a, b, ordemColSetor, ordemDirSetor));
+  }, [dadosEntrega, ctesEntregaFiltrados, ordemColSetor, ordemDirSetor]);
 
   const totalEntregaArmazem  = ctesEntregaFiltrados.filter(c => !c.emTransito).length ?? 0;
   const totalEntregaTransito = ctesEntregaFiltrados.filter(c => c.emTransito).length ?? 0;
@@ -11329,21 +11393,48 @@ export function Disponiveis() {
                   </div>
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
-                      <span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span>
-                      <span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
-                    </div>
+                    {(() => {
+                      const toggleOrdemSetor = (col: ColunaOrdemSetor) => {
+                        if (ordemColSetor === col) setOrdemDirSetor(d => !d);
+                        else { setOrdemColSetor(col); setOrdemDirSetor(true); }
+                      };
+                      const ThBtnSetor = ({ col, children, align }: { col: ColunaOrdemSetor; children: React.ReactNode; align?: 'left' | 'center' | 'right' }) => {
+                        const cls =
+                          align === 'right' ? 'justify-end w-full text-right' :
+                          align === 'center' ? 'justify-center w-full text-center' :
+                          'justify-start text-left';
+                        return (
+                          <button
+                            onClick={() => toggleOrdemSetor(col)}
+                            className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${cls}`}
+                          >
+                            {children}
+                            {ordemColSetor === col
+                              ? (ordemDirSetor ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />)
+                              : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
+                          </button>
+                        );
+                      };
+                      return (
+                        <>
+                          <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
+                            <span />
+                            <ThBtnSetor col="setor">Setor</ThBtnSetor>
+                            <span />
+                            <ThBtnSetor col="atraso" align="center">Atraso</ThBtnSetor>
+                            <ThBtnSetor col="armazem" align="center">Piso</ThBtnSetor>
+                            <ThBtnSetor col="transito" align="center">A caminho</ThBtnSetor>
+                            <ThBtnSetor col="totalVol" align="center">Volumes</ThBtnSetor>
+                            <ThBtnSetor col="totalPeso" align="center">Peso</ThBtnSetor>
+                            <ThBtnSetor col="totalCubagem" align="center">Cubagem</ThBtnSetor>
+                            <ThBtnSetor col="totalFrete" align="right">Frete (R$)</ThBtnSetor>
+                            <ThBtnSetor col="totalVlrNf" align="right">Vlr NF (R$)</ThBtnSetor>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {
                         const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
@@ -11447,19 +11538,48 @@ export function Disponiveis() {
                     <span className="text-sm text-slate-500 dark:text-slate-400">({gruposSetor.length} setores · {totalEntregaArmazem + totalEntregaTransito} CT-es)</span>
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
-                      <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Setor</span><span />
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Atraso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">A caminho</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Volumes</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
-                    </div>
+                    {(() => {
+                      const toggleOrdemSetor = (col: ColunaOrdemSetor) => {
+                        if (ordemColSetor === col) setOrdemDirSetor(d => !d);
+                        else { setOrdemColSetor(col); setOrdemDirSetor(true); }
+                      };
+                      const ThBtnSetor = ({ col, children, align }: { col: ColunaOrdemSetor; children: React.ReactNode; align?: 'left' | 'center' | 'right' }) => {
+                        const cls =
+                          align === 'right' ? 'justify-end w-full text-right' :
+                          align === 'center' ? 'justify-center w-full text-center' :
+                          'justify-start text-left';
+                        return (
+                          <button
+                            onClick={() => toggleOrdemSetor(col)}
+                            className={`flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${cls}`}
+                          >
+                            {children}
+                            {ordemColSetor === col
+                              ? (ordemDirSetor ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0 rotate-180" />)
+                              : <span className="w-3 h-3 shrink-0 flex items-center justify-center opacity-40 text-[10px] leading-none">↕</span>}
+                          </button>
+                        );
+                      };
+                      return (
+                        <>
+                          <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
+                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
+                            <span />
+                            <ThBtnSetor col="setor">Setor</ThBtnSetor>
+                            <span />
+                            <ThBtnSetor col="atraso" align="center">Atraso</ThBtnSetor>
+                            <ThBtnSetor col="armazem" align="center">Piso</ThBtnSetor>
+                            <ThBtnSetor col="transito" align="center">A caminho</ThBtnSetor>
+                            <ThBtnSetor col="totalVol" align="center">Volumes</ThBtnSetor>
+                            <ThBtnSetor col="totalPeso" align="center">Peso</ThBtnSetor>
+                            <ThBtnSetor col="totalCubagem" align="center">Cubagem</ThBtnSetor>
+                            <ThBtnSetor col="totalFrete" align="right">Frete (R$)</ThBtnSetor>
+                            <ThBtnSetor col="totalVlrNf" align="right">Vlr NF (R$)</ThBtnSetor>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                       {(() => {
                         const maxPeso    = Math.max(...gruposSetor.map(g => g.totalPeso), 1);
