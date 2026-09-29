@@ -2695,6 +2695,21 @@ function CardCarregamento({
   );
 
   const unidadesReais = (() => {
+    const isManual = (carregamento.origem_criacao ?? null) === 'MANUAL';
+    if (isManual) {
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const u of todasUnidades) {
+        const x = String(u ?? '').trim().toUpperCase();
+        if (!x || !/^[A-Z0-9]{2,5}$/.test(x)) continue;
+        if (seen.has(x)) continue;
+        seen.add(x);
+        out.push(x);
+      }
+      const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
+      if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
+      return out;
+    }
     if (carregamento.ctes.length === 0) {
       const out: string[] = [];
       const seen = new Set<string>();
@@ -2858,15 +2873,23 @@ function CardCarregamento({
       seen.add(x);
       out.push(x);
     };
+    const isManual = (carregamento.origem_criacao ?? null) === 'MANUAL';
+    const setoresDeclarados = String(setoresEntrega ?? '').trim() !== ''
+      ? String(setoresEntrega ?? '').split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    if (isManual && setoresDeclarados.length > 0) {
+      for (const s of setoresDeclarados) add(s);
+      return out;
+    }
     for (const c of (carregamento.ctes ?? [])) {
       const setor = String((c as any).setor ?? (c as any).setor_cte ?? '').trim();
       if (setor) add(setor);
     }
     if (out.length === 0) {
-      for (const s of String(setoresEntrega ?? '').split(',')) add(s);
+      for (const s of setoresDeclarados) add(s);
     }
     return out;
-  }, [carregamento.ctes, setoresEntrega]);
+  }, [carregamento.ctes, setoresEntrega, carregamento.origem_criacao]);
 
   const setoresFull = setoresReais.join(', ');
   const setoresTexto = (() => {
