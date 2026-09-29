@@ -2425,10 +2425,13 @@ function CardCarregamento({
   const ativo = modoApontamento === carregamento.placa_provisoria;
   const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${carregamento.placa_provisoria ?? ''}`;
 
-  const qtdeCtesCarreg = (carregamento.ctes?.length ?? 0) || 0;
-  const pesoDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_peso ?? 0) || 0;
-  const cubagemDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_cubagem ?? 0) || 0;
-  const freteDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_frete ?? 0) || 0;
+  const qtdeCtesArray = (carregamento.ctes?.length ?? 0) || 0;
+  const qtdeCtesHeader = Number(carregamento.total_ctes ?? 0) || 0;
+  const qtdeCtesCarreg = Math.max(qtdeCtesArray, qtdeCtesHeader);
+
+  const pesoDoCarregamento = Number(carregamento.total_peso ?? 0) || 0;
+  const cubagemDoCarregamento = Number(carregamento.total_cubagem ?? 0) || 0;
+  const freteDoCarregamento = Number(carregamento.total_frete ?? 0) || 0;
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
   const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
@@ -2586,7 +2589,7 @@ function CardCarregamento({
   });
 
   useEffect(() => {
-    if ((carregamento.ctes?.length ?? 0) <= 0) return;
+    if (qtdeCtesCarreg <= 0) return;
     if (totaisCard) return;
     const cached = totaisCarregamentoCache.get(carregamentoKey);
     if (cached) { setTotaisCard(cached); return; }
@@ -2622,7 +2625,7 @@ function CardCarregamento({
       } catch {}
     })();
     return () => { alive = false; };
-  }, [carregamentoKey, totaisCard]);
+  }, [carregamentoKey, qtdeCtesCarreg, totaisCard]);
 
   const totalPeso =
     (totaisCard && totaisCard.peso > 0) ? totaisCard.peso :
