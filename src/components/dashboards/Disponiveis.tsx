@@ -2662,6 +2662,11 @@ function CardCarregamento({
       ? `Criado: ${formatData(carregamento.data_criacao)} ${String(carregamento.hora_criacao ?? '').slice(0, 5)}`
       : null);
   const destino = (() => {
+    const isManual = (carregamento.origem_criacao ?? null) === 'MANUAL';
+    if (isManual) {
+      const d = String(carregamento.destino ?? '').trim().toUpperCase();
+      return d || null;
+    }
     if (carregamento.destino) return carregamento.destino;
     const m = carregamento.placa_provisoria.match(/^[A-Z0-9]{2,5}-([A-Z0-9]{2,5})$/);
     if (m?.[1]) return m[1];
