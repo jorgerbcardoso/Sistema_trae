@@ -1,0 +1,693 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: ESTEIO                                                                               29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164210-3  25/09 30/10     918982                         2             BANDEIRANTE QUIMICA  BOESSIO TRANSPORTES  BOESSIO TRANSPORTES  ESTEIO         FEC     120.000,00    9.800,00   6.000    0,0 80
+                             918983
+TOTAIS:                                  1 CTRCS            2                                                                                                   120.000,00    9.800,00   6.000    0,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: GYN7H66                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+VIX035060-5  25/09 07/10    2871589                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FLAVIO HENRIQUE GARC ALOANDIA       GI5       2.460,18      130,39      27    0,2 83
+FRA164599-4  25/09 09/10    4414162                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN JOSUE SANTOS         ALTO PARAISO D GI5       3.072,08      161,41      87    0,3 83
+VIX034964-0  25/09 08/10     313643                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR THIAGO MARIGUELLA FI ALTO PARAISO D GI5       1.674,81      172,18      78    0,3 83
+VIX034729-9  22/09 05/10     312909                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR DANIEL FORNIELES GAN ARAGUAPAZ      GI5       1.782,15      172,80      83    0,3 83
+VIX034970-4  25/09 08/10     313546                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR YASMIN GABRIELLY PER ARAGUAPAZ      GI5       1.724,80      172,47      78    0,3 83
+VIX034787-6  23/09 02/10     992276                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LUDMILLA DE OLIVEIRA BELA VISTA DE  GI5       2.655,67      154,20      38    0,3 83
+CWB012791-4  24/09 09/10     365658                         2             NILKO TECNOLOGIA LTD NILKO TECNOLOGIA LTD MANTIQUEIRA ALIMENTO CABECEIRAS     GI5       4.065,60      886,20      65    1,1 83
+VIX034794-9  23/09 06/10    2868907                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  KETELLYN MARTINS ROD CAMPESTRE DE G GI5       1.791,59      147,33      38    0,3 83
+FRA162391-5  23/09 07/10    4411213                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN ENRICO ALESSANDRO CO CAMPOS BELOS   GI5       2.399,02      129,08      38    0,2 95
+VIX034778-7  23/09 06/10     991755                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LETICIA BRAZ         CAVALCANTE     GI5       2.867,67      155,89      38    0,3 83
+VIX034921-6  24/09 07/10    2872563                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  WANDERSON MENDES MES FAINA          GI5       2.336,63      129,41      37    0,2 83
+SAO165086-6  28/09 07/10     226861                         1             IABV - INDUSTRIA DE  CARRETEIRO%20AUTO%20 CARRETEIRO%20AUTO%20 GOIANESIA      GI5       3.965,44      191,52     103    0,3 80
+VIX035059-1  25/09 06/10    2868475                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  JOSELIA MESSIAS SOUS GOIANIRA       GI5       1.592,08      123,48      27    0,2 83
+SAO164151-4  25/09 05/10       3261                         1             PROFUROS INDUSTRIA E MAQNA IND. MECANICA  MAQNA IND. MECANICA  GOIANIRA       GI5       8.648,23      842,22     395    0,5 80
+VIX034907-1  24/09 07/10    2870643                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  PEDRINA FERNANDES DA IACIARA        GI5       1.073,11      141,61      26    0,3 83
+MT2006969-8  28/09 08/10       3517                         1             C EAMP B BIJUTERIA A LAVI BIJUTERIAS LTDA LAVI BIJUTERIAS LTDA IPORA          GI5         419,00      141,15      20    0,1 80
+FRA164609-5  25/09 09/10    4414452                         4             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN PEDRO HENRIQUE SOUZA IPORA          GI5         600,28      112,08      36    0,0 83
+VIX034683-7  22/09 05/10    2868846                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  GIRLAINE LEMES CARDO IPORA          GI5       2.411,99      130,00      27    0,2 83
+SAO165278-8  28/09 08/10       4767                         3             YI-WU BIJUTERIAS LTD LAVI BIJUTERIAS LTDA LAVI BIJUTERIAS LTDA IPORA          GI5       1.021,19      267,62     150    0,6 80
+SAO165321-1  28/09 08/10      11157                         3             TINGOY INDUSTRIA E C PCH COMERCIO DE CARN PCH COMERCIO DE CARN IPORA          GI5         957,00      230,00      29    0,1 80
+VIX035053-2  25/09 08/10     174758                        10             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI W MENDANHA DOS SANTO ITABERAI       GI5       5.990,00      352,11     109    0,7 83
+VIX034929-1  24/09 07/10     992852                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  MARIANNY NUNES       ITABERAI       GI5       1.696,91      124,32      37    0,2 83
+VIX034783-3  23/09 06/10     991892                         3             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ISMAEL DA CRUZ ROSA  ITAPURANGA     GI5       5.508,43      176,90      42    0,3 83
+VIX034937-2  24/09 07/10     993117                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ANDREIA RIBEIRO DA S ITAPURANGA     GI5       1.989,01      126,64      32    0,2 83
+VIX034684-5  22/09 05/10    2869269                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  DIONATHAN ALVES DA C JUSSARA        GI5       2.158,21      127,99      28    0,2 83
+VIX035066-4  25/09 08/10    2872864                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LUCILENE BORBA DE FR MUNDO NOVO     GI5       1.108,30      141,90      26    0,3 83
+FND161283-2  22/09 07/10       6577                         1             INFOCELL PREMIUM LTD INFOCELL PREMIUM LTD BRENDA SOUSA DA COST NEROPOLIS      GI5         182,30      144,54      47    0,1 83
+VIX034687-0  22/09 05/10    2869666                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  VICTOR MAZON CARVALH ORIZONA        GI5       1.742,36      124,68      27    0,2 83
+VIX034730-2  22/09 05/10     312910                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR KEILLA VERAS         PALMEIRAS DE G GI5       1.491,21      171,15      82    0,3 83
+VIX035075-3  25/09 08/10    2873502                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  MAYRA MARTINS        PARAUNA        GI5       1.434,65      189,92      35    0,5 83
+VIX035097-4  25/09 08/10      80516                         2             REFRICRIL DISTR DE A REFRICRIL DISTR DE A 22.688.124 SIDNEY JO PARAUNA        GI5       3.182,32      214,66      48    0,3 83
+VIX034781-7  23/09 06/10     991814                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LUSIANE PINTO        PIRES DO RIO   GI5       2.128,55      127,75      30    0,2 83
+VIX034685-3  22/09 05/10    2869352                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ALMIR OLIVEIRA       PIRES DO RIO   GI5       2.019,25      126,88      28    0,2 83
+VIX035093-1  25/09 08/10     174769                        20             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI RHANIA LOPES PEREIRA PIRES DO RIO   GI5       3.380,00      930,39      70    1,7 83
+VIX034985-2  25/09 08/10     313313                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR STEFANY SILVA        POSSE          GI5       1.723,58      172,47      84    0,3 83
+VIX034990-9  25/09 08/10     312614                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR ANDRESSA ALVES DE OL POSSE          GI5       2.984,80      181,30      72    0,3 83
+VIX034792-2  23/09 06/10     992494                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  DOUGLAS RESENDE      SANTA BARBARA  GI5       4.892,06      289,45      62    0,5 83
+VIX034782-5  23/09 02/10     991858                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  GEOVANNA CARVALHO    SAO LUIS DE MO GI5       2.231,00      128,57      30    0,2 83
+VIX034732-9  22/09 06/10     312953                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR MAISA ROSA DE OLIVEI SAO MIGUEL DO  GI5       1.534,35      171,39      82    0,3 83
+VIX034994-1  25/09 08/10      37492                         8             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RENOVADORA DE PNEUS  VIANOPOLIS     GI5       1.674,52      275,26      71    0,3 83
+VIX034932-1  24/09 07/10     992970                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  VIVIAM MARA FIUZA DI CAMPINORTE     GIT       2.419,70      130,07      30    0,2 83
+VIX034668-3  22/09 05/10     722747                         4             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  AGDA ESTER           GUARINOS       GIT       4.264,42      300,76      70    0,4 83
+SAO165599-0  28/09 08/10     397675                         2             MOAS IND E COM IMP E MOAS IND E COM IMP E JACK IMPORTS LTDA    ITAPACI        GIT       2.350,89      138,23      10    0,2 80
+SAO165143-9  28/09 08/10       6104                         1             DUTRA                GOFRETES INTERMEDIAC MATEUS CORREIA DE MA MINACU         GIT          44,97      382,81      50    1,0 80
+VIX034788-4  23/09 06/10     992309                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  RULIMAR GOMES ALEIXO MINACU         GIT       2.971,06      156,72      38    0,3 83
+FRA162373-7  23/09 07/10    4411028                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN BENONI MOURA         NIQUELANDIA    GIT       3.271,63      183,10     101    0,3 83
+FRA164614-1  25/09 09/10    4415651                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN FABIANA NUNES DA SIL NOVA GLORIA    GIT       5.682,31      165,59      40    0,2 83
+VIX034678-1  22/09 05/10    2867934                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ANA PAULA DA SILVA B NOVO PLANALTO  GIT       1.208,19      142,69      26    0,3 83
+VIX035064-8  25/09 08/10    2872751                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  EDSON CALAZANS       PORANGATU      GIT       3.219,29      158,69      40    0,3 83
+VIX034919-4  24/09 07/10    2872423                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  PATRACIA ANDRAIA SOU PORANGATU      GIT       4.785,51      216,58      74    0,5 83
+VIX034784-1  23/09 06/10     992131                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ELTHON CLAUDIO DOS S SAO DOMINGOS   GIT       2.149,61      127,92      32    0,2 83
+VIX034798-1  23/09 06/10    2870574                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  WELITON PROENAA      URUACU         GIT       1.862,17      125,64      29    0,2 83
+VIX034926-7  24/09 07/10     992754                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ADOLFO JABBER RACHID URUACU         GIT       1.952,91      126,35      35    0,2 83
+SAO164957-4  28/09 02/10    5835451                         4             ATACADO UNIAO LTDA   ATACADO UNIAO LTDA   46.011.811 THIAGO CH APARECIDA DE G GYN       6.278,99      236,17     209    0,9 80
+SAO165578-7  28/09 02/10      32662              LUQSO      7             CLARO S.A            VERKO LOGISTICA EIRE CLARO S.A.           APARECIDA DE G GYN     111.192,10    3.079,84   2.751    5,0 80
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: GYN7H66                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+VIX034694-2  22/09 29/09       2730                         4             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD FASHION MAN CONFECCA GOIANIA        GYN       6.132,00      143,42      55    0,1 83
+VIX035049-4  25/09 02/10     441348                        24             COBRA ROLAMENTOS E A COBRA ROLAMENTOS E A COBRA ROLAMENTOS E A GOIANIA        GYN      24.987,26      823,44     403    1,3 83
+                             441457,     441470
+VIX034693-4  22/09 29/09       2723                         4             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD MIRANDA E CIA INDUS. GOIANIA        GYN       5.460,91      128,55      40    0,1 83
+SAO165017-3  28/09 02/10      17179                         5             TRUKPRO COMPONENTES  AGUILERA AUTOPECAS D AGUILERA AUTOPECAS D GOIANIA        GYN      11.180,00      317,89     126    0,5 80
+SAO165199-4  28/09 02/10      18528                         1             GERBAR COMERCIAL IND GERBAR COMERCIAL IND VENTURA INTERIORES L GOIANIA        GYN       2.800,00      136,23       5    0,1 80
+SAO165103-0  28/09 02/10     102511                         2             WASCO INDUSTRIA E CO WASCO INDUSTRIA E CO NAVESA MOTORS LTDA   GOIANIA        GYN       3.673,24      187,44      51    0,1 80
+VIX034941-1  24/09 01/10     119121                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  SENDAS DISTRIBUIDORA GOIANIA        GYN       1.200,00      469,63       9    0,0 83
+SAO165176-5  28/09 02/10       7958                         4             KMC MOVEIS DE ACO LT GOFRETES INTERMEDIAC ISABELLA TEREZA RODR GOIANIA        GYN         495,46       95,53      20    0,0 80
+SAO164926-4  28/09 02/10      15357                        11             AURORA INDUSTRIA LTD AGUILERA AUTOPECAS D AGUILERA AUTOPECAS D GOIANIA        GYN      19.766,40      548,71     154    0,3 80
+SAO164988-4  28/09 02/10       2366              PTLLX      1             CABEL IND COM COND E AM TRANSPORTES E LOG PORTAL DIST. DE PRO. GOIANIA        GYN      12.861,80      534,60     318    1,2   
+SAO165066-1  28/09 02/10      14816                         3             WALTEC IND. COM. PEC WALTEC IND. COM. PEC ODAPEL-DISTRIBUIDORA GOIANIA        GYN       5.668,62      714,56      58    0,3 80
+VIX034762-1  23/09 30/09       2756                        10             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD ELLEN CRIACOES LTDA  GOIANIA        GYN       5.341,65      277,38     228    0,3 83
+SAO165580-9  28/09 02/10      32663              LUQSO      5             CLARO S.A            VERKO LOGISTICA EIRE CLARO S.A.           GOIANIA        GYN      52.133,49    1.419,73   1.173    3,0 80
+SAO164897-7  28/09 02/10     705388                         9             HIDRAU TORQUE IND.,C AGUILERA AUTOPECAS D AGUILERA AUTOPECAS D GOIANIA        GYN      20.969,65      598,41     372    0,7 80
+SAO165125-1  28/09 02/10      21247                         2             J.D.M BALCOES        CENTRAL DO FRETE INT CLEICE KELI DOS SANT GOIANIA        GYN         250,00      153,67      60    0,1 80
+VIX034942-9  24/09 01/10     119138                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  SENDAS DISTRIBUIDORA GOIANIA        GYN       3.015,00      478,91       5    0,0 83
+VIX034695-1  22/09 29/09        649                         9             OTTI IMPORT E EXPORT OTTI IMPORT E EXPORT FASHION MAN CONFECCA GOIANIA        GYN       6.105,12      204,51     166    0,3 83
+SAO165272-9  28/09 06/10      91412                         1             TRANSBOR COMERCIO DE ACTIVE IND DE COSMET ACTIVE IND DE COSMET SENADOR CANEDO GYN       4.348,00      134,89       8    0,1 80
+SAO164915-9  28/09 06/10    1295160                         2             SMC PNEUMATICOS DO B ACTIVE IND DE COSMET ACTIVE IND DE COSMET SENADOR CANEDO GYN       1.123,38      127,96       2    0,0 80
+TOTAIS:                                 74 CTRCS          253                                                                                                   437.736,06   22.055,93   9.249   31,9
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   4
+ssw0194                                                                                     PLACA: ITB2J06                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO165356-3  28/09 06/10     158093                        12             ANIDROL PRODUTOS PAR CURITIBA LABORATORIO CURITIBA LABORATORIO BOM JESUS      ITB       9.016,00      714,09     117    0,2 80
+SAO165939-1  29/09 07/10      59247                        28             ROYAL QUIMICA LTDA   I C DE ABREU LTDA    I C DE ABREU LTDA    BOM JESUS      ITB       4.454,78      250,83     205    0,0 80
+SAO165343-1  28/09 06/10      72920                         2             ANALISTA COM DE PDS  CURITIBA LABORATORIO CURITIBA LABORATORIO BOM JESUS      ITB         408,00      305,52      22    0,0 80
+VIX034727-2  22/09 01/10     312824                         1             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR JEANE MENDES DE OLIV BOM JESUS      ITB         445,90       98,32      25    0,1 83
+VIX034791-4  23/09 02/10     992406                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  BEATRIZ PAULA COSTA  CALDAS NOVAS   ITB       1.977,24      126,55      37    0,2 83
+SAO164955-8  28/09 06/10      52508                        12             FREECOM COM UTILIDAD THERMAS CALDAS DISTR THERMAS CALDAS DISTR CALDAS NOVAS   ITB       2.869,28      361,84     154    1,1 95
+VIX034779-5  23/09 02/10     991756                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  DAVI                 CALDAS NOVAS   ITB       2.128,55      127,75      30    0,2 83
+SAO166018-7  29/09 07/10      37424                        50             GELSUPER IND E COM D JL E SOUZA PRODUTOS  JL E SOUZA PRODUTOS  CALDAS NOVAS   ITB       4.350,00      642,78     650    0,0 80
+VIX034908-9  24/09 05/10    2870795                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  DAIANE PIREA COSTA P CALDAS NOVAS   ITB         923,42      118,16      21    0,2 83
+SAO165589-2  28/09 06/10     397658                         3             MOAS IND E COM IMP E MOAS IND E COM IMP E DROGARIA FERNANDES E EDEIA          ITB       5.798,85      153,06      39    0,3 80
+VIX034938-1  24/09 05/10     993137                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  REGINALDO DE ALMEIDA GOIATUBA       ITB       2.867,67      155,89      38    0,3 83
+SAO165801-8  29/09 07/10     156985                         1             FAMA DO BRASIL IND D J. BATISTA DE FREITA J. BATISTA DE FREITA GOIATUBA       ITB       6.407,75      231,89     281    0,0 80
+VIX034692-6  22/09 01/10    2870127                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  SAMARA DOS SANTOS RI INACIOLANDIA   ITB       2.138,28      127,83      28    0,2 95
+SAO165094-7  28/09 02/10     190269                        38             NATHOR INDUSTRIA E C VILELA FRANCO LTDA M VILELA FRANCO LTDA M ITUMBIARA      ITB       7.773,02      484,38     202    2,3 80
+SAO165358-0  28/09 02/10     147835                         3             REMADI IMP COM MATS  GUIZETTI E GUIZETTI  GUIZETTI E GUIZETTI  ITUMBIARA      ITB       3.417,60      170,10      46    0,1 80
+PSA163864-5  24/09 01/10    3663234                         2             GRUPO MULTI S A      GRUPO MULTI S A      LOJAS MIDIA SANTA RI ITUMBIARA      ITB       1.375,04       83,57      10    0,1 83
+PSA164641-9  25/09 02/10     213827                         6             MIMO IMPORTACAO E EX MIMO IMPORTACAO E EX PABLINE SILVA RIBEIR ITUMBIARA      ITB       1.136,91      112,34      18    0,0 83
+CAM429758-0  25/09 01/10      88919                         5             KALIPSO EQUIP INDIVI KALIPSO EQUIP INDIVI GUIZETTI E GUIZETTI  ITUMBIARA      ITB       3.578,03      139,41      47    0,3 83
+SAO165973-1  29/09 05/10    1619533                        61             TILIBRA PRODUTOS DE  LOJAS DO ZINHO LTDA  LOJAS DO ZINHO LTDA  ITUMBIARA      ITB      26.928,53      868,66     869    1,8 80
+PSA164791-1  25/09 02/10    3667552                        32             GRUPO MULTI S A      GRUPO MULTI S A      REIMIX OPORTUNIDADES ITUMBIARA      ITB      18.419,75      428,22     120    1,5 83
+SAO165085-8  28/09 02/10     226835                         1             IABV - INDUSTRIA DE  153 AUTO PECAS LTDA  153 AUTO PECAS LTDA  ITUMBIARA      ITB       7.976,13      229,05     232    0,4 80
+SAO165933-2  29/09 05/10      58296                         1             SILC INDUSTRIA DE AU AGAZZI & CIA LTDA-EP AGAZZI & CIA LTDA-EP ITUMBIARA      ITB      10.559,75      640,16     479    0,0 80
+SAO166015-2  29/09 05/10     594669                        29             METALBO INDUSTRIA DE GUIZETTI E GUIZETTI  GUIZETTI E GUIZETTI  ITUMBIARA      ITB       7.928,60      449,66     684    0,4 80
+SAO165192-7  28/09 02/10       5205                         1             W.A IMPORTADORA E DI C E S EMBREAGENS LTD C E S EMBREAGENS LTD ITUMBIARA      ITB       1.388,80      105,13      30    0,1 80
+CAM429562-5  25/09 01/10     885630                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL CASPPER DISTRIBUIDOR ITUMBIARA      ITB       2.511,94      110,22       5    0,2 83
+SAO165595-7  28/09 02/10     397657                         9             MOAS IND E COM IMP E MOAS IND E COM IMP E CUSTODIO EAMPAMP DIA ITUMBIARA      ITB      13.650,47      315,97      68    0,8 80
+SAO165087-4  28/09 02/10     226836                         1             IABV - INDUSTRIA DE  AGAZZI & CIA LTDA-EP AGAZZI & CIA LTDA-EP ITUMBIARA      ITB      10.829,04      309,81     186    0,4 80
+SAO164937-0  28/09 02/10      47134                        58             DIPLOMATA IND. COM.  L.L. PAPELARIA LTDA  L.L. PAPELARIA LTDA  ITUMBIARA      ITB      16.422,80      813,85     181    3,7 80
+CAS009666-1  28/09 31/12     884581              FCA        2             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH CASPPER DISTRIBUIDOR ITUMBIARA      ITB           0,01        0,01       0    0,0 83
+SAO165806-9  29/09 05/10     116682                         3             LUMOBRAS LUBRIFICANT SUPREMA MAQUINAS E F SUPREMA MAQUINAS E F ITUMBIARA      ITB       1.182,90      108,90      11    0,0 80
+SAO164953-1  28/09 02/10     110424                         9             METAL CHEK DO BRASIL ELETROSOLDA MAQ E FE ELETROSOLDA MAQ E FE ITUMBIARA      ITB       3.543,00      121,60      41    0,1 80
+CAM429172-7  23/09 29/09     884416                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL DINATEC PECAS E SERV ITUMBIARA      ITB       2.716,30      110,72       8    0,2 83
+SAO164934-5  28/09 02/10      77947                         1             SALES IND. COM. DE M CENTRAL COM SERV DE  CENTRAL COM SERV DE  ITUMBIARA      ITB         793,97      156,29       6    0,1 80
+CAM429755-5  25/09 01/10      88910                        13             KALIPSO EQUIP INDIVI KALIPSO EQUIP INDIVI ELETROSOLDA MAQ E FE ITUMBIARA      ITB       7.826,43      220,01     160    0,5 83
+VIX034928-3  24/09 01/10     992832                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ALEXANDRE DE SOUZA S ITUMBIARA      ITB       2.235,73      128,60      30    0,2 83
+SAO166092-6  29/09 07/10     214295                         4             ESTILOTEX INDUSTRIA  ARTES E LINHAS LTDA  ARTES E LINHAS LTDA  MORRINHOS      ITB       4.990,50      169,82      61    0,7 80
+SAO165609-1  28/09 06/10     160608                         7             ETILUX IMP E DISTR D NBC COMERCIO DE UTIL NBC COMERCIO DE UTIL PONTALINA      ITB       2.460,45      297,24      75    0,3 80
+SAO165796-8  29/09 07/10      17163                        82             PORCELARTE IND E COM GJS UTILIDADES LTDA  GJS UTILIDADES LTDA  PONTALINA      ITB       4.289,60      798,41     772    0,0 80
+TOTAIS:                                 38 CTRCS          490                                                                                                   207.721,02   10.786,64   5.987   16,9
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   5
+ssw0194                                                                                     PLACA: KEU9D16                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+RAO004964-6  17/09 13/10      91831                         2             GNATUS PRODUTOS MEDI GNATUS PRODUTOS MEDI MATHEUS DE RESENDE A ABAETETUBA     BEL      38.635,30    3.850,00     360    3,1 83
+JOI002281-1  23/09 19/10    1020137                        25             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S G.R. LIMA COMERCIO E ANANINDEUA     BEL       5.727,06      961,47     222    0,3 83
+RAO005225-6  24/09 16/10      92014                         2             GNATUS PRODUTOS MEDI GNATUS PRODUTOS MEDI PATRICIA OLIVEIRA    ANANINDEUA     BEL      36.225,10    1.965,00     190    1,8 83
+TIT164165-4  25/09 23/10     598746                         6             BT EQUIPAMENTOS IND  BT EQUIPAMENTOS IND  ALUBAR METAIS E CABO BARCARENA      BEL       7.660,05      327,92      42    0,0 83
+FND162511-0  23/09 16/10        243                         2             VJ IND E COM DE MOVE VJ IND E COM DE MOVE FERNANDA SANCHES BAT BELEM          BEL       4.658,26      756,32      68    0,8 83
+SAO165033-5  28/09 19/10       7228                       114             VGF INDUSTRIA E COME VGF INDUSTRIA E COME LIDER COMERCIO E IND BELEM          BEL      63.585,50    6.822,46     746    5,9 80
+                               7229
+SJP164989-2  28/09 21/10     322651                        34             INDUSTRIA DE ALUMINI INDUSTRIA DE ALUMINI LOJAS IMPERIO EIRELI BELEM          BEL      21.004,03    2.000,03     303    2,5 83
+IBI162129-7  23/09 16/10       2194                        10             PRIME FABRICACAO E C PRIME FABRICACAO E C ECOLAVE LAVANDERIA I BELEM          BEL       8.788,50      975,98     148    1,0 83
+VIX034786-8  23/09 15/10     992247                        12             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  JANNICE AMARAS MONTE BELEM          BEL      15.313,33      762,73     181    1,3 83
+FRA164668-1  25/09 20/10     251576                         9             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA HAPVIDA ASSISTENCIA  BELEM          BEL       6.683,40      358,49      54    0,6 83
+VIX033050-7  08/09 29/09     982988                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  SERENI               BELEM          BEL      13.700,66      632,26     137    1,1 83
+SAS028232-4  29/09 31/12      34046              TIT        3             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH VORAUS COMERCIO DE P BELEM          BEL           0,01        0,01     100    0,0 80
+SAO165375-0  28/09 19/10    1173915                        31             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  P R COMERCIO LTDA    BELEM          BEL      24.666,09    1.692,15     366    1,4 80
+CAM429322-3  23/09 14/10     258473                         1             TYROLIT DO BRASIL LT TYROLIT DO BRASIL LT NOVA CASA DISTRIBUID BENEVIDES      BEL         263,50      360,88      17    0,1 83
+VIX034520-2  21/09 19/10     174709                         2             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI JR COMERCIO DE PRODU CANAA DOS CARA BEL       4.266,98      583,40      22    0,3 83
+SAO164747-4  25/09 21/10     160138                        16             ETILUX IMP E DISTR D ETILUX IMP E DISTR D EDUVIRGEM FERREIRA D CONCEICAO DO A BEL       3.657,60      427,31      45    0,1 80
+BNU002360-4  24/09 21/10      75745                         2             AGUIA TEX MALHAS LTD AGUIA TEX MALHAS LTD 603 - SOL MAGAZINE D DOM ELISEU     BEL       5.452,80      472,59      38    0,3 83
+IBI163301-5  24/09 20/10     272758                        14             OLIVEIRA E LOPES LTD OLIVEIRA E LOPES LTD ELISEU TECIDOS LTDA  DOM ELISEU     BEL       3.437,20      412,69      70    0,3 83
+BIR164071-2  25/09 04/11      15867                        16             PECUARISTA D OESTE D PECUARISTA D OESTE D FARIA E BRITO PRODUT MARABA         BEL      37.396,80    2.290,77     413    1,4 83
+SJP162158-1  23/09 30/10      23484                        27             SO CORDAS RIO PRETO  SO CORDAS RIO PRETO  OZEIAS FERNANDES RIB MARABA         BEL       9.809,43      933,29     218    0,4 83
+BNU002350-7  24/09 23/10      75754                         2             AGUIA TEX MALHAS LTD AGUIA TEX MALHAS LTD SOL MAGAZINE PARAGOM PARAGOMINAS    BEL       5.452,80      418,26      38    0,3 83
+SJP162144-1  23/09 21/10     322443                         1             INDUSTRIA DE ALUMINI INDUSTRIA DE ALUMINI JESSICA LIMA DOS SAN PARAGOMINAS    BEL       5.035,66      499,99      81    0,5 83
+SJP164247-2  25/09 23/10       1310                         1             L.A. SANTOS INDUSTRI L.A. SANTOS INDUSTRI HUDIELIO DA SILVA LE PARAUAPEBAS    BEL         105,00      170,00      12    0,0 83
+FND163008-3  24/09 22/10       4579                         3             GD INDUSTRIA E COMER GD INDUSTRIA E COMER ROSIMAR SOUZA        PARAUAPEBAS    BEL         135,69      300,77      75    0,3 83
+FND160402-3  21/09 19/10      14589                         3             MARTINS E ORNELAS IN MARTINS E ORNELAS IN ISAAC BARRETO        PARAUAPEBAS    BEL       3.299,00    1.653,40      47    1,6 83
+SAO164573-1  25/09 21/10     139599                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON GIULIA NAVARRO       PARAUAPEBAS    BEL       3.207,72      484,52      41    0,3 80
+IBI163297-3  24/09 22/10     272757                        16             OLIVEIRA E LOPES LTD OLIVEIRA E LOPES LTD OSORIO COMERCIO DE T REDENCAO       BEL       4.160,00      534,73     112    0,2 83
+RAO005252-3  24/09 20/10      91066                         3             SATELIT PRODUTOS P/  JBS SA               JBS SA               REDENCAO       BEL       1.021,81      300,99      25    0,1 83
+BNU002342-6  24/09 27/10      75759                         2             AGUIA TEX MALHAS LTD AGUIA TEX MALHAS LTD SOL MAGAZINE RONDON  RONDON DO PARA BEL       4.166,40      407,88      28    0,3 83
+BNU002359-1  24/09 23/10      75760                         2             AGUIA TEX MALHAS LTD AGUIA TEX MALHAS LTD SOL MAGAZINE PARA 06 SAO MIGUEL DO  BEL       5.452,80      418,26      38    0,3 83
+BNU002357-4  24/09 23/10      75762                         4             AGUIA TEX MALHAS LTD AGUIA TEX MALHAS LTD SOL MAGAZINE PARA 06 TAILANDIA      BEL       9.806,40      850,38      69    0,5 83
+IBI163292-2  24/09 22/10     272823                        20             OLIVEIRA E LOPES LTD OLIVEIRA E LOPES LTD BIG TECIDOS E CALCAD TAILANDIA      BEL       8.396,00    1.232,59     159    0,9 83
+JOI002287-0  23/09 05/11    1021617                        28             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S RORAIMA ENERGIA S.A  BOA VISTA      BVT       8.615,00    1.224,30      60    0,3 83
+RAO005125-0  22/09 30/10      55874                         6             QUIMICENTER PROD PAR QUIMICENTER PROD PAR ACAO EDUCACIONAL CLA BOA VISTA      BVT       1.339,00      489,00      60    0,1 83
+TIT164371-1  25/09 09/11      51307                         1             SANTAE EQUIPAMENTOS  SANTAE EQUIPAMENTOS  IRRIMAQ REP E COM DE BOA VISTA      BVT       2.851,94      306,81      18    0,1 83
+FND155696-7  11/09 23/10      79607                         1             VITAL ESPORTE LTDA-M VITAL ESPORTE LTDA-M CAMILA CRISTINA BARR BOA VISTA      BVT       1.090,00      380,00      30    0,3 83
+SAO165338-5  28/09 06/11     376721                         2             CAPLAB INDUSTRIA E C CAPLAB INDUSTRIA E C GONTIJO ALIMENTOS LT BOA VISTA      BVT       2.065,83      338,51      11    0,1 80
+SJP157149-4  15/09 27/10       1347                         3             MARIZZA PRADO DECORA VOLKMER E VOLKMER EV VOLKMER E VOLKMER EV BOA VISTA      BVT       7.800,00    1.785,98     120    1,5 83
+BIR163503-4  24/09 10/11       7281                         8             GROOL VESTUARIO E CA GROOL VESTUARIO E CA ERICA DE SALES LUNIE BOCA DO ACRE   MAO       2.681,89    1.897,59      61    0,6 83
+VIX034740-0  22/09 23/10      37438                         6             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RECAUCHUTADORA ELO L MANAUS         MAO      73.559,71   20.289,53   3.856   15,9 51
+RAO005108-0  21/09 21/10     181678                         2             INCESA-IND DE COMPON INCESA-IND DE COMPON B A ELETRICA LTDA    MANAUS         MAO      51.125,12    3.218,47     712    2,4 83
+SAO161358-8  22/09 22/10       1083              NELCC      1             MABE MAGAZINE LTDA   VIOLETA TRANSPORTES  TXT BUILD LTDA       MANAUS         MAO       4.811,98    1.100,28      18    1,0 83
+IBI162125-4  23/09 27/10        524                        11             SILTEX ARTIGOS TEXTE SILTEX ARTIGOS TEXTE CHECK UP HOSPITAL LT MANAUS         MAO      10.979,52    1.266,05     189    0,9 83
+RAO005295-7  25/09 27/10       6512                         3             D2 COMERCIO DE FERRA D2 COMERCIO DE FERRA MRV ENGENHARIA E PAR MANAUS         MAO       1.048,95      275,48      40    0,0 83
+TUB002135-1  17/09 22/10       4871                         1             PICK UP SUL ACESSORI PICK UP SUL ACESSORI VALDERISA DA SILVA M MANAUS         MAO       1.890,50      513,01      35    0,3 83
+CAM429726-1  25/09 27/10     586608                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S J TOLEDO COMPONENTES MANAUS         MAO       3.560,00      419,25      12    0,1 83
+SAO164629-0  25/09 27/10     140006                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON IDIVAN SARAIVA DE BR MANAUS         MAO       3.646,33      461,32      41    0,3 80
+SAO165608-2  28/09 28/10     159257                        14             ETILUX IMP E DISTR D ETILUX IMP E DISTR D CASA MODELO COMERCIO MANAUS         MAO       5.506,78      500,27     117    0,3 80
+RAO005290-6  25/09 27/10      22636                         1             METALRIB PORTAS FRIG METALRIB PORTAS FRIG SERVICO NACIONAL DE  MANAUS         MAO       5.857,40      470,00      58    0,3 83
+RAO005241-8  24/09 26/10     445206                         4             CONDUMAX - ELETRO ME CONDUMAX - ELETRO ME F R DE CASTRO COM VA MANAUS         MAO       7.506,99      880,70     205    0,7 83
+CAM428601-4  21/09 21/10     585658                         2             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S CRISTALCOPO DA AMAZO MANAUS         MAO       2.842,70      412,30       2    0,1 83
+RAO005254-0  24/09 26/10       7469                         1             SUPERFRIO REFRIGERAC SUPERFRIO REFRIGERAC EMANUELE DE SOUZA    MANAUS         MAO       2.771,62      450,00      45    0,2 83
+CAM428602-2  21/09 21/10     585696                         5             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S ARDAGH INDUSTRIA DE  MANAUS         MAO       1.729,40      446,27      26    0,2 83
+TIT161629-3  22/09 26/10     597893                         2             BT EQUIPAMENTOS IND  BT EQUIPAMENTOS IND  CLIMAZON INDUSTRIAL  MANAUS         MAO      41.960,00      704,97      15    0,2 83
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   6
+ssw0194                                                                                     PLACA: KEU9D16                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164651-6  25/09 27/10    1173848                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MANAUS         MAO       2.978,64      461,75      40    0,1 80
+CAM429464-5  24/09 26/10     586394                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S ARDAGH INDUSTRIA DE  MANAUS         MAO         173,07      368,58       0    0,0 83
+JOI002285-3  23/09 27/10    1021616                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S AGGREKO ENERGIA LOCA MANAUS         MAO       1.117,88      436,52       8    0,0 83
+JOI002284-5  23/09 27/10    1020048                         5             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S MANAUS AMBIENTAL S/A MANAUS         MAO       4.020,66      776,84      14    0,1 83
+VIX035057-5  25/09 28/10      37487                         4             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RECAUCHUTADORA ELO L MANAUS         MAO      59.371,18   17.066,76   3.213   13,4 83
+FRA164704-1  25/09 29/10     354859                         3             FREE WAY ARTEFATOS D FREE WAY ARTEFATOS D JARI MAGAZINE LTDA   LARANJAL DO JA MCP       6.312,00      589,11      47    0,2 83
+RAO004721-0  08/09 01/10     401518                        21             CHIAPERINI INDUSTRIA CHIAPERINI INDUSTRIA SERVICOS TECNICOS DO MACAPA         MCP      40.763,43    4.725,00     976    3,9 51
+FND159052-9  17/09 15/10      21593                         3             CASELLI STORE COMERC CASELLI STORE COMERC CRISTINA BRITO       MACAPA         MCP         405,30      414,83      54    0,4 83
+SAO164655-9  25/09 21/10    1173845                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  NUTRIAMA LTDA        MACAPA         MCP      11.277,78      641,34      92    0,1 80
+PSA162721-0  23/09 20/10     535201                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  LARISSA MOUTINHO DE  MACAPA         MCP       5.088,48      684,84      57    0,4 83
+IBI162128-9  23/09 27/10        525                         3             SILTEX ARTIGOS TEXTE SILTEX ARTIGOS TEXTE J M L FERREIRA       MAZAGAO        MCP       3.918,00      457,25      48    0,2 83
+SJP162145-9  23/09 21/10     322442                         3             INDUSTRIA DE ALUMINI INDUSTRIA DE ALUMINI ATACADAO ECONOMICO L SANTANA        MCP      24.248,57    2.990,66     435    3,5 83
+TOTAIS:                                 66 CTRCS          545                                                                                                   766.086,53  101.301,09  15.182   76,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   7
+ssw0194                                                                                     PLACA: LVR1G95                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO165468-3  28/09 08/10       4849                         5             A.V.A. PAPAI COMERCI GOFRETES INTERMEDIAC AGROPECUARIA GOVEA L LUCAS DO RIO V LVR       1.612,85      261,94      73    0,5 80
+SAO165936-7  29/09 09/10      91169                        22             BRASCAMP EQUIPTOS PR CENTRAL EPI LTDA-ME  CENTRAL EPI LTDA-ME  LUCAS DO RIO V LVR      10.967,00      539,80     224    1,0 80
+CAT161523-8  22/09 05/10     565683                         8             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND PRIMARE INTERIORES L LUCAS DO RIO V LVR       3.864,51      565,06     228    0,6 83
+VIX034860-1  24/09 06/10    3359290                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  VICTOR SANTIAGO DE S LUCAS DO RIO V LVR       1.571,71      134,66      28    0,2 83
+SAO165990-1  29/09 09/10     484081                         4             REHAU INDUSTRIA LTDA INDUSTRIA E COMERCIO INDUSTRIA E COMERCIO LUCAS DO RIO V LVR       6.361,15      636,12      95    0,2 80
+SAO163037-7  24/09 06/10      50596                         9             DOCE BRINQUEDO IND E ARLINDO MORATELLI    ARLINDO MORATELLI    LUCAS DO RIO V LVR       2.552,30      180,44      79    0,2 80
+VIX034903-8  24/09 06/10    3361193                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  WILLAMS FLAVIO DE SA LUCAS DO RIO V LVR       1.708,38      135,89      28    0,2 83
+CAT161520-3  22/09 05/10     565679                         7             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND DANI COMERCIO DE MOV LUCAS DO RIO V LVR       3.228,17      459,59     179    0,6 83
+SAO165312-1  28/09 08/10      33655                         3             DINAMICA ILUMINACAO  ESPACO LUZ ILUMINACA ESPACO LUZ ILUMINACA LUCAS DO RIO V LVR       3.152,04      203,27      19    0,3 80
+SAO164918-3  28/09 08/10     164112                        22             POLIBRAS MINAS PLAST DANIELLE RODRIGUES D DANIELLE RODRIGUES D LUCAS DO RIO V LVR       2.883,17      517,03     106    0,6 80
+SAO165249-4  28/09 08/10     136024                         2             NAT CEREAIS E ALIMEN SABOR E SAUDE COM PR SABOR E SAUDE COM PR LUCAS DO RIO V LVR      12.437,97    1.092,55     780    3,1 80
+SAO165534-5  28/09 08/10     447874                         3             FORTPEL COMERCIO DE  FORTPEL COMERCIO DE  RAIA DROGASIL S/A    LUCAS DO RIO V LVR         519,12      121,08      14    0,1 80
+SAO163624-3  24/09 06/10       5629                         2             RF18 INDUSTRIA, COME A L SCHIAVINI CIA LT A L SCHIAVINI CIA LT LUCAS DO RIO V LVR       5.085,61      219,03      27    0,1 80
+CWB012738-8  23/09 07/10      23065                         1             CARBON CIENTIFICA LT CARBON CIENTIFICA LT SOLO CERTO LABORATOR LUCAS DO RIO V LVR      10.100,00      838,25     195    0,8 83
+SAO165146-3  28/09 08/10      60579                        65             PETROCAR PRODUTOS AU RAVATTI DISTRIBUIDOR RAVATTI DISTRIBUIDOR LUCAS DO RIO V LVR      12.287,75      736,54     558    0,0 80
+SAO163191-8  24/09 06/10     483121                        24             REHAU INDUSTRIA LTDA M TRES COMERCIO DE M M TRES COMERCIO DE M LUCAS DO RIO V LVR      37.756,26    1.271,30     596    0,8 80
+SAO165253-2  28/09 08/10        180                         8             SUPRATECH COMERCIO D FABRICA PLASTILUCAS  FABRICA PLASTILUCAS  LUCAS DO RIO V LVR       7.416,00      372,95     207    0,6 80
+SAO165637-6  28/09 08/10     363086                         2             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU BRF S.A              LUCAS DO RIO V LVR      10.306,78    3.014,48   1.804    2,4 95
+SAO163574-3  24/09 06/10      31018                         6             M. C. CIOFFOLETTI IL PAULO SERGIO PICOLI  PAULO SERGIO PICOLI  LUCAS DO RIO V LVR       3.595,40      184,14      37    0,3 80
+SAO164834-9  27/09 07/10    1406823                         1             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C COOP.DE CREDITO DE L LUCAS DO RIO V LVR          59,21      108,27       6    0,0 80
+SAO165098-0  28/09 13/10      96197                        16             RIO MASTER IMPORTACA MARCIO DE SORRILHA M MARCIO DE SORRILHA M TAPURAH        LVR       5.665,20      808,09     181    2,2 95
+SAO165048-3  28/09 13/10      71945                         6             FOX IMPORT LTDA. - M MARCIO DE SORRILHA M MARCIO DE SORRILHA M TAPURAH        LVR       5.435,10      273,13      62    0,5 80
+SAO165020-3  28/09 13/10      60860                        66             DIVERTOYS INDUSTRIA  LUZIA SOUZA CAMPOS L LUZIA SOUZA CAMPOS L TAPURAH        LVR      10.181,77    1.522,91     402    4,2 80
+TOTAIS:                                 23 CTRCS          286                                                                                                   158.747,45   14.196,52   5.927   19,3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   8
+ssw0194                                                                                     PLACA: NVM1G95                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO163843-2  24/09 07/10     361958                        10             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU BRF S.A              NOVA MUTUM     FEC      72.433,89   14.008,10   9.097   12,5 15
+  Demais NF:                 361959,     361960,     361961,     361962,     361963,     361964,     361965,     361966,     361967,     361968,     361990
+                             361991,     361992
+SAO163597-2  24/09 05/10     139966                         1             FILTER UP IND E COM  M.S. SCHRANCK EAMP,  M.S. SCHRANCK EAMP,  NOVA MUTUM     NVM       1.802,33      235,45      17    0,1 80
+SAO164426-2  25/09 06/10     292748                         1             NIPO CENTER IMPORT L NIPO CENTER IMPORT L W ALVES MARTINS LTDA NOVA MUTUM     NVM         645,16      135,28      27    0,1 80
+SAO163070-9  24/09 05/10       6520                        39             H J W BOLSAS LTDA    NOSSA LOJA COMERCIO  NOSSA LOJA COMERCIO  NOVA MUTUM     NVM      12.082,90    3.382,71     892    9,0 80
+SAO163540-9  24/09 05/10      37079                        27             A V CALEGARI DISTR D PAPELARIA AVENIDA LT PAPELARIA AVENIDA LT NOVA MUTUM     NVM       3.408,79      375,89      59    1,2 80
+SAO164215-4  25/09 06/10      82748                        15             SCUADRA EMBALAGENS D VILLA SUSHI LTDA     VILLA SUSHI LTDA     NOVA MUTUM     NVM       2.319,00      494,81      42    1,0 80
+SAO164212-0  25/09 08/10      66389                        40             LIG BRINK INDUSTRIA  MC CONFECCOES E VARI MC CONFECCOES E VARI SAO JOSE DO RI NVM       5.586,76    2.062,34     259    3,9 80
+                              66391
+TOTAIS:                                  7 CTRCS          133                                                                                                    98.278,83   20.694,58  10.394   27,7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   9
+ssw0194                                                                                     PLACA: RVD5F91                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TIT162152-1  23/09 05/10     598111                         2             BT EQUIPAMENTOS IND  COOP AGROINDL PROD R COOP AGROINDL PROD R ACREUNA        RVD       1.460,00      335,34      12    0,1 83
+SAO164960-4  28/09 06/10     461925                         3             COMERCIO E IMPORTACA MAPEL PAPELARIA LTDA MAPEL PAPELARIA LTDA ACREUNA        RVD       3.415,10      224,47      26    0,1 80
+SAO165971-5  29/09 07/10      17671                         7             INDUSCOMEL IND COM.  COOP AGROINDL PROD R COOP AGROINDL PROD R ACREUNA        RVD       3.484,57      305,26     250    0,0 80
+RAO005276-1  25/09 05/10     403678                         6             CHIAPERINI INDUSTRIA CHIAPERINI INDUSTRIA TAKEMOTO E TODA LTDA ACREUNA        RVD       5.242,40      300,00     207    0,7 83
+TIT162153-0  23/09 05/10     598109                         1             BT EQUIPAMENTOS IND  COOP AGROINDUSTRIAL  COOP AGROINDUSTRIAL  MONTIVIDIU     RVD       1.183,00      351,55       9    0,0 83
+VIX034940-2  24/09 05/10     993170                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  TERESINHA TIEKO TOMO MONTIVIDIU     RVD       3.098,97      135,47      30    0,2 83
+CAM429712-1  25/09 05/10     126102                        14             BRITISH INDUSTRIA E  BRITISH INDUSTRIA E  M M DA COSTA LTDA    QUIRINOPOLIS   RVD       4.064,99      148,69      39    0,0 83
+SAO164928-1  28/09 06/10     133472                         2             NICROM QUIMICA LTDA  GM IND COM E IMP DE  GM IND COM E IMP DE  QUIRINOPOLIS   RVD       4.111,75      998,97     496    0,6 80
+SAO165055-6  28/09 06/10     156854                         1             FAMA DO BRASIL IND D STEFANO MARTINS FARI STEFANO MARTINS FARI QUIRINOPOLIS   RVD       4.037,87      311,80     259    0,2 80
+PSA163857-2  24/09 05/10    3662598                        16             GRUPO MULTI S A      GRUPO MULTI S A      SOFT SYSTEM INFORMAT QUIRINOPOLIS   RVD      56.127,40      398,39     268    0,8 83
+SAO165914-6  29/09 06/10     360268                        41             ROJEMAC IMP E EXPORT THE CASA HOME UTILID THE CASA HOME UTILID RIO VERDE      RVD      15.077,77      659,09     495    0,0 80
+CAM429858-6  26/09 02/10     886949                         1             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ELETROTURBO ELETRICA RIO VERDE      RVD         565,23      105,40       6    0,2 83
+RAO005101-2  21/09 28/09     445182                         2             CONDUMAX - ELETRO ME CONDUMAX - ELETRO ME SINERGIA IND MONT EL RIO VERDE      RVD      28.898,00    1.437,54     987    3,3 83
+SAO165035-1  28/09 05/10      13295                         6             MG ATACADO E VAREJO  DANILO SIMOES ARAUJO DANILO SIMOES ARAUJO RIO VERDE      RVD       9.084,67      531,90      89    1,3 80
+SAO165910-3  29/09 06/10      50594                        31             TUBOS PETRA LTDA     METTA DISTRIBUIDORA  METTA DISTRIBUIDORA  RIO VERDE      RVD      12.196,80      885,37     218    2,6 80
+FRA164601-0  25/09 06/10    4414197                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN VELBRAN JUNIOR       RIO VERDE      RVD         698,94      138,59      10    0,3 83
+SAO165348-2  28/09 05/10     380846                        14             SODRAMAR INDUSTRIA E ELETROLIDER RV EIREL ELETROLIDER RV EIREL RIO VERDE      RVD       8.108,00      409,95      84    0,6 80
+SAO164990-6  28/09 05/10       1391                         7             L. A. SALMAZO INDUST SHOPPING DAS CADEIRA SHOPPING DAS CADEIRA RIO VERDE      RVD       2.400,00      134,97     122    0,5 80
+CAM429572-2  25/09 02/10     885723                         2             ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL POLIPECAS DISTRIBUID RIO VERDE      RVD       1.459,69      130,90      10    0,4 83
+SAO164985-0  28/09 05/10       1667              PTLLX      1             CABEL IND COM COND E AM TRANSPORTES E LOG SOLAR INVESTIMENTOS  RIO VERDE      RVD       7.200,00      261,12     110    0,4   
+SAO165985-5  29/09 06/10       5511                        99             LEFLEX PROCESSOS PLA COMERCIAL AVEIA E ME COMERCIAL AVEIA E ME RIO VERDE      RVD       4.074,00    1.342,34     760    4,7 80
+VIX034632-2  22/09 30/09     991168                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FABIO RIBEIRO DE OLI RIO VERDE      RVD       2.868,90      155,90      38    0,3 83
+SAO165829-8  29/09 06/10       7592                        16             NATUREZA DO VALE PRO ADEMIR ALEX PEREIRA  ADEMIR ALEX PEREIRA  RIO VERDE      RVD       3.961,60      302,86     218    0,5 80
+SAO164893-4  28/09 05/10     167999                         3             ICDER IND E COM DISC CASA DAS MANGUEIRAS  CASA DAS MANGUEIRAS  RIO VERDE      RVD       1.782,80      114,86      25    0,0 80
+SAO165016-5  28/09 05/10       5796                         8             TXT RETENTORES LTDA  MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       5.538,00      268,77     159    0,6 80
+SAO165127-7  28/09 05/10       1735                         5             MANIA ARTIGOS DECOR  THE CASA HOME UTILID THE CASA HOME UTILID RIO VERDE      RVD       6.801,90      364,48      94    0,5 80
+SAO164969-8  28/09 05/10     952721                        11             RENNER SAYERLACK S/A CENTER GLASS IND. E  CENTER GLASS IND. E  RIO VERDE      RVD      12.861,47      651,38     387    0,6 80
+CAM429701-6  25/09 02/10       1202                        20             GLASSPACK COMERCIO D DELTA INDUSTRIA DIST DELTA INDUSTRIA DIST RIO VERDE      RVD       5.120,00      213,01     152    0,5 83
+SAO165171-4  28/09 05/10       4698                        20             LE FONTE H COMERCIAL LE FONTE H COMERCIAL CONDOMINIO DE OBRA D RIO VERDE      RVD      27.350,00      479,99     114    0,8 80
+SAO165124-2  28/09 05/10      21245                         4             J.D.M BALCOES        CENTRAL DO FRETE INT JOSEBIAS VIDAL DE OL RIO VERDE      RVD         350,00      178,27      65    0,0 80
+SAO164975-2  28/09 05/10     204616                         4             HIMAFLEX INDUSTRIA E BIANATO IRRIGACAO E  BIANATO IRRIGACAO E  RIO VERDE      RVD       2.331,39      286,61     149    1,1 80
+SAO165039-4  28/09 05/10      47120                        17             PLASNOVA LOUVEIRA IN BIANATO IRRIGACAO E  BIANATO IRRIGACAO E  RIO VERDE      RVD       6.284,00      225,55      97    0,8 80
+SAS028217-1  29/09 31/12    1405251              TIT        2             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH ITAU UNIBANCO S.A    RIO VERDE      RVD           0,01        0,01      15    0,0 80
+SAO164936-1  28/09 05/10      28063                         3             OLIVERPLAST INDUSTRI MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       4.903,90      470,18      83    1,1 80
+SAO165133-1  28/09 05/10      80690                         1             CONTEC IND.  E COM.  MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       3.202,82      191,70       9    0,0 80
+SAO165254-1  28/09 05/10     195746                         7             INDUSTRIA QUIMICA UN FLORAMAX CONTROLE DE FLORAMAX CONTROLE DE RIO VERDE      RVD       2.646,00      267,70      38    0,1 80
+SAO164974-4  28/09 05/10     204669                         4             HIMAFLEX INDUSTRIA E CASA DAS MANGUEIRAS  CASA DAS MANGUEIRAS  RIO VERDE      RVD       2.403,66      125,82     132    0,3 80
+VIX034785-0  23/09 01/10     992185                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  LUCIANO LOURENCO FER RIO VERDE      RVD       1.780,00      124,98      35    0,2 83
+SAO165041-6  28/09 05/10     126500                         2             SABER QUIMICA INDUST DUALEX AGRONEGOCIOS  DUALEX AGRONEGOCIOS  RIO VERDE      RVD       6.439,90    1.295,91     431    0,0 80
+VIX034493-1  21/09 29/09     990910                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  GENI PEREIRA DA COST RIO VERDE      RVD       1.830,00      125,38      35    0,2 83
+SAO165974-0  29/09 06/10    1619788                         6             TILIBRA PRODUTOS DE  CUNHA RAMOS PAPELARI CUNHA RAMOS PAPELARI RIO VERDE      RVD       4.748,23      195,90      61    0,2 80
+VIX034959-3  24/09 02/10      14375                         6             FTTX BRASIL TELECOM  FTTX BRASIL TELECOM  ADRIANA CRISTINA ROD RIO VERDE      RVD      13.046,58      401,76      74    0,5 51
+TIT162151-3  23/09 02/10     598094                         2             BT EQUIPAMENTOS IND  COOPERATIVA AGROIND  COOPERATIVA AGROIND  RIO VERDE      RVD       1.741,00      298,01      13    0,1 83
+SAO165056-4  28/09 05/10      83097                         1             PASSAMANARIA SAO VIT GERALDO ALVES DE SOU GERALDO ALVES DE SOU RIO VERDE      RVD       1.229,73       93,30      14    0,1 80
+SAO166011-0  29/09 06/10      17072                         7             METAL VIDROS LTDA    VIDRO EXPRESS EIRELI VIDRO EXPRESS EIRELI RIO VERDE      RVD         449,12      172,99      82    0,2 80
+BHZ034122-3  15/09 23/09      10311                         1             FORJARIA ALVORADA LT BOUGAINVILLE MOVEIS  BOUGAINVILLE MOVEIS  RIO VERDE      RVD       3.564,00      208,73      16    0,0 83
+SAO165842-5  29/09 06/10     521597              QBGIC      1             GAZIN INDUSTRIA E CO PASSARO TRANSPORTES  NICOLE GOMES NEVES   RIO VERDE      RVD       1.968,71      196,94      18    0,1   
+CAS009667-9  28/09 31/12     883909              FCA        3             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH CASPPER DISTRIBUIDOR RIO VERDE      RVD           0,01        0,01     100    0,0 95
+SAO165121-8  28/09 05/10      12969                        18             GAUER DISTRIBUIDORA  STRADAO ACESSORIOS L STRADAO ACESSORIOS L RIO VERDE      RVD      27.932,46      839,58     231    2,2 80
+SAO165590-6  28/09 05/10     397749                         2             MOAS IND E COM IMP E MOAS IND E COM IMP E DROGADIAS COM DE PRO RIO VERDE      RVD       2.515,26       97,90      10    0,1 80
+SAO164979-5  28/09 05/10       3802                         3             ARV COM E IND DE ART MEGATECNOLOGIA IMPLE MEGATECNOLOGIA IMPLE RIO VERDE      RVD       1.440,00      118,13      30    0,1 80
+SAO165635-0  28/09 05/10     363061                         8             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU BRF S.A.             RIO VERDE      RVD      27.700,69    4.435,42   4.720    5,5 80
+                             363066
+SAO166118-3  29/09 06/10      16963                         1             IMPE INDUSTRIA DE ES IMPE INDUSTRIA DE ES FPN LOCACOES         RIO VERDE      RVD       1.965,00      238,47      35    0,4 80
+BHZ034173-8  22/09 30/09       9473                         4             RIPLAS PECAS PLASTIC ELIANE REGINA FERREI ELIANE REGINA FERREI RIO VERDE      RVD         670,74      209,00      20    0,4 51
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:  10
+ssw0194                                                                                     PLACA: RVD5F91                                                                              29/09/2026 17:05
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO165027-1  28/09 05/10     424768                         1             DNI-DANI CONDUTORES  HIDRO VOLT MATERIAIS HIDRO VOLT MATERIAIS RIO VERDE      RVD       2.206,02      107,14       8    0,0 80
+VIX034793-1  23/09 02/10    2868889                         1             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  EDIJAINE BARBOSA DA  SANTA HELENA D RVD       2.196,06      195,98      44    0,4 83
+PSA163953-6  24/09 05/10    3665863                         1             GRUPO MULTI S A      GRUPO MULTI S A      EDIJAINE BARBOSA DA  SANTA HELENA D RVD       2.769,68       95,97      16    0,2 83
+SAO165958-8  29/09 07/10      39065                         7             MTP POLIURETANOS LTD FORTE AUTO PECAS SHE FORTE AUTO PECAS SHE SANTA HELENA D RVD       4.339,60      325,06     117    0,7 80
+SAO165008-4  28/09 06/10      27460                         2             NOBUK INDUSTRIA E CO FORTE AUTO PECAS SHE FORTE AUTO PECAS SHE SANTA HELENA D RVD       4.212,60      269,33     180    0,3 80
+SAO165977-4  29/09 07/10     451731                         8             IBIRA INDUSTRIA E CO COOP AGROINDUS DOS P COOP AGROINDUS DOS P SANTA HELENA D RVD       7.426,26      360,42     327    0,0 80
+SAO166037-3  29/09 07/10     226915                         1             IABV - INDUSTRIA DE  FORTE AUTO PECAS SHE FORTE AUTO PECAS SHE SANTA HELENA D RVD      11.796,05      606,60     399    0,0 80
+TIT162154-8  23/09 05/10     598110                         1             BT EQUIPAMENTOS IND  COOP AGROINDUS DOS P COOP AGROINDUS DOS P SANTA HELENA D RVD       1.320,00      334,32      11    0,1 83
+SAO165932-4  29/09 07/10      74680                        12             SANTA CRUZ INDUSTRIA 63925501 WIRES GOMES 63925501 WIRES GOMES SANTA HELENA D RVD       4.650,00      391,58     305    0,0 80
+TOTAIS:                                 63 CTRCS          489                                                                                                   404.333,30   25.583,01  13.595   35,9
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                            272 CTRCS        2.198                                                                                                 2.192.903,19  204.417,77  66.333  207,7
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--

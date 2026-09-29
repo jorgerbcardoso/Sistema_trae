@@ -983,12 +983,14 @@ foreach ($placas_ssw as $placa) {
             $resCapMatch = sql(
                 "SELECT cap.seq_carregamento, cap.placa_provisoria
                  FROM {$tabelaCap} cap
-                 JOIN {$tabela} c
-                   ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+                 LEFT JOIN {$tabela} c
+                        ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
                  WHERE cap.unidade = \$1
                    AND RIGHT(UPPER(BTRIM(cap.placa_provisoria)), 4) = \$2
                    AND COALESCE(cap.simulado, FALSE) = FALSE
-                   AND c.data_finalizacao IS NULL
+                 GROUP BY cap.seq_carregamento, cap.placa_provisoria
+                 HAVING BOOL_OR(c.data_finalizacao IS NULL)
+                     OR COUNT(c.seq_carregamento) = 0
                  ORDER BY cap.seq_carregamento DESC
                  LIMIT 1",
                 [$unidade, $sufixoRve],
@@ -1053,12 +1055,14 @@ foreach ($placas_ssw as $placa) {
         $resSeqPlaca = sql(
             "SELECT cap.seq_carregamento
              FROM {$tabelaCap} cap
-             JOIN {$tabela} c
-               ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+             LEFT JOIN {$tabela} c
+                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
              WHERE cap.unidade = \$1
                AND UPPER(cap.placa_provisoria) = UPPER(\$2)
                AND COALESCE(cap.simulado, FALSE) = FALSE
-               AND c.data_finalizacao IS NULL
+             GROUP BY cap.seq_carregamento
+             HAVING BOOL_OR(c.data_finalizacao IS NULL)
+                 OR COUNT(c.seq_carregamento) = 0
              ORDER BY cap.seq_carregamento DESC
              LIMIT 1",
             [$unidade, $placaProvisoriaSalvar],
@@ -1100,12 +1104,14 @@ foreach ($placas_ssw as $placa) {
             "SELECT cap.seq_carregamento,
                     COALESCE(cap.simulado, FALSE) AS simulado
              FROM {$tabelaCap} cap
-             JOIN {$tabela} c
-               ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+             LEFT JOIN {$tabela} c
+                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
              WHERE cap.unidade = \$1
                AND UPPER(cap.placa_provisoria) = UPPER(\$2)
-               AND c.data_finalizacao IS NULL
-             ORDER BY COALESCE(cap.simulado, FALSE) DESC, cap.seq_carregamento DESC
+             GROUP BY cap.seq_carregamento, cap.simulado
+             HAVING BOOL_OR(c.data_finalizacao IS NULL)
+                 OR COUNT(c.seq_carregamento) = 0
+             ORDER BY COALESCE(cap.simulado, FALSE) ASC, cap.seq_carregamento DESC
              LIMIT 1",
             [$unidade, $placaProvisoriaSalvar],
             $conn
@@ -1115,12 +1121,14 @@ foreach ($placas_ssw as $placa) {
                 "SELECT cap.seq_carregamento,
                         COALESCE(cap.simulado, FALSE) AS simulado
                  FROM {$tabelaCap} cap
-                 JOIN {$tabela} c
-                   ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+                 LEFT JOIN {$tabela} c
+                        ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
                  WHERE cap.unidade = \$1
                    AND regexp_replace(UPPER(BTRIM(cap.placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
-                   AND c.data_finalizacao IS NULL
-                 ORDER BY COALESCE(cap.simulado, FALSE) DESC, cap.seq_carregamento DESC
+                 GROUP BY cap.seq_carregamento, cap.simulado
+                 HAVING BOOL_OR(c.data_finalizacao IS NULL)
+                     OR COUNT(c.seq_carregamento) = 0
+                 ORDER BY COALESCE(cap.simulado, FALSE) ASC, cap.seq_carregamento DESC
                  LIMIT 1",
                 [$unidade, $placaProvisoriaNorm],
                 $conn
@@ -1187,6 +1195,64 @@ foreach ($placas_ssw as $placa) {
             $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
         }
     }
+
+    if ($seqCarreg <= 0 && $domainUpper === 'RVE' && (($placaRealRve ?? '') !== '' || ($sufixoRve ?? '') !== '')) {
+        $condFallback = [];
+        $paramsFallback = [$unidade];
+        $idx = 1;
+        if (($placaRealRve ?? '') !== '') {
+            $idx++;
+            $condFallback[] = "UPPER(cap.placa_provisoria) = \${$idx}";
+            $paramsFallback[] = $placaRealRve;
+        }
+        if (($sufixoRve ?? '') !== '') {
+            $idx++;
+            $condFallback[] = "RIGHT(UPPER(BTRIM(cap.placa_provisoria)), 4) = \${$idx}";
+            $paramsFallback[] = $sufixoRve;
+        }
+        if (count($condFallback) > 0) {
+            $ordemPlacaReal = (($placaRealRve ?? '') !== '')
+                ? "CASE WHEN UPPER(cap.placa_provisoria) = '" . pg_escape_string($conn, $placaRealRve) . "' THEN 0 ELSE 1 END, "
+                : '';
+            $qFb = "SELECT cap.seq_carregamento
+                    FROM {$tabelaCap} cap
+                    WHERE cap.unidade = \$1
+                      AND COALESCE(cap.simulado, FALSE) = FALSE
+                      AND (" . implode(' OR ', $condFallback) . ")
+                    ORDER BY {$ordemPlacaReal}cap.seq_carregamento DESC
+                    LIMIT 1";
+            $rFb = sql($qFb, $paramsFallback, $conn);
+            if ($rFb && pg_num_rows($rFb) > 0) {
+                $seqFb = (int)pg_fetch_result($rFb, 0, 0);
+                if ($seqFb > 0) {
+                    $seqCarreg = $seqFb;
+                    $seqCarregRveAgrupado = $seqFb;
+                    $reaproveitandoPorPlaca = true;
+                    $rOrigFb = sql(
+                        "SELECT origem_criacao, placa_provisoria
+                         FROM {$tabela}
+                         WHERE unidade = \$1
+                           AND seq_carregamento = \$2
+                         ORDER BY data_inclusao ASC, hora_inclusao ASC
+                         LIMIT 1",
+                        [$unidade, $seqCarreg],
+                        $conn
+                    );
+                    if ($rOrigFb && pg_num_rows($rOrigFb) > 0) {
+                        $rowOF = pg_fetch_assoc($rOrigFb);
+                        $tmpOF = strtoupper(trim((string)($rowOF['origem_criacao'] ?? '')));
+                        if ($tmpOF !== '') $origemCriacaoSalvar = $tmpOF;
+                        $tmpPF = strtoupper(trim((string)($rowOF['placa_provisoria'] ?? '')));
+                        if ($tmpPF !== '') $placaProvisoriaSalvar = $tmpPF;
+                    }
+                    if ($domainUpper === 'RVE' && $origemCriacaoSalvar === 'MANUAL') {
+                        $preservarCabecalhoRve = true;
+                    }
+                }
+            }
+        }
+    }
+
     if ($seqCarreg <= 0) {
         $seqCarreg = nextSeqCarregamentoSsw($conn, $seqName);
         if ($seqCarreg <= 0) {
@@ -1232,8 +1298,22 @@ foreach ($placas_ssw as $placa) {
     }
 
     $info = $carregamentos[$placa] ?? null;
+    if (($info === null || empty($info['ctes'])) && $domainUpper === 'RVE' && ($sufixoRve ?? '') !== '') {
+        foreach ($carregamentos as $kChave => $vChave) {
+            $kUp = strtoupper(trim((string)$kChave));
+            if ($kUp === '') continue;
+            if (strlen($kUp) < 4) continue;
+            if (substr($kUp, -4) === $sufixoRve) {
+                if ($info === null) {
+                    $info = ['ctes' => [], 'destinos' => []];
+                }
+                $info['ctes'] = array_merge($info['ctes'], is_array($vChave['ctes'] ?? null) ? $vChave['ctes'] : []);
+                $info['destinos'] = array_merge($info['destinos'], is_array($vChave['destinos'] ?? null) ? $vChave['destinos'] : []);
+            }
+        }
+    }
     $ctes = $info['ctes'] ?? [];
-    $__dbg('C', 'ctes por placa', ['placa' => $placa, 'ctes' => is_array($ctes) ? count($ctes) : null]);
+    $__dbg('C', 'ctes por placa', ['placa' => $placa, 'ctes' => is_array($ctes) ? count($ctes) : null, 'fallback_sufixo' => ($domainUpper === 'RVE' && ($sufixoRve ?? '') !== '' && !isset($carregamentos[$placa])) ? true : false]);
 
     $destinosRaw = array_filter(array_map('strtoupper', array_map('trim', $info['destinos'] ?? [])));
     $destinos = [];
