@@ -2220,6 +2220,11 @@ function CardCarregamento({
         true
       );
       if (res?.success) {
+        const keyAntigo = `${String(seq).padStart(6, '0')}|${carregamento.placa_provisoria ?? ''}`;
+        const keyNovo   = `${String(seq).padStart(6, '0')}|${placa}`;
+        totaisCarregamentoCache.delete(keyAntigo);
+        totaisCarregamentoCache.delete(keyNovo);
+        setTotaisCard(null);
         toast.success(`Carregamento ${placa} iniciado. Aguardando conferência no TMS para preenchimento dos CT-es.`);
         setIniciarDialogOpen(false);
         await onRecarregarCarregamentos();
@@ -2420,14 +2425,15 @@ function CardCarregamento({
   const ativo = modoApontamento === carregamento.placa_provisoria;
   const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${carregamento.placa_provisoria ?? ''}`;
 
-  const pesoDoCarregamento = Number(carregamento.total_peso ?? 0) || 0;
-  const cubagemDoCarregamento = Number(carregamento.total_cubagem ?? 0) || 0;
-  const freteDoCarregamento = Number(carregamento.total_frete ?? 0) || 0;
+  const qtdeCtesCarreg = (carregamento.ctes?.length ?? 0) || 0;
+  const pesoDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_peso ?? 0) || 0;
+  const cubagemDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_cubagem ?? 0) || 0;
+  const freteDoCarregamento = qtdeCtesCarreg === 0 ? 0 : Number(carregamento.total_frete ?? 0) || 0;
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-  const totalPesoLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
-  const totalCubagemLocal = (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
-  const freteTotalsLocal = (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
+  const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
+  const totalCubagemLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
+  const freteTotalsLocal = (qtdeCtesCarreg === 0) ? { cif: 0, fob: 0 } : (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
     const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
     const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
     const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
@@ -2460,6 +2466,22 @@ function CardCarregamento({
   } : null;
 
   const [totaisCard, setTotaisCard] = useState<null | { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number }>(totaisCardInicial);
+
+  useEffect(() => {
+    if (qtdeCtesCarreg === 0) {
+      totaisCarregamentoCache.delete(carregamentoKey);
+      setTotaisCard(null);
+      return;
+    }
+    const inicial = (pesoInicial > 0 || cubagemInicial > 0 || (cifInicial + fobInicial) > 0) ? {
+      peso: pesoInicial,
+      cubagem: cubagemInicial,
+      vlr_frete: freteDoCarregamento > 0 ? freteDoCarregamento : (cifInicial + fobInicial),
+      cif: cifInicial,
+      fob: fobInicial,
+    } : null;
+    if (!totaisCard && inicial) setTotaisCard(inicial);
+  }, [carregamentoKey, qtdeCtesCarreg, pesoInicial, cubagemInicial, freteDoCarregamento, cifInicial, fobInicial, totaisCard]);
   const normalizeCapTon = (v: any) => {
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) return null;
