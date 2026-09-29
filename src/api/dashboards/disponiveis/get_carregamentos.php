@@ -281,13 +281,17 @@ if (count($nros) > 0) {
 if (count($linhasMap) > 0) {
     foreach ($carregamentos as &$c) {
         $n = (int)($c['nro_linha'] ?? 0);
+        $origemCri = strtoupper(trim((string)($c['origem_criacao'] ?? '')));
+        $isManualOrAdiado = ($origemCri === 'MANUAL') || ((bool)($c['adiado'] ?? false));
         if ($n > 0 && isset($linhasMap[$n])) {
             $c['linha_nome'] = $linhasMap[$n]['linha_nome'];
             $c['linha_dest'] = $linhasMap[$n]['linha_dest'];
             $c['linha_unidades'] = $linhasMap[$n]['linha_unidades'];
-            $destLinha = strtoupper(trim((string)($linhasMap[$n]['linha_dest'] ?? '')));
-            if ($destLinha !== '') {
-                $c['destino'] = $destLinha;
+            if (!$isManualOrAdiado) {
+                $destLinha = strtoupper(trim((string)($linhasMap[$n]['linha_dest'] ?? '')));
+                if ($destLinha !== '') {
+                    $c['destino'] = $destLinha;
+                }
             }
         } else {
             $c['linha_nome'] = null;
