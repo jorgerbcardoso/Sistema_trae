@@ -1108,7 +1108,7 @@ function compararCteEntrega(a: CteEntrega, b: CteEntrega, col: ColunaOrdemEntreg
     case 'destinatario': va = a.destinatario ?? ''; vb = b.destinatario ?? ''; break;
     case 'cidade': va = a.cidade ?? ''; vb = b.cidade ?? ''; break;
     case 'prevEnt': va = parseDataBR(a.prevEnt) ?? 0; vb = parseDataBR(b.prevEnt) ?? 0; break;
-    case 'agendamento': va = parseDataHoraBR(a.agendamento, (a as any).data_prev_ent) ?? 0; vb = parseDataHoraBR(b.agendamento, (b as any).data_prev_ent) ?? 0; break;
+    case 'agendamento': va = getAgendamentoOrdem(a.agendamento, (a as any).data_prev_ent); vb = getAgendamentoOrdem(b.agendamento, (b as any).data_prev_ent); break;
     case 'peso': va = parsePeso(a.peso); vb = parsePeso(b.peso); break;
     case 'cubagem': va = parseCubagem(a.cubagem); vb = parseCubagem(b.cubagem); break;
     case 'volumes': va = Number(String(a.qtdeVol ?? '0').replace(/\D/g, '')) || 0; vb = Number(String(b.qtdeVol ?? '0').replace(/\D/g, '')) || 0; break;
@@ -1406,7 +1406,18 @@ function TabelaEntrega({
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatAgendamento(cte.agendamento, (cte as any).data_prev_ent)}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  {(() => {
+                    const txt = formatAgendamento(cte.agendamento, (cte as any).data_prev_ent);
+                    const valido = txt !== '-' && txt !== '';
+                    if (!valido) return <span className="text-slate-400 dark:text-slate-500">-</span>;
+                    return (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 dark:bg-blue-900/35 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        {txt}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
@@ -1982,8 +1993,21 @@ function parseMoeda(s: string): number {
       : cleaned;
   return parseFloat(normalized) || 0;
 }
+function isAgendamentoSSWFalha(s: string): boolean {
+  const raw = String(s ?? '').trim();
+  if (!raw) return false;
+  const norm = raw.replace(/\s+/g, ' ').trim();
+  if (norm === '23:59' || norm === '23:59:00') return true;
+  return false;
+}
+function getAgendamentoOrdem(s: string, dataPrevEnt?: string | null): number {
+  if (isAgendamentoSSWFalha(s)) return Number.POSITIVE_INFINITY;
+  const ts = parseDataHoraBR(s, dataPrevEnt);
+  return ts ?? Number.POSITIVE_INFINITY;
+}
 function formatAgendamento(s: string, dataPrevEnt?: string | null | undefined): string {
   const raw = String(s ?? '').trim();
+  if (isAgendamentoSSWFalha(s)) return '-';
   if (!raw) return '-';
   const norm = raw.replace(/\s+/g, ' ');
   const m1 = norm.match(/^(\d{2}\/\d{2})(\d{2}:\d{2}(?::\d{2})?)$/);
