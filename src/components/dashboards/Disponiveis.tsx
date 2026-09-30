@@ -3054,7 +3054,7 @@ function CardCarregamento({
 
           <div className="flex items-center gap-1.5 shrink-0 justify-end flex-wrap">
             <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs">
-              {carregamento.total_ctes} CT-e{carregamento.total_ctes !== 1 ? 's' : ''}
+              {qtdeCtesCarreg} CT-e{qtdeCtesCarreg !== 1 ? 's' : ''}
             </Badge>
           </div>
 
@@ -3235,14 +3235,14 @@ function CardCarregamento({
           <Button
             size="sm"
             variant="outline"
-            disabled={loadingRota || carregamento.ctes.length === 0}
+            disabled={loadingRota || qtdeCtesCarreg <= 0}
             className={
-              (loadingRota || carregamento.ctes.length === 0)
+              (loadingRota || qtdeCtesCarreg <= 0)
                 ? 'h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 : `h-8 text-xs border-indigo-300 dark:border-indigo-700 ${loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria ? 'text-indigo-400' : 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'}`
             }
             onClick={() => onCarregarRota(carregamento)}
-            title={carregamento.ctes.length === 0 ? 'Carregamento sem CT-es' : 'Ver rota e pontos de entrega do carregamento'}
+            title={qtdeCtesCarreg <= 0 ? 'Carregamento sem CT-es' : 'Ver rota e pontos de entrega do carregamento'}
           >
             {loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria
               ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />

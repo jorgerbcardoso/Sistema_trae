@@ -131,6 +131,7 @@ try {
 
 $carregamentos = [];
 $idxPorPlaca   = [];
+$idxPorSeq     = [];
 
 while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $placa = $row['placa_provisoria'] ?? '';
@@ -154,6 +155,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
 
     $idx = count($carregamentos);
     $idxPorPlaca[$placa] = $idx;
+    if ($seqCarreg !== null && $seqCarreg > 0) $idxPorSeq[$seqCarreg] = $idx;
     $rank = (int)($row['origem_rank'] ?? 0);
     $origemCriacao = null;
     if ($rank >= 3) $origemCriacao = 'SSW';
@@ -530,6 +532,7 @@ if (strtoupper($domain) === 'RVE') {
 
 $sqlCtes = "
     SELECT
+        c.seq_carregamento,
         c.placa_provisoria,
         c.nro_cte,
         c.ser_cte,
@@ -553,7 +556,6 @@ $sqlCtes = "
     FROM {$tabelaCarregamento} c
     {$joinCteDest}
     WHERE c.unidade = \$1
-      AND c.data_finalizacao IS NULL
       AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
       {$filtroSerieRve}
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
@@ -562,14 +564,22 @@ $sqlCtes = "
 try {
     $resCtes = sql($sqlCtes, [$unidade], $conn);
     while ($resCtes && ($cteRow = pg_fetch_assoc($resCtes))) {
-        $placa = $cteRow['placa_provisoria'] ?? '';
-        if ($placa === '' || !isset($idxPorPlaca[$placa])) continue;
+        $seqCte = ($cteRow['seq_carregamento'] !== null && $cteRow['seq_carregamento'] !== '') ? (int)$cteRow['seq_carregamento'] : 0;
+        $placa  = $cteRow['placa_provisoria'] ?? '';
+
+        $idx = null;
+        if ($seqCte > 0 && isset($idxPorSeq[$seqCte])) {
+            $idx = $idxPorSeq[$seqCte];
+        } elseif ($placa !== '' && isset($idxPorPlaca[$placa])) {
+            $idx = $idxPorPlaca[$placa];
+        }
+        if ($idx === null) continue;
 
         $serCte = $cteRow['ser_cte'] ?? '';
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
         $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
 
-        $carregamentos[$idxPorPlaca[$placa]]['ctes'][] = [
+        $carregamentos[$idx]['ctes'][] = [
             'seq_cte'        => $nroCte,   // compatibilidade com frontend (usa seq_cte como ID)
             'nroCte'         => $nroCte,
             'ser_cte'        => $serCte,

@@ -110,6 +110,410 @@ function getUnidadesOcupadasCarregamentos($conn, $tabela, $tabelaCap, $unidade) 
     return $map;
 }
 
+// ─── Helper: atualizar CT-es do TMS ANTES de finalizar (falha NÃO bloqueia) ──
+function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqName, $unidade, $login, $placa) {
+    try {
+        $unidadeEsc = pg_escape_string($conn, $unidade);
+        $loginEsc   = pg_escape_string($conn, $login);
+        $placaEsc   = pg_escape_string($conn, strtoupper(trim((string)$placa)));
+        if ($placaEsc === '') return false;
+
+        $resCarBase = null;
+        try {
+            $resCarBase = sql(
+                "SELECT
+                    seq_carregamento, destino, unidades, setores_entrega, origem_criacao,
+                    data_finalizacao, hora_finalizacao, login_finalizacao,
+                    data_inclusao, hora_inclusao
+                 FROM {$tabela}
+                 WHERE unidade = \$1 AND UPPER(placa_provisoria) = \$2
+                 ORDER BY data_inclusao DESC, hora_inclusao DESC
+                 LIMIT 1",
+                [$unidade, strtoupper(trim((string)$placa))],
+                $conn
+            );
+        } catch (Exception $e) {}
+        if (!$resCarBase || pg_num_rows($resCarBase) === 0) return false;
+
+        $rowBase = pg_fetch_assoc($resCarBase);
+        $seqCarreg = (int)($rowBase['seq_carregamento'] ?? 0);
+        $destinoCarreg = (string)($rowBase['destino'] ?? '');
+        $unidadesCarreg = (string)($rowBase['unidades'] ?? '');
+        $setoresEntregaCarreg = (string)($rowBase['setores_entrega'] ?? '');
+        $origemCriacao = strtoupper(trim((string)($rowBase['origem_criacao'] ?? '')));
+        if ($origemCriacao === '') $origemCriacao = 'SSW';
+
+        $dtRef = null;
+        $dataFinalDb = trim((string)($rowBase['data_finalizacao'] ?? ''));
+        if ($dataFinalDb !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $dataFinalDb, $m)) {
+            $dtRef = DateTime::createFromFormat('Y-m-d', $m[1] . '-' . $m[2] . '-' . $m[3]);
+        } else {
+            $dtInc = trim((string)($rowBase['data_inclusao'] ?? ''));
+            if ($dtInc !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $dtInc, $m)) {
+                $dtRef = DateTime::createFromFormat('Y-m-d', $m[1] . '-' . $m[2] . '-' . $m[3]);
+            }
+        }
+        if (!$dtRef) $dtRef = new DateTime();
+        $ddmmaa = $dtRef->format('dmy');
+        // Tenta também ontem para cobrir casos de saída no dia anterior
+        $ddmmaaOntem = (clone $dtRef)->modify('-1 day')->format('dmy');
+
+        $extractXml = function ($html) {
+            $html = (string)$html;
+            if ($html === '') return null;
+            $inicio = strpos($html, '<?xml');
+            if ($inicio === false) $inicio = strpos($html, '<xml');
+            if ($inicio === false) {
+                $dec = @urldecode($html);
+                if ($dec && $dec !== $html) {
+                    $inicio = strpos($dec, '<?xml');
+                    if ($inicio === false) $inicio = strpos($dec, '<xml');
+                    if ($inicio !== false) $html = $dec;
+                }
+            }
+            if ($inicio === false) {
+                $iniR = strpos($html, '<r>');
+                if ($iniR === false) $iniR = strpos($html, '<r ');
+                if ($iniR !== false) {
+                    $fimR = strrpos($html, '</r>');
+                    if ($fimR !== false) {
+                        $frag = substr($html, $iniR, ($fimR + 4) - $iniR);
+                        return "<xml>{$frag}</xml>";
+                    }
+                }
+                return null;
+            }
+            $fim = strrpos($html, '</xml>');
+            $tagFim = '</xml>';
+            if ($fim === false) {
+                $fim = strrpos($html, '</data>');
+                $tagFim = '</data>';
+            }
+            if ($fim === false) return null;
+            return substr($html, $inicio, ($fim + strlen($tagFim)) - $inicio);
+        };
+        $parseDt = function ($s) {
+            $s = trim((string)$s);
+            if ($s === '') return null;
+            if (preg_match('/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
+                $dia = (int)$m[1]; $mes = (int)$m[2];
+                $anoRaw = (string)$m[3]; $ano = strlen($anoRaw) === 2 ? (2000 + (int)$anoRaw) : (int)$anoRaw;
+                $hh = (int)$m[4]; $mm = (int)$m[5]; $ss = isset($m[6]) ? (int)$m[6] : 0;
+                $dt = DateTime::createFromFormat('Y-m-d H:i:s', sprintf('%04d-%02d-%02d %02d:%02d:%02d', $ano, $mes, $dia, $hh, $mm, $ss));
+                return $dt ?: null;
+            }
+            foreach (['d/m/y H:i:s', 'd/m/Y H:i:s', 'd/m/y H:i', 'd/m/Y H:i'] as $f) {
+                $dt = DateTime::createFromFormat($f, $s);
+                if ($dt !== false) return $dt;
+            }
+            return null;
+        };
+
+        require_once __DIR__ . '/../../lib/ssw_loader.php';
+        try { require_ssw(); } catch (Exception $e) {}
+        try { ssw_login($domain); } catch (Exception $e) { return false; }
+
+        $info = ['saida' => null, 'qtd' => 0, 'manifestos' => []];
+        // Consulta data_ref e ontem para maior acurácia
+        foreach ([$ddmmaa, $ddmmaaOntem] as $dataDia) {
+            $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+                   "&t_data_saida_ini=" . rawurlencode($dataDia) .
+                   "&t_data_saida_fin=" . rawurlencode($dataDia);
+            $html = '';
+            try { $html = ssw_go($url); } catch (Exception $e) { continue; }
+            $xmlStr = $extractXml($html);
+            if ($xmlStr === null) continue;
+            $xml = @simplexml_load_string($xmlStr);
+            if ($xml === false) continue;
+            $rows = $xml->xpath('//r');
+            if (!$rows || count($rows) === 0) continue;
+            foreach ($rows as $r) {
+                $f3 = strtoupper(trim((string)($r->f3 ?? '')));
+                $f2 = strtoupper(trim((string)($r->f2 ?? '')));
+                $placaLida = $f3 !== '' ? $f3 : $f2;
+                if ($placaLida !== strtoupper(trim((string)$placa))) continue;
+                $f11 = trim((string)($r->f11 ?? ''));
+                $dt = $f11 !== '' ? $parseDt($f11) : null;
+                if ($dt !== null) {
+                    if ($info['saida'] === null || $dt->getTimestamp() < $info['saida']->getTimestamp()) $info['saida'] = $dt;
+                }
+                $f8Raw = trim((string)($r->f8 ?? ''));
+                $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
+                if ($f8Num > 0) $info['qtd'] += $f8Num;
+                $f17 = trim((string)($r->f17 ?? ''));
+                $seqMan = (string)preg_replace('/[^\d]/', '', $f17);
+                if ($seqMan !== '') $info['manifestos'][$seqMan] = true;
+            }
+        }
+        $manifestos = isset($info['manifestos']) && is_array($info['manifestos']) ? array_keys($info['manifestos']) : [];
+        if (count($manifestos) === 0) return true;
+
+        $tblCte = "{$domain}_cte";
+        $cteTableOk = false;
+        try {
+            $resReg = sql("SELECT to_regclass($1) AS reg", [$tblCte], $conn);
+            $val = $resReg ? pg_fetch_result($resReg, 0, 0) : null;
+            $cteTableOk = ($val !== null && $val !== '');
+        } catch (Exception $e) {}
+        if (!$cteTableOk) return false;
+
+        $horaFinalDb = trim((string)($rowBase['hora_finalizacao'] ?? ''));
+        $loginFinalDb = trim((string)($rowBase['login_finalizacao'] ?? ''));
+        $dtFinal = $info['saida'] instanceof DateTime ? $info['saida'] : new DateTime();
+        $dataFinalStr = $dtFinal->format('Y-m-d');
+        $horaFinalStr = $horaFinalDb !== '' ? $horaFinalDb : $dtFinal->format('H:i:s');
+        $loginFinalStr = $loginFinalDb !== '' ? $loginFinalDb : $login;
+
+        $colCache = [];
+        $cteCol = function (string $col) use (&$colCache, $conn, $tblCte): bool {
+            $c = strtolower(trim($col));
+            if ($c === '') return false;
+            if (isset($colCache[$c])) return (bool)$colCache[$c];
+            try {
+                $res = sql(
+                    "SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = lower($1) AND column_name = $2
+                     LIMIT 1",
+                    [strtolower($tblCte), $c],
+                    $conn
+                );
+            } catch (Exception $e) { $res = null; }
+            $ok = ($res && pg_num_rows($res) > 0);
+            $colCache[$c] = $ok;
+            return $ok;
+        };
+        $toFloat = function ($v) {
+            $s = trim((string)$v);
+            if ($s === '') return 0.0;
+            $s = str_replace(['.', ' '], ['', ''], $s);
+            $s = str_replace(',', '.', $s);
+            return (float)$s;
+        };
+        $parseDateBr = function ($v) {
+            $s = trim((string)$v);
+            if ($s === '') return null;
+            $dt = DateTime::createFromFormat('d/m/y', $s);
+            if ($dt !== false) return $dt->format('Y-m-d');
+            $dt = DateTime::createFromFormat('d/m/Y', $s);
+            if ($dt !== false) return $dt->format('Y-m-d');
+            return null;
+        };
+
+        $pairs = [];
+        $cteXml = [];
+        foreach ($manifestos as $seqMan) {
+            $seqMan = trim((string)$seqMan);
+            if ($seqMan === '') continue;
+            $urlMan = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+            $htmlMan = '';
+            try { $htmlMan = ssw_go($urlMan); } catch (Exception $e) { continue; }
+            $xmlManStr = $extractXml($htmlMan);
+            if ($xmlManStr === null) continue;
+            $xmlMan = @simplexml_load_string($xmlManStr);
+            if ($xmlMan === false) continue;
+            $rowsMan = $xmlMan->xpath('//r');
+            if (!$rowsMan || count($rowsMan) === 0) continue;
+            foreach ($rowsMan as $rm) {
+                $f0 = strtoupper(trim((string)($rm->f0 ?? '')));
+                if ($f0 === '') continue;
+                $f0Clean = preg_replace('/[^A-Z0-9]/', '', $f0);
+                if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0Clean, $mC)) continue;
+                $ser = strtoupper($mC[1]);
+                $nro = (int)$mC[2];
+                if ($nro <= 0) continue;
+                $k = $ser . '|' . $nro;
+                $pairs[$k] = ['ser' => $ser, 'nro' => $nro];
+                if (!isset($cteXml[$k])) {
+                    $cteXml[$k] = [
+                        'ser_cte' => $ser, 'nro_cte' => $nro, 'destino_cte' => '',
+                        'cidade_destino' => trim((string)($rm->f5 ?? '')),
+                        'remetente' => trim((string)($rm->f3 ?? '')),
+                        'destinatario' => trim((string)($rm->f4 ?? '')),
+                        'pagador' => '',
+                        'data_emissao' => $parseDateBr((string)($rm->f2 ?? '')),
+                        'data_prev_ent' => $parseDateBr((string)($rm->f12 ?? '')),
+                        'vlr_merc' => $toFloat((string)($rm->f9 ?? '')),
+                        'vlr_frete' => $toFloat((string)($rm->f10 ?? '')),
+                        'peso' => $toFloat((string)($rm->f8 ?? '')),
+                        'cubagem' => 0.0,
+                        'qtde_vol' => (int)preg_replace('/[^\d]/', '', (string)($rm->f7 ?? '')),
+                    ];
+                }
+            }
+        }
+        if (count($pairs) === 0) return true;
+
+        if ($seqCarreg <= 0) {
+            $seqCarreg = nextSeqCarregamento($conn, $seqName);
+            if ($seqCarreg > 0) {
+                @pg_query($conn,
+                    "UPDATE {$tabela} SET seq_carregamento = {$seqCarreg}
+                     WHERE unidade = '{$unidadeEsc}' AND UPPER(placa_provisoria) = '{$placaEsc}'"
+                );
+                @pg_query($conn,
+                    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
+                     VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaEsc}', NULL)
+                     ON CONFLICT (unidade, seq_carregamento) DO NOTHING"
+                );
+            }
+        }
+
+        $cteInfo = [];
+        if ($seqCarreg > 0 && count($pairs) > 0) {
+            $joinCidade = $cteCol('seq_cidade_dest') ? "LEFT JOIN cidade cid_dest ON cte.seq_cidade_dest = cid_dest.seq_cidade" : "";
+            $selCidade = $cteCol('seq_cidade_dest') ? "COALESCE(cid_dest.nome, '')" : "''";
+            $selDest = $cteCol('sigla_dest') ? "UPPER(BTRIM(cte.sigla_dest))" : "''";
+            $selRemet = $cteCol('nome_emit') ? "COALESCE(cte.nome_emit, '')" : "''";
+            $selDestinat = $cteCol('nome_dest') ? "COALESCE(cte.nome_dest, '')" : "''";
+            $selPagador = $cteCol('nome_pag') ? "COALESCE(cte.nome_pag, '')" : "''";
+            $selEmissao = $cteCol('data_emissao') ? "cte.data_emissao::date" : "NULL::date";
+            $selPrev = $cteCol('data_prev_ent') ? "cte.data_prev_ent::date" : "NULL::date";
+            $selMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, 0)" : "0";
+            $selFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, 0)" : "0";
+            $selPeso = $cteCol('peso_real')
+                ? "COALESCE(cte.peso_real, 0)"
+                : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, 0)" : "0");
+            $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
+            $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, 0)" : "0";
+
+            $pairsArr = array_values($pairs);
+            foreach (array_chunk($pairsArr, 400) as $chunk) {
+                $params = [];
+                $vals = [];
+                $p = 1;
+                foreach ($chunk as $it) {
+                    $vals[] = '($' . $p . ', $' . ($p + 1) . ')';
+                    $params[] = (string)$it['ser'];
+                    $params[] = (int)$it['nro'];
+                    $p += 2;
+                }
+                if (count($vals) === 0) continue;
+                $q = "
+                    WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $vals) . ")
+                    SELECT req.ser_cte, req.nro_cte,
+                           {$selDest} AS destino_cte, {$selCidade} AS cidade_destino,
+                           {$selRemet} AS remetente, {$selDestinat} AS destinatario,
+                           {$selPagador} AS pagador, {$selEmissao} AS data_emissao,
+                           {$selPrev} AS data_prev_ent, {$selMerc} AS vlr_merc,
+                           {$selFrete} AS vlr_frete, {$selPeso} AS peso,
+                           {$selCub} AS cubagem, {$selVol} AS qtde_vol
+                    FROM req
+                    JOIN {$tblCte} cte
+                      ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
+                     AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
+                    {$joinCidade}
+                ";
+                $resC = @pg_query_params($conn, $q, $params);
+                if ($resC) {
+                    while ($rowC = pg_fetch_assoc($resC)) {
+                        $k = (string)($rowC['ser_cte'] ?? '') . '|' . (int)($rowC['nro_cte'] ?? 0);
+                        $cteInfo[$k] = $rowC;
+                    }
+                }
+            }
+        }
+        $cteAll = $cteXml;
+        foreach ($cteInfo as $k => $rowC) {
+            $cteAll[$k] = [
+                'ser_cte' => (string)($rowC['ser_cte'] ?? ''),
+                'nro_cte' => (int)($rowC['nro_cte'] ?? 0),
+                'destino_cte' => (string)($rowC['destino_cte'] ?? ''),
+                'cidade_destino' => (string)($rowC['cidade_destino'] ?? ($cteXml[$k]['cidade_destino'] ?? '')),
+                'remetente' => (string)($rowC['remetente'] ?? ($cteXml[$k]['remetente'] ?? '')),
+                'destinatario' => (string)($rowC['destinatario'] ?? ($cteXml[$k]['destinatario'] ?? '')),
+                'pagador' => (string)($rowC['pagador'] ?? ''),
+                'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
+                'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
+                'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
+            ];
+        }
+        $added = 0;
+        if (count($cteAll) > 0) {
+            @pg_query($conn, 'BEGIN');
+            try {
+                foreach ($cteAll as $rowC) {
+                    $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
+                    $nro = (int)($rowC['nro_cte'] ?? 0);
+                    if ($ser === '' || $nro <= 0) continue;
+                    $check = @pg_query($conn,
+                        "SELECT 1 FROM {$tabela}
+                         WHERE unidade = '{$unidadeEsc}'
+                           AND (
+                                (seq_carregamento IS NOT NULL AND seq_carregamento = {$seqCarreg})
+                                OR UPPER(placa_provisoria) = '{$placaEsc}'
+                           )
+                           AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
+                           AND nro_cte = {$nro}
+                         LIMIT 1"
+                    );
+                    if ($check && pg_num_rows($check) > 0) continue;
+                    $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
+                    $destCteEsc = pg_escape_string($conn, $destCte);
+                    $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
+                    $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
+                    $emissaoSql = $emissaoVal !== '' ? "'" . pg_escape_string($conn, $emissaoVal) . "'::date" : 'NULL';
+                    $prevSql = $prevVal !== '' ? "'" . pg_escape_string($conn, $prevVal) . "'::date" : 'NULL';
+                    $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
+                    $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
+                    $peso = (float)($rowC['peso'] ?? 0);
+                    $cub = (float)($rowC['cubagem'] ?? 0);
+                    $vol = (int)($rowC['qtde_vol'] ?? 0);
+                    $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
+                    $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
+                    $pagador = pg_escape_string($conn, (string)($rowC['pagador'] ?? ''));
+                    $cidadeDest = pg_escape_string($conn, (string)($rowC['cidade_destino'] ?? ''));
+                    $destCarEsc = pg_escape_string($conn, strtoupper(trim((string)$destinoCarreg)));
+                    $unidCarEsc = pg_escape_string($conn, strtoupper(trim((string)$unidadesCarreg)));
+                    $setorCarEsc = pg_escape_string($conn, (string)$setoresEntregaCarreg);
+                    $origemEsc = pg_escape_string($conn, $origemCriacao);
+                    $dataFinEsc = pg_escape_string($conn, $dataFinalStr);
+                    $horaFinEsc = pg_escape_string($conn, $horaFinalStr);
+                    $loginFinEsc = pg_escape_string($conn, $loginFinalStr);
+
+                    @pg_query($conn,
+                        "INSERT INTO {$tabela}
+                         (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                          ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                          remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                          vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+                          destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento,
+                          data_finalizacao, hora_finalizacao, login_finalizacao)
+                         VALUES
+                         ('{$unidadeEsc}', " . ($seqCarreg > 0 ? $seqCarreg : 'NULL') . ", '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
+                          '" . pg_escape_string($conn, $ser) . "', {$nro}, '{$destCteEsc}', {$emissaoSql}, {$prevSql},
+                          '{$remetente}', '{$destinatario}', '{$pagador}', '{$cidadeDest}',
+                          {$vlrMerc}, {$vlrFrete}, {$peso}, {$cub}, {$vol},
+                          '{$destCarEsc}', '{$unidCarEsc}', '{$setorCarEsc}', NULL, '{$origemEsc}', '{$unidadeEsc}',
+                          '{$dataFinEsc}'::date, '{$horaFinEsc}'::time, '{$loginFinEsc}')"
+                    );
+                    $added += 1;
+                }
+                if ($added > 0) {
+                    @pg_query($conn,
+                        "DELETE FROM {$tabela}
+                         WHERE unidade = '{$unidadeEsc}'
+                           AND UPPER(placa_provisoria) = '{$placaEsc}'
+                           AND nro_cte = 0
+                           AND (seq_carregamento IS NULL OR seq_carregamento = {$seqCarreg})
+                           AND data_finalizacao IS NULL"
+                    );
+                }
+                @pg_query($conn, 'COMMIT');
+            } catch (Exception $e) {
+                @pg_query($conn, 'ROLLBACK');
+                return false;
+            }
+        }
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
 // ─── Ação: criar carregamento manual (linha sentinela com nro_cte = 0) ────────
 if ($acao === 'criar') {
     $placa   = strtoupper(trim($input['placa'] ?? ''));
@@ -551,7 +955,8 @@ if ($acao === 'adicionar_ctes') {
             "DELETE FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-               AND nro_cte = 0"
+               AND nro_cte = 0
+               AND data_finalizacao IS NULL"
         );
     }
 
@@ -616,30 +1021,41 @@ if ($acao === 'remover_cte') {
         "DELETE FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
            AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-           AND nro_cte = {$nroCte}"
+           AND nro_cte = {$nroCte}
+           AND data_finalizacao IS NULL"
     );
 
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao remover CT-e.']);
     }
 
-    // Se ficou sem CT-es, reinsere sentinela para manter o carregamento visível
+    // Se ficou sem CT-es, reinsere sentinela para manter o carregamento visível (somente em andamento)
     $checkRestantes = pg_query($conn,
         "SELECT 1 FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
            AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
            AND nro_cte > 0
+           AND data_finalizacao IS NULL
          LIMIT 1"
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
-        $origemCriacao = $origemCriacaoCarreg !== '' ? $origemCriacaoCarreg : 'MANUAL';
-        $destinoSql = $destinoCarreg !== '' ? "'" . pg_escape_string($conn, $destinoCarreg) . "'" : 'NULL';
-        $unidadesSql = $unidadesCarreg !== '' ? "'" . pg_escape_string($conn, $unidadesCarreg) . "'" : 'NULL';
-        $setoresSql = $setoresEntregaCarreg !== '' ? "'" . pg_escape_string($conn, $setoresEntregaCarreg) . "'" : 'NULL';
-        pg_query($conn,
-            "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
+        $temEmAndamento = pg_query($conn,
+            "SELECT 1 FROM {$tabela}
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND data_finalizacao IS NULL
+             LIMIT 1"
         );
+        if ($temEmAndamento && pg_num_rows($temEmAndamento) > 0) {
+            $origemCriacao = $origemCriacaoCarreg !== '' ? $origemCriacaoCarreg : 'MANUAL';
+            $destinoSql = $destinoCarreg !== '' ? "'" . pg_escape_string($conn, $destinoCarreg) . "'" : 'NULL';
+            $unidadesSql = $unidadesCarreg !== '' ? "'" . pg_escape_string($conn, $unidadesCarreg) . "'" : 'NULL';
+            $setoresSql = $setoresEntregaCarreg !== '' ? "'" . pg_escape_string($conn, $setoresEntregaCarreg) . "'" : 'NULL';
+            pg_query($conn,
+                "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
+                 VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
+            );
+        }
     }
 
     if (empty($placa) || !is_array($seqs)) {
@@ -815,7 +1231,8 @@ if ($acao === 'deletar_carregamento') {
         $resDel = sql(
             "DELETE FROM {$tabela}
              WHERE unidade = \$1
-               AND seq_carregamento = \$2",
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL",
             [$unidade, $seqCarreg],
             $conn
         );
@@ -823,7 +1240,8 @@ if ($acao === 'deletar_carregamento') {
         $resDel = sql(
             "DELETE FROM {$tabela}
              WHERE unidade = \$1
-               AND placa_provisoria = \$2",
+               AND placa_provisoria = \$2
+               AND data_finalizacao IS NULL",
             [$unidade, $placa],
             $conn
         );
@@ -835,18 +1253,40 @@ if ($acao === 'deletar_carregamento') {
     $deleted = pg_affected_rows($resDel);
 
     // Remove parâmetros associados (capacidade) se existir
-    if ($seqCarreg > 0) {
-        @pg_query($conn,
-            "DELETE FROM {$tabelaCap}
-             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-               AND seq_carregamento = " . ((int)$seqCarreg)
-        );
-    } else {
-        @pg_query($conn,
-            "DELETE FROM {$tabelaCap}
-             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'"
-        );
+    if ($deleted > 0) {
+        if ($seqCarreg > 0) {
+            @pg_query($conn,
+                "DELETE FROM {$tabelaCap}
+                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                   AND seq_carregamento = " . ((int)$seqCarreg)
+            );
+        } elseif ($placa !== '') {
+            // Protegemos o delete por placa da tabelaCap apenas se o carregamento está em andamento
+            $seqsCap = sql(
+                "SELECT DISTINCT COALESCE(c.seq_carregamento, 0) AS s
+                 FROM {$tabela} c
+                 WHERE c.unidade = \$1
+                   AND UPPER(c.placa_provisoria) = UPPER(\$2)
+                   AND c.data_finalizacao IS NULL",
+                [$unidade, $placa],
+                $conn
+            );
+            $toDeleteCap = [];
+            if ($seqsCap) {
+                while ($r = pg_fetch_assoc($seqsCap)) {
+                    $v = (int)($r['s'] ?? 0);
+                    if ($v > 0) $toDeleteCap[] = $v;
+                }
+            }
+            if (!empty($toDeleteCap)) {
+                $in = implode(',', array_map('intval', array_unique($toDeleteCap)));
+                @pg_query($conn,
+                    "DELETE FROM {$tabelaCap}
+                     WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                       AND seq_carregamento IN ({$in})"
+                );
+            }
+        }
     }
 
     respondJson(['success' => true, 'deleted' => $deleted]);
@@ -1149,6 +1589,11 @@ if ($acao === 'finalizar_carregamento') {
     $placa = strtoupper(trim((string)($input['placa'] ?? '')));
     if ($placa === '') {
         respondJson(['success' => false, 'message' => 'Placa não informada.']);
+    }
+
+    try {
+        _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqName, $unidade, $login, $placa);
+    } catch (Exception $e) {
     }
 
     $res = pg_query($conn,
@@ -2108,7 +2553,8 @@ if ($acao === 'atualizar_ctes_ssw') {
                                 "DELETE FROM {$tabela}
                                  WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                                    AND UPPER(placa_provisoria) = '" . pg_escape_string($conn, $placaReq) . "'
-                                   AND nro_cte = 0"
+                                   AND nro_cte = 0
+                                   AND data_finalizacao IS NULL"
                             );
                         }
                         pg_query($conn, 'COMMIT');

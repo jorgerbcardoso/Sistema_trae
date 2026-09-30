@@ -461,15 +461,36 @@ if (empty($placas_ssw)) {
     $loginEsc = pg_escape_string($conn, $login);
     $resFinAll = @pg_query(
         $conn,
-        "UPDATE {$tabela}
+        "UPDATE {$tabela} externo
          SET data_finalizacao = CURRENT_DATE,
              hora_finalizacao = CURRENT_TIME,
              login_finalizacao = '{$loginEsc}'
-         WHERE UPPER(unidade) = '{$unidadeEsc}'
-           AND data_finalizacao IS NULL
-           AND origem_ssw IS NOT NULL AND origem_ssw <> ''"
+         WHERE UPPER(externo.unidade) = '{$unidadeEsc}'
+           AND externo.data_finalizacao IS NULL
+           AND externo.origem_ssw IS NOT NULL AND externo.origem_ssw <> ''
+           AND NOT EXISTS (
+               SELECT 1 FROM {$tabela} interno
+               WHERE interno.seq_carregamento = externo.seq_carregamento
+                 AND (interno.nro_cte::text ~ '^[0-9]+$' AND (interno.nro_cte::text)::int > 0)
+           )
+           AND externo.seq_carregamento IS NOT NULL"
     );
-    if ($resFinAll) $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAll);
+    if (!$resFinAll) {
+        $resFinAllFallback = @pg_query(
+            $conn,
+            "UPDATE {$tabela}
+             SET data_finalizacao = CURRENT_DATE,
+                 hora_finalizacao = CURRENT_TIME,
+                 login_finalizacao = '{$loginEsc}'
+             WHERE UPPER(unidade) = '{$unidadeEsc}'
+               AND data_finalizacao IS NULL
+               AND origem_ssw IS NOT NULL AND origem_ssw <> ''
+               AND COALESCE(nro_cte, 0) = 0"
+        );
+        if ($resFinAllFallback) $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAllFallback);
+    } else {
+        $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAll);
+    }
     respondJson([
         'success' => true,
         'message' => "Nenhum carregamento encontrado no SSW para esta unidade.",
@@ -1458,9 +1479,9 @@ foreach ($placas_ssw as $placa) {
                  destino = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(destino, ''), {$destinoCarEsc})" : $destinoCarEsc) . ",
                  unidades = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(unidades, ''), {$unidadesCarEsc})" : $unidadesCarEsc) . ",
                  origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
-                 data_finalizacao = NULL,
-                 hora_finalizacao = NULL,
-                 login_finalizacao = NULL
+                 data_finalizacao = CASE WHEN data_finalizacao IS NULL THEN NULL ELSE data_finalizacao END,
+                 hora_finalizacao = CASE WHEN data_finalizacao IS NULL THEN NULL ELSE hora_finalizacao END,
+                 login_finalizacao = CASE WHEN data_finalizacao IS NULL THEN NULL ELSE login_finalizacao END
              WHERE UPPER(unidade) = '{$unidadeEsc}'
                AND seq_carregamento = {$seqCarreg}"
         );
