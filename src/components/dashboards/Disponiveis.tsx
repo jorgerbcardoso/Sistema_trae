@@ -3638,14 +3638,14 @@ function CardCarregamento({
                 <span />
                 <span />
                 <span />
-                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{cteDetalheTotais.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{parseMoeda(String(cteDetalheTotais.vlr_frete ?? '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 <span className="text-right font-mono">{
                   (() => {
                     const v = normPesoKgTotal(cteDetalheTotais.peso ?? 0);
                     return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                   })()
                 }</span>
-                <span className="text-right font-mono">{cteDetalheTotais.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                <span className="text-right font-mono">{parseCubagem(String(cteDetalheTotais.cubagem ?? '0')).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
               </div>
             )}
           </div>
