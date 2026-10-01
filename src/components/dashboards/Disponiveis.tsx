@@ -2513,8 +2513,8 @@ function CardCarregamento({
   const freteCifLocal = freteTotalsLocal.cif;
   const freteFobLocal = freteTotalsLocal.fob;
 
-  const pesoInicial = pesoDoCarregamento > 0 ? pesoDoCarregamento : totalPesoLocal;
-  const cubagemInicial = cubagemDoCarregamento > 0 ? cubagemDoCarregamento : totalCubagemLocal;
+  const pesoInicial = totalPesoLocal > 0 ? totalPesoLocal : normPesoKgTotal(carregamento.total_peso ?? 0);
+  const cubagemInicial = totalCubagemLocal > 0 ? totalCubagemLocal : Number(carregamento.total_cubagem ?? 0) || 0;
   const freteCalcLocalInicial = freteCifLocal + freteFobLocal;
   let cifInicial: number;
   let fobInicial: number;
@@ -3641,8 +3641,8 @@ function CardCarregamento({
                 <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{parseMoeda(String(cteDetalheTotais.vlr_frete ?? '0')).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 <span className="text-right font-mono">{
                   (() => {
-                    const v = normPesoKgTotal(cteDetalheTotais.peso ?? 0);
-                    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const totalPeso = cteDetalheLista.reduce((sum, c) => sum + parsePeso(String(c.peso ?? '0')), 0);
+                    return totalPeso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                   })()
                 }</span>
                 <span className="text-right font-mono">{parseCubagem(String(cteDetalheTotais.cubagem ?? '0')).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
