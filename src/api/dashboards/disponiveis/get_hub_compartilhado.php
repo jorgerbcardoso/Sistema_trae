@@ -104,6 +104,15 @@ if (empty($unidadesCompart)) {
     respondJson(['success' => true, 'unidades' => [], 'dados' => []]);
 }
 
+function parseBRNumHub($v): float {
+    $s = trim((string)$v);
+    if ($s === '') return 0.0;
+    $s = str_replace('.', '', $s);
+    $s = str_replace(',', '.', $s);
+    $n = @(float)$s;
+    return is_finite($n) ? $n : 0.0;
+}
+
 ssw_login($domain);
 set_time_limit(180);
 
@@ -419,10 +428,10 @@ foreach ($unidadesCompart as $siglaHub) {
                 $destinatar  = trim(substr($linha, 78, 10));
                 $cidade      = trim(substr($linha, 89, 9));
                 $uf          = trim(substr($linha, 99, 2));
-                $mercadoria  = trim(substr($linha, 106, 14));
-                $frete       = trim(substr($linha, 121, 11));
-                $peso        = trim(substr($linha, 133, 7));
-                $m3          = trim(substr($linha, 141, 6));
+                $mercadoria  = parseBRNumHub(trim(substr($linha, 106, 14)));
+                $frete       = parseBRNumHub(trim(substr($linha, 121, 11)));
+                $peso        = parseBRNumHub(trim(substr($linha, 133, 7)));
+                $m3          = parseBRNumHub(trim(substr($linha, 141, 6)));
                 $qvol        = trim(substr($linha, 148, 7));
                 $manifesto   = trim(substr($linha, 162, 9));
                 $prevChegada = trim(substr($linha, 174, 12));

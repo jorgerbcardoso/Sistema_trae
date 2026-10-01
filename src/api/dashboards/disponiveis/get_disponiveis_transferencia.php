@@ -123,6 +123,15 @@ function destinoBloqueadoRve(string $domain, string $siglaAtual, string $destino
     return false;
 }
 
+function parseBRNum($v): float {
+    $s = trim((string)$v);
+    if ($s === '') return 0.0;
+    $s = str_replace('.', '', $s);
+    $s = str_replace(',', '.', $s);
+    $n = @(float)$s;
+    return is_finite($n) ? $n : 0.0;
+}
+
 ssw_login($domain);
 set_time_limit(120);
 ini_set('memory_limit', '256M');
@@ -315,10 +324,10 @@ if ($headerLine !== null) {
         $destinatar  = $getCell($arr, $idx, ['DESTINATARIO']);
         $cidade      = $getCell($arr, $idx, ['CIDADE']);
         $uf          = $getCell($arr, $idx, ['UF']);
-        $mercadoria  = $getCell($arr, $idx, ['MERCADORIA']);
-        $frete       = $getCell($arr, $idx, ['FRETE']);
-        $peso        = $getCell($arr, $idx, ['KGREA', 'KG REA', 'KG']);
-        $m3          = $getCell($arr, $idx, ['M3']);
+        $mercadoria  = parseBRNum($getCell($arr, $idx, ['MERCADORIA']));
+        $frete       = parseBRNum($getCell($arr, $idx, ['FRETE']));
+        $peso        = parseBRNum($getCell($arr, $idx, ['KGREA', 'KG REA', 'KG']));
+        $m3          = parseBRNum($getCell($arr, $idx, ['M3']));
         $qvol        = $getCell($arr, $idx, ['QVOL']);
         $manifesto   = $getCell($arr, $idx, ['MANIFESTO/END']);
         $prevChegada = $getCell($arr, $idx, ['PREVCHEGADA']);
@@ -445,10 +454,10 @@ if ($headerLine !== null) {
         $destinatar  = trim(substr($linha, 78, 10));
         $cidade      = trim(substr($linha, 89, 9));
         $uf          = trim(substr($linha, 99, 2));
-        $mercadoria  = trim(substr($linha, 106, 14));
-        $frete       = trim(substr($linha, 121, 11));
-        $peso        = trim(substr($linha, 133, 7));
-        $m3          = trim(substr($linha, 141, 6));
+        $mercadoria  = parseBRNum(trim(substr($linha, 106, 14)));
+        $frete       = parseBRNum(trim(substr($linha, 121, 11)));
+        $peso        = parseBRNum(trim(substr($linha, 133, 7)));
+        $m3          = parseBRNum(trim(substr($linha, 141, 6)));
         $qvol        = trim(substr($linha, 148, 7));
         $manifesto   = trim(substr($linha, 162, 9));
         $prevChegada = trim(substr($linha, 174, 12));

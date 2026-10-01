@@ -2390,7 +2390,7 @@ function CardCarregamento({
             return acc;
           }, { cif: 0, fob: 0 });
           setTotaisCard({
-            peso: Number(totais?.peso ?? 0) || 0,
+            peso: normPesoKgTotal(totais?.peso ?? 0),
             cubagem: Number(totais?.cubagem ?? 0) || 0,
             vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
             cif: frete.cif,
@@ -2464,7 +2464,7 @@ function CardCarregamento({
       `"${c.sigla_dest || ''}"`,
       `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
       c.vlr_frete.toFixed(2).replace('.', ','),
-      (() => { const n = Number(c.peso ?? 0); const v = (n > 0 && n < 1) ? n * 1000 : n; return Number.isFinite(v) ? v.toFixed(2).replace('.', ',') : '0,00'; })(),
+      normPesoKgCte(c.peso ?? 0).toFixed(2).replace('.', ','),
       c.cubagem.toFixed(3).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
@@ -2487,12 +2487,12 @@ function CardCarregamento({
   const normPesoKgCte = (v: any): number => {
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) return 0;
-    return n < 1 ? n * 1000 : n;
+    return n < 100 ? n * 1000 : n;
   };
   const normPesoKgTotal = (v: any): number => {
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) return 0;
-    return n < 30 ? n * 1000 : n;
+    return n < 1000 ? n * 1000 : n;
   };
 
   const pesoDoCarregamento = normPesoKgTotal(carregamento.total_peso ?? 0);
@@ -2680,7 +2680,7 @@ function CardCarregamento({
           return acc;
         }, { cif: 0, fob: 0 });
         const next = {
-          peso: Number(totais?.peso ?? 0) || 0,
+          peso: normPesoKgTotal(totais?.peso ?? 0),
           cubagem: Number(totais?.cubagem ?? 0) || 0,
           vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
           cif: frete.cif,
@@ -3615,9 +3615,8 @@ function CardCarregamento({
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{
                           (() => {
-                            const n = Number(cte.peso ?? 0);
-                            const v = (n > 0 && n < 1) ? n * 1000 : n;
-                            return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                            const v = normPesoKgCte(cte.peso ?? 0);
+                            return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                           })()
                         }</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
@@ -3642,9 +3641,8 @@ function CardCarregamento({
                 <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{cteDetalheTotais.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 <span className="text-right font-mono">{
                   (() => {
-                    const n = Number(cteDetalheTotais.peso ?? 0);
-                    const v = (n > 0 && n < 30) ? n * 1000 : n;
-                    return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                    const v = normPesoKgTotal(cteDetalheTotais.peso ?? 0);
+                    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                   })()
                 }</span>
                 <span className="text-right font-mono">{cteDetalheTotais.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>

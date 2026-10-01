@@ -749,6 +749,15 @@ function parseRelatorioCarregamentos($texto) {
     $larguras = [12,5,5,10,12,5,6,5,5,20,20,20,14,3,14,11,7,6,2];
     $separador = '------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--';
 
+    $parseBr = function (string $s): float {
+        $s = trim($s);
+        if ($s === '') return 0.0;
+        $s = str_replace('.', '', $s);
+        $s = str_replace(',', '.', $s);
+        $v = @(float)$s;
+        return is_finite($v) ? $v : 0.0;
+    };
+
     foreach ($linhas as $linha) {
         $linha = rtrim($linha, "\n");
         if ($linha === '') continue;
@@ -823,10 +832,10 @@ function parseRelatorioCarregamentos($texto) {
             'destinatario' => $destin,
             'cidade'       => $locEnt,
             'qtde_vol'     => (int)preg_replace('/\\D/', '', $qVol),
-            'vlr_merc'     => $merc,
-            'vlr_frete'    => $frete,
-            'peso'         => $kg,
-            'cubagem'      => $m3,
+            'vlr_merc'     => $parseBr($merc),
+            'vlr_frete'    => $parseBr($frete),
+            'peso'         => $parseBr($kg),
+            'cubagem'      => $parseBr($m3),
         ];
     }
 

@@ -1,0 +1,201 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: ESTEIO                                                                               01/10/2026 18:00
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164210-3  25/09 30/10     918982                         2             BANDEIRANTE QUIMICA  BOESSIO TRANSPORTES  BOESSIO TRANSPORTES  ESTEIO         FEC     120.000,00    9.800,00   6.000    0,0 80
+                             918983
+TOTAIS:                                  1 CTRCS            2                                                                                                   120.000,00    9.800,00   6.000    0,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: FICRON                                                                               01/10/2026 18:00
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO167774-8  01/10 13/10      23926                        13             HORTIPLAST EMBALAGEN HORTIPLAST EMBALAGEN LANGER SOLUCOES INDU CAMPO VERDE    RON       5.816,75      250,00     165    0,5 80
+TOTAIS:                                  1 CTRCS           13                                                                                                     5.816,75      250,00     165    0,5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: GYN9115                                                                              01/10/2026 18:00
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+VIX035080-0  25/09 08/10     993318                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ROBERTO SOUSA        ALVORADA DO NO GI5       1.780,00      124,98      35    0,2 83
+VIX035264-1  28/09 09/10     994958                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FLAVIO BARBOSA VIEIR ARAGUAPAZ      GI5       2.559,99      131,18      30    0,2 83
+SAO167368-8  30/09 08/10     363566                         3             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU LATICINIOS BELA VIST BELA VISTA DE  GI5       7.927,10      280,84      89    0,0 80
+VIX035249-7  28/09 08/10     994232                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  RENATO JALES DE CARV GOIANESIA      GI5       2.533,96      130,98      32    0,2 83
+VIX035254-3  28/09 08/10     994351                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  RAFAEL MENDONAA      GOIANESIA      GI5       6.873,90      305,23      81    0,7 83
+VIX035282-9  28/09 08/10     995308                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FERNANDA SOUZA MORAI GOIANESIA      GI5       2.419,98      130,07      30    0,2 83
+SAO167013-1  30/09 13/10     398145                         6             MOAS IND E COM IMP E MOAS IND E COM IMP E RONALDO MARCOS NUNES IPORA          GI5       6.651,05      144,45      40    0,3 80
+VIX035241-1  28/09 09/10     993713                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  BHEATRIZ EDUARDA     IPORA          GI5       2.271,74      128,89      27    0,2 83
+JDF034261-1  29/09 13/10      30593                        29             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL ETICA CONFECCOES LTD ITABERAI       GI5      50.623,01    2.917,58     392    0,0 83
+                              30727
+VIX035270-5  28/09 13/10     995025                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FABIO ALVES DE OLIVE NEROPOLIS      GI5       5.936,45      297,77      75    0,6 83
+SAO167370-0  30/09 13/10     363587                        33             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU LACTOSUL INDUSTRIA D PIRANHAS       GI5      18.122,24    1.269,86   1.169    1,6 80
+                             363588
+VIX035292-6  28/09 09/10     174810                         5             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI FRANCIMAR LIMA DE AN POSSE          GI5       3.029,05      295,32      53    0,6 83
+VIX035081-8  25/09 08/10     993331                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  SIDIANE CARRARO      POSSE          GI5       2.249,61      128,72      32    0,2 83
+SAO167153-7  30/09 08/10      51961                         1             WILLIAM CICERO SILVA WILLIAM CICERO SILVA MARCELA BARBOSA REGO TRINDADE       GI5       1.734,65      445,75       3    0,7 80
+SAO167202-9  30/09 08/10    1174607                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  67.557.327 DIVINO ET TRINDADE       GI5         755,38      142,12      12    0,0 80
+VIX035252-7  28/09 09/10     994341                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  AIRES RUY FIDELIS RA URUACU         GIT       2.459,99      130,39      30    0,2 83
+JDF034258-1  29/09 06/10      30553                        14             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL MPL INDUSTRIA E COME APARECIDA DE G GYN      16.373,87      722,24     133    0,0 83
+                              30554,      30864
+JDF034259-9  29/09 06/10      30434                        10             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL SALLO CONFECCAO E CO APARECIDA DE G GYN      12.978,38      584,71     138    0,0 83
+                              30674
+VIX035197-1  28/09 05/10     723225                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  JAIRO PEREIRA DA SIL APARECIDA DE G GYN       4.340,00      256,51      43    0,2 83
+JDF034265-3  29/09 06/10      30672                         7             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL PEDRO B ALVES CIA LT GOIANIA        GYN       9.046,35      416,33      83    0,0 83
+SAO166792-1  30/09 06/10     715662                         9             GATES DO BRASIL IND  SUECA ROLAMENTOS E S SUECA ROLAMENTOS E S GOIANIA        GYN     144.481,92    3.142,40   1.839    4,3 80
+                             715684
+JDF034260-2  29/09 06/10      30501                         1             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL RODOLFO ROCHA DE SOU GOIANIA        GYN       7.282,62      344,90      18    0,0 83
+JOI002377-9  25/09 02/10      29670                         1             GALZER IMPORTACAO E  GALZER IMPORTACAO E  ELCIONE CAETANO DE F GOIANIA        GYN       8.037,70      240,54     143    0,2 83
+JDF034267-0  29/09 06/10      30413                       108             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL FASHION MAN CONFECCA GOIANIA        GYN     220.059,75    9.108,46   1.682    0,0 83
+JDF034268-8  29/09 06/10      30831                         2             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL MAROTO IND E COM     GOIANIA        GYN       2.906,00      167,65      17    0,0 83
+CWB012919-4  26/09 05/10    7475606                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  MATHEUS SANTOS DE OL GOIANIA        GYN       2.088,35      197,11      39    0,5 83
+VIX035076-1  25/09 02/10       2767                       165             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD M. G. COMERCIO ATAC. GOIANIA        GYN      40.478,52    5.510,94   3.775   15,7 83
+CWB012865-1  25/09 05/10     246947                         3             DIST DE PECAS ELETRI DIST DE PECAS ELETRI CASTELO COM DE BATER GOIANIA        GYN      58.505,93    2.900,00   2.920    1,8 83
+                             246948
+JDF034262-9  29/09 06/10      30735                        20             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL LACO CALF JEANS LTDA GOIANIA        GYN      18.524,71      809,34     171    0,0 83
+VIX035210-1  28/09 05/10     723593                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MARCIA DIVINA CAVALC GOIANIA        GYN       3.381,43      193,19      40    0,3 83
+VIX035077-0  25/09 02/10       2780                        12             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD ARLAN MENDES FERREIR GOIANIA        GYN      17.455,20      429,38     163    1,1 83
+JDF034263-7  29/09 13/10      30669                         6             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL IND COM CONFS IRMAOS JARAGUA        GYN       9.208,01      478,13      67    0,0 83
+JDF034266-1  29/09 13/10      30632                        27             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL M. C. DA S. BRAUDES  JARAGUA        GYN      24.918,59    1.226,93     228    0,0 83
+VIX035098-2  25/09 06/10      80528                         6             REFRICRIL DISTR DE A REFRICRIL DISTR DE A HELP AR PRESTADORA D SENADOR CANEDO GYN       7.491,88      225,52      85    0,2 83
+JDF034264-5  29/09 06/10      30737                         7             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL ZAPPIA CONF IMP E EX ANAPOLIS       PLS       6.479,80      351,27      60    0,0 83
+VIX035239-0  28/09 05/10    2875638                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ROGERIO TOLENTINO    ANAPOLIS       PLS       1.975,46      126,53      37    0,2 83
+TOTAIS:                                 36 CTRCS          503                                                                                                   733.942,57   34.436,21  13.807   30,6
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                             38 CTRCS          518                                                                                                   859.759,32   44.486,21  19.972   31,1
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
