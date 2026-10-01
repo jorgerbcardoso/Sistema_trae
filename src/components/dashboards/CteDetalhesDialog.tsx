@@ -218,7 +218,7 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
   return (
     <Dialog open={openProp} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="w-[min(90vw,720px)] max-h-[calc(100vh-120px)] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent className="!w-[92vw] !max-w-[520px] !max-h-[80vh] h-[80vh] overflow-hidden flex flex-col !p-0 gap-0">
         <DialogHeader className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle className="flex items-center gap-2 text-sm">
@@ -253,7 +253,7 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-3.5 pr-2">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-3 pr-1">
           <Secao title="Identificação">
             <Campo label="CTRC" valor={ctrcDisplay} icon={FileText} mono />
             <Campo label="NF" valor={cte.nfiscal} mono />
@@ -351,34 +351,34 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
                 <span className="w-1 h-3 bg-pink-500/70 rounded-full" />
                 Composição do Custo
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
-                <div className="order-2 md:order-1 flex flex-col gap-1.5">
-                  <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-3 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-0.5">
                     {parcelas.map(p => {
                       const pct = custoTotal > 0 ? (p.valor / custoTotal) * 100 : 0;
                       return (
                         <div key={p.key} className="flex items-center justify-between gap-2 py-0.5 border-b border-slate-100 dark:border-slate-800/60 last:border-b-0">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             <span
-                              className="w-2.5 h-2.5 rounded-sm shrink-0"
+                              className="w-2 h-2 rounded-sm shrink-0"
                               style={{ backgroundColor: corMap[p.label] ?? '#64748b' }}
                             />
-                            <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">{p.label}</span>
+                            <span className="text-[10.5px] text-slate-600 dark:text-slate-400 truncate">{p.label}</span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 text-[11px]">
-                            <span className="font-mono tabular-nums text-slate-400 dark:text-slate-500 w-9 text-right">{pct.toFixed(0)}%</span>
-                            <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 text-right w-[68px]">{fmtMoeda(p.valor)}</span>
+                          <div className="flex items-center gap-1.5 shrink-0 text-[10.5px]">
+                            <span className="font-mono tabular-nums text-slate-400 dark:text-slate-500 w-8 text-right">{pct.toFixed(0)}%</span>
+                            <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 text-right w-[58px]">{fmtMoeda(p.valor)}</span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="pt-1.5 mt-0.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="pt-1 mt-0.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</span>
-                    <span className="font-mono tabular-nums font-bold text-xs text-indigo-600 dark:text-indigo-400">{fmtMoeda(custoTotal)}</span>
+                    <span className="font-mono tabular-nums font-bold text-[11px] text-indigo-600 dark:text-indigo-400">{fmtMoeda(custoTotal)}</span>
                   </div>
                 </div>
-                <div className="order-1 md:order-2 h-48 shrink-0">
+                <div className="h-44 shrink-0">
                   {donutData.length > 0 && (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -388,8 +388,8 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
                           nameKey="name"
                           cx="50%"
                           cy="50%"
-                          innerRadius={42}
-                          outerRadius={72}
+                          innerRadius={34}
+                          outerRadius={60}
                           stroke="none"
                           paddingAngle={2}
                         >
