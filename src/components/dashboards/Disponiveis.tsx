@@ -2214,13 +2214,13 @@ function CardCarregamento({
         case 'prev': return parseBrDate(c?.data_prev_ent);
         case 'dest': return isEntregaCteDetalhe ? String(c?.setor ?? '') : String(c?.sigla_dest ?? '');
         case 'pagador': return isEntregaCteDetalhe ? String(c?.destinatario ?? '') : String(c?.nome_pag ?? '');
-        case 'frete': return Number(c?.vlr_frete ?? 0) || 0;
+        case 'frete': return parseMoeda(String(c?.vlr_frete ?? '0'));
         case 'peso': {
-          const n = Number(c?.peso ?? 0);
+          const n = parsePeso(String(c?.peso ?? ''));
           if (!Number.isFinite(n) || n <= 0) return 0;
           return n < 1 ? n * 1000 : n;
         }
-        case 'cub': return Number(c?.cubagem ?? 0) || 0;
+        case 'cub': return parseCubagem(String(c?.cubagem ?? '0'));
         default: return '';
       }
     };
@@ -2382,7 +2382,7 @@ function CardCarregamento({
           const lista = Array.isArray(res?.ctes) ? res.ctes : [];
           const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
           const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
-            const v = Number(c?.vlr_frete ?? 0) || 0;
+            const v = parseMoeda(String(c?.vlr_frete ?? '0'));
             const rem = normalizePessoa(String(c?.remetente ?? ''));
             const pag = normalizePessoa(String(c?.nome_pag ?? ''));
             if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
@@ -2391,8 +2391,8 @@ function CardCarregamento({
           }, { cif: 0, fob: 0 });
           setTotaisCard({
             peso: normPesoKgTotal(totais?.peso ?? 0),
-            cubagem: Number(totais?.cubagem ?? 0) || 0,
-            vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
+            cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
+            vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
             cif: frete.cif,
             fob: frete.fob,
           });
@@ -2463,9 +2463,9 @@ function CardCarregamento({
       c.data_prev_ent,
       `"${String(c.sigla_dest ?? '')}"`,
       `"${String(c.nome_pag ?? '').replace(/"/g, '""')}"`,
-      (Number(c.vlr_frete) || 0).toFixed(2).replace('.', ','),
+      parseMoeda(String(c.vlr_frete ?? '0')).toFixed(2).replace('.', ','),
       normPesoKgCte(c.peso ?? 0).toFixed(2).replace('.', ','),
-      (Number(c.cubagem) || 0).toFixed(3).replace('.', ','),
+      parseCubagem(String(c.cubagem ?? '0')).toFixed(3).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -2485,12 +2485,12 @@ function CardCarregamento({
   const qtdeCtesCarreg = Math.max(qtdeCtesArray, qtdeCtesHeader);
 
   const normPesoKgCte = (v: any): number => {
-    const n = Number(v);
+    const n = parsePeso(String(v ?? ''));
     if (!Number.isFinite(n) || n <= 0) return 0;
     return n < 100 ? n * 1000 : n;
   };
   const normPesoKgTotal = (v: any): number => {
-    const n = Number(v);
+    const n = parsePeso(String(v ?? ''));
     if (!Number.isFinite(n) || n <= 0) return 0;
     return n < 1000 ? n * 1000 : n;
   };
@@ -2672,7 +2672,7 @@ function CardCarregamento({
         const totais = res?.totais ?? null;
         const lista = Array.isArray(res?.ctes) ? res.ctes : [];
         const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
-          const v = Number(c?.vlr_frete ?? 0) || 0;
+          const v = parseMoeda(String(c?.vlr_frete ?? '0'));
           const rem = normalizePessoa(String(c?.remetente ?? ''));
           const pag = normalizePessoa(String(c?.nome_pag ?? ''));
           if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
@@ -2681,8 +2681,8 @@ function CardCarregamento({
         }, { cif: 0, fob: 0 });
         const next = {
           peso: normPesoKgTotal(totais?.peso ?? 0),
-          cubagem: Number(totais?.cubagem ?? 0) || 0,
-          vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
+          cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
+          vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
           cif: frete.cif,
           fob: frete.fob,
         };
@@ -4907,9 +4907,9 @@ function ModalRotaCarregamento({
       const hasEndereco = hasEnderecoReal || isFec;
 
       const ctrc = padCte(ser, nro);
-      const peso = c?.peso !== null && c?.peso !== undefined && String(c.peso) !== '' ? Number(c.peso) : 0;
-      const frete = c?.vlr_frete !== null && c?.vlr_frete !== undefined && String(c.vlr_frete) !== '' ? Number(c.vlr_frete) : 0;
-      const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? Number(c.cubagem) : 0;
+      const peso = c?.peso !== null && c?.peso !== undefined && String(c.peso) !== '' ? parsePeso(String(c.peso)) : 0;
+      const frete = c?.vlr_frete !== null && c?.vlr_frete !== undefined && String(c.vlr_frete) !== '' ? parseMoeda(String(c.vlr_frete)) : 0;
+      const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
       const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '');
       const emissao = norm(c?.data_emissao ?? '');
@@ -5684,8 +5684,8 @@ function ModalRotaCarregamento({
     let frete = 0;
     for (const g of all) {
       for (const c of g.ctes) {
-        peso += Number(c.peso ?? 0) || 0;
-        frete += Number((c as any).frete ?? 0) || 0;
+        peso += Number.isFinite(c.peso) ? c.peso : 0;
+        frete += Number.isFinite((c as any).frete) ? (c as any).frete : 0;
       }
     }
     return { peso, frete };
