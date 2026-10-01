@@ -594,7 +594,7 @@ function TabelaCtes({
             <th className="px-3 py-2 text-center w-[68px] font-semibold">Coleta</th>
             <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="chegadaUnid">Chegada na Unid.</ThBtn></th>
+            <th className="px-3 py-2 text-left"><ThBtn col="chegadaUnid">Chegada</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
             <th className="px-3 py-2 text-left"><ThBtn col="ultOcor">Últ. Ocor.</ThBtn></th>
@@ -783,7 +783,7 @@ function GrupoDestinoCard({
       'NF',
       'Situação',
       'Emissão',
-      'Chegada na Unid.',
+      'Chegada',
       'Parado (dias)',
       'Prev. Ent.',
       'Pagador',
@@ -1198,7 +1198,7 @@ const TabelaEntregaColunas: { key: ColunaOrdemEntrega | null; label: string; ali
   { key: null, label: '' },
   { key: 'ctrc', label: 'CTRC' },
   { key: 'emissao', label: 'Emissão' },
-  { key: 'chegadaUnid', label: 'Chegada na Unid.' },
+  { key: 'chegadaUnid', label: 'Chegada' },
   { key: 'nf', label: 'NF' },
   { key: 'pagador', label: 'Pagador' },
   { key: 'destinatario', label: 'Destinatário' },
@@ -1348,7 +1348,7 @@ function TabelaEntrega({
             )}
             <th className={thClass('left')} onClick={() => trocarOrdem('ctrc')} title="Ordenar por CTRC">CTRC{seta('ctrc')}</th>
             <th className={thClass('left')} onClick={() => trocarOrdem('emissao')} title="Ordenar por Emissão">Emissão{seta('emissao')}</th>
-            <th className={thClass('left')} onClick={() => trocarOrdem('chegadaUnid')} title="Ordenar por Chegada na Unid.">Chegada na Unid.{seta('chegadaUnid')}</th>
+            <th className={thClass('left')} onClick={() => trocarOrdem('chegadaUnid')} title="Ordenar por Chegada">Chegada{seta('chegadaUnid')}</th>
             <th className={thClass('left')} onClick={() => trocarOrdem('nf')} title="Ordenar por NF">NF{seta('nf')}</th>
             <th className={thClass('left')} onClick={() => trocarOrdem('pagador')} title="Ordenar por Pagador">Pagador{seta('pagador')}</th>
             <th className={thClass('left')} onClick={() => trocarOrdem('destinatario')} title="Ordenar por Destinatário">Destinatário{seta('destinatario')}</th>
@@ -1506,7 +1506,7 @@ function GrupoSetorCard({
       'Setor',
       'CTRC',
       'Emissão',
-      'Chegada na Unid.',
+      'Chegada',
       'Parado (dias)',
       'NF',
       'Situação',
@@ -9950,7 +9950,7 @@ export function Disponiveis() {
       'NF',
       'Situação',
       'Emissão',
-      'Chegada na Unid.',
+      'Chegada',
       'Parado (dias)',
       'Prev. Ent.',
       'Pagador',
@@ -10073,7 +10073,7 @@ export function Disponiveis() {
       'Setor',
       'CTRC',
       'Emissão',
-      'Chegada na Unid.',
+      'Chegada',
       'Parado (dias)',
       'NF',
       'Situação',
