@@ -1010,7 +1010,7 @@ function TabelaColetas({ coletas }: { coletas: Coleta[] }) {
       {cidades.map(cidade => {
         const cols = porCidade[cidade];
         const totalVol  = cols.reduce((s, c) => s + (parseInt(c.qtdeVol) || 0), 0);
-        const totalPeso = cols.reduce((s, c) => s + (parseFloat(c.peso.replace('.', '').replace(',', '.')) || 0), 0);
+        const totalPeso = cols.reduce((s, c) => s + parsePeso(c.peso), 0);
         const temAtrasada = cols.some(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada');
 
         return (
@@ -1446,7 +1446,7 @@ function TabelaEntrega({
                     );
                   })()}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parseFloat(cte.peso.replace('.', '').replace(',', '.'))) + ' kg' : '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parsePeso(cte.peso)) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
@@ -2458,21 +2458,21 @@ function CardCarregamento({
     const rows = lista.map((c: any) => [
       c.ctrc,
       `"${String(c.nfs ?? '').replace(/"/g, '""')}"`,
-      `"${c.unidade_carregamento || ''}"`,
+      `"${String(c.unidade_carregamento ?? '')}"`,
       c.data_emissao,
       c.data_prev_ent,
-      `"${c.sigla_dest || ''}"`,
-      `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
-      c.vlr_frete.toFixed(2).replace('.', ','),
+      `"${String(c.sigla_dest ?? '')}"`,
+      `"${String(c.nome_pag ?? '').replace(/"/g, '""')}"`,
+      (Number(c.vlr_frete) || 0).toFixed(2).replace('.', ','),
       normPesoKgCte(c.peso ?? 0).toFixed(2).replace('.', ','),
-      c.cubagem.toFixed(3).replace('.', ','),
+      (Number(c.cubagem) || 0).toFixed(3).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ctes_${titulo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    a.download = `ctes_${String(titulo ?? 'exportacao').replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -9929,8 +9929,8 @@ export function Disponiveis() {
       }
       map[key].totalCtes++;
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
-      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
-      map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+      map[key].totalPeso    += parsePeso(cte.peso);
+      map[key].totalCubagem += parseCubagem(cte.cubagem);
       map[key].totalFrete   += parseMoeda(cte.frete);
       map[key].totalVlrNf   += parseMoeda(cte.vlrNf);
     };
@@ -9944,7 +9944,7 @@ export function Disponiveis() {
         map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
       }
       map[key].coletas.push(coleta);
-      const pesoColeta = parseFloat(coleta.peso.replace('.', '').replace(',', '.')) || 0;
+      const pesoColeta = parsePeso(coleta.peso);
       map[key].totalPeso    += pesoColeta;
       map[key].totalCubagem += pesoColeta * 0.0033333333333333;
       map[key].totalVlrNf   += parseMoeda(coleta.valMerc);
@@ -10012,8 +10012,8 @@ export function Disponiveis() {
       }
       map[key].totalCtes++;
       map[key].totalVol     += parseInt(cte.qtdeVol) || 0;
-      map[key].totalPeso    += parseFloat(cte.peso.replace('.', '').replace(',', '.')) || 0;
-      map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
+      map[key].totalPeso    += parsePeso(cte.peso);
+      map[key].totalCubagem += parseCubagem(cte.cubagem);
       map[key].totalFrete   += parseMoeda(cte.frete);
       map[key].totalVlrNf   += parseMoeda(cte.vlrMerc);
     }

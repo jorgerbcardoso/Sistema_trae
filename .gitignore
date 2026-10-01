@@ -1,2 +1,6 @@
 node_modules
 logos_clientes/
+# Visual Studio
+.vs/
+# Arquivos locais gerados pelo desktop
+*-DESKTOP-279DQOB.*
