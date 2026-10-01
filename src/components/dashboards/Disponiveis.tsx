@@ -431,19 +431,7 @@ function TabelaCtes({
   };
 
   const toDateVal = (v: string): number => {
-    const s = (v ?? '').trim();
-    if (!s || s === '—') return 0;
-    const m = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
-    if (!m) return 0;
-    const dia = parseInt(m[1], 10);
-    const mes = parseInt(m[2], 10);
-    const anoRaw = m[3];
-    const ano = !anoRaw
-      ? new Date().getFullYear()
-      : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
-    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-    const t = d.getTime();
-    return Number.isNaN(t) ? 0 : t;
+    return parseDataBR(v) ?? 0;
   };
 
   const ORDEM_IND: Record<string, number> = { vermelho: 4, laranja: 3, amarelo: 2, verde: 1 };
@@ -689,11 +677,11 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap" title={cte.nfiscal || ''}>
                   {cte.nfiscal || '-'}
                 </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.emissao}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{formatarDataTabelaSemAno(cte.emissao)}</td>
                 <td className={`px-3 py-2 whitespace-nowrap ${cte.indicadorSaida ? TEXTO_INDICADOR[cte.indicadorSaida] : 'text-slate-600 dark:text-slate-400'}`}>
-                  {cte.chegadaUnid || ''}
+                  {cte.chegadaUnid ? formatarDataTabelaSemAno(cte.chegadaUnid) : ''}
                 </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.prevEnt}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{formatarDataTabelaSemAno(cte.prevEnt)}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
                 <td
                   className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[110px] truncate"
@@ -713,7 +701,7 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
                 <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{stripDv(cte.manifesto || '-') || '-'}</td>
                 {tipo === 'transito' && (
-                  <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{cte.prevChegada}</td>
+                  <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{formatarDataTabelaSemAno(cte.prevChegada)}</td>
                 )}
                 <td className="px-3 py-2 text-center">
                   <IndicadorDot cor={cte.indicadorSaida} title={cte.indicadorSaida ? `Atraso saída: ${cte.indicadorSaida}` : 'Sem manifesto'} />
@@ -1073,12 +1061,29 @@ const ORDEM_INDICADOR: Record<string, number> = { vermelho: 4, laranja: 3, amare
 
 const parseDataBR = (s: string | null | undefined): number | null => {
   const v = String(s ?? '').trim();
-  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+  if (!v || v === '—') return null;
+  const m = v.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
   if (!m) return null;
-  const yy = m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10);
-  const dt = new Date(yy, parseInt(m[2], 10) - 1, parseInt(m[1], 10), 0, 0, 0, 0);
+  const dia = parseInt(m[1], 10);
+  const mes = parseInt(m[2], 10);
+  if (dia < 1 || dia > 31 || mes < 1 || mes > 12) return null;
+  const anoRaw = m[3];
+  const ano = !anoRaw
+    ? new Date().getFullYear()
+    : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
+  const dt = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
   if (Number.isNaN(dt.getTime())) return null;
   return dt.getTime();
+};
+
+const formatarDataTabelaSemAno = (s: string | null | undefined): string => {
+  const v = String(s ?? '').trim();
+  if (!v || v === '—') return '-';
+  const m1 = v.match(/^(\d{2})\/(\d{2})(?:\/\d{2,4})?$/);
+  if (m1) return `${m1[1]}/${m1[2]}`;
+  const m2 = v.match(/^(\d{2})\/(\d{2})(?:\/\d{2,4})?\s+(\d{2}:\d{2}(?::\d{2})?)$/);
+  if (m2) return `${m2[1]}/${m2[2]} ${m2[3]}`;
+  return v;
 };
 
 const parseDataHoraBR = (s: string | null | undefined, def?: string | null): number | null => {
@@ -1399,13 +1404,13 @@ function TabelaEntrega({
                   {jaNoCarregamento && <span className="ml-1 text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                   {jaEmOutro && <span className="ml-1.5 text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                 </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.emissao || ''}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.chegadaUnid || ''}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.emissao ? formatarDataTabelaSemAno(cte.emissao) : ''}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.chegadaUnid ? formatarDataTabelaSemAno(cte.chegadaUnid) : ''}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.nfiscal}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.pagador}</td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[80px] truncate">{cte.destinatario}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.cidade}</td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{cte.prevEnt}</td>
+                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatarDataTabelaSemAno(cte.prevEnt)}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                   {(() => {
                     const txt = formatAgendamento(cte.agendamento, (cte as any).data_prev_ent);
@@ -1413,7 +1418,7 @@ function TabelaEntrega({
                     if (!valido) return <span className="text-slate-400 dark:text-slate-500">-</span>;
                     return (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 dark:bg-blue-900/35 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                        {txt}
+                        {formatarDataTabelaSemAno(txt)}
                       </span>
                     );
                   })()}
@@ -1423,7 +1428,7 @@ function TabelaEntrega({
                 <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
                 {tipo === 'transito' && (
-                  <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{cte.prevChegada}</td>
+                  <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{formatarDataTabelaSemAno(cte.prevChegada)}</td>
                 )}
                 <td className="px-3 py-2 text-center">
                   <IndicadorDot
