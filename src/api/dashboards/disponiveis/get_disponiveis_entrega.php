@@ -284,6 +284,7 @@ foreach ($linhas as $linha) {
 }
 
 $tblCte = "{$domain}_cte";
+$tblOcor = "{$domain}_ocorrencia";
 $infoPorCte = [];
 
 if (!empty($ctes)) {
@@ -316,15 +317,39 @@ if (!empty($ctes)) {
                 c.nro_cte,
                 TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao,
                 TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
-                COALESCE(c.unid_atual, '') AS unid_atual
+                COALESCE(c.unid_atual, '') AS unid_atual,
+                COALESCE(c.ult_ocor::text, '') AS cod_ult_ocor,
+                COALESCE(o.descricao, '') AS desc_ult_ocor,
+                COALESCE(TO_CHAR(c.data_ult_ocor::date, 'DD/MM/YYYY'), '') AS data_ult_ocor,
+                COALESCE(TO_CHAR(NULLIF(c.hora_ult_ocor::text, '')::time, 'HH24:MI'), '') AS hora_ult_ocor
             FROM {$tblCte} c
+            LEFT JOIN {$tblOcor} o
+              ON o.codigo = c.ult_ocor
             JOIN req r
               ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
              AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
              AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
             ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST
         ";
-        $resEmi = pg_query_params($g_sql, $q, $params);
+        $resEmi = @pg_query_params($g_sql, $q, $params);
+        if (!$resEmi) {
+            $qBase = "
+                WITH req(ctrc) AS (VALUES " . implode(',', $values) . ")
+                SELECT DISTINCT ON (UPPER(BTRIM(c.ser_cte)), c.nro_cte)
+                    UPPER(BTRIM(c.ser_cte)) AS ser_cte,
+                    c.nro_cte,
+                    TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao,
+                    TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
+                    COALESCE(c.unid_atual, '') AS unid_atual
+                FROM {$tblCte} c
+                JOIN req r
+                  ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
+                 AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
+                 AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
+                ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST
+            ";
+            $resEmi = @pg_query_params($g_sql, $qBase, $params);
+        }
         if ($resEmi) {
             while ($row = pg_fetch_assoc($resEmi)) {
                 $k = ((string)($row['ser_cte'] ?? '')) . '|' . (int)($row['nro_cte'] ?? 0);
@@ -332,6 +357,12 @@ if (!empty($ctes)) {
                     'emissao' => (string)($row['emissao'] ?? ''),
                     'chegadaUnid' => (string)($row['chegada_unid'] ?? ''),
                     'unidAtual' => (string)($row['unid_atual'] ?? ''),
+                    'codUltOcor' => (string)($row['cod_ult_ocor'] ?? ''),
+                    'descUltOcor' => (string)($row['desc_ult_ocor'] ?? ''),
+                    'dataUltOcor' => trim(
+                        ((string)($row['data_ult_ocor'] ?? ''))
+                        . (((string)($row['hora_ult_ocor'] ?? '')) !== '' ? (' ' . (string)($row['hora_ult_ocor'] ?? '')) : '')
+                    ),
                 ];
             }
         }
@@ -343,6 +374,13 @@ if (!empty($ctes)) {
             if ($infoPorCte[$k]['emissao'] !== '') $c['emissao'] = $infoPorCte[$k]['emissao'];
             if ($infoPorCte[$k]['chegadaUnid'] !== '') $c['chegadaUnid'] = $infoPorCte[$k]['chegadaUnid'];
             if ($infoPorCte[$k]['unidAtual'] !== '') $c['unidAtual'] = $infoPorCte[$k]['unidAtual'];
+            if (($infoPorCte[$k]['codUltOcor'] ?? '') !== '' || ($infoPorCte[$k]['descUltOcor'] ?? '') !== '') {
+                $c['codUltOcor'] = (string)($infoPorCte[$k]['codUltOcor'] ?? ($c['codUltOcor'] ?? ''));
+                $c['descUltOcor'] = (string)($infoPorCte[$k]['descUltOcor'] ?? ($c['descUltOcor'] ?? ''));
+                if (($infoPorCte[$k]['dataUltOcor'] ?? '') !== '') {
+                    $c['dataUltOcor'] = (string)($infoPorCte[$k]['dataUltOcor']);
+                }
+            }
         }
     }
     unset($c);

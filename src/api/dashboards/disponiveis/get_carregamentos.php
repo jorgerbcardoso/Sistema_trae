@@ -476,6 +476,7 @@ if (count($rotas) > 0) {
 
 // ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
 $tblCte = "{$domain}_cte";
+$tblOcor = "{$domain}_ocorrencia";
 $cteCols = null;
 $cteCol = function(string $col) use ($conn, $tblCte, &$cteCols): bool {
     if ($cteCols === null) {
@@ -515,12 +516,25 @@ $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, c.cubagem_cte)" : "c.cubag
 $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, c.qtde_vol_cte)" : "c.qtde_vol_cte";
 
 $selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
+$joinOcorExtra = "
+    LEFT JOIN {$tblOcor} ocorr
+           ON ocorr.codigo = cte.ult_ocor
+";
+$selCodUltOcor = $cteCol('ult_ocor') ? "COALESCE(cte.ult_ocor::text, '')" : "''";
+$selDescUltOcor = $cteCol('ult_ocor') ? "COALESCE(ocorr.descricao, '')" : "''";
+$selDataUltOcor = ($cteCol('data_ult_ocor') || $cteCol('ult_ocor'))
+    ? "COALESCE(TO_CHAR(cte.data_ult_ocor::date, 'DD/MM/YYYY'), '')"
+    : "''";
+$selHoraUltOcor = $cteCol('hora_ult_ocor')
+    ? "COALESCE(TO_CHAR(NULLIF(cte.hora_ult_ocor::text, '')::time, 'HH24:MI'), '')"
+    : "''";
 if (strtoupper($domain) === 'RVE') {
     $tblCidParam = "{$domain}_cid_param";
     $joinCteDest = "
         LEFT JOIN {$tblCte} cte
                ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
               AND cte.nro_cte = c.nro_cte
+        {$joinOcorExtra}
         LEFT JOIN {$tblCidParam} cidp
                ON cidp.seq_cidade = cte.seq_cidade_entr
     ";
@@ -528,6 +542,13 @@ if (strtoupper($domain) === 'RVE') {
         WHEN UPPER(BTRIM(COALESCE(c.destino_cte, ''))) = 'FEC' AND COALESCE(cidp.unidade, '') <> '' THEN UPPER(BTRIM(cidp.unidade))
         ELSE UPPER(BTRIM(COALESCE(c.destino_cte, '')))
     END AS destino_cte_painel,";
+} else {
+    $joinCteDest = "
+        LEFT JOIN {$tblCte} cte
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte.nro_cte = c.nro_cte
+        {$joinOcorExtra}
+    ";
 }
 
 $sqlCtes = "
@@ -552,7 +573,11 @@ $sqlCtes = "
         {$selVol} AS qtde_vol_cte,
         c.login_inclusao,
         c.data_inclusao,
-        c.hora_inclusao
+        c.hora_inclusao,
+        {$selCodUltOcor} AS cod_ult_ocor_cte,
+        {$selDescUltOcor} AS desc_ult_ocor_cte,
+        {$selDataUltOcor} AS data_ult_ocor_cte,
+        {$selHoraUltOcor} AS hora_ult_ocor_cte
     FROM {$tabelaCarregamento} c
     {$joinCteDest}
     WHERE c.unidade = \$1
@@ -601,6 +626,12 @@ try {
             'login_inclusao' => $cteRow['login_inclusao'] ?? '',
             'data_inclusao'  => $cteRow['data_inclusao'] ?? null,
             'hora_inclusao'  => $cteRow['hora_inclusao'] ?? null,
+            'codUltOcor'     => (string)($cteRow['cod_ult_ocor_cte'] ?? ''),
+            'descUltOcor'    => (string)($cteRow['desc_ult_ocor_cte'] ?? ''),
+            'dataUltOcor'    => trim(
+                ((string)($cteRow['data_ult_ocor_cte'] ?? ''))
+                . (((string)($cteRow['hora_ult_ocor_cte'] ?? '')) !== '' ? (' ' . (string)($cteRow['hora_ult_ocor_cte'] ?? '')) : '')
+            ),
         ];
     }
 } catch (Exception $e) {}
