@@ -15,6 +15,7 @@ import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
 import { toast } from 'sonner';
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
+import { OCORRENCIA_SEM_CODIGO, OcorrenciasMultiSelect } from '../admin/OcorrenciasMultiSelect';
 import { useConfirmDialog, usePromptDialog, type ConfirmDialogOptions, type PromptDialogOptions } from '../ui/alert-dialog';
 import {
   Warehouse,
@@ -8041,6 +8042,7 @@ export function Disponiveis() {
     periodoPrevisaoFim: string;
     tempoArmazemDe: string;
     tempoArmazemAte: string;
+    ultOcorCodigos: string[];
   };
 
   const filtrosVazios: FiltrosDisponiveis = {
@@ -8051,16 +8053,70 @@ export function Disponiveis() {
     periodoPrevisaoFim: '',
     tempoArmazemDe: '',
     tempoArmazemAte: '',
+    ultOcorCodigos: [OCORRENCIA_SEM_CODIGO],
   };
 
   const [showFilters, setShowFilters] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
+  const [todasOcorrenciasCarregadas, setTodasOcorrenciasCarregadas] = useState<{ codigo: number }[] | null>(null);
 
   useEffect(() => {
-    if (showFilters) setTempFilters(filters);
-  }, [showFilters, filters]);
+    if (!showFilters || todasOcorrenciasCarregadas !== null) return;
+    let ativo = true;
+    (async () => {
+      try {
+        if (ENVIRONMENT.isFigmaMake) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          if (!ativo) return;
+          const mock = Array.from({ length: 12 }, (_, i) => ({ codigo: i + 1 }));
+          setTodasOcorrenciasCarregadas(mock);
+        } else {
+          const token = localStorage.getItem('auth_token');
+          const res = await apiFetch(`/sistema/api/users/get_domain_ocorrencias.php?domain=${encodeURIComponent(user?.domain ?? dominioUsuario ?? '')}`, {
+            method: 'GET',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+          if (!ativo) return;
+          if (res.success && Array.isArray(res.ocorrencias)) {
+            setTodasOcorrenciasCarregadas(res.ocorrencias.map((o: any) => ({ codigo: Number(o.codigo) })));
+          } else {
+            setTodasOcorrenciasCarregadas([]);
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao carregar ocorrências (filtros):', e);
+        if (ativo) setTodasOcorrenciasCarregadas([]);
+      }
+    })();
+    return () => { ativo = false; };
+  }, [showFilters, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
+
+  const inicializaOcorrenciasTodasMarcadas = (base: FiltrosDisponiveis): FiltrosDisponiveis => {
+    if (!todasOcorrenciasCarregadas) return base;
+    const todas = [
+      OCORRENCIA_SEM_CODIGO,
+      ...todasOcorrenciasCarregadas.map(o => String(o.codigo))
+    ];
+    return { ...base, ultOcorCodigos: todas };
+  };
+
+  useEffect(() => {
+    if (!showFilters) return;
+    setTempFilters(atual => {
+      const precisaInicializar = (!atual.ultOcorCodigos?.length) ||
+        (atual.ultOcorCodigos.length === 1 && atual.ultOcorCodigos[0] === OCORRENCIA_SEM_CODIGO && todasOcorrenciasCarregadas && todasOcorrenciasCarregadas.length > 0);
+      if (!precisaInicializar) return atual;
+      return inicializaOcorrenciasTodasMarcadas(atual);
+    });
+    setFilters(atual => {
+      const precisaInicializar = (!atual.ultOcorCodigos?.length) ||
+        (atual.ultOcorCodigos.length === 1 && atual.ultOcorCodigos[0] === OCORRENCIA_SEM_CODIGO && todasOcorrenciasCarregadas && todasOcorrenciasCarregadas.length > 0);
+      if (!precisaInicializar) return atual;
+      return inicializaOcorrenciasTodasMarcadas(atual);
+    });
+  }, [showFilters, todasOcorrenciasCarregadas]);
 
   const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
@@ -9571,10 +9627,24 @@ export function Disponiveis() {
         if (unidadeData?.ctes?.length) list.push(...unidadeData.ctes);
       }
     }
+    const sel = filters.ultOcorCodigos ?? [];
+    const temFiltro = sel.length > 0;
+    const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
+    const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
     return list.filter((cte) => {
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (filters.unidadeDestino?.length) {
         if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
+      }
+      if (temFiltro) {
+        const anyCte = cte as any;
+        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
+        const sem = !rawCod || rawCod === '0' || !(anyCte.descUltOcor ?? anyCte.descricao_ultima_ocorrencia ?? '');
+        if (sem) {
+          if (!permiteSem) return false;
+        } else {
+          if (!codigosSet.has(rawCod)) return false;
+        }
       }
       if (emissaoInicio || emissaoFim) {
         const d = parseDataBR(cte.emissao);
@@ -9593,7 +9663,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dados, dadosHub, filters.unidadeDestino, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
+  }, [dados, dadosHub, filters.unidadeDestino, filters.ultOcorCodigos, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
     const totals: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
@@ -9738,8 +9808,22 @@ export function Disponiveis() {
 
   const ctesEntregaFiltrados = React.useMemo(() => {
     const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
+    const sel = filters.ultOcorCodigos ?? [];
+    const temFiltro = sel.length > 0;
+    const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
+    const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
     return list.filter((cte) => {
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
+      if (temFiltro) {
+        const anyCte = cte as any;
+        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
+        const sem = !rawCod || rawCod === '0' || !(anyCte.descUltOcor ?? anyCte.descricao_ultima_ocorrencia ?? '');
+        if (sem) {
+          if (!permiteSem) return false;
+        } else {
+          if (!codigosSet.has(rawCod)) return false;
+        }
+      }
       if (previsaoInicio || previsaoFim) {
         if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
       }
@@ -9752,11 +9836,16 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
+  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
-    setFilters(filtrosVazios);
-    setTempFilters(filtrosVazios);
+    const base = { ...filtrosVazios };
+    const todas = todasOcorrenciasCarregadas
+      ? [OCORRENCIA_SEM_CODIGO, ...todasOcorrenciasCarregadas.map(o => String(o.codigo))]
+      : base.ultOcorCodigos;
+    const full = { ...base, ultOcorCodigos: todas };
+    setFilters(full);
+    setTempFilters(full);
   };
 
   const cancelFilters = () => {
@@ -10288,6 +10377,17 @@ export function Disponiveis() {
                           domain={user?.domain}
                           label="Unidade(s) Destino"
                           emptyHint={<><strong>Nenhuma unidade selecionada</strong> = sem filtro (todas as unidades)</>}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). Padrão: todas as ocorrências marcadas</p>
+                        <OcorrenciasMultiSelect
+                          value={tempFilters.ultOcorCodigos}
+                          onChange={(value) => setTempFilters({ ...tempFilters, ultOcorCodigos: value })}
+                          domain={user?.domain}
+                          label="Última Ocorrência"
+                          emptyHint={<><strong>Nenhuma ocorrência selecionada</strong> = sem filtro (todas as ocorrências)</>}
                         />
                       </div>
                     </div>
