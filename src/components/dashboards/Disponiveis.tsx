@@ -872,9 +872,8 @@ function GrupoDestinoCard({
         <span className="flex items-center justify-center text-slate-600 dark:text-slate-400 font-medium">{grupo.totalVol.toLocaleString('pt-BR')}</span>
         <span className="flex items-center justify-center px-1">
           {(() => {
-            const label = grupo.totalPeso >= 1000
-              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
-              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
+            const pesoKg = grupo.totalPeso;
+            const label = pesoKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + 'kg';
             return (
               <div className="relative w-full h-3.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div
@@ -1623,9 +1622,8 @@ function GrupoSetorCard({
         <span className="flex items-center justify-center font-semibold text-slate-800 dark:text-slate-200">{grupo.totalVol.toLocaleString('pt-BR')}</span>
         <span className="flex items-center justify-center px-2">
           {(() => {
-            const label = grupo.totalPeso >= 1000
-              ? `${(grupo.totalPeso / 1000).toFixed(1)}t`
-              : `${grupo.totalPeso.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
+            const pesoKg = grupo.totalPeso;
+            const label = pesoKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + 'kg';
             return (
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctPeso}%`, background: 'linear-gradient(90deg, #065f46, #059669, #10b981)' }} />
@@ -2217,7 +2215,11 @@ function CardCarregamento({
         case 'dest': return isEntregaCteDetalhe ? String(c?.setor ?? '') : String(c?.sigla_dest ?? '');
         case 'pagador': return isEntregaCteDetalhe ? String(c?.destinatario ?? '') : String(c?.nome_pag ?? '');
         case 'frete': return Number(c?.vlr_frete ?? 0) || 0;
-        case 'peso': return Number(c?.peso ?? 0) || 0;
+        case 'peso': {
+          const n = Number(c?.peso ?? 0);
+          if (!Number.isFinite(n) || n <= 0) return 0;
+          return n < 1 ? n * 1000 : n;
+        }
         case 'cub': return Number(c?.cubagem ?? 0) || 0;
         default: return '';
       }
@@ -2388,7 +2390,7 @@ function CardCarregamento({
             return acc;
           }, { cif: 0, fob: 0 });
           setTotaisCard({
-            peso: Number(totais?.peso ?? 0) || 0,
+            peso: (() => { const n = Number(totais?.peso ?? 0) || 0; return n * 1000; })(),
             cubagem: Number(totais?.cubagem ?? 0) || 0,
             vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
             cif: frete.cif,
@@ -2462,7 +2464,7 @@ function CardCarregamento({
       `"${c.sigla_dest || ''}"`,
       `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
       c.vlr_frete.toFixed(2).replace('.', ','),
-      c.peso.toFixed(2).replace('.', ','),
+      (() => { const n = Number(c.peso ?? 0); const v = n * 1000; return Number.isFinite(v) ? v.toFixed(2).replace('.', ',') : '0,00'; })(),
       c.cubagem.toFixed(3).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
@@ -2482,12 +2484,23 @@ function CardCarregamento({
   const qtdeCtesHeader = Number(carregamento.total_ctes ?? 0) || 0;
   const qtdeCtesCarreg = Math.max(qtdeCtesArray, qtdeCtesHeader);
 
-  const pesoDoCarregamento = Number(carregamento.total_peso ?? 0) || 0;
+  const normPesoKgCte = (v: any): number => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return n < 1 ? n * 1000 : n;
+  };
+  const normPesoKgTotal = (v: any): number => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return n < 30 ? n * 1000 : n;
+  };
+
+  const pesoDoCarregamento = normPesoKgTotal(carregamento.total_peso ?? 0);
   const cubagemDoCarregamento = Number(carregamento.total_cubagem ?? 0) || 0;
   const freteDoCarregamento = Number(carregamento.total_frete ?? 0) || 0;
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-  const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parsePeso((c as any)?.peso ?? ''), 0);
+  const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + normPesoKgCte((c as any)?.peso ?? ''), 0);
   const totalCubagemLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
   const freteTotalsLocal = (qtdeCtesCarreg === 0) ? { cif: 0, fob: 0 } : (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
     const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
@@ -2667,7 +2680,7 @@ function CardCarregamento({
           return acc;
         }, { cif: 0, fob: 0 });
         const next = {
-          peso: Number(totais?.peso ?? 0) || 0,
+          peso: (Number(totais?.peso ?? 0) || 0) * 1000,
           cubagem: Number(totais?.cubagem ?? 0) || 0,
           vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
           cif: frete.cif,
@@ -3196,10 +3209,10 @@ function CardCarregamento({
               ) : null}
             </div>
             <BarraCapacidade
-              valor={totalPeso / 1000}
-              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? capacidadeTonExib!}
+              valor={(Number(totalPeso) || 0) * 1000}
+              capacidade={((isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? capacidadeTonExib!) * 1000}
               corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
-              label="Peso (ton)"
+              label="Peso (Kg)"
             />
             <BarraCapacidade
               valor={totalCubagem}
@@ -3236,7 +3249,7 @@ function CardCarregamento({
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
-            <span><Weight className="w-3 h-3 inline mr-1" />{(totalPeso / 1000).toFixed(3)}t</span>
+            <span><Weight className="w-3 h-3 inline mr-1" />{((Number(totalPeso) || 0) * 1000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
             <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
           </div>
         )}
@@ -3600,7 +3613,13 @@ function CardCarregamento({
                           {(isEntregaCteDetalhe ? (cte as any).destinatario : cte.nome_pag) || '-'}
                         </span>
                         <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{
+                          (() => {
+                            const n = Number(cte.peso ?? 0);
+                            const v = n * 1000;
+                            return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                          })()
+                        }</span>
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
                       </div>
                       );
@@ -3621,7 +3640,13 @@ function CardCarregamento({
                 <span />
                 <span />
                 <span className="text-right font-mono text-indigo-700 dark:text-indigo-300">{cteDetalheTotais.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                <span className="text-right font-mono">{cteDetalheTotais.peso.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-right font-mono">{
+                  (() => {
+                    const n = Number(cteDetalheTotais.peso ?? 0);
+                    const v = n * 1000;
+                    return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
+                  })()
+                }</span>
                 <span className="text-right font-mono">{cteDetalheTotais.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
               </div>
             )}
