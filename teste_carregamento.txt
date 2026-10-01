@@ -1,0 +1,266 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: ESTEIO                                                                               01/10/2026 20:13
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO164210-3  25/09 30/10     918982                         2             BANDEIRANTE QUIMICA  BOESSIO TRANSPORTES  BOESSIO TRANSPORTES  ESTEIO         FEC     120.000,00    9.800,00   6.000    0,0 80
+                             918983
+TOTAIS:                                  1 CTRCS            2                                                                                                   120.000,00    9.800,00   6.000    0,0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: FICRON                                                                               01/10/2026 20:13
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO167774-8  01/10 13/10      23926                        13             HORTIPLAST EMBALAGEN HORTIPLAST EMBALAGEN LANGER SOLUCOES INDU CAMPO VERDE    RON       5.816,75      250,00     165    0,5 80
+TOTAIS:                                  1 CTRCS           13                                                                                                     5.816,75      250,00     165    0,5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: GYN9115                                                                              01/10/2026 20:13
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+VIX035080-0  25/09 08/10     993318                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ROBERTO SOUSA        ALVORADA DO NO GI5       1.780,00      124,98      35    0,2 83
+VIX035264-1  28/09 09/10     994958                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FLAVIO BARBOSA VIEIR ARAGUAPAZ      GI5       2.559,99      131,18      30    0,2 83
+SAO167540-1  30/09 08/10    3062414                        18             LORENZETTI SA INDS B LORENZETTI SA INDS B COM. 007 MAT CONST A BELA VISTA DE  GI5       6.165,40      222,65      50    0,5 80
+SAO166951-6  30/09 08/10     376714                        11             CAPLAB INDUSTRIA E C CAPLAB INDUSTRIA E C LATICINIOS BELA VIST BELA VISTA DE  GI5       5.930,16      632,52     146    0,4 80
+SAO167368-8  30/09 08/10     363566                         3             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU LATICINIOS BELA VIST BELA VISTA DE  GI5       7.927,10      280,84      89    0,0 80
+VIX035249-7  28/09 08/10     994232                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  RENATO JALES DE CARV GOIANESIA      GI5       2.533,96      130,98      32    0,2 83
+VIX035282-9  28/09 08/10     995308                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FERNANDA SOUZA MORAI GOIANESIA      GI5       2.419,98      130,07      30    0,2 83
+VIX035254-3  28/09 08/10     994351                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  RAFAEL MENDONAA      GOIANESIA      GI5       6.873,90      305,23      81    0,7 83
+VIX035241-1  28/09 09/10     993713                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  BHEATRIZ EDUARDA     IPORA          GI5       2.271,74      128,89      27    0,2 83
+SAO167013-1  30/09 13/10     398145                         6             MOAS IND E COM IMP E MOAS IND E COM IMP E RONALDO MARCOS NUNES IPORA          GI5       6.651,05      144,45      40    0,3 80
+JDF034261-1  29/09 13/10      30593                        29             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL ETICA CONFECCOES LTD ITABERAI       GI5      50.623,01    2.917,58     392    0,0 83
+                              30727
+SAO167539-7  30/09 13/10    3062412                         9             LORENZETTI SA INDS B LORENZETTI SA INDS B CM CERRADO MAT DE CO ITAPURANGA     GI5       4.030,96      181,75      34    0,4 80
+SAO167554-1  30/09 13/10    3062453                        41             LORENZETTI SA INDS B LORENZETTI SA INDS B ENCASA UTILIDADES E  ITAPURANGA     GI5      26.443,01      622,87     188    1,7 80
+                            3062455
+SAO167542-7  30/09 13/10    3062418                         6             LORENZETTI SA INDS B LORENZETTI SA INDS B CONSTRUITA FERRAGIST ITAPURANGA     GI5       2.440,13      143,15      20    0,2 80
+VIX035270-5  28/09 13/10     995025                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FABIO ALVES DE OLIVE NEROPOLIS      GI5       5.936,45      297,77      75    0,6 83
+SAO167522-2  30/09 13/10    3063069                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B MATERIAIS PARA CONST NOVA VENEZA    GI5         219,80       75,06       1    0,0 80
+SAO167370-0  30/09 13/10     363587                        33             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU LACTOSUL INDUSTRIA D PIRANHAS       GI5      18.122,24    1.269,86   1.169    1,6 80
+                             363588
+VIX035081-8  25/09 08/10     993331                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  SIDIANE CARRARO      POSSE          GI5       2.249,61      128,72      32    0,2 83
+VIX035292-6  28/09 09/10     174810                         5             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI FRANCIMAR LIMA DE AN POSSE          GI5       3.029,05      295,32      53    0,6 83
+VIX035246-2  28/09 09/10     994071                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  FERNANDA ALMEIDA     SAO MIGUEL DO  GI5       2.271,74      128,89      27    0,2 83
+VIX035275-6  28/09 13/10     995137                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  VANESSA SANTOS VERA  SILVANIA       GI5       1.911,00      126,02      35    0,2 83
+SAO167153-7  30/09 08/10      51961                         1             WILLIAM CICERO SILVA WILLIAM CICERO SILVA MARCELA BARBOSA REGO TRINDADE       GI5       1.734,65      445,75       3    0,7 80
+SAO167202-9  30/09 08/10    1174607                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  67.557.327 DIVINO ET TRINDADE       GI5         755,38      142,12      12    0,0 80
+SAO167080-8  30/09 13/10        333                         1             ROTO STOKE COMERCIO  GOFRETES INTERMEDIAC VALDINELIA NASCIMENT ITAPACI        GIT         201,19      148,16       8    0,3 80
+SAO167531-1  30/09 13/10    3062394                        14             LORENZETTI SA INDS B LORENZETTI SA INDS B ANA PAULA CONSTRUCOE MINACU         GIT       4.183,69      189,54      36    0,4 80
+                            3062396
+VIX035252-7  28/09 09/10     994341                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  AIRES RUY FIDELIS RA URUACU         GIT       2.459,99      130,39      30    0,2 83
+VIX035197-1  28/09 05/10     723225                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  JAIRO PEREIRA DA SIL APARECIDA DE G GYN       4.340,00      256,51      43    0,2 83
+SAO167514-1  30/09 06/10    3063052                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B GONCALVES FERRAGISTA APARECIDA DE G GYN         209,72       68,20       1    0,0 80
+JDF034259-9  29/09 06/10      30434                        10             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL SALLO CONFECCAO E CO APARECIDA DE G GYN      12.978,38      584,71     138    0,0 83
+                              30674
+SAO167517-6  30/09 06/10    3063059                        13             LORENZETTI SA INDS B LORENZETTI SA INDS B GREGO COMERCIO DE FE APARECIDA DE G GYN       7.250,60      120,56      19    0,2 80
+JDF034258-1  29/09 06/10      30553                        14             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL MPL INDUSTRIA E COME APARECIDA DE G GYN      16.373,87      722,24     133    0,0 83
+                              30554,      30864
+SAO165655-4  28/09 02/10    3060583                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B A M COMERCIO DE FERR APARECIDA DE G GYN         603,94       70,16       1    0,0 80
+SAO167504-4  30/09 06/10    3063032                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B FL COMERCIO REPRESEN APARECIDA DE G GYN         260,60       68,46       3    0,0 80
+SAO167564-8  30/09 06/10    3062478                        25             LORENZETTI SA INDS B LORENZETTI SA INDS B M P M FERRAGENS LTDA APARECIDA DE G GYN       9.715,29      265,28     103    0,8 80
+                            3062480
+SAO167506-1  30/09 06/10    3063036                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B SANTOS E CARNEIRO LT APARECIDA DE G GYN         499,96       78,48       5    0,1 80
+SAO167657-1  01/10 07/10     196263                         7             INCOPARTS INDUSTRIA  DIPECARR DISTRIBUIDO DIPECARR DISTRIBUIDO APARECIDA DE G GYN       5.545,33      332,72     102    0,1 80
+SAO167369-6  30/09 06/10     363574                        38             DIVERSEY BRASIL INDU DIVERSEY BRASIL INDU NEOCLEAN COM DE MAT  GOIANIA        GYN       3.936,57      331,49     205    0,5 80
+JDF034260-2  29/09 06/10      30501                         1             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL RODOLFO ROCHA DE SOU GOIANIA        GYN       7.282,62      344,90      18    0,0 83
+CWB012919-4  26/09 05/10    7475606                         1             LOJA ELECTROLUX COM  LOJA ELECTROLUX COM  MATHEUS SANTOS DE OL GOIANIA        GYN       2.088,35      197,11      39    0,5 83
+VIX035248-9  28/09 05/10     994199                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  BRASILL INFORMATICA  GOIANIA        GYN       4.256,82      155,53      64    0,4 83
+VIX035077-0  25/09 02/10       2780                        12             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD ARLAN MENDES FERREIR GOIANIA        GYN      17.455,20      429,38     163    1,1 83
+SAO167323-8  30/09 06/10    2759069                         2             BRIDGESTONE DO BRASI BRIDGESTONE DO BRASI PACAEMBU AUTOPECAS L GOIANIA        GYN       4.132,35      130,41      56    0,3 80
+SAO167316-5  30/09 06/10    2759073                        19             BRIDGESTONE DO BRASI BRIDGESTONE DO BRASI GC GUSCAR COMERCIO D GOIANIA        GYN      45.437,01    1.182,09     520    3,0 80
+SAO165663-5  28/09 02/10    3060603                        16             LORENZETTI SA INDS B LORENZETTI SA INDS B BLUME LTDA           GOIANIA        GYN       5.646,14      162,25      30    0,3 80
+                            3060605
+SAO167502-8  30/09 06/10     198889                         1             LORENZETTI SA INDS B LORENZETTI SA INDS B HIDROREPAROS COM DE  GOIANIA        GYN       1.168,84       81,80      11    0,0 80
+VIX035206-3  28/09 05/10     723597                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  LUCAS PRATES         GOIANIA        GYN       3.381,43      193,19      40    0,3 83
+SAO167710-1  01/10 07/10     521945              QBGIC      1             GAZIN INDUSTRIA E CO PASSARO TRANSPORTES  ROSANGELA CORREA DO  GOIANIA        GYN       1.209,99      165,03      13    0,1 83
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   4
+ssw0194                                                                                     PLACA: GYN9115                                                                              01/10/2026 20:13
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO166509-0  29/09 05/10     142257                         2             L.F COMERCIO DE ARTI CENTRAL DO FRETE INT ODARA CASTRO         GOIANIA        GYN       3.590,90      187,13      58    0,3 80
+SAO167527-3  30/09 06/10    3062386                         8             LORENZETTI SA INDS B LORENZETTI SA INDS B JD DISTRIBUICAO LTDA GOIANIA        GYN       3.599,19      129,66      23    0,3 80
+SAO166034-9  29/09 05/10      23693                       128             AEAMPS TECHNOLOGIES  MS GOIAS SELANTES LT MS GOIAS SELANTES LT GOIANIA        GYN       9.354,24      729,44     743    0,0 80
+SAO166792-1  30/09 06/10     715662                         9             GATES DO BRASIL IND  SUECA ROLAMENTOS E S SUECA ROLAMENTOS E S GOIANIA        GYN     144.481,92    3.142,40   1.839    4,3 80
+                             715684
+SAO165695-3  28/09 02/10    3060703                        15             LORENZETTI SA INDS B LORENZETTI SA INDS B SERGIO ANTONIO BROMB GOIANIA        GYN       5.065,25      159,38      26    0,3 80
+                            3060705
+SAO167573-7  30/09 06/10    3062501                        23             LORENZETTI SA INDS B LORENZETTI SA INDS B COMERCIAL DE ALIMENT GOIANIA        GYN      11.094,06      243,67      63    0,7 80
+VIX035210-1  28/09 05/10     723593                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MARCIA DIVINA CAVALC GOIANIA        GYN       3.381,43      193,19      40    0,3 83
+JOI002377-9  25/09 02/10      29670                         1             GALZER IMPORTACAO E  GALZER IMPORTACAO E  ELCIONE CAETANO DE F GOIANIA        GYN       8.037,70      240,54     143    0,2 83
+SAO167558-3  30/09 06/10    3062465                         2             LORENZETTI SA INDS B LORENZETTI SA INDS B IRMAOS SOARES S/A    GOIANIA        GYN       2.589,48       93,29       8    0,1 80
+CWB012865-1  25/09 05/10     246947                         3             DIST DE PECAS ELETRI DIST DE PECAS ELETRI CASTELO COM DE BATER GOIANIA        GYN      58.505,93    2.900,00   2.920    1,8 83
+                             246948
+SAS028250-2  30/09 31/12          1              TIT        2             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH GOIANIA        GYN          10,00        0,01      15    0,0 80
+VIX035247-1  28/09 05/10     994198                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  BRASILL INFORMATICA  GOIANIA        GYN       4.256,82      155,53      64    0,4 83
+JDF034268-8  29/09 06/10      30831                         2             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL MAROTO IND E COM     GOIANIA        GYN       2.906,00      167,65      17    0,0 83
+JDF034265-3  29/09 06/10      30672                         7             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL PEDRO B ALVES CIA LT GOIANIA        GYN       9.046,35      416,33      83    0,0 83
+VIX035076-1  25/09 02/10       2767                       165             PEAK IMPORTADORA LTD PEAK IMPORTADORA LTD M. G. COMERCIO ATAC. GOIANIA        GYN      40.478,52    5.510,94   3.775   15,7 83
+JDF034267-0  29/09 06/10      30413                       108             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL FASHION MAN CONFECCA GOIANIA        GYN     220.059,75    9.108,46   1.682    0,0 83
+SAO165678-3  28/09 02/10    3060653                         3             LORENZETTI SA INDS B LORENZETTI SA INDS B COMERCIAL FB FERRAGI GOIANIA        GYN       1.481,04       92,02      11    0,1 80
+JDF034262-9  29/09 06/10      30735                        20             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL LACO CALF JEANS LTDA GOIANIA        GYN      18.524,71      809,34     171    0,0 83
+SAO167078-6  30/09 06/10    1259855                         1             INFINITY CABOS ESPEC INFINITY CABOS ESPEC JC IMPORTACAO E DIST GOIANIA        GYN       4.999,00      372,69     170    0,8 80
+JDF034266-1  29/09 13/10      30632                        27             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL M. C. DA S. BRAUDES  JARAGUA        GYN      24.918,59    1.226,93     228    0,0 83
+JDF034263-7  29/09 13/10      30669                         6             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL IND COM CONFS IRMAOS JARAGUA        GYN       9.208,01      478,13      67    0,0 83
+VIX035262-4  28/09 07/10     994870                         4             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  MARILIA MENDONEA GUI SENADOR CANEDO GYN       4.478,82      214,14      54    0,4 83
+SAO167782-9  01/10 09/10     179097                         1             NORDSON DO BRASIL IN ACTIVE IND DE COSMET ACTIVE IND DE COSMET SENADOR CANEDO GYN      41.918,25      215,69       3    0,0 80
+SAO167913-9  01/10 09/10        845                        20             ECOLAB QUIMICA LTDA  ECOLAB QUIMICA LTDA  JBS S.A - UNIDADE SE SENADOR CANEDO GYN      12.630,00      507,65     510    0,7 80
+VIX035098-2  25/09 06/10      80528                         6             REFRICRIL DISTR DE A REFRICRIL DISTR DE A HELP AR PRESTADORA D SENADOR CANEDO GYN       7.491,88      225,52      85    0,2 83
+VIX035239-0  28/09 05/10    2875638                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  ROGERIO TOLENTINO    ANAPOLIS       PLS       1.975,46      126,53      37    0,2 83
+SAO167541-9  30/09 06/10    3062416                        18             LORENZETTI SA INDS B LORENZETTI SA INDS B CONEXAO ELETRICO E H ANAPOLIS       PLS       2.367,73      112,12      14    0,1 80
+SAO167563-0  30/09 06/10    3062476                         8             LORENZETTI SA INDS B LORENZETTI SA INDS B LPS VAREJO E ATACADO ANAPOLIS       PLS       4.477,39      189,31      40    0,4 80
+JDF034264-5  29/09 06/10      30737                         7             COMPANHIA INDUSTRIAL COMPANHIA INDUSTRIAL ZAPPIA CONF IMP E EX ANAPOLIS       PLS       6.479,80      351,27      60    0,0 83
+TOTAIS:                                 76 CTRCS          983                                                                                                   992.906,41   43.714,20  17.324   45,8
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                             78 CTRCS          998                                                                                                 1.118.723,16   53.764,20  23.489   46,3
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--

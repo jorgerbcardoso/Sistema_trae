@@ -2487,12 +2487,12 @@ function CardCarregamento({
   const normPesoKgCte = (v: any): number => {
     const n = parsePeso(String(v ?? ''));
     if (!Number.isFinite(n) || n <= 0) return 0;
-    return n < 100 ? n * 1000 : n;
+    return n; // tratar como kg sem escalonamento automático
   };
   const normPesoKgTotal = (v: any): number => {
     const n = parsePeso(String(v ?? ''));
     if (!Number.isFinite(n) || n <= 0) return 0;
-    return n < 1000 ? n * 1000 : n;
+    return n; // tratar como kg sem escalonamento automático
   };
 
   const pesoDoCarregamento = normPesoKgTotal(carregamento.total_peso ?? 0);
