@@ -145,3 +145,83 @@ Objetivo: listas grandes com navegação rápida, ordenação clara e consistên
 3) TOTALIZAÇÃO:
 - Exibir totalizadores do conjunto filtrado/buscado (não apenas da página atual).
 - Exemplo: somas de mercadoria/frete, volumes, peso, cubagem, e quantidade de registros.
+
+
+COMPONENTE REUTILIZÁVEL: CteDetalhesDialog (Detalhes do CT-e)
+
+Objetivo: Exibir um dialog com todas as informações relevantes de um CT-e, incluindo dados de identificação, datas, envolvidos, valores, medidas e um gráfico donut da composição do custo. Projetado para ser reutilizado em QUALQUER tela do sistema que liste CT-es.
+
+1) LOCALIZAÇÃO:
+   - Arquivo: `src/components/dashboards/CteDetalhesDialog.tsx`
+
+2) COMO USAR (padrão DialogTrigger):
+   ```tsx
+   import { CteDetalhesDialog } from './CteDetalhesDialog';
+   import { Info } from 'lucide-react';
+
+   // Dentro de uma célula de tabela ou qualquer lugar:
+   <CteDetalhesDialog cte={meuCte}>
+     <button
+       type="button"
+       className="p-0.5 rounded hover:bg-indigo-50 text-indigo-500 transition-colors"
+       onClick={(e) => { e.stopPropagation(); }}
+       title="Detalhes do CT-e"
+     >
+       <Info className="w-3.5 h-3.5" />
+     </button>
+   </CteDetalhesDialog>
+   ```
+   - O `children` é o trigger (qualquer elemento clicável).
+   - `e.stopPropagation()` é recomendado para evitar acionar o clique da linha (modo apontamento).
+
+3) PROPS:
+   - `cte: CteDetalhesData` — (obrigatório) objeto com dados do CT-e. Interface aberta com index signature `[k:string]:any`, então campos extras são aceitos.
+   - `children: React.ReactNode` — (obrigatório) elemento trigger que abre o dialog.
+   - `open?: boolean` — (opcional) controlar estado aberto externamente.
+   - `onOpenChange?: (open: boolean) => void` — (opcional) callback de mudança de estado.
+
+4) HELPERS EXPORTADOS (para reuso em cálculos):
+   ```ts
+   import { calcularParcelasCusto, calcularCustoTotal } from './CteDetalhesDialog';
+   ```
+   - `calcularCustoTotal(cte): number` — Soma as 11 parcelas de custo. Retorna number em reais.
+   - `calcularParcelasCusto(cte): CteCustoParcela[]` — Retorna array de `{ key, label, valor }` apenas com parcelas > 0. Útil para listar ou renderizar donut manualmente.
+
+5) DADOS ESPERADOS NO OBJETO `cte` (tudo opcional — o dialog só mostra o que vier):
+   - **Identificação**: ctrc, serCte, nroCte, seqCte, nfiscal, pedido, manifesto, setor, setorNome, unidadeDest, nomeDest, placaColeta
+   - **Datas**: emissao, chegadaUnid, unidAtual, prevEnt, prevChegada, agendamento
+   - **Envolvidos**: remetente, pagador, destinatario, cnpjDest, endereco, bairro, cidade, uf, cep, unidadeOrigem
+   - **Valores e Medidas**: vlrNf, vlrMerc, frete, peso, pesoCalc, pesoReal, cubagem, qtdeVol
+   - **Ocorrência**: codUltOcor, descUltOcor, dataUltOcor
+   - **Custos (11 parcelas)**: custoSeguro, custoIcms, custoPisCofins, custoGris, custoPedagio, custoExpedicao, custoTransbordo, custoVendedor, custoRecepcao, custoDespDiv, custoTransferenciaReal
+
+6) BACKENDS QUE JÁ RETORNAM OS CAMPOS NOVOS (para referência):
+   - Transferência: `src/api/dashboards/disponiveis/get_disponiveis_transferencia.php` (campos: pesoCalc, placaColeta + 11 custos)
+   - Entrega: `src/api/dashboards/disponiveis/get_disponiveis_entrega.php` (mesmos 13 campos)
+   - Carregamentos: `src/api/dashboards/disponiveis/get_carregamentos.php` (campos dentro de cada cte interno de cada carregamento)
+
+7) IMPORTANTE: BACKENDS QUE QUISEREM EXIBIR CUSTOS EM OUTRAS TELAS:
+   Os relatórios SSW (019, 081, etc.) NÃO trazem peso_calc nem os custos. Esses dados SÓ existem na tabela local `[dominio]_cte`. O backend DEVE:
+   a) Fazer LEFT JOIN com `[dominio]_cte` pelo par `(ser_cte, nro_cte)` extraído do CTRC.
+   b) DETECTAR se as colunas existem no domínio (para não quebrar em bases antigas) usando o padrão:
+      ```php
+      function cteCol($col) {
+          static $cols = null;
+          if ($cols === null) {
+              global $config;
+              $dom = $config['db_schema'];
+              $r = sql("SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3", [$dom, $dom.'_cte', $col]);
+              $cols = array_column($r, 'column_name');
+          }
+          return in_array($col, $cols) ? "c.$col" : "'' as $col";
+      }
+      ```
+   c) No SELECT usar: `COALESCE(`.cteCol('peso_calc').`, '') as pesoCalc` (e similar para cada custo).
+   d) No loop de merge, só incluir o campo no JSON se valor não vazio.
+
+8) GRÁFICO DONUT — REGRAS DE IMPLEMENTAÇÃO (já aplicadas no componente):
+   - Pie sempre com `stroke="none"` (obrigatório — remove borda branca entre fatias).
+   - Tooltip com `useTooltipStyle()` (compatível com tema escuro).
+   - `paddingAngle={2}`, `innerRadius={48}`, `outerRadius={78}` — valores padrão para visual equilibrado.
+   - Lista lateral com cores + pct + valor substitui a Legend padrão do Recharts (evita quebras de layout).
+

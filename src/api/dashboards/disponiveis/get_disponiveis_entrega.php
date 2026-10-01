@@ -287,6 +287,40 @@ $tblCte = "{$domain}_cte";
 $tblOcor = "{$domain}_ocorrencia";
 $infoPorCte = [];
 
+$cteColsEnt = null;
+$cteColEnt = static function(string $col) use ($g_sql, $tblCte, &$cteColsEnt): bool {
+    if ($cteColsEnt === null) {
+        $cteColsEnt = [];
+        try {
+            $resCols = @pg_query_params($g_sql,
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND lower(table_name) = lower($1)",
+                [$tblCte]
+            );
+            while ($resCols && ($r = pg_fetch_assoc($resCols))) {
+                $name = strtolower(trim((string)($r['column_name'] ?? '')));
+                if ($name !== '') $cteColsEnt[$name] = true;
+            }
+        } catch (Exception $e) {
+            $cteColsEnt = [];
+        }
+    }
+    return isset($cteColsEnt[strtolower($col)]);
+};
+
+$selPesoCalcEnt = $cteColEnt('peso_calc') ? "COALESCE(c.peso_calc::text, '')" : "''";
+$selPlacaColetaEnt = $cteColEnt('placa_coleta') ? "COALESCE(c.placa_coleta, '')" : "''";
+$selCustoSeguroEnt = $cteColEnt('custo_seguro') ? "COALESCE(c.custo_seguro::text, '')" : "''";
+$selCustoIcmsEnt = $cteColEnt('custo_icms') ? "COALESCE(c.custo_icms::text, '')" : "''";
+$selCustoPisCofinsEnt = $cteColEnt('custo_pis_cofins') ? "COALESCE(c.custo_pis_cofins::text, '')" : "''";
+$selCustoGrisEnt = $cteColEnt('custo_gris') ? "COALESCE(c.custo_gris::text, '')" : "''";
+$selCustoPedagioEnt = $cteColEnt('custo_pedagio') ? "COALESCE(c.custo_pedagio::text, '')" : "''";
+$selCustoExpedicaoEnt = $cteColEnt('custo_expedicao') ? "COALESCE(c.custo_expedicao::text, '')" : "''";
+$selCustoTransbordoEnt = $cteColEnt('custo_transbordo') ? "COALESCE(c.custo_transbordo::text, '')" : "''";
+$selCustoVendedorEnt = $cteColEnt('custo_vendedor') ? "COALESCE(c.custo_vendedor::text, '')" : "''";
+$selCustoRecepcaoEnt = $cteColEnt('custo_recepcao') ? "COALESCE(c.custo_recepcao::text, '')" : "''";
+$selCustoDespDivEnt = $cteColEnt('custo_desp_div') ? "COALESCE(c.custo_desp_div::text, '')" : "''";
+$selCustoTransfRealEnt = $cteColEnt('custo_transferencia_real') ? "COALESCE(c.custo_transferencia_real::text, '')" : "''";
+
 if (!empty($ctes)) {
     $ctrcs = [];
     $seen = [];
@@ -321,7 +355,20 @@ if (!empty($ctes)) {
                 COALESCE(c.ult_ocor::text, '') AS cod_ult_ocor,
                 COALESCE(o.descricao, '') AS desc_ult_ocor,
                 COALESCE(TO_CHAR(c.data_ult_ocor::date, 'DD/MM/YYYY'), '') AS data_ult_ocor,
-                COALESCE(TO_CHAR(NULLIF(c.hora_ult_ocor::text, '')::time, 'HH24:MI'), '') AS hora_ult_ocor
+                COALESCE(TO_CHAR(NULLIF(c.hora_ult_ocor::text, '')::time, 'HH24:MI'), '') AS hora_ult_ocor,
+                {$selPesoCalcEnt} AS peso_calc,
+                {$selPlacaColetaEnt} AS placa_coleta,
+                {$selCustoSeguroEnt} AS custo_seguro,
+                {$selCustoIcmsEnt} AS custo_icms,
+                {$selCustoPisCofinsEnt} AS custo_pis_cofins,
+                {$selCustoGrisEnt} AS custo_gris,
+                {$selCustoPedagioEnt} AS custo_pedagio,
+                {$selCustoExpedicaoEnt} AS custo_expedicao,
+                {$selCustoTransbordoEnt} AS custo_transbordo,
+                {$selCustoVendedorEnt} AS custo_vendedor,
+                {$selCustoRecepcaoEnt} AS custo_recepcao,
+                {$selCustoDespDivEnt} AS custo_desp_div,
+                {$selCustoTransfRealEnt} AS custo_transferencia_real
             FROM {$tblCte} c
             LEFT JOIN {$tblOcor} o
               ON o.codigo = c.ult_ocor
@@ -340,7 +387,20 @@ if (!empty($ctes)) {
                     c.nro_cte,
                     TO_CHAR(c.data_emissao::date, 'DD/MM/YYYY') AS emissao,
                     TO_CHAR(c.data_chegada_unid::date, 'DD/MM/YYYY') AS chegada_unid,
-                    COALESCE(c.unid_atual, '') AS unid_atual
+                    COALESCE(c.unid_atual, '') AS unid_atual,
+                    {$selPesoCalcEnt} AS peso_calc,
+                    {$selPlacaColetaEnt} AS placa_coleta,
+                    {$selCustoSeguroEnt} AS custo_seguro,
+                    {$selCustoIcmsEnt} AS custo_icms,
+                    {$selCustoPisCofinsEnt} AS custo_pis_cofins,
+                    {$selCustoGrisEnt} AS custo_gris,
+                    {$selCustoPedagioEnt} AS custo_pedagio,
+                    {$selCustoExpedicaoEnt} AS custo_expedicao,
+                    {$selCustoTransbordoEnt} AS custo_transbordo,
+                    {$selCustoVendedorEnt} AS custo_vendedor,
+                    {$selCustoRecepcaoEnt} AS custo_recepcao,
+                    {$selCustoDespDivEnt} AS custo_desp_div,
+                    {$selCustoTransfRealEnt} AS custo_transferencia_real
                 FROM {$tblCte} c
                 JOIN req r
                   ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
@@ -363,6 +423,19 @@ if (!empty($ctes)) {
                         ((string)($row['data_ult_ocor'] ?? ''))
                         . (((string)($row['hora_ult_ocor'] ?? '')) !== '' ? (' ' . (string)($row['hora_ult_ocor'] ?? '')) : '')
                     ),
+                    'pesoCalc' => (string)($row['peso_calc'] ?? ''),
+                    'placaColeta' => (string)($row['placa_coleta'] ?? ''),
+                    'custoSeguro' => (string)($row['custo_seguro'] ?? ''),
+                    'custoIcms' => (string)($row['custo_icms'] ?? ''),
+                    'custoPisCofins' => (string)($row['custo_pis_cofins'] ?? ''),
+                    'custoGris' => (string)($row['custo_gris'] ?? ''),
+                    'custoPedagio' => (string)($row['custo_pedagio'] ?? ''),
+                    'custoExpedicao' => (string)($row['custo_expedicao'] ?? ''),
+                    'custoTransbordo' => (string)($row['custo_transbordo'] ?? ''),
+                    'custoVendedor' => (string)($row['custo_vendedor'] ?? ''),
+                    'custoRecepcao' => (string)($row['custo_recepcao'] ?? ''),
+                    'custoDespDiv' => (string)($row['custo_desp_div'] ?? ''),
+                    'custoTransferenciaReal' => (string)($row['custo_transferencia_real'] ?? ''),
                 ];
             }
         }
@@ -380,6 +453,11 @@ if (!empty($ctes)) {
                 if (($infoPorCte[$k]['dataUltOcor'] ?? '') !== '') {
                     $c['dataUltOcor'] = (string)($infoPorCte[$k]['dataUltOcor']);
                 }
+            }
+            if (($infoPorCte[$k]['pesoCalc'] ?? '') !== '') $c['pesoCalc'] = $infoPorCte[$k]['pesoCalc'];
+            if (($infoPorCte[$k]['placaColeta'] ?? '') !== '') $c['placaColeta'] = $infoPorCte[$k]['placaColeta'];
+            foreach (['custoSeguro','custoIcms','custoPisCofins','custoGris','custoPedagio','custoExpedicao','custoTransbordo','custoVendedor','custoRecepcao','custoDespDiv','custoTransferenciaReal'] as $ck) {
+                if (($infoPorCte[$k][$ck] ?? '') !== '') $c[$ck] = $infoPorCte[$k][$ck];
             }
         }
     }

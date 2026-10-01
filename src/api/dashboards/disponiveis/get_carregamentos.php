@@ -528,6 +528,19 @@ $selDataUltOcor = ($cteCol('data_ult_ocor') || $cteCol('ult_ocor'))
 $selHoraUltOcor = $cteCol('hora_ult_ocor')
     ? "COALESCE(TO_CHAR(NULLIF(cte.hora_ult_ocor::text, '')::time, 'HH24:MI'), '')"
     : "''";
+$selPesoCalc = $cteCol('peso_calc') ? "COALESCE(cte.peso_calc::text, '')" : "''";
+$selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(cte.placa_coleta, '')" : "''";
+$selCustoSeguro = $cteCol('custo_seguro') ? "COALESCE(cte.custo_seguro::text, '')" : "''";
+$selCustoIcms = $cteCol('custo_icms') ? "COALESCE(cte.custo_icms::text, '')" : "''";
+$selCustoPisCofins = $cteCol('custo_pis_cofins') ? "COALESCE(cte.custo_pis_cofins::text, '')" : "''";
+$selCustoGris = $cteCol('custo_gris') ? "COALESCE(cte.custo_gris::text, '')" : "''";
+$selCustoPedagio = $cteCol('custo_pedagio') ? "COALESCE(cte.custo_pedagio::text, '')" : "''";
+$selCustoExpedicao = $cteCol('custo_expedicao') ? "COALESCE(cte.custo_expedicao::text, '')" : "''";
+$selCustoTransbordo = $cteCol('custo_transbordo') ? "COALESCE(cte.custo_transbordo::text, '')" : "''";
+$selCustoVendedor = $cteCol('custo_vendedor') ? "COALESCE(cte.custo_vendedor::text, '')" : "''";
+$selCustoRecepcao = $cteCol('custo_recepcao') ? "COALESCE(cte.custo_recepcao::text, '')" : "''";
+$selCustoDespDiv = $cteCol('custo_desp_div') ? "COALESCE(cte.custo_desp_div::text, '')" : "''";
+$selCustoTransfReal = $cteCol('custo_transferencia_real') ? "COALESCE(cte.custo_transferencia_real::text, '')" : "''";
 if (strtoupper($domain) === 'RVE') {
     $tblCidParam = "{$domain}_cid_param";
     $joinCteDest = "
@@ -577,7 +590,20 @@ $sqlCtes = "
         {$selCodUltOcor} AS cod_ult_ocor_cte,
         {$selDescUltOcor} AS desc_ult_ocor_cte,
         {$selDataUltOcor} AS data_ult_ocor_cte,
-        {$selHoraUltOcor} AS hora_ult_ocor_cte
+        {$selHoraUltOcor} AS hora_ult_ocor_cte,
+        {$selPesoCalc} AS peso_calc_cte,
+        {$selPlacaColeta} AS placa_coleta_cte,
+        {$selCustoSeguro} AS custo_seguro_cte,
+        {$selCustoIcms} AS custo_icms_cte,
+        {$selCustoPisCofins} AS custo_pis_cofins_cte,
+        {$selCustoGris} AS custo_gris_cte,
+        {$selCustoPedagio} AS custo_pedagio_cte,
+        {$selCustoExpedicao} AS custo_expedicao_cte,
+        {$selCustoTransbordo} AS custo_transbordo_cte,
+        {$selCustoVendedor} AS custo_vendedor_cte,
+        {$selCustoRecepcao} AS custo_recepcao_cte,
+        {$selCustoDespDiv} AS custo_desp_div_cte,
+        {$selCustoTransfReal} AS custo_transferencia_real_cte
     FROM {$tabelaCarregamento} c
     {$joinCteDest}
     WHERE c.unidade = \$1
@@ -604,8 +630,8 @@ try {
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
         $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
 
-        $carregamentos[$idx]['ctes'][] = [
-            'seq_cte'        => $nroCte,   // compatibilidade com frontend (usa seq_cte como ID)
+        $cteItem = [
+            'seq_cte'        => $nroCte,
             'nroCte'         => $nroCte,
             'ser_cte'        => $serCte,
             'ctrc'           => $ctrc,
@@ -633,6 +659,24 @@ try {
                 . (((string)($cteRow['hora_ult_ocor_cte'] ?? '')) !== '' ? (' ' . (string)($cteRow['hora_ult_ocor_cte'] ?? '')) : '')
             ),
         ];
+        if (($cteRow['peso_calc_cte'] ?? '') !== '') $cteItem['pesoCalc'] = (string)$cteRow['peso_calc_cte'];
+        if (($cteRow['placa_coleta_cte'] ?? '') !== '') $cteItem['placaColeta'] = (string)$cteRow['placa_coleta_cte'];
+        foreach ([
+            'custoSeguro' => 'custo_seguro_cte',
+            'custoIcms' => 'custo_icms_cte',
+            'custoPisCofins' => 'custo_pis_cofins_cte',
+            'custoGris' => 'custo_gris_cte',
+            'custoPedagio' => 'custo_pedagio_cte',
+            'custoExpedicao' => 'custo_expedicao_cte',
+            'custoTransbordo' => 'custo_transbordo_cte',
+            'custoVendedor' => 'custo_vendedor_cte',
+            'custoRecepcao' => 'custo_recepcao_cte',
+            'custoDespDiv' => 'custo_desp_div_cte',
+            'custoTransferenciaReal' => 'custo_transferencia_real_cte',
+        ] as $k => $dbk) {
+            if (($cteRow[$dbk] ?? '') !== '') $cteItem[$k] = (string)$cteRow[$dbk];
+        }
+        $carregamentos[$idx]['ctes'][] = $cteItem;
     }
 } catch (Exception $e) {}
 
