@@ -2390,7 +2390,7 @@ function CardCarregamento({
             return acc;
           }, { cif: 0, fob: 0 });
           setTotaisCard({
-            peso: (() => { const n = Number(totais?.peso ?? 0) || 0; return n * 1000; })(),
+            peso: Number(totais?.peso ?? 0) || 0,
             cubagem: Number(totais?.cubagem ?? 0) || 0,
             vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
             cif: frete.cif,
@@ -2464,7 +2464,7 @@ function CardCarregamento({
       `"${c.sigla_dest || ''}"`,
       `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
       c.vlr_frete.toFixed(2).replace('.', ','),
-      (() => { const n = Number(c.peso ?? 0); const v = n * 1000; return Number.isFinite(v) ? v.toFixed(2).replace('.', ',') : '0,00'; })(),
+      (() => { const n = Number(c.peso ?? 0); const v = (n > 0 && n < 1) ? n * 1000 : n; return Number.isFinite(v) ? v.toFixed(2).replace('.', ',') : '0,00'; })(),
       c.cubagem.toFixed(3).replace('.', ','),
     ]);
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
@@ -2680,7 +2680,7 @@ function CardCarregamento({
           return acc;
         }, { cif: 0, fob: 0 });
         const next = {
-          peso: (Number(totais?.peso ?? 0) || 0) * 1000,
+          peso: Number(totais?.peso ?? 0) || 0,
           cubagem: Number(totais?.cubagem ?? 0) || 0,
           vlr_frete: Number(totais?.vlr_frete ?? 0) || 0,
           cif: frete.cif,
@@ -3209,10 +3209,10 @@ function CardCarregamento({
               ) : null}
             </div>
             <BarraCapacidade
-              valor={(Number(totalPeso) || 0) * 1000}
-              capacidade={((isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? capacidadeTonExib!) * 1000}
+              valor={(Number(totalPeso) || 0) / 1000}
+              capacidade={(isEntregaCarreg ? (capacidadeSugerida?.ton ?? null) : null) ?? capacidadeTonExib!}
               corGradient="linear-gradient(90deg, #7c3aed, #8b5cf6)"
-              label="Peso (Kg)"
+              label="Peso (Ton)"
             />
             <BarraCapacidade
               valor={totalCubagem}
@@ -3249,7 +3249,7 @@ function CardCarregamento({
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
-            <span><Weight className="w-3 h-3 inline mr-1" />{((Number(totalPeso) || 0) * 1000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg</span>
+            <span><Weight className="w-3 h-3 inline mr-1" />{((Number(totalPeso) || 0) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ton</span>
             <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
           </div>
         )}
@@ -3616,7 +3616,7 @@ function CardCarregamento({
                         <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{
                           (() => {
                             const n = Number(cte.peso ?? 0);
-                            const v = n * 1000;
+                            const v = (n > 0 && n < 1) ? n * 1000 : n;
                             return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
                           })()
                         }</span>
@@ -3643,7 +3643,7 @@ function CardCarregamento({
                 <span className="text-right font-mono">{
                   (() => {
                     const n = Number(cteDetalheTotais.peso ?? 0);
-                    const v = n * 1000;
+                    const v = (n > 0 && n < 30) ? n * 1000 : n;
                     return Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
                   })()
                 }</span>
