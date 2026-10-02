@@ -560,11 +560,14 @@ $cteCol = static function(string $col) use ($g_sql, $tblCte, &$cteCols): bool {
 
 $selPesoCalc = $cteCol('peso_calc') ? "COALESCE(c.peso_calc::text, '')" : "''";
 $selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(c.placa_coleta, '')" : "''";
+$hasSeqCidadeEntr = $cteCol('seq_cidade_entr');
 $hasSeqCidade = $cteCol('seq_cidade');
 $hasSiglaDest = $cteCol('sigla_dest');
-$joinCidade = $hasSeqCidade ? "LEFT JOIN cidade cd ON cd.seq_cidade = c.seq_cidade" : "";
-$selCidadeEntrega = $hasSeqCidade ? "COALESCE(cd.nome || '/' || cd.uf, '')" : "''";
-$selUnidadeEntrega = $hasSiglaDest ? "COALESCE(c.sigla_dest, '')" : "''";
+$joinCidade = ($hasSeqCidadeEntr || $hasSeqCidade)
+    ? ("LEFT JOIN cidade cd ON cd.seq_cidade = c." . ($hasSeqCidadeEntr ? "seq_cidade_entr" : "seq_cidade"))
+    : "";
+$selCidadeEntrega = ($hasSeqCidadeEntr || $hasSeqCidade) ? "COALESCE(cd.nome || '/' || cd.uf, '')" : "''";
+$selUnidadeEntrega = $hasSiglaDest ? "UPPER(BTRIM(COALESCE(c.sigla_dest, '')))" : "''";
 $selCepEntrega = $cteCol('cep_entrega') ? "COALESCE(c.cep_entrega::text, '')" : "''";
 $selEnderecoEntrega = $cteCol('endereco_entrega') ? "COALESCE(c.endereco_entrega, '')" : "''";
 $selBairroEntrega = $cteCol('bairro_entrega') ? "COALESCE(c.bairro_entrega, '')" : "''";
