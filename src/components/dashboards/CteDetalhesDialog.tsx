@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Badge } from '../ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Package, Truck, Building2, MapPin, Weight, Box, CalendarDays, DollarSign, FileText, Car, AlertCircle } from 'lucide-react';
 import { useTooltipStyle } from './CustomTooltip';
@@ -33,6 +34,11 @@ export interface CteDetalhesData {
   cidade?: string;
   bairro?: string;
   cep?: string;
+  cidadeEntrega?: string;
+  unidadeEntrega?: string;
+  cepEntrega?: string;
+  enderecoEntrega?: string;
+  bairroEntrega?: string;
   uf?: string;
   setor?: string;
   setorNome?: string;
@@ -160,6 +166,34 @@ function Secao({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+function SecaoRecolhivel({
+  value,
+  title,
+  barClass = 'bg-indigo-500/70',
+  children,
+  contentClassName,
+}: {
+  value: string;
+  title: string;
+  barClass?: string;
+  children: React.ReactNode;
+  contentClassName?: string;
+}) {
+  return (
+    <AccordionItem value={value} className="border-0">
+      <AccordionTrigger className="py-0.5 hover:no-underline text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="flex items-center gap-1.5">
+          <span className={`w-1 h-3 rounded-full ${barClass}`} />
+          {title}
+        </span>
+      </AccordionTrigger>
+      <AccordionContent className={contentClassName}>
+        {children}
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
 export function calcularParcelasCusto(cte: CteDetalhesData): CteCustoParcela[] {
   const out: CteCustoParcela[] = [];
   for (const c of CUSTO_CAMPOS) {
@@ -214,6 +248,23 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
 
   const ctrcDisplay = cte.ctrc || (cte.serCte && cte.nroCte ? `${cte.serCte}${String(cte.nroCte).padStart(6, '0')}` : '');
   const temCusto = custoTotal > 0 || donutData.length > 0;
+  const temEntrega = Boolean(
+    String(cte.cidadeEntrega ?? '').trim()
+    || String(cte.unidadeEntrega ?? '').trim()
+    || String(cte.cepEntrega ?? '').trim()
+    || String(cte.enderecoEntrega ?? '').trim()
+    || String(cte.bairroEntrega ?? '').trim()
+  );
+  const [accordionValue, setAccordionValue] = useState<string[]>(() => {
+    const base = ['datas', 'clientes', 'valores'];
+    if (temCusto) base.push('custo');
+    return base;
+  });
+  useEffect(() => {
+    const base = ['datas', 'clientes', 'valores'];
+    if (temCusto) base.push('custo');
+    setAccordionValue(base);
+  }, [ctrcDisplay, temCusto]);
 
   return (
     <Dialog open={openProp} onOpenChange={onOpenChange}>
@@ -261,97 +312,117 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
             {(cte.unidadeOrigem) && <Campo label="Unid. Origem" valor={cte.unidadeOrigem} />}
           </Secao>
 
-          <Secao title="Datas">
-            <Campo label="Emissão" valor={cte.emissao} icon={CalendarDays} mono />
-            <Campo label="Chegada Unid." valor={cte.chegadaUnid} mono />
-            <Campo label="Prev. Entrega" valor={cte.prevEnt} mono />
-            {cte.prevChegada && <Campo label="Prev. Chegada" valor={cte.prevChegada} mono />}
-            {cte.agendamento && (
-              <Campo
-                label="Agendamento"
-                valor={
-                  <Badge className="bg-blue-100 dark:bg-blue-900/35 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10.5px] w-fit font-medium">
-                    {cte.agendamento}
-                  </Badge>
-                }
-              />
-            )}
-          </Secao>
+          <Accordion type="multiple" value={accordionValue} onValueChange={setAccordionValue} className="space-y-3">
+            <SecaoRecolhivel value="datas" title="Datas" contentClassName="pt-1 pb-0">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
+                <Campo label="Emissão" valor={cte.emissao} icon={CalendarDays} mono />
+                <Campo label="Chegada Unid." valor={cte.chegadaUnid} mono />
+                <Campo label="Prev. Entrega" valor={cte.prevEnt} mono />
+                {cte.prevChegada && <Campo label="Prev. Chegada" valor={cte.prevChegada} mono />}
+                {cte.agendamento && (
+                  <Campo
+                    label="Agendamento"
+                    valor={
+                      <Badge className="bg-blue-100 dark:bg-blue-900/35 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10.5px] w-fit font-medium">
+                        {cte.agendamento}
+                      </Badge>
+                    }
+                  />
+                )}
+              </div>
+            </SecaoRecolhivel>
 
-          <Secao title="Clientes">
-            <Campo label="Remetente" valor={cte.remetente} icon={Building2} />
-            <Campo label="Pagador" valor={cte.pagador} icon={DollarSign} />
-            <Campo label="Destinatário" valor={cte.destinatario} icon={Package} />
-            {cte.cnpjDest && <Campo label="CNPJ Dest." valor={cte.cnpjDest} mono />}
-            {(cte.unidadeDest || cte.nomeDest) && (
-              <Campo
-                label="Unid. Destino"
-                valor={
-                  <span>
-                    <strong className="font-semibold">{cte.unidadeDest}</strong>
-                    {cte.nomeDest && cte.nomeDest !== cte.unidadeDest ? ` · ${cte.nomeDest}` : ''}
-                  </span>
-                }
-              />
-            )}
-            {cte.unidAtual && <Campo label="Unid. Atual" valor={cte.unidAtual} />}
-            <Campo
-              label="Endereço"
-              valor={
-                <div className="space-y-0.5 leading-tight">
-                  {cte.endereco && <div>{cte.endereco}</div>}
-                  {(cte.cidade || cte.uf || cte.cep) && (
-                    <div className="text-slate-500 dark:text-slate-400">
-                      {[cte.bairro, [cte.cidade, cte.uf].filter(Boolean).join('/'), cte.cep].filter(Boolean).join(' · ')}
+            <SecaoRecolhivel value="clientes" title="Clientes" contentClassName="pt-1 pb-0">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
+                <Campo label="Remetente" valor={cte.remetente} icon={Building2} />
+                <Campo label="Pagador" valor={cte.pagador} icon={DollarSign} />
+                <Campo label="Destinatário" valor={cte.destinatario} icon={Package} />
+                {cte.cnpjDest && <Campo label="CNPJ Dest." valor={cte.cnpjDest} mono />}
+                {(cte.unidadeDest || cte.nomeDest) && (
+                  <Campo
+                    label="Unid. Destino"
+                    valor={
+                      <span>
+                        <strong className="font-semibold">{cte.unidadeDest}</strong>
+                        {cte.nomeDest && cte.nomeDest !== cte.unidadeDest ? ` · ${cte.nomeDest}` : ''}
+                      </span>
+                    }
+                  />
+                )}
+                {cte.unidAtual && <Campo label="Unid. Atual" valor={cte.unidAtual} />}
+                <Campo
+                  label="Endereço"
+                  valor={
+                    <div className="space-y-0.5 leading-tight">
+                      {cte.endereco && <div>{cte.endereco}</div>}
+                      {(cte.cidade || cte.uf || cte.cep) && (
+                        <div className="text-slate-500 dark:text-slate-400">
+                          {[cte.bairro, [cte.cidade, cte.uf].filter(Boolean).join('/'), cte.cep].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              }
-              icon={MapPin}
-            />
-          </Secao>
+                  }
+                  icon={MapPin}
+                />
+                {temEntrega && (
+                  <div className="col-span-2 pt-1">
+                    <div className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <span className="w-1 h-3 bg-sky-500/70 rounded-full" />
+                      Entrega
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 pl-2.5 border-l border-slate-200 dark:border-slate-700/70 mt-1">
+                      <Campo label="Cidade" valor={cte.cidadeEntrega} icon={MapPin} />
+                      <Campo label="Unidade" valor={cte.unidadeEntrega} />
+                      <Campo label="CEP" valor={cte.cepEntrega} mono />
+                      <Campo label="Bairro" valor={cte.bairroEntrega} />
+                      <div className="col-span-2">
+                        <Campo label="Endereço" valor={cte.enderecoEntrega} icon={MapPin} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SecaoRecolhivel>
 
-          <Secao title="Valores e Medidas">
-            <Campo
-              label="Vlr. Mercadoria"
-              valor={vlrMercNum > 0 ? <span className="font-semibold">{fmtMoeda(vlrMercNum)}</span> : undefined}
-              icon={DollarSign}
-              mono
-            />
-            <Campo
-              label="Frete"
-              valor={freteNum > 0 ? <span className="font-semibold">{fmtMoeda(freteNum)}</span> : undefined}
-              mono
-            />
-            <Campo
-              label="Custo Total"
-              valor={temCusto ? fmtMoeda(custoTotal) : undefined}
-              mono
-              highlight
-            />
-            <Campo
-              label="Peso (Real)"
-              valor={pesoNum > 0 ? <span className="font-medium">{fmtPeso(pesoNum)}</span> : undefined}
-              icon={Weight}
-              mono
-            />
-            <Campo
-              label="Peso de Cálculo"
-              valor={pesoCalcNum > 0 ? fmtPeso(pesoCalcNum) : undefined}
-              mono
-              highlight
-            />
-            <Campo label="Cubagem" valor={cubagemNum > 0 ? `${cubagemNum.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} m³` : undefined} mono />
-            <Campo label="Volumes" valor={volNum > 0 ? fmtVol(volNum) : undefined} icon={Box} mono />
-          </Secao>
+            <SecaoRecolhivel value="valores" title="Valores e Medidas" contentClassName="pt-1 pb-0">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
+                <Campo
+                  label="Vlr. Mercadoria"
+                  valor={vlrMercNum > 0 ? <span className="font-semibold">{fmtMoeda(vlrMercNum)}</span> : undefined}
+                  icon={DollarSign}
+                  mono
+                />
+                <Campo
+                  label="Frete"
+                  valor={freteNum > 0 ? <span className="font-semibold">{fmtMoeda(freteNum)}</span> : undefined}
+                  mono
+                />
+                <Campo
+                  label="Custo Total"
+                  valor={temCusto ? fmtMoeda(custoTotal) : undefined}
+                  mono
+                  highlight
+                />
+                <Campo
+                  label="Peso (Real)"
+                  valor={pesoNum > 0 ? <span className="font-medium">{fmtPeso(pesoNum)}</span> : undefined}
+                  icon={Weight}
+                  mono
+                />
+                <Campo
+                  label="Peso de Cálculo"
+                  valor={pesoCalcNum > 0 ? fmtPeso(pesoCalcNum) : undefined}
+                  mono
+                  highlight
+                />
+                <Campo label="Cubagem" valor={cubagemNum > 0 ? `${cubagemNum.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} m³` : undefined} mono />
+                <Campo label="Volumes" valor={volNum > 0 ? fmtVol(volNum) : undefined} icon={Box} mono />
+              </div>
+            </SecaoRecolhivel>
 
-          {temCusto && (
-            <div className="space-y-1.5">
-              <h4 className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <span className="w-1 h-3 bg-pink-500/70 rounded-full" />
-                Composição do Custo
-              </h4>
-              <div className="grid grid-cols-2 gap-3 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
+            {temCusto && (
+              <SecaoRecolhivel value="custo" title="Composição do Custo" barClass="bg-pink-500/70" contentClassName="pt-1 pb-0">
+                <div className="grid grid-cols-2 gap-3 pl-2.5 border-l border-slate-200 dark:border-slate-700/70">
                 <div className="flex flex-col gap-1.5">
                   <div className="flex flex-col gap-0.5">
                     {parcelas.map(p => {
@@ -406,8 +477,9 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
                   )}
                 </div>
               </div>
-            </div>
-          )}
+              </SecaoRecolhivel>
+            )}
+          </Accordion>
 
           {(cte.codUltOcor || cte.descUltOcor) && (
             <Secao title="Última Ocorrência">

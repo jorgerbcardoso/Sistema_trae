@@ -583,6 +583,11 @@ $selHoraUltOcor = $cteCol('hora_ult_ocor')
     : "''";
 $selPesoCalc = $cteCol('peso_calc') ? "COALESCE(cte.peso_calc::text, '')" : "''";
 $selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(cte.placa_coleta, '')" : "''";
+$selCidadeEntrega = $cteCol('cidade_entrega') ? "COALESCE(cte.cidade_entrega, '')" : "''";
+$selUnidadeEntrega = $cteCol('unidade_entrega') ? "COALESCE(cte.unidade_entrega, '')" : "''";
+$selCepEntrega = $cteCol('cep_entrega') ? "COALESCE(cte.cep_entrega::text, '')" : "''";
+$selEnderecoEntrega = $cteCol('endereco_entrega') ? "COALESCE(cte.endereco_entrega, '')" : "''";
+$selBairroEntrega = $cteCol('bairro_entrega') ? "COALESCE(cte.bairro_entrega, '')" : "''";
 $selCustoSeguro = $cteCol('custo_seguro') ? "COALESCE(cte.custo_seguro::text, '')" : "''";
 $selCustoIcms = $cteCol('custo_icms') ? "COALESCE(cte.custo_icms::text, '')" : "''";
 $selCustoPisCofins = $cteCol('custo_pis_cofins') ? "COALESCE(cte.custo_pis_cofins::text, '')" : "''";
@@ -646,6 +651,11 @@ $sqlCtes = "
         {$selHoraUltOcor} AS hora_ult_ocor_cte,
         {$selPesoCalc} AS peso_calc_cte,
         {$selPlacaColeta} AS placa_coleta_cte,
+        {$selCidadeEntrega} AS cidade_entrega_cte,
+        {$selUnidadeEntrega} AS unidade_entrega_cte,
+        {$selCepEntrega} AS cep_entrega_cte,
+        {$selEnderecoEntrega} AS endereco_entrega_cte,
+        {$selBairroEntrega} AS bairro_entrega_cte,
         {$selCustoSeguro} AS custo_seguro_cte,
         {$selCustoIcms} AS custo_icms_cte,
         {$selCustoPisCofins} AS custo_pis_cofins_cte,
@@ -714,6 +724,11 @@ try {
         ];
         if (($cteRow['peso_calc_cte'] ?? '') !== '') $cteItem['pesoCalc'] = (string)$cteRow['peso_calc_cte'];
         if (($cteRow['placa_coleta_cte'] ?? '') !== '') $cteItem['placaColeta'] = (string)$cteRow['placa_coleta_cte'];
+        if (($cteRow['cidade_entrega_cte'] ?? '') !== '') $cteItem['cidadeEntrega'] = (string)$cteRow['cidade_entrega_cte'];
+        if (($cteRow['unidade_entrega_cte'] ?? '') !== '') $cteItem['unidadeEntrega'] = (string)$cteRow['unidade_entrega_cte'];
+        if (($cteRow['cep_entrega_cte'] ?? '') !== '') $cteItem['cepEntrega'] = (string)$cteRow['cep_entrega_cte'];
+        if (($cteRow['endereco_entrega_cte'] ?? '') !== '') $cteItem['enderecoEntrega'] = (string)$cteRow['endereco_entrega_cte'];
+        if (($cteRow['bairro_entrega_cte'] ?? '') !== '') $cteItem['bairroEntrega'] = (string)$cteRow['bairro_entrega_cte'];
         foreach ([
             'custoSeguro' => 'custo_seguro_cte',
             'custoIcms' => 'custo_icms_cte',

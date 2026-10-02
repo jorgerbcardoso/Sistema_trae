@@ -560,6 +560,11 @@ $cteCol = static function(string $col) use ($g_sql, $tblCte, &$cteCols): bool {
 
 $selPesoCalc = $cteCol('peso_calc') ? "COALESCE(c.peso_calc::text, '')" : "''";
 $selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(c.placa_coleta, '')" : "''";
+$selCidadeEntrega = $cteCol('cidade_entrega') ? "COALESCE(c.cidade_entrega, '')" : "''";
+$selUnidadeEntrega = $cteCol('unidade_entrega') ? "COALESCE(c.unidade_entrega, '')" : "''";
+$selCepEntrega = $cteCol('cep_entrega') ? "COALESCE(c.cep_entrega::text, '')" : "''";
+$selEnderecoEntrega = $cteCol('endereco_entrega') ? "COALESCE(c.endereco_entrega, '')" : "''";
+$selBairroEntrega = $cteCol('bairro_entrega') ? "COALESCE(c.bairro_entrega, '')" : "''";
 $selCustoSeguro = $cteCol('custo_seguro') ? "COALESCE(c.custo_seguro::text, '')" : "''";
 $selCustoIcms = $cteCol('custo_icms') ? "COALESCE(c.custo_icms::text, '')" : "''";
 $selCustoPisCofins = $cteCol('custo_pis_cofins') ? "COALESCE(c.custo_pis_cofins::text, '')" : "''";
@@ -607,6 +612,11 @@ if (!empty($ctes)) {
                 COALESCE(TO_CHAR(NULLIF(c.hora_ult_ocor::text, '')::time, 'HH24:MI'), '') AS hora_ult_ocor,
                 {$selPesoCalc} AS peso_calc,
                 {$selPlacaColeta} AS placa_coleta,
+                {$selCidadeEntrega} AS cidade_entrega,
+                {$selUnidadeEntrega} AS unidade_entrega,
+                {$selCepEntrega} AS cep_entrega,
+                {$selEnderecoEntrega} AS endereco_entrega,
+                {$selBairroEntrega} AS bairro_entrega,
                 {$selCustoSeguro} AS custo_seguro,
                 {$selCustoIcms} AS custo_icms,
                 {$selCustoPisCofins} AS custo_pis_cofins,
@@ -638,6 +648,11 @@ if (!empty($ctes)) {
                     COALESCE(c.unid_atual, '') AS unid_atual,
                     {$selPesoCalc} AS peso_calc,
                     {$selPlacaColeta} AS placa_coleta,
+                    {$selCidadeEntrega} AS cidade_entrega,
+                    {$selUnidadeEntrega} AS unidade_entrega,
+                    {$selCepEntrega} AS cep_entrega,
+                    {$selEnderecoEntrega} AS endereco_entrega,
+                    {$selBairroEntrega} AS bairro_entrega,
                     {$selCustoSeguro} AS custo_seguro,
                     {$selCustoIcms} AS custo_icms,
                     {$selCustoPisCofins} AS custo_pis_cofins,
@@ -672,6 +687,11 @@ if (!empty($ctes)) {
                     ),
                     'pesoCalc' => (string)($row['peso_calc'] ?? ''),
                     'placaColeta' => (string)($row['placa_coleta'] ?? ''),
+                    'cidadeEntrega' => (string)($row['cidade_entrega'] ?? ''),
+                    'unidadeEntrega' => (string)($row['unidade_entrega'] ?? ''),
+                    'cepEntrega' => (string)($row['cep_entrega'] ?? ''),
+                    'enderecoEntrega' => (string)($row['endereco_entrega'] ?? ''),
+                    'bairroEntrega' => (string)($row['bairro_entrega'] ?? ''),
                     'custoSeguro' => (string)($row['custo_seguro'] ?? ''),
                     'custoIcms' => (string)($row['custo_icms'] ?? ''),
                     'custoPisCofins' => (string)($row['custo_pis_cofins'] ?? ''),
@@ -727,6 +747,11 @@ if (!empty($ctes)) {
             $c['dataUltOcor'] = $infoPorCte[$k]['dataUltOcor'] ?? '';
             if (($infoPorCte[$k]['pesoCalc'] ?? '') !== '') $c['pesoCalc'] = $infoPorCte[$k]['pesoCalc'];
             if (($infoPorCte[$k]['placaColeta'] ?? '') !== '') $c['placaColeta'] = $infoPorCte[$k]['placaColeta'];
+            if (($infoPorCte[$k]['cidadeEntrega'] ?? '') !== '') $c['cidadeEntrega'] = $infoPorCte[$k]['cidadeEntrega'];
+            if (($infoPorCte[$k]['unidadeEntrega'] ?? '') !== '') $c['unidadeEntrega'] = $infoPorCte[$k]['unidadeEntrega'];
+            if (($infoPorCte[$k]['cepEntrega'] ?? '') !== '') $c['cepEntrega'] = $infoPorCte[$k]['cepEntrega'];
+            if (($infoPorCte[$k]['enderecoEntrega'] ?? '') !== '') $c['enderecoEntrega'] = $infoPorCte[$k]['enderecoEntrega'];
+            if (($infoPorCte[$k]['bairroEntrega'] ?? '') !== '') $c['bairroEntrega'] = $infoPorCte[$k]['bairroEntrega'];
             foreach (['custoSeguro','custoIcms','custoPisCofins','custoGris','custoPedagio','custoExpedicao','custoTransbordo','custoVendedor','custoRecepcao','custoDespDiv','custoTransferenciaReal'] as $ck) {
                 if (($infoPorCte[$k][$ck] ?? '') !== '') $c[$ck] = $infoPorCte[$k][$ck];
             }
