@@ -1729,6 +1729,7 @@ interface CarregamentoAreaProps {
   loadingRota: boolean;
   rotaCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
+  onRecarregarCarregamentosCalendario: () => Promise<void>;
   onImportarCarregamentos: (opts?: { silent?: boolean }) => Promise<any>;
   importandoCarregamentos: boolean;
   onImportarVeiculos: () => Promise<any>;
@@ -6273,6 +6274,7 @@ function CarregamentoArea({
   loadingRota,
   rotaCarregamentoPlaca,
   onRecarregarCarregamentos,
+  onRecarregarCarregamentosCalendario,
   onImportarCarregamentos,
   importandoCarregamentos,
   onImportarVeiculos,
@@ -6844,6 +6846,9 @@ function CarregamentoArea({
   const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
   const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
   const [calAtualizandoCtes, setCalAtualizandoCtes] = useState(false);
+  const [calAutoAtualizandoVazios, setCalAutoAtualizandoVazios] = useState(false);
+  const [calAutoAtualProgress, setCalAutoAtualProgress] = useState<{ total: number; done: number; ok: number; fail: number } | null>(null);
+  const calAutoAtualKeyRef = useRef('');
   const [calVolMode, setCalVolMode] = useState<'frete' | 'peso' | 'cub' | 'merc'>('frete');
 
   const abrirDetalheCarregamento = (c: Carregamento) => {
@@ -6879,7 +6884,7 @@ function CarregamentoArea({
 
   const atualizarCtesCarregamento = async (c: Carregamento) => {
     const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
-    if (!placa || calAtualizandoCtes) return;
+    if (!placa || calAtualizandoCtes || calAutoAtualizandoVazios) return;
     const dataRef = toKey((c as any)?.data_finalizacao ?? '');
     setCalAtualizandoCtes(true);
     try {
@@ -6915,6 +6920,65 @@ function CarregamentoArea({
       setCalAtualizandoCtes(false);
     }
   };
+
+  useEffect(() => {
+    calAutoAtualKeyRef.current = '';
+  }, [sigla]);
+
+  useEffect(() => {
+    if (calAutoAtualizandoVazios) return;
+    if (!sigla) return;
+    if (loadingCarregamentosCalendario) return;
+    const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
+    if (list.length === 0) return;
+    const d = new Date();
+    const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const key = `${String(sigla).trim().toUpperCase()}|${hoje}`;
+    if (calAutoAtualKeyRef.current === key) return;
+    calAutoAtualKeyRef.current = key;
+
+    const vazios = list.filter((c: any) => {
+      const fim = toKey(c?.data_finalizacao ?? c?.dataFinalizacao ?? '');
+      if (!fim) return false;
+      const qtd = Number(c?.total_ctes ?? c?.totalCtes ?? 0) || 0;
+      return qtd <= 0;
+    });
+    if (vazios.length === 0) return;
+
+    void (async () => {
+      setCalAutoAtualizandoVazios(true);
+      setCalAutoAtualProgress({ total: vazios.length, done: 0, ok: 0, fail: 0 });
+      toast.info(`Encontrados ${vazios.length} carregamento(s) finalizado(s) vazio(s). Atualizando CT-es... isso pode demorar.`);
+      let ok = 0;
+      let fail = 0;
+      for (let i = 0; i < vazios.length; i += 1) {
+        const c = vazios[i] as any;
+        const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
+        const dataRef = toKey(c?.data_finalizacao ?? c?.dataFinalizacao ?? '') || null;
+        if (!placa) {
+          fail += 1;
+          setCalAutoAtualProgress({ total: vazios.length, done: i + 1, ok, fail });
+          continue;
+        }
+        try {
+          const res = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+            { method: 'POST', body: JSON.stringify({ acao: 'atualizar_ctes_ssw', placa, data_ref: dataRef }) },
+            true
+          );
+          if (res?.success) ok += 1;
+          else fail += 1;
+        } catch (e) {
+          fail += 1;
+        }
+        setCalAutoAtualProgress({ total: vazios.length, done: i + 1, ok, fail });
+      }
+      await onRecarregarCarregamentosCalendario();
+      toast.success(`Atualização concluída: ${ok}/${vazios.length}.`);
+      setCalAutoAtualizandoVazios(false);
+      setCalAutoAtualProgress(null);
+    })();
+  }, [sigla, carregamentosCalendario, loadingCarregamentosCalendario, calAutoAtualizandoVazios, onRecarregarCarregamentosCalendario]);
 
   useEffect(() => {
     setCalPage(1);
@@ -7100,6 +7164,12 @@ function CarregamentoArea({
               </button>
             </div>
             {loadingCarregamentosCalendario ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : null}
+            {calAutoAtualizandoVazios && calAutoAtualProgress ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Atualizando CT-es vazios {calAutoAtualProgress.done}/{calAutoAtualProgress.total}
+              </span>
+            ) : null}
           </div>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${calOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -7228,8 +7298,8 @@ function CarregamentoArea({
                               {isFinalizado ? (
                                 <button
                                   type="button"
-                                  disabled={calAtualizandoCtes}
-                                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-indigo-200 dark:hover:border-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 ${calAtualizandoCtes ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                  disabled={calAtualizandoCtes || calAutoAtualizandoVazios}
+                                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-indigo-200 dark:hover:border-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 ${(calAtualizandoCtes || calAutoAtualizandoVazios) ? 'opacity-60 cursor-not-allowed' : ''}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     void atualizarCtesCarregamento(c);
@@ -7404,7 +7474,7 @@ function CarregamentoArea({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={calAtualizandoCtes}
+                                disabled={calAtualizandoCtes || calAutoAtualizandoVazios}
                                 onClick={() => void atualizarCtesCarregamento(c)}
                               >
                                 {calAtualizandoCtes ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
@@ -11353,6 +11423,7 @@ export function Disponiveis() {
             loadingRota={loadingRota}
             rotaCarregamentoPlaca={rotaCarregamentoPlaca}
             onRecarregarCarregamentos={carregarCarregamentos}
+            onRecarregarCarregamentosCalendario={carregarCarregamentosCalendario}
             onImportarCarregamentos={handleImportarCarregamentos}
             importandoCarregamentos={importandoCarregamentos}
             onImportarVeiculos={handleImportarVeiculos}

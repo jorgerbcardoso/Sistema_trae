@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../lib/ssw_carregamento_ctes.php';
 
 handleOptionsRequest();
 validateRequestMethod('POST');
@@ -15,6 +16,7 @@ $unidade = strtoupper(trim(
     ?? $currentUser['unidade']
     ?? ''
 ));
+$login = $currentUser['username'] ?? $auth['user']['username'] ?? '';
 
 if (empty($unidade)) {
     respondJson(['success' => false, 'message' => 'Unidade do usuário não identificada.']);
@@ -419,6 +421,57 @@ foreach ($carregamentos as &$c) {
 unset($c);
 
 if ($modo === 'calendario') {
+    $dtMinRestore = date('Y-m-d', strtotime('-2 days'));
+    $maxRestore = 8;
+    $did = 0;
+    foreach ($carregamentos as $idx => $car) {
+        if ($did >= $maxRestore) break;
+        $dataFinal = trim((string)($car['data_finalizacao'] ?? ''));
+        $qtd = (int)($car['total_ctes'] ?? 0);
+        $sim = (bool)($car['simulado'] ?? false);
+        if ($sim) continue;
+        if ($qtd > 0) continue;
+        if ($dataFinal === '' || $dataFinal < $dtMinRestore) continue;
+        $seq = (int)($car['seq_carregamento'] ?? 0);
+        if ($seq <= 0) continue;
+        $dtRef = null;
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $dataFinal, $m)) {
+            $dtRef = DateTime::createFromFormat('Y-m-d', "{$m[1]}-{$m[2]}-{$m[3]}");
+        }
+
+        $out = ssw_restore_ctes_carregamento($conn, $domain, $unidade, $login, $car, $dtRef);
+        $added = (int)($out['added'] ?? 0);
+        if (($out['success'] ?? false) && $added > 0) {
+            $did += 1;
+            try {
+                $filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+                $resAgg = sql(
+                    "SELECT
+                        COUNT(*) FILTER (WHERE nro_cte > 0) AS total_ctes,
+                        COALESCE(SUM(COALESCE(vlr_frete_cte, 0)), 0) AS total_frete,
+                        COALESCE(SUM(COALESCE(vlr_merc_cte, 0)), 0)  AS total_mercadoria,
+                        COALESCE(SUM(COALESCE(peso_cte, 0)), 0)      AS total_peso,
+                        COALESCE(SUM(COALESCE(cubagem_cte, 0)), 0)   AS total_cubagem
+                     FROM {$tabelaCarregamento}
+                     WHERE unidade = $1
+                       AND seq_carregamento = $2
+                       {$filtroSerieRve}",
+                    [$unidade, $seq],
+                    $conn
+                );
+                if ($resAgg && pg_num_rows($resAgg) > 0) {
+                    $ra = pg_fetch_assoc($resAgg);
+                    $carregamentos[$idx]['total_ctes'] = (int)($ra['total_ctes'] ?? 0);
+                    $carregamentos[$idx]['total_frete'] = (float)($ra['total_frete'] ?? 0);
+                    $carregamentos[$idx]['total_mercadoria'] = (float)($ra['total_mercadoria'] ?? 0);
+                    $carregamentos[$idx]['total_peso'] = (float)($ra['total_peso'] ?? 0);
+                    $carregamentos[$idx]['total_cubagem'] = (float)($ra['total_cubagem'] ?? 0);
+                }
+            } catch (Exception $e) {
+            }
+        }
+    }
+
     respondJson(['success' => true, 'carregamentos' => $carregamentos]);
 }
 

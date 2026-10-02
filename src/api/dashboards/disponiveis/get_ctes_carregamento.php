@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../lib/ssw_carregamento_ctes.php';
 
 handleOptionsRequest();
 validateRequestMethod('POST');
@@ -224,6 +225,97 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'cubagem'       => round($cubNum, 3),
         'qtde_vol'      => $qtdeVol,
     ];
+}
+
+if (count($ctes) === 0 && $seqCarreg > 0) {
+    $resBase = null;
+    try {
+        $resBase = sql(
+            "SELECT
+                seq_carregamento,
+                placa_provisoria,
+                destino,
+                unidades,
+                setores_entrega,
+                origem_criacao,
+                data_finalizacao,
+                hora_finalizacao,
+                login_finalizacao
+             FROM {$tabela}
+             WHERE unidade = $1
+               AND seq_carregamento = $2
+             ORDER BY data_inclusao DESC, hora_inclusao DESC
+             LIMIT 1",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+    } catch (Exception $e) {
+        $resBase = null;
+    }
+
+    if ($resBase && pg_num_rows($resBase) > 0) {
+        $rowBase = pg_fetch_assoc($resBase);
+        $dataFinal = trim((string)($rowBase['data_finalizacao'] ?? ''));
+        if ($dataFinal !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $dataFinal, $m)) {
+            $dtRef = DateTime::createFromFormat('Y-m-d', "{$m[1]}-{$m[2]}-{$m[3]}");
+        } else {
+            $dtRef = null;
+        }
+
+        $out = ssw_restore_ctes_carregamento($conn, $domain, $unidade, ($currentUser['username'] ?? $auth['user']['username'] ?? ''), $rowBase, $dtRef);
+        if (($out['success'] ?? false) && (int)($out['added'] ?? 0) > 0) {
+            $res = sql($sql, $params, $conn);
+            $ctes = [];
+            $totFrete = 0.0;
+            $totPeso = 0.0;
+            $totCub = 0.0;
+            $totVol = 0;
+            while ($res && ($row = pg_fetch_assoc($res))) {
+                $serCte = $row['ser_cte'] ?? '';
+                $nroCte = (int)($row['nro_cte'] ?? 0);
+                $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : ('#' . $nroCte);
+
+                $vlrFrete = (float)($row['vlr_frete'] ?? 0);
+                $pesoNum  = (float)($row['peso'] ?? 0);
+                $cubNum   = (float)($row['cubagem'] ?? 0);
+                $qtdeVol  = (int)($row['qtde_vol'] ?? 0);
+
+                $destOrig = strtoupper(trim($row['destino_cte'] ?? ''));
+                $unidFec = strtoupper(trim((string)($row['unidade_fec'] ?? '')));
+                $destPainel = ($domainUpper === 'RVE' && $destOrig === 'FEC' && $unidFec !== '') ? $unidFec : $destOrig;
+                $destMain = $destPainel !== '' ? (string)($mapDestinoCompart[$destPainel] ?? $destPainel) : '';
+                $destMain = strtoupper(trim((string)$destMain));
+                $destDisplay = ($destMain !== '' && $destPainel !== '' && $destMain !== $destPainel) ? ($destMain . ' (' . $destPainel . ')') : $destPainel;
+
+                $totFrete += $vlrFrete;
+                $totPeso  += $pesoNum;
+                $totCub   += $cubNum;
+                $totVol   += $qtdeVol;
+
+                $ctes[] = [
+                    'seq_cte'       => $nroCte,
+                    'ctrc'          => $ctrc,
+                    'nfs'           => $row['nfs'] ?? '',
+                    'unidade_carregamento' => strtoupper(trim($row['unidade_carregamento'] ?? '')),
+                    'data_emissao'  => $row['data_emissao'] ?? '',
+                    'data_prev_ent' => $row['data_prev_ent'] ?? '',
+                    'sigla_dest'    => $destOrig,
+                    'sigla_dest_painel' => $destPainel,
+                    'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
+                    'sigla_dest_principal' => $destMain,
+                    'sigla_dest_display' => $destDisplay,
+                    'nome_pag'      => $row['pagador_cte'] ?? '',
+                    'destinatario'  => $row['destinatario_cte'] ?? '',
+                    'remetente'     => $row['remetente_cte'] ?? '',
+                    'cidade'        => $row['cidade_destino_cte'] ?? '',
+                    'vlr_frete'     => round($vlrFrete, 2),
+                    'peso'          => round($pesoNum, 2),
+                    'cubagem'       => round($cubNum, 3),
+                    'qtde_vol'      => $qtdeVol,
+                ];
+            }
+        }
+    }
 }
 
 respondJson([
