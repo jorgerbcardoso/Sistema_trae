@@ -195,11 +195,6 @@ foreach ($linhas as $linha) {
 
     if ($setor == 'SETOR') continue;
 
-    if (strtoupper($domain) === 'BNR') {
-        $cod = preg_replace('/\D/', '', (string)$codUltOcor);
-        if ($cod !== '' && in_array((int)$cod, [52, 25, 34, 11], true)) continue;
-    }
-
     $isEmTransito = !empty($prevChegada) && strpos(strtoupper($prevChegada), 'HOJE') !== false;
 
     $prevDate = '';

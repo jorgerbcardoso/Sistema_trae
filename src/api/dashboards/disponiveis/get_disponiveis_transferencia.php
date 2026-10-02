@@ -790,16 +790,6 @@ if (!empty($ctes)) {
     unset($c);
 }
 
-if (strtoupper($domain) === 'BNR' && !empty($ctes)) {
-    $bloq = ['52' => true, '25' => true, '34' => true, '11' => true];
-    $ctes = array_values(array_filter($ctes, static function($c) use ($bloq) {
-        $codRaw = trim((string)($c['codUltOcor'] ?? ''));
-        $cod = preg_replace('/\D/', '', $codRaw);
-        if ($cod === '') return true;
-        return !isset($bloq[$cod]);
-    }));
-}
-
 $ontem = date('dmy', strtotime('yesterday'));
 $hoje  = date('dmy');
 

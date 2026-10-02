@@ -66,6 +66,9 @@ interface Cte {
   nomeDest: string;
   indicadorSaida: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
   atrasoTransf: 'verde' | 'amarelo' | 'laranja' | 'vermelho' | null;
+  codUltOcor?: string;
+  descUltOcor?: string;
+  dataUltOcor?: string;
 }
 
 interface Coleta {
@@ -1317,6 +1320,8 @@ export function Disponiveis() {
   const { theme } = useTheme();
 
   const unidadeLogada = user?.unidade_atual || user?.unidade || '';
+  const domain = String(user?.domain || '').trim().toUpperCase();
+  const isBNR = domain === 'BNR';
   const isMTZ = unidadeLogada === 'MTZ' || unidadeLogada === '';
 
   const [sigla] = useState<string>(unidadeLogada);
@@ -1337,6 +1342,19 @@ export function Disponiveis() {
   const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Set<number>>(new Set());
+
+  const BNR_OCOR_PADRAO_OCULTAS = ['52', '25', '34', '11'];
+  const [bnrOcorIncluidas, setBnrOcorIncluidas] = useState<string[]>([]);
+  const [bnrFiltroOcorOpen, setBnrFiltroOcorOpen] = useState(false);
+  const toggleBnrOcor = useCallback((cod: string) => {
+    setBnrOcorIncluidas(prev => prev.includes(cod) ? prev.filter(x => x !== cod) : [...prev, cod]);
+  }, []);
+  const incluirTodasBnrOcor = useCallback(() => {
+    setBnrOcorIncluidas([...BNR_OCOR_PADRAO_OCULTAS]);
+  }, []);
+  const resetBnrOcor = useCallback(() => {
+    setBnrOcorIncluidas([]);
+  }, []);
 
   const [hubCarregamentoPlaca, setHubCarregamentoPlaca] = useState<string | null>(null);
 
@@ -1370,6 +1388,26 @@ export function Disponiveis() {
     return m;
   }, [carregamentos]);
 
+  const bnrOcorDeveOcultar = useCallback((codRaw: any) => {
+    if (!isBNR) return false;
+    const cod = String(codRaw ?? '').replace(/\D/g, '');
+    if (!cod) return false;
+    if (!BNR_OCOR_PADRAO_OCULTAS.includes(cod)) return false;
+    return !bnrOcorIncluidas.includes(cod);
+  }, [isBNR, bnrOcorIncluidas]);
+
+  const ctesTransferFiltrados = React.useMemo(() => {
+    const list = dados?.ctes ?? [];
+    if (!isBNR) return list;
+    return list.filter((c: any) => !bnrOcorDeveOcultar(c?.codUltOcor));
+  }, [dados, isBNR, bnrOcorDeveOcultar]);
+
+  const ctesEntregaFiltrados = React.useMemo(() => {
+    const list = dadosEntrega?.ctes ?? [];
+    if (!isBNR) return list;
+    return list.filter((c: any) => !bnrOcorDeveOcultar(c?.codUltOcor));
+  }, [dadosEntrega, isBNR, bnrOcorDeveOcultar]);
+
   const todosCtes = React.useMemo(() => {
     const lista: { nroCte: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[] = [];
     const vistos = new Set<number>();
@@ -1378,18 +1416,18 @@ export function Disponiveis() {
       vistos.add(nroCte);
       lista.push({ nroCte, ctrc, destinatario, cidade, peso, cubagem });
     };
-    if (dados?.ctes) {
-      for (const c of dados.ctes) {
+    if (ctesTransferFiltrados) {
+      for (const c of ctesTransferFiltrados) {
         add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
       }
     }
-    if (dadosEntrega?.ctes) {
-      for (const c of dadosEntrega.ctes) {
+    if (ctesEntregaFiltrados) {
+      for (const c of ctesEntregaFiltrados) {
         add(c.nroCte, c.ctrc, c.destinatario, c.cidade, c.peso, c.cubagem);
       }
     }
     return lista;
-  }, [dados, dadosEntrega]);
+  }, [ctesTransferFiltrados, ctesEntregaFiltrados]);
 
   const [abaAtiva, setAbaAtiva] = useState<'transferencia' | 'entrega' | 'todos'>('transferencia');
 
@@ -1630,7 +1668,7 @@ export function Disponiveis() {
   const grupos: GrupoDestino[] = React.useMemo(() => {
     if (!dados) return [];
     const map: Record<string, GrupoDestino> = {};
-    for (const cte of dados.ctes) {
+    for (const cte of ctesTransferFiltrados) {
       const key = cte.unidadeDest;
       if (!map[key]) {
         map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
@@ -1671,21 +1709,21 @@ export function Disponiveis() {
         default:             return mult * (b.totalCtes - a.totalCtes);
       }
     });
-  }, [dados, ordemCol, ordemDir]);
+  }, [dados, ctesTransferFiltrados, ordemCol, ordemDir]);
 
-  const totalArmazem  = dados?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalTransito = dados?.ctes.filter(c => c.emTransito).length ?? 0;
+  const totalArmazem  = ctesTransferFiltrados.filter(c => !c.emTransito).length ?? 0;
+  const totalTransito = ctesTransferFiltrados.filter(c => c.emTransito).length ?? 0;
   const totalColetas  = dados?.coletas.length ?? 0;
   const totalVol      = grupos.reduce((s, g) => s + g.totalVol, 0);
   const totalPeso     = grupos.reduce((s, g) => s + g.totalPeso, 0);
   const totalCubagem  = grupos.reduce((s, g) => s + g.totalCubagem, 0);
   const coletasAtrasadas = dados?.coletas.filter(c => c.statusColeta === 'atrasada' || c.statusColeta === 'coletada_atrasada').length ?? 0;
-  const ctesTransitoAlerta = dados?.ctes.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
+  const ctesTransitoAlerta = ctesTransferFiltrados.filter(c => c.emTransito && (c.atrasoTransf === 'vermelho' || c.atrasoTransf === 'laranja')).length ?? 0;
 
   const gruposSetor: GrupoSetor[] = React.useMemo(() => {
     if (!dadosEntrega) return [];
     const map: Record<string, GrupoSetor> = {};
-    for (const cte of dadosEntrega.ctes) {
+    for (const cte of ctesEntregaFiltrados) {
       const key = cte.setor || 'SEM SETOR';
       if (!map[key]) {
         map[key] = { setor: key, armazem: [], transito: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0 };
@@ -1701,14 +1739,14 @@ export function Disponiveis() {
       map[key].totalCubagem += parseFloat(cte.cubagem.replace(',', '.')) || 0;
     }
     return Object.values(map).sort((a, b) => b.totalCtes - a.totalCtes);
-  }, [dadosEntrega]);
+  }, [dadosEntrega, ctesEntregaFiltrados]);
 
-  const totalEntregaArmazem  = dadosEntrega?.ctes.filter(c => !c.emTransito).length ?? 0;
-  const totalEntregaTransito = dadosEntrega?.ctes.filter(c => c.emTransito).length ?? 0;
+  const totalEntregaArmazem  = ctesEntregaFiltrados.filter(c => !c.emTransito).length ?? 0;
+  const totalEntregaTransito = ctesEntregaFiltrados.filter(c => c.emTransito).length ?? 0;
   const totalEntregaVol      = gruposSetor.reduce((s, g) => s + g.totalVol, 0);
   const totalEntregaPeso     = gruposSetor.reduce((s, g) => s + g.totalPeso, 0);
   const totalEntregaCubagem  = gruposSetor.reduce((s, g) => s + g.totalCubagem, 0);
-  const entregaAtrasados     = dadosEntrega?.ctes.filter(c => c.diasAtraso > 0).length ?? 0;
+  const entregaAtrasados     = ctesEntregaFiltrados.filter(c => c.diasAtraso > 0).length ?? 0;
 
   const totalGeralArmazem  = totalArmazem + totalEntregaArmazem;
   const totalGeralTransito = totalTransito + totalEntregaTransito;
@@ -1748,6 +1786,78 @@ export function Disponiveis() {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               <span className="ml-1.5">Atualizar</span>
             </Button>
+          )}
+          {isBNR && !isMTZ && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBnrFiltroOcorOpen(v => !v)}
+                className="dark:border-slate-600"
+              >
+                <ListFilter className="w-4 h-4" />
+                <span className="ml-1.5">Ocorrências</span>
+              </Button>
+              {bnrFiltroOcorOpen && (
+                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-xl p-3 z-50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Filtro BNR
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                        Por padrão, estes códigos ficam desmarcados (ocultos).
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                      onClick={() => setBnrFiltroOcorOpen(false)}
+                    >
+                      <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-1">
+                    {BNR_OCOR_PADRAO_OCULTAS.map(cod => {
+                      const sel = bnrOcorIncluidas.includes(cod);
+                      return (
+                        <button
+                          key={cod}
+                          type="button"
+                          onClick={() => toggleBnrOcor(cod)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 text-left"
+                        >
+                          {sel ? (
+                            <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
+                          <span className="text-sm text-slate-800 dark:text-slate-200">Incluir ocorrência #{cod}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={resetBnrOcor}
+                      className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:underline"
+                    >
+                      Restaurar padrão
+                    </button>
+                    <button
+                      type="button"
+                      onClick={incluirTodasBnrOcor}
+                      className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Incluir todas
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       }
