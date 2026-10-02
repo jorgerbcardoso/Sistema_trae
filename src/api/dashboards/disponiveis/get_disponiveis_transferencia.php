@@ -560,8 +560,11 @@ $cteCol = static function(string $col) use ($g_sql, $tblCte, &$cteCols): bool {
 
 $selPesoCalc = $cteCol('peso_calc') ? "COALESCE(c.peso_calc::text, '')" : "''";
 $selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(c.placa_coleta, '')" : "''";
-$selCidadeEntrega = $cteCol('cidade_entrega') ? "COALESCE(c.cidade_entrega, '')" : "''";
-$selUnidadeEntrega = $cteCol('unidade_entrega') ? "COALESCE(c.unidade_entrega, '')" : "''";
+$hasSeqCidade = $cteCol('seq_cidade');
+$hasSiglaDest = $cteCol('sigla_dest');
+$joinCidade = $hasSeqCidade ? "LEFT JOIN cidade cd ON cd.seq_cidade = c.seq_cidade" : "";
+$selCidadeEntrega = $hasSeqCidade ? "COALESCE(cd.nome || '/' || cd.uf, '')" : "''";
+$selUnidadeEntrega = $hasSiglaDest ? "COALESCE(c.sigla_dest, '')" : "''";
 $selCepEntrega = $cteCol('cep_entrega') ? "COALESCE(c.cep_entrega::text, '')" : "''";
 $selEnderecoEntrega = $cteCol('endereco_entrega') ? "COALESCE(c.endereco_entrega, '')" : "''";
 $selBairroEntrega = $cteCol('bairro_entrega') ? "COALESCE(c.bairro_entrega, '')" : "''";
@@ -631,6 +634,7 @@ if (!empty($ctes)) {
             FROM {$tblCte} c
             LEFT JOIN {$tblOcor} o
               ON o.codigo = c.ult_ocor
+            {$joinCidade}
             JOIN req r
               ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
              AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
@@ -665,6 +669,7 @@ if (!empty($ctes)) {
                     {$selCustoDespDiv} AS custo_desp_div,
                     {$selCustoTransfReal} AS custo_transferencia_real
                 FROM {$tblCte} c
+                {$joinCidade}
                 JOIN req r
                   ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
                  AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))

@@ -583,8 +583,11 @@ $selHoraUltOcor = $cteCol('hora_ult_ocor')
     : "''";
 $selPesoCalc = $cteCol('peso_calc') ? "COALESCE(cte.peso_calc::text, '')" : "''";
 $selPlacaColeta = $cteCol('placa_coleta') ? "COALESCE(cte.placa_coleta, '')" : "''";
-$selCidadeEntrega = $cteCol('cidade_entrega') ? "COALESCE(cte.cidade_entrega, '')" : "''";
-$selUnidadeEntrega = $cteCol('unidade_entrega') ? "COALESCE(cte.unidade_entrega, '')" : "''";
+$hasSeqCidadeEntrega = $cteCol('seq_cidade');
+$hasSiglaDestEntrega = $cteCol('sigla_dest');
+$joinCidadeEntrega = $hasSeqCidadeEntrega ? "LEFT JOIN cidade cdent ON cdent.seq_cidade = cte.seq_cidade" : "";
+$selCidadeEntrega = $hasSeqCidadeEntrega ? "COALESCE(cdent.nome || '/' || cdent.uf, '')" : "''";
+$selUnidadeEntrega = $hasSiglaDestEntrega ? "COALESCE(cte.sigla_dest, '')" : "''";
 $selCepEntrega = $cteCol('cep_entrega') ? "COALESCE(cte.cep_entrega::text, '')" : "''";
 $selEnderecoEntrega = $cteCol('endereco_entrega') ? "COALESCE(cte.endereco_entrega, '')" : "''";
 $selBairroEntrega = $cteCol('bairro_entrega') ? "COALESCE(cte.bairro_entrega, '')" : "''";
@@ -606,6 +609,7 @@ if (strtoupper($domain) === 'RVE') {
                ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
               AND cte.nro_cte = c.nro_cte
         {$joinOcorExtra}
+        {$joinCidadeEntrega}
         LEFT JOIN {$tblCidParam} cidp
                ON cidp.seq_cidade = cte.seq_cidade_entr
     ";
@@ -619,6 +623,7 @@ if (strtoupper($domain) === 'RVE') {
                ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
               AND cte.nro_cte = c.nro_cte
         {$joinOcorExtra}
+        {$joinCidadeEntrega}
     ";
 }
 
