@@ -8138,6 +8138,7 @@ export function Disponiveis() {
   const isMTZ = sigla === 'MTZ' || sigla === '';
   const dominioUsuario = (user?.domain ?? '').trim().toUpperCase();
   const unidadeAtual = sigla;
+  const isBNR = dominioUsuario === 'BNR';
   const painelAtivo = pageVisible && location.pathname.includes('/dashboards/disponiveis');
 
   const shouldIgnoreDestinoRVE = (destinoRaw: string | null | undefined) => {
@@ -8169,7 +8170,7 @@ export function Disponiveis() {
     periodoPrevisaoFim: '',
     tempoArmazemDe: '',
     tempoArmazemAte: '',
-    ultOcorCodigos: [OCORRENCIA_SEM_CODIGO],
+    ultOcorCodigos: [],
   };
 
   const [showFilters, setShowFilters] = useState(false);
@@ -8177,9 +8178,10 @@ export function Disponiveis() {
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [todasOcorrenciasCarregadas, setTodasOcorrenciasCarregadas] = useState<{ codigo: number }[] | null>(null);
+  const [ultOcorTouched, setUltOcorTouched] = useState(false);
 
   useEffect(() => {
-    if (!showFilters || todasOcorrenciasCarregadas !== null) return;
+    if (!(showFilters || isBNR) || todasOcorrenciasCarregadas !== null) return;
     let ativo = true;
     (async () => {
       try {
@@ -8207,32 +8209,37 @@ export function Disponiveis() {
       }
     })();
     return () => { ativo = false; };
-  }, [showFilters, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
+  }, [showFilters, isBNR, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
 
-  const inicializaOcorrenciasTodasMarcadas = (base: FiltrosDisponiveis): FiltrosDisponiveis => {
+  const inicializaOcorrenciasDefault = (base: FiltrosDisponiveis): FiltrosDisponiveis => {
     if (!todasOcorrenciasCarregadas) return base;
+    const ocultarBNR = new Set(['52', '25', '34', '11']);
     const todas = [
       OCORRENCIA_SEM_CODIGO,
       ...todasOcorrenciasCarregadas.map(o => String(o.codigo))
     ];
-    return { ...base, ultOcorCodigos: todas };
+    const filtradas = isBNR ? todas.filter(c => c === OCORRENCIA_SEM_CODIGO || !ocultarBNR.has(c)) : todas;
+    return { ...base, ultOcorCodigos: filtradas };
   };
 
   useEffect(() => {
     if (!showFilters) return;
-    setTempFilters(atual => {
-      const precisaInicializar = (!atual.ultOcorCodigos?.length) ||
-        (atual.ultOcorCodigos.length === 1 && atual.ultOcorCodigos[0] === OCORRENCIA_SEM_CODIGO && todasOcorrenciasCarregadas && todasOcorrenciasCarregadas.length > 0);
-      if (!precisaInicializar) return atual;
-      return inicializaOcorrenciasTodasMarcadas(atual);
-    });
+    setTempFilters(filters);
+  }, [showFilters, filters]);
+
+  useEffect(() => {
+    if (!isBNR) return;
+    if (todasOcorrenciasCarregadas === null) return;
+    if (ultOcorTouched) return;
     setFilters(atual => {
-      const precisaInicializar = (!atual.ultOcorCodigos?.length) ||
-        (atual.ultOcorCodigos.length === 1 && atual.ultOcorCodigos[0] === OCORRENCIA_SEM_CODIGO && todasOcorrenciasCarregadas && todasOcorrenciasCarregadas.length > 0);
-      if (!precisaInicializar) return atual;
-      return inicializaOcorrenciasTodasMarcadas(atual);
+      if (atual.ultOcorCodigos?.length) return atual;
+      return inicializaOcorrenciasDefault(atual);
     });
-  }, [showFilters, todasOcorrenciasCarregadas]);
+    setTempFilters(atual => {
+      if (atual.ultOcorCodigos?.length) return atual;
+      return inicializaOcorrenciasDefault(atual);
+    });
+  }, [isBNR, todasOcorrenciasCarregadas, ultOcorTouched]);
 
   const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
@@ -9747,10 +9754,17 @@ export function Disponiveis() {
     const temFiltro = sel.length > 0;
     const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
     const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
+    const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
+    const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (filters.unidadeDestino?.length) {
         if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
+      }
+      if (ocultarPadraoBNR) {
+        const anyCte = cte as any;
+        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
+        if (rawCod && ocultarBNR.has(rawCod)) return false;
       }
       if (temFiltro) {
         const anyCte = cte as any;
@@ -9779,7 +9793,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dados, dadosHub, filters.unidadeDestino, filters.ultOcorCodigos, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
+  }, [dados, dadosHub, filters.unidadeDestino, filters.ultOcorCodigos, ultOcorTouched, isBNR, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
     const totals: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
@@ -9928,8 +9942,15 @@ export function Disponiveis() {
     const temFiltro = sel.length > 0;
     const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
     const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
+    const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
+    const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
+      if (ocultarPadraoBNR) {
+        const anyCte = cte as any;
+        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
+        if (rawCod && ocultarBNR.has(rawCod)) return false;
+      }
       if (temFiltro) {
         const anyCte = cte as any;
         const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
@@ -9952,16 +9973,14 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, dominioUsuario, unidadeAtual]);
+  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, ultOcorTouched, isBNR, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
     const base = { ...filtrosVazios };
-    const todas = todasOcorrenciasCarregadas
-      ? [OCORRENCIA_SEM_CODIGO, ...todasOcorrenciasCarregadas.map(o => String(o.codigo))]
-      : base.ultOcorCodigos;
-    const full = { ...base, ultOcorCodigos: todas };
+    const full = inicializaOcorrenciasDefault(base);
     setFilters(full);
     setTempFilters(full);
+    setUltOcorTouched(false);
   };
 
   const cancelFilters = () => {
@@ -10497,10 +10516,13 @@ export function Disponiveis() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). Padrão: todas as ocorrências marcadas</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). No BNR: 52/25/34/11 começam desmarcadas</p>
                         <OcorrenciasMultiSelect
                           value={tempFilters.ultOcorCodigos}
-                          onChange={(value) => setTempFilters({ ...tempFilters, ultOcorCodigos: value })}
+                          onChange={(value) => {
+                            setUltOcorTouched(true);
+                            setTempFilters({ ...tempFilters, ultOcorCodigos: value });
+                          }}
                           domain={user?.domain}
                           label="Última Ocorrência"
                           emptyHint={<><strong>Nenhuma ocorrência selecionada</strong> = sem filtro (todas as ocorrências)</>}
