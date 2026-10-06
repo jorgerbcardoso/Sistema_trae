@@ -1704,6 +1704,7 @@ function GrupoSetorCard({
 interface CarregamentoAreaProps {
   abaAtiva: 'transferencia' | 'entrega' | 'todos';
   sigla: string;
+  loginUsuario: string;
   carregamentos: Carregamento[];
   loadingCarregamentos: boolean;
   carregamentosTransferOpen: boolean;
@@ -1722,7 +1723,7 @@ interface CarregamentoAreaProps {
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
-  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[]) => Promise<{ ok: boolean; message?: string; total?: number; fora?: number; cap_tipo?: string }>;
+  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[], opts?: { previsaoAte?: string }) => Promise<{ ok: boolean; message?: string; total?: number; fora?: number; cap_tipo?: string }>;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
@@ -6242,11 +6243,16 @@ function ModalCarregamentoAutomaticoEntrega({
   onFechar,
 }: {
   setores: GrupoSetor[];
-  onConfirmar: (setores: string[]) => Promise<void>;
+  onConfirmar: (setores: string[], opts: { previsaoAte: string }) => Promise<void>;
   onFechar: () => void;
 }) {
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
+  const [previsaoAte, setPrevisaoAte] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
   const setoresFiltrados = useMemo(() => {
     const b = busca.trim().toUpperCase();
@@ -6311,6 +6317,20 @@ function ModalCarregamentoAutomaticoEntrega({
             </p>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Previsão de entrega (até)</label>
+              <Input
+                type="date"
+                value={previsaoAte}
+                onChange={(e) => setPrevisaoAte(e.target.value)}
+              />
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Por padrão: até amanhã. Seleciona CT-es com previsão de entrega até esta data.
+              </p>
+            </div>
+          </div>
+
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="grid grid-cols-[36px_minmax(0,1fr)_80px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
               <span />
@@ -6359,14 +6379,14 @@ function ModalCarregamentoAutomaticoEntrega({
           <Button
             variant="outline"
             disabled={!podeCarregarTodos}
-            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean))}
+            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean), { previsaoAte })}
           >
             Carregar todos
           </Button>
           <Button
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
             disabled={!podeCarregarSelecionados}
-            onClick={() => onConfirmar(selected)}
+            onClick={() => onConfirmar(selected, { previsaoAte })}
           >
             Carregar selecionados
           </Button>
@@ -6379,6 +6399,7 @@ function ModalCarregamentoAutomaticoEntrega({
 function CarregamentoArea({
   abaAtiva,
   sigla,
+  loginUsuario,
   carregamentos,
   loadingCarregamentos,
   carregamentosTransferOpen,
@@ -6424,6 +6445,7 @@ function CarregamentoArea({
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [loadingEntregaAuto, setLoadingEntregaAuto] = useState(false);
+  const [entregaExibir, setEntregaExibir] = useState<'meus' | 'todos'>('meus');
   const [excluindoTodosEntrega, setExcluindoTodosEntrega] = useState(false);
   const [resumoEntregaOpen, setResumoEntregaOpen] = useState(false);
   const [resumoEntregaItens, setResumoEntregaItens] = useState<{ setor: string; placa: string; inseridos: number; fora: number; cap_tipo?: string }[]>([]);
@@ -6432,58 +6454,6 @@ function CarregamentoArea({
   const [capSaving, setCapSaving] = useState(false);
   const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
   const tooltipStyle = useTooltipStyle();
-  useEffect(() => {
-    // #region debug-point D:window-errors
-    const onErr = (ev: any) => {
-      try {
-        fetch('http://127.0.0.1:7777/event', {
-          method: 'POST',
-          body: JSON.stringify({
-            sessionId: 'transfer-block-pe-error',
-            runId: 'pre-fix',
-            hypothesisId: 'D',
-            location: 'Disponiveis.tsx:CarregamentoArea:window.error',
-            msg: '[DEBUG] window.error',
-            data: {
-              message: String(ev?.message ?? ''),
-              filename: String(ev?.filename ?? ''),
-              lineno: Number(ev?.lineno ?? 0) || 0,
-              colno: Number(ev?.colno ?? 0) || 0,
-              stack: String(ev?.error?.stack ?? ''),
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {}
-    };
-    const onRej = (ev: any) => {
-      try {
-        const reason = ev?.reason;
-        fetch('http://127.0.0.1:7777/event', {
-          method: 'POST',
-          body: JSON.stringify({
-            sessionId: 'transfer-block-pe-error',
-            runId: 'pre-fix',
-            hypothesisId: 'D',
-            location: 'Disponiveis.tsx:CarregamentoArea:window.unhandledrejection',
-            msg: '[DEBUG] window.unhandledrejection',
-            data: {
-              reason: String(reason?.message ?? reason ?? ''),
-              stack: String(reason?.stack ?? ''),
-            },
-            ts: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {}
-    };
-    window.addEventListener('error', onErr);
-    window.addEventListener('unhandledrejection', onRej);
-    return () => {
-      window.removeEventListener('error', onErr);
-      window.removeEventListener('unhandledrejection', onRej);
-    };
-    // #endregion
-  }, []);
   const isAtivoCarregamento = useCallback((c: Carregamento) => {
     const dt = String((c as any)?.data_finalizacao ?? (c as any)?.dataFinalizacao ?? '').trim();
     return dt === '';
@@ -6577,6 +6547,13 @@ function CarregamentoArea({
     return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && isEntregaCarregamento(c) && mostrarCarregamentoAdiado(c));
   }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento, mostrarCarregamentoAdiado]);
 
+  const carregamentosEntregaVisiveis = React.useMemo(() => {
+    if (entregaExibir === 'todos') return carregamentosEntrega;
+    const login = String(loginUsuario ?? '').trim().toUpperCase();
+    if (!login) return carregamentosEntrega;
+    return carregamentosEntrega.filter((c) => String((c as any).login_criacao ?? '').trim().toUpperCase() === login);
+  }, [carregamentosEntrega, entregaExibir, loginUsuario]);
+
   const carregamentosTransferencia = React.useMemo(() => {
     return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && !isEntregaCarregamento(c) && mostrarCarregamentoAdiado(c));
   }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento, mostrarCarregamentoAdiado]);
@@ -6616,12 +6593,13 @@ function CarregamentoArea({
     onCriarCarregamento(placa, destino, paradas);
   };
 
-  const handleCarregarAutomaticoEntrega = async (setores: string[]) => {
+  const handleCarregarAutomaticoEntrega = async (setores: string[], opts: { previsaoAte: string }) => {
     if (loadingEntregaAuto) return;
     try {
       setLoadingEntregaAuto(true);
       const setoresOk = (setores ?? []).map((s) => String(s ?? '').trim().toUpperCase()).filter(Boolean);
       if (setoresOk.length === 0) return;
+      const previsaoAte = String(opts?.previsaoAte ?? '').trim();
 
       const placasUsadas = new Set(
         (carregamentos ?? [])
@@ -6646,7 +6624,7 @@ function CarregamentoArea({
         }
         placasUsadas.add(placa);
 
-        const res = await onCarregamentoAutomaticoEntrega(placa, [setor]);
+        const res = await onCarregamentoAutomaticoEntrega(placa, [setor], { previsaoAte });
         if (res.ok) {
           const add = Number(res.total ?? 0) || 0;
           const fora = Number(res.fora ?? 0) || 0;
@@ -6822,6 +6800,10 @@ function CarregamentoArea({
 
   const handleExcluirTodosEntrega = async () => {
     if (excluindoTodosEntrega) return;
+    if (entregaExibir !== 'todos') {
+      toast.info('Para excluir TODOS os carregamentos de entrega da unidade, altere Exibir para "Todos".');
+      return;
+    }
     const qtd = carregamentosEntrega.length;
     if (qtd <= 0) return;
     const ok = await confirmar({
@@ -8136,28 +8118,7 @@ function CarregamentoArea({
         <button
           type="button"
           className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-          onClick={() => {
-            // #region debug-point A:toggle-transfer
-            fetch('http://127.0.0.1:7777/event', {
-              method: 'POST',
-              body: JSON.stringify({
-                sessionId: 'transfer-block-pe-error',
-                runId: 'pre-fix',
-                hypothesisId: 'A',
-                location: 'Disponiveis.tsx:transfer.toggle',
-                msg: '[DEBUG] click transfer toggle',
-                data: {
-                  openBefore: !!carregamentosTransferOpen,
-                  qtdTransfer: Number(carregamentosTransferencia?.length ?? 0) || 0,
-                  importandoCarregamentos: !!importandoCarregamentos,
-                  loadingCarregamentos: !!loadingCarregamentos,
-                },
-                ts: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion
-            setCarregamentosTransferOpen((v) => !v);
-          }}
+          onClick={() => setCarregamentosTransferOpen((v) => !v)}
         >
           <div className="flex items-center gap-2">
             <Truck className="w-4 h-4 text-emerald-500" />
@@ -8309,9 +8270,9 @@ function CarregamentoArea({
             <Truck className="w-4 h-4 text-emerald-500" />
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Carregamentos de Entrega</h3>
             {loadingCarregamentos && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-            {carregamentosEntrega.length > 0 ? (
+            {carregamentosEntregaVisiveis.length > 0 ? (
               <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-xs">
-                {carregamentosEntrega.length} carregamento{carregamentosEntrega.length !== 1 ? 's' : ''}
+                {carregamentosEntregaVisiveis.length} carregamento{carregamentosEntregaVisiveis.length !== 1 ? 's' : ''}
               </Badge>
             ) : null}
           </div>
@@ -8321,13 +8282,30 @@ function CarregamentoArea({
         {carregamentosEntregaOpen && (
           <>
             <div className="flex flex-wrap gap-2 justify-end px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <div className="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 mr-auto">
+                <span className="px-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">Exibir</span>
+                <button
+                  type="button"
+                  className={`h-7 px-2 text-[11px] font-semibold border-l border-slate-200 dark:border-slate-700 ${entregaExibir === 'meus' ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  onClick={() => setEntregaExibir('meus')}
+                >
+                  Meus
+                </button>
+                <button
+                  type="button"
+                  className={`h-7 px-2 text-[11px] font-semibold border-l border-slate-200 dark:border-slate-700 ${entregaExibir === 'todos' ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                  onClick={() => setEntregaExibir('todos')}
+                >
+                  Todos
+                </button>
+              </div>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-xs h-8 border-red-300 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                 onClick={() => { void handleExcluirTodosEntrega(); }}
-                disabled={excluindoTodosEntrega || carregamentosEntrega.length === 0}
-                title={carregamentosEntrega.length === 0 ? 'Nenhum carregamento de entrega em andamento' : 'Excluir todos os carregamentos de entrega'}
+                disabled={entregaExibir !== 'todos' || excluindoTodosEntrega || carregamentosEntrega.length === 0}
+                title={entregaExibir !== 'todos' ? 'Altere Exibir para "Todos" para habilitar' : (carregamentosEntrega.length === 0 ? 'Nenhum carregamento de entrega em andamento' : 'Excluir todos os carregamentos de entrega')}
               >
                 {excluindoTodosEntrega ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
                 Excluir todos
@@ -8363,7 +8341,7 @@ function CarregamentoArea({
               </Badge>
             </div>
 
-            {carregamentosEntrega.length === 0 && !loadingCarregamentos ? (
+            {carregamentosEntregaVisiveis.length === 0 && !loadingCarregamentos ? (
               <div className="flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500">
                 <Truck className="w-10 h-10 mb-2 opacity-20" />
                 <p className="text-sm">Nenhum carregamento de entrega em andamento</p>
@@ -8371,7 +8349,7 @@ function CarregamentoArea({
               </div>
             ) : (
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {carregamentosEntrega.map((c, i) => {
+                {carregamentosEntregaVisiveis.map((c, i) => {
                   const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
                   const isOver = !!dragEntregaOver && placa === dragEntregaOver;
                   const isDragging = !!dragEntregaOrigem && placa === dragEntregaOrigem;
@@ -9228,13 +9206,14 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos]);
 
-  const handleCarregamentoAutomaticoEntrega = useCallback(async (placa: string, setores: string[]) => {
+  const handleCarregamentoAutomaticoEntrega = useCallback(async (placa: string, setores: string[], opts?: { previsaoAte?: string }) => {
     const placaOk = String(placa ?? '').trim().toUpperCase();
     const setoresOk = (Array.isArray(setores) ? setores : [])
       .map((s) => String(s ?? '').trim().toUpperCase())
       .filter(Boolean);
 
     if (!placaOk) return { ok: false, message: 'Informe a placa/identificação.' };
+    const previsaoAteIso = String(opts?.previsaoAte ?? '').trim();
 
     const parsePrevEntTs = (v: string): number => {
       const s = String(v ?? '').trim();
@@ -9251,6 +9230,15 @@ export function Disponiveis() {
       const ts = d.getTime();
       return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
     };
+
+    const limitePrevEntTs = (() => {
+      if (!previsaoAteIso) return null;
+      const dt = parseDataISO(previsaoAteIso);
+      if (!dt) return null;
+      const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59, 999);
+      const ts = d.getTime();
+      return Number.isNaN(ts) ? null : ts;
+    })();
 
     const ctesBase = (() => {
       const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
@@ -9270,6 +9258,10 @@ export function Disponiveis() {
       const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
       return list.filter((cte) => {
         if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
+        if (limitePrevEntTs !== null) {
+          const ts = parsePrevEntTs(String((cte as any).prevEnt ?? ''));
+          if (!Number.isFinite(ts) || ts > limitePrevEntTs) return false;
+        }
         if (previsaoInicio || previsaoFim) {
           if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
         }
@@ -9318,6 +9310,9 @@ export function Disponiveis() {
       const capMaxM3 = maxCap && maxCap.m3 > 0 ? maxCap.m3 : null;
 
       const ctesOrdenados = [...ctesSel].sort((a, b) => {
+        const aa = getAgendamentoOrdem(String((a as any).agendamento ?? ''), String((a as any).prevEnt ?? ''));
+        const bb = getAgendamentoOrdem(String((b as any).agendamento ?? ''), String((b as any).prevEnt ?? ''));
+        if (aa !== bb) return aa - bb;
         const ta = parsePrevEntTs(String((a as any).prevEnt ?? ''));
         const tb = parsePrevEntTs(String((b as any).prevEnt ?? ''));
         return (ta - tb) || (Number(a.nroCte ?? 0) - Number(b.nroCte ?? 0));
@@ -11896,6 +11891,7 @@ export function Disponiveis() {
           <CarregamentoArea
             abaAtiva={abaAtiva}
             sigla={sigla}
+            loginUsuario={String(user?.username ?? '')}
             carregamentos={carregamentos}
             loadingCarregamentos={loadingCarregamentos}
             carregamentosTransferOpen={carregamentosTransferOpen}
