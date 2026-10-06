@@ -2199,6 +2199,9 @@ function CardCarregamento({
   const modoCarregCteDetalhe = String((carregamento as any).modo_carregamento ?? (carregamento as any).modoCarregamento ?? '').trim().toUpperCase();
   const setoresEntregaCteDetalhe = String((carregamento as any).setores_entrega ?? (carregamento as any).setoresEntrega ?? '').trim();
   const isEntregaCteDetalhe = modoCarregCteDetalhe === 'ENTREGA' || (setoresEntregaCteDetalhe !== '' && String(carregamento.destino ?? '').trim() === '');
+  const placa1 = String(carregamento.placa_provisoria ?? '').trim().toUpperCase();
+  const placa2 = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
+  const isConjunto = !!placa2;
 
   const cteDetalheListaOrdenada = React.useMemo(() => {
     const parseBrDate = (v: any): number => {
@@ -2573,10 +2576,6 @@ function CardCarregamento({
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const placa1 = String(carregamento.placa_provisoria ?? '').trim().toUpperCase();
-  const placa2 = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
-  const isConjunto = !!placa2;
   const ativo = modoApontamento === placa1;
   const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${placa1}`;
 
@@ -6433,6 +6432,58 @@ function CarregamentoArea({
   const [capSaving, setCapSaving] = useState(false);
   const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
   const tooltipStyle = useTooltipStyle();
+  useEffect(() => {
+    // #region debug-point D:window-errors
+    const onErr = (ev: any) => {
+      try {
+        fetch('http://127.0.0.1:7777/event', {
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId: 'transfer-block-pe-error',
+            runId: 'pre-fix',
+            hypothesisId: 'D',
+            location: 'Disponiveis.tsx:CarregamentoArea:window.error',
+            msg: '[DEBUG] window.error',
+            data: {
+              message: String(ev?.message ?? ''),
+              filename: String(ev?.filename ?? ''),
+              lineno: Number(ev?.lineno ?? 0) || 0,
+              colno: Number(ev?.colno ?? 0) || 0,
+              stack: String(ev?.error?.stack ?? ''),
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch {}
+    };
+    const onRej = (ev: any) => {
+      try {
+        const reason = ev?.reason;
+        fetch('http://127.0.0.1:7777/event', {
+          method: 'POST',
+          body: JSON.stringify({
+            sessionId: 'transfer-block-pe-error',
+            runId: 'pre-fix',
+            hypothesisId: 'D',
+            location: 'Disponiveis.tsx:CarregamentoArea:window.unhandledrejection',
+            msg: '[DEBUG] window.unhandledrejection',
+            data: {
+              reason: String(reason?.message ?? reason ?? ''),
+              stack: String(reason?.stack ?? ''),
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onRej);
+    return () => {
+      window.removeEventListener('error', onErr);
+      window.removeEventListener('unhandledrejection', onRej);
+    };
+    // #endregion
+  }, []);
   const isAtivoCarregamento = useCallback((c: Carregamento) => {
     const dt = String((c as any)?.data_finalizacao ?? (c as any)?.dataFinalizacao ?? '').trim();
     return dt === '';
@@ -8085,7 +8136,28 @@ function CarregamentoArea({
         <button
           type="button"
           className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-          onClick={() => setCarregamentosTransferOpen((v) => !v)}
+          onClick={() => {
+            // #region debug-point A:toggle-transfer
+            fetch('http://127.0.0.1:7777/event', {
+              method: 'POST',
+              body: JSON.stringify({
+                sessionId: 'transfer-block-pe-error',
+                runId: 'pre-fix',
+                hypothesisId: 'A',
+                location: 'Disponiveis.tsx:transfer.toggle',
+                msg: '[DEBUG] click transfer toggle',
+                data: {
+                  openBefore: !!carregamentosTransferOpen,
+                  qtdTransfer: Number(carregamentosTransferencia?.length ?? 0) || 0,
+                  importandoCarregamentos: !!importandoCarregamentos,
+                  loadingCarregamentos: !!loadingCarregamentos,
+                },
+                ts: Date.now(),
+              }),
+            }).catch(() => {});
+            // #endregion
+            setCarregamentosTransferOpen((v) => !v);
+          }}
         >
           <div className="flex items-center gap-2">
             <Truck className="w-4 h-4 text-emerald-500" />
