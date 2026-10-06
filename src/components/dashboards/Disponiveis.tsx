@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useTooltipStyle } from './CustomTooltip';
@@ -294,6 +295,7 @@ interface Carregamento {
   capacidade_m3: number | null;
   vlr_min_frete?: number | null;
   vlr_frete_carreteiro?: number | null;
+  seq_carregamento_conjunto?: number | null;
   destino?: string | null;
   destinos_card?: string | null;
   paradas?: string | null;
@@ -2124,6 +2126,7 @@ function escolherIntermediariasLinha(
 
 function CardCarregamento({
   carregamento,
+  carregamentoConjunto,
   unidadeAtual,
   todosCtes,
   cteKeysDisponiveisTransferencia,
@@ -2144,6 +2147,7 @@ function CardCarregamento({
   importandoCarregamentos,
 }: {
   carregamento: Carregamento;
+  carregamentoConjunto?: Carregamento | null;
   unidadeAtual: string;
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   cteKeysDisponiveisTransferencia: Set<string>;
@@ -2179,6 +2183,8 @@ function CardCarregamento({
   const [placaVerdadeira, setPlacaVerdadeira] = useState('');
   const [iniciandoSimulacao, setIniciandoSimulacao] = useState(false);
   const [cteDetalheDialogOpen, setCteDetalheDialogOpen] = useState(false);
+  const [cteDetalheAbaConjunto, setCteDetalheAbaConjunto] = useState<'placa1' | 'placa2' | 'todas'>('todas');
+  const [cteDetalheListasConjunto, setCteDetalheListasConjunto] = useState<null | { placa1: any[]; placa2: any[] }>(null);
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
   const [loadingCteDetalhe, setLoadingCteDetalhe] = useState(false);
@@ -2297,9 +2303,10 @@ function CardCarregamento({
   const finalizarELevarAoSSW = async () => {
     if (finalizando) return;
     const placa = carregamento.placa_provisoria;
+    const placaConj = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
     const ok = await confirmar({
       title: 'Finalizar carregamento?',
-      description: `Finalizar o carregamento ${placa}?`,
+      description: placaConj ? `Finalizar os carregamentos ${String(placa ?? '').trim().toUpperCase()} + ${placaConj}?` : `Finalizar o carregamento ${placa}?`,
       confirmText: 'Finalizar',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -2307,17 +2314,30 @@ function CardCarregamento({
     if (!ok) return;
     setFinalizando(true);
     try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'finalizar_carregamento', placa }) },
-        true
-      );
-      if (res?.success) {
-        toast.success(`Carregamento ${placa} finalizado.`);
-        await onRecarregarCarregamentos();
-      } else {
-        toast.error(res?.message || 'Erro ao finalizar carregamento.');
+      const finalizarUm = async (p: string) => {
+        return apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'finalizar_carregamento', placa: p }) },
+          true
+        );
+      };
+      const p1 = String(placa ?? '').trim().toUpperCase();
+      const res1 = await finalizarUm(p1);
+      if (!res1?.success) {
+        toast.error(res1?.message || 'Erro ao finalizar carregamento.');
+        return;
       }
+      if (placaConj) {
+        const res2 = await finalizarUm(placaConj);
+        if (!res2?.success) {
+          toast.error(res2?.message || 'Erro ao finalizar carregamento conjunto.');
+          return;
+        }
+        toast.success(`Carregamentos finalizados: ${p1} + ${placaConj}.`);
+      } else {
+        toast.success(`Carregamento ${p1} finalizado.`);
+      }
+      await onRecarregarCarregamentos();
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao finalizar carregamento.');
     } finally {
@@ -2361,45 +2381,94 @@ function CardCarregamento({
 
   const abrirCteDetalhe = async () => {
     setCteDetalheDialogOpen(true);
+    setCteDetalheAbaConjunto('todas');
+    setCteDetalheListasConjunto(null);
     setCteDetalheLista([]);
     cteDetalheListaRef.current = [];
     setCteDetalheTotais(null);
     setLoadingCteDetalhe(true);
     setCteDetalheSelecionados(new Set());
-    const titulo = `Carregamento ${carregamento.placa_provisoria}`;
+    const titulo = isConjunto ? `Carregamento conjunto ${placa1} + ${placa2}` : `Carregamento ${placa1}`;
     cteDetalheTituloRef.current = titulo;
     try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null }) },
-        true
-      );
-      if (res.success) {
-        setCteDetalheLista(res.ctes ?? []);
-        cteDetalheListaRef.current = res.ctes ?? [];
-        setCteDetalheTotais(res.totais ?? null);
-        try {
-          const totais = res?.totais ?? null;
-          const lista = Array.isArray(res?.ctes) ? res.ctes : [];
-          const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-          const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
-            const v = parseMoeda(String(c?.vlr_frete ?? '0'));
-            const rem = normalizePessoa(String(c?.remetente ?? ''));
-            const pag = normalizePessoa(String(c?.nome_pag ?? ''));
-            if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-            else acc.fob += v;
-            return acc;
-          }, { cif: 0, fob: 0 });
-          setTotaisCard({
-            peso: normPesoKgTotal(totais?.peso ?? 0),
-            cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
-            vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
-            cif: frete.cif,
-            fob: frete.fob,
-          });
-        } catch {}
+      const fetchLista = async (p: string, seq: any) => {
+        return apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ placa: p, seq_carregamento: seq ?? null }) },
+          true
+        );
+      };
+
+      if (!isConjunto) {
+        const res = await fetchLista(placa1, carregamento.seq_carregamento ?? null);
+        if (res.success) {
+          setCteDetalheLista(res.ctes ?? []);
+          cteDetalheListaRef.current = res.ctes ?? [];
+          setCteDetalheTotais(res.totais ?? null);
+          try {
+            const totais = res?.totais ?? null;
+            const lista = Array.isArray(res?.ctes) ? res.ctes : [];
+            const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+            const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
+              const v = parseMoeda(String(c?.vlr_frete ?? '0'));
+              const rem = normalizePessoa(String(c?.remetente ?? ''));
+              const pag = normalizePessoa(String(c?.nome_pag ?? ''));
+              if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
+              else acc.fob += v;
+              return acc;
+            }, { cif: 0, fob: 0 });
+            setTotaisCard({
+              peso: normPesoKgTotal(totais?.peso ?? 0),
+              cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
+              vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
+              cif: frete.cif,
+              fob: frete.fob,
+            });
+          } catch {}
+        } else {
+          toast.error(res.message || 'Erro ao carregar CT-es');
+        }
       } else {
-        toast.error(res.message || 'Erro ao carregar CT-es');
+        const [r1, r2] = await Promise.all([
+          fetchLista(placa1, carregamento.seq_carregamento ?? null),
+          fetchLista(placa2, carregamentoConjunto?.seq_carregamento ?? null),
+        ]);
+        if (!r1?.success || !r2?.success) {
+          toast.error((!r1?.success ? r1?.message : r2?.message) || 'Erro ao carregar CT-es');
+        } else {
+          const l1 = (r1.ctes ?? []).map((c: any) => ({ ...c, __placa: placa1 }));
+          const l2 = (r2.ctes ?? []).map((c: any) => ({ ...c, __placa: placa2 }));
+          const merged = [...l1, ...l2];
+          setCteDetalheListasConjunto({ placa1: l1, placa2: l2 });
+          setCteDetalheLista(merged);
+          cteDetalheListaRef.current = merged;
+          const t1 = r1.totais ?? {};
+          const t2 = r2.totais ?? {};
+          setCteDetalheTotais({
+            peso: (Number(t1.peso ?? 0) || 0) + (Number(t2.peso ?? 0) || 0),
+            cubagem: (Number(t1.cubagem ?? 0) || 0) + (Number(t2.cubagem ?? 0) || 0),
+            vlr_frete: (Number(t1.vlr_frete ?? 0) || 0) + (Number(t2.vlr_frete ?? 0) || 0),
+            qtde_vol: (Number(t1.qtde_vol ?? 0) || 0) + (Number(t2.qtde_vol ?? 0) || 0),
+          });
+          try {
+            const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+            const frete = merged.reduce((acc: { cif: number; fob: number }, c: any) => {
+              const v = parseMoeda(String(c?.vlr_frete ?? '0'));
+              const rem = normalizePessoa(String(c?.remetente ?? ''));
+              const pag = normalizePessoa(String(c?.nome_pag ?? ''));
+              if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
+              else acc.fob += v;
+              return acc;
+            }, { cif: 0, fob: 0 });
+            setTotaisCard({
+              peso: merged.reduce((s: number, c: any) => s + normPesoKgTotal(c?.peso ?? 0), 0),
+              cubagem: merged.reduce((s: number, c: any) => s + parseCubagem(String(c?.cubagem ?? '0')), 0),
+              vlr_frete: merged.reduce((s: number, c: any) => s + parseMoeda(String(c?.vlr_frete ?? '0')), 0),
+              cif: frete.cif,
+              fob: frete.fob,
+            });
+          } catch {}
+        }
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar CT-es');
@@ -2408,7 +2477,23 @@ function CardCarregamento({
     }
   };
 
+  useEffect(() => {
+    if (!isConjunto) return;
+    if (!cteDetalheListasConjunto) return;
+    const next =
+      cteDetalheAbaConjunto === 'placa1' ? cteDetalheListasConjunto.placa1 :
+      cteDetalheAbaConjunto === 'placa2' ? cteDetalheListasConjunto.placa2 :
+      [...cteDetalheListasConjunto.placa1, ...cteDetalheListasConjunto.placa2];
+    setCteDetalheLista(next);
+    cteDetalheListaRef.current = next;
+    setCteDetalheSelecionados(new Set());
+  }, [isConjunto, cteDetalheAbaConjunto, cteDetalheListasConjunto]);
+
   const removerCtesSelecionados = async () => {
+    if (isConjunto && cteDetalheAbaConjunto === 'todas') {
+      toast.info('Para excluir CT-es, selecione a aba PLACA1 ou PLACA2.');
+      return;
+    }
     if (cteDetalheSelecionados.size === 0) return;
     const qtd = cteDetalheSelecionados.size;
     const ok = await confirmar({
@@ -2422,9 +2507,12 @@ function CardCarregamento({
     setLoadingCteDetalhe(true);
     try {
       const seq_ctes = Array.from(cteDetalheSelecionados.values()).filter(n => Number.isFinite(n) && n > 0);
+      const placaRemocao = isConjunto
+        ? (cteDetalheAbaConjunto === 'placa2' ? placa2 : placa1)
+        : placa1;
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', placa: carregamento.placa_provisoria, seq_ctes }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', placa: placaRemocao, seq_ctes }) },
         true
       );
       if (!res?.success) {
@@ -2433,7 +2521,7 @@ function CardCarregamento({
       }
       const resList = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria }) },
+        { method: 'POST', body: JSON.stringify({ placa: placaRemocao }) },
         true
       );
       if (resList.success) {
@@ -2455,19 +2543,27 @@ function CardCarregamento({
     const lista = cteDetalheListaRef.current;
     const titulo = cteDetalheTituloRef.current;
     if (!lista.length) return;
-    const header = ['CTRC', 'NFs', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
-    const rows = lista.map((c: any) => [
-      c.ctrc,
-      `"${String(c.nfs ?? '').replace(/"/g, '""')}"`,
-      `"${String(c.unidade_carregamento ?? '')}"`,
-      c.data_emissao,
-      c.data_prev_ent,
-      `"${String(c.sigla_dest ?? '')}"`,
-      `"${String(c.nome_pag ?? '').replace(/"/g, '""')}"`,
-      parseMoeda(String(c.vlr_frete ?? '0')).toFixed(2).replace('.', ','),
-      normPesoKgCte(c.peso ?? 0).toFixed(2).replace('.', ','),
-      parseCubagem(String(c.cubagem ?? '0')).toFixed(3).replace('.', ','),
-    ]);
+    const isConjuntoCsv = !!cteDetalheListasConjunto;
+    const header = isConjuntoCsv
+      ? ['Placa', 'CTRC', 'NFs', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)']
+      : ['CTRC', 'NFs', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
+    const rows = lista.map((c: any) => {
+      const base = [
+        c.ctrc,
+        `"${String(c.nfs ?? '').replace(/"/g, '""')}"`,
+        `"${String(c.unidade_carregamento ?? '')}"`,
+        c.data_emissao,
+        c.data_prev_ent,
+        `"${String(c.sigla_dest ?? '')}"`,
+        `"${String(c.nome_pag ?? '').replace(/"/g, '""')}"`,
+        parseMoeda(String(c.vlr_frete ?? '0')).toFixed(2).replace('.', ','),
+        normPesoKgCte(c.peso ?? 0).toFixed(2).replace('.', ','),
+        parseCubagem(String(c.cubagem ?? '0')).toFixed(3).replace('.', ','),
+      ];
+      if (!isConjuntoCsv) return base;
+      const placa = String((c as any).__placa ?? '').trim().toUpperCase();
+      return [`"${placa.replace(/"/g, '""')}"`, ...base];
+    });
     const csv = [header.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -2478,12 +2574,19 @@ function CardCarregamento({
     URL.revokeObjectURL(url);
   };
 
-  const ativo = modoApontamento === carregamento.placa_provisoria;
-  const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${carregamento.placa_provisoria ?? ''}`;
+  const placa1 = String(carregamento.placa_provisoria ?? '').trim().toUpperCase();
+  const placa2 = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
+  const isConjunto = !!placa2;
+  const ativo = modoApontamento === placa1;
+  const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${placa1}`;
 
-  const qtdeCtesArray = (carregamento.ctes?.length ?? 0) || 0;
-  const qtdeCtesHeader = Number(carregamento.total_ctes ?? 0) || 0;
-  const qtdeCtesCarreg = Math.max(qtdeCtesArray, qtdeCtesHeader);
+  const qtdeCtesArray1 = (carregamento.ctes?.length ?? 0) || 0;
+  const qtdeCtesHeader1 = Number(carregamento.total_ctes ?? 0) || 0;
+  const qtdeCtesCarreg1 = Math.max(qtdeCtesArray1, qtdeCtesHeader1);
+  const qtdeCtesArray2 = carregamentoConjunto ? ((carregamentoConjunto.ctes?.length ?? 0) || 0) : 0;
+  const qtdeCtesHeader2 = carregamentoConjunto ? (Number(carregamentoConjunto.total_ctes ?? 0) || 0) : 0;
+  const qtdeCtesCarreg2 = carregamentoConjunto ? Math.max(qtdeCtesArray2, qtdeCtesHeader2) : 0;
+  const qtdeCtesCarreg = qtdeCtesCarreg1 + qtdeCtesCarreg2;
 
   const normPesoKgCte = (v: any): number => {
     const n = parsePeso(String(v ?? ''));
@@ -2496,14 +2599,17 @@ function CardCarregamento({
     return n; // tratar como kg sem escalonamento automático
   };
 
-  const pesoDoCarregamento = normPesoKgTotal(carregamento.total_peso ?? 0);
-  const cubagemDoCarregamento = Number(carregamento.total_cubagem ?? 0) || 0;
-  const freteDoCarregamento = Number(carregamento.total_frete ?? 0) || 0;
+  const pesoDoCarregamento = normPesoKgTotal((Number(carregamento.total_peso ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_peso ?? 0) || 0) : 0));
+  const cubagemDoCarregamento = (Number(carregamento.total_cubagem ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_cubagem ?? 0) || 0) : 0);
+  const freteDoCarregamento = (Number(carregamento.total_frete ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_frete ?? 0) || 0) : 0);
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-  const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + normPesoKgCte((c as any)?.peso ?? ''), 0);
-  const totalCubagemLocal = qtdeCtesCarreg === 0 ? 0 : (carregamento.ctes ?? []).reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
-  const freteTotalsLocal = (qtdeCtesCarreg === 0) ? { cif: 0, fob: 0 } : (carregamento.ctes ?? []).reduce((acc: { cif: number; fob: number }, c) => {
+  const ctesParaTotais: any[] = isConjunto
+    ? [...(carregamento.ctes ?? []), ...(carregamentoConjunto?.ctes ?? [])]
+    : (carregamento.ctes ?? []);
+  const totalPesoLocal = qtdeCtesCarreg === 0 ? 0 : ctesParaTotais.reduce((s, c) => s + normPesoKgCte((c as any)?.peso ?? ''), 0);
+  const totalCubagemLocal = qtdeCtesCarreg === 0 ? 0 : ctesParaTotais.reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
+  const freteTotalsLocal = (qtdeCtesCarreg === 0) ? { cif: 0, fob: 0 } : ctesParaTotais.reduce((acc: { cif: number; fob: number }, c) => {
     const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
     const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
     const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
@@ -2657,6 +2763,7 @@ function CardCarregamento({
 
   useEffect(() => {
     if (qtdeCtesCarreg <= 0) return;
+    if (isConjunto) return;
     if (totaisCard) return;
     const cached = totaisCarregamentoCache.get(carregamentoKey);
     if (cached) { setTotaisCard(cached); return; }
@@ -2692,7 +2799,7 @@ function CardCarregamento({
       } catch {}
     })();
     return () => { alive = false; };
-  }, [carregamentoKey, qtdeCtesCarreg, totaisCard]);
+  }, [carregamentoKey, qtdeCtesCarreg, totaisCard, isConjunto]);
 
   const totalPeso =
     (totaisCard && totaisCard.peso > 0) ? totaisCard.peso :
@@ -3079,7 +3186,17 @@ function CardCarregamento({
             <div className="flex items-center gap-1.5 min-w-0">
               <Badge className={`min-w-0 max-w-full h-6 px-2 text-xs font-mono inline-flex items-center gap-1 ${ativo ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
                 <Truck className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{carregamento.placa_provisoria}</span>
+                {isConjunto ? (
+                  <span className="min-w-0 flex items-center gap-1">
+                    <span className="min-w-0 flex flex-col leading-[1.05]">
+                      <span className="truncate">{placa1}</span>
+                      <span className="truncate opacity-80">{placa2}</span>
+                    </span>
+                    <Layers className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                  </span>
+                ) : (
+                  <span className="truncate">{placa1}</span>
+                )}
               </Badge>
               <button
                 type="button"
@@ -3429,10 +3546,26 @@ function CardCarregamento({
           <div className="shrink-0 pr-20 flex flex-col gap-1.5">
             <DialogHeader>
               <DialogTitle>
-                CT-es · Carregamento{carregamento.seq_carregamento ? ` ${String(carregamento.seq_carregamento).padStart(6, '0')}` : ''} · {carregamento.placa_provisoria}
+                CT-es · Carregamento{carregamento.seq_carregamento ? ` ${String(carregamento.seq_carregamento).padStart(6, '0')}` : ''} · {placa1}{isConjunto ? ` + ${placa2}` : ''}
               </DialogTitle>
               <DialogDescription>Selecione os CT-es e clique em “Excluir selecionados” para remover do carregamento</DialogDescription>
             </DialogHeader>
+
+            {isConjunto ? (
+              <div className="flex items-center gap-3">
+                <Tabs value={cteDetalheAbaConjunto} onValueChange={(v) => setCteDetalheAbaConjunto(v as any)} className="w-fit">
+                  <TabsList className="h-7">
+                    <TabsTrigger value="placa1" className="text-[11px]">PLACA1</TabsTrigger>
+                    <TabsTrigger value="placa2" className="text-[11px]">PLACA2</TabsTrigger>
+                    <TabsTrigger value="todas" className="text-[11px]">TODAS</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 inline-flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  {placa1} / {placa2}
+                </span>
+              </div>
+            ) : null}
 
             {/* Destinos do carregamento */}
             {(() => {
@@ -6312,13 +6445,116 @@ function CarregamentoArea({
     return false;
   }, []);
 
+  const hojeKeyAdiado = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const toKeyAdiado = (v: any): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    const mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (mIso) return `${mIso[1]}-${mIso[2]}-${mIso[3]}`;
+    const mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (mBr) return `${mBr[3]}-${mBr[2]}-${mBr[1]}`;
+    return '';
+  };
+
+  const mapaLinhasPorNumero = React.useMemo(() => {
+    const m = new Map<number, LinhaCarregamento>();
+    for (const l of (linhasOrigem ?? [])) {
+      const n = Number((l as any).nro_linha ?? 0);
+      if (n > 0) m.set(n, l);
+    }
+    return m;
+  }, [linhasOrigem]);
+
+  const proximoDiaProgramadoLinha = React.useCallback((nroLinha: number, baseKey: string): string => {
+    const linha = mapaLinhasPorNumero.get(nroLinha);
+    const m = String(baseKey ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!linha || !m) return baseKey;
+
+    const hasAgendaLinha = (l: LinhaCarregamento): boolean => {
+      return Boolean(
+        (l as any).carrega_seg ||
+        (l as any).carrega_ter ||
+        (l as any).carrega_qua ||
+        (l as any).carrega_qui ||
+        (l as any).carrega_sex ||
+        (l as any).carrega_sab ||
+        (l as any).carrega_dom
+      );
+    };
+
+    const linhaCarregaNoDia = (l: LinhaCarregamento, dow: number): boolean => {
+      if (!hasAgendaLinha(l)) return true;
+      if (dow === 0) return Boolean((l as any).carrega_dom);
+      if (dow === 1) return Boolean((l as any).carrega_seg);
+      if (dow === 2) return Boolean((l as any).carrega_ter);
+      if (dow === 3) return Boolean((l as any).carrega_qua);
+      if (dow === 4) return Boolean((l as any).carrega_qui);
+      if (dow === 5) return Boolean((l as any).carrega_sex);
+      if (dow === 6) return Boolean((l as any).carrega_sab);
+      return true;
+    };
+
+    const baseDt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0, 0);
+    for (let i = 1; i <= 21; i += 1) {
+      const dt = new Date(baseDt.getTime());
+      dt.setDate(dt.getDate() + i);
+      if (linhaCarregaNoDia(linha, dt.getDay())) {
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      }
+    }
+    const dt = new Date(baseDt.getTime());
+    dt.setDate(dt.getDate() + 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  }, [mapaLinhasPorNumero]);
+
+  const mostrarCarregamentoAdiado = React.useCallback((c: Carregamento): boolean => {
+    const isAdiado = Boolean((c as any)?.adiado);
+    if (!isAdiado) return true;
+    const nroLinha = Number((c as any)?.nro_linha ?? 0) || 0;
+    const iniKey = toKeyAdiado((c as any)?.data_criacao ?? '');
+    if (nroLinha <= 0 || !iniKey) return true;
+    const nextKey = proximoDiaProgramadoLinha(nroLinha, iniKey);
+    if (!nextKey) return true;
+    return hojeKeyAdiado >= nextKey;
+  }, [hojeKeyAdiado, proximoDiaProgramadoLinha]);
+
   const carregamentosEntrega = React.useMemo(() => {
-    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && isEntregaCarregamento(c));
-  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento]);
+    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && isEntregaCarregamento(c) && mostrarCarregamentoAdiado(c));
+  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento, mostrarCarregamentoAdiado]);
 
   const carregamentosTransferencia = React.useMemo(() => {
-    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && !isEntregaCarregamento(c));
-  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento]);
+    return (carregamentos ?? []).filter((c) => isAtivoCarregamento(c) && !isEntregaCarregamento(c) && mostrarCarregamentoAdiado(c));
+  }, [carregamentos, isAtivoCarregamento, isEntregaCarregamento, mostrarCarregamentoAdiado]);
+
+  const carregamentosTransferConjuntoSecundarios = React.useMemo(() => {
+    const set = new Set<number>();
+    for (const c of carregamentosTransferencia) {
+      const seqConj = Number((c as any).seq_carregamento_conjunto ?? (c as any).seqCarregamentoConjunto ?? 0) || 0;
+      if (seqConj > 0) set.add(seqConj);
+    }
+    return set;
+  }, [carregamentosTransferencia]);
+
+  const carregamentosTransferenciaVisiveis = React.useMemo(() => {
+    return carregamentosTransferencia.filter((c) => {
+      const seq = Number((c as any).seq_carregamento ?? (c as any).seqCarregamento ?? 0) || 0;
+      if (seq <= 0) return true;
+      return !carregamentosTransferConjuntoSecundarios.has(seq);
+    });
+  }, [carregamentosTransferencia, carregamentosTransferConjuntoSecundarios]);
+
+  const mapCarregamentosAtivosPorSeq = React.useMemo(() => {
+    const map = new Map<number, Carregamento>();
+    for (const c of (carregamentos ?? [])) {
+      const seq = Number((c as any).seq_carregamento ?? (c as any).seqCarregamento ?? 0) || 0;
+      if (seq > 0) map.set(seq, c);
+    }
+    return map;
+  }, [carregamentos]);
 
   const carregamentosTransferNaoSimulados = React.useMemo(() => {
     return carregamentosTransferencia.filter((c: any) => !c?.simulado);
@@ -6468,6 +6704,8 @@ function CarregamentoArea({
 
   const [dragEntregaOrigem, setDragEntregaOrigem] = useState<string | null>(null);
   const [dragEntregaOver, setDragEntregaOver] = useState<string | null>(null);
+  const [dragTransferOrigem, setDragTransferOrigem] = useState<string | null>(null);
+  const [dragTransferOver, setDragTransferOver] = useState<string | null>(null);
 
   const fundirEntrega = async (placaOrig: string, placaDest: string) => {
     const orig = String(placaOrig ?? '').trim().toUpperCase();
@@ -6497,6 +6735,37 @@ function CarregamentoArea({
       await onRecarregarCarregamentos();
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao fundir carregamentos.');
+    }
+  };
+
+  const conjuntarTransferencia = async (placaOrig: string, placaDest: string) => {
+    const orig = String(placaOrig ?? '').trim().toUpperCase();
+    const dest = String(placaDest ?? '').trim().toUpperCase();
+    if (!orig || !dest || orig === dest) return;
+
+    const ok = await confirmar({
+      title: 'Criar carregamento conjunto?',
+      description: `Agrupar os carregamentos ${dest} + ${orig} em um único card (com 2 placas)?`,
+      confirmText: 'Criar conjunto',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'conjuntar_transferencia', placa_origem: orig, placa_destino: dest }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message || 'Erro ao criar carregamento conjunto.');
+        return;
+      }
+      toast.success(`Carregamento conjunto criado: ${dest} + ${orig}. O card de ${orig} foi agrupado dentro de ${dest}.`);
+      await onRecarregarCarregamentos();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao criar carregamento conjunto.');
     }
   };
 
@@ -6685,6 +6954,39 @@ function CarregamentoArea({
     return list.filter((c) => !isEntregaCarregamento(c));
   }, [carregamentosCalendario, calTipo, isEntregaCarregamento]);
 
+  const calMapPorSeq = React.useMemo(() => {
+    const m = new Map<number, Carregamento>();
+    for (const c of (calList ?? [])) {
+      const seq = Number((c as any)?.seq_carregamento ?? 0) || 0;
+      if (seq > 0) m.set(seq, c);
+    }
+    return m;
+  }, [calList]);
+
+  const calSecundariosConjunto = React.useMemo(() => {
+    const s = new Set<number>();
+    for (const c of (calList ?? [])) {
+      const ref = Number((c as any)?.seq_carregamento_conjunto ?? 0) || 0;
+      if (ref > 0) s.add(ref);
+    }
+    return s;
+  }, [calList]);
+
+  const calListVisivel = React.useMemo(() => {
+    if (calSecundariosConjunto.size === 0) return calList;
+    return (calList ?? []).filter((c) => {
+      const seq = Number((c as any)?.seq_carregamento ?? 0) || 0;
+      if (seq <= 0) return true;
+      return !calSecundariosConjunto.has(seq);
+    });
+  }, [calList, calSecundariosConjunto]);
+
+  const getCalConjunto = React.useCallback((c: Carregamento): Carregamento | null => {
+    const ref = Number((c as any)?.seq_carregamento_conjunto ?? 0) || 0;
+    if (ref <= 0) return null;
+    return calMapPorSeq.get(ref) ?? null;
+  }, [calMapPorSeq]);
+
   const calNorm = React.useMemo(() => {
     const mapLinhas = new Map<number, LinhaCarregamento>();
     for (const l of (linhasOrigem ?? [])) {
@@ -6738,7 +7040,7 @@ function CarregamentoArea({
       return toKey(dt);
     };
 
-    return calList.map((c) => {
+    return calListVisivel.map((c) => {
       let iniKey = toKey((c as any).data_criacao);
       const fimKey = toKey((c as any).data_finalizacao);
       const adiado = Boolean((c as any).adiado);
@@ -6748,7 +7050,7 @@ function CarregamentoArea({
       }
       return { c, iniKey, fimKey };
     });
-  }, [calList, linhasOrigem]);
+  }, [calListVisivel, linhasOrigem]);
 
   const isPresentOnDay = (x: { iniKey: string; fimKey: string }, dayKey: string): boolean => {
     if (!x.iniKey) return false;
@@ -6781,11 +7083,12 @@ function CarregamentoArea({
       for (const x of calNorm) {
         if (!isPresentOnDay(x as any, d)) continue;
         const c = (x as any).c as Carregamento;
-        frete += Number(c.total_frete ?? 0) || 0;
-        freteTer += Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
-        merc += Number(c.total_mercadoria ?? 0) || 0;
-        peso += Number(c.total_peso ?? 0) || 0;
-        cub += Number(c.total_cubagem ?? 0) || 0;
+        const c2 = getCalConjunto(c);
+        frete += (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
+        freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        merc += (Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0);
+        peso += (Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0);
+        cub += (Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0);
       }
 
       for (const x of calNorm) {
@@ -6820,7 +7123,7 @@ function CarregamentoArea({
         avgTempoMin,
       };
     });
-  }, [ultimosDias, calNorm, hojeKey]);
+  }, [ultimosDias, calNorm, hojeKey, getCalConjunto]);
 
   type CalSortCol =
     | 'placa'
@@ -6841,10 +7144,12 @@ function CarregamentoArea({
   const pageSize = 10;
   const [calDetalheOpen, setCalDetalheOpen] = useState(false);
   const [calDetalheItem, setCalDetalheItem] = useState<Carregamento | null>(null);
+  const [calDetalheConjunto, setCalDetalheConjunto] = useState<Carregamento | null>(null);
   const [calCtesOpen, setCalCtesOpen] = useState(false);
   const [calCtesLoading, setCalCtesLoading] = useState(false);
   const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
   const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
+  const [calCtesPlacas, setCalCtesPlacas] = useState<null | { placa1: string; placa2: string }>(null);
   const [calAtualizandoCtes, setCalAtualizandoCtes] = useState(false);
   const [calAutoAtualizandoVazios, setCalAutoAtualizandoVazios] = useState(false);
   const [calAutoAtualProgress, setCalAutoAtualProgress] = useState<{ total: number; done: number; ok: number; fail: number } | null>(null);
@@ -6853,27 +7158,57 @@ function CarregamentoArea({
 
   const abrirDetalheCarregamento = (c: Carregamento) => {
     setCalDetalheItem(c);
+    setCalDetalheConjunto(getCalConjunto(c));
     setCalDetalheOpen(true);
   };
 
-  const abrirCtesCarregamento = async (placa: string, seqCarregamento?: number | null) => {
-    const p = String(placa ?? '').trim().toUpperCase();
-    if (!p) return;
+  const abrirCtesCarregamento = async (c: Carregamento) => {
+    const placa1 = String(c?.placa_provisoria ?? '').trim().toUpperCase();
+    if (!placa1) return;
+    const c2 = getCalConjunto(c);
+    const placa2 = c2 ? String(c2?.placa_provisoria ?? '').trim().toUpperCase() : '';
     setCalCtesOpen(true);
     setCalCtesLista([]);
     setCalCtesTotais(null);
+    setCalCtesPlacas(placa2 ? { placa1, placa2 } : null);
     setCalCtesLoading(true);
     try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: p, seq_carregamento: seqCarregamento ?? null }) },
-        true
-      );
-      if (res?.success) {
-        setCalCtesLista(res.ctes ?? []);
-        setCalCtesTotais(res.totais ?? null);
+      const fetchLista = async (p: string, seq: any) => {
+        return apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ placa: p, seq_carregamento: seq ?? null }) },
+          true
+        );
+      };
+
+      if (!placa2) {
+        const res = await fetchLista(placa1, (c as any)?.seq_carregamento ?? null);
+        if (res?.success) {
+          setCalCtesLista(res.ctes ?? []);
+          setCalCtesTotais(res.totais ?? null);
+        } else {
+          toast.error(res?.message || 'Erro ao carregar CT-es');
+        }
       } else {
-        toast.error(res?.message || 'Erro ao carregar CT-es');
+        const [r1, r2] = await Promise.all([
+          fetchLista(placa1, (c as any)?.seq_carregamento ?? null),
+          fetchLista(placa2, (c2 as any)?.seq_carregamento ?? null),
+        ]);
+        if (!r1?.success || !r2?.success) {
+          toast.error((!r1?.success ? r1?.message : r2?.message) || 'Erro ao carregar CT-es');
+        } else {
+          const l1 = (r1.ctes ?? []).map((x: any) => ({ ...x, __placa: placa1 }));
+          const l2 = (r2.ctes ?? []).map((x: any) => ({ ...x, __placa: placa2 }));
+          setCalCtesLista([...l1, ...l2]);
+          const t1 = r1.totais ?? {};
+          const t2 = r2.totais ?? {};
+          setCalCtesTotais({
+            peso: (Number(t1.peso ?? 0) || 0) + (Number(t2.peso ?? 0) || 0),
+            cubagem: (Number(t1.cubagem ?? 0) || 0) + (Number(t2.cubagem ?? 0) || 0),
+            vlr_frete: (Number(t1.vlr_frete ?? 0) || 0) + (Number(t2.vlr_frete ?? 0) || 0),
+            qtde_vol: (Number(t1.qtde_vol ?? 0) || 0) + (Number(t2.qtde_vol ?? 0) || 0),
+          });
+        }
       }
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar CT-es');
@@ -6909,7 +7244,7 @@ function CarregamentoArea({
         }
         await onRecarregarCarregamentos();
         if (calCtesOpen) {
-          await abrirCtesCarregamento(placa, (c as any)?.seq_carregamento ?? null);
+          await abrirCtesCarregamento(c);
         }
       } else {
         toast.error(res?.message || 'Falha ao atualizar CT-es');
@@ -7026,18 +7361,24 @@ function CarregamentoArea({
     const dir = calSortDir === 'asc' ? 1 : -1;
     const now = Date.now();
     const getStr = (v: any) => String(v ?? '').trim().toUpperCase();
+    const soma = (c: Carregamento, key: string): number => {
+      const c2 = getCalConjunto(c);
+      const v1 = Number((c as any)[key] ?? 0) || 0;
+      const v2 = c2 ? (Number((c2 as any)[key] ?? 0) || 0) : 0;
+      return v1 + v2;
+    };
     const getNum = (c: Carregamento): number => {
       switch (calSortCol) {
-        case 'frete': return Number(c.total_frete ?? 0) || 0;
-        case 'frete_ter': return Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+        case 'frete': return soma(c, 'total_frete');
+        case 'frete_ter': return soma(c, 'vlr_frete_carreteiro');
         case 'frete_ter_pct': {
-          const total = Number(c.total_frete ?? 0) || 0;
-          const ter = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+          const total = soma(c, 'total_frete');
+          const ter = soma(c, 'vlr_frete_carreteiro');
           return total > 0 ? (ter / total) * 100 : 0;
         }
-        case 'merc': return Number(c.total_mercadoria ?? 0) || 0;
-        case 'peso': return Number(c.total_peso ?? 0) || 0;
-        case 'cub': return Number(c.total_cubagem ?? 0) || 0;
+        case 'merc': return soma(c, 'total_mercadoria');
+        case 'peso': return soma(c, 'total_peso');
+        case 'cub': return soma(c, 'total_cubagem');
         case 'inicio': {
           const k = toKey(c.data_criacao);
           return toTs(k, c.hora_criacao) ?? 0;
@@ -7069,21 +7410,22 @@ function CarregamentoArea({
       return 0;
     });
     return copy;
-  }, [calItemsDia, calSortCol, calSortDir]);
+  }, [calItemsDia, calSortCol, calSortDir, getCalConjunto]);
 
   const calTotals = React.useMemo(() => {
     return calSorted.reduce(
       (acc, c) => {
-        acc.frete += Number(c.total_frete ?? 0) || 0;
-        acc.freteTer += Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
-        acc.merc += Number(c.total_mercadoria ?? 0) || 0;
-        acc.peso += Number(c.total_peso ?? 0) || 0;
-        acc.cub += Number(c.total_cubagem ?? 0) || 0;
+        const c2 = getCalConjunto(c);
+        acc.frete += (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
+        acc.freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        acc.merc += (Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0);
+        acc.peso += (Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0);
+        acc.cub += (Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0);
         return acc;
       },
       { frete: 0, freteTer: 0, merc: 0, peso: 0, cub: 0 }
     );
-  }, [calSorted]);
+  }, [calSorted, getCalConjunto]);
 
   const totalPages = Math.max(1, Math.ceil(calSorted.length / pageSize));
   const calPageSafe = Math.min(Math.max(calPage, 1), totalPages);
@@ -7238,6 +7580,10 @@ function CarregamentoArea({
                         <td colSpan={12} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
                       </tr>
                     ) : calPageItems.map((c) => {
+                      const c2 = getCalConjunto(c);
+                      const placa1 = String(c.placa_provisoria ?? '').toUpperCase();
+                      const placa2 = c2 ? String(c2.placa_provisoria ?? '').toUpperCase() : '';
+                      const isConjunto = !!placa2;
                       const iniK = toKey(c.data_criacao);
                       const fimK = toKey(c.data_finalizacao);
                       const iniTs = toTs(iniK, c.hora_criacao);
@@ -7245,8 +7591,8 @@ function CarregamentoArea({
                       const end = fimTs ?? Date.now();
                       const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
                       const isFinalizado = !!fimK;
-                      const freteTotal = Number(c.total_frete ?? 0) || 0;
-                      const freteTer = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+                      const freteTotal = (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
+                      const freteTer = (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
                       const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
                       const pctClass = pctTer < 30
                         ? 'text-emerald-700 dark:text-emerald-400'
@@ -7270,7 +7616,13 @@ function CarregamentoArea({
                                   {String((c as any).seq_carregamento).padStart(6, '0')}
                                 </span>
                               ) : null}
-                              <span>{String(c.placa_provisoria ?? '').toUpperCase()}</span>
+                              <span>{placa1}{isConjunto ? ` + ${placa2}` : ''}</span>
+                              {isConjunto ? (
+                                <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                  <Layers className="w-3 h-3" />
+                                  CONJ
+                                </span>
+                              ) : null}
                               {(c as any).adiado ? (
                                 <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">ADIADO</span>
                               ) : null}
@@ -7287,9 +7639,9 @@ function CarregamentoArea({
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTotal)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTer)}</td>
                           <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(Number(c.total_mercadoria ?? 0) || 0)}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo((Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0))}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum((Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0), 2)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum((Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0), 3)}</td>
                           <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{iniK ? dtLabelSemAno(iniK, c.hora_criacao) : ''}</td>
                           <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{fimK ? dtLabelSemAno(fimK, c.hora_finalizacao) : ''}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
@@ -7347,27 +7699,37 @@ function CarregamentoArea({
                 open={calDetalheOpen}
                 onOpenChange={(v) => {
                   setCalDetalheOpen(v);
-                  if (!v) setCalDetalheItem(null);
+                  if (!v) {
+                    setCalDetalheItem(null);
+                    setCalDetalheConjunto(null);
+                  }
                 }}
               >
                 <DialogContent className="sm:max-w-[760px]">
                   <DialogHeader>
                     <DialogTitle>
-                      Carregamento{calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                      {(() => {
+                        const p1 = String(calDetalheItem?.placa_provisoria ?? '').toUpperCase();
+                        const p2 = String(calDetalheConjunto?.placa_provisoria ?? '').toUpperCase();
+                        const isConj = !!p2;
+                        const seqTxt = calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : '';
+                        return `Carregamento${seqTxt} · ${p1}${isConj ? ` + ${p2}` : ''}`;
+                      })()}
                     </DialogTitle>
                     <DialogDescription>Detalhes do carregamento selecionado</DialogDescription>
                   </DialogHeader>
                   {(() => {
                     const c = calDetalheItem;
                     if (!c) return null;
+                    const c2 = calDetalheConjunto;
                     const iniK = toKey(c.data_criacao);
                     const fimK = toKey(c.data_finalizacao);
                     const iniTs = toTs(iniK, c.hora_criacao);
                     const fimTs = fimK ? toTs(fimK, c.hora_finalizacao) : null;
                     const end = fimTs ?? Date.now();
                     const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
-                    const freteTotal = Number(c.total_frete ?? 0) || 0;
-                    const freteTer = Number((c as any).vlr_frete_carreteiro ?? 0) || 0;
+                    const freteTotal = (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
+                    const freteTer = (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
                     const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
                     const pctClass = pctTer < 30
                       ? 'text-emerald-700 dark:text-emerald-400'
@@ -7429,15 +7791,15 @@ function CarregamentoArea({
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Mercadoria (R$)</div>
-                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(Number(c.total_mercadoria ?? 0) || 0)}</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney((Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0))}</div>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Peso (kg)</div>
-                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum(Number(c.total_peso ?? 0) || 0, 2)}</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum((Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0), 2)}</div>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Cubagem (m³)</div>
-                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum(Number(c.total_cubagem ?? 0) || 0, 3)}</div>
+                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtNum((Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0), 3)}</div>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Início</div>
@@ -7460,10 +7822,16 @@ function CarregamentoArea({
                                 size="sm"
                                 className="bg-sky-500 hover:bg-sky-600 text-white"
                                 onClick={async () => {
-                                  const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
-                                  if (!placa) return;
-                                  const finalizou = await onFinalizarCarregamento(placa);
-                                  if (finalizou) setCalDetalheOpen(false);
+                                  const p1 = String(c.placa_provisoria ?? '').trim().toUpperCase();
+                                  const p2 = c2 ? String(c2.placa_provisoria ?? '').trim().toUpperCase() : '';
+                                  if (!p1) return;
+                                  const fin1 = await onFinalizarCarregamento(p1);
+                                  if (!fin1) return;
+                                  if (p2) {
+                                    const fin2 = await onFinalizarCarregamento(p2);
+                                    if (!fin2) return;
+                                  }
+                                  setCalDetalheOpen(false);
                                 }}
                               >
                                 Finalizar
@@ -7481,7 +7849,7 @@ function CarregamentoArea({
                                 Atualizar CT-es
                               </Button>
                             ) : null}
-                            <Button type="button" variant="outline" size="sm" onClick={() => abrirCtesCarregamento(String(c.placa_provisoria ?? ''), (c as any).seq_carregamento ?? null)}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => void abrirCtesCarregamento(c)}>
                               Ver CT-es
                             </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => setCalDetalheOpen(false)}>
@@ -7499,12 +7867,19 @@ function CarregamentoArea({
                 <DialogContent className="max-w-4xl h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
                   <DialogHeader>
                     <DialogTitle>
-                      CT-es · Carregamento{calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : ''} · {String(calDetalheItem?.placa_provisoria ?? '').toUpperCase()}
+                      {(() => {
+                        const p1 = String(calCtesPlacas?.placa1 ?? calDetalheItem?.placa_provisoria ?? '').toUpperCase();
+                        const p2 = String(calCtesPlacas?.placa2 ?? '').toUpperCase();
+                        const isConj = !!p2;
+                        const seqTxt = calDetalheItem?.seq_carregamento ? ` ${String(calDetalheItem.seq_carregamento).padStart(6, '0')}` : '';
+                        return `CT-es · Carregamento${seqTxt} · ${p1}${isConj ? ` + ${p2}` : ''}`;
+                      })()}
                     </DialogTitle>
                     <DialogDescription>Lista de CT-es envolvidos no carregamento</DialogDescription>
                   </DialogHeader>
                   <div className="min-h-0 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-                    <div className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                    <div className={`grid ${calCtesPlacas ? 'grid-cols-[80px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]' : 'grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]'} gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400`}>
+                      {calCtesPlacas ? <span>Placa</span> : null}
                       <span>CTRC</span>
                       <span>NFs</span>
                       <span>Carr.</span>
@@ -7525,7 +7900,8 @@ function CarregamentoArea({
                       ) : calCtesLista.length === 0 ? (
                         <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 text-center">—</div>
                       ) : calCtesLista.map((cte: any, idx: number) => (
-                        <div key={`${cte.seq_cte ?? idx}-${idx}`} className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[11px] border-b border-slate-100 dark:border-slate-800">
+                        <div key={`${cte.seq_cte ?? idx}-${idx}`} className={`grid ${calCtesPlacas ? 'grid-cols-[80px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]' : 'grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]'} gap-2 px-3 py-2 text-[11px] border-b border-slate-100 dark:border-slate-800`}>
+                          {calCtesPlacas ? <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{String(cte.__placa ?? '').toUpperCase() || '-'}</span> : null}
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{cte.ctrc}</span>
                           <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{primeiraNfNfs(String(cte.nfs ?? '')) || '-'}</span>
                           <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
@@ -7545,7 +7921,8 @@ function CarregamentoArea({
                       ))}
                     </div>
                     {calCtesTotais && (
-                      <div className="grid grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px] gap-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      <div className={`grid ${calCtesPlacas ? 'grid-cols-[80px_105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]' : 'grid-cols-[105px_70px_45px_70px_80px_55px_minmax(0,1fr)_90px_75px_75px]'} gap-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300`}>
+                        {calCtesPlacas ? <span /> : null}
                         <span className="text-slate-600 dark:text-slate-300">Total</span>
                         <span className="text-slate-500 dark:text-slate-400">{calCtesLista.length} CT-es</span>
                         <span />
@@ -7772,6 +8149,9 @@ function CarregamentoArea({
               >
                 <ListTree className="w-3.5 h-3.5 mr-1.5" />Carr. Automático
               </Button>
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-8 px-2 flex items-center">
+                Arraste um card e solte em outro para criar um conjunto (2 placas)
+              </Badge>
             </div>
 
             {carregamentosTransferencia.length === 0 && !loadingCarregamentos ? (
@@ -7782,30 +8162,65 @@ function CarregamentoArea({
               </div>
             ) : (
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {carregamentosTransferencia.map((c, i) => (
-                  <CardCarregamento
-                    key={i}
-                    carregamento={c}
-                    unidadeAtual={sigla}
-                    todosCtes={todosCtes}
-                    cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
-                    cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
-                    veiculoCapacidades={undefined}
-                    modoApontamento={modoApontamento}
-                    confirmar={confirmar}
-                    onIniciarApontamento={onIniciarApontamento}
-                    onCancelarApontamento={onCancelarApontamento}
-                    onExcluirCarregamento={onExcluirCarregamento}
-                    onRemoverCte={onRemoverCte}
-                    onCarregarSSW={onCarregarSSW}
-                    onCarregarRota={onCarregarRota}
-                    loadingRota={loadingRota}
-                    rotaCarregamentoPlaca={rotaCarregamentoPlaca}
-                    onRecarregarCarregamentos={onRecarregarCarregamentos}
-                    onImportarCarregamentos={onImportarCarregamentos}
-                    importandoCarregamentos={importandoCarregamentos}
-                  />
-                ))}
+                {carregamentosTransferenciaVisiveis.map((c, i) => {
+                  const seqConj = Number((c as any).seq_carregamento_conjunto ?? (c as any).seqCarregamentoConjunto ?? 0) || 0;
+                  const carregamentoConjunto = seqConj > 0 ? (mapCarregamentosAtivosPorSeq.get(seqConj) ?? null) : null;
+                  const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
+                  const isOver = dragTransferOver !== null && dragTransferOver === placa;
+                  const podeArrastar = placa !== '' && seqConj <= 0;
+                  return (
+                    <div
+                      key={i}
+                      className={isOver ? 'ring-2 ring-indigo-300 dark:ring-indigo-800 rounded-xl' : undefined}
+                      draggable={podeArrastar}
+                      onDragStart={(e) => {
+                        if (!podeArrastar) return;
+                        setDragTransferOrigem(placa);
+                        setDragTransferOver(null);
+                        e.dataTransfer.setData('text/plain', placa);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragTransferOrigem) return;
+                        if (placa === dragTransferOrigem) return;
+                        e.preventDefault();
+                        setDragTransferOver(placa);
+                      }}
+                      onDragLeave={() => { if (dragTransferOver === placa) setDragTransferOver(null); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const orig = (dragTransferOrigem ?? e.dataTransfer.getData('text/plain') ?? '').trim().toUpperCase();
+                        setDragTransferOrigem(null);
+                        setDragTransferOver(null);
+                        if (!orig || !placa || orig === placa) return;
+                        void conjuntarTransferencia(orig, placa);
+                      }}
+                    >
+                      <CardCarregamento
+                        carregamento={c}
+                        carregamentoConjunto={carregamentoConjunto}
+                        unidadeAtual={sigla}
+                        todosCtes={todosCtes}
+                        cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
+                        cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+                        veiculoCapacidades={undefined}
+                        modoApontamento={modoApontamento}
+                        confirmar={confirmar}
+                        onIniciarApontamento={onIniciarApontamento}
+                        onCancelarApontamento={onCancelarApontamento}
+                        onExcluirCarregamento={onExcluirCarregamento}
+                        onRemoverCte={onRemoverCte}
+                        onCarregarSSW={onCarregarSSW}
+                        onCarregarRota={onCarregarRota}
+                        loadingRota={loadingRota}
+                        rotaCarregamentoPlaca={rotaCarregamentoPlaca}
+                        onRecarregarCarregamentos={onRecarregarCarregamentos}
+                        onImportarCarregamentos={onImportarCarregamentos}
+                        importandoCarregamentos={importandoCarregamentos}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>
@@ -8722,15 +9137,6 @@ export function Disponiveis() {
     }
     return res;
   }, [handleImportarCarregamentos, carregarCarregamentos]);
-
-  useEffect(() => {
-    if (!painelAtivo) return;
-    if (abaAtiva === 'entrega') return;
-    if (!carregamentosTransferOpen) return;
-    if (!importacaoAutomatica) return;
-    const id = setInterval(() => { void handleImportarCarregamentos({ silent: true }); }, 300000);
-    return () => clearInterval(id);
-  }, [abaAtiva, painelAtivo, carregamentosTransferOpen, importacaoAutomatica, handleImportarCarregamentos]);
 
   const handleCriarCarregamento = useCallback(async (placa: string, destino: string, paradas: string) => {
     try {

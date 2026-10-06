@@ -286,14 +286,6 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wide">{ctrcDisplay || 'CT-e'}</span>
               </div>
             </DialogTitle>
-            <div className="flex items-center gap-2">
-              {(cte.setor || cte.setorNome) && (
-                <Badge className="bg-emerald-100 dark:bg-emerald-900/35 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10.5px] h-6 font-medium">
-                  <MapPin className="w-2.5 h-2.5 mr-1" />
-                  {cte.setor}{cte.setorNome && cte.setorNome !== cte.setor ? ` · ${cte.setorNome}` : ''}
-                </Badge>
-              )}
-            </div>
           </div>
         </DialogHeader>
 

@@ -46,6 +46,7 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento_conjunto INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -98,14 +99,15 @@ $sqlCarregamentos = "
         cap.cap_ton,
         cap.cap_m3,
         cap.vlr_frete_carreteiro,
-        COALESCE(cap.simulado, FALSE) AS simulado
+        COALESCE(cap.simulado, FALSE) AS simulado,
+        cap.seq_carregamento_conjunto
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v
            ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
     WHERE c.unidade = \$1 {$filtroSerieRve}
-    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha
+    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha, cap.seq_carregamento_conjunto
 ";
 
 if ($modo === 'calendario') {
@@ -198,6 +200,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'capacidade_m3'    => $capM3,
         'vlr_min_frete'    => $vlrMinFrete,
         'vlr_frete_carreteiro' => $vlrFreteCarreteiro,
+        'seq_carregamento_conjunto' => ($row['seq_carregamento_conjunto'] !== null && $row['seq_carregamento_conjunto'] !== '') ? (int)$row['seq_carregamento_conjunto'] : null,
         'destino'          => $destino !== '' ? $destino : null,
         'paradas'          => $paradas !== '' ? $paradas : null,
         'ctes'             => [],

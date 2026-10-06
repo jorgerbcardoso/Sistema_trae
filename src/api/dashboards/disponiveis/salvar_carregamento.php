@@ -45,6 +45,7 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento_conjunto INT");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -1752,6 +1753,31 @@ if ($acao === 'verificar_saidas_ssw') {
         if ($p !== '') $open[$p] = true;
     }
 
+    $conjuntoPorPlaca = [];
+    try {
+        $resConj = sql(
+            "SELECT
+                cap.seq_carregamento AS seq1,
+                cap.seq_carregamento_conjunto AS seq2,
+                (SELECT placa_provisoria FROM {$tabela} c1 WHERE c1.unidade = cap.unidade AND c1.seq_carregamento = cap.seq_carregamento LIMIT 1) AS placa1,
+                (SELECT placa_provisoria FROM {$tabela} c2 WHERE c2.unidade = cap.unidade AND c2.seq_carregamento = cap.seq_carregamento_conjunto LIMIT 1) AS placa2
+             FROM {$tabelaCap} cap
+             WHERE cap.unidade = \$1
+               AND COALESCE(cap.seq_carregamento_conjunto, 0) > 0",
+            [$unidade],
+            $conn
+        );
+        while ($resConj && ($rc = pg_fetch_assoc($resConj))) {
+            $p1 = strtoupper(trim((string)($rc['placa1'] ?? '')));
+            $p2 = strtoupper(trim((string)($rc['placa2'] ?? '')));
+            if ($p1 === '' || $p2 === '' || $p1 === $p2) continue;
+            $conjuntoPorPlaca[$p1] = [$p1, $p2];
+            $conjuntoPorPlaca[$p2] = [$p1, $p2];
+        }
+    } catch (Exception $e) {
+        $conjuntoPorPlaca = [];
+    }
+
     $tblCte = "{$domain}_cte";
     $cteTableOk = false;
     try {
@@ -1787,6 +1813,7 @@ if ($acao === 'verificar_saidas_ssw') {
     $updated = 0;
     foreach ($placaParaInfo as $placa => $info) {
         if (!isset($open[$placa])) continue;
+        $placasFinalizar = isset($conjuntoPorPlaca[$placa]) ? $conjuntoPorPlaca[$placa] : [$placa];
         $dt = $info['saida'];
         $data = $dt->format('Y-m-d');
         $hora = $dt->format('H:i:s');
@@ -2078,18 +2105,22 @@ if ($acao === 'verificar_saidas_ssw') {
             }
         }
 
-        $resUpd = sql(
-            "UPDATE {$tabela}
-             SET data_finalizacao = \$1::date,
-                 hora_finalizacao = \$2::time,
-                 login_finalizacao = \$3
-             WHERE unidade = \$4
-               AND UPPER(placa_provisoria) = \$5
-               AND data_finalizacao IS NULL",
-            [$data, $hora, $login, $unidade, $placa],
-            $conn
-        );
-        if ($resUpd) $updated += (int)pg_affected_rows($resUpd);
+        foreach ($placasFinalizar as $pf) {
+            $pf = strtoupper(trim((string)$pf));
+            if ($pf === '' || !isset($open[$pf])) continue;
+            $resUpd = sql(
+                "UPDATE {$tabela}
+                 SET data_finalizacao = \$1::date,
+                     hora_finalizacao = \$2::time,
+                     login_finalizacao = \$3
+                 WHERE unidade = \$4
+                   AND UPPER(placa_provisoria) = \$5
+                   AND data_finalizacao IS NULL",
+                [$data, $hora, $login, $unidade, $pf],
+                $conn
+            );
+            if ($resUpd) $updated += (int)pg_affected_rows($resUpd);
+        }
     }
 
     respondJson(['success' => true, 'updated' => $updated]);
@@ -2579,6 +2610,113 @@ if ($acao === 'atualizar_ctes_ssw') {
             'cte_found_count' => $cteFoundCount,
         ],
     ]);
+}
+
+// ─── Ação: criar carregamento conjunto (transferência) ─────────────────────────
+if ($acao === 'conjuntar_transferencia') {
+    $placaOrig = strtoupper(trim((string)($input['placa_origem'] ?? '')));
+    $placaDest = strtoupper(trim((string)($input['placa_destino'] ?? '')));
+    if ($placaOrig === '' || $placaDest === '' || $placaOrig === $placaDest) {
+        respondJson(['success' => false, 'message' => 'Placas inválidas para conjunto.']);
+    }
+
+    $resDest = sql(
+        "SELECT seq_carregamento, COALESCE(setores_entrega, '') AS setores_entrega, COALESCE(destino, '') AS destino
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND UPPER(placa_provisoria) = UPPER(\$2)
+           AND data_finalizacao IS NULL
+         ORDER BY data_inclusao ASC, hora_inclusao ASC
+         LIMIT 1",
+        [$unidade, $placaDest],
+        $conn
+    );
+    $resOrig = sql(
+        "SELECT seq_carregamento, COALESCE(setores_entrega, '') AS setores_entrega, COALESCE(destino, '') AS destino
+         FROM {$tabela}
+         WHERE unidade = \$1
+           AND UPPER(placa_provisoria) = UPPER(\$2)
+           AND data_finalizacao IS NULL
+         ORDER BY data_inclusao ASC, hora_inclusao ASC
+         LIMIT 1",
+        [$unidade, $placaOrig],
+        $conn
+    );
+    if (!$resDest || pg_num_rows($resDest) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento de destino não encontrado (ou finalizado).']);
+    }
+    if (!$resOrig || pg_num_rows($resOrig) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento de origem não encontrado (ou finalizado).']);
+    }
+
+    $rowDest = pg_fetch_assoc($resDest);
+    $rowOrig = pg_fetch_assoc($resOrig);
+    $seqDest = (int)($rowDest['seq_carregamento'] ?? 0);
+    $seqOrig = (int)($rowOrig['seq_carregamento'] ?? 0);
+    if ($seqDest <= 0 || $seqOrig <= 0) {
+        respondJson(['success' => false, 'message' => 'seq_carregamento inválido para conjunto.']);
+    }
+
+    $destinoDest = strtoupper(trim((string)($rowDest['destino'] ?? '')));
+    $destinoOrig = strtoupper(trim((string)($rowOrig['destino'] ?? '')));
+    $setDest = strtoupper(trim((string)($rowDest['setores_entrega'] ?? '')));
+    $setOrig = strtoupper(trim((string)($rowOrig['setores_entrega'] ?? '')));
+    $isEntregaDest = ($destinoDest === '' && $setDest !== '');
+    $isEntregaOrig = ($destinoOrig === '' && $setOrig !== '');
+    if ($isEntregaDest || $isEntregaOrig) {
+        respondJson(['success' => false, 'message' => 'Conjunto permitido apenas entre carregamentos de transferência.']);
+    }
+
+    $resCheck = sql(
+        "SELECT
+            (SELECT COALESCE(seq_carregamento_conjunto, 0) FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2 LIMIT 1) AS dest_conj,
+            (SELECT 1 FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento_conjunto = \$2 LIMIT 1) AS dest_eh_sec,
+            (SELECT COALESCE(seq_carregamento_conjunto, 0) FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$3 LIMIT 1) AS orig_conj,
+            (SELECT 1 FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento_conjunto = \$3 LIMIT 1) AS orig_eh_sec",
+        [$unidade, $seqDest, $seqOrig],
+        $conn
+    );
+    $destConj = 0;
+    $origConj = 0;
+    $destEhSec = false;
+    $origEhSec = false;
+    if ($resCheck && pg_num_rows($resCheck) > 0) {
+        $rc = pg_fetch_assoc($resCheck);
+        $destConj = (int)($rc['dest_conj'] ?? 0);
+        $origConj = (int)($rc['orig_conj'] ?? 0);
+        $destEhSec = ($rc['dest_eh_sec'] ?? null) !== null;
+        $origEhSec = ($rc['orig_eh_sec'] ?? null) !== null;
+    }
+    if ($destConj > 0 || $destEhSec || $origConj > 0 || $origEhSec) {
+        respondJson(['success' => false, 'message' => 'Um dos carregamentos já faz parte de um conjunto.']);
+    }
+
+    pg_query($conn, 'BEGIN');
+    try {
+        $upd = sql(
+            "UPDATE {$tabelaCap}
+             SET seq_carregamento_conjunto = \$1
+             WHERE unidade = \$2
+               AND seq_carregamento = \$3",
+            [$seqOrig, $unidade, $seqDest],
+            $conn
+        );
+        $affected = $upd ? (int)pg_affected_rows($upd) : 0;
+        if ($affected <= 0) {
+            $ins = sql(
+                "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, seq_carregamento_conjunto, simulado)
+                 VALUES (\$1, \$2, \$3, FALSE)",
+                [$unidade, $seqDest, $seqOrig],
+                $conn
+            );
+            if (!$ins) throw new Exception('Erro ao inserir conjunto.');
+        }
+        pg_query($conn, 'COMMIT');
+        respondJson(['success' => true, 'placa1' => $placaDest, 'placa2' => $placaOrig, 'seq1' => $seqDest, 'seq2' => $seqOrig]);
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao criar carregamento conjunto.']);
+    }
 }
 
 // ─── Ação: fundir carregamentos de entrega (juntar setores em um único carregamento) ───
