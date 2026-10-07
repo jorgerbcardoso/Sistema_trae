@@ -395,9 +395,6 @@ foreach ($carregamentos as &$c) {
         foreach ($destinos as $d) {
             $d = strtoupper(trim((string)$d));
             if ($d === '') continue;
-            if ($isCentralizadora && isset($mapDestinoCompart[$d]) && strtoupper((string)$mapDestinoCompart[$d]) === $destFinal) {
-                $d = $destFinal;
-            }
             if ($d === '' || isset($seen[$d])) continue;
             $seen[$d] = true;
             $out[] = $d;
@@ -412,9 +409,6 @@ foreach ($carregamentos as &$c) {
                 $u = strtoupper(trim((string)$p));
                 if ($u === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
                 if ($destFinal !== '' && $u === $destFinal) continue;
-                if ($isCentralizadora && isset($mapDestinoCompart[$u]) && strtoupper((string)$mapDestinoCompart[$u]) === $destFinal) {
-                    $u = $destFinal;
-                }
                 if ($u === '' || isset($seen[$u])) continue;
                 $seen[$u] = true;
                 $out[] = $u;
