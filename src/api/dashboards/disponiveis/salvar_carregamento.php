@@ -46,6 +46,15 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento_conjunto INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS placa_definitiva VARCHAR(10)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS placa_carreta VARCHAR(10)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS cpf_motorista VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS ddd_motorista VARCHAR(5)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS fone_motorista VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS qtde_pallets INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS conferente VARCHAR(80)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS ajudantes VARCHAR(120)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS doca VARCHAR(20)");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");

@@ -58,8 +58,21 @@ $tblCar = "{$domain}_carregamento";
 $tblUnid = "{$domain}_unidade";
 $tblCte = "{$domain}_cte";
 $tblEmpParam = "{$domain}_emp_param";
+$tblCap = "{$domain}_carregamento_capacidade";
+$tblMot = "{$domain}_motorista";
 
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS unidade VARCHAR(10)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS placa_definitiva VARCHAR(10)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS placa_carreta VARCHAR(10)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS cpf_motorista VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS ddd_motorista VARCHAR(5)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS fone_motorista VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS qtde_pallets INT");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS conferente VARCHAR(80)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS ajudantes VARCHAR(120)");
+@pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS doca VARCHAR(20)");
 
 $seqCar = 0;
 try {
@@ -78,6 +91,77 @@ try {
     }
 } catch (Exception $e) {
     $seqCar = 0;
+}
+
+$dadosCap = [
+    'placa_definitiva' => '',
+    'placa_carreta' => '',
+    'cpf_motorista' => '',
+    'motorista_nome' => '',
+    'ddd_motorista' => '',
+    'fone_motorista' => '',
+    'qtde_pallets' => 0,
+    'conferente' => '',
+    'ajudantes' => '',
+    'doca' => '',
+    'veiculo_tipo' => '',
+    'veiculo_cubagem' => '',
+];
+try {
+    if ($seqCar > 0) {
+        $resCap = sql(
+            "SELECT placa_definitiva, placa_carreta, cpf_motorista, ddd_motorista, fone_motorista, qtde_pallets, conferente, ajudantes, doca
+             FROM {$tblCap}
+             WHERE unidade = $1 AND seq_carregamento = $2
+             LIMIT 1",
+            [$unidade, $seqCar],
+            $conn
+        );
+        if ($resCap && pg_num_rows($resCap) > 0) {
+            $rc = pg_fetch_assoc($resCap);
+            $dadosCap['placa_definitiva'] = strtoupper(trim((string)($rc['placa_definitiva'] ?? '')));
+            $dadosCap['placa_carreta'] = strtoupper(trim((string)($rc['placa_carreta'] ?? '')));
+            $dadosCap['cpf_motorista'] = preg_replace('/\D+/', '', (string)($rc['cpf_motorista'] ?? ''));
+            $dadosCap['ddd_motorista'] = trim((string)($rc['ddd_motorista'] ?? ''));
+            $dadosCap['fone_motorista'] = trim((string)($rc['fone_motorista'] ?? ''));
+            $dadosCap['qtde_pallets'] = (int)($rc['qtde_pallets'] ?? 0);
+            $dadosCap['conferente'] = trim((string)($rc['conferente'] ?? ''));
+            $dadosCap['ajudantes'] = trim((string)($rc['ajudantes'] ?? ''));
+            $dadosCap['doca'] = trim((string)($rc['doca'] ?? ''));
+        }
+    }
+} catch (Exception $e) {
+}
+
+if ($dadosCap['cpf_motorista'] !== '' && $dadosCap['motorista_nome'] === '') {
+    try {
+        $resMot = sql("SELECT nome, ddd, fone FROM {$tblMot} WHERE cpf = $1 LIMIT 1", [$dadosCap['cpf_motorista']], $conn);
+        if ($resMot && pg_num_rows($resMot) > 0) {
+            $rm = pg_fetch_assoc($resMot);
+            $dadosCap['motorista_nome'] = trim((string)($rm['nome'] ?? ''));
+            if ($dadosCap['ddd_motorista'] === '') $dadosCap['ddd_motorista'] = trim((string)($rm['ddd'] ?? ''));
+            if ($dadosCap['fone_motorista'] === '') $dadosCap['fone_motorista'] = trim((string)($rm['fone'] ?? ''));
+        }
+    } catch (Exception $e) {}
+}
+
+if ($dadosCap['placa_definitiva'] !== '') {
+    try {
+        $resV = sql(
+            "SELECT tipo, capacidade_m3
+             FROM {$domain}_veiculo
+             WHERE UPPER(placa) = UPPER($1)
+             LIMIT 1",
+            [$dadosCap['placa_definitiva']],
+            $conn
+        );
+        if ($resV && pg_num_rows($resV) > 0) {
+            $rv = pg_fetch_assoc($resV);
+            $dadosCap['veiculo_tipo'] = strtoupper(trim((string)($rv['tipo'] ?? '')));
+            $capM3 = trim((string)($rv['capacidade_m3'] ?? ''));
+            $dadosCap['veiculo_cubagem'] = $capM3;
+        }
+    } catch (Exception $e) {}
 }
 
 $freteTotal = 0.0;
@@ -346,6 +430,114 @@ $styleGrid = [
     ],
 ];
 
+$applyHeader = function($ws) use ($styleGrid, $styleDarkBar, $styleDarkBarRight, $styleLabel, $styleValue, $unidade, $unidNome, $seqCar, $darkBlue, $darkBlue2, $lightBlue, $inputBg, $gridBorder, $logoUrl) {
+    $ws->getRowDimension(1)->setRowHeight(24);
+    $ws->getRowDimension(2)->setRowHeight(18);
+    $ws->getRowDimension(3)->setRowHeight(16);
+    $ws->getRowDimension(4)->setRowHeight(18);
+
+    $ws->mergeCells('C1:L2');
+    $ws->setCellValue('C1', 'ORDEM DE CARREGAMENTO');
+    $ws->getStyle('C1:L2')->applyFromArray([
+        'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '000000']],
+        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+    ]);
+
+    $ws->getStyle('A1:L3')->applyFromArray($styleGrid);
+
+    $ws->mergeCells('A4:J4');
+    $ws->mergeCells('K4:L4');
+    $ws->setCellValue('A4', '');
+    $ws->setCellValue('K4', $seqCar > 0 ? ('OC Nº ' . $seqCar) : 'OC Nº');
+    $ws->getStyle('A4:J4')->applyFromArray($styleDarkBar);
+    $ws->getStyle('K4:L4')->applyFromArray($styleDarkBarRight);
+
+    $ws->mergeCells('A5:C5');
+    $ws->mergeCells('D5:F5');
+    $ws->mergeCells('G5:H5');
+    $ws->mergeCells('K5:L5');
+    $ws->setCellValue('A5', 'DATA DA EMISSÃO');
+    $ws->setCellValue('D5', 'DATA DO CARREGAMENTO');
+    $ws->setCellValue('G5', 'TIPO DE OPERAÇÃO');
+    $ws->setCellValue('I5', 'SIGLA');
+    $ws->setCellValue('J5', 'Nº:');
+    $ws->setCellValue('K5', 'UNIDADE / CD');
+    $ws->getStyle('A5:L5')->applyFromArray($styleLabel);
+
+    $ws->mergeCells('A6:C6');
+    $ws->mergeCells('D6:F6');
+    $ws->mergeCells('G6:H6');
+    $ws->mergeCells('K6:L6');
+    $ws->setCellValue('A6', date('d/m/Y'));
+    $ws->setCellValue('D6', date('d/m/Y'));
+    $ws->setCellValue('G6', 'ENTREGA');
+    $ws->setCellValue('I6', $unidade);
+    $ws->setCellValue('J6', $seqCar > 0 ? $seqCar : '');
+    $ws->setCellValue('K6', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+    $ws->getStyle('A6:L6')->applyFromArray($styleValue);
+
+    $ws->getStyle('A5:L6')->applyFromArray($styleGrid);
+
+    if ($logoUrl !== '') {
+        $tmpFile = null;
+        try {
+            $imgBin = @file_get_contents($logoUrl);
+            if ($imgBin !== false && $imgBin !== '') {
+                $tmpFile = tempnam(sys_get_temp_dir(), 'presto_logo_');
+                $tmpPng = $tmpFile . '.png';
+                @file_put_contents($tmpPng, $imgBin);
+                $tmpFile = $tmpPng;
+            }
+        } catch (Exception $e) {
+            $tmpFile = null;
+        }
+
+        if ($tmpFile && is_file($tmpFile)) {
+            try {
+                $drawing = new Drawing();
+                $drawing->setName('Logo');
+                $drawing->setPath($tmpFile);
+                $drawing->setCoordinates('A1');
+                $drawing->setHeight(52);
+                $drawing->setOffsetX(8);
+                $drawing->setOffsetY(6);
+                $drawing->setWorksheet($ws);
+            } catch (Exception $e) {
+            }
+        }
+    }
+
+    $logoPrestoUrl = 'https://webpresto.com.br/images/logo_rel.png';
+    if ($logoPrestoUrl !== '') {
+        $tmpFile = null;
+        try {
+            $imgBin = @file_get_contents($logoPrestoUrl);
+            if ($imgBin !== false && $imgBin !== '') {
+                $tmpFile = tempnam(sys_get_temp_dir(), 'presto_logo_rel_');
+                $tmpPng = $tmpFile . '.png';
+                @file_put_contents($tmpPng, $imgBin);
+                $tmpFile = $tmpPng;
+            }
+        } catch (Exception $e) {
+            $tmpFile = null;
+        }
+
+        if ($tmpFile && is_file($tmpFile)) {
+            try {
+                $drawing = new Drawing();
+                $drawing->setName('Logo Presto');
+                $drawing->setPath($tmpFile);
+                $drawing->setCoordinates('L1');
+                $drawing->setHeight(40);
+                $drawing->setOffsetX(140);
+                $drawing->setOffsetY(10);
+                $drawing->setWorksheet($ws);
+            } catch (Exception $e) {
+            }
+        }
+    }
+};
+
 $sheet->mergeCells('C1:L2');
 $sheet->setCellValue('C1', 'ORDEM DE CARREGAMENTO');
 $sheet->getStyle('C1:L2')->applyFromArray([
@@ -378,7 +570,7 @@ $sheet->mergeCells('A6:C6');
 $sheet->mergeCells('D6:F6');
 $sheet->mergeCells('G6:H6');
 $sheet->mergeCells('K6:L6');
-$sheet->setCellValue('A6', '');
+$sheet->setCellValue('A6', date('d/m/Y'));
 $sheet->setCellValue('D6', date('d/m/Y'));
 $sheet->setCellValue('G6', 'ENTREGA');
 $sheet->setCellValue('I6', $unidade);
@@ -403,9 +595,12 @@ $sheet->getStyle('A8:L8')->applyFromArray($styleLabel);
 $sheet->mergeCells('A9:F9');
 $sheet->mergeCells('G9:H9');
 $sheet->mergeCells('I9:L9');
-$sheet->setCellValue('A9', '');
-$sheet->setCellValue('G9', '');
-$sheet->setCellValue('I9', '');
+$sheet->setCellValue('A9', $dadosCap['motorista_nome']);
+$sheet->setCellValue('G9', $dadosCap['cpf_motorista']);
+$tel = '';
+if ($dadosCap['ddd_motorista'] !== '' && $dadosCap['fone_motorista'] !== '') $tel = '(' . $dadosCap['ddd_motorista'] . ') ' . $dadosCap['fone_motorista'];
+else if ($dadosCap['fone_motorista'] !== '') $tel = $dadosCap['fone_motorista'];
+$sheet->setCellValue('I9', $tel);
 $sheet->getStyle('A9:L9')->applyFromArray($styleValue);
 
 $sheet->mergeCells('A10:B10');
@@ -428,11 +623,11 @@ $sheet->mergeCells('E11:F11');
 $sheet->mergeCells('G11:H11');
 $sheet->mergeCells('I11:J11');
 $sheet->mergeCells('K11:L11');
-$sheet->setCellValue('A11', '');
-$sheet->setCellValue('C11', $placa);
-$sheet->setCellValue('E11', '');
-$sheet->setCellValue('G11', '');
-$sheet->setCellValue('I11', '');
+$sheet->setCellValue('A11', $dadosCap['placa_definitiva']);
+$sheet->setCellValue('C11', $dadosCap['placa_carreta']);
+$sheet->setCellValue('E11', $dadosCap['veiculo_tipo']);
+$sheet->setCellValue('G11', $dadosCap['veiculo_cubagem']);
+$sheet->setCellValue('I11', $dadosCap['qtde_pallets'] > 0 ? (int)$dadosCap['qtde_pallets'] : '');
 $sheet->setCellValue('K11', '');
 $sheet->getStyle('A11:L11')->applyFromArray($styleValue);
 
@@ -458,9 +653,9 @@ $sheet->mergeCells('A14:C14');
 $sheet->mergeCells('D14:F14');
 $sheet->mergeCells('G14:H14');
 $sheet->mergeCells('I14:J14');
-$sheet->setCellValue('A14', '');
-$sheet->setCellValue('D14', '');
-$sheet->setCellValue('G14', '');
+$sheet->setCellValue('A14', $dadosCap['conferente']);
+$sheet->setCellValue('D14', $dadosCap['ajudantes']);
+$sheet->setCellValue('G14', $dadosCap['doca']);
 $sheet->setCellValue('I14', '');
 $sheet->setCellValue('K14', '');
 $sheet->setCellValue('L14', '');
@@ -478,7 +673,7 @@ $sheet->mergeCells('A16:C16');
 $sheet->mergeCells('D16:F16');
 $sheet->mergeCells('G16:L16');
 $sheet->setCellValue('A16', '');
-$sheet->setCellValue('D16', '');
+$sheet->setCellValue('D16', $dadosCap['qtde_pallets'] > 0 ? (int)$dadosCap['qtde_pallets'] : '');
 $sheet->setCellValue('G16', '☐ BATIDA     ☐ PALETIZADA     ☐ MISTA');
 $sheet->getStyle('A16:L16')->applyFromArray($styleValue);
 $sheet->getStyle('G16')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -828,77 +1023,61 @@ if ($mapImage !== '') {
                     $sheet2 = $spreadsheet->createSheet();
                     $sheet2->setTitle('Rota');
                     $sheet2->getDefaultRowDimension()->setRowHeight(16);
-                    $sheet2->getColumnDimension('A')->setWidth(18);
-                    $sheet2->getColumnDimension('B')->setWidth(18);
-                    $sheet2->getColumnDimension('C')->setWidth(18);
-                    $sheet2->getColumnDimension('D')->setWidth(18);
-                    $sheet2->getColumnDimension('E')->setWidth(18);
-                    $sheet2->getColumnDimension('F')->setWidth(18);
-                    $sheet2->mergeCells('A1:F1');
-                    $sheet2->setCellValue('A1', 'ROTA');
-                    $sheet2->getStyle('A1:F1')->applyFromArray($styleDarkBarCenter);
-                    $sheet2->mergeCells('A2:F2');
-                    $sheet2->setCellValue('A2', $rotaTxt);
-                    $sheet2->getStyle('A2:F2')->applyFromArray($styleValue);
+                    foreach ($colWidths as $col => $w) {
+                        $sheet2->getColumnDimension($col)->setWidth($w);
+                    }
+
+                    $applyHeader($sheet2);
+
+                    $sheet2->mergeCells('A7:L7');
+                    $sheet2->setCellValue('A7', 'ROTA');
+                    $sheet2->getStyle('A7:L7')->applyFromArray($styleDarkBarCenter);
+
+                    $sheet2->mergeCells('A8:L8');
+                    $sheet2->setCellValue('A8', $rotaTxt);
+                    $sheet2->getStyle('A8:L8')->applyFromArray($styleValue);
 
                     $fmtMoeda = function($v) {
                         $n = (float)($v ?? 0);
                         return number_format($n, 2, ',', '.');
                     };
 
-                    $sheet2->mergeCells('A3:B3');
-                    $sheet2->mergeCells('C3:F3');
-                    $sheet2->setCellValue('A3', 'Carregamento');
-                    $sheet2->setCellValue('C3', ($seqCar > 0 ? str_pad((string)$seqCar, 6, '0', STR_PAD_LEFT) : '') . ($seqCar > 0 ? ' · ' : '') . $placa);
-                    $sheet2->getStyle('A3:B3')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('C3:F3')->applyFromArray($styleValue);
-
-                    $sheet2->mergeCells('A4:B4');
-                    $sheet2->mergeCells('C4:D4');
-                    $sheet2->setCellValue('A4', 'Peso Real (kg)');
-                    $sheet2->setCellValue('C4', number_format((float)$totalPesoReal, 2, ',', '.'));
-                    $sheet2->setCellValue('E4', 'Peso Calc (kg)');
-                    $sheet2->setCellValue('F4', number_format((float)$totalPesoCalc, 2, ',', '.'));
-                    $sheet2->getStyle('A4:B4')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('C4:D4')->applyFromArray($styleValue);
-                    $sheet2->getStyle('E4')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('F4')->applyFromArray($styleValue);
-
-                    $sheet2->mergeCells('A5:B5');
-                    $sheet2->mergeCells('C5:D5');
-                    $sheet2->setCellValue('A5', 'Cubagem (m³)');
-                    $sheet2->setCellValue('C5', number_format((float)$totalCubagem, 3, ',', '.'));
-                    $sheet2->setCellValue('E5', 'Frete (R$)');
-                    $sheet2->setCellValue('F5', $freteTotal > 0 ? $fmtMoeda($freteTotal) : '');
-                    $sheet2->getStyle('A5:B5')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('C5:D5')->applyFromArray($styleValue);
-                    $sheet2->getStyle('E5')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('F5')->applyFromArray($styleValue);
-
-                    $sheet2->mergeCells('A6:B6');
-                    $sheet2->mergeCells('C6:D6');
-                    $sheet2->setCellValue('A6', 'Km (aprox.)');
+                    $sheet2->mergeCells('A9:B9');
+                    $sheet2->mergeCells('C9:D9');
+                    $sheet2->setCellValue('A9', 'Km (aprox.)');
                     $kmNum = is_numeric($rotaKm) ? (float)$rotaKm : 0.0;
-                    $sheet2->setCellValue('C6', $kmNum > 0 ? number_format($kmNum, 1, ',', '.') : '');
-                    $sheet2->setCellValue('E6', 'Qt. Vol.');
-                    $sheet2->setCellValue('F6', $totalVolumes > 0 ? (int)$totalVolumes : '');
-                    $sheet2->getStyle('A6:B6')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('C6:D6')->applyFromArray($styleValue);
-                    $sheet2->getStyle('E6')->applyFromArray($styleLabel);
-                    $sheet2->getStyle('F6')->applyFromArray($styleValue);
+                    $sheet2->setCellValue('C9', $kmNum > 0 ? number_format($kmNum, 1, ',', '.') : '');
+                    $sheet2->setCellValue('E9', 'Qt. Vol.');
+                    $sheet2->setCellValue('F9', $totalVolumes > 0 ? (int)$totalVolumes : '');
+                    $sheet2->setCellValue('G9', 'Peso Real (kg)');
+                    $sheet2->setCellValue('H9', number_format((float)$totalPesoReal, 2, ',', '.'));
+                    $sheet2->setCellValue('I9', 'Cubagem (m³)');
+                    $sheet2->setCellValue('J9', number_format((float)$totalCubagem, 3, ',', '.'));
+                    $sheet2->setCellValue('K9', 'Frete (R$)');
+                    $sheet2->setCellValue('L9', $freteTotal > 0 ? $fmtMoeda($freteTotal) : '');
+                    $sheet2->getStyle('A9:B9')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('C9:D9')->applyFromArray($styleValue);
+                    $sheet2->getStyle('E9')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('F9')->applyFromArray($styleValue);
+                    $sheet2->getStyle('G9')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('H9')->applyFromArray($styleValue);
+                    $sheet2->getStyle('I9')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('J9')->applyFromArray($styleValue);
+                    $sheet2->getStyle('K9')->applyFromArray($styleLabel);
+                    $sheet2->getStyle('L9')->applyFromArray($styleValue);
 
                     $drawing = new Drawing();
                     $drawing->setName('Mapa Rota');
                     $drawing->setPath($tmpPng);
-                    $drawing->setCoordinates('A8');
-                    $drawing->setHeight(430);
+                    $drawing->setCoordinates('A11');
+                    $drawing->setHeight(520);
                     $drawing->setOffsetX(5);
                     $drawing->setOffsetY(5);
                     $drawing->setWorksheet($sheet2);
 
                     $sheet2->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);
                     $sheet2->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.35)->setRight(0.35);
-                    $sheet2->getPageSetup()->setPrintArea('A1:F40');
+                    $sheet2->getPageSetup()->setPrintArea('A1:L46');
                 } catch (Exception $e) {
                 }
             }
@@ -917,6 +1096,7 @@ if ($out !== false && $out !== '') {
     ob_end_clean();
 }
 
+$spreadsheet->setActiveSheetIndex(0);
 $writer = new Xlsx($spreadsheet);
 $writer->setPreCalculateFormulas(false);
 if (method_exists($writer, 'setUseDiskCaching')) {

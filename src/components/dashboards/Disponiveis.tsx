@@ -4883,6 +4883,286 @@ function ModalHub({
   );
 }
 
+function ModalDadosOrdemCarregamento({
+  unidade,
+  placa,
+  seqCarregamento,
+  onFechar,
+  onConcluirSalvar,
+}: {
+  unidade: string;
+  placa: string;
+  seqCarregamento: number;
+  onFechar: () => void;
+  onConcluirSalvar: () => Promise<void>;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [placaDefinitiva, setPlacaDefinitiva] = useState('');
+  const [placaCarreta, setPlacaCarreta] = useState('');
+  const [cpfMotorista, setCpfMotorista] = useState('');
+  const [motoristaNome, setMotoristaNome] = useState('');
+  const [dddMotorista, setDddMotorista] = useState('');
+  const [foneMotorista, setFoneMotorista] = useState('');
+  const [qtdePallets, setQtdePallets] = useState<string>('');
+  const [conferente, setConferente] = useState('');
+  const [ajudantes, setAjudantes] = useState('');
+  const [doca, setDoca] = useState('');
+
+  const [motBusca, setMotBusca] = useState('');
+  const [motList, setMotList] = useState<{ cpf: string; nome: string; ddd: string; fone: string }[]>([]);
+  const [motLoading, setMotLoading] = useState(false);
+  const [motOpen, setMotOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      setLoading(true);
+      try {
+        const resp = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/dados_ordem_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'get', unidade, placa, seq_carregamento: seqCarregamento }) },
+          true
+        );
+        if (!alive) return;
+        if (resp?.success && resp?.data) {
+          setPlacaDefinitiva(String(resp.data.placa_definitiva ?? '').toUpperCase());
+          setPlacaCarreta(String(resp.data.placa_carreta ?? '').toUpperCase());
+          setCpfMotorista(String(resp.data.cpf_motorista ?? ''));
+          setMotoristaNome(String(resp.data.motorista_nome ?? ''));
+          setDddMotorista(String(resp.data.ddd_motorista ?? ''));
+          setFoneMotorista(String(resp.data.fone_motorista ?? ''));
+          setQtdePallets(resp.data.qtde_pallets ? String(resp.data.qtde_pallets) : '');
+          setConferente(String(resp.data.conferente ?? ''));
+          setAjudantes(String(resp.data.ajudantes ?? ''));
+          setDoca(String(resp.data.doca ?? ''));
+        }
+      } catch (e: any) {
+        toast.error(e?.message || 'Erro ao carregar dados da ordem.');
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+    void run();
+    return () => { alive = false; };
+  }, [placa, seqCarregamento, unidade]);
+
+  useEffect(() => {
+    if (!motOpen) return;
+    const t = setTimeout(async () => {
+      const term = motBusca.trim();
+      setMotLoading(true);
+      try {
+        const resp = await apiFetch('/sistema/api/search_motoristas.php', {
+          method: 'POST',
+          body: JSON.stringify({ search: term }),
+        });
+        if (resp?.success && Array.isArray(resp.data)) setMotList(resp.data);
+        else setMotList([]);
+      } catch {
+        setMotList([]);
+      } finally {
+        setMotLoading(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [motBusca, motOpen]);
+
+  const fetchVeiculo = async (placaBusca: string): Promise<{ placa: string; tipo: string } | null> => {
+    const p = String(placaBusca ?? '').trim().toUpperCase();
+    if (!p) return null;
+    try {
+      const resp = await apiFetch('/sistema/api/search_veiculos.php', {
+        method: 'POST',
+        body: JSON.stringify({ search: p }),
+      });
+      if (!resp?.success || !Array.isArray(resp.data)) return null;
+      const found = resp.data.find((v: any) => String(v?.placa ?? '').trim().toUpperCase() === p);
+      if (!found) return null;
+      return { placa: p, tipo: String(found?.tipo ?? '').trim().toUpperCase() };
+    } catch {
+      return null;
+    }
+  };
+
+  const salvar = async () => {
+    if (saving || loading) return;
+    const cavalo = placaDefinitiva.trim().toUpperCase();
+    const carreta = placaCarreta.trim().toUpperCase();
+    const cpf = String(cpfMotorista ?? '').replace(/\D+/g, '');
+
+    if (!cavalo) { toast.error('Selecione a placa definitiva.'); return; }
+    if (!cpf) { toast.error('Selecione o motorista.'); return; }
+
+    setSaving(true);
+    try {
+      const vCav = await fetchVeiculo(cavalo);
+      if (!vCav) { toast.error('Placa definitiva não encontrada na base.'); return; }
+      if (String(vCav.tipo).toUpperCase() === 'CARRETA') { toast.error('Placa definitiva não pode ser do tipo CARRETA.'); return; }
+
+      if (carreta) {
+        if (carreta !== cavalo) {
+          const vCar = await fetchVeiculo(carreta);
+          if (!vCar) { toast.error('Carreta não encontrada na base.'); return; }
+          if (String(vCar.tipo).toUpperCase() !== 'CARRETA') { toast.error('Se a carreta for diferente da placa definitiva, ela deve ser do tipo CARRETA.'); return; }
+        }
+      }
+
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/dados_ordem_carregamento.php`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            acao: 'save',
+            unidade,
+            placa,
+            seq_carregamento: seqCarregamento,
+            placa_definitiva: cavalo,
+            placa_carreta: carreta || '',
+            cpf_motorista: cpf,
+            ddd_motorista: dddMotorista,
+            fone_motorista: foneMotorista,
+            qtde_pallets: qtdePallets ? parseInt(qtdePallets, 10) : 0,
+            conferente,
+            ajudantes,
+            doca,
+          }),
+        },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message || 'Erro ao salvar dados da ordem.');
+        return;
+      }
+      toast.success('Dados salvos.');
+      onFechar();
+      await onConcluirSalvar();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar dados da ordem.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(860px,calc(100vw-32px))] max-h-[calc(100vh-120px)] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">Ordem de Carregamento · Dados</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{unidade} · {placa}{seqCarregamento > 0 ? ` · ${String(seqCarregamento).padStart(6, '0')}` : ''}</p>
+          </div>
+          <button onClick={!saving ? onFechar : undefined} disabled={saving} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-4 overflow-y-auto min-h-0 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Placa definitiva</label>
+              <FilterSelectVeiculo value={placaDefinitiva} onChange={setPlacaDefinitiva} placeholder="Buscar placa (não pode ser CARRETA)" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Carreta (opcional)</label>
+              <FilterSelectVeiculo value={placaCarreta} onChange={setPlacaCarreta} placeholder="Opcional (igual ou tipo CARRETA)" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5 relative">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Motorista</label>
+              <Input
+                value={motBusca}
+                onChange={(e) => setMotBusca(e.target.value)}
+                onFocus={() => { setMotOpen(true); }}
+                placeholder={motoristaNome ? `${motoristaNome} · ${String(cpfMotorista)}` : 'Digite nome ou CPF'}
+              />
+              {motOpen && (
+                <div className="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg overflow-hidden">
+                  <div className="px-2 py-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>{motLoading ? 'Buscando...' : `${motList.length} motorista(s)`}</span>
+                    <button type="button" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => setMotOpen(false)}>✕</button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {motList.map((m) => (
+                      <button
+                        key={m.cpf}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                        onClick={() => {
+                          setCpfMotorista(String(m.cpf ?? ''));
+                          setMotoristaNome(String(m.nome ?? ''));
+                          setDddMotorista(String(m.ddd ?? ''));
+                          setFoneMotorista(String(m.fone ?? ''));
+                          setMotBusca('');
+                          setMotOpen(false);
+                        }}
+                      >
+                        <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{m.nome}</div>
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 font-mono">
+                          {m.cpf}{m.ddd && m.fone ? ` · (${m.ddd}) ${m.fone}` : ''}
+                        </div>
+                      </button>
+                    ))}
+                    {(!motLoading && motList.length === 0) && (
+                      <div className="px-3 py-3 text-[11px] text-slate-500 dark:text-slate-400">Nenhum motorista encontrado.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {motoristaNome ? `${motoristaNome} · ${String(cpfMotorista)}` : 'Selecione um motorista para gravar o CPF.'}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">DDD</label>
+                <Input value={dddMotorista} onChange={(e) => setDddMotorista(e.target.value)} maxLength={5} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Fone</label>
+                <Input value={foneMotorista} onChange={(e) => setFoneMotorista(e.target.value)} maxLength={20} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Qtde pallets</label>
+              <Input value={qtdePallets} onChange={(e) => setQtdePallets(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Conferente</label>
+              <Input value={conferente} onChange={(e) => setConferente(e.target.value)} maxLength={80} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Ajudantes</label>
+              <Input value={ajudantes} onChange={(e) => setAjudantes(e.target.value)} maxLength={120} placeholder="Até 2 nomes" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Doca</label>
+              <Input value={doca} onChange={(e) => setDoca(e.target.value.toUpperCase())} maxLength={20} />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200 dark:border-slate-700">
+          <Button variant="outline" onClick={!saving ? onFechar : undefined} disabled={saving}>Cancelar</Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void salvar(); }} disabled={saving || loading}>
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
+            Salvar e gerar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalRotaCarregamento({
   carregamento,
   dados,
@@ -4950,6 +5230,9 @@ function ModalRotaCarregamento({
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
   const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete'>('ctrc');
   const [cteRotaSortDir, setCteRotaSortDir] = useState<'asc' | 'desc'>('asc');
+  const [dragParadaKey, setDragParadaKey] = useState<string | null>(null);
+  const [dragParadaOver, setDragParadaOver] = useState<string | null>(null);
+  const [dadosOrdemAberto, setDadosOrdemAberto] = useState(false);
 
   const carregarInfo = dados?.carregamento ?? {};
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
@@ -5802,6 +6085,21 @@ function ModalRotaCarregamento({
     });
   }, [defaultParadasOrder]);
 
+  const moverParadaPara = useCallback((fromKey: string, toKey: string) => {
+    setParadasOrder((prev) => {
+      const base = (prev.length > 0 ? [...prev] : [...defaultParadasOrder]);
+      const fromIdx = base.indexOf(fromKey);
+      const toIdx = base.indexOf(toKey);
+      if (fromIdx < 0 || toIdx < 0) return base;
+      if (fromIdx === toIdx) return base;
+      const next = [...base];
+      next.splice(fromIdx, 1);
+      const insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
+      next.splice(insertIdx, 0, fromKey);
+      return next;
+    });
+  }, [defaultParadasOrder]);
+
   const toggleCteRotaSort = (key: 'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete') => {
     setCteRotaSortKey((prev) => {
       if (prev === key) {
@@ -5939,7 +6237,7 @@ function ModalRotaCarregamento({
             <Button
               size="sm"
               className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => { void exportarOrdemCarregamento(); }}
+              onClick={() => { setDadosOrdemAberto(true); }}
               disabled={xlsxLoading}
             >
               {xlsxLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
@@ -5989,10 +6287,47 @@ function ModalRotaCarregamento({
                   const uNome = unidadesMap.get(g.unidade)?.nome ?? '';
                   const isFirst = idx === 0;
                   const isLast = idx === paradasOrderEfetiva.length - 1;
+                  const isDragging = dragParadaKey === k;
+                  const isOver = dragParadaOver === k && dragParadaKey !== null && dragParadaKey !== k;
                   return (
-                    <div key={k} className="mb-2">
+                    <div
+                      key={k}
+                      className={`mb-2 ${isOver ? 'ring-2 ring-emerald-400 rounded-lg' : ''}`}
+                      onDragOver={(e) => {
+                        if (!dragParadaKey || dragParadaKey === k) return;
+                        e.preventDefault();
+                        setDragParadaOver(k);
+                        try { e.dataTransfer.dropEffect = 'move'; } catch {}
+                      }}
+                      onDragLeave={() => {
+                        setDragParadaOver((prev) => (prev === k ? null : prev));
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const from = dragParadaKey;
+                        setDragParadaOver(null);
+                        setDragParadaKey(null);
+                        if (from && from !== k) moverParadaPara(from, k);
+                      }}
+                    >
                       <div className="flex gap-1 items-stretch">
-                        <div className="w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-200 flex items-center justify-center font-extrabold text-lg tabular-nums">
+                        <div
+                          draggable
+                          onDragStart={(e) => {
+                            setDragParadaKey(k);
+                            setDragParadaOver(null);
+                            try {
+                              e.dataTransfer.effectAllowed = 'move';
+                              e.dataTransfer.setData('text/plain', k);
+                            } catch {}
+                          }}
+                          onDragEnd={() => {
+                            setDragParadaKey(null);
+                            setDragParadaOver(null);
+                          }}
+                          className={`w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-200 flex items-center justify-center font-extrabold text-lg tabular-nums cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-90' : ''}`}
+                          title="Arraste para reordenar"
+                        >
                           {idx + 1}
                         </div>
                         <button
@@ -6050,10 +6385,47 @@ function ModalRotaCarregamento({
                   const isFec = String(g.unidade ?? '').toUpperCase() === 'FEC';
                   const isFirst = idx === 0;
                   const isLast = idx === paradasOrderEfetiva.length - 1;
+                  const isDragging = dragParadaKey === k;
+                  const isOver = dragParadaOver === k && dragParadaKey !== null && dragParadaKey !== k;
                   return (
-                    <div key={k} className="mb-2">
+                    <div
+                      key={k}
+                      className={`mb-2 ${isOver ? 'ring-2 ring-emerald-400 rounded-lg' : ''}`}
+                      onDragOver={(e) => {
+                        if (!dragParadaKey || dragParadaKey === k) return;
+                        e.preventDefault();
+                        setDragParadaOver(k);
+                        try { e.dataTransfer.dropEffect = 'move'; } catch {}
+                      }}
+                      onDragLeave={() => {
+                        setDragParadaOver((prev) => (prev === k ? null : prev));
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const from = dragParadaKey;
+                        setDragParadaOver(null);
+                        setDragParadaKey(null);
+                        if (from && from !== k) moverParadaPara(from, k);
+                      }}
+                    >
                       <div className="flex gap-1 items-stretch">
-                        <div className={`w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 ${isFec ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-800 dark:text-orange-200' : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200'} flex items-center justify-center font-extrabold text-lg tabular-nums`}>
+                        <div
+                          draggable
+                          onDragStart={(e) => {
+                            setDragParadaKey(k);
+                            setDragParadaOver(null);
+                            try {
+                              e.dataTransfer.effectAllowed = 'move';
+                              e.dataTransfer.setData('text/plain', k);
+                            } catch {}
+                          }}
+                          onDragEnd={() => {
+                            setDragParadaKey(null);
+                            setDragParadaOver(null);
+                          }}
+                          className={`w-9 shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 ${isFec ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-800 dark:text-orange-200' : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200'} flex items-center justify-center font-extrabold text-lg tabular-nums cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-90' : ''}`}
+                          title="Arraste para reordenar"
+                        >
                           {idx + 1}
                         </div>
                         <button
@@ -6120,6 +6492,15 @@ function ModalRotaCarregamento({
           </div>
         </div>
       </div>
+      {dadosOrdemAberto && (
+        <ModalDadosOrdemCarregamento
+          unidade={origem}
+          placa={String(carregamento.placa_provisoria ?? '').toUpperCase()}
+          seqCarregamento={Number((carregamento as any)?.seq_carregamento ?? 0) || 0}
+          onFechar={() => setDadosOrdemAberto(false)}
+          onConcluirSalvar={exportarOrdemCarregamento}
+        />
+      )}
     </div>,
     document.body
   );
@@ -6251,9 +6632,10 @@ function ModalCarregamentoAutomaticoEntrega({
 }) {
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
+  const [previsaoModo, setPrevisaoModo] = useState<'periodo' | 'ate'>('periodo');
   const [previsaoInicio, setPrevisaoInicio] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 60);
+    d.setFullYear(d.getFullYear() - 2);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [previsaoFim, setPrevisaoFim] = useState(() => {
@@ -6293,12 +6675,12 @@ function ModalCarregamentoAutomaticoEntrega({
   };
 
   const periodoTs = useMemo(() => {
-    const ini = parseDataISOAuto(previsaoInicio);
+    const ini = previsaoModo === 'ate' ? null : parseDataISOAuto(previsaoInicio);
     const fim = parseDataISOAuto(previsaoFim);
     const iniTs = ini ? new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0).getTime() : null;
     const fimTs = fim ? new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).getTime() : null;
     return { iniTs: (iniTs != null && Number.isFinite(iniTs)) ? iniTs : null, fimTs: (fimTs != null && Number.isFinite(fimTs)) ? fimTs : null };
-  }, [previsaoInicio, previsaoFim]);
+  }, [previsaoInicio, previsaoFim, previsaoModo]);
 
   const countsPorSetor = useMemo(() => {
     const map = new Map<string, number>();
@@ -6399,20 +6781,48 @@ function ModalCarregamentoAutomaticoEntrega({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Previsão de entrega (período)</label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
-                  value={previsaoInicio}
-                  onChange={(e) => setPrevisaoInicio(e.target.value)}
-                />
-                <Input
-                  type="date"
-                  value={previsaoFim}
-                  onChange={(e) => setPrevisaoFim(e.target.value)}
-                />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    className={`h-7 px-2 text-[11px] font-semibold ${previsaoModo === 'periodo' ? 'bg-emerald-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                    onClick={() => setPrevisaoModo('periodo')}
+                  >
+                    Período
+                  </button>
+                  <button
+                    type="button"
+                    className={`h-7 px-2 text-[11px] font-semibold border-l border-slate-200 dark:border-slate-700 ${previsaoModo === 'ate' ? 'bg-emerald-600 text-white' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                    onClick={() => setPrevisaoModo('ate')}
+                  >
+                    Só até
+                  </button>
+                </div>
+                {previsaoModo === 'periodo' ? (
+                  <div className="grid grid-cols-2 gap-2 flex-1 min-w-[240px]">
+                    <Input
+                      type="date"
+                      value={previsaoInicio}
+                      onChange={(e) => setPrevisaoInicio(e.target.value)}
+                    />
+                    <Input
+                      type="date"
+                      value={previsaoFim}
+                      onChange={(e) => setPrevisaoFim(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-[160px]">
+                    <Input
+                      type="date"
+                      value={previsaoFim}
+                      onChange={(e) => setPrevisaoFim(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Sugestão: 60 dias atrás até amanhã. A lista de CT-es por setor muda conforme este período.
+                Sugestão: 2 anos atrás até amanhã. A lista de CT-es por setor muda conforme o filtro.
               </p>
             </div>
           </div>
@@ -6467,14 +6877,14 @@ function ModalCarregamentoAutomaticoEntrega({
           <Button
             variant="outline"
             disabled={!podeCarregarTodos}
-            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean), { previsaoInicio, previsaoFim })}
+            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean), { previsaoInicio: previsaoModo === 'ate' ? '' : previsaoInicio, previsaoFim })}
           >
             Carregar todos
           </Button>
           <Button
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
             disabled={!podeCarregarSelecionados}
-            onClick={() => onConfirmar(selected, { previsaoInicio, previsaoFim })}
+            onClick={() => onConfirmar(selected, { previsaoInicio: previsaoModo === 'ate' ? '' : previsaoInicio, previsaoFim })}
           >
             Carregar selecionados
           </Button>
