@@ -5224,6 +5224,7 @@ function ModalRotaCarregamento({
   const [coordsByKey, setCoordsByKey] = useState<Record<string, { lat: number; lng: number }>>({});
   const [geoStatusByKey, setGeoStatusByKey] = useState<Record<string, 'pending' | 'loading' | 'ok' | 'error'>>({});
   const [geoErrorByKey, setGeoErrorByKey] = useState<Record<string, string>>({});
+  const [geoUserLockedByKey, setGeoUserLockedByKey] = useState<Record<string, boolean>>({});
   const [geoRunning, setGeoRunning] = useState(false);
   const [geoHydrated, setGeoHydrated] = useState(false);
 
@@ -5233,6 +5234,7 @@ function ModalRotaCarregamento({
   const [dragParadaKey, setDragParadaKey] = useState<string | null>(null);
   const [dragParadaOver, setDragParadaOver] = useState<string | null>(null);
   const [dadosOrdemAberto, setDadosOrdemAberto] = useState(false);
+  const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
 
   const carregarInfo = dados?.carregamento ?? {};
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
@@ -5281,6 +5283,20 @@ function ModalRotaCarregamento({
     const normKey = (s: any) => norm(s).toUpperCase().replace(/\s+/g, ' ');
     const normEnd = (s: any) => norm(s).toUpperCase().replace(/\s+/g, ' ');
     const isValidSigla = (s: string) => /^[A-Z0-9]{2,5}$/.test(s);
+
+    const normCep = (s: any) => normEnd(s).replace(/\D+/g, '');
+    const buildGeoQuery = (p: { endereco: string; bairro: string; cep: string; cidade: string; uf: string }) => {
+      const cepN = normCep(p.cep);
+      const cidadeUf = [p.cidade, p.uf].filter(Boolean).join(' - ');
+      const parts = [
+        cepN,
+        p.endereco,
+        p.bairro,
+        cidadeUf,
+        'BRASIL',
+      ].filter(Boolean);
+      return parts.join(', ');
+    };
 
     const destinosEntrega = new Map<string, {
       key: string;
@@ -5343,7 +5359,7 @@ function ModalRotaCarregamento({
             endereco ? `${endereco}${bairro ? `, ${bairro}` : ''}` : (bairro ? bairro : ''),
             [cep, cidade && uf ? `${cidade}/${uf}` : (cidade || uf)].filter(Boolean).join(' · ')
           ].filter(Boolean).join(' · ');
-        const query = (isFec && !hasEnderecoReal) ? '' : [endereco, bairro, cep, cidade, uf].filter(Boolean).join(', ');
+        const query = (isFec && !hasEnderecoReal) ? '' : buildGeoQuery({ endereco, bairro, cep, cidade, uf });
         const key = (isFec && !hasEnderecoReal)
           ? `${unidadeDestino}|${ctrc || `${ser}-${nro}`}`
           : `${unidadeDestino}|${destinatario}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
@@ -5468,6 +5484,7 @@ function ModalRotaCarregamento({
   }, [entregaByKey, grupos.entrega, grupos.transferencia, transfByUnidade, unidadesOrdem]);
 
   const [paradasOrder, setParadasOrder] = useState<string[]>([]);
+  const lastPlacaProvisoriaRef = useRef<string | null>(null);
 
   const paradasOrderEfetiva = useMemo(() => {
     const keysAll = new Set<string>([
@@ -5491,6 +5508,11 @@ function ModalRotaCarregamento({
   }, [defaultParadasOrder, grupos.entrega, grupos.transferencia, paradasOrder]);
 
   useEffect(() => {
+    const placa = String(carregamento.placa_provisoria ?? '');
+    const prevPlaca = lastPlacaProvisoriaRef.current;
+    const isNovoCarregamento = prevPlaca !== placa;
+    lastPlacaProvisoriaRef.current = placa;
+
     const initial: Record<string, { lat: number; lng: number }> = {};
     const status: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
     for (const g of grupos.entrega) {
@@ -5505,9 +5527,21 @@ function ModalRotaCarregamento({
     setCoordsByKey(initial);
     setGeoStatusByKey(status);
     setGeoErrorByKey({});
+    setGeoUserLockedByKey((prev) => {
+      if (isNovoCarregamento) return {};
+      const keysNow = new Set(grupos.entrega.map((g) => g.key));
+      const out: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(prev || {})) {
+        if (v && keysNow.has(k)) out[k] = true;
+      }
+      return out;
+    });
     setGeoRunning(false);
     setAbertos(new Set());
-    setParadasOrder(defaultParadasOrder);
+    setParadasOrder((prev) => {
+      if (isNovoCarregamento) return defaultParadasOrder;
+      return prev.length > 0 ? prev : defaultParadasOrder;
+    });
     setGeoHydrated(true);
   }, [carregamento.placa_provisoria, defaultParadasOrder]);
 
@@ -5667,7 +5701,10 @@ function ModalRotaCarregamento({
         iconAnchor: [15, 40],
         popupAnchor: [0, -40],
       });
-      const m = L.marker([p.lat, p.lng], { icon }).addTo(map);
+      const m = L.marker([p.lat, p.lng], { icon, draggable: p.tipo === 'ENTREGA', autoPan: true }).addTo(map);
+      if (p.tipo === 'ENTREGA') {
+        try { m.dragging.enable(); } catch {}
+      }
       if (p.tipo === 'UNIDADE') {
         const sigla = String(p.titulo ?? '').toUpperCase();
         const nome = unidadesMap.get(sigla)?.nome ?? '';
@@ -5682,9 +5719,13 @@ function ModalRotaCarregamento({
         const cep = g?.cep ?? '';
         const cidade = g?.cidade ?? '';
         const uf = g?.uf ?? '';
+        const cNow = groupKey ? coordsByKey[groupKey] : null;
+        const latTxt = cNow && Number.isFinite(cNow.lat as any) ? Number(cNow.lat).toFixed(6).replace('.', ',') : '';
+        const lngTxt = cNow && Number.isFinite(cNow.lng as any) ? Number(cNow.lng).toFixed(6).replace('.', ',') : '';
         const ctesTxt = Array.isArray(g?.ctes)
           ? g!.ctes.slice(0, 6).map((c: any) => c?.ctrc).filter(Boolean).join(', ') + (g!.ctes.length > 6 ? '…' : '')
           : '';
+        const gKeyEnc = encodeURIComponent(groupKey);
         m.bindPopup(`
           <div style="font-size:12px;line-height:1.35">
             <div style="font-weight:700;margin-bottom:6px">${tipo}</div>
@@ -5694,8 +5735,107 @@ function ModalRotaCarregamento({
             ${cep ? `<div><span style="color:#64748b">CEP:</span> ${cep}</div>` : ''}
             ${(cidade || uf) ? `<div><span style="color:#64748b">Cidade:</span> ${cidade}${cidade && uf ? '/' : ''}${uf}</div>` : ''}
             ${Array.isArray(g?.ctes) ? `<div><span style="color:#64748b">CT-es:</span> ${g!.ctes.length}${ctesTxt ? ` · ${ctesTxt}` : ''}</div>` : ''}
+            ${(latTxt && lngTxt) ? `<div><span style="color:#64748b">Coord.:</span> ${latTxt}, ${lngTxt}</div>` : ''}
+            <div style="margin-top:8px">
+              <a href="#" data-action="editar-endereco" data-key="${gKeyEnc}" style="color:#2563eb;text-decoration:underline">Editar endereço</a>
+              <span style="color:#94a3b8"> · </span>
+              <a href="#" data-action="ajustar-geoloc" data-key="${gKeyEnc}" style="color:#2563eb;text-decoration:underline">Ajustar Geolocalização Manualmente</a>
+            </div>
           </div>
         `);
+
+        const salvarCoordGrupo = async (lat: number, lng: number) => {
+          if (!groupKey) return;
+          setCoordsByKey((prev) => ({ ...(prev || {}), [groupKey]: { lat, lng } }));
+          setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'ok' }));
+          setGeoErrorByKey((prev) => {
+            const next = { ...(prev || {}) };
+            delete next[groupKey];
+            return next;
+          });
+          if (!Array.isArray(g?.ctes) || g!.ctes.length === 0) return;
+          await Promise.allSettled(g!.ctes.map((c: any) => persistirGeoloc(c.ser, c.nro, lat, lng)));
+        };
+
+        m.on('dragend', () => {
+          try {
+            const ll = m.getLatLng();
+            const lat = Number(ll?.lat);
+            const lng = Number(ll?.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            if (groupKey) setGeoUserLockedByKey((prev) => ({ ...(prev || {}), [groupKey]: true }));
+            void salvarCoordGrupo(lat, lng).then(() => {
+              toast.success('Geolocalização atualizada.');
+            }).catch(() => {
+              toast.error('Erro ao salvar geolocalização.');
+            });
+          } catch {
+          }
+        });
+
+        m.on('popupopen', (ev: any) => {
+          const el = ev?.popup?.getElement?.() as HTMLElement | null;
+          if (!el) return;
+          const bindOnce = (a: HTMLAnchorElement | null, handler: (e: MouseEvent) => void) => {
+            if (!a) return;
+            if (a.getAttribute('data-bound') === '1') return;
+            a.setAttribute('data-bound', '1');
+            a.addEventListener('click', handler);
+          };
+
+          const aAjustar = el.querySelector('a[data-action="ajustar-geoloc"]') as HTMLAnchorElement | null;
+          bindOnce(aAjustar, (e) => {
+            e.preventDefault();
+            const keyEnc = aAjustar?.getAttribute('data-key') || '';
+            const key = decodeURIComponent(keyEnc);
+            const cur = key ? coordsByKey[key] : null;
+            const pre = cur ? `${Number(cur.lat).toFixed(6)},${Number(cur.lng).toFixed(6)}` : '';
+            const ans = window.prompt('Informe latitude e longitude (ex: -29.123456,-51.123456)', pre);
+            if (!ans) return;
+            const parts = ans.split(/[\s;]+/).join(' ').split(',').map((x) => x.trim()).filter(Boolean);
+            if (parts.length < 2) { toast.error('Informe no formato LAT,LON'); return; }
+            const lat = Number(String(parts[0]).replace(',', '.'));
+            const lng = Number(String(parts[1]).replace(',', '.'));
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error('Latitude/Longitude inválidas.'); return; }
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) { toast.error('Latitude/Longitude fora do intervalo.'); return; }
+            if (key) setGeoUserLockedByKey((prev) => ({ ...(prev || {}), [key]: true }));
+            void salvarCoordGrupo(lat, lng).then(() => {
+              try { m.setLatLng([lat, lng]); } catch {}
+              toast.success('Geolocalização atualizada.');
+            }).catch(() => {
+              toast.error('Erro ao salvar geolocalização.');
+            });
+          });
+
+          const aEditar = el.querySelector('a[data-action="editar-endereco"]') as HTMLAnchorElement | null;
+          bindOnce(aEditar, (e) => {
+            e.preventDefault();
+            const q0 = String(g?.query ?? '').trim();
+            const pre = q0 ? q0 : [endereco, bairro, cep, cidade && uf ? `${cidade} - ${uf}` : (cidade || uf), 'BRASIL'].filter(Boolean).join(', ');
+            const ans = window.prompt('Informe o endereço para buscar no mapa (ex: CEP, rua, bairro, cidade/UF)', pre);
+            if (!ans) return;
+            const q = String(ans).trim();
+            if (!q) return;
+            void (async () => {
+              try {
+                if (groupKey) setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'loading' }));
+                const coord = await geocodeEndereco(q);
+                if (!coord) {
+                  toast.error('Endereço não encontrado.');
+                  if (groupKey) setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'error' }));
+                  return;
+                }
+                if (groupKey) setGeoUserLockedByKey((prev) => ({ ...(prev || {}), [groupKey]: true }));
+                await salvarCoordGrupo(coord.lat, coord.lng);
+                try { m.setLatLng([coord.lat, coord.lng]); } catch {}
+                toast.success('Geolocalização atualizada.');
+              } catch {
+                toast.error('Erro ao buscar endereço.');
+                if (groupKey) setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'error' }));
+              }
+            })();
+          });
+        });
       }
       markers.push(m);
     });
@@ -5711,7 +5851,7 @@ function ModalRotaCarregamento({
       const bounds = L.latLngBounds(all);
       map.fitBounds(bounds, { padding: [30, 30] });
     }
-  }, [leafletLoaded, pontosOrdenados, routeCoords]);
+  }, [coordsByKey, leafletLoaded, pontosOrdenados, routeCoords]);
 
   const focarRota = useCallback(() => {
     const L = (window as any).L;
@@ -5981,7 +6121,7 @@ function ModalRotaCarregamento({
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
     if (!token) return null;
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt`;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt&types=address,postcode&autocomplete=false`;
     const resp = await fetch(url);
     const json = await resp.json();
     const center = json?.features?.[0]?.center;
@@ -6000,11 +6140,15 @@ function ModalRotaCarregamento({
     );
   };
 
-  const iniciarGeocoding = async () => {
+  const iniciarGeocoding = async (onlyKeys?: string[]) => {
     if (geoRunning) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
-    const pendentes = grupos.entrega.filter((g) => (geoStatusByKey[g.key] ?? 'pending') === 'pending');
+    const onlySet = Array.isArray(onlyKeys) && onlyKeys.length > 0 ? new Set(onlyKeys) : null;
+    const pendentes = grupos.entrega.filter((g) => {
+      if (onlySet) return onlySet.has(g.key);
+      return (geoStatusByKey[g.key] ?? 'pending') === 'pending';
+    });
     if (pendentes.length === 0) return;
     setGeoRunning(true);
     try {
@@ -6057,6 +6201,29 @@ function ModalRotaCarregamento({
     void iniciarGeocoding();
   }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey, iniciarGeocoding]);
 
+  const resetarGeolocalizacoes = useCallback(() => {
+    if (geoRunning) return;
+    const tokenNow = getToken();
+    if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
+    const keys = grupos.entrega.map((g) => g.key).filter((k) => !geoUserLockedByKey[k]);
+    if (keys.length === 0) {
+      toast.info('Nada para resetar: todos os destinos já foram ajustados manualmente.');
+      return;
+    }
+    autoGeoRef.current = null;
+    setGeoErrorByKey((prev) => {
+      const next = { ...(prev || {}) };
+      for (const k of keys) delete next[k];
+      return next;
+    });
+    setGeoStatusByKey((prev) => {
+      const next = { ...(prev || {}) };
+      for (const k of keys) next[k] = 'pending';
+      return next;
+    });
+    void iniciarGeocoding(keys);
+  }, [geoRunning, getToken, grupos.entrega, geoUserLockedByKey, iniciarGeocoding]);
+
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
   const pct = totalEnt > 0 ? Math.round((okEnt / totalEnt) * 100) : 100;
@@ -6093,9 +6260,9 @@ function ModalRotaCarregamento({
       if (fromIdx < 0 || toIdx < 0) return base;
       if (fromIdx === toIdx) return base;
       const next = [...base];
-      next.splice(fromIdx, 1);
-      const insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
-      next.splice(insertIdx, 0, fromKey);
+      const tmp = next[fromIdx];
+      next[fromIdx] = next[toIdx];
+      next[toIdx] = tmp;
       return next;
     });
   }, [defaultParadasOrder]);
@@ -6236,6 +6403,16 @@ function ModalRotaCarregamento({
             </Button>
             <Button
               size="sm"
+              className="h-8 text-xs bg-slate-600 hover:bg-slate-700 text-white"
+              onClick={resetarGeolocalizacoes}
+              disabled={geoRunning}
+              title={!getToken() ? 'Token Mapbox não configurado' : undefined}
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Resetar Geolocalizações
+            </Button>
+            <Button
+              size="sm"
               className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => { setDadosOrdemAberto(true); }}
               disabled={xlsxLoading}
@@ -6292,7 +6469,7 @@ function ModalRotaCarregamento({
                   return (
                     <div
                       key={k}
-                      className={`mb-2 ${isOver ? 'ring-2 ring-emerald-400 rounded-lg' : ''}`}
+                      className={`mb-2 rounded-lg transition-colors ${isOver ? 'ring-2 ring-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20' : ''}`}
                       onDragOver={(e) => {
                         if (!dragParadaKey || dragParadaKey === k) return;
                         e.preventDefault();
@@ -6363,6 +6540,14 @@ function ModalRotaCarregamento({
                           >
                             <ChevronDown className="w-4 h-4 text-slate-500" />
                           </button>
+                          <button
+                            type="button"
+                            className="mt-1 h-[26px] w-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); setGeoEditarKey(g.key); }}
+                            title="Editar geolocalização"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                          </button>
                         </div>
                       </div>
                       {aberto && renderCtes(g.ctes)}
@@ -6390,7 +6575,7 @@ function ModalRotaCarregamento({
                   return (
                     <div
                       key={k}
-                      className={`mb-2 ${isOver ? 'ring-2 ring-emerald-400 rounded-lg' : ''}`}
+                      className={`mb-2 rounded-lg transition-colors ${isOver ? 'ring-2 ring-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20' : ''}`}
                       onDragOver={(e) => {
                         if (!dragParadaKey || dragParadaKey === k) return;
                         e.preventDefault();
@@ -6501,8 +6686,247 @@ function ModalRotaCarregamento({
           onConcluirSalvar={exportarOrdemCarregamento}
         />
       )}
+      {geoEditarKey && (
+        <ModalEditarGeolocalizacaoEntrega
+          leafletLoaded={leafletLoaded}
+          tileUrl={`${ENVIRONMENT.apiBaseUrl}/map/osm_tile.php?z={z}&x={x}&y={y}`}
+          grupo={entregaByKey.get(geoEditarKey) ?? null}
+          coord={coordsByKey[geoEditarKey] ?? null}
+          onFechar={() => setGeoEditarKey(null)}
+          onGeocode={geocodeEndereco}
+          onSalvar={async (lat, lng) => {
+            const g = entregaByKey.get(geoEditarKey);
+            if (!g) return;
+            setCoordsByKey((prev) => ({ ...(prev || {}), [geoEditarKey]: { lat, lng } }));
+            setGeoStatusByKey((prev) => ({ ...(prev || {}), [geoEditarKey]: 'ok' }));
+            setGeoErrorByKey((prev) => {
+              const next = { ...(prev || {}) };
+              delete next[geoEditarKey];
+              return next;
+            });
+            setGeoUserLockedByKey((prev) => ({ ...(prev || {}), [geoEditarKey]: true }));
+            await Promise.allSettled(g.ctes.map((c) => persistirGeoloc(c.ser, c.nro, lat, lng)));
+          }}
+        />
+      )}
     </div>,
     document.body
+  );
+}
+
+function ModalEditarGeolocalizacaoEntrega({
+  leafletLoaded,
+  tileUrl,
+  grupo,
+  coord,
+  onFechar,
+  onGeocode,
+  onSalvar,
+}: {
+  leafletLoaded: boolean;
+  tileUrl: string;
+  grupo: null | {
+    key: string;
+    titulo: string;
+    query: string;
+    endereco: string;
+    bairro: string;
+    cep: string;
+    cidade: string;
+    uf: string;
+    ctes: { ser: string; nro: number; ctrc: string }[];
+  };
+  coord: null | { lat: number; lng: number };
+  onFechar: () => void;
+  onGeocode: (query: string) => Promise<{ lat: number; lng: number } | null>;
+  onSalvar: (lat: number, lng: number) => Promise<void>;
+}) {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+
+  const [query, setQuery] = useState<string>(() => {
+    const q0 = String(grupo?.query ?? '').trim();
+    if (q0) return q0;
+    const g = grupo;
+    if (!g) return '';
+    return [
+      g.cep,
+      g.endereco,
+      g.bairro,
+      [g.cidade, g.uf].filter(Boolean).join(' - '),
+      'BRASIL',
+    ].filter(Boolean).join(', ');
+  });
+  const [lat, setLat] = useState<string>(() => (coord ? String(coord.lat) : ''));
+  const [lng, setLng] = useState<string>(() => (coord ? String(coord.lng) : ''));
+  const [salvando, setSalvando] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+
+  useEffect(() => {
+    setQuery(() => {
+      const q0 = String(grupo?.query ?? '').trim();
+      if (q0) return q0;
+      const g = grupo;
+      if (!g) return '';
+      return [
+        g.cep,
+        g.endereco,
+        g.bairro,
+        [g.cidade, g.uf].filter(Boolean).join(' - '),
+        'BRASIL',
+      ].filter(Boolean).join(', ');
+    });
+  }, [grupo?.key]);
+
+  useEffect(() => {
+    if (!leafletLoaded) return;
+    const L = (window as any).L;
+    if (!L) return;
+    if (!mapContainerRef.current) return;
+
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView([-15, -55], 4);
+      L.tileLayer(tileUrl, { attribution: '&copy; OpenStreetMap contributors' }).addTo(mapRef.current);
+      mapRef.current.on('click', (e: any) => {
+        const lt = Number(e?.latlng?.lat);
+        const lg = Number(e?.latlng?.lng);
+        if (!Number.isFinite(lt) || !Number.isFinite(lg)) return;
+        setLat(String(lt));
+        setLng(String(lg));
+        try { markerRef.current?.setLatLng([lt, lg]); } catch {}
+      });
+    }
+
+    const map = mapRef.current;
+    const latN = Number(String(lat).replace(',', '.'));
+    const lngN = Number(String(lng).replace(',', '.'));
+    if (Number.isFinite(latN) && Number.isFinite(lngN)) {
+      if (!markerRef.current) {
+        markerRef.current = L.marker([latN, lngN], { draggable: true, autoPan: true }).addTo(map);
+        try { markerRef.current.dragging.enable(); } catch {}
+        markerRef.current.on('dragend', () => {
+          try {
+            const ll = markerRef.current.getLatLng();
+            const lt = Number(ll?.lat);
+            const lg = Number(ll?.lng);
+            if (!Number.isFinite(lt) || !Number.isFinite(lg)) return;
+            setLat(String(lt));
+            setLng(String(lg));
+          } catch {}
+        });
+      } else {
+        try { markerRef.current.setLatLng([latN, lngN]); } catch {}
+      }
+      try { map.setView([latN, lngN], Math.max(map.getZoom?.() ?? 13, 13)); } catch {}
+    }
+  }, [leafletLoaded, tileUrl, lat, lng]);
+
+  const normalizarCoord = (s: string) => Number(String(s ?? '').trim().replace(',', '.'));
+
+  const aplicarCoord = (c: { lat: number; lng: number }) => {
+    setLat(String(c.lat));
+    setLng(String(c.lng));
+    try { markerRef.current?.setLatLng([c.lat, c.lng]); } catch {}
+    try { mapRef.current?.setView([c.lat, c.lng], 15); } catch {}
+  };
+
+  const buscar = async () => {
+    const q = String(query ?? '').trim();
+    if (!q) { toast.error('Informe um endereço.'); return; }
+    setBuscando(true);
+    try {
+      const c = await onGeocode(q);
+      if (!c) { toast.error('Endereço não encontrado.'); return; }
+      aplicarCoord(c);
+      toast.success('Local encontrado. Ajuste o pin se necessário.');
+    } catch {
+      toast.error('Erro ao buscar endereço.');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const salvar = async () => {
+    const latN = normalizarCoord(lat);
+    const lngN = normalizarCoord(lng);
+    if (!Number.isFinite(latN) || !Number.isFinite(lngN)) { toast.error('Latitude/Longitude inválidas.'); return; }
+    if (latN < -90 || latN > 90 || lngN < -180 || lngN > 180) { toast.error('Latitude/Longitude fora do intervalo.'); return; }
+    setSalvando(true);
+    try {
+      await onSalvar(latN, lngN);
+      toast.success('Geolocalização atualizada.');
+      onFechar();
+    } catch {
+      toast.error('Erro ao salvar geolocalização.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Editar geolocalização</h3>
+          </div>
+          <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <div className="text-xs text-slate-600 dark:text-slate-300 mb-3">
+            Arraste o pin, clique no mapa, ou busque por endereço.
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="h-[420px] w-full relative">
+                {!leafletLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />Carregando mapa...
+                  </div>
+                )}
+                <div ref={mapContainerRef} className="w-full h-full" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1">Endereço (para busca)</div>
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="CEP, rua, bairro, cidade/UF" />
+                <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={buscar} disabled={buscando}>
+                  {buscando ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Search className="w-3.5 h-3.5 mr-1.5" />}
+                  Buscar no mapa
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1">Latitude</div>
+                  <Input value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1">Longitude</div>
+                  <Input value={lng} onChange={(e) => setLng(e.target.value)} inputMode="decimal" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={onFechar} disabled={salvando}>Cancelar</Button>
+                <Button type="button" onClick={salvar} disabled={salvando}>
+                  {salvando ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
