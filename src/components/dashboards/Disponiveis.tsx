@@ -6278,9 +6278,23 @@ function ModalCarregamentoAutomaticoEntrega({
     return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
   };
 
+  const parseDataISOAuto = (v: string): Date | null => {
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const ano = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    const dia = parseInt(m[3], 10);
+    if (!Number.isFinite(ano) || !Number.isFinite(mes) || !Number.isFinite(dia)) return null;
+    if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
   const periodoTs = useMemo(() => {
-    const ini = parseDataISO(previsaoInicio);
-    const fim = parseDataISO(previsaoFim);
+    const ini = parseDataISOAuto(previsaoInicio);
+    const fim = parseDataISOAuto(previsaoFim);
     const iniTs = ini ? new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0).getTime() : null;
     const fimTs = fim ? new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).getTime() : null;
     return { iniTs: (iniTs != null && Number.isFinite(iniTs)) ? iniTs : null, fimTs: (fimTs != null && Number.isFinite(fimTs)) ? fimTs : null };
