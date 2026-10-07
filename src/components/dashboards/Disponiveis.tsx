@@ -1706,6 +1706,7 @@ interface CarregamentoAreaProps {
   sigla: string;
   loginUsuario: string;
   carregamentos: Carregamento[];
+  ctesDisponiveisEntrega: any[];
   loadingCarregamentos: boolean;
   carregamentosTransferOpen: boolean;
   setCarregamentosTransferOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -1723,7 +1724,7 @@ interface CarregamentoAreaProps {
   onIniciarApontamento: (placa: string) => void;
   onCancelarApontamento: () => void;
   onCriarCarregamento: (placa: string, destino: string, paradas: string) => void;
-  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[], opts?: { previsaoAte?: string }) => Promise<{ ok: boolean; message?: string; total?: number; fora?: number; cap_tipo?: string }>;
+  onCarregamentoAutomaticoEntrega: (placa: string, setores: string[], opts?: { previsaoInicio?: string; previsaoFim?: string }) => Promise<{ ok: boolean; message?: string; total?: number; fora?: number; cap_tipo?: string }>;
   onFinalizarCarregamento: (placa: string) => Promise<boolean>;
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
@@ -2002,8 +2003,8 @@ function parseCubagem(s: any): number {
   const hasDot = cleaned.includes('.');
   const normalized = hasComma
     ? cleaned.replace(/\./g, '').replace(',', '.')
-    : (hasDot && /^\-?\d{1,3}(\.\d{3})+$/.test(cleaned))
-      ? cleaned.replace(/\./g, '')
+    : (hasDot && /^\-?0\.\d+$/.test(cleaned))
+      ? cleaned
       : cleaned;
   return parseFloat(normalized) || 0;
 }
@@ -2599,9 +2600,9 @@ function CardCarregamento({
     return n; // tratar como kg sem escalonamento automático
   };
 
-  const pesoDoCarregamento = normPesoKgTotal((Number(carregamento.total_peso ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_peso ?? 0) || 0) : 0));
-  const cubagemDoCarregamento = (Number(carregamento.total_cubagem ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_cubagem ?? 0) || 0) : 0);
-  const freteDoCarregamento = (Number(carregamento.total_frete ?? 0) || 0) + (carregamentoConjunto ? (Number(carregamentoConjunto.total_frete ?? 0) || 0) : 0);
+  const pesoDoCarregamento = normPesoKgTotal(parsePeso(String(carregamento.total_peso ?? 0)) + (carregamentoConjunto ? parsePeso(String(carregamentoConjunto.total_peso ?? 0)) : 0));
+  const cubagemDoCarregamento = parseCubagem(String(carregamento.total_cubagem ?? 0)) + (carregamentoConjunto ? parseCubagem(String(carregamentoConjunto.total_cubagem ?? 0)) : 0);
+  const freteDoCarregamento = parseMoeda(String(carregamento.total_frete ?? 0)) + (carregamentoConjunto ? parseMoeda(String(carregamentoConjunto.total_frete ?? 0)) : 0);
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
   const ctesParaTotais: any[] = isConjunto
@@ -2621,7 +2622,7 @@ function CardCarregamento({
   const freteFobLocal = freteTotalsLocal.fob;
 
   const pesoInicial = totalPesoLocal > 0 ? totalPesoLocal : normPesoKgTotal(carregamento.total_peso ?? 0);
-  const cubagemInicial = totalCubagemLocal > 0 ? totalCubagemLocal : Number(carregamento.total_cubagem ?? 0) || 0;
+  const cubagemInicial = totalCubagemLocal > 0 ? totalCubagemLocal : parseCubagem(String(carregamento.total_cubagem ?? 0));
   const freteCalcLocalInicial = freteCifLocal + freteFobLocal;
   let cifInicial: number;
   let fobInicial: number;
@@ -6239,27 +6240,75 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
 
 function ModalCarregamentoAutomaticoEntrega({
   setores,
+  ctes,
   onConfirmar,
   onFechar,
 }: {
   setores: GrupoSetor[];
-  onConfirmar: (setores: string[], opts: { previsaoAte: string }) => Promise<void>;
+  ctes: any[];
+  onConfirmar: (setores: string[], opts: { previsaoInicio: string; previsaoFim: string }) => Promise<void>;
   onFechar: () => void;
 }) {
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
-  const [previsaoAte, setPrevisaoAte] = useState(() => {
+  const [previsaoInicio, setPrevisaoInicio] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 60);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [previsaoFim, setPrevisaoFim] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
+  const parsePrevEntTs = (v: string): number => {
+    const s = String(v ?? '').trim();
+    if (!s || s === '—') return Number.POSITIVE_INFINITY;
+    const m = s.match(/^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?$/);
+    if (!m) return Number.POSITIVE_INFINITY;
+    const dia = parseInt(m[1], 10);
+    const mes = parseInt(m[2], 10);
+    const anoRaw = m[3];
+    const ano = !anoRaw
+      ? new Date().getFullYear()
+      : (anoRaw.length === 2 ? 2000 + parseInt(anoRaw, 10) : parseInt(anoRaw, 10));
+    const d = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    const ts = d.getTime();
+    return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
+  };
+
+  const periodoTs = useMemo(() => {
+    const ini = parseDataISO(previsaoInicio);
+    const fim = parseDataISO(previsaoFim);
+    const iniTs = ini ? new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0).getTime() : null;
+    const fimTs = fim ? new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).getTime() : null;
+    return { iniTs: (iniTs != null && Number.isFinite(iniTs)) ? iniTs : null, fimTs: (fimTs != null && Number.isFinite(fimTs)) ? fimTs : null };
+  }, [previsaoInicio, previsaoFim]);
+
+  const countsPorSetor = useMemo(() => {
+    const map = new Map<string, number>();
+    const list = Array.isArray(ctes) ? ctes : [];
+    for (const c of list) {
+      const setor = String((c as any)?.setor ?? '').trim().toUpperCase();
+      if (!setor) continue;
+      const ts = parsePrevEntTs(String((c as any)?.prevEnt ?? (c as any)?.data_prev_ent ?? ''));
+      if (periodoTs.iniTs !== null && (!Number.isFinite(ts) || ts < periodoTs.iniTs)) continue;
+      if (periodoTs.fimTs !== null && (!Number.isFinite(ts) || ts > periodoTs.fimTs)) continue;
+      map.set(setor, (map.get(setor) ?? 0) + 1);
+    }
+    return map;
+  }, [ctes, periodoTs.iniTs, periodoTs.fimTs]);
+
   const setoresFiltrados = useMemo(() => {
     const b = busca.trim().toUpperCase();
     const list = [...(setores ?? [])];
-    list.sort((a, b) => (b.totalCtes - a.totalCtes) || a.setor.localeCompare(b.setor));
-    if (!b) return list;
-    return list.filter((s) => {
+    list.sort((a, b) => {
+      const ca = countsPorSetor.get(String(a.setor ?? '').trim().toUpperCase()) ?? 0;
+      const cb = countsPorSetor.get(String(b.setor ?? '').trim().toUpperCase()) ?? 0;
+      return (cb - ca) || a.setor.localeCompare(b.setor);
+    });
+    const base = (!b) ? list : list.filter((s) => {
       const alvo = [
         String(s.setor ?? ''),
         String(s.nome ?? ''),
@@ -6271,7 +6320,23 @@ function ModalCarregamentoAutomaticoEntrega({
         .toUpperCase();
       return alvo.includes(b);
     });
-  }, [setores, busca]);
+    return base.filter((s) => {
+      const k = String(s.setor ?? '').trim().toUpperCase();
+      if (!k) return false;
+      return (countsPorSetor.get(k) ?? 0) > 0;
+    });
+  }, [setores, busca, countsPorSetor]);
+
+  useEffect(() => {
+    const valid = new Set(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean));
+    setSelecionados((prev) => {
+      const next = new Set<string>();
+      for (const s of prev) {
+        if (valid.has(String(s ?? '').trim())) next.add(s);
+      }
+      return next;
+    });
+  }, [setoresFiltrados]);
 
   const toggleSel = (s: string) => {
     const k = String(s ?? '').trim();
@@ -6319,14 +6384,21 @@ function ModalCarregamentoAutomaticoEntrega({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Previsão de entrega (até)</label>
-              <Input
-                type="date"
-                value={previsaoAte}
-                onChange={(e) => setPrevisaoAte(e.target.value)}
-              />
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Previsão de entrega (período)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={previsaoInicio}
+                  onChange={(e) => setPrevisaoInicio(e.target.value)}
+                />
+                <Input
+                  type="date"
+                  value={previsaoFim}
+                  onChange={(e) => setPrevisaoFim(e.target.value)}
+                />
+              </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Por padrão: até amanhã. Seleciona CT-es com previsão de entrega até esta data.
+                Sugestão: 60 dias atrás até amanhã. A lista de CT-es por setor muda conforme este período.
               </p>
             </div>
           </div>
@@ -6365,7 +6437,9 @@ function ModalCarregamentoAutomaticoEntrega({
                           </div>
                         ) : null}
                       </div>
-                      <span className="text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">{s.totalCtes}</span>
+                      <span className="text-right font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                        {countsPorSetor.get(k.toUpperCase()) ?? 0}
+                      </span>
                     </button>
                   );
                 })
@@ -6379,14 +6453,14 @@ function ModalCarregamentoAutomaticoEntrega({
           <Button
             variant="outline"
             disabled={!podeCarregarTodos}
-            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean), { previsaoAte })}
+            onClick={() => onConfirmar(setoresFiltrados.map((s) => String(s.setor ?? '').trim()).filter(Boolean), { previsaoInicio, previsaoFim })}
           >
             Carregar todos
           </Button>
           <Button
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
             disabled={!podeCarregarSelecionados}
-            onClick={() => onConfirmar(selected, { previsaoAte })}
+            onClick={() => onConfirmar(selected, { previsaoInicio, previsaoFim })}
           >
             Carregar selecionados
           </Button>
@@ -6401,6 +6475,7 @@ function CarregamentoArea({
   sigla,
   loginUsuario,
   carregamentos,
+  ctesDisponiveisEntrega,
   loadingCarregamentos,
   carregamentosTransferOpen,
   setCarregamentosTransferOpen,
@@ -6593,13 +6668,14 @@ function CarregamentoArea({
     onCriarCarregamento(placa, destino, paradas);
   };
 
-  const handleCarregarAutomaticoEntrega = async (setores: string[], opts: { previsaoAte: string }) => {
+  const handleCarregarAutomaticoEntrega = async (setores: string[], opts: { previsaoInicio: string; previsaoFim: string }) => {
     if (loadingEntregaAuto) return;
     try {
       setLoadingEntregaAuto(true);
       const setoresOk = (setores ?? []).map((s) => String(s ?? '').trim().toUpperCase()).filter(Boolean);
       if (setoresOk.length === 0) return;
-      const previsaoAte = String(opts?.previsaoAte ?? '').trim();
+      const previsaoInicio = String(opts?.previsaoInicio ?? '').trim();
+      const previsaoFim = String(opts?.previsaoFim ?? '').trim();
 
       const placasUsadas = new Set(
         (carregamentos ?? [])
@@ -6624,7 +6700,7 @@ function CarregamentoArea({
         }
         placasUsadas.add(placa);
 
-        const res = await onCarregamentoAutomaticoEntrega(placa, [setor], { previsaoAte });
+        const res = await onCarregamentoAutomaticoEntrega(placa, [setor], { previsaoInicio, previsaoFim });
         if (res.ok) {
           const add = Number(res.total ?? 0) || 0;
           const fora = Number(res.fora ?? 0) || 0;
@@ -6800,15 +6876,15 @@ function CarregamentoArea({
 
   const handleExcluirTodosEntrega = async () => {
     if (excluindoTodosEntrega) return;
-    if (entregaExibir !== 'todos') {
-      toast.info('Para excluir TODOS os carregamentos de entrega da unidade, altere Exibir para "Todos".');
-      return;
-    }
-    const qtd = carregamentosEntrega.length;
+    const alvo = carregamentosEntregaVisiveis;
+    const qtd = alvo.length;
     if (qtd <= 0) return;
+    const escopo = entregaExibir === 'todos'
+      ? `TODOS os ${qtd} carregamento(s) de entrega em andamento da unidade ${sigla}`
+      : `apenas os seus ${qtd} carregamento(s) de entrega em andamento (login ${String(loginUsuario ?? '').trim().toUpperCase() || '-'})`;
     const ok = await confirmar({
       title: 'Excluir todos os carregamentos de entrega?',
-      description: `Excluir TODOS os ${qtd} carregamento(s) de entrega em andamento da unidade ${sigla}?`,
+      description: `Excluir ${escopo}?`,
       confirmText: 'Excluir todos',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -6816,17 +6892,42 @@ function CarregamentoArea({
     if (!ok) return;
     try {
       setExcluindoTodosEntrega(true);
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'deletar_todos_entrega' }) },
-        true
-      );
-      if (res?.success) {
+      if (entregaExibir === 'todos') {
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'deletar_todos_entrega' }) },
+          true
+        );
+        if (!res?.success) {
+          toast.error(res?.message || 'Erro ao excluir carregamentos de entrega.');
+          return;
+        }
         toast.success('Carregamentos de entrega excluídos.');
         await onRecarregarCarregamentos();
-      } else {
-        toast.error(res?.message || 'Erro ao excluir carregamentos de entrega.');
+        return;
       }
+
+      let okCount = 0;
+      let errCount = 0;
+      for (const c of alvo) {
+        const placa = String((c as any)?.placa_provisoria ?? '').trim().toUpperCase();
+        const seqCarregamento = Number((c as any)?.seq_carregamento ?? (c as any)?.seqCarregamento ?? 0) || 0;
+        if (!placa && seqCarregamento <= 0) continue;
+        try {
+          const res = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+            { method: 'POST', body: JSON.stringify({ acao: 'deletar_carregamento', placa, seq_carregamento: seqCarregamento || undefined }) },
+            true
+          );
+          if (res?.success) okCount += 1;
+          else errCount += 1;
+        } catch {
+          errCount += 1;
+        }
+      }
+      if (errCount > 0) toast.error(`Falha ao excluir ${errCount} carregamento(s).`);
+      if (okCount > 0) toast.success(`${okCount} carregamento(s) excluído(s).`);
+      await onRecarregarCarregamentos();
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao excluir carregamentos de entrega.');
     } finally {
@@ -8304,8 +8405,8 @@ function CarregamentoArea({
                 variant="outline"
                 className="text-xs h-8 border-red-300 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                 onClick={() => { void handleExcluirTodosEntrega(); }}
-                disabled={entregaExibir !== 'todos' || excluindoTodosEntrega || carregamentosEntrega.length === 0}
-                title={entregaExibir !== 'todos' ? 'Altere Exibir para "Todos" para habilitar' : (carregamentosEntrega.length === 0 ? 'Nenhum carregamento de entrega em andamento' : 'Excluir todos os carregamentos de entrega')}
+                disabled={excluindoTodosEntrega || carregamentosEntregaVisiveis.length === 0}
+                title={carregamentosEntregaVisiveis.length === 0 ? 'Nenhum carregamento de entrega em andamento' : (entregaExibir === 'todos' ? 'Excluir todos os carregamentos de entrega da unidade' : 'Excluir todos os seus carregamentos de entrega')}
               >
                 {excluindoTodosEntrega ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
                 Excluir todos
@@ -8551,7 +8652,24 @@ function CarregamentoArea({
       {modalAutomaticoModo === 'entrega' && (
         <ModalCarregamentoAutomaticoEntrega
           onFechar={() => setModalAutomaticoModo(null)}
-          setores={gruposSetorEntrega}
+          setores={(() => {
+            const ocupados = new Set<string>();
+            for (const c of (carregamentos ?? [])) {
+              if (!isAtivoCarregamento(c) || !isEntregaCarregamento(c)) continue;
+              const setores = String((c as any)?.setores_entrega ?? (c as any)?.setoresEntrega ?? '').trim().toUpperCase();
+              const placa = String((c as any)?.placa_provisoria ?? '').trim().toUpperCase();
+              if (setores) {
+                setores.split(',').map(s => s.trim()).filter(Boolean).forEach(s => ocupados.add(s));
+              }
+              if (placa) ocupados.add(placa);
+            }
+            return (gruposSetorEntrega ?? []).filter((s) => {
+              const k = String(s.setor ?? '').trim().toUpperCase();
+              if (!k) return false;
+              return !ocupados.has(k);
+            });
+          })()}
+          ctes={ctesDisponiveisEntrega}
           onConfirmar={handleCarregarAutomaticoEntrega}
         />
       )}
@@ -9206,14 +9324,15 @@ export function Disponiveis() {
     }
   }, [carregarCarregamentos]);
 
-  const handleCarregamentoAutomaticoEntrega = useCallback(async (placa: string, setores: string[], opts?: { previsaoAte?: string }) => {
+  const handleCarregamentoAutomaticoEntrega = useCallback(async (placa: string, setores: string[], opts?: { previsaoInicio?: string; previsaoFim?: string }) => {
     const placaOk = String(placa ?? '').trim().toUpperCase();
     const setoresOk = (Array.isArray(setores) ? setores : [])
       .map((s) => String(s ?? '').trim().toUpperCase())
       .filter(Boolean);
 
     if (!placaOk) return { ok: false, message: 'Informe a placa/identificação.' };
-    const previsaoAteIso = String(opts?.previsaoAte ?? '').trim();
+    const previsaoInicioIso = String(opts?.previsaoInicio ?? '').trim();
+    const previsaoFimIso = String(opts?.previsaoFim ?? '').trim();
 
     const parsePrevEntTs = (v: string): number => {
       const s = String(v ?? '').trim();
@@ -9231,18 +9350,18 @@ export function Disponiveis() {
       return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
     };
 
-    const limitePrevEntTs = (() => {
-      if (!previsaoAteIso) return null;
-      const dt = parseDataISO(previsaoAteIso);
-      if (!dt) return null;
-      const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59, 999);
-      const ts = d.getTime();
-      return Number.isNaN(ts) ? null : ts;
+    const periodoPrevEntTs = (() => {
+      const ini = previsaoInicioIso ? parseDataISO(previsaoInicioIso) : null;
+      const fim = previsaoFimIso ? parseDataISO(previsaoFimIso) : null;
+      const iniTs = ini ? new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0).getTime() : null;
+      const fimTs = fim ? new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999).getTime() : null;
+      return {
+        iniTs: (iniTs != null && Number.isFinite(iniTs)) ? iniTs : null,
+        fimTs: (fimTs != null && Number.isFinite(fimTs)) ? fimTs : null,
+      };
     })();
 
     const ctesBase = (() => {
-      const previsaoInicio = parseDataISO(filters.periodoPrevisaoInicio);
-      const previsaoFim = parseDataISO(filters.periodoPrevisaoFim);
       const tempoArmazemDe = (() => {
         const s = (filters.tempoArmazemDe ?? '').trim();
         if (!s) return null;
@@ -9258,12 +9377,11 @@ export function Disponiveis() {
       const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
       return list.filter((cte) => {
         if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
-        if (limitePrevEntTs !== null) {
+        if (periodoPrevEntTs.iniTs !== null || periodoPrevEntTs.fimTs !== null) {
           const ts = parsePrevEntTs(String((cte as any).prevEnt ?? ''));
-          if (!Number.isFinite(ts) || ts > limitePrevEntTs) return false;
-        }
-        if (previsaoInicio || previsaoFim) {
-          if (!matchesRangeBR(cte.prevEnt, previsaoInicio, previsaoFim)) return false;
+          if (!Number.isFinite(ts)) return false;
+          if (periodoPrevEntTs.iniTs !== null && ts < periodoPrevEntTs.iniTs) return false;
+          if (periodoPrevEntTs.fimTs !== null && ts > periodoPrevEntTs.fimTs) return false;
         }
         if (tempoArmazemDe !== null || tempoArmazemAte !== null) {
           if (cte.emTransito) return false;
@@ -9279,7 +9397,8 @@ export function Disponiveis() {
       ? ctesBase
       : ctesBase.filter((c) => {
         const setorCte = String(c.setor ?? '').trim().toUpperCase();
-        return setoresOk.some((s) => setorCte.includes(s));
+        const tokens = setorCte.split(',').map((x) => x.trim()).filter(Boolean);
+        return setoresOk.some((s) => setorCte === s || tokens.includes(s));
       });
 
     if (ctesSel.length === 0) return { ok: false, message: 'Nenhum CT-e encontrado para os setores selecionados.' };
@@ -9409,7 +9528,7 @@ export function Disponiveis() {
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
     }
-  }, [carregarCarregamentos, dadosEntrega, filters.periodoPrevisaoInicio, filters.periodoPrevisaoFim, filters.tempoArmazemDe, filters.tempoArmazemAte, unidadeAtual]);
+  }, [carregarCarregamentos, dadosEntrega, filters.tempoArmazemDe, filters.tempoArmazemAte, unidadeAtual]);
 
   const handleFinalizarCarregamento = useCallback(async (placa: string) => {
     const ok = await confirmar({
@@ -11893,6 +12012,7 @@ export function Disponiveis() {
             sigla={sigla}
             loginUsuario={String(user?.username ?? '')}
             carregamentos={carregamentos}
+            ctesDisponiveisEntrega={dadosEntrega?.ctes ?? []}
             loadingCarregamentos={loadingCarregamentos}
             carregamentosTransferOpen={carregamentosTransferOpen}
             setCarregamentosTransferOpen={setCarregamentosTransferOpen}

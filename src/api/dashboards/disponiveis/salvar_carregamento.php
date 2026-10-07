@@ -286,8 +286,16 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
         $toFloat = function ($v) {
             $s = trim((string)$v);
             if ($s === '') return 0.0;
-            $s = str_replace(['.', ' '], ['', ''], $s);
-            $s = str_replace(',', '.', $s);
+            $s = preg_replace('/[^\d,\.\-]/', '', $s);
+            if ($s === '' || $s === '-') return 0.0;
+            $hasComma = (strpos($s, ',') !== false);
+            $hasDot = (strpos($s, '.') !== false);
+            if ($hasComma) {
+                $s = str_replace('.', '', $s);
+                $s = str_replace(',', '.', $s);
+            } else if ($hasDot && preg_match('/^\-?\d{1,3}(\.\d{3})+$/', $s) && !preg_match('/^\-?0\.\d+$/', $s)) {
+                $s = str_replace('.', '', $s);
+            }
             return (float)$s;
         };
         $parseDateBr = function ($v) {
@@ -425,10 +433,10 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                 'pagador' => (string)($rowC['pagador'] ?? ''),
                 'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
                 'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
-                'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
-                'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
-                'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
-                'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                'vlr_merc' => $toFloat($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                'vlr_frete' => $toFloat($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                'peso' => $toFloat($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                'cubagem' => $toFloat($rowC['cubagem'] ?? 0),
                 'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
             ];
         }
@@ -458,10 +466,10 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                     $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
                     $emissaoSql = $emissaoVal !== '' ? "'" . pg_escape_string($conn, $emissaoVal) . "'::date" : 'NULL';
                     $prevSql = $prevVal !== '' ? "'" . pg_escape_string($conn, $prevVal) . "'::date" : 'NULL';
-                    $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
-                    $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
-                    $peso = (float)($rowC['peso'] ?? 0);
-                    $cub = (float)($rowC['cubagem'] ?? 0);
+                    $vlrMerc = $toFloat($rowC['vlr_merc'] ?? 0);
+                    $vlrFrete = $toFloat($rowC['vlr_frete'] ?? 0);
+                    $peso = $toFloat($rowC['peso'] ?? 0);
+                    $cub = $toFloat($rowC['cubagem'] ?? 0);
                     $vol = (int)($rowC['qtde_vol'] ?? 0);
                     $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
                     $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
@@ -1841,10 +1849,17 @@ if ($acao === 'verificar_saidas_ssw') {
             $toFloat = function ($v) {
                 $s = trim((string)$v);
                 if ($s === '') return 0.0;
-                $s = str_replace(['.', ' '], ['', ''], $s);
-                $s = str_replace(',', '.', $s);
-                $n = (float)$s;
-                return (float)$n;
+                $s = preg_replace('/[^\d,\.\-]/', '', $s);
+                if ($s === '' || $s === '-') return 0.0;
+                $hasComma = (strpos($s, ',') !== false);
+                $hasDot = (strpos($s, '.') !== false);
+                if ($hasComma) {
+                    $s = str_replace('.', '', $s);
+                    $s = str_replace(',', '.', $s);
+                } else if ($hasDot && preg_match('/^\-?\d{1,3}(\.\d{3})+$/', $s) && !preg_match('/^\-?0\.\d+$/', $s)) {
+                    $s = str_replace('.', '', $s);
+                }
+                return (float)$s;
             };
             $parseDateBr = function ($v) {
                 $s = trim((string)$v);
@@ -2025,10 +2040,10 @@ if ($acao === 'verificar_saidas_ssw') {
                             'pagador' => (string)($rowC['pagador'] ?? ''),
                             'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
                             'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
-                            'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
-                            'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
-                            'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
-                            'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                            'vlr_merc' => $toFloat($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                            'vlr_frete' => $toFloat($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                            'peso' => $toFloat($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                            'cubagem' => $toFloat($rowC['cubagem'] ?? 0),
                             'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
                         ];
                     }
@@ -2057,10 +2072,10 @@ if ($acao === 'verificar_saidas_ssw') {
                                 $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
                                 $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
                                 $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
-                                $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
-                                $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
-                                $peso = (float)($rowC['peso'] ?? 0);
-                                $cub = (float)($rowC['cubagem'] ?? 0);
+                                $vlrMerc = $toFloat($rowC['vlr_merc'] ?? 0);
+                                $vlrFrete = $toFloat($rowC['vlr_frete'] ?? 0);
+                                $peso = $toFloat($rowC['peso'] ?? 0);
+                                $cub = $toFloat($rowC['cubagem'] ?? 0);
                                 $vol = (int)($rowC['qtde_vol'] ?? 0);
                                 $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
                                 $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
@@ -2367,10 +2382,17 @@ if ($acao === 'atualizar_ctes_ssw') {
         $toFloat = function ($v) {
             $s = trim((string)$v);
             if ($s === '') return 0.0;
-            $s = str_replace(['.', ' '], ['', ''], $s);
-            $s = str_replace(',', '.', $s);
-            $n = (float)$s;
-            return (float)$n;
+            $s = preg_replace('/[^\d,\.\-]/', '', $s);
+            if ($s === '' || $s === '-') return 0.0;
+            $hasComma = (strpos($s, ',') !== false);
+            $hasDot = (strpos($s, '.') !== false);
+            if ($hasComma) {
+                $s = str_replace('.', '', $s);
+                $s = str_replace(',', '.', $s);
+            } else if ($hasDot && preg_match('/^\-?\d{1,3}(\.\d{3})+$/', $s) && !preg_match('/^\-?0\.\d+$/', $s)) {
+                $s = str_replace('.', '', $s);
+            }
+            return (float)$s;
         };
         $parseDateBr = function ($v) {
             $s = trim((string)$v);
@@ -2518,10 +2540,10 @@ if ($acao === 'atualizar_ctes_ssw') {
                         'pagador' => (string)($rowC['pagador'] ?? ''),
                         'data_emissao' => (string)($rowC['data_emissao'] ?? ($cteXml[$k]['data_emissao'] ?? '')),
                         'data_prev_ent' => (string)($rowC['data_prev_ent'] ?? ($cteXml[$k]['data_prev_ent'] ?? '')),
-                        'vlr_merc' => (float)($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
-                        'vlr_frete' => (float)($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
-                        'peso' => (float)($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
-                        'cubagem' => (float)($rowC['cubagem'] ?? 0),
+                        'vlr_merc' => $toFloat($rowC['vlr_merc'] ?? ($cteXml[$k]['vlr_merc'] ?? 0)),
+                        'vlr_frete' => $toFloat($rowC['vlr_frete'] ?? ($cteXml[$k]['vlr_frete'] ?? 0)),
+                        'peso' => $toFloat($rowC['peso'] ?? ($cteXml[$k]['peso'] ?? 0)),
+                        'cubagem' => $toFloat($rowC['cubagem'] ?? 0),
                         'qtde_vol' => (int)($rowC['qtde_vol'] ?? ($cteXml[$k]['qtde_vol'] ?? 0)),
                     ];
                 }
@@ -2549,10 +2571,10 @@ if ($acao === 'atualizar_ctes_ssw') {
                             $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
                             $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
                             $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
-                            $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
-                            $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
-                            $peso = (float)($rowC['peso'] ?? 0);
-                            $cub = (float)($rowC['cubagem'] ?? 0);
+                            $vlrMerc = $toFloat($rowC['vlr_merc'] ?? 0);
+                            $vlrFrete = $toFloat($rowC['vlr_frete'] ?? 0);
+                            $peso = $toFloat($rowC['peso'] ?? 0);
+                            $cub = $toFloat($rowC['cubagem'] ?? 0);
                             $vol = (int)($rowC['qtde_vol'] ?? 0);
                             $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
                             $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
