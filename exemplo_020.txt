@@ -1,0 +1,542 @@
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   1
+ssw0194                                                                                     PLACA: ALT9I93                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO168284-9  01/10 16/10     151401                         1             DISPAFILM DO BRASIL  A.C. DE OLIVEIRA DE  A.C. DE OLIVEIRA DE  ALTA FLORESTA  ALT       2.528,64      461,60     311    1,2 80
+SJP168003-0  01/10 19/10        219                        23             WORLD CHIPS COMERCIO DANIEL OSVALDO MARTI DANIEL OSVALDO MARTI ALTA FLORESTA  ALT       1.495,00      361,96      87    0,7 83
+CAT166755-6  30/09 16/10      11234                         3             MARCOS DE OLIVEIRA C MARCOS DE OLIVEIRA C MARANTA MAGAZINE LTD ALTA FLORESTA  ALT       9.335,55      276,38      36    0,5 83
+SAO167892-2  01/10 16/10     959448                         1             JOMARCA INDL DE PARA FORTE PARAFUSOS E CO FORTE PARAFUSOS E CO ALTA FLORESTA  ALT       8.489,76      408,31     447    0,6 80
+SAO168829-4  02/10 19/10        802                         8             AGRO-FAUNA COM DE IN AGRO-FAUNA COM DE IN AGRICOLA CACHIMBO VA ALTA FLORESTA  ALT       6.960,54      336,37      79    0,2 80
+SAO170466-4  06/10 21/10     913291                        10             ZANOTTI S.A.         BUZZI E BUZZI LTDA E BUZZI E BUZZI LTDA E ALTA FLORESTA  ALT       3.360,00      194,65      83    0,4 80
+SAO168246-6  01/10 16/10     161214                         4             ETILUX IMP E DISTR D TENDE TUDO ALTA FLOR TENDE TUDO ALTA FLOR ALTA FLORESTA  ALT         390,29      261,18      49    0,1 80
+FRA167302-5  30/09 16/10    4421383                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN JOAO MANOEL MARQUES  ALTA FLORESTA  ALT       1.269,18      169,49      42    0,1 83
+SAO170196-7  05/10 20/10     139839                         4             SNF BRASIL COMERCIAL JBS S/A              JBS S/A              ALTA FLORESTA  ALT       1.828,56      677,89     100    0,2 80
+FND165442-0  28/09 14/10     106420                         1             MOBIGU COMERCIO DE M MOBIGU COMERCIO DE M MARCOS ROBERTO ROBER ALTA FLORESTA  ALT         143,26      241,13       2    0,1 83
+RAO005392-9  30/09 15/10      16877                         5             INTERFINA INDUSTRIA  INTERFINA INDUSTRIA  B3G AGRO COMERCIO E  ALTA FLORESTA  ALT       6.279,75      300,00      77    0,1 83
+SAO169708-1  05/10 20/10       4143                        13             FLASH NEW PARTS - PL CASA DAS LATARIAS E  CASA DAS LATARIAS E  ALTA FLORESTA  ALT       1.644,00      249,92     241    0,6 80
+SAO167641-5  01/10 16/10        907                         1             JN ELETROFERRAGENS L ENGECON ENERGIA COME ENGECON ENERGIA COME ALTA FLORESTA  ALT       2.610,79      364,63     372    0,6 80
+CAT166728-9  30/09 16/10      11232                         3             MARCOS DE OLIVEIRA C MARCOS DE OLIVEIRA C DAVI VEZENTIN        ALTA FLORESTA  ALT       2.981,40      201,40      38    0,4 83
+SAO167932-5  01/10 16/10     377269                         9             TALGE DESCARTAVEIS D TAYLA CARNEIRO DAMAS TAYLA CARNEIRO DAMAS ALTA FLORESTA  ALT       1.746,55      222,30      89    0,3 80
+FRA170869-4  06/10 22/10    4423300                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN OZIRES RODRIGUES     ALTA FLORESTA  ALT       6.370,88      578,40     133    0,9 83
+CAT166756-4  30/09 16/10      11235                         3             MARCOS DE OLIVEIRA C MARCOS DE OLIVEIRA C AF AGROSUL LTDA      ALTA FLORESTA  ALT      10.817,40      288,65      38    0,4 83
+SAO169862-1  05/10 20/10      65711                        14             VATHISA IND E COM DE MANA ENERGIA ENGENHA MANA ENERGIA ENGENHA ALTA FLORESTA  ALT      42.856,27    6.471,00   2.198    2,3 80
+SAO169391-3  03/10 19/10    1413223                        12             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C LOJAS AVENIDA S A    ALTA FLORESTA  ALT       1.792,06      156,56      54    0,0 80
+CAT166745-9  30/09 16/10      11233                         3             MARCOS DE OLIVEIRA C MARCOS DE OLIVEIRA C J L DE LIMA CONFECCO ALTA FLORESTA  ALT      10.023,30      253,90      37    0,6 83
+SAO166738-6  30/09 15/10       4114                         4             LU YUAN - ME         CLEIDE FERREIRA 0154 CLEIDE FERREIRA 0154 ALTA FLORESTA  ALT       1.323,20      578,19     125    0,3 80
+SAO166730-1  30/09 15/10      42996                         2             NEOTRENTINA ARTIGOS  A.C. DE OLIVEIRA DE  A.C. DE OLIVEIRA DE  ALTA FLORESTA  ALT       2.145,93      152,55      21    0,2 80
+SAO170224-6  06/10 21/10    1415656                        11             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C LOJAS AVENIDA S A    ALTA FLORESTA  ALT       1.558,72      154,55      65    0,3 80
+SAO168374-8  01/10 16/10     300037              FHCGP      7             COPAG DA AMAZONIA S/ SUPPLOG ARMAZENS GER 32530919 MARIA APARE ALTA FLORESTA  ALT       3.033,77      103,93      10    0,1 80
+SAO167958-9  01/10 16/10      21572                         2             BAZAR IMPORTADORA EI A.C. DE OLIVEIRA DE  A.C. DE OLIVEIRA DE  ALTA FLORESTA  ALT       2.239,02      152,55      20    0,2 80
+SAO166727-1  30/09 15/10     177967                         8             JETFIO INDUSTRIA TEX DAFA BUZZI IND E COM DAFA BUZZI IND E COM ALTA FLORESTA  ALT      13.080,61      385,82     134    0,4 80
+BIR166768-8  30/09 16/10      15903                         4             PECUARISTA D OESTE D PECUARISTA D OESTE D ALVORADA COM DE PROD ALTA FLORESTA  ALT       6.258,00      524,71      73    0,2 83
+SAO166800-5  30/09 15/10      68896                        10             C3B COMERCIO DE IMPO TENDE TUDO ALTA FLOR TENDE TUDO ALTA FLOR ALTA FLORESTA  ALT       1.523,25      206,33      74    0,3 95
+SAO170328-5  06/10 21/10     495879                        54             MUSTANG PLURON QUIMI MUSTANG PLURON QUIMI PREF. MUN. DE ALTA F ALTA FLORESTA  ALT      20.016,00    2.560,55   1.104    1,7 80
+                             495880,     495881
+SAO166517-1  29/09 14/10     204558                       125             SANTA HELENA IND DE  SANTA HELENA IND DE  MARTINS E BRUCHMAM M ALTA FLORESTA  ALT      20.367,21    1.787,58   1.124    2,7 53
+                             204559,     204560
+SAO166514-6  29/09 14/10     448610                        32             FORTPEL COMERCIO DE  FORTPEL COMERCIO DE  JBS S/A              ALTA FLORESTA  ALT       3.512,67    1.427,37     125    1,8 80
+                             448611
+VIX035897-5  02/10 22/10      49279                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  MUNICIPIO DE APIACAS APIACAS        ALT       2.500,00      454,36      49    0,7 83
+SAO167544-3  30/09 19/10    3062427                        12             LORENZETTI SA INDS B LORENZETTI SA INDS B DOM BOSCO MATERIAIS  APIACAS        ALT       4.835,52      168,01      35    0,4 80
+SAO166857-9  30/09 19/10     259453                        13             ROMA JENSEN COMERCIO SILVA DOS REIS E CIA SILVA DOS REIS E CIA CARLINDA       ALT       2.257,36      213,60      60    1,4 80
+VIX035886-0  02/10 22/10    3391625                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  DANIEL RIBEIRO SOARE CARLINDA       ALT       3.167,31      410,30      46    0,6 83
+SAO167993-7  01/10 20/10      63824                        11             A C GARCIA COM E IND A C GARCIA COM E IND SERGIO SCARPIN E CIA CARLINDA       ALT       3.047,78      489,98     178    0,6 80
+MT2007043-2  01/10 20/10      70218                         4             TAPUZIM COMERCIAL LT CANTINHO DO BEBE     CANTINHO DO BEBE     NOVA MONTE VER ALT       1.819,90      324,87      34    0,2 80
+FRA165864-6  29/09 19/10    4417539                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN LUIZ HENRIQUE DOS SA NOVA MONTE VER ALT       1.594,66      171,59      28    0,2 83
+SAO168935-5  02/10 20/10     168312                         3             INDUSTRIAS REUNIDAS  COLOMBO FERRAGENS E  COLOMBO FERRAGENS E  PARANAITA      ALT       1.758,39      182,75      53    0,0 80
+SAO166995-8  30/09 16/10     107721                        16             ASTRO TECNOLOGIA IND COLOMBO FERRAGENS E  COLOMBO FERRAGENS E  PARANAITA      ALT       4.677,90      306,71     211    0,7 80
+TOTAIS:                                 40 CTRCS          441                                                                                                   223.640,38   23.232,02   8.080   23,5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   2
+ssw0194                                                                                     PLACA: BDG7D12                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO168806-5  02/10 16/10         65                         2             TRUCKLINK BRASIL     P.A.B.L AUTO PECAS R P.A.B.L AUTO PECAS R AGUA BOA       BDG       3.957,12      196,63      45    0,5 50
+SAO170143-6  05/10 19/10    3066115                        31             LORENZETTI SA INDS B LORENZETTI SA INDS B ACCADROLI E CIA LTDA AGUA BOA       BDG      17.558,37      466,97     100    1,0 80
+                            3066117
+SAO171068-1  06/10 20/10    3066418                        10             LORENZETTI SA INDS B LORENZETTI SA INDS B ACCADROLI E CIA LTDA AGUA BOA       BDG       2.793,67      134,97      17    0,1 80
+SAO170527-0  06/10 20/10      56022                        22             GIOPLAST INDUSTRIA E R M SOUTO FERNANDES  R M SOUTO FERNANDES  AGUA BOA       BDG       3.599,56      625,80     185    1,6 80
+SAO170947-0  06/10 20/10     449822                        18             FORTPEL COMERCIO DE  FORTPEL COMERCIO DE  JBS S/A AGUA BOA     AGUA BOA       BDG       1.450,55      819,22      54    0,9 80
+FRA169999-7  05/10 21/10    4425488                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN GUILHERME HOFFMANN   AGUA BOA       BDG         699,48      159,99       9    0,2 83
+SAO170497-4  06/10 15/10     290501                       155             HIDROALL DO BRASIL L PAULO PEIXOTO PISCIN PAULO PEIXOTO PISCIN ARAGARCAS      BDG      37.405,58    5.889,82   2.326    4,2 80
+SAO170349-8  06/10 15/10      43086                        17             NOVA TOYS IND. E COM A M H LAYMOUN LTDA   A M H LAYMOUN LTDA   ARAGARCAS      BDG       1.571,49      259,17      52    1,3 80
+SAO170717-5  06/10 15/10      42644                         2             MONICA COSMETICOS E  A M H LAYMOUN LTDA   A M H LAYMOUN LTDA   ARAGARCAS      BDG         683,50      117,67      60    0,3 80
+MT2007096-3  06/10 15/10      11211                         1             VICTORIA VESTUARIOS  A M H LAYMOUN LTDA   A M H LAYMOUN LTDA   ARAGARCAS      BDG         412,81      115,63      30    0,0 80
+PSA170859-7  06/10 16/10     539494                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  BRUNO EVERTON ALMEID BARRA DO GARCA BDG       2.309,98      288,20      45    0,5 95
+SAO166513-8  29/09 07/10     448586                       160             FORTPEL COMERCIO DE  FORTPEL COMERCIO DE  JBS S/A              BARRA DO GARCA BDG      15.648,72    4.133,15     653    8,9 95
+SAO171244-6  07/10 16/10       5576                         8             BRAZIL WORLD PAPER C S. M. MOHAMAD SAFA   S. M. MOHAMAD SAFA   BARRA DO GARCA BDG       4.243,93      227,86     119    0,5 80
+SAO170350-1  06/10 15/10      43083                        17             NOVA TOYS IND. E COM M A M LEIMOUN LTDA   M A M LEIMOUN LTDA   BARRA DO GARCA BDG       1.571,49      258,70      54    1,3 80
+MT2007098-0  06/10 15/10       3980                         1             BALDY VARIEDADES LTD E E M ATA LEIMOUN LT E E M ATA LEIMOUN LT BARRA DO GARCA BDG         500,00       64,32      30    0,1 80
+SAO169407-3  03/10 13/10    1413319                        17             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C LOJAS AVENIDA S.A    BARRA DO GARCA BDG       2.550,61      204,96      77    0,0 80
+SAO170703-5  06/10 15/10      26426                         1             HC MENCHINI COM MOVE HC MENCHINI COM MOVE LUANA MENDES VILELA  BARRA DO GARCA BDG      10.543,50      381,90      71    0,9 80
+SAO170278-5  06/10 15/10      28640                        43             SENIR EMBALAGENS LTD M A M LEIMOUN  LTDA  M A M LEIMOUN  LTDA  BARRA DO GARCA BDG       3.160,40      382,92     572    1,0 80
+MT2007095-5  06/10 15/10      11210                         1             VICTORIA VESTUARIOS  E E M ATA LEIMOUN LT E E M ATA LEIMOUN LT BARRA DO GARCA BDG         508,76       64,32      40    0,1 80
+SAO170416-8  06/10 15/10         40                         1             BRAKEMATIC LTDA      CENTRAL AUTO PECAS E CENTRAL AUTO PECAS E BARRA DO GARCA BDG       2.128,14      107,27      15    0,0 80
+SAO170562-8  06/10 15/10         37                         2             VTJ COMERCIO DE TECI M A M LEIMOUN LTDA   M A M LEIMOUN LTDA   BARRA DO GARCA BDG       2.000,00      112,39      62    0,5 80
+SAO170383-8  06/10 15/10        923                         3             SCAR COMERCIO E REPR M A M LEIMOUN  LTDA  M A M LEIMOUN  LTDA  BARRA DO GARCA BDG         338,30       76,49      39    0,1 80
+VIX035329-9  29/09 08/10    3376087                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  MARIA LUISA AMARO NU BARRA DO GARCA BDG       1.717,96      127,38      28    0,2 83
+PSA170844-9  06/10 21/10     539641                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  RONI VON BUENO FERNA BOM JESUS DO A BDG       1.290,90      207,30      16    0,3 95
+FRA169947-4  05/10 21/10    4422544                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN MARCOS BASILIO       CANABRAVA DO N BDG       6.114,63      276,38      99    0,3 83
+CAM431404-2  06/10 20/10     743391                        10             IND E COM DE COLCHOE IND E COM DE COLCHOE IDEALE - HOME CENTER CANARANA       BDG         814,28      234,10      10    0,3 95
+SAO169347-6  03/10 16/10    1413337                        33             BRS SP SUPRIMENTOS C BRS SP SUPRIMENTOS C INSTITUTO FED DE EDU CONFRESA       BDG       9.450,91      769,09     409    0,0 80
+SAO170418-4  06/10 20/10     347042                         8             FABRICA DE ARTEF DE  L E M COMERCIO DE PR L E M COMERCIO DE PR CONFRESA       BDG       3.533,68      402,51      64    0,3 80
+                             347067
+SAO170492-3  06/10 20/10     836302                        41             DUAS RODAS INDUSTRIA HAPPY DAY FESTA LTDA HAPPY DAY FESTA LTDA CONFRESA       BDG       5.002,79      305,59     171    0,4 80
+SAO170345-5  06/10 20/10     145141                       100             DUAS RODAS NORDESTE  DUAS RODAS NORDESTE  CONFESTA PRODUTOS PA CONFRESA       BDG      20.756,04    4.087,46   1.059    1,2 80
+SAO166516-2  29/09 13/10     448683                        80             FORTPEL COMERCIO DE  FORTPEL COMERCIO DE  JBS S/A              CONFRESA       BDG       7.785,00    3.582,97     326    5,0 95
+BIR165149-8  28/09 14/10       5063                         5             MAZIN E MAZIN INDUST AGRO FUTURO COMERCIO AGRO FUTURO COMERCIO CONFRESA       BDG       4.677,62      390,09     105    0,8 83
+MT2007077-7  05/10 19/10       2931                         1             LOJAS DE 1 TUDO LTDA CONFESTA PRODUTOS PA CONFESTA PRODUTOS PA CONFRESA       BDG       2.264,00      317,68       8    0,1 80
+SAO170407-9  06/10 20/10      61733                        27             DIVERTOYS INDUSTRIA  GAROTADA MODA INFANT GAROTADA MODA INFANT CONFRESA       BDG       5.399,45      655,46      98    1,5 80
+VIX035310-8  28/09 13/10      37581                         1             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO JOAO CAVALCANTE MACH CONFRESA       BDG         212,67      405,94       9    0,0 83
+SAO169829-0  05/10 19/10     377024                         3             CAPLAB INDUSTRIA E C LATICINIOS ALTO BOA  LATICINIOS ALTO BOA  CONFRESA       BDG       2.177,26      379,54      32    0,1 80
+FRA169938-5  05/10 21/10    4422305                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN GABRIEL GONAOALVES B NOVA NAZARE    BDG       1.309,18      169,75      42    0,1 83
+FRA170036-7  05/10 21/10    4426806                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN ROBERTO GOMES DA SIL NOVA XAVANTINA BDG       2.768,50      219,52      65    0,3 83
+PSA170825-2  06/10 21/10     539311                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  RAFAEL ESTEVES DE LI NOVA XAVANTINA BDG       2.764,90      251,52      41    0,4 95
+FRA170006-5  05/10 21/10    4425556                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN AFB AGROPECUARIA FAZ NOVA XAVANTINA BDG         898,01      172,49      13    0,2 83
+VIX035405-8  29/09 14/10    3379110                         1             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  CAFE CAMARADA NULL   NOVA XAVANTINA BDG       1.637,93      269,42      40    0,5 83
+FRA169944-0  05/10 21/10    4422334                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN DIEGO DINIZ          NOVA XAVANTINA BDG         576,36      136,72       7    0,1 83
+VIX035753-7  01/10 16/10    3384713                         2             BELMICRO TECNOLOGIA  BELMICRO TECNOLOGIA  LUANA VIERA RAMALHO  NOVA XAVANTINA BDG       3.789,00      212,50      38    0,3 83
+FRA169958-0  05/10 21/10     376461                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN CHRISTOPHER  AMUY DE QUERENCIA      BDG         385,82      113,02      11    0,0 83
+SAO170320-0  06/10 20/10      21842                        44             VP INDUSTRIA, COMERC VP INDUSTRIA, COMERC CADORE BIDOIA EAMP C QUERENCIA      BDG      28.154,62    3.814,04   1.319    6,5 80
+SAO170481-8  06/10 20/10      36448                        11             REAL SEDA INDUSTRIAS QUERENFESTA PRODUTOS QUERENFESTA PRODUTOS QUERENCIA      BDG       1.662,52      584,69      42    1,0 80
+SAO170546-6  06/10 20/10    1055161                        20             NEWELL BRANDS BRASIL NEWELL BRANDS BRASIL CADORE BIDOIA EAMP C QUERENCIA      BDG       4.030,02      642,97      91    1,2 83
+SAO169668-8  05/10 19/10     304164                        13             ACP MERCANTIL INDUST NEIDE BENDER-ME      NEIDE BENDER-ME      VILA RICA      BDG       2.344,43      136,68      65    0,0 80
+TOTAIS:                                 48 CTRCS          924                                                                                                   237.154,44   33.953,16   8.861   45,2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   3
+ssw0194                                                                                     PLACA: CAM2H01                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CBA017741-5  23/09 06/10     169193                         1             MELISSA ROSLER       DISTRIBUIDORA DE MOV DISTRIBUIDORA DE MOV OURINHOS       BAU       3.425,64      448,76      41    1,0 83
+CGD035104-1  25/09 08/10     162532                         2             ROTILLI E MACHADO LT INJEX INDUSTRIAS CIR INJEX INDUSTRIAS CIR OURINHOS       BAU         323,57        0,01       0    0,0 83
+ALT161381-2  22/09 28/09       1381                         8             R.R.R. COMERCIAL DE  R.R.R. COMERCIAL DE  WFS COMERCIO LTDA    CAMPINAS       CAM         608,00      512,09      60    0,0 54
+CBA017765-2  25/09 02/10      75401                         1             ANTONIO JOAO PAES DE NEOSOLAR ENERGIA LTD NEOSOLAR ENERGIA LTD ITAPEVA        CAM         783,57        0,01      34    0,0 83
+CBA017742-3  23/09 02/10       2461                         5             COMPANHIA BRASILEIRA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       1.273,49      160,83      13    0,1 83
+                               2462,       2483,       2484,       2487
+CBA017782-2  29/09 08/10      41907                         1             ODAPEL-DISTRIBUIDORA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       2.851,35      164,95       4    0,0 83
+CGD035180-6  01/10 13/10     433334                         1             SHARK TRATORES E PEC ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       1.393,56      136,70       5    0,0 83
+CBA017783-1  30/09 09/10     361417                         2             EMBREPAR DO BRASIL L ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM         797,63      159,58       7    0,0 83
+                             361430
+CBA017763-6  25/09 06/10     369636                         2             AGUILERA COMERCIAL D ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       1.693,43      161,92       6    0,0 83
+                             369748
+CGD035168-7  30/09 09/10     196728                         1             ODAPEL DISTRIBUIDORA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM         378,60      134,05       4    0,0 83
+CBA017770-9  28/09 07/10       2495                         3             COMPANHIA BRASILEIRA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       2.417,69      163,82      13    0,2 83
+                               2500,       2506
+CGD035084-2  24/09 05/10     465014                         3             REDE ANCORA MS IND.  ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM         597,89      134,63       6    0,0 83
+                             465015,     465016
+CGD035179-2  01/10 13/10      88275                         1             REAL MOTO PECAS LTDA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM          76,09      133,26       1    0,0 83
+CBA017724-5  17/09 28/09     363195                        28             AGUILERA COMERCIAL D ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM      24.806,97      472,81     259    0,7 83
+  Demais NF:                 366630,     366633,     366635,     366636,     366637,     366640,     366766,     366767,     366769,     367374,     367585
+                             367589,     367593,     367597,     367600,     367744,     367905,     368135,     368136
+CBA017723-7  17/09 28/09      93085                         2             ATACADO UNIAO LTDA   ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       2.791,62      164,80      15    0,0 83
+                              93111
+CBA017772-5  29/09 08/10      96356                         5             ATACADO UNIAO LTDA   ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM         829,83      159,67      10    0,1 83
+                              96379,      96384,      96392,      96528
+CBA017785-7  30/09 09/10     721167                         4             REDE ANCORA MT IMP E ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       9.896,87      247,45     124    0,5 83
+                             722223,     722468,     722718
+CBA017744-0  23/09 02/10     361025                         3             AGUILERA COMERCIAL D ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       1.537,44      242,59      27    0,5 83
+                             363328,     368382
+CBA017673-7  11/09 22/09       2191                         1             COMPANHIA BRASILEIRA ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM         278,25        0,01      10    0,0 83
+CBA017758-0  24/09 05/10     716867                        10             REDE ANCORA MT IMP E ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       9.815,50      204,22     108    0,3 83
+                             719250,     717188,     720297,     716921,     720436,     720771
+CGD035135-1  29/09 08/10     452220                         2             PACAEMBU AUTOPECAS L ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       2.871,35      140,56      36    0,0 83
+                             452508
+CGD035133-4  29/09 08/10     465246                         2             REDE ANCORA MS IND.  ZF AUTOMOTIVE BRASIL ZF AUTOMOTIVE BRASIL ITU            CAM       1.479,38      136,92      32    0,0 83
+                             465500
+TTS000007-8  25/09 31/12     381834              FCA       16             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH PLASTCOR DO BRASIL L LIMEIRA        CAM           0,01        0,01      20    0,0 83
+CBA017759-8  25/09 06/10     136221                         1             PARANA COM DE MAT EL PARANA COM DE MAT EL SEED EL IND. COM.I M MOGI GUACU     CAM       1.627,50      274,64      34    0,0 83
+CBA017537-4  17/08 27/08    1049871                        26             SDB COMERCIO DE ALIM NEWELL BRANDS BRASIL NEWELL BRANDS BRASIL POUSO ALEGRE   CAM       6.827,59      600,92     113    0,9 54
+SAS028247-2  30/09 31/12          1              TIT        1             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH SUMARE         CAM           5,00        0,01      10    0,0 80
+PVA012296-3  26/09 01/10      22219                         5             BELA SHOP LTDA       SANFARMA IND COM E I SANFARMA IND COM E I SUMARE         CAM       1.883,77      182,57      50    0,0 83
+SAS028317-7  07/10 31/12          1              TIT        1             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH SUMARE         CAM          10,00        0,01       0    0,0 80
+CNP000808-7  18/09 24/09     169198                         2             RODRIGUES E ASSIS LT PPG IND DO BRASIL TI PPG IND DO BRASIL TI SUMARE         CAM      10.175,50    1.142,38     806    0,0 83
+SAS028312-6  07/10 31/12      71026              TIT        8             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH SUMARE         CAM           0,01        0,01      15    0,0 80
+SIN002114-8  25/08 08/09     261080                         2             IKLA MILENA SANTIAGO HMDK DIGITAL MOVEIS  HMDK DIGITAL MOVEIS  GUAPIACU       CAT       1.163,98      371,86      38    0,2 83
+CGD035142-3  29/09 13/10        196                         2             ILTO BITENCOURT DA S MALUBI DECOR IND. CO MALUBI DECOR IND. CO VALENTIM GENTI FND       1.204,90      130,60      20    0,0 83
+CBA017721-1  17/09 28/09     533439                         1             RAFAEL FELICE SIMOES FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  EXTREMA        NVV       1.901,82      111,51      26    0,2 83
+NPG149611-5  02/09 15/09     528010                         1             VALMIRA CLIMACO DE A FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  EXTREMA        NVV       8.961,92      332,15      25    0,0 83
+CBA017743-1  23/09 02/10      12084                         1             MULTIBAR COMERCIO DE MIMO IMPORTACAO E EX MIMO IMPORTACAO E EX EXTREMA        NVV         172,26      131,85       7    0,0 83
+BSB129601-9  23/09 02/10    1046762                         3             AMAZON SERVICOS DE V NEWELL BRANDS BRASIL NEWELL BRANDS BRASIL POUSO ALEGRE   NVV      30.900,50      666,33     485    0,0 83
+SIN002131-8  23/09 02/10    1433412                         4             COMAGRAN MATO GROSSO NEWELL BRANDS BRASIL NEWELL BRANDS BRASIL POUSO ALEGRE   NVV         638,09      150,24      15    0,0 83
+FND166274-1  29/09 16/10      20145                         6             POLIZELLI MOVEIS E U POLIZELLI MOVEIS E U LEANDRA AGUIAR NASCI PASSOS         PSS         280,50      308,17      72    0,5 83
+SIN002132-6  23/09 01/10        262                        14             50.605.396 DIENISON  STL IND E COM DE ACE STL IND E COM DE ACE CRAVINHOS      RAO       2.499,68      820,00     104    0,0 83
+GYS015741-4  28/09 31/12     381003              UNI        7             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH PLASTCOR DO BRASIL L SAO PAULO      SAO           0,01        0,01       0    0,0 83
+CGD035064-8  23/09 06/10    1135926                         1             573557 - THALIA  DE  CASSINI E MOREIRA CO CASSINI E MOREIRA CO MIRASSOL       SJP         403,34      164,07      15    0,0 83
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   4
+ssw0194                                                                                     PLACA: CAM2H01                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CBA017774-1  29/09 08/10       2369                         1             COMPANHIA BRASILEIRA FRASLE MOBILITY SORO FRASLE MOBILITY SORO SOROCABA       TIT       1.094,74      152,22      20    0,0 83
+TOTAIS:                                 42 CTRCS          191                                                                                                   140.678,84    9.619,20   2.691    5,1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   5
+ssw0194                                                                                     PLACA: IRS8H42                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+BNU002608-5  30/09 29/10        217                         2             JUGUITEX CONFECCOES  JUGUITEX CONFECCOES  SOL MAGAZINE PARA 03 ABAETETUBA     BEL       6.250,00      375,00      60    0,2 83
+FND167168-5  30/09 09/11      13956                         3             DE MARCHI COMERCIO D DE MARCHI COMERCIO D MARIA ROSELY OLIVEIR AFUA           BEL       1.665,82      476,92      57    0,1 83
+SAO169879-6  05/10 27/10    1175149                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  TEC ELETRICA LTDA    ANANINDEUA     BEL       3.769,56      488,03      35    0,1 80
+FND166898-6  30/09 26/10       7059                         2             ZARGO IND E COM DE M ZARGO IND E COM DE M LOURIANY DE SOUSA CO ANANINDEUA     BEL       2.089,97    1.046,02      45    1,0 83
+CAT167755-1  01/10 27/10     567099                         1             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND MANOEL VITOR         ANANINDEUA     BEL         913,50      484,43      52    0,1 83
+SAO166171-0  29/09 21/10      64932                         2             PET SOCIETY PRODUTOS MBS PRO GROOMING COM ICC PET SHOP         ANANINDEUA     BEL       1.330,00      319,56      18    0,1 80
+                              64933
+BIR167717-9  01/10 26/10        726                         4             JRBS INDUSTRIA E COM JRBS INDUSTRIA E COM ALAN A S CONCEICAO   BELEM          BEL       1.576,22      389,72      60    0,3 83
+BIR166722-0  30/09 23/10       1494                         4             XANDY COMERCIO DE MA XANDY COMERCIO DE MA EWERTON PATRICK CARD BELEM          BEL       3.000,00      321,11      70    0,3 83
+FND159479-6  18/09 13/10      21828                         3             CASELLI STORE COMERC CASELLI STORE COMERC ASSAD FILIPE DA SILV BELEM          BEL         168,80      255,02      63    0,2 83
+SAO168083-8  01/10 22/10     249829                         3             COMERCIAL ELMAR LTDA A. F. S ALIMENTOS LT A. F. S ALIMENTOS LT BELEM          BEL         728,70      420,99      36    0,2 80
+FRA168128-1  01/10 26/10     252124                         3             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA SARMANHO REPRESENTAC BELEM          BEL         772,00      194,23      26    0,4 83
+FND159474-5  18/09 13/10       6480                         2             INFOCELL PREMIUM LTD INFOCELL PREMIUM LTD PAULO VITOR DA SILVA BELEM          BEL         125,90      190,35      27    0,1 83
+FND159554-7  18/09 13/10      19715                         3             POLIZELLI MOVEIS E U POLIZELLI MOVEIS E U DANIEL CABRAL DE OLI BELEM          BEL         187,30      367,52      50    0,4 83
+SAO166833-1  30/09 21/10        463                         1             WA PEDRAS E REVESTIM WA PEDRAS E REVESTIM MARCICLEI LOBATO DE  BELEM          BEL       4.128,50    1.427,08     500    0,8 80
+CAT157758-1  16/09 08/10     564545                         1             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND FELIPE MOURA         BELEM          BEL       1.126,31      363,18      68    0,2 83
+SAO166249-0  29/09 20/10     140184                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON SIDNEY CARDEL NOVAES BELEM          BEL       3.370,65      353,02      41    0,3 80
+SAO167195-2  30/09 21/10    1174610                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  BELEM          BEL      10.031,72      742,80     111    0,6 80
+CAT159756-6  18/09 13/10     564986                         1             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND JOSE LOURENCO FERRIT BELEM          BEL         757,54      331,11      39    0,1 83
+BIR166091-8  29/09 22/10     277766                         1             UTILITY COMERCIO E I UTILITY COMERCIO E I IZABELA LOBATO MARCA BELEM          BEL         857,01      260,91      20    0,1 83
+VIX033620-3  12/09 02/10     310109                         3             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR LUCIANO SILVA DOS SA BELEM          BEL       1.599,80      322,00      54    0,2 83
+CAT166065-9  29/09 22/10     566889                         2             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND VIVIANE CAVALEIRO CO BELEM          BEL       1.667,74      348,86      65    0,2 83
+PSA165508-6  28/09 20/10       2947                        28             VOLPE ROSSA COMERCIA VOLPE ROSSA COMERCIA ANT COSTA BARAO LTDA BELEM          BEL       6.012,15      652,82     230    0,8 83
+FND162540-3  23/09 16/10       6612                         2             INFOCELL PREMIUM LTD INFOCELL PREMIUM LTD VANDERSON RODRIGUES  BELEM          BEL         125,60      190,34      27    0,1 83
+CAT161547-5  22/09 15/10     565672                         1             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND DENISE AMANDA MEDEIR BELEM          BEL         845,59      343,55      52    0,1 83
+SJP167823-0  01/10 26/10    1138559                         2             CASSINI E MOREIRA CO CASSINI E MOREIRA CO 575293 - BETH PIMENT BELEM          BEL       1.877,45      333,44      55    0,0 83
+SAO170824-4  06/10 27/10     140932                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON LUIZ HENRIQUE        BELEM          BEL       3.933,08      357,56      41    0,3 80
+SAO171041-9  06/10 27/10        356                        89             ENVISION IND DE PROD ENVISION IND DE PROD AMERICANAS S/A PA    BENEVIDES      BEL      15.753,43    1.343,80     195    0,4 80
+SAO171048-6  06/10 27/10        352                         3             ENVISION IND DE PROD ENVISION IND DE PROD AMERICANAS S/A PA    BENEVIDES      BEL         469,38      872,58       5    0,1 80
+SAO171039-7  06/10 27/10        354                        17             ENVISION IND DE PROD ENVISION IND DE PROD AMERICANAS S/A PA    BENEVIDES      BEL       3.009,08    1.418,92      37    0,7 80
+SAO168197-4  01/10 29/10       6670                        14             ENVISION IND DE PROD ENVISION IND DE PROD MAGAZINE LUIZA S/A   BENEVIDES      BEL      14.455,55    4.567,96     315    3,1 15
+SAO171038-9  06/10 27/10        353                         6             ENVISION IND DE PROD ENVISION IND DE PROD AMERICANAS S/A PA    BENEVIDES      BEL         938,76      874,22      15    0,3 80
+RAO005394-5  30/09 26/10     126873                        18             ZILQUIMICA PROD P/ L ZILQUIMICA PROD P/ L LABFERT ANALISES LTD BONITO         BEL      20.616,00    1.020,00     190    0,4 83
+CAM426722-2  10/09 05/10     735701                         3             IND E COM DE COLCHOE IND E COM DE COLCHOE CARLOS FERNANDO REIS BRAGANCA       BEL       1.773,42    2.787,11      93    1,4 83
+CAS009663-6  28/09 31/12     735701              FCA        1             EXPRESSO RIO VERMELH EXPRESSO RIO VERMELH CARLOS FERNANDO REIS BRAGANCA       BEL           0,01        0,01      20    0,0 83
+BNU002415-5  25/09 26/10        208                         3             JUGUITEX CONFECCOES  JUGUITEX CONFECCOES  SOL MAGAZINE MARABA  CAPANEMA       BEL       6.250,00      476,40      61    0,3 50
+VIX034971-2  25/09 22/10     313529                         2             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR DRA. MARIA ELINARA   CAPITAO POCO   BEL         955,04      320,51      49    0,1 83
+SAO169915-6  05/10 27/10      13137                         2             BABUS COM VAREJISTA  BABUS COM VAREJISTA  IVONE CAMPOS ESSASHI CASTANHAL      BEL       1.376,20      319,88      89    0,2 80
+FRA165827-1  29/09 23/10     251749                        35             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA NORTE SAFETY EQUIPAM CASTANHAL      BEL      28.760,00    1.643,05     440    2,2 83
+SAO153816-1  09/09 30/09    1332746                         1             KARINA PLASTICOS LTD KARINA PLASTICOS LTD SIMETRIA IND. COM. D CASTANHAL      BEL         506,34      145,63      20    0,0 98
+FRA165830-1  29/09 23/10     251773                         7             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA NORTE SAFETY EQUIPAM CASTANHAL      BEL       5.017,50      364,57      45    0,0 83
+BNU002416-3  25/09 22/10        207                         3             JUGUITEX CONFECCOES  JUGUITEX CONFECCOES  SOL MAGAZINE MARABA  CASTANHAL      BEL       6.250,00      476,40      61    0,3 50
+SAO167065-4  30/09 26/10     161342                         8             ETILUX IMP E DISTR D ETILUX IMP E DISTR D AGRO ACAI AGROPECUAR CONCEICAO DO A BEL       1.799,20      396,86      21    0,1 80
+SAO166384-4  29/09 23/10     160718                        17             ETILUX IMP E DISTR D ETILUX IMP E DISTR D TERRA FORTE PROD AGR FLORESTA DO AR BEL       3.948,93      429,65      46    0,1 80
+SAO167032-8  30/09 26/10     161068                        13             ETILUX IMP E DISTR D ETILUX IMP E DISTR D AGRO CONSTRUCOES COM FLORESTA DO AR BEL       3.327,72      424,65      35    0,1 80
+BNU002609-3  30/09 29/10        216                         2             JUGUITEX CONFECCOES  JUGUITEX CONFECCOES  SOL MAGAZINE PARA 03 IGARAPE-MIRI   BEL       6.250,00      470,29      60    0,3 83
+FND159550-4  18/09 16/10      21841                         2             CASELLI STORE COMERC CASELLI STORE COMERC JOAO BATISTA PANTOJA IGARAPE-MIRI   BEL         125,90      196,01      27    0,1 83
+SAO166257-1  29/09 23/10     140186                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON ANTONIO RONE ALVES J MAE DO RIO     BEL       3.370,65      485,83      41    0,3 80
+SAO167194-4  30/09 05/11      31622                         9             VGF INDUSTRIA E COME VGF INDUSTRIA E COME CAC ENGENHARIA SA    MARABA         BEL      13.843,84      683,96     123    0,0 40
+SAO168015-3  01/10 04/11      11014                         1             BM RODAS E PNEUS LTD GOFRETES INTERMEDIAC THAINA DE AQUINO MAM OBIDOS         BEL       2.058,33      479,75      32    0,2 80
+BIR166742-4  30/09 28/10      15891                         2             PECUARISTA D OESTE D PECUARISTA D OESTE D ALVORADA COMERCIO DE PARAGOMINAS    BEL       2.544,00      284,58      29    0,1 83
+SAO169823-1  05/10 29/10      15023                        10             TECCOM IND E COM PRO TECCOM IND E COM PRO TECNOMOTOR PECAS E S PARAGOMINAS    BEL      11.916,80      743,31     149    0,3 80
+CAT163430-5  24/09 22/10     566330                         1             MOVEIS PROVINCIA IND MOVEIS PROVINCIA IND LEIDIANE FERREIRA NO PARAUAPEBAS    BEL          29,89      460,91       5    0,0 83
+SAO166244-9  29/09 23/10     140183                         2             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON JOSE JAIR SOARES DE  PARAUAPEBAS    BEL       3.594,97      487,63      41    0,3 80
+SAO167918-0  01/10 27/10      20727                        12             BRINCADEIRA DE CRIAN JULIANA DA FONSECA O JULIANA DA FONSECA O PARAUAPEBAS    BEL       1.290,67      321,86      32    0,3 80
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   6
+ssw0194                                                                                     PLACA: IRS8H42                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+FND164549-8  25/09 23/10        234                         2             VJ IND E COM DE MOVE VJ IND E COM DE MOVE GABRIELA RIBEIRO GOM PARAUAPEBAS    BEL       4.531,29      865,04      68    0,7 83
+SAO158078-7  16/09 09/10    1172037                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MATEUS SUPERMERCADOS PARAUAPEBAS    BEL      29.982,47    1.252,69     201    0,7 80
+VIX035850-9  01/10 05/11     174885                         2             MAIS PROXIMA COMERCI MAIS PROXIMA COMERCI 48008896 DIRLEY MARQ PORTEL         BEL       3.728,58    1.157,07      20    0,2 83
+BIR166767-0  30/09 28/10      15901                         4             PECUARISTA D OESTE D PECUARISTA D OESTE D AURORA COMERCIO E DI REDENCAO       BEL       7.632,00      483,56      87    0,3 83
+VIX034699-3  22/09 19/10     311829                         4             FAURA MOVEIS E DECOR FAURA MOVEIS E DECOR ECLESIA SOARES       REDENCAO       BEL       1.924,80      484,11      68    0,3 83
+BIR166741-6  30/09 28/10      15897                         2             PECUARISTA D OESTE D PECUARISTA D OESTE D ALVORADA COM. PRODUT REDENCAO       BEL       2.544,00      284,58      29    0,1 83
+FND164556-1  25/09 05/11      12135                         3             START HOME SHOP COME START HOME SHOP COME JOSE DOUGLAS GONCALV SALINOPOLIS    BEL         846,65      386,54      55    0,4 83
+CAM429972-8  28/09 22/10     586715                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S FRIGOL S.A           SAO FELIX DO X BEL         985,11      400,03       1    0,0 83
+FND155580-4  11/09 16/10      13611                         3             DE MARCHI COMERCIO D DE MARCHI COMERCIO D BIANCA DIAS SIQUEIRA SAO SEBASTIAO  BEL         324,39      359,80      54    0,1 83
+FRA169936-9  05/10 03/11    4422303                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN MATHEUS RODEIGUES    TAILANDIA      BEL       2.937,20      414,87      65    0,3 83
+SJP164982-5  28/09 28/10     132981                         2             AMERICANFLEX IND REU AMERICANFLEX IND REU SCHMIDT E MENEZES LT TUCUMA         BEL       9.377,99    2.624,60     119    2,0 83
+FND162570-5  23/09 21/10      21963                         3             CASELLI STORE COMERC CASELLI STORE COMERC MAIARA DOS SANTOS FI TUCURUI        BEL       1.325,37      394,54      50    0,4 83
+FND161281-6  22/09 27/10       4534                         1             GD INDUSTRIA E COMER GD INDUSTRIA E COMER CARMEM LUCIA SERRA D VISEU          BEL         110,98      219,67      24    0,1 83
+IBI164909-4  28/09 27/10     122067                         5             IND E COM DE BORDADO IND E COM DE BORDADO TERRA TECIDOS LTDA   XINGUARA       BEL       2.715,78      571,59      52    0,5 83
+BAU167942-2  01/10 12/11      74602                         1             TRIPTEM COMERCIO DE  TRIPTEM COMERCIO DE  IZAETE SILVA LIMA (3 BOA VISTA      BVT       3.134,40      382,06      40    0,1 83
+SAO167059-0  30/09 09/11        897                         6             MIRIELLE ARAUJO DIAS MIRIELLE ARAUJO DIAS D. RODRIGUES SANTOS  BOA VISTA      BVT       2.600,00    2.526,00     480    1,9 80
+SJP163571-9  24/09 06/11    1138707                         2             CASSINI E MOREIRA CO CASSINI E MOREIRA CO 574653 - 58.143.698  BOA VISTA      BVT       1.916,22      599,20      85    0,0 83
+FND166801-3  30/09 11/11        930                         2             HOME NOBRE INDUSTRIA HOME NOBRE INDUSTRIA NATALIA SODRE        BOA VISTA      BVT          10,00        0,01      45    0,0 83
+SAO169584-3  05/10 12/11      33354                       306             BPA INDUSTRIAS LTDA  BPA INDUSTRIAS LTDA  ARAUJO E SARAIVA LTD BOA VISTA      BVT      21.182,85    6.537,51   1.354    3,6 80
+                              33363
+SAO170958-5  06/10 13/11    1174985                        26             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  TROPICAL VEICULOS LT BOA VISTA      BVT      27.396,91    2.813,13     384    1,4 80
+FND164014-3  25/09 09/11        834                         4             LGN MOVEIS E-COMMERC LGN MOVEIS E-COMMERC KLEBER               BOA VISTA      BVT         511,96      529,51      59    0,4 83
+FND165441-1  28/09 16/11      43453                         1             CEF COMERCIO E IMPOR CEF COMERCIO E IMPOR PAULO RICARDO FERREI MUCAJAI        BVT         186,71      399,55      11    0,1 83
+SJP165803-4  29/09 16/11       1210                         3             ADMILSON ADAO PEREIR ADMILSON ADAO PEREIR MARLUCIO BRANDAO GER RORAINOPOLIS   BVT       3.600,00      382,83      42    0,0 83
+JOI002381-7  25/09 11/11    1023260                         5             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S PETROBRAS TRANSPORTE COARI          MAO       6.322,57    1.368,19      43    0,1 50
+SAO168874-0  02/10 09/11      95374                         3             TIRRENO IND E COM DE TIRRENO IND E COM DE REVEMAR COMERCIO DE  HUMAITA        MAO       2.228,03      855,42      12    0,0 80
+JOI002447-3  28/09 30/10    1024787                        41             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S AGGREKO ENERGIA LOCA MANAUS         MAO      45.881,53    1.206,63     189    0,5 83
+SAO166243-1  29/09 29/10     140182                         4             DAIKIN MCQUAY AR CON DAIKIN MCQUAY AR CON FRANCISCO THALLES AM MANAUS         MAO       7.489,93      688,35      82    0,5 80
+FND161271-9  22/09 26/10       6525                         1             INDUSTRIA DE MOVEIS  INDUSTRIA DE MOVEIS  SONIA BARBOSA ABENSU MANAUS         MAO         833,84      267,48      48    0,1 83
+FRA167211-8  30/09 04/11     251875                         2             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA ZONA NORTE ENGENHARI MANAUS         MAO       1.942,00      181,06      12    0,1 83
+RAO005414-3  30/09 30/10     415924                         2             APIS FLORA INDUSTRIA APIS FLORA INDUSTRIA TOTAL LOGISTICA FARM MANAUS         MAO       2.231,11      639,35       8    0,0 83
+JOI002560-7  30/09 04/11    1025775                         5             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S IMPLAMERICA INDUSTRI MANAUS         MAO      45.457,64      613,99       6    0,1 83
+SAO167193-6  30/09 30/10    1174606                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MANAUS         MAO       9.088,21      568,11     100    0,1 80
+FND167175-8  30/09 04/11     195049                         1             GUSTAVO HENRIQUE COS GUSTAVO HENRIQUE COS THAYANA GOMES        MANAUS         MAO         219,12      247,17      25    0,1 83
+SAO166427-1  29/09 29/10    1173973                         2             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  MANAUS         MAO       9.167,07      559,74      99    0,2 80
+JOI002112-1  16/09 20/10    1015185                         1             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S ARDAGH INDUSTRIA DE  MANAUS         MAO         207,00      417,41       5    0,0 45
+VIX035737-5  30/09 03/11      37638                       360             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RECAUCHUTADORA ELO L MANAUS         MAO      55.725,46   16.038,63   3.015   12,6 83
+VIX035311-6  28/09 29/10      37580                        20             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RECAUCHUTADORA ELO L MANAUS         MAO       3.826,02    1.012,19     226    0,7 83
+FRA168129-0  01/10 05/11     252086                        36             SOFT WORKS EPI CALCA SOFT WORKS EPI CALCA HAPVIDA ASSISTENCIA  MANAUS         MAO      32.080,32    1.681,27     259    4,5 83
+VIX035687-5  30/09 03/11      14446                         6             FTTX BRASIL TELECOM  FTTX BRASIL TELECOM  RYLC COMERCIO DE ELE MANAUS         MAO      18.745,00      933,58      89    0,5 83
+SAO169828-1  05/10 05/11     377390                         3             CAPLAB INDUSTRIA E C CAPLAB INDUSTRIA E C ELIANA FELDBERG      MANAUS         MAO       1.828,32      284,95      27    0,1 80
+RAO005416-0  30/09 30/10     403929                        10             CHIAPERINI INDUSTRIA CHIAPERINI INDUSTRIA K.F CONSTRUCOES E CO MANAUS         MAO       4.791,46      472,00     105    0,3 95
+JOI002571-2  30/09 04/11    1027409                         4             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S LOJAS RIACHUELO SA   MANAUS         MAO       4.375,67      488,61      21    0,0 83
+SAO164307-0  25/09 21/10       1755              UETAB      1             LIDERVAC MAQUINAS E  TRANSPORTES DE CARGA L F DEL PUPPO EMPREE MACAPA         MCP      14.900,00      706,77      80    0,5 80
+SAO164660-5  25/09 21/10    1173822                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  NUTRIAMA LTDA        MACAPA         MCP       6.861,92      598,61      98    0,1 80
+SJC162330-3  23/09 21/10       2103                         1             PULA TOYS COMERCIOS  PULA TOYS COMERCIOS  GEZIANE SANTANA DO A MACAPA         MCP         359,90      330,10      12    0,2 80
+FND167176-6  30/09 28/10     106746                         2             MOBIGU COMERCIO DE M MOBIGU COMERCIO DE M LINAIR SOUZA DE SA   MACAPA         MCP         705,33      392,69      80    0,3 83
+SAO166242-2  29/09 23/10        678                         8             C6M BRINDES LTDA     GOFRETES INTERMEDIAC SEST SERVICO SOCIAL  MACAPA         MCP       9.900,00      955,85     105    0,8 80
+SAO167045-0  30/09 30/10      22387                         2             ESTANTE CENTER LTDA  GOFRETES INTERMEDIAC FABIAN PAIXAO        OIAPOQUE       MCP       1.599,88      352,61      36    0,1 80
+JOI002382-5  25/09 23/10    1023808                         8             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S AMCEL - AMAPA FLORES SANTANA        MCP       2.686,17      520,32      15    0,1 83
+JOI002380-9  25/09 23/10    1022194                        12             DIMENSIONAL BRASIL S DIMENSIONAL BRASIL S CARAMURU ALIMENTOS S SANTANA        MCP       6.244,92    1.275,19     264    0,1 50
+TOTAIS:                                104 CTRCS        1.295                                                                                                   644.346,60   91.576,66  12.634   55,1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   7
+ssw0194                                                                                     PLACA: JTI7D12                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO169767-6  05/10 16/10    1620744                        24             TILIBRA PRODUTOS DE  ALESSANDRA ALVES CAR ALESSANDRA ALVES CAR CAIAPONIA      JTI       6.363,19      263,56     198    0,5 80
+SAO170389-7  06/10 16/10     405531                         4             KANAFLEX S/A. IND. D AM FILHO MANGUEIRAS  AM FILHO MANGUEIRAS  CHAPADAO DO CE JTI       6.305,67      637,42     132    1,8 80
+SAO169713-7  05/10 15/10      96541                         8             SANSUY S/A IND. DE P GORGEN TRANSPORTES L GORGEN TRANSPORTES L CHAPADAO DO CE JTI      14.379,92      792,35     235    0,0 80
+SAO170533-4  06/10 14/10       1342                        18             GJL UTILIDADES DOMES LIMA E ASSIS LTDA    LIMA E ASSIS LTDA    JATAI          JTI       5.536,84      811,27     256    2,3 80
+PSA170835-0  06/10 15/10     538822                         1             FRIGELAR COMERCIO E  FRIGELAR COMERCIO E  CAIRO LELES JUNIOR   JATAI          JTI       1.392,88      175,79      16    0,3 95
+CAM430742-9  01/10 08/10      46171                         2             GREENS WET AROMATIZA CC CARVALHO LTDA ME  CC CARVALHO LTDA ME  JATAI          JTI       2.348,90      253,09      27    0,1 83
+VIX035621-2  30/09 08/10     997164                         2             WEBCONTINENTAL LTDA  WEBCONTINENTAL LTDA  NATALIA SANTOS CARDO JATAI          JTI       3.260,24      159,01      38    0,3 83
+CAM430780-1  01/10 08/10      22607                         3             TOPMETAL IND. E COM. TECNOESSE IND E COM  TECNOESSE IND E COM  JATAI          JTI      15.365,00      881,11      53    0,1 83
+CAM430746-1  01/10 08/10       2594                         4             ATOM LABOR INDUSTRIA MULT EPI LTDA        MULT EPI LTDA        JATAI          JTI       2.805,98      279,78      46    0,3 83
+ITJ002580-1  30/09 09/10    1020581                         4             CPX DISTRIBUIDORA S  CPX DISTRIBUIDORA S  BRUNO .              JATAI          JTI       1.528,85      139,39      25    0,2 83
+SAO170529-6  06/10 14/10     246137                        89             VIMACEDO COMERCI LTD F LINS DE MELO       F LINS DE MELO       JATAI          JTI      19.308,15    2.062,43   1.399    2,9 80
+CAM431204-0  05/10 13/10      97522                        19             KOINONIA FITAS E PEC TECNOESSE IND E COM  TECNOESSE IND E COM  JATAI          JTI      17.700,00    2.936,46      60    4,7 95
+SAO168996-7  02/10 09/10     381248                         5             SODRAMAR INDUSTRIA E PISCINAS JATAI EIREL PISCINAS JATAI EIREL JATAI          JTI       2.579,60      310,87      18    0,1 80
+SAO168998-3  02/10 09/10       5363                         3             IPC SOLUCOES INDUSTR GOFRETES INTERMEDIAC CAIAPO IND E COM AGU JATAI          JTI       1.716,70      122,04      24    0,0 80
+SAO169294-1  02/10 09/10    3064654                         4             LORENZETTI SA INDS B LORENZETTI SA INDS B J CRUZEIRO DA COSTA  JATAI          JTI       4.060,94      116,78      17    0,1 80
+SAO170386-2  06/10 14/10     706993                         1             APERAM INOX SERVICOS BOTTEGA METAIS LTDA  BOTTEGA METAIS LTDA  JATAI          JTI      25.822,81    2.166,44   1.037    0,6 80
+SAO168547-3  02/10 09/10    3063891                         8             LORENZETTI SA INDS B LORENZETTI SA INDS B J CRUZEIRO DA COSTA  JATAI          JTI       4.070,92      173,85      35    0,4 80
+SAO168546-5  02/10 09/10    3063889                         7             LORENZETTI SA INDS B LORENZETTI SA INDS B J CRUZEIRO DA COSTA  JATAI          JTI       2.713,93      144,83      18    0,2 80
+SAO169756-1  05/10 13/10     160858                        27             DELLO INDUSTRIA E CO MISCELANEA LIVRARIA  MISCELANEA LIVRARIA  JATAI          JTI       4.944,70      301,60     121    0,8 80
+SAO169607-6  05/10 13/10    1621131                         6             TILIBRA PRODUTOS DE  NEUDES OLIVEIRA DE J NEUDES OLIVEIRA DE J JATAI          JTI       4.165,08      190,89      87    0,2 80
+SAO170271-8  06/10 14/10      16248                         4             SUPER METALRIO LTDA  COOPERATIVA AGROINDU COOPERATIVA AGROINDU JATAI          JTI       1.514,07      199,85      48    0,2 80
+SAO169842-7  05/10 13/10       2570                         3             OVERFIX AMBIENTAL E  A C NAVES MARQUES    A C NAVES MARQUES    JATAI          JTI       1.520,00      316,19      32    0,1 80
+SAO170478-8  06/10 14/10     160895                        25             DELLO INDUSTRIA E CO TRAJETON MAGAZINE LT TRAJETON MAGAZINE LT JATAI          JTI       2.934,95      164,92      63    0,5 80
+SAO169704-8  05/10 13/10      76758                        14             ACCO BRANDS BRASIL L MISCELANEA LIVRARIA  MISCELANEA LIVRARIA  JATAI          JTI       6.144,32      227,78     157    0,2 80
+VIX035313-2  28/09 06/10      37585                         1             UNIQUE RUBBER TECHNO UNIQUE RUBBER TECHNO RECAPAGEM DE PNEUS C JATAI          JTI      20.137,74    1.297,69     806    2,4 83
+SAO168550-3  02/10 09/10    3063894                        48             LORENZETTI SA INDS B LORENZETTI SA INDS B JVL MAT ELET HIDRAUL JATAI          JTI      26.857,66      639,18     198    1,8 80
+                            3063895
+ITJ002538-1  29/09 08/10    1019101                         4             CPX DISTRIBUIDORA S  CPX DISTRIBUIDORA S  MURILLO  ALVES ROCHA JATAI          JTI       1.163,91      162,27      27    0,3 83
+ITJ002478-3  28/09 07/10    1017190                         4             CPX DISTRIBUIDORA S  CPX DISTRIBUIDORA S  SANDOLE DANIEL RIBEI JATAI          JTI       1.570,95      139,59      28    0,2 83
+FRA167258-4  30/09 09/10    4419637                         1             PALACIO DAS FERRAMEN PALACIO DAS FERRAMEN BENEDITO ALMEIDA     JATAI          JTI         929,50      139,58      14    0,3 83
+SAO169295-0  02/10 09/10    3064656                        21             LORENZETTI SA INDS B LORENZETTI SA INDS B J CRUZEIRO DA COSTA  JATAI          JTI       9.350,60      369,26      95    1,1 80
+SAO169568-1  05/10 13/10      40811                         2             DECORTEXTIL DO BRASI CASA MIRANDA         CASA MIRANDA         JATAI          JTI       5.758,60      240,43      30    0,7 80
+SAO170421-4  06/10 16/10     347075                         3             FABRICA DE ARTEF DE  DENNER PERES GOMES   DENNER PERES GOMES   PEROLANDIA     JTI       1.899,44      181,96      26    0,1 80
+CAM429951-5  28/09 07/10     282954                        39             SABORECITRUS IND E C SABORECITRUS IND E C RV ALIMENTACAO LTDA  SERRANOPOLIS   JTI       3.272,70      213,97     123    0,4 83
+TOTAIS:                                 33 CTRCS          408                                                                                                   229.424,74   17.211,63   5.487   24,2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EXPRESSO RIO VERMELHO TRANSPOR                                                     CTRCS INCLUIDOS EM GAIOLA/PALLET                                                                             PAG:   8
+ssw0194                                                                                     PLACA: SIN3H49                                                                              07/10/2026 17:10
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+CTRC         EMISS P ENT    NFISCAL PEDIDO       SUBC    QVOL GAIOL PALLE REMETENTE            PAGADOR              DESTINATARIO         LOC ENTREGA    UNI     MERCADORIA       FRETE   KgREA     M3 OC
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+SAO166904-4  30/09 13/10     823690                        28             H P COMERCIO INTERNA H P COMERCIO INTERNA ADEMAR DE BRITO COST COLIDER        COL      25.142,43    3.872,51   2.062    0,0 80
+SAO169969-5  05/10 26/10     166592                        23             ABC ARTEFATOS DE BOR ABC ARTEFATOS DE BOR HC PNEUS S A FILIAL  ITAITUBA       NPG      13.689,11    1.380,48     426    1,1 80
+                             166732
+SAO169954-7  05/10 26/10     166601                        15             ABC ARTEFATOS DE BOR ABC ARTEFATOS DE BOR RADIAL PNEUS LTDA    NOVO PROGRESSO NPG      12.203,79    1.000,17     327    0,7 80
+                             166602,     166644
+FRA167197-9  30/09 22/10      18557                         8             GOFER IND DE CALCADO GOFER IND DE CALCADO ILSON MORAIS CARDOSO RUROPOLIS      NPG       7.429,20      530,83      91    0,5 83
+SAO168893-6  02/10 14/10     102259                        14             METALURGICA PASTANA  ELER DE SOUZA E CIA  ELER DE SOUZA E CIA  SINOP          SIN       3.895,50    1.095,65     600    4,0 80
+SAO170393-5  06/10 16/10     166734                        28             ABC ARTEFATOS DE BOR ABC ARTEFATOS DE BOR CAIADO PNEUS LTDA    SINOP          SIN      19.087,30    1.142,34     574    0,7 80
+TOTAIS:                                  6 CTRCS          116                                                                                                    81.447,33    9.021,98   4.079    6,9
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--
+TOTAL GERAL                            273 CTRCS        3.375                                                                                                 1.556.692,33  184.614,65  41.832  160,0
+------------+-----+-----+----------+------------+-----+------+-----+-----+--------------------+--------------------+--------------------+--------------+---+--------------+-----------+-------+------+--

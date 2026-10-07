@@ -760,6 +760,7 @@ function parseRelatorioCarregamentos($texto) {
 
     foreach ($linhas as $linha) {
         $linha = rtrim($linha, "\n");
+        $linha = ltrim($linha);
         if ($linha === '') continue;
 
         if (preg_match('/PLACA:\\s*([A-Z0-9-]+)/', $linha, $m)) {
@@ -780,7 +781,7 @@ function parseRelatorioCarregamentos($texto) {
         if (preg_match('/^TOTAL GERAL/', trim($linha))) continue;
 
         $ctrc = trim(substr($linha, 0, 13));
-        if (!preg_match('/^[A-Z]{3}\\d{6}-\\d$/', $ctrc)) continue;
+        if (!preg_match('/^[A-Z0-9]{3}\\d{6}-\\d$/', $ctrc)) continue;
 
         $offset = 0;
         $cols = [];
