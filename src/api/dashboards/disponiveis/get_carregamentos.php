@@ -762,4 +762,53 @@ try {
     }
 } catch (Exception $e) {}
 
+$recalcDestinosCardFromCtes = function(array &$c) {
+    $origem = strtoupper(trim((string)($c['origem_criacao'] ?? '')));
+    $adiado = (bool)($c['adiado'] ?? false);
+    $forcarManual = ($origem === 'MANUAL') || $adiado;
+    if ($forcarManual) return;
+
+    $destFinal = strtoupper(trim((string)($c['destino'] ?? '')));
+    $out = [];
+    $seen = [];
+    $ctes = isset($c['ctes']) && is_array($c['ctes']) ? $c['ctes'] : [];
+
+    if (count($ctes) > 0) {
+        foreach ($ctes as $cte) {
+            $d = strtoupper(trim((string)($cte['destino_cte_painel'] ?? $cte['destino_cte'] ?? '')));
+            if ($d === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $d)) continue;
+            if (isset($seen[$d])) continue;
+            $seen[$d] = true;
+            $out[] = $d;
+        }
+    }
+
+    if (count($out) === 0) {
+        $paradasStr = strtoupper(trim((string)($c['paradas'] ?? '')));
+        $parts = $paradasStr !== '' ? preg_split('/[,\s;]+/', $paradasStr) : [];
+        if (is_array($parts)) {
+            foreach ($parts as $p) {
+                $u = strtoupper(trim((string)$p));
+                if ($u === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $u)) continue;
+                if (isset($seen[$u])) continue;
+                $seen[$u] = true;
+                $out[] = $u;
+            }
+        }
+    }
+
+    if ($destFinal !== '') {
+        $out = array_values(array_filter($out, function($d) use ($destFinal) { return $d !== $destFinal; }));
+        $out[] = $destFinal;
+    }
+
+    if (count($out) === 0 && $destFinal !== '') $out = [$destFinal];
+    $c['destinos_card'] = count($out) > 0 ? implode(', ', $out) : null;
+};
+
+foreach ($carregamentos as &$c) {
+    $recalcDestinosCardFromCtes($c);
+}
+unset($c);
+
 respondJson(['success' => true, 'carregamentos' => $carregamentos]);
