@@ -2906,15 +2906,6 @@ function CardCarregamento({
     }
     const destinosCard = String((carregamento as any).destinos_card ?? (carregamento as any).destinosCard ?? '').trim();
     if (destinosCard) {
-      const allowed = new Set<string>();
-      for (const u of todasUnidades) {
-        const x = String(u ?? '').trim().toUpperCase();
-        if (x && /^[A-Z0-9]{2,5}$/.test(x)) allowed.add(x);
-      }
-      for (const u of Array.from(unidadesComCtes)) {
-        const x = String(u ?? '').trim().toUpperCase();
-        if (x && /^[A-Z0-9]{2,5}$/.test(x)) allowed.add(x);
-      }
       const parts = destinosCard
         .split(',')
         .map((p) => p.trim().toUpperCase())
@@ -2922,10 +2913,16 @@ function CardCarregamento({
       const out: string[] = [];
       const seen = new Set<string>();
       for (const u of parts) {
-        if (allowed.size > 0 && !allowed.has(u)) continue;
         if (seen.has(u)) continue;
         seen.add(u);
         out.push(u);
+      }
+      const destFinal = String(destino ?? '').trim().toUpperCase();
+      if (destFinal && /^[A-Z0-9]{2,5}$/.test(destFinal)) {
+        const next = out.filter((d) => d !== destFinal);
+        next.push(destFinal);
+        out.length = 0;
+        out.push(...next);
       }
       const central = Boolean((carregamento as any).destino_centralizadora) ? String(destino || '').trim().toUpperCase() : '';
       if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
