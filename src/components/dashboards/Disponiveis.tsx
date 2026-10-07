@@ -2863,7 +2863,7 @@ function CardCarregamento({
   const todasUnidades = [...paradasArray, destino].filter(Boolean) as string[];
 
   const unidadesComCtes = new Set<string>(
-    carregamento.ctes
+    (ctesParaTotais ?? [])
       .map((c) => {
         const d = ((c as any).destino_cte_painel ?? c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
         if (d) return d;
@@ -2890,7 +2890,7 @@ function CardCarregamento({
       if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
       return out;
     }
-    if (carregamento.ctes.length === 0) {
+    if ((ctesParaTotais?.length ?? 0) === 0) {
       const out: string[] = [];
       const seen = new Set<string>();
       for (const u of todasUnidades) {

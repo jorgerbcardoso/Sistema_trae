@@ -1012,7 +1012,10 @@ foreach ($placas_ssw as $placa) {
             }
 
             $resCapMatch = sql(
-                "SELECT cap.seq_carregamento, cap.placa_provisoria
+                "SELECT cap.seq_carregamento,
+                        cap.placa_provisoria,
+                        COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) AS aberto,
+                        COUNT(c.seq_carregamento) AS qtd
                  FROM {$tabelaCap} cap
                  LEFT JOIN {$tabela} c
                         ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
@@ -1022,7 +1025,8 @@ foreach ($placas_ssw as $placa) {
                  GROUP BY cap.seq_carregamento, cap.placa_provisoria
                  HAVING BOOL_OR(c.data_finalizacao IS NULL)
                      OR COUNT(c.seq_carregamento) = 0
-                 ORDER BY cap.seq_carregamento DESC
+                 ORDER BY COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) DESC,
+                          cap.seq_carregamento DESC
                  LIMIT 1",
                 [$unidade, $sufixoRve],
                 $conn
@@ -1084,7 +1088,9 @@ foreach ($placas_ssw as $placa) {
         $seqCarreg = $seqCarregRveAgrupado;
     } else if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
         $resSeqPlaca = sql(
-            "SELECT cap.seq_carregamento
+            "SELECT cap.seq_carregamento,
+                    COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) AS aberto,
+                    COUNT(c.seq_carregamento) AS qtd
              FROM {$tabelaCap} cap
              LEFT JOIN {$tabela} c
                     ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
@@ -1094,7 +1100,8 @@ foreach ($placas_ssw as $placa) {
              GROUP BY cap.seq_carregamento
              HAVING BOOL_OR(c.data_finalizacao IS NULL)
                  OR COUNT(c.seq_carregamento) = 0
-             ORDER BY cap.seq_carregamento DESC
+             ORDER BY COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) DESC,
+                      cap.seq_carregamento DESC
              LIMIT 1",
             [$unidade, $placaProvisoriaSalvar],
             $conn
