@@ -2010,6 +2010,7 @@ function parseCubagem(s: any): number {
 }
 
 const totaisCarregamentoCache = new Map<string, { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number }>();
+const destinosCarregamentoCache = new Map<number, string[]>();
 function parseMoeda(s: string): number {
   if (!s) return 0;
   const raw = String(s).trim();
@@ -2874,7 +2875,9 @@ function CardCarregamento({
       .filter(Boolean)
   );
 
-  const unidadesReais = (() => {
+  const [destinosOverride, setDestinosOverride] = useState<string[] | null>(null);
+
+  const unidadesReaisBase = (() => {
     const isManual = (carregamento.origem_criacao ?? null) === 'MANUAL';
     if (isManual) {
       const out: string[] = [];
@@ -2947,6 +2950,8 @@ function CardCarregamento({
     if (central && /^[A-Z0-9]{2,5}$/.test(central) && !out.includes(central)) out.unshift(central);
     return out;
   })();
+
+  const unidadesReais = (destinosOverride && destinosOverride.length > 0) ? destinosOverride : unidadesReaisBase;
 
   const unidadesDestinoFull = unidadesReais.join(', ');
 
@@ -3039,6 +3044,43 @@ function CardCarregamento({
   const setoresEntrega = String((carregamento as any).setores_entrega ?? '').trim();
   const isEntregaCarreg = modoDeclarado === 'ENTREGA' || (setoresEntrega !== '' && String(carregamento.destino ?? '').trim() === '');
   const isTransferCarreg = modoDeclarado === 'TRANSFERENCIA' || (!isEntregaCarreg && !setoresEntrega);
+
+  useEffect(() => {
+    if (!isTransferCarreg) return;
+    if (destinosOverride && destinosOverride.length > 0) return;
+    if (unidadesReaisBase.length > 1) return;
+    const seq = Number(carregamento.seq_carregamento ?? 0) || 0;
+    if (seq <= 0) return;
+    const cached = destinosCarregamentoCache.get(seq);
+    if (cached && cached.length > 0) {
+      setDestinosOverride(cached);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ seq_carregamento: seq }) },
+          true
+        );
+        if (!alive) return;
+        if (!res?.success) return;
+        const lista = Array.isArray(res?.ctes) ? res.ctes : [];
+        const set = new Set<string>();
+        for (const c of lista) {
+          const u = String(c?.sigla_dest_painel ?? c?.sigla_dest ?? '').trim().toUpperCase();
+          if (!u || !/^[A-Z0-9]{2,5}$/.test(u)) continue;
+          set.add(u);
+        }
+        const out = Array.from(set);
+        if (out.length <= 1) return;
+        destinosCarregamentoCache.set(seq, out);
+        setDestinosOverride(out);
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [carregamento.seq_carregamento, destinosOverride, isTransferCarreg, unidadesReaisBase.length]);
 
   const setoresReais = useMemo(() => {
     const out: string[] = [];
