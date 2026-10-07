@@ -1,5 +1,5 @@
-import React from 'react';
-import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+import React, { useEffect } from 'react';
+import { createBrowserRouter, Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { LoginPage } from './components/auth/LoginPage';
 import { LoginAceville } from './components/auth/LoginAceville';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
@@ -85,6 +85,16 @@ import { ParametrosEmpresa } from './components/admin/ParametrosEmpresa';
 
 // Componente Root que renderiza as rotas filhas
 function Root() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const demo = (new URLSearchParams(location.search).get('demo') ?? '').trim().toLowerCase();
+    if (demo === 'area-cliente' || demo === 'area-cliente-demo') {
+      if (location.pathname !== '/area-cliente-demo') navigate('/area-cliente-demo', { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
   return <Outlet />;
 }
 

@@ -26,6 +26,11 @@ export function AutoLoginRedirect() {
   const [validating, setValidating] = useState(false);
 
   useEffect(() => {
+    const demo = (searchParams.get('demo') ?? '').trim().toLowerCase();
+    if (demo === 'area-cliente' || demo === 'area-cliente-demo') {
+      navigate('/area-cliente-demo', { replace: true });
+      return;
+    }
     const token = searchParams.get('token');
     const orcamento = searchParams.get('orcamento');
     const pedido = searchParams.get('pedido'); // ✅ NOVO: Suporte para pedidos
