@@ -119,6 +119,14 @@ export const router = createBrowserRouter([
           return { Component: CotacaoFornecedor };
         }
       },
+
+      {
+        path: 'area-cliente-demo',
+        async lazy() {
+          const { default: AreaClienteDemo } = await import('./pages/public/AreaClienteDemo');
+          return { Component: AreaClienteDemo };
+        }
+      },
       
       // ✅ Rota raiz "/" - Detecta auto-login OU redireciona para menu
       {
