@@ -78,6 +78,15 @@ PADRÕES DE CÓDIGO CRÍTICOS:
 6. TEXTOS DE STATUS:
    - Evitar citar “SSW” nos textos de UI (botões/toasts/status). Preferir termos genéricos como “Gerando arquivo”, “Aguardando geração do relatório”, “Processando arquivo”.
 
+7. DEBUG RÁPIDO (PHP) — TOAST NO FRONTEND:
+  - Em QUALQUER endpoint PHP consumido pelo frontend via `apiUtils`, você pode chamar `msg(...)` (definida em `src/api/config.php`) para exibir um toast na tela.
+  - Observação: `msg(...)` ENCERRA a execução do script (retorna JSON imediatamente). Útil para depurar rapidamente valores intermediários.
+  - Importante: coloque `msg(...)` sempre em uma linha isolada (não dentro de `if (...)`, `for (...)`, string concatenada, etc.), para evitar erro de sintaxe.
+  - Exemplos:
+    - `msg('Cheguei até aqui')`
+    - `msg(['act' => $act, 'arq' => $arq, 'len' => strlen($html)])`
+    - `msg('Erro ao baixar relatório', 'error', 200)`
+
 
 PADRÃO PARA TELAS COM FILTROS (DIALOG):
 

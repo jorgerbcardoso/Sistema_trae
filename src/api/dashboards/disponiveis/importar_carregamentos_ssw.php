@@ -338,16 +338,6 @@ foreach ($xml->xpath('//r') as $r) {
     }
     if ($placa === '') continue;
     $placas_ssw[] = $placa;
-
-    $seqNode = '';
-    foreach ($r->children() as $c) {
-        $seqNode = (string)$c;
-    }
-    $seqNode = trim((string)$seqNode);
-    if ($seqNode !== '') {
-        $seqs_ssw[] = $seqNode;
-        $placaPorSeq[$seqNode] = $placa;
-    }
 }
 $__dbg('A', 'xml placas extraidas', ['placas' => count($placas_ssw), 'seqs' => count($seqs_ssw), 'amostraPlacas' => array_slice($placas_ssw, 0, 5), 'amostraSeqs' => array_slice($seqs_ssw, 0, 5)]);
 $placas_ssw_fallback = [];
@@ -368,7 +358,8 @@ if (empty($placas_ssw)) {
     }
 }
 $placas_ssw = array_values(array_unique($placas_ssw));
-$seqs_ssw = array_values(array_unique($seqs_ssw));
+$seqs_ssw = [];
+$placaPorSeq = [];
 $__dbg('A', 'placas/seqs final', ['placas' => count($placas_ssw), 'seqs' => count($seqs_ssw)]);
 
 $veiculosFaltantes = [];
@@ -879,8 +870,8 @@ function parseRelatorioCarregamentos($texto) {
     return $porPlaca;
 }
 
-$loteIds = !empty($seqs_ssw) ? $seqs_ssw : $placas_ssw;
-$tamanhoLote = !empty($seqs_ssw) ? 60 : 25;
+$loteIds = $placas_ssw;
+$tamanhoLote = 25;
 $carregamentos = [];
 
 for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
@@ -888,7 +879,7 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
     if (empty($chunk)) continue;
 
     $act = 'SR_IMP|' . implode('|', array_map('rawurlencode', $chunk));
-$__dbg('B', 'ssw0194 SR_IMP request', ['modo' => !empty($seqs_ssw) ? 'seq' : 'placa', 'chunk' => count($chunk), 'act_head' => substr($act, 0, 80)]);
+    $__dbg('B', 'ssw0194 SR_IMP request', ['modo' => 'placa', 'chunk' => count($chunk), 'act_head' => substr($act, 0, 80)]);
     $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act={$act}");
     $str_decodificada = urldecode($str_retorno);
     $act_download = ssw_get_act($str_decodificada);
@@ -897,7 +888,7 @@ $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strle
 
     if (empty($act_download) || empty($arq_download)) {
         foreach ($chunk as $p) {
-            $placaLog = !empty($seqs_ssw) ? (string)($placaPorSeq[$p] ?? '') : (string)$p;
+            $placaLog = (string)$p;
             $logs[] = ['placa' => $placaLog !== '' ? $placaLog : (string)$p, 'status' => 'erro', 'msg' => 'Não foi possível obter os parâmetros de download do relatório.'];
         }
         continue;
@@ -907,7 +898,7 @@ $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strle
     $__dbg('B', 'ssw0424 download', ['len' => is_string($relatorio) ? strlen($relatorio) : null, 'head' => substr((string)$relatorio, 0, 160)]);
     if (empty($relatorio) || strlen($relatorio) < 50) {
         foreach ($chunk as $p) {
-            $placaLog = !empty($seqs_ssw) ? (string)($placaPorSeq[$p] ?? '') : (string)$p;
+            $placaLog = (string)$p;
             $logs[] = ['placa' => $placaLog !== '' ? $placaLog : (string)$p, 'status' => 'erro', 'msg' => 'Relatório vazio ou inválido.'];
         }
         continue;
