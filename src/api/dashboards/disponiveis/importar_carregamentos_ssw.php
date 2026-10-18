@@ -884,6 +884,19 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
     $str_decodificada = urldecode($str_retorno);
     $act_download = ssw_get_act($str_decodificada);
     $arq_download = ssw_get_arq($str_decodificada);
+    if ((empty($act_download) || empty($arq_download)) && preg_match("/abrir\\s*\\(\\s*'([^']+\\.sswweb)'\\s*,\\s*'([^']+\\.sswweb)'/i", $str_decodificada, $mAbrir)) {
+        $act_download = trim((string)($mAbrir[1] ?? ''));
+        $arq_download = trim((string)($mAbrir[2] ?? ''));
+    }
+    if (empty($act_download) || empty($arq_download)) {
+        if (preg_match('/id=web_body[^>]*value="([^"]+)"/i', $str_retorno, $mBody)) {
+            $wb = urldecode((string)($mBody[1] ?? ''));
+            if (preg_match("/abrir\\s*\\(\\s*'([^']+\\.sswweb)'\\s*,\\s*'([^']+\\.sswweb)'/i", $wb, $mAbrir2)) {
+                $act_download = trim((string)($mAbrir2[1] ?? ''));
+                $arq_download = trim((string)($mAbrir2[2] ?? ''));
+            }
+        }
+    }
 $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strlen($str_retorno) : null, 'act' => $act_download, 'arq' => $arq_download, 'head' => substr((string)$str_decodificada, 0, 160)]);
 
     if (empty($act_download) || empty($arq_download)) {
