@@ -1356,6 +1356,7 @@ foreach ($placas_ssw as $placa) {
     try {
         $inseridos = 0;
         $atualizados = 0;
+        $movidosDeOutro = 0;
         $ignoradosEmOutro = 0;
         if ($reaproveitandoPorPlaca && $seqCarreg > 0) {
             $resDup = sql(
@@ -1486,8 +1487,55 @@ foreach ($placas_ssw as $placa) {
                     continue;
                 }
 
-                $check_outro = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND data_finalizacao IS NULL AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND COALESCE(seq_carregamento, 0) <> {$seqCarreg} LIMIT 1");
-                if ($check_outro && pg_num_rows($check_outro) > 0) { $ignoradosEmOutro++; continue; }
+                $check_outro = pg_query($conn, "SELECT seq_carregamento FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND data_finalizacao IS NULL AND ser_cte = '{$ser}' AND nro_cte = {$nro} AND COALESCE(seq_carregamento, 0) <> {$seqCarreg} ORDER BY COALESCE(seq_carregamento, 0) DESC LIMIT 1");
+                if ($check_outro && pg_num_rows($check_outro) > 0) {
+                    $seqOutro = (int)pg_fetch_result($check_outro, 0, 0);
+                    if ($seqOutro > 0) {
+                        $rVis = pg_query($conn, "SELECT (MAX(data_finalizacao) IS NULL) AS visivel FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND seq_carregamento = {$seqOutro}");
+                        $visivel = ($rVis && pg_num_rows($rVis) > 0) ? (string)pg_fetch_result($rVis, 0, 0) : '';
+                        $ehVisivel = ($visivel === 't' || $visivel === 'true' || $visivel === '1');
+                        if (!$ehVisivel) {
+                            $resMove = pg_query($conn,
+                                "UPDATE {$tabela}
+                                 SET placa_provisoria = '{$placaProvEsc}',
+                                     origem_ssw = '{$placaEsc}',
+                                     seq_carregamento = {$seqCarreg},
+                                     destino = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(destino, ''), {$destinoCarEsc})" : $destinoCarEsc) . ",
+                                     unidades = " . ($preservarCabecalhoRve ? "COALESCE(NULLIF(unidades, ''), {$unidadesCarEsc})" : $unidadesCarEsc) . ",
+                                     destino_cte = '{$destinoCte}',
+                                     data_emissao_cte = {$emissaoSql},
+                                     data_prev_ent_cte = {$prevEntSql},
+                                     remetente_cte = '{$remetente}',
+                                     destinatario_cte = '{$destinat}',
+                                     pagador_cte = '{$pagador}',
+                                     cidade_destino_cte = '{$cidade}',
+                                     vlr_merc_cte = {$vlrMerc},
+                                     vlr_frete_cte = {$vlrFrete},
+                                     peso_cte = {$pesoVal},
+                                     cubagem_cte = {$cubVal},
+                                     qtde_vol_cte = {$qtdeVol},
+                                     origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
+                                     data_finalizacao = NULL,
+                                     hora_finalizacao = NULL,
+                                     login_finalizacao = NULL
+                                 WHERE UPPER(unidade) = '{$unidadeEsc}'
+                                   AND seq_carregamento = {$seqOutro}
+                                   AND ser_cte = '{$ser}'
+                                   AND nro_cte = {$nro}"
+                            );
+                            if (!$resMove) throw new Exception(pg_last_error($conn));
+                            $affMove = (int)pg_affected_rows($resMove);
+                            if ($affMove > 0) {
+                                $movidosDeOutro++;
+                                $atualizados++;
+                                continue;
+                            }
+                        }
+                    }
+
+                    $ignoradosEmOutro++;
+                    continue;
+                }
 
                 $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
                 $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
@@ -1541,6 +1589,9 @@ foreach ($placas_ssw as $placa) {
         }
         if ($ignoradosEmOutro > 0) {
             $msg .= " {$ignoradosEmOutro} CT-e(s) ignorado(s) por já estarem em outro carregamento.";
+        }
+        if ($movidosDeOutro > 0) {
+            $msg .= " {$movidosDeOutro} CT-e(s) movido(s) de carregamentos antigos que não aparecem no quadro.";
         }
         $logs[] = ['placa' => $placa, 'status' => $status, 'msg' => $msg];
     } catch (Exception $e) {
