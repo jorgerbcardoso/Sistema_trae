@@ -1016,7 +1016,7 @@ if ($obrigarPlacasReais) {
 }
 
 foreach ($placas_ssw as $placa) {
-    $placa = strtoupper(trim((string)$placa));
+    $placa = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placa)));
     if ($placa === '') continue;
 
     $__dbg('C', 'placa loop', ['placa' => $placa, 'temInfo' => isset($carregamentos[$placa]), 'ctes_info' => isset($carregamentos[$placa]) ? count(($carregamentos[$placa]['ctes'] ?? [])) : null]);
@@ -1126,136 +1126,43 @@ foreach ($placas_ssw as $placa) {
 
     $seqCarreg = 0;
     $preservarCabecalhoRve = false;
-    if ($seqCarregRveAgrupado > 0) {
-        $seqCarreg = $seqCarregRveAgrupado;
-    } else if ($domainUpper === 'RVE' && $sufixoRve !== null && $sufixoRve !== '' && $placaProvisoriaSalvar !== '') {
-        $resSeqPlaca = sql(
-            "SELECT cap.seq_carregamento,
-                    COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) AS aberto,
-                    COUNT(c.seq_carregamento) AS qtd
-             FROM {$tabelaCap} cap
-             LEFT JOIN {$tabela} c
-                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
-             WHERE cap.unidade = \$1
-               AND UPPER(cap.placa_provisoria) = UPPER(\$2)
-               AND COALESCE(cap.simulado, FALSE) = FALSE
-             GROUP BY cap.seq_carregamento
-             HAVING BOOL_OR(c.data_finalizacao IS NULL)
-                 OR COUNT(c.seq_carregamento) = 0
-             ORDER BY COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) DESC,
-                      cap.seq_carregamento DESC
-             LIMIT 1",
-            [$unidade, $placaProvisoriaSalvar],
-            $conn
-        );
-        if ($resSeqPlaca && pg_num_rows($resSeqPlaca) > 0) {
-            $seqCarreg = (int)pg_fetch_result($resSeqPlaca, 0, 0);
-            if ($seqCarreg > 0) $seqCarregRveAgrupado = $seqCarreg;
-        }
-    }
     $reaproveitandoPorPlaca = false;
     $origemCriacaoSalvar = 'SSW';
-    if ($seqCarregRveAgrupado > 0 && $seqCarreg > 0) {
-        $resOrig = sql(
-            "SELECT origem_criacao, placa_provisoria
-             FROM {$tabela}
-             WHERE unidade = \$1
-               AND seq_carregamento = \$2
-             ORDER BY data_inclusao ASC, hora_inclusao ASC
-             LIMIT 1",
-            [$unidade, $seqCarreg],
-            $conn
-        );
-        if ($resOrig && pg_num_rows($resOrig) > 0) {
-            $rowOrig = pg_fetch_assoc($resOrig);
-            $tmpOrig = strtoupper(trim((string)($rowOrig['origem_criacao'] ?? '')));
-            if ($tmpOrig !== '') $origemCriacaoSalvar = $tmpOrig;
-            $tmpPlaca = strtoupper(trim((string)($rowOrig['placa_provisoria'] ?? '')));
-            if ($tmpPlaca !== '') $placaProvisoriaSalvar = $tmpPlaca;
-        }
-        $reaproveitandoPorPlaca = true;
-        if ($domainUpper === 'RVE' && $origemCriacaoSalvar === 'MANUAL') {
-            $preservarCabecalhoRve = true;
-        }
-    }
-    if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
-        $placaProvisoriaNorm = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placaProvisoriaSalvar)));
-        $resSeqExist = sql(
-            "SELECT cap.seq_carregamento,
-                    COALESCE(cap.simulado, FALSE) AS simulado
-             FROM {$tabelaCap} cap
-             LEFT JOIN {$tabela} c
-                    ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
-             WHERE cap.unidade = \$1
-               AND UPPER(cap.placa_provisoria) = UPPER(\$2)
-             GROUP BY cap.seq_carregamento, cap.simulado
-             HAVING BOOL_OR(c.data_finalizacao IS NULL)
-                 OR COUNT(c.seq_carregamento) = 0
-             ORDER BY COALESCE(cap.simulado, FALSE) ASC, cap.seq_carregamento DESC
-             LIMIT 1",
-            [$unidade, $placaProvisoriaSalvar],
-            $conn
-        );
-        if ((!$resSeqExist || pg_num_rows($resSeqExist) === 0) && $placaProvisoriaNorm !== '' && $placaProvisoriaNorm !== strtoupper(trim((string)$placaProvisoriaSalvar))) {
-            $resSeqExist = sql(
-                "SELECT cap.seq_carregamento,
-                        COALESCE(cap.simulado, FALSE) AS simulado
-                 FROM {$tabelaCap} cap
-                 LEFT JOIN {$tabela} c
-                        ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
-                 WHERE cap.unidade = \$1
-                   AND regexp_replace(UPPER(BTRIM(cap.placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
-                 GROUP BY cap.seq_carregamento, cap.simulado
-                 HAVING BOOL_OR(c.data_finalizacao IS NULL)
-                     OR COUNT(c.seq_carregamento) = 0
-                 ORDER BY COALESCE(cap.simulado, FALSE) ASC, cap.seq_carregamento DESC
-                 LIMIT 1",
-                [$unidade, $placaProvisoriaNorm],
-                $conn
-            );
-        }
-        if ($resSeqExist && pg_num_rows($resSeqExist) > 0) {
-            $seqCarreg = (int)pg_fetch_result($resSeqExist, 0, 0);
-            $reaproveitandoPorPlaca = $seqCarreg > 0;
-            if ($reaproveitandoPorPlaca) {
-                $resOrig = sql(
-                    "SELECT origem_criacao
-                     FROM {$tabela}
-                     WHERE unidade = \$1
-                       AND seq_carregamento = \$2
-                     ORDER BY data_inclusao ASC, hora_inclusao ASC
-                     LIMIT 1",
-                    [$unidade, $seqCarreg],
-                    $conn
-                );
-                if ($resOrig && pg_num_rows($resOrig) > 0) {
-                    $tmp = strtoupper(trim((string)pg_fetch_result($resOrig, 0, 0)));
-                    if ($tmp !== '') $origemCriacaoSalvar = $tmp;
-                }
-            }
-        }
-    }
     if ($seqCarreg <= 0 && $placaProvisoriaSalvar !== '') {
         $placaProvisoriaNorm2 = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placaProvisoriaSalvar)));
         $resSeqCar = sql(
-            "SELECT seq_carregamento, origem_criacao
-             FROM {$tabela}
-             WHERE unidade = \$1
-               AND UPPER(placa_provisoria) = UPPER(\$2)
-               AND data_finalizacao IS NULL
-             ORDER BY COALESCE(seq_carregamento, 0) DESC
+            "SELECT c.seq_carregamento,
+                    (SELECT origem_criacao
+                     FROM {$tabela} c2
+                     WHERE c2.unidade = \$1
+                       AND c2.seq_carregamento = c.seq_carregamento
+                     ORDER BY c2.data_inclusao ASC, c2.hora_inclusao ASC
+                     LIMIT 1) AS origem_criacao
+             FROM {$tabela} c
+             WHERE c.unidade = \$1
+               AND UPPER(c.placa_provisoria) = UPPER(\$2)
+             GROUP BY c.seq_carregamento
+             HAVING MAX(c.data_finalizacao) IS NULL
+             ORDER BY COALESCE(c.seq_carregamento, 0) DESC
              LIMIT 1",
             [$unidade, $placaProvisoriaSalvar],
             $conn
         );
         if ((!$resSeqCar || pg_num_rows($resSeqCar) === 0) && $placaProvisoriaNorm2 !== '' && $placaProvisoriaNorm2 !== strtoupper(trim((string)$placaProvisoriaSalvar))) {
             $resSeqCar = sql(
-                "SELECT seq_carregamento, origem_criacao
-                 FROM {$tabela}
-                 WHERE unidade = \$1
-                   AND regexp_replace(UPPER(BTRIM(placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
-                   AND data_finalizacao IS NULL
-                 ORDER BY COALESCE(seq_carregamento, 0) DESC
+                "SELECT c.seq_carregamento,
+                        (SELECT origem_criacao
+                         FROM {$tabela} c2
+                         WHERE c2.unidade = \$1
+                           AND c2.seq_carregamento = c.seq_carregamento
+                         ORDER BY c2.data_inclusao ASC, c2.hora_inclusao ASC
+                         LIMIT 1) AS origem_criacao
+                 FROM {$tabela} c
+                 WHERE c.unidade = \$1
+                   AND regexp_replace(UPPER(BTRIM(c.placa_provisoria)), '[^A-Z0-9]', '', 'g') = \$2
+                 GROUP BY c.seq_carregamento
+                 HAVING MAX(c.data_finalizacao) IS NULL
+                 ORDER BY COALESCE(c.seq_carregamento, 0) DESC
                  LIMIT 1",
                 [$unidade, $placaProvisoriaNorm2],
                 $conn
@@ -1269,68 +1176,8 @@ foreach ($placas_ssw as $placa) {
             if ($tmp !== '') $origemCriacaoSalvar = $tmp;
         }
     }
-    if ($seqCarreg <= 0) {
-        $resSeq = @pg_query($conn, "SELECT seq_carregamento FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND origem_ssw = '{$placaEsc}' AND seq_carregamento IS NOT NULL LIMIT 1");
-        if ($resSeq && pg_num_rows($resSeq) > 0) {
-            $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
-        }
-    }
-
-    if ($seqCarreg <= 0 && $domainUpper === 'RVE' && (($placaRealRve ?? '') !== '' || ($sufixoRve ?? '') !== '')) {
-        $condFallback = [];
-        $paramsFallback = [$unidade];
-        $idx = 1;
-        if (($placaRealRve ?? '') !== '') {
-            $idx++;
-            $condFallback[] = "UPPER(cap.placa_provisoria) = \${$idx}";
-            $paramsFallback[] = $placaRealRve;
-        }
-        if (($sufixoRve ?? '') !== '') {
-            $idx++;
-            $condFallback[] = "RIGHT(UPPER(BTRIM(cap.placa_provisoria)), 4) = \${$idx}";
-            $paramsFallback[] = $sufixoRve;
-        }
-        if (count($condFallback) > 0) {
-            $ordemPlacaReal = (($placaRealRve ?? '') !== '')
-                ? "CASE WHEN UPPER(cap.placa_provisoria) = '" . pg_escape_string($conn, $placaRealRve) . "' THEN 0 ELSE 1 END, "
-                : '';
-            $qFb = "SELECT cap.seq_carregamento
-                    FROM {$tabelaCap} cap
-                    WHERE cap.unidade = \$1
-                      AND COALESCE(cap.simulado, FALSE) = FALSE
-                      AND (" . implode(' OR ', $condFallback) . ")
-                    ORDER BY {$ordemPlacaReal}cap.seq_carregamento DESC
-                    LIMIT 1";
-            $rFb = sql($qFb, $paramsFallback, $conn);
-            if ($rFb && pg_num_rows($rFb) > 0) {
-                $seqFb = (int)pg_fetch_result($rFb, 0, 0);
-                if ($seqFb > 0) {
-                    $seqCarreg = $seqFb;
-                    $seqCarregRveAgrupado = $seqFb;
-                    $reaproveitandoPorPlaca = true;
-                    $rOrigFb = sql(
-                        "SELECT origem_criacao, placa_provisoria
-                         FROM {$tabela}
-                         WHERE unidade = \$1
-                           AND seq_carregamento = \$2
-                         ORDER BY data_inclusao ASC, hora_inclusao ASC
-                         LIMIT 1",
-                        [$unidade, $seqCarreg],
-                        $conn
-                    );
-                    if ($rOrigFb && pg_num_rows($rOrigFb) > 0) {
-                        $rowOF = pg_fetch_assoc($rOrigFb);
-                        $tmpOF = strtoupper(trim((string)($rowOF['origem_criacao'] ?? '')));
-                        if ($tmpOF !== '') $origemCriacaoSalvar = $tmpOF;
-                        $tmpPF = strtoupper(trim((string)($rowOF['placa_provisoria'] ?? '')));
-                        if ($tmpPF !== '') $placaProvisoriaSalvar = $tmpPF;
-                    }
-                    if ($domainUpper === 'RVE' && $origemCriacaoSalvar === 'MANUAL') {
-                        $preservarCabecalhoRve = true;
-                    }
-                }
-            }
-        }
+    if ($domainUpper === 'RVE' && $origemCriacaoSalvar === 'MANUAL') {
+        $preservarCabecalhoRve = true;
     }
 
     if ($seqCarreg <= 0) {
