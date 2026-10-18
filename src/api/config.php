@@ -302,7 +302,8 @@ function msg($message, $type = 'info', $statusCode = 200, $extra_data = []) {
             'success' => $success,
             'toast' => [
                 'message' => $formattedMessage,
-                'type' => $type
+                'type' => $type,
+                'force' => true
             ],
             'debug' => $message // Incluir array original para debug no console
         ];
@@ -318,7 +319,8 @@ function msg($message, $type = 'info', $statusCode = 200, $extra_data = []) {
             'success' => $success,
             'toast' => [
                 'message' => $message,
-                'type' => $type
+                'type' => $type,
+                'force' => true
             ]
         ];
         

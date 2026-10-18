@@ -82,6 +82,7 @@ PADRÕES DE CÓDIGO CRÍTICOS:
   - Em QUALQUER endpoint PHP consumido pelo frontend via `apiUtils`, você pode chamar `msg(...)` (definida em `src/api/config.php`) para exibir um toast na tela.
   - Observação: `msg(...)` ENCERRA a execução do script (retorna JSON imediatamente). Útil para depurar rapidamente valores intermediários.
   - Importante: coloque `msg(...)` sempre em uma linha isolada (não dentro de `if (...)`, `for (...)`, string concatenada, etc.), para evitar erro de sintaxe.
+  - Mesmo quando a chamada do frontend estiver usando `suppressToast`, mensagens via `msg(...)` devem aparecer (flag `toast.force`).
   - Exemplos:
     - `msg('Cheguei até aqui')`
     - `msg(['act' => $act, 'arq' => $arq, 'len' => strlen($html)])`

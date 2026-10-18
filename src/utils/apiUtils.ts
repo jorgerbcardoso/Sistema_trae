@@ -187,7 +187,7 @@ export async function handleAPIResponse(response: Response, suppressToast = fals
   // ================================================================
   // 4. INTERCEPTAR E EXIBIR TOAST (se houver)
   // ================================================================
-  if (data.toast && !suppressToast) {
+  if (data.toast && (!suppressToast || (data.toast as any).force === true || (data as any).forceToast === true)) {
     const { message, type } = data.toast;
     
     console.log('🔔 [apiUtils] Toast detectado:', { message, type });
