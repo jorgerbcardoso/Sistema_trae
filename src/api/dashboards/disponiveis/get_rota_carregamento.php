@@ -32,6 +32,7 @@ $conn = connect();
 $tblCar = "{$domain}_carregamento";
 $tblUnid = "{$domain}_unidade";
 $tblCte = "{$domain}_cte";
+$tblCliente = "{$domain}_cliente";
 
 $parseCoord = function($v) {
     if ($v === null) return null;
@@ -60,6 +61,8 @@ $parseCoord = function($v) {
 
 @pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS latitude_entrega VARCHAR(32)");
 @pg_query($conn, "ALTER TABLE {$tblCte} ADD COLUMN IF NOT EXISTS longitude_entrega VARCHAR(32)");
+@pg_query($conn, "ALTER TABLE {$tblCliente} ADD COLUMN IF NOT EXISTS latitude_entrega VARCHAR(32)");
+@pg_query($conn, "ALTER TABLE {$tblCliente} ADD COLUMN IF NOT EXISTS longitude_entrega VARCHAR(32)");
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
 
 $carRow = null;
@@ -128,11 +131,17 @@ try {
             COALESCE(cid.nome, '') AS cidade_entrega,
             COALESCE(cid.uf, '') AS uf_entrega,
             cte.latitude_entrega,
-            cte.longitude_entrega
+            cte.longitude_entrega,
+            COALESCE(cte.loc_ent_dif, '') AS loc_ent_dif,
+            COALESCE(cte.cnpj_emit, '') AS cnpj_emit,
+            cli.latitude_entrega AS cli_latitude_entrega,
+            cli.longitude_entrega AS cli_longitude_entrega
         FROM {$tblCar} car
         LEFT JOIN {$tblCte} cte
                ON cte.ser_cte = car.ser_cte
               AND cte.nro_cte = car.nro_cte
+        LEFT JOIN {$tblCliente} cli
+               ON cli.cnpj = cte.cnpj_emit
         LEFT JOIN cidade cid
                ON cid.seq_cidade = cte.seq_cidade_entr
         WHERE car.unidade = $1
@@ -169,8 +178,22 @@ try {
             'bairro_entrega' => (string)($r['bairro_entrega'] ?? ''),
             'cidade_entrega' => (string)($r['cidade_entrega'] ?? ''),
             'uf_entrega' => (string)($r['uf_entrega'] ?? ''),
-            'latitude_entrega' => $parseCoord($r['latitude_entrega'] ?? null),
-            'longitude_entrega' => $parseCoord($r['longitude_entrega'] ?? null),
+            'latitude_entrega' => (function() use ($parseCoord, $r) {
+                $lat = $parseCoord($r['latitude_entrega'] ?? null);
+                if ($lat !== null && $lat != 0) return $lat;
+                $loc = strtoupper(trim((string)($r['loc_ent_dif'] ?? '')));
+                if ($loc !== 'N') return $lat;
+                $cliLat = $parseCoord($r['cli_latitude_entrega'] ?? null);
+                return ($cliLat !== null && $cliLat != 0) ? $cliLat : $lat;
+            })(),
+            'longitude_entrega' => (function() use ($parseCoord, $r) {
+                $lng = $parseCoord($r['longitude_entrega'] ?? null);
+                if ($lng !== null && $lng != 0) return $lng;
+                $loc = strtoupper(trim((string)($r['loc_ent_dif'] ?? '')));
+                if ($loc !== 'N') return $lng;
+                $cliLng = $parseCoord($r['cli_longitude_entrega'] ?? null);
+                return ($cliLng !== null && $cliLng != 0) ? $cliLng : $lng;
+            })(),
         ];
     }
 } catch (Exception $e) {
