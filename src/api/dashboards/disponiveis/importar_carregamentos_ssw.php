@@ -1435,25 +1435,25 @@ foreach ($placas_ssw as $placa) {
                 $nro = (int)($cte_info['nro_cte'] ?? 0);
                 if ($ser === '' || $nro <= 0) continue;
 
+                $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
+                $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
+                $pagador    = pg_escape_string($conn, trim($cte_info['pagador'] ?? ''));
+                $destinat   = pg_escape_string($conn, trim($cte_info['destinatario'] ?? ''));
+                $cidade     = pg_escape_string($conn, trim($cte_info['cidade'] ?? ''));
+
+                $emissao = trim($cte_info['emissao'] ?? '');
+                $prevEnt = trim($cte_info['prev_ent'] ?? '');
+                $emissaoSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $emissao) ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')" : 'NULL';
+                $prevEntSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $prevEnt) ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')" : 'NULL';
+
+                $vlrMerc  = normalizarNumero($cte_info['vlr_merc']  ?? 0);
+                $vlrFrete = normalizarNumero($cte_info['vlr_frete'] ?? 0);
+                $pesoVal  = normalizarNumero($cte_info['peso']      ?? 0);
+                $cubVal   = normalizarNumero($cte_info['cubagem']   ?? 0);
+                $qtdeVol  = (int)($cte_info['qtde_vol'] ?? 0);
+
                 $check_dup = pg_query($conn, "SELECT 1 FROM {$tabela} WHERE UPPER(unidade) = '{$unidadeEsc}' AND seq_carregamento = {$seqCarreg} AND ser_cte = '{$ser}' AND nro_cte = {$nro} LIMIT 1");
                 if ($check_dup && pg_num_rows($check_dup) > 0) {
-                    $destinoCte = pg_escape_string($conn, strtoupper(trim($cte_info['destino_cte'] ?? '')));
-                    $remetente  = pg_escape_string($conn, trim($cte_info['remetente'] ?? ''));
-                    $pagador    = pg_escape_string($conn, trim($cte_info['pagador'] ?? ''));
-                    $destinat   = pg_escape_string($conn, trim($cte_info['destinatario'] ?? ''));
-                    $cidade     = pg_escape_string($conn, trim($cte_info['cidade'] ?? ''));
-
-                    $emissao = trim($cte_info['emissao'] ?? '');
-                    $prevEnt = trim($cte_info['prev_ent'] ?? '');
-                    $emissaoSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $emissao) ? "TO_DATE('{$emissao}', 'DD/MM/YYYY')" : 'NULL';
-                    $prevEntSql = preg_match('/^\\d{2}\\/\\d{2}\\/\\d{4}$/', $prevEnt) ? "TO_DATE('{$prevEnt}', 'DD/MM/YYYY')" : 'NULL';
-
-                    $vlrMerc  = normalizarNumero($cte_info['vlr_merc']  ?? 0);
-                    $vlrFrete = normalizarNumero($cte_info['vlr_frete'] ?? 0);
-                    $pesoVal  = normalizarNumero($cte_info['peso']      ?? 0);
-                    $cubVal   = normalizarNumero($cte_info['cubagem']   ?? 0);
-                    $qtdeVol  = (int)($cte_info['qtde_vol'] ?? 0);
-
                     $resUpdCte = pg_query($conn,
                         "UPDATE {$tabela}
                          SET placa_provisoria = '{$placaProvEsc}',
