@@ -738,6 +738,7 @@ function listarSaidasAutorizadasSsw0125(string $siglaOrigem): array {
 
 function parseRelatorioCarregamentos($texto) {
     $texto = mb_convert_encoding($texto, 'UTF-8', 'ISO-8859-1');
+    $texto = str_replace("\x0C", "\n", (string)$texto);
     $texto = str_replace("\r\n", "\n", str_replace("\r", "\n", $texto));
     $linhas = explode("\n", $texto);
 
@@ -760,8 +761,7 @@ function parseRelatorioCarregamentos($texto) {
 
     foreach ($linhas as $linha) {
         $linha = rtrim($linha, "\n");
-        $linha = ltrim($linha);
-        if ($linha === '') continue;
+        if (trim($linha) === '') continue;
 
         if (preg_match('/PLACA:\\s*([A-Z0-9-]+)/', $linha, $m)) {
             $placaAtual = strtoupper(trim($m[1]));
@@ -776,36 +776,72 @@ function parseRelatorioCarregamentos($texto) {
         }
 
         if ($placaAtual === null) continue;
-        if (strpos($linha, $separador) !== false) continue;
-        if (preg_match('/^TOTAIS:/', trim($linha))) continue;
-        if (preg_match('/^TOTAL GERAL/', trim($linha))) continue;
 
-        $ctrc = trim(substr($linha, 0, 13));
-        if (!preg_match('/^[A-Z0-9]{3}\\d{6}-\\d$/', $ctrc)) continue;
+        $linhaTrim = ltrim($linha);
+        if (strpos($linhaTrim, $separador) !== false) continue;
+        if (preg_match('/^TOTAIS:/', $linhaTrim)) continue;
+        if (preg_match('/^TOTAL GERAL/', $linhaTrim)) continue;
 
-        $offset = 0;
-        $cols = [];
-        foreach ($larguras as $w) {
-            $cols[] = rtrim(substr($linha, $offset, $w));
-            $offset += $w + 1;
+        if (!preg_match('/^([A-Z0-9]{3}\\d{6,7}-\\d{1,2})\\b/', $linhaTrim, $mC)) continue;
+        $ctrcRaw = strtoupper(trim((string)$mC[1]));
+
+        $emiss = '';
+        $prevEnt = '';
+        $qVol = '';
+        $remet = '';
+        $pagador = '';
+        $destin = '';
+        $locEnt = '';
+        $uni = '';
+        $merc = '';
+        $frete = '';
+        $kg = '';
+        $m3 = '';
+
+        $parts = preg_split('/\\s{2,}/', rtrim($linhaTrim));
+        if (is_array($parts) && count($parts) >= 10) {
+            $emiss   = trim($parts[1] ?? '');
+            $prevEnt = trim($parts[2] ?? '');
+
+            $n = count($parts);
+            $remet   = trim((string)($parts[$n - 10] ?? ''));
+            $pagador = trim((string)($parts[$n - 9] ?? ''));
+            $destin  = trim((string)($parts[$n - 8] ?? ''));
+            $locEnt  = trim((string)($parts[$n - 7] ?? ''));
+            $uni     = strtoupper(trim((string)($parts[$n - 6] ?? '')));
+            $merc    = trim((string)($parts[$n - 5] ?? ''));
+            $frete   = trim((string)($parts[$n - 4] ?? ''));
+            $kg      = trim((string)($parts[$n - 3] ?? ''));
+            $m3      = trim((string)($parts[$n - 2] ?? ''));
+
+            if ($n >= 14) {
+                $cand = trim((string)($parts[5] ?? ''));
+                if (preg_match('/^\\d+$/', $cand)) $qVol = $cand;
+            }
+        } else {
+            $offset = 0;
+            $cols = [];
+            foreach ($larguras as $w) {
+                $cols[] = rtrim(substr($linhaTrim, $offset, $w));
+                $offset += $w + 1;
+            }
+            $emiss   = trim($cols[1] ?? '');
+            $prevEnt = trim($cols[2] ?? '');
+            $qVol    = trim($cols[6] ?? '');
+            $remet   = trim($cols[9] ?? '');
+            $pagador = trim($cols[10] ?? '');
+            $destin  = trim($cols[11] ?? '');
+            $locEnt  = trim($cols[12] ?? '');
+            $uni     = strtoupper(trim($cols[13] ?? ''));
+            $merc    = trim($cols[14] ?? '');
+            $frete   = trim($cols[15] ?? '');
+            $kg      = trim($cols[16] ?? '');
+            $m3      = trim($cols[17] ?? '');
         }
 
-        $ctrcRaw = $ctrc;
-        $emiss   = trim($cols[1] ?? '');
-        $prevEnt = trim($cols[2] ?? '');
-        $qVol    = trim($cols[6] ?? '');
-        $remet   = trim($cols[9] ?? '');
-        $pagador = trim($cols[10] ?? '');
-        $destin  = trim($cols[11] ?? '');
-        $locEnt  = trim($cols[12] ?? '');
-        $uni     = strtoupper(trim($cols[13] ?? ''));
-        $merc    = trim($cols[14] ?? '');
-        $frete   = trim($cols[15] ?? '');
-        $kg      = trim($cols[16] ?? '');
-        $m3      = trim($cols[17] ?? '');
-
-        $ser = substr($ctrcRaw, 0, 3);
-        $nro = (int)substr($ctrcRaw, 3, 6);
+        if (!preg_match('/^([A-Z0-9]{3})(\\d{6,7})-\\d{1,2}$/', $ctrcRaw, $mN)) continue;
+        $ser = strtoupper($mN[1]);
+        $nro = (int)$mN[2];
         if ($ser === '' || $nro <= 0) continue;
 
         $emissaoFull = null;
@@ -1730,7 +1766,12 @@ if (count($placasUp) > 0) {
          WHERE UPPER(unidade) = '{$unidadeEsc}'
            AND data_finalizacao IS NULL
            AND origem_ssw IS NOT NULL AND origem_ssw <> ''
-           AND UPPER(origem_ssw) NOT IN ({$inUp})"
+           AND UPPER(origem_ssw) NOT IN ({$inUp})
+           AND NOT EXISTS (
+               SELECT 1 FROM {$tabela} interno
+               WHERE interno.seq_carregamento = {$tabela}.seq_carregamento
+                 AND (interno.nro_cte::text ~ '^[0-9]+$' AND (interno.nro_cte::text)::int > 0)
+           )"
     );
     if ($resFin) $finalizadosSumiramSsw = (int)pg_affected_rows($resFin);
 }
