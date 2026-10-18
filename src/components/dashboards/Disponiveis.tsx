@@ -5259,6 +5259,7 @@ function ModalRotaCarregamento({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const layersRef = useRef<any[]>([]);
+  const didInitialFitRef = useRef(false);
 
   const [coordsByKey, setCoordsByKey] = useState<Record<string, { lat: number; lng: number }>>({});
   const [geoStatusByKey, setGeoStatusByKey] = useState<Record<string, 'pending' | 'loading' | 'ok' | 'error'>>({});
@@ -5551,6 +5552,7 @@ function ModalRotaCarregamento({
     const prevPlaca = lastPlacaProvisoriaRef.current;
     const isNovoCarregamento = prevPlaca !== placa;
     lastPlacaProvisoriaRef.current = placa;
+    if (isNovoCarregamento) didInitialFitRef.current = false;
 
     const initial: Record<string, { lat: number; lng: number }> = {};
     const status: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
@@ -5618,6 +5620,84 @@ function ModalRotaCarregamento({
     const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(la1) * Math.cos(la2);
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
   };
+
+  const otimizarOrdemEntregas = useCallback(async (override?: Record<string, { lat: number; lng: number }>) => {
+    if (paradasOrderEfetiva.some((k) => k.startsWith('T:'))) return;
+    const entregaKeys = paradasOrderEfetiva.filter((k) => k.startsWith('E:')).map((k) => k.slice(2));
+    if (entregaKeys.length < 2) return;
+
+    const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
+      const s = String(sigla ?? '').trim().toUpperCase();
+      if (!s || s === 'FEC') return null;
+      const u = unidadesMap.get(s);
+      if (!u) return null;
+      if (!Number.isFinite(u.lat as any) || !Number.isFinite(u.lng as any)) return null;
+      if ((u.lat as number) === 0 && (u.lng as number) === 0) return null;
+      return { lat: u.lat as number, lng: u.lng as number };
+    };
+
+    const origemCoord = getUnidCoord(origem);
+    if (!origemCoord) return;
+
+    const finalSigla = String(unidadesOrdem[unidadesOrdem.length - 1] ?? '').trim().toUpperCase();
+    const finalCoord = finalSigla ? getUnidCoord(finalSigla) : null;
+
+    const entregas = entregaKeys
+      .map((k) => ({ key: k, coord: (override?.[k] ?? coordsByKey[k]) || null }))
+      .filter((x) => !!x.coord && Number.isFinite((x.coord as any).lat) && Number.isFinite((x.coord as any).lng)) as { key: string; coord: { lat: number; lng: number } }[];
+    if (entregas.length < 2) return;
+
+    type P = { kind: 'origem' | 'entrega' | 'final'; key?: string; coord: { lat: number; lng: number } };
+    const input: P[] = [
+      { kind: 'origem', coord: origemCoord },
+      ...entregas.map((e) => ({ kind: 'entrega' as const, key: e.key, coord: e.coord })),
+      ...(finalCoord ? [{ kind: 'final' as const, coord: finalCoord }] : []),
+    ];
+
+    let ordemEntregas: string[] | null = null;
+    try {
+      const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
+      const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=false`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const waypoints = Array.isArray(data?.waypoints) ? data.waypoints : null;
+      if (waypoints && waypoints.length === input.length) {
+        const order = waypoints
+          .map((w: any, i: number) => ({ i, o: Number(w?.waypoint_index ?? i) }))
+          .sort((a: any, b: any) => a.o - b.o)
+          .map((x: any) => x.i);
+
+        const keys: string[] = [];
+        for (const idx of order) {
+          const p = input[idx];
+          if (p.kind !== 'entrega' || !p.key) continue;
+          keys.push(p.key);
+        }
+        if (keys.length >= 2) ordemEntregas = keys;
+      }
+    } catch {}
+
+    if (!ordemEntregas) {
+      const restantes = [...entregas];
+      const out: string[] = [];
+      let cur = origemCoord;
+      while (restantes.length > 0) {
+        let bestIdx = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < restantes.length; i += 1) {
+          const d = calcDist(cur, restantes[i].coord);
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+        const [next] = restantes.splice(bestIdx, 1);
+        out.push(next.key);
+        cur = next.coord;
+      }
+      if (out.length >= 2) ordemEntregas = out;
+    }
+
+    if (!ordemEntregas || ordemEntregas.length < 2) return;
+    setParadasOrder(ordemEntregas.map((k) => `E:${k}`));
+  }, [calcDist, coordsByKey, origem, paradasOrderEfetiva, setParadasOrder, unidadesMap, unidadesOrdem]);
 
   const pontosOrdenados = useMemo(() => {
     const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
@@ -5714,8 +5794,10 @@ function ModalRotaCarregamento({
     layersRef.current = [];
 
     const markers: any[] = [];
+    let entregaIdx = 0;
     pontosOrdenados.forEach((p, idx) => {
       const bg = p.tipo === 'UNIDADE' ? '#2563eb' : '#059669';
+      const label = p.tipo === 'ENTREGA' ? String(++entregaIdx) : '';
       const icon = L.divIcon({
         className: 'custom-pin-icon',
         html: `
@@ -5732,7 +5814,7 @@ function ModalRotaCarregamento({
                     stroke-width="2"
                     filter="url(#shadow-rota-${idx})"/>
               <circle cx="15" cy="12" r="7" fill="white"/>
-              <text x="15" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="${bg}">${idx + 1}</text>
+              ${label ? `<text x="15" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="${bg}">${label}</text>` : ''}
             </svg>
           </div>
         `,
@@ -5786,6 +5868,7 @@ function ModalRotaCarregamento({
         const salvarCoordGrupo = async (lat: number, lng: number) => {
           if (!groupKey) return;
           setCoordsByKey((prev) => ({ ...(prev || {}), [groupKey]: { lat, lng } }));
+          void otimizarOrdemEntregas({ [groupKey]: { lat, lng } });
           setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'ok' }));
           setGeoErrorByKey((prev) => {
             const next = { ...(prev || {}) };
@@ -5886,11 +5969,12 @@ function ModalRotaCarregamento({
     }
 
     const all = [...pontosOrdenados.map((p) => [p.lat, p.lng] as [number, number]), ...routeCoords.map((c) => [c.lat, c.lng] as [number, number])];
-    if (all.length > 0) {
+    if (all.length > 0 && !didInitialFitRef.current) {
       const bounds = L.latLngBounds(all);
       map.fitBounds(bounds, { padding: [30, 30] });
+      didInitialFitRef.current = true;
     }
-  }, [coordsByKey, leafletLoaded, pontosOrdenados, routeCoords]);
+  }, [coordsByKey, didInitialFitRef, leafletLoaded, otimizarOrdemEntregas, pontosOrdenados, routeCoords]);
 
   const focarRota = useCallback(() => {
     const L = (window as any).L;
