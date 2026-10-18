@@ -332,9 +332,9 @@ $placas_ssw = [];
 $seqs_ssw = [];
 $placaPorSeq = [];
 foreach ($xml->xpath('//r') as $r) {
-    $placa = strtoupper(trim((string)($r->f0 ?? '')));
+    $placa = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)($r->f0 ?? ''))));
     if ($placa === '') {
-        $placa = strtoupper(trim((string)($r->f8 ?? '')));
+        $placa = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)($r->f8 ?? ''))));
     }
     if ($placa === '') continue;
     $placas_ssw[] = $placa;
@@ -755,7 +755,7 @@ function parseRelatorioCarregamentos($texto) {
         if (trim($linha) === '') continue;
 
         if (preg_match('/PLACA:\\s*([A-Z0-9-]+)/', $linha, $m)) {
-            $placaAtual = strtoupper(trim($m[1]));
+            $placaAtual = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($m[1])));
             if (!isset($porPlaca[$placaAtual])) {
                 $porPlaca[$placaAtual] = ['ctes' => [], 'destinos' => []];
             }
@@ -922,9 +922,11 @@ $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strle
     foreach ($parsed as $k => $v) { $totCtes += is_array($v) ? count(($v['ctes'] ?? [])) : 0; }
     $__dbg('C', 'parseRelatorioCarregamentos', ['placas' => count($parsed), 'ctes_total' => $totCtes, 'placas_sample' => array_slice(array_keys($parsed), 0, 5)]);
     foreach ($parsed as $placa => $data) {
-        if (!isset($carregamentos[$placa])) $carregamentos[$placa] = ['ctes' => [], 'destinos' => []];
-        $carregamentos[$placa]['ctes'] = array_merge($carregamentos[$placa]['ctes'], $data['ctes'] ?? []);
-        $carregamentos[$placa]['destinos'] = array_merge($carregamentos[$placa]['destinos'], $data['destinos'] ?? []);
+        $placaKey = preg_replace('/[^A-Z0-9]/', '', strtoupper(trim((string)$placa)));
+        if ($placaKey === '') continue;
+        if (!isset($carregamentos[$placaKey])) $carregamentos[$placaKey] = ['ctes' => [], 'destinos' => []];
+        $carregamentos[$placaKey]['ctes'] = array_merge($carregamentos[$placaKey]['ctes'], $data['ctes'] ?? []);
+        $carregamentos[$placaKey]['destinos'] = array_merge($carregamentos[$placaKey]['destinos'], $data['destinos'] ?? []);
     }
 }
 
@@ -1506,6 +1508,7 @@ foreach ($placas_ssw as $placa) {
     pg_query($conn, 'BEGIN');
     try {
         $inseridos = 0;
+        $atualizados = 0;
         $ignoradosEmOutro = 0;
         if ($reaproveitandoPorPlaca && $seqCarreg > 0) {
             $resDup = sql(
@@ -1632,6 +1635,7 @@ foreach ($placas_ssw as $placa) {
                            AND nro_cte = {$nro}"
                     );
                     if (!$resUpdCte) throw new Exception(pg_last_error($conn));
+                    $atualizados++;
                     continue;
                 }
 
@@ -1679,9 +1683,15 @@ foreach ($placas_ssw as $placa) {
         pg_query($conn, 'COMMIT');
         $__dbg('D', 'commit', ['placa' => $placa, 'seq' => $seqCarreg, 'placaProvisoriaSalvar' => $placaProvisoriaSalvar, 'inseridos' => $inseridos, 'ignoradosEmOutro' => $ignoradosEmOutro, 'ctes_input' => is_array($ctes) ? count($ctes) : null]);
         $status = $ja_existe ? 'atualizado' : 'importado';
+        $totalProc = $inseridos + $atualizados;
         $msg = ($placaProvisoriaSalvar !== $placa)
-            ? "{$inseridos} CT-e(s) importado(s). Agrupado em {$placaProvisoriaSalvar}."
-            : "{$inseridos} CT-e(s) importado(s).";
+            ? "{$totalProc} CT-e(s) processado(s). Agrupado em {$placaProvisoriaSalvar}."
+            : "{$totalProc} CT-e(s) processado(s).";
+        if ($atualizados > 0 && $inseridos > 0) {
+            $msg .= " ({$inseridos} novo(s), {$atualizados} já existente(s))";
+        } elseif ($atualizados > 0 && $inseridos === 0) {
+            $msg .= " ({$atualizados} já existente(s))";
+        }
         if ($ignoradosEmOutro > 0) {
             $msg .= " {$ignoradosEmOutro} CT-e(s) ignorado(s) por já estarem em outro carregamento.";
         }
