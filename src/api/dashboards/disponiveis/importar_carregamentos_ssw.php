@@ -903,7 +903,7 @@ $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strle
         continue;
     }
 
-    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=1");
+    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0");
     $__dbg('B', 'ssw0424 download', ['len' => is_string($relatorio) ? strlen($relatorio) : null, 'head' => substr((string)$relatorio, 0, 160)]);
     if (empty($relatorio) || strlen($relatorio) < 50) {
         foreach ($chunk as $p) {
