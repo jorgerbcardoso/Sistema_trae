@@ -52,33 +52,21 @@ $tblCar = "{$domain}_carregamento";
 
 try {
     $seqCar = $seqCarInput;
-    $useSeq = $seqCar > 0;
+    if ($seqCar <= 0) {
+        respondJson(['success' => false, 'message' => 'seq_carregamento inválido.']);
+    }
 
     @pg_query($conn, 'BEGIN');
 
-    if ($useSeq) {
-        sql(
-            "UPDATE {$tblCar}
-             SET ordem = NULL
-             WHERE unidade = $1
-               AND seq_carregamento = $2
-               AND data_finalizacao IS NULL
-               AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
-            [$unidade, $seqCar],
-            $conn
-        );
-    } else {
-        sql(
-            "UPDATE {$tblCar}
-             SET ordem = NULL
-             WHERE unidade = $1
-               AND UPPER(placa_provisoria) = UPPER($2)
-               AND data_finalizacao IS NULL
-               AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
-            [$unidade, $placa],
-            $conn
-        );
-    }
+    sql(
+        "UPDATE {$tblCar}
+         SET ordem = NULL
+         WHERE seq_carregamento = $1
+           AND data_finalizacao IS NULL
+           AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
+        [$seqCar],
+        $conn
+    );
 
     $atualizados = 0;
     if (!empty($lista)) {
@@ -86,15 +74,8 @@ try {
         for ($off = 0; $off < count($lista); $off += $chunkSize) {
             $chunk = array_slice($lista, $off, $chunkSize);
             $vals = [];
-            $params = [];
-            $p = 1;
-            if ($useSeq) {
-                $params = [$unidade, $seqCar];
-                $p = 3;
-            } else {
-                $params = [$unidade, $placa];
-                $p = 3;
-            }
+            $params = [$seqCar];
+            $p = 2;
             $ordSeq = $off + 1;
             foreach ($chunk as $it) {
                 $vals[] = '($' . $p . ', $' . ($p + 1) . ', $' . ($p + 2) . ')';
@@ -105,28 +86,15 @@ try {
                 $ordSeq += 1;
             }
             if (empty($vals)) continue;
-            $q = $useSeq
-                ? ("
-                    UPDATE {$tblCar} car
-                       SET ordem = v.ordem,
-                           seq_carregamento = $2
-                      FROM (VALUES " . implode(', ', $vals) . ") AS v(ser_cte, nro_cte, ordem)
-                     WHERE car.unidade = $1
-                       AND car.seq_carregamento = $2
-                       AND car.data_finalizacao IS NULL
-                       AND car.ser_cte = v.ser_cte
-                       AND car.nro_cte = v.nro_cte
-                ")
-                : ("
-                    UPDATE {$tblCar} car
-                       SET ordem = v.ordem
-                      FROM (VALUES " . implode(', ', $vals) . ") AS v(ser_cte, nro_cte, ordem)
-                     WHERE car.unidade = $1
-                       AND UPPER(car.placa_provisoria) = UPPER($2)
-                       AND car.data_finalizacao IS NULL
-                       AND car.ser_cte = v.ser_cte
-                       AND car.nro_cte = v.nro_cte
-                ");
+            $q = "
+                UPDATE {$tblCar} car
+                   SET ordem = v.ordem
+                  FROM (VALUES " . implode(', ', $vals) . ") AS v(ser_cte, nro_cte, ordem)
+                 WHERE car.seq_carregamento = $1
+                   AND car.data_finalizacao IS NULL
+                   AND car.ser_cte = v.ser_cte
+                   AND car.nro_cte = v.nro_cte
+            ";
             $res = sql($q, $params, $conn);
             if ($res) $atualizados += pg_affected_rows($res);
         }

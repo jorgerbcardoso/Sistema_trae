@@ -5327,6 +5327,7 @@ function ModalRotaCarregamento({
   const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
 
   const carregarInfo = dados?.carregamento ?? {};
+  const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
   const paradas = Array.isArray(carregarInfo?.paradas) ? (carregarInfo.paradas as string[]) : [];
 
@@ -6073,30 +6074,32 @@ function ModalRotaCarregamento({
   const ordemInicialSavedRef = useRef(false);
 
   const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number; ordem: number }[]) => {
-    const seq = Number(carregamento?.seq_carregamento ?? 0) || 0;
-    if (seq <= 0) return;
+    if (seqCarregamento <= 0) return;
     if (!Array.isArray(ctes) || ctes.length === 0) return;
     try {
-      await apiFetch(
+      const resp = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_ordem_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, ctes }) },
+        { method: 'POST', body: JSON.stringify({ seq_carregamento: seqCarregamento, ctes }) },
         true
       );
+      if (!resp?.success) {
+        toast.error(resp?.message || 'Erro ao salvar ordem do carregamento.');
+      }
     } catch {
+      toast.error('Erro ao salvar ordem do carregamento.');
     }
-  }, [carregamento?.placa_provisoria, carregamento?.seq_carregamento, origem]);
+  }, [seqCarregamento]);
 
   useEffect(() => {
     if (ordemInicialSavedRef.current) return;
-    const seq = Number(carregamento?.seq_carregamento ?? 0) || 0;
-    if (seq <= 0) return;
+    if (seqCarregamento <= 0) return;
     const ctesBackend = Array.isArray((dados as any)?.ctes) ? ((dados as any).ctes as any[]) : [];
     const hasOrdem = ctesBackend.some((c) => (Number(c?.ordem ?? 0) || 0) > 0);
     if (hasOrdem) { ordemInicialSavedRef.current = true; return; }
     if (!Array.isArray(ctesOrdem) || ctesOrdem.length === 0) return;
     ordemInicialSavedRef.current = true;
     void salvarOrdemCtes(ctesOrdem);
-  }, [carregamento?.seq_carregamento, ctesOrdem, dados, salvarOrdemCtes]);
+  }, [seqCarregamento, ctesOrdem, dados, salvarOrdemCtes]);
 
   useEffect(() => {
     const sig = ctesOrdem.map((c) => `${c.ser_cte}${String(c.nro_cte)}:${String(c.ordem)}`).join('|');
