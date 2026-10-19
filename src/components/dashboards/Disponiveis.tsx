@@ -5319,7 +5319,7 @@ function ModalRotaCarregamento({
   const [geoHydrated, setGeoHydrated] = useState(false);
 
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
-  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete'>('ctrc');
+  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete'>('ctrc');
   const [cteRotaSortDir, setCteRotaSortDir] = useState<'asc' | 'desc'>('asc');
   const [dragParadaKey, setDragParadaKey] = useState<string | null>(null);
   const [dragParadaOver, setDragParadaOver] = useState<string | null>(null);
@@ -5435,24 +5435,18 @@ function ModalRotaCarregamento({
       const frete = c?.vlr_frete !== null && c?.vlr_frete !== undefined && String(c.vlr_frete) !== '' ? parseMoeda(String(c.vlr_frete)) : 0;
       const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
-      const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '');
+      const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '').split('/')[0].trim();
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
       const ordem = Number(c?.ordem ?? 0) || 0;
       const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
 
       if (hasEndereco) {
-        const baseTitulo = (isFec && !hasEnderecoReal)
-          ? [destinatario, ctrc ? `CT-e ${ctrc}` : '', 'Endereço incompleto'].filter(Boolean).join(' · ')
-          : [
-            destinatario,
-            endereco ? `${endereco}${bairro ? `, ${bairro}` : ''}` : (bairro ? bairro : ''),
-            [cep, cidade && uf ? `${cidade}/${uf}` : (cidade || uf)].filter(Boolean).join(' · ')
-          ].filter(Boolean).join(' · ');
+        const baseTitulo = destinatario;
         const query = (isFec && !hasEnderecoReal) ? '' : buildGeoQuery({ endereco, bairro, cep, cidade, uf });
         const key = (isFec && !hasEnderecoReal)
           ? `${unidadeDestino}|${ctrc || `${ser}-${nro}`}`
-          : `${unidadeDestino}|${destinatario}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
+          : `${unidadeDestino}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
         const g = destinosEntrega.get(key) ?? {
           key,
           tipo: 'ENTREGA' as const,
@@ -6440,7 +6434,7 @@ function ModalRotaCarregamento({
     });
   }, [defaultParadasOrder]);
 
-  const toggleCteRotaSort = (key: 'ctrc' | 'dest' | 'emissao' | 'prev' | 'peso' | 'frete') => {
+  const toggleCteRotaSort = (key: 'ctrc' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete') => {
     setCteRotaSortKey((prev) => {
       if (prev === key) {
         setCteRotaSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -6464,16 +6458,23 @@ function ModalRotaCarregamento({
     return { peso, frete };
   }, [grupos.entrega, grupos.transferencia]);
 
-  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number }[]) => {
+  const formatDataDDMM = (d: string) => {
+    const f = formatData(String(d ?? ''));
+    if (!f) return '-';
+    const m = f.match(/^(\d{2}\/\d{2})/);
+    return m?.[1] ? m[1] : f;
+  };
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number; cidade?: string; destinatario?: string }[]) => {
     const list = [...items];
     const dir = cteRotaSortDir === 'asc' ? 1 : -1;
     const cmpStr = (a: string, b: string) => a.localeCompare(b);
     const cmpNum = (a: number, b: number) => a - b;
     list.sort((a, b) => {
       if (cteRotaSortKey === 'ctrc') return cmpStr(String(a.ctrc ?? ''), String(b.ctrc ?? '')) * dir;
-      if (cteRotaSortKey === 'dest') return cmpStr(String(a.destino ?? ''), String(b.destino ?? '')) * dir;
+      if (cteRotaSortKey === 'destinatario') return cmpStr(String(a.destinatario ?? ''), String(b.destinatario ?? '')) * dir;
       if (cteRotaSortKey === 'emissao') return cmpStr(String(a.emissao ?? ''), String(b.emissao ?? '')) * dir;
       if (cteRotaSortKey === 'prev') return cmpStr(String(a.prev ?? ''), String(b.prev ?? '')) * dir;
+      if (cteRotaSortKey === 'cidade') return cmpStr(String(a.cidade ?? ''), String(b.cidade ?? '')) * dir;
       if (cteRotaSortKey === 'frete') return cmpNum(Number(a.frete ?? 0) || 0, Number(b.frete ?? 0) || 0) * dir;
       return cmpNum(Number(a.peso ?? 0) || 0, Number(b.peso ?? 0) || 0) * dir;
     });
@@ -6482,18 +6483,21 @@ function ModalRotaCarregamento({
     return (
       <div className="mt-2 pl-6">
         <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
-            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('dest')}>
-              Dest.{cteRotaSortKey === 'dest' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('destinatario')}>
+              Destinatário{cteRotaSortKey === 'destinatario' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
               Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('prev')}>
               Prev{cteRotaSortKey === 'prev' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('cidade')}>
+              Cidade{cteRotaSortKey === 'cidade' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('peso')}>
               Peso (kg){cteRotaSortKey === 'peso' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
@@ -6504,18 +6508,20 @@ function ModalRotaCarregamento({
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
-                <span className="font-mono text-slate-600 dark:text-slate-400 truncate">{String(c.destino ?? '').toUpperCase()}</span>
-                <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.emissao ?? '')) || '-'}</span>
-                <span className="text-slate-600 dark:text-slate-400">{formatData(String(c.prev ?? '')) || '-'}</span>
+                <span className="text-slate-700 dark:text-slate-200 truncate">{String(c.destinatario ?? '').trim() || '-'}</span>
+                <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span>
+                <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.prev ?? ''))}</span>
+                <span className="text-slate-600 dark:text-slate-400 truncate">{String(c.cidade ?? '').trim() || '-'}</span>
                 <span className="text-right font-mono text-slate-700 dark:text-slate-200">{(Number(c.peso ?? 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 <span className="text-right font-mono text-slate-700 dark:text-slate-200">{(Number(c.frete ?? 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_44px_56px_56px_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
             <span className="text-slate-600 dark:text-slate-300">Total</span>
+            <span />
             <span />
             <span />
             <span />
@@ -6684,6 +6690,10 @@ function ModalRotaCarregamento({
                           type="button"
                           onClick={() => toggleAberto(k)}
                           className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                          title={[
+                            g.endereco ? `${g.endereco}${g.bairro ? `, ${g.bairro}` : ''}` : (g.bairro || ''),
+                            [g.cep, g.cidade && g.uf ? `${g.cidade}/${g.uf}` : (g.cidade || g.uf)].filter(Boolean).join(' · ')
+                          ].filter(Boolean).join(' · ') || 'Endereço não informado'}
                         >
                           {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           <div className="flex-1 min-w-0">
@@ -6798,12 +6808,6 @@ function ModalRotaCarregamento({
                                 {g.destinatario || g.titulo}
                               </div>
                               <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${isFec ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'}`}>{isFec ? 'FEC' : 'Entrega'}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-600 dark:text-slate-400 whitespace-normal leading-snug mt-0.5">
-                              {[
-                                g.endereco ? `${g.endereco}${g.bairro ? `, ${g.bairro}` : ''}` : (g.bairro || ''),
-                                [g.cep, g.cidade && g.uf ? `${g.cidade}/${g.uf}` : (g.cidade || g.uf)].filter(Boolean).join(' · ')
-                              ].filter(Boolean).join(' · ') || 'Endereço não informado'}
                             </div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                               {isFec ? 'FEC' : 'Entrega'} · {g.ctes.length} CT-e(s) · <span className={cor}>{statusLabel}</span>
