@@ -94,6 +94,7 @@ interface Cte {
   emissao: string;
   chegadaUnid?: string;
   unidAtual?: string;
+  setor?: string;
   prevEnt: string;
   nfiscal: string;
   pedido: string;
@@ -1278,6 +1279,7 @@ function TabelaEntrega({
     tipo: '',
     emissao: c.emissao || '',
     prevEnt: c.prevEnt,
+    setor: c.setor,
     nfiscal: c.nfiscal,
     pedido: '',
     remetente: '',
@@ -1293,7 +1295,7 @@ function TabelaEntrega({
     manifesto: c.manifesto,
     prevChegada: c.prevChegada,
     emTransito: c.emTransito,
-    unidadeDest: '',
+    unidadeDest: c.setor,
     nomeDest: '',
     indicadorSaida: null,
     atrasoTransf: null,
@@ -1508,6 +1510,14 @@ function GrupoSetorCard({
 
   const temAgendObrig = [...grupo.armazem, ...grupo.transito].some(c => c.agendObrig);
 
+  const onToggleCteSetor = onToggleCte
+    ? (cte: Cte) => onToggleCte({ ...cte, setor: grupo.setor, unidadeDest: grupo.setor })
+    : undefined;
+
+  const onToggleTodosSetor = onToggleTodos
+    ? (ctes: Cte[], selecionar: boolean) => onToggleTodos(ctes.map(c => ({ ...c, setor: grupo.setor, unidadeDest: grupo.setor })), selecionar)
+    : undefined;
+
   const exportarSetorCSV = (ev: React.MouseEvent) => {
     ev.stopPropagation();
     const lista = [...grupo.armazem, ...grupo.transito];
@@ -1686,12 +1696,12 @@ function GrupoSetorCard({
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
+                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCteSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
+                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCteSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
             )}
           </div>
@@ -10967,6 +10977,13 @@ export function Disponiveis() {
   const handleConfirmarApontamento = useCallback(async () => {
     if (!modoApontamento || ctesSelecionados.size === 0) return;
     try {
+      const seqCar = Number(
+        carregamentos.find(c => String(c.placa_provisoria ?? '').trim().toUpperCase() === String(modoApontamento ?? '').trim().toUpperCase())?.seq_carregamento ?? 0
+      ) || 0;
+      if (seqCar <= 0) {
+        toast.error('Não foi possível identificar o seq_carregamento deste carregamento.');
+        return;
+      }
       const ctesPayload = Array.from(ctesSelecionados.values()).map(c => ({
         seqCte: c.seqCte ?? 0,
         nroCte: c.nroCte,
@@ -10988,7 +11005,7 @@ export function Disponiveis() {
       }));
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', placa: modoApontamento, ctes: ctesPayload }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', seq_carregamento: seqCar, ctes: ctesPayload }) },
         true
       );
       if (res.success) {
@@ -11002,7 +11019,7 @@ export function Disponiveis() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao adicionar CT-es');
     }
-  }, [modoApontamento, ctesSelecionados, carregarCarregamentos]);
+  }, [modoApontamento, ctesSelecionados, carregarCarregamentos, carregamentos]);
 
   const toggleCte = useCallback((cte: Cte) => {
     const id = cteId(cte);
