@@ -12,22 +12,11 @@ if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
 }
 
 $input = getRequestInput();
-$currentUser = getCurrentUser();
-$unidade = strtoupper(trim(
-    $input['unidade']
-    ?? $currentUser['unidade_atual']
-    ?? $currentUser['unidade']
-    ?? ''
-));
-$placa = strtoupper(trim((string)($input['placa'] ?? '')));
 $seqCarInput = (int)($input['seq_carregamento'] ?? 0);
 $ctes = $input['ctes'] ?? [];
 
-if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
-    respondJson(['success' => false, 'message' => 'Unidade inválida.']);
-}
-if ($placa === '') {
-    respondJson(['success' => false, 'message' => 'Placa inválida.']);
+if ($seqCarInput <= 0) {
+    respondJson(['success' => false, 'message' => 'seq_carregamento inválido.']);
 }
 if (!is_array($ctes)) $ctes = [];
 
@@ -52,9 +41,6 @@ $tblCar = "{$domain}_carregamento";
 
 try {
     $seqCar = $seqCarInput;
-    if ($seqCar <= 0) {
-        respondJson(['success' => false, 'message' => 'seq_carregamento inválido.']);
-    }
 
     @pg_query($conn, 'BEGIN');
 
