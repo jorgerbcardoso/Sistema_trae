@@ -580,14 +580,12 @@ $joinCteMatch = $hasSeqCte
               AND cte.nro_cte = c.nro_cte
     ");
 
-$selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
-$selVlrFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, c.vlr_frete_cte)" : "c.vlr_frete_cte";
+$selVlrMerc = "c.vlr_merc_cte";
+$selVlrFrete = "c.vlr_frete_cte";
 $selTpFrete = $cteCol('tp_frete') ? "COALESCE(cte.tp_frete::text, '')" : "''";
-$selPeso = $cteCol('peso_real')
-    ? ("COALESCE(cte.peso_real" . ($cteCol('peso_calc') ? ", cte.peso_calc" : "") . ", c.peso_cte)")
-    : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, c.peso_cte)" : "c.peso_cte");
-$selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, c.cubagem_cte)" : "c.cubagem_cte";
-$selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, c.qtde_vol_cte)" : "c.qtde_vol_cte";
+$selPeso = "c.peso_cte";
+$selCub = "c.cubagem_cte";
+$selVol = "c.qtde_vol_cte";
 
 $selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
 $joinOcorExtra = "
