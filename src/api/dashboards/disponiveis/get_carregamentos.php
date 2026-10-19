@@ -694,6 +694,7 @@ $sqlCtes = "
     FROM {$tabelaCarregamento} c
     {$joinCteDest}
     WHERE c.unidade = \$1
+      AND c.data_finalizacao IS NULL
       AND (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0)
       {$filtroSerieRve}
     ORDER BY c.placa_provisoria, c.data_inclusao, c.hora_inclusao
