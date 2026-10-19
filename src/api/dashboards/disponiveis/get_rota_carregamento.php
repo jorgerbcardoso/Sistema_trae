@@ -34,6 +34,47 @@ $tblUnid = "{$domain}_unidade";
 $tblCte = "{$domain}_cte";
 $tblCliente = "{$domain}_cliente";
 
+$tableExists = function($conn, string $tableName): bool {
+    $t = strtolower(trim($tableName));
+    if ($t === '') return false;
+    $res = sql(
+        "SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower($1)
+         LIMIT 1",
+        [$t],
+        $conn
+    );
+    return ($res && pg_num_rows($res) > 0);
+};
+
+$colCache = [];
+$colExists = function($conn, string $tableName, string $col) use (&$colCache): bool {
+    $t = strtolower(trim($tableName));
+    if ($t === '') return false;
+    if (!isset($colCache[$t])) {
+        $colCache[$t] = [];
+        try {
+            $res = sql(
+                "SELECT column_name
+                 FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND lower(table_name) = lower($1)",
+                [$t],
+                $conn
+            );
+            while ($res && ($r = pg_fetch_assoc($res))) {
+                $name = strtolower(trim((string)($r['column_name'] ?? '')));
+                if ($name !== '') $colCache[$t][$name] = true;
+            }
+        } catch (Exception $e) {
+            $colCache[$t] = [];
+        }
+    }
+    return isset($colCache[$t][strtolower($col)]);
+};
+
 $parseCoord = function($v) {
     if ($v === null) return null;
     if (is_int($v) || is_float($v)) return (float)$v;
@@ -64,6 +105,46 @@ $parseCoord = function($v) {
 @pg_query($conn, "ALTER TABLE {$tblCliente} ADD COLUMN IF NOT EXISTS latitude_entrega VARCHAR(32)");
 @pg_query($conn, "ALTER TABLE {$tblCliente} ADD COLUMN IF NOT EXISTS longitude_entrega VARCHAR(32)");
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
+
+$cteOk = $tableExists($conn, $tblCte);
+$clienteOk = $tableExists($conn, $tblCliente);
+$hasSeqCidadeEntr = $cteOk && $colExists($conn, $tblCte, 'seq_cidade_entr');
+$hasCepEntrega = $cteOk && $colExists($conn, $tblCte, 'cep_entrega');
+$hasEnderecoEntrega = $cteOk && $colExists($conn, $tblCte, 'endereco_entrega');
+$hasBairroEntrega = $cteOk && $colExists($conn, $tblCte, 'bairro_entrega');
+$hasLatEntrega = $cteOk && $colExists($conn, $tblCte, 'latitude_entrega');
+$hasLngEntrega = $cteOk && $colExists($conn, $tblCte, 'longitude_entrega');
+$hasLocEntDif = $cteOk && $colExists($conn, $tblCte, 'loc_ent_dif');
+$hasLocDifEnt = $cteOk && $colExists($conn, $tblCte, 'loc_dif_ent');
+$hasCnpjEmit = $cteOk && $colExists($conn, $tblCte, 'cnpj_emit');
+
+$joinCte = $cteOk ? "
+        LEFT JOIN {$tblCte} cte
+               ON cte.ser_cte = car.ser_cte
+              AND cte.nro_cte = car.nro_cte
+" : "";
+$joinCliente = ($clienteOk && $hasCnpjEmit) ? "
+        LEFT JOIN {$tblCliente} cli
+               ON cli.cnpj = cte.cnpj_emit
+" : "";
+$joinCidade = $hasSeqCidadeEntr ? "
+        LEFT JOIN cidade cid
+               ON cid.seq_cidade = cte.seq_cidade_entr
+" : "";
+$selSeqCidadeEntr = $hasSeqCidadeEntr ? "COALESCE(cte.seq_cidade_entr, NULL) AS seq_cidade_entr," : "NULL AS seq_cidade_entr,";
+$selCepEntrega = $hasCepEntrega ? "COALESCE(cte.cep_entrega::text, '') AS cep_entrega," : "'' AS cep_entrega,";
+$selEnderecoEntrega = $hasEnderecoEntrega ? "COALESCE(cte.endereco_entrega, '') AS endereco_entrega," : "'' AS endereco_entrega,";
+$selBairroEntrega = $hasBairroEntrega ? "COALESCE(cte.bairro_entrega, '') AS bairro_entrega," : "'' AS bairro_entrega,";
+$selCidadeEntrega = $hasSeqCidadeEntr ? "COALESCE(cid.nome, '') AS cidade_entrega," : "'' AS cidade_entrega,";
+$selUfEntrega = $hasSeqCidadeEntr ? "COALESCE(cid.uf, '') AS uf_entrega," : "'' AS uf_entrega,";
+$selLatEntrega = $hasLatEntrega ? "cte.latitude_entrega," : "NULL AS latitude_entrega,";
+$selLngEntrega = $hasLngEntrega ? "cte.longitude_entrega," : "NULL AS longitude_entrega,";
+$selLocEntDif = $hasLocEntDif
+    ? "COALESCE(cte.loc_ent_dif, '') AS loc_ent_dif,"
+    : ($hasLocDifEnt ? "COALESCE(cte.loc_dif_ent, '') AS loc_ent_dif," : "'' AS loc_ent_dif,");
+$selCnpjEmit = $hasCnpjEmit ? "COALESCE(cte.cnpj_emit, '') AS cnpj_emit," : "'' AS cnpj_emit,";
+$selCliLat = ($clienteOk && $colExists($conn, $tblCliente, 'latitude_entrega') && $hasCnpjEmit) ? "cli.latitude_entrega AS cli_latitude_entrega," : "NULL AS cli_latitude_entrega,";
+$selCliLng = ($clienteOk && $colExists($conn, $tblCliente, 'longitude_entrega') && $hasCnpjEmit) ? "cli.longitude_entrega AS cli_longitude_entrega" : "NULL AS cli_longitude_entrega";
 
 $carRow = null;
 try {
@@ -124,26 +205,22 @@ try {
             COALESCE(car.peso_cte, 0) AS peso,
             COALESCE(car.cubagem_cte, 0) AS cubagem,
             COALESCE(car.qtde_vol_cte, 0) AS qtde_vol,
-            COALESCE(cte.seq_cidade_entr, NULL) AS seq_cidade_entr,
-            COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
-            COALESCE(cte.endereco_entrega, '') AS endereco_entrega,
-            COALESCE(cte.bairro_entrega, '') AS bairro_entrega,
-            COALESCE(cid.nome, '') AS cidade_entrega,
-            COALESCE(cid.uf, '') AS uf_entrega,
-            cte.latitude_entrega,
-            cte.longitude_entrega,
-            COALESCE(cte.loc_ent_dif, '') AS loc_ent_dif,
-            COALESCE(cte.cnpj_emit, '') AS cnpj_emit,
-            cli.latitude_entrega AS cli_latitude_entrega,
-            cli.longitude_entrega AS cli_longitude_entrega
+            {$selSeqCidadeEntr}
+            {$selCepEntrega}
+            {$selEnderecoEntrega}
+            {$selBairroEntrega}
+            {$selCidadeEntrega}
+            {$selUfEntrega}
+            {$selLatEntrega}
+            {$selLngEntrega}
+            {$selLocEntDif}
+            {$selCnpjEmit}
+            {$selCliLat}
+            {$selCliLng}
         FROM {$tblCar} car
-        LEFT JOIN {$tblCte} cte
-               ON cte.ser_cte = car.ser_cte
-              AND cte.nro_cte = car.nro_cte
-        LEFT JOIN {$tblCliente} cli
-               ON cli.cnpj = cte.cnpj_emit
-        LEFT JOIN cidade cid
-               ON cid.seq_cidade = cte.seq_cidade_entr
+        {$joinCte}
+        {$joinCliente}
+        {$joinCidade}
         WHERE car.unidade = $1
           AND UPPER(car.placa_provisoria) = UPPER($2)
           AND car.data_finalizacao IS NULL
