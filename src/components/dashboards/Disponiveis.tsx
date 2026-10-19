@@ -6031,7 +6031,7 @@ function ModalRotaCarregamento({
   }, [pontosOrdenados, routeCoords]);
 
   const ctesOrdem = useMemo(() => {
-    const out: { ser_cte: string; nro_cte: number }[] = [];
+    const out: { ser_cte: string; nro_cte: number; ordem: number }[] = [];
     const seen = new Set<string>();
     const push = (c: any) => {
       const ser = String(c?.ser_cte ?? c?.ser ?? c?.serCte ?? '').trim().toUpperCase();
@@ -6040,19 +6040,30 @@ function ModalRotaCarregamento({
       const k = `${ser}|${nro}`;
       if (seen.has(k)) return;
       seen.add(k);
-      out.push({ ser_cte: ser, nro_cte: nro });
+      return { ser_cte: ser, nro_cte: nro };
     };
+    let ordem = 0;
     for (const k of paradasOrderEfetiva) {
       if (k.startsWith('T:')) {
         const sigla = k.slice(2);
         const g = transfByUnidade.get(sigla);
         if (!g?.ctes) continue;
-        for (const c of g.ctes) push(c);
+        ordem += 1;
+        for (const c of g.ctes) {
+          const base = push(c);
+          if (!base) continue;
+          out.push({ ...base, ordem });
+        }
       } else if (k.startsWith('E:')) {
         const gKey = k.slice(2);
         const g = entregaByKey.get(gKey);
         if (!g?.ctes) continue;
-        for (const c of g.ctes) push(c);
+        ordem += 1;
+        for (const c of g.ctes) {
+          const base = push(c);
+          if (!base) continue;
+          out.push({ ...base, ordem });
+        }
       }
     }
     return out;
@@ -6060,21 +6071,21 @@ function ModalRotaCarregamento({
 
   const ordemSyncRef = useRef<{ t: any; sig: string }>({ t: null, sig: '' });
 
-  const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number }[]) => {
+  const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number; ordem: number }[]) => {
     if (!carregamento?.placa_provisoria) return;
     if (!Array.isArray(ctes) || ctes.length === 0) return;
     try {
       await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_ordem_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, ctes }) },
+        { method: 'POST', body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, ctes }) },
         true
       );
     } catch {
     }
-  }, [carregamento?.placa_provisoria, origem]);
+  }, [carregamento?.placa_provisoria, carregamento?.seq_carregamento, origem]);
 
   useEffect(() => {
-    const sig = ctesOrdem.map((c) => `${c.ser_cte}${String(c.nro_cte)}`).join('|');
+    const sig = ctesOrdem.map((c) => `${c.ser_cte}${String(c.nro_cte)}:${String(c.ordem)}`).join('|');
     if (!sig) return;
     if (ordemSyncRef.current.sig === sig) return;
     ordemSyncRef.current.sig = sig;
@@ -6253,7 +6264,7 @@ function ModalRotaCarregamento({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, rota: rotaTxt, rota_km: routeDistanceKm, linhas, map_image: mapImage }),
+          body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, rota: rotaTxt, rota_km: routeDistanceKm, linhas, map_image: mapImage }),
         }
       );
       if (!resp.ok) {

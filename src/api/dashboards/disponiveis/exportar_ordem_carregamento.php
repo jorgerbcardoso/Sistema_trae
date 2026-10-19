@@ -40,6 +40,7 @@ $unidade = strtoupper(trim(
     ?? ''
 ));
 $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+$seqCarInput = (int)($input['seq_carregamento'] ?? 0);
 $rotaTxt = (string)($input['rota'] ?? '');
 $mapImage = (string)($input['map_image'] ?? '');
 $rotaKm = ($input['rota_km'] ?? null);
@@ -78,18 +79,22 @@ $tblMot = "{$domain}_motorista";
 
 $seqCar = 0;
 try {
-    $resCar = sql(
-        "SELECT MAX(seq_carregamento) AS seq_carregamento
-         FROM {$tblCar}
-         WHERE unidade = $1
-           AND UPPER(placa_provisoria) = UPPER($2)
-           AND data_finalizacao IS NULL",
-        [$unidade, $placa],
-        $conn
-    );
-    if ($resCar) {
-        $row = pg_fetch_assoc($resCar);
-        $seqCar = (int)($row['seq_carregamento'] ?? 0);
+    if ($seqCarInput > 0) {
+        $seqCar = $seqCarInput;
+    } else {
+        $resCar = sql(
+            "SELECT MAX(seq_carregamento) AS seq_carregamento
+             FROM {$tblCar}
+             WHERE unidade = $1
+               AND UPPER(placa_provisoria) = UPPER($2)
+               AND data_finalizacao IS NULL",
+            [$unidade, $placa],
+            $conn
+        );
+        if ($resCar) {
+            $row = pg_fetch_assoc($resCar);
+            $seqCar = (int)($row['seq_carregamento'] ?? 0);
+        }
     }
 } catch (Exception $e) {
     $seqCar = 0;
@@ -217,6 +222,7 @@ $fmtDdMmYy = function($v) {
 
 $linhasDb = [];
 try {
+    $whereSeq = $seqCar > 0 ? " AND car.seq_carregamento = $3" : "";
     $qLinhas = "
         SELECT
             car.ordem,
@@ -247,13 +253,15 @@ try {
         WHERE car.unidade = $1
           AND UPPER(car.placa_provisoria) = UPPER($2)
           AND car.data_finalizacao IS NULL
+          {$whereSeq}
           AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
         ORDER BY
           CASE WHEN car.ordem IS NULL OR car.ordem <= 0 THEN 999999 ELSE car.ordem END,
           car.ser_cte,
           car.nro_cte
     ";
-    $resL = sql($qLinhas, [$unidade, $placa], $conn);
+    $paramsLinhas = $seqCar > 0 ? [$unidade, $placa, $seqCar] : [$unidade, $placa];
+    $resL = sql($qLinhas, $paramsLinhas, $conn);
     $idx = 1;
     while ($resL && ($r = pg_fetch_assoc($resL))) {
         $destCte = strtoupper(trim((string)($r['destino_cte'] ?? '')));
@@ -871,8 +879,7 @@ $totReal = 0.0;
 $totCalc = 0.0;
 $totCub = 0.0;
 $totVol = 0;
-$paradaIdx = 0;
-$paradaKeyPrev = null;
+$paradaOrdemPrev = null;
 foreach ($linhas as $item) {
     if (!is_array($item)) continue;
     if ($row >= $totalRow) break;
@@ -897,18 +904,10 @@ foreach ($linhas as $item) {
     if ($cubagem > 0) $totCub += $cubagem;
     if ($qtVol > 0) $totVol += $qtVol;
 
-    $paradaKey = '';
-    if ($op === 'E') {
-        $paradaKey = strtoupper(trim($endLinha2 . '|' . $cidade));
-    } else {
-        $paradaKey = $destinoCte !== '' ? $destinoCte : strtoupper(trim($cidade));
-    }
-    if ($paradaKey === '' && $ordem > 0) $paradaKey = (string)$ordem;
     $paradaCell = '';
-    if ($paradaKeyPrev === null || $paradaKey !== $paradaKeyPrev) {
-        $paradaIdx += 1;
-        $paradaCell = (string)$paradaIdx;
-        $paradaKeyPrev = $paradaKey;
+    if ($ordem > 0 && ($paradaOrdemPrev === null || $ordem !== $paradaOrdemPrev)) {
+        $paradaCell = (string)$ordem;
+        $paradaOrdemPrev = $ordem;
     }
 
     $sheet->setCellValue('A' . $row, $paradaCell);
