@@ -328,6 +328,51 @@ const primeiraNfNfs = (nfs: string): string => {
   return parts.length >= 2 ? parts[1] : parts[0];
 };
 
+const sugerirVeiculoPorPesoCub = (
+  pesoKg: number,
+  cubM3: number,
+  caps: any[] | undefined | null
+): { tipo: string; ton: number; m3: number; raw: any } | null => {
+  const pesoTon = (Number(pesoKg) || 0) / 1000;
+  const cub = Number(cubM3) || 0;
+  if (pesoTon <= 0 && cub <= 0) return null;
+  const list = Array.isArray(caps) ? caps : [];
+  if (list.length === 0) return null;
+
+  const normTipo = (s: any) =>
+    String(s ?? '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
+  const toNum = (v: any): number => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    const s = String(v ?? '').trim().replace(/\s+/g, '').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const norm = list
+    .map((c) => ({
+      tipo: String(c?.tipo ?? '').trim(),
+      tipoN: normTipo(c?.tipo ?? ''),
+      ton: toNum((c as any)?.capacidade_ton ?? (c as any)?.ton ?? 0),
+      m3: toNum((c as any)?.capacidade_m3 ?? (c as any)?.m3 ?? 0),
+      raw: c,
+    }))
+    .filter((c) => {
+      if (!c.tipo) return false;
+      if (c.tipoN === 'CAVALO' || c.tipoN === 'CAVALO TRUCADO' || c.tipoN === 'AVIAO') return false;
+      return c.ton > 0 || c.m3 > 0;
+    })
+    .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
+  if (norm.length === 0) return null;
+  const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
+  return ok ?? norm[norm.length - 1];
+};
+
 const COR_INDICADOR: Record<string, string> = {
   verde:    'bg-green-500',
   amarelo:  'bg-yellow-400',
@@ -3225,43 +3270,16 @@ function CardCarregamento({
     if (!isEntregaCarreg) return null;
     const caps = Array.isArray(veiculoCapacidades) ? veiculoCapacidades : [];
     if (caps.length === 0) return 'Ajustar capacidades';
-    const pesoTon = (Number(totalPeso) || 0) / 1000;
-    const cub = Number(totalCubagem) || 0;
-    if (pesoTon <= 0 && cub <= 0) return null;
-    const norm = caps
-      .map((c) => ({
-        tipo: String(c.tipo ?? '').trim(),
-        ton: Number((c as any).capacidade_ton ?? (c as any).ton ?? 0) || 0,
-        m3: Number((c as any).capacidade_m3 ?? (c as any).m3 ?? 0) || 0,
-      }))
-      .filter((c) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
-      .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
-    if (norm.length === 0) return 'Ajustar capacidades';
-    const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
-    if (ok) return ok.tipo;
-    return norm[norm.length - 1].tipo;
+    const sug = sugerirVeiculoPorPesoCub(Number(totalPeso) || 0, Number(totalCubagem) || 0, caps);
+    return sug ? sug.tipo : null;
   }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
 
   const capacidadeSugerida = useMemo(() => {
     if (!isEntregaCarreg) return null;
     const caps = Array.isArray(veiculoCapacidades) ? veiculoCapacidades : [];
     if (caps.length === 0) return null;
-    const pesoTon = (Number(totalPeso) || 0) / 1000;
-    const cub = Number(totalCubagem) || 0;
-    if (pesoTon <= 0 && cub <= 0) return null;
-    const norm = caps
-      .map((c) => ({
-        tipo: String(c.tipo ?? '').trim(),
-        ton: Number((c as any).capacidade_ton ?? (c as any).ton ?? 0) || 0,
-        m3: Number((c as any).capacidade_m3 ?? (c as any).m3 ?? 0) || 0,
-      }))
-      .filter((c) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
-      .sort((a, b) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
-    if (norm.length === 0) return null;
-    const ok = norm.find((c) => (c.ton <= 0 || c.ton >= pesoTon) && (c.m3 <= 0 || c.m3 >= cub));
-    if (ok) return { ton: ok.ton, m3: ok.m3 };
-    const max = norm[norm.length - 1];
-    return { ton: max.ton, m3: max.m3 };
+    const sug = sugerirVeiculoPorPesoCub(Number(totalPeso) || 0, Number(totalCubagem) || 0, caps);
+    return sug ? { ton: sug.ton, m3: sug.m3 } : null;
   }, [isEntregaCarreg, veiculoCapacidades, totalPeso, totalCubagem]);
 
   const bordaBaseClass = isSimulado
@@ -4991,8 +5009,8 @@ function ModalDadosOrdemCarregamento({
   placa,
   seqCarregamento,
   rotaKm,
-  capTon,
-  capM3,
+  pesoKg,
+  cubM3,
   onFechar,
   onConcluirSalvar,
 }: {
@@ -5000,8 +5018,8 @@ function ModalDadosOrdemCarregamento({
   placa: string;
   seqCarregamento: number;
   rotaKm: number;
-  capTon: number | null;
-  capM3: number | null;
+  pesoKg: number;
+  cubM3: number;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
 }) {
@@ -5116,7 +5134,6 @@ function ModalDadosOrdemCarregamento({
   useEffect(() => {
     let alive = true;
     const run = async () => {
-      const cavalo = placaDefinitiva.trim().toUpperCase();
       setCalcLoading(true);
       try {
         const resp = await apiFetch(
@@ -5126,51 +5143,9 @@ function ModalDadosOrdemCarregamento({
         );
         if (!alive) return;
         const items = Array.isArray(resp?.items) ? resp.items : [];
-        const normTipo2 = (s: any) =>
-          String(s ?? '')
-            .trim()
-            .toUpperCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\s+/g, ' ');
-        const parseNum = (v: any): number => {
-          if (v === null || v === undefined) return 0;
-          if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-          const s = String(v ?? '').trim().replace(/\s+/g, '').replace(',', '.');
-          const n = Number(s);
-          return Number.isFinite(n) ? n : 0;
-        };
-        const approxEq = (a: number, b: number) => Math.abs(a - b) <= 0.0005;
-
-        if (cavalo) {
-          const vCav = await fetchVeiculo(cavalo);
-          if (!alive) return;
-          const tipo = String(vCav?.tipo ?? '').trim().toUpperCase();
-          setCalcTipoVeiculo(tipo);
-          if (!tipo) { setCalcParams(null); return; }
-          const tipoN = normTipo2(tipo);
-          const it = items.find((x: any) => normTipo2(x?.tipo ?? '') === tipoN);
-          setCalcParams(it ?? null);
-          return;
-        }
-
-        const ton = capTon !== null && capTon !== undefined ? Number(capTon) : null;
-        const m3 = capM3 !== null && capM3 !== undefined ? Number(capM3) : null;
-        if ((ton === null || !Number.isFinite(ton)) && (m3 === null || !Number.isFinite(m3))) {
-          setCalcTipoVeiculo('');
-          setCalcParams(null);
-          return;
-        }
-        const itByCap = items.find((x: any) => {
-          const t = parseNum(x?.capacidade_ton ?? x?.ton ?? 0);
-          const v = parseNum(x?.capacidade_m3 ?? x?.m3 ?? 0);
-          const okTon = ton === null || !Number.isFinite(ton) ? true : approxEq(t, ton);
-          const okM3 = m3 === null || !Number.isFinite(m3) ? true : approxEq(v, m3);
-          return okTon && okM3;
-        });
-        const tipoCap = String(itByCap?.tipo ?? '').trim().toUpperCase();
-        setCalcTipoVeiculo(tipoCap);
-        setCalcParams(itByCap ?? null);
+        const sug = sugerirVeiculoPorPesoCub(pesoKg, cubM3, items);
+        setCalcTipoVeiculo(String(sug?.tipo ?? '').trim().toUpperCase());
+        setCalcParams(sug?.raw ?? null);
       } catch {
         if (!alive) return;
         setCalcParams(null);
@@ -5180,7 +5155,7 @@ function ModalDadosOrdemCarregamento({
     };
     void run();
     return () => { alive = false; };
-  }, [placaDefinitiva, capTon, capM3]);
+  }, [pesoKg, cubM3]);
 
   useEffect(() => {
     let alive = true;
@@ -5578,6 +5553,12 @@ function ModalRotaCarregamento({
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
   const paradas = Array.isArray(carregarInfo?.paradas) ? (carregarInfo.paradas as string[]) : [];
+  const totaisCalc = useMemo(() => {
+    const list = Array.isArray(dados?.ctes) ? dados.ctes : [];
+    const peso = list.reduce((s: number, c: any) => s + parsePeso(String(c?.peso ?? c?.peso_cte ?? '0')), 0);
+    const cub = list.reduce((s: number, c: any) => s + parseCubagem(String(c?.cubagem ?? c?.cubagem_cte ?? '0')), 0);
+    return { peso, cub };
+  }, [dados]);
 
   const unidadesMap = useMemo(() => {
     const m = new Map<string, { sigla: string; nome: string; lat: number | null; lng: number | null }>();
@@ -7136,8 +7117,8 @@ function ModalRotaCarregamento({
           placa={String(carregamento.placa_provisoria ?? '').toUpperCase()}
           seqCarregamento={Number((carregamento as any)?.seq_carregamento ?? 0) || 0}
           rotaKm={Number(routeDistanceKm ?? 0) || 0}
-          capTon={carregamento.capacidade_ton ?? null}
-          capM3={carregamento.capacidade_m3 ?? null}
+          pesoKg={totaisCalc.peso}
+          cubM3={totaisCalc.cub}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
         />
