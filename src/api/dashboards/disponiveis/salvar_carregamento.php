@@ -878,8 +878,10 @@ if ($acao === 'adicionar_ctes') {
             continue;
         }
 
-        $destCte  = pg_escape_string($conn, strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $destCteRaw = strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? ''));
+        $destCte  = pg_escape_string($conn, $destCteRaw);
         $setorCteRaw = strtoupper(trim((string)($cteData['setor'] ?? $cteData['setor_cte'] ?? '')));
+        if ($setorCteRaw === '' && $destCteRaw !== '') $setorCteRaw = $destCteRaw;
         $setorCteEsc = pg_escape_string($conn, $setorCteRaw);
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']
@@ -972,6 +974,18 @@ if ($acao === 'adicionar_ctes') {
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
                AND nro_cte = 0
                AND data_finalizacao IS NULL"
+        );
+    }
+
+    if (preg_match('/^[A-Z0-9]{2,5}$/', $placa)) {
+        @pg_query($conn,
+            "UPDATE {$tabela}
+             SET setor_cte = destino_cte
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND data_finalizacao IS NULL
+               AND COALESCE(setor_cte, '') = ''
+               AND COALESCE(destino_cte, '') <> ''"
         );
     }
 
