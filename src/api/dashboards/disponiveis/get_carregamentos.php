@@ -704,15 +704,9 @@ try {
     $resCtes = sql($sqlCtes, [$unidade], $conn);
     while ($resCtes && ($cteRow = pg_fetch_assoc($resCtes))) {
         $seqCte = ($cteRow['seq_carregamento'] !== null && $cteRow['seq_carregamento'] !== '') ? (int)$cteRow['seq_carregamento'] : 0;
-        $placa  = $cteRow['placa_provisoria'] ?? '';
-
-        $idx = null;
-        if ($seqCte > 0 && isset($idxPorSeq[$seqCte])) {
-            $idx = $idxPorSeq[$seqCte];
-        } elseif ($placa !== '' && isset($idxPorPlaca[$placa])) {
-            $idx = $idxPorPlaca[$placa];
-        }
-        if ($idx === null) continue;
+        if ($seqCte <= 0) continue;
+        if (!isset($idxPorSeq[$seqCte])) continue;
+        $idx = $idxPorSeq[$seqCte];
 
         $serCte = $cteRow['ser_cte'] ?? '';
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;

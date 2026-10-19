@@ -10512,7 +10512,6 @@ export function Disponiveis() {
       );
       if (!criar?.success) return { ok: false, message: criar?.message || 'Erro ao criar carregamento.' };
       const seqCarregamento = Number(criar?.seq_carregamento ?? 0) || 0;
-
       const ctesPayload = ctesDentro.map((c) => ({
         nroCte: c.nroCte,
         serCte: c.serCte,
@@ -10540,6 +10539,39 @@ export function Disponiveis() {
       if (!add?.success) return { ok: false, message: add?.message || 'Erro ao adicionar CT-es.' };
       const adicionados = Number(add?.adicionados ?? 0) || 0;
       const ignorados = Number(add?.ignorados ?? 0) || 0;
+      const carregarTotais = async () => {
+        try {
+          const r = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
+            { method: 'POST', body: JSON.stringify({ placa: placaOk, seq_carregamento: seqCarregamento || undefined }) },
+            true
+          );
+          if (!r?.success) return;
+          const totais = r?.totais ?? null;
+          const lista = Array.isArray(r?.ctes) ? r.ctes : [];
+          const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
+            const v = parseMoeda(String(c?.vlr_frete ?? '0'));
+            const tp = String(c?.tp_frete ?? '').trim().toUpperCase();
+            if (tp === 'C') acc.cif += v;
+            else if (tp !== '') acc.fob += v;
+            else {
+              const pag = normalizePessoa(String(c?.nome_pag ?? ''));
+              const dest = normalizePessoa(String(c?.destinatario ?? ''));
+              if (pag !== '' && dest !== '' && pag === dest) acc.fob += v;
+              else acc.cif += v;
+            }
+            return acc;
+          }, { cif: 0, fob: 0 });
+          totaisCarregamentoCache.set(String(seqCarregamento), {
+            peso: normPesoKgTotal(totais?.peso ?? 0),
+            cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
+            vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
+            cif: frete.cif,
+            fob: frete.fob,
+          });
+        } catch {}
+      };
+      setTimeout(() => { carregarTotais(); }, 0);
 
       if (adicionados <= 0) {
         await apiFetch(
