@@ -2802,9 +2802,14 @@ function CardCarregamento({
   useEffect(() => {
     if (qtdeCtesCarreg <= 0) return;
     if (isConjunto) return;
-    if (totaisCard) return;
     const cached = totaisCarregamentoCache.get(carregamentoKey);
-    if (cached) { setTotaisCard(cached); return; }
+    if (cached) {
+      if (!totaisCard) { setTotaisCard(cached); }
+      return;
+    }
+    const origem = String(carregamento.origem_criacao ?? '').toUpperCase();
+    const precisaRecalcular = origem !== 'MANUAL';
+    if (totaisCard && !precisaRecalcular) return;
     let alive = true;
     (async () => {
       try {
@@ -10562,7 +10567,7 @@ export function Disponiveis() {
             }
             return acc;
           }, { cif: 0, fob: 0 });
-          totaisCarregamentoCache.set(String(seqCarregamento), {
+          totaisCarregamentoCache.set(`${String(seqCarregamento)}|${placaOk}`, {
             peso: normPesoKgTotal(totais?.peso ?? 0),
             cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
             vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
