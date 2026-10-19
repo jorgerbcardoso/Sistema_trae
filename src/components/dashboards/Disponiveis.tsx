@@ -9931,7 +9931,7 @@ function CarregamentoArea({
       </Dialog>
 
       <Dialog open={capFrotaDialogOpen} onOpenChange={setCapFrotaDialogOpen}>
-        <DialogContent className="sm:max-w-[1160px]">
+        <DialogContent className="sm:max-w-[1320px] w-[min(1320px,calc(100vw-32px))]">
           <DialogHeader>
             <DialogTitle>Ajustar Tabela Frota</DialogTitle>
             <DialogDescription>Define os custos por tipo de veículo para estimativa automática no cálculo de frota.</DialogDescription>
@@ -9946,61 +9946,61 @@ function CarregamentoArea({
               <div className="py-6 text-center text-sm text-slate-500">Nenhum tipo de veículo encontrado.</div>
             ) : (
               <div className="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                <table className="w-full text-sm min-w-[1180px]">
+                <table className="w-full text-sm min-w-[1100px]">
                   <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Tipo</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[170px]">Valor Diária em Operação (R$)</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[160px]">Média por km/Litro</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[140px]">Manutenção R$/km</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Pneus R$/km</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[130px]">Custo fixo diário</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[170px]">Custo diário do motorista</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[140px]">Custo Pernoite dia</th>
+                      <th className="px-2 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[110px]">Tipo</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[160px]">Diária em Operação (R$)</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[95px]">Km/L</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Manut. R$/Km</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[110px]">Pneus R$/km</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Custo fixo diário</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[150px]">Custo diário do mot.</th>
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-slate-600 dark:text-slate-300 w-[130px]">Custo Pernoite</th>
                     </tr>
                   </thead>
                   <tbody>
                     {capFrotaItems.map((it, idx) => (
                       <tr key={it.tipo} className="border-b border-slate-100 dark:border-slate-800">
-                        <td className="px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{it.tipo}</td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.01" value={it.vlr_diaria} onChange={(e) => {
+                        <td className="px-2 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{it.tipo}</td>
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_diaria} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_diaria: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.01" value={it.media_consumo} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.media_consumo} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, media_consumo: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.0001" value={it.vlr_manutencao_km} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_manutencao_km} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_manutencao_km: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.0001" value={it.vlr_pneus_km} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_pneus_km} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_pneus_km: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.01" value={it.fixo_diario} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.fixo_diario} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, fixo_diario: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.01" value={it.custo_diario_motorista} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.custo_diario_motorista} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_diario_motorista: v } : p)));
                           }} />
                         </td>
-                        <td className="px-3 py-2">
-                          <Input type="number" inputMode="decimal" step="0.01" value={it.custo_pernoite} onChange={(e) => {
+                        <td className="px-2 py-2 text-right">
+                          <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.custo_pernoite} onChange={(e) => {
                             const v = e.target.value;
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_pernoite: v } : p)));
                           }} />
