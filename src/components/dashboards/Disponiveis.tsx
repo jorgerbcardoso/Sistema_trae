@@ -2789,10 +2789,16 @@ function CardCarregamento({
         const lista = Array.isArray(res?.ctes) ? res.ctes : [];
         const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
           const v = parseMoeda(String(c?.vlr_frete ?? '0'));
-          const rem = normalizePessoa(String(c?.remetente ?? ''));
+          const tp = String(c?.tp_frete ?? '').trim().toUpperCase();
+          if (tp !== '') {
+            if (tp === 'C') acc.cif += v;
+            else acc.fob += v;
+            return acc;
+          }
           const pag = normalizePessoa(String(c?.nome_pag ?? ''));
-          if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-          else acc.fob += v;
+          const dest = normalizePessoa(String(c?.destinatario ?? ''));
+          if (pag !== '' && dest !== '' && pag === dest) acc.fob += v;
+          else acc.cif += v;
           return acc;
         }, { cif: 0, fob: 0 });
         const next = {

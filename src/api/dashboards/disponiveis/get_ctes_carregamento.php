@@ -91,6 +91,28 @@ $conn = connect();
 $tabela = "{$domain}_carregamento";
 $tblCte = "{$domain}_cte";
 $cteTableOk = tabelaExisteCtesCarreg($conn, $tblCte);
+$hasSeqCte = false;
+$hasTpFrete = false;
+if ($cteTableOk) {
+    try {
+        $resCols = sql(
+            "SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND lower(table_name) = lower($1)",
+            [$tblCte],
+            $conn
+        );
+        while ($resCols && ($r = pg_fetch_assoc($resCols))) {
+            $name = strtolower(trim((string)($r['column_name'] ?? '')));
+            if ($name === 'seq_cte') $hasSeqCte = true;
+            if ($name === 'tp_frete') $hasTpFrete = true;
+        }
+    } catch (Exception $e) {
+        $hasSeqCte = false;
+        $hasTpFrete = false;
+    }
+}
 $domainUpper = strtoupper($domain);
 $tblCidParam = "{$domain}_cid_param";
 $cidParamOk = ($domainUpper === 'RVE') && $cteTableOk && tabelaExisteCtesCarreg($conn, $tblCidParam);
@@ -105,13 +127,23 @@ $whereSql = $seqCarreg > 0
 $params = $seqCarreg > 0 ? [$unidade, $seqCarreg] : [$unidade, $placa];
 
 $joinCte = $cteTableOk
-    ? "LEFT JOIN {$tblCte} cte
-         ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
-        AND cte.nro_cte = car.nro_cte"
+    ? ($hasSeqCte
+        ? "LEFT JOIN LATERAL (
+               SELECT *
+               FROM {$tblCte} cte2
+               WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(car.ser_cte))
+                 AND cte2.nro_cte = car.nro_cte
+               ORDER BY cte2.seq_cte DESC
+               LIMIT 1
+           ) cte ON TRUE"
+        : "LEFT JOIN {$tblCte} cte
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
+              AND cte.nro_cte = car.nro_cte")
     : "";
 $joinCidParam = $cidParamOk ? "LEFT JOIN {$tblCidParam} cidp ON cidp.seq_cidade = cte.seq_cidade_entr" : "";
 $selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";
 $selUnidFec = $cidParamOk ? "COALESCE(cidp.unidade, '') AS unidade_fec," : "'' AS unidade_fec,";
+$selTpFrete = ($cteTableOk && $hasTpFrete) ? "COALESCE(cte.tp_frete::text, '') AS tp_frete," : "'' AS tp_frete,";
 
 $sql = "
     SELECT
@@ -122,6 +154,7 @@ $sql = "
         COALESCE(car.setor_cte, '') AS setor_cte,
         {$selNfs}
         {$selUnidFec}
+        {$selTpFrete}
         TO_CHAR(
             CASE
                 WHEN car.data_emissao_cte IS NULL THEN NULL
@@ -216,6 +249,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
         'sigla_dest_principal' => $destMain,
         'sigla_dest_display' => $destDisplay,
+        'tp_frete'      => $row['tp_frete'] ?? '',
         'nome_pag'      => $row['pagador_cte'] ?? '',
         'destinatario'  => $row['destinatario_cte'] ?? '',
         'remetente'     => $row['remetente_cte'] ?? '',
@@ -304,6 +338,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                     'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
                     'sigla_dest_principal' => $destMain,
                     'sigla_dest_display' => $destDisplay,
+                    'tp_frete'      => $row['tp_frete'] ?? '',
                     'nome_pag'      => $row['pagador_cte'] ?? '',
                     'destinatario'  => $row['destinatario_cte'] ?? '',
                     'remetente'     => $row['remetente_cte'] ?? '',

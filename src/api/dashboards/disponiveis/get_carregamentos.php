@@ -560,11 +560,23 @@ $cteCol = function(string $col) use ($conn, $tblCte, &$cteCols): bool {
     return isset($cteCols[strtolower($col)]);
 };
 
-$joinCteDest = "
-    LEFT JOIN {$tblCte} cte
-           ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-          AND cte.nro_cte = c.nro_cte
-";
+$hasSeqCte = $cteCol('seq_cte');
+$joinCteMatch = $hasSeqCte
+    ? ("
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM {$tblCte} cte2
+            WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte2.nro_cte = c.nro_cte
+            ORDER BY cte2.seq_cte DESC
+            LIMIT 1
+        ) cte ON TRUE
+    ")
+    : ("
+        LEFT JOIN {$tblCte} cte
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte.nro_cte = c.nro_cte
+    ");
 
 $selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
 $selVlrFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, c.vlr_frete_cte)" : "c.vlr_frete_cte";
@@ -615,9 +627,7 @@ $selCustoTransfReal = $cteCol('custo_transferencia_real') ? "COALESCE(cte.custo_
 if (strtoupper($domain) === 'RVE') {
     $tblCidParam = "{$domain}_cid_param";
     $joinCteDest = "
-        LEFT JOIN {$tblCte} cte
-               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte.nro_cte = c.nro_cte
+        {$joinCteMatch}
         {$joinOcorExtra}
         {$joinCidadeEntrega}
         LEFT JOIN {$tblCidParam} cidp
@@ -629,9 +639,7 @@ if (strtoupper($domain) === 'RVE') {
     END AS destino_cte_painel,";
 } else {
     $joinCteDest = "
-        LEFT JOIN {$tblCte} cte
-               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte.nro_cte = c.nro_cte
+        {$joinCteMatch}
         {$joinOcorExtra}
         {$joinCidadeEntrega}
     ";
