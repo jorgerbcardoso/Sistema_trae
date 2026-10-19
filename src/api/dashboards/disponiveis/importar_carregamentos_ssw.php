@@ -789,45 +789,53 @@ function parseRelatorioCarregamentos($texto) {
         $kg = '';
         $m3 = '';
 
-        $parts = preg_split('/\\s{2,}/', rtrim($linhaTrim));
-        if (is_array($parts) && count($parts) >= 10) {
-            $emiss   = trim($parts[1] ?? '');
-            $prevEnt = trim($parts[2] ?? '');
+        $offset = 0;
+        $cols = [];
+        foreach ($larguras as $w) {
+            $cols[] = rtrim(substr($linhaTrim, $offset, $w));
+            $offset += $w + 1;
+        }
+        $emiss   = trim($cols[1] ?? '');
+        $prevEnt = trim($cols[2] ?? '');
+        $qVol    = trim($cols[6] ?? '');
+        $remet   = trim($cols[9] ?? '');
+        $pagador = trim($cols[10] ?? '');
+        $destin  = trim($cols[11] ?? '');
+        $locEnt  = trim($cols[12] ?? '');
+        $uni     = strtoupper(trim($cols[13] ?? ''));
+        $merc    = trim($cols[14] ?? '');
+        $frete   = trim($cols[15] ?? '');
+        $kg      = trim($cols[16] ?? '');
+        $m3      = trim($cols[17] ?? '');
 
-            $n = count($parts);
-            $remet   = trim((string)($parts[$n - 10] ?? ''));
-            $pagador = trim((string)($parts[$n - 9] ?? ''));
-            $destin  = trim((string)($parts[$n - 8] ?? ''));
-            $locEnt  = trim((string)($parts[$n - 7] ?? ''));
-            $uni     = strtoupper(trim((string)($parts[$n - 6] ?? '')));
-            $merc    = trim((string)($parts[$n - 5] ?? ''));
-            $frete   = trim((string)($parts[$n - 4] ?? ''));
-            $kg      = trim((string)($parts[$n - 3] ?? ''));
-            $m3      = trim((string)($parts[$n - 2] ?? ''));
+        if ($uni === '' || !preg_match('/^\\d{2}\\/\\d{2}$/', $emiss) || !preg_match('/^\\d{2}\\/\\d{2}$/', $prevEnt)) {
+            $parts = preg_split('/\\s{2,}/', rtrim($linhaTrim));
+            if (is_array($parts) && count($parts) >= 8) {
+                $p1 = trim((string)($parts[1] ?? ''));
+                $p2 = trim((string)($parts[2] ?? ''));
+                if (!preg_match('/^\\d{2}\\/\\d{2}$/', $p1) && preg_match('/^(\\d{2}\\/\\d{2})\\s+(\\d{2}\\/\\d{2})$/', $p1, $mD)) {
+                    $p2 = $mD[2];
+                    $p1 = $mD[1];
+                }
+                if (preg_match('/^\\d{2}\\/\\d{2}$/', $p1)) $emiss = $p1;
+                if (preg_match('/^\\d{2}\\/\\d{2}$/', $p2)) $prevEnt = $p2;
 
-            if ($n >= 14) {
-                $cand = trim((string)($parts[5] ?? ''));
-                if (preg_match('/^\\d+$/', $cand)) $qVol = $cand;
+                $n = count($parts);
+                $remet   = trim((string)($parts[$n - 10] ?? $remet));
+                $pagador = trim((string)($parts[$n - 9] ?? $pagador));
+                $destin  = trim((string)($parts[$n - 8] ?? $destin));
+                $locEnt  = trim((string)($parts[$n - 7] ?? $locEnt));
+                $uni     = strtoupper(trim((string)($parts[$n - 6] ?? $uni)));
+                $merc    = trim((string)($parts[$n - 5] ?? $merc));
+                $frete   = trim((string)($parts[$n - 4] ?? $frete));
+                $kg      = trim((string)($parts[$n - 3] ?? $kg));
+                $m3      = trim((string)($parts[$n - 2] ?? $m3));
+
+                if ($n >= 14) {
+                    $cand = trim((string)($parts[5] ?? ''));
+                    if (preg_match('/^\\d+$/', $cand)) $qVol = $cand;
+                }
             }
-        } else {
-            $offset = 0;
-            $cols = [];
-            foreach ($larguras as $w) {
-                $cols[] = rtrim(substr($linhaTrim, $offset, $w));
-                $offset += $w + 1;
-            }
-            $emiss   = trim($cols[1] ?? '');
-            $prevEnt = trim($cols[2] ?? '');
-            $qVol    = trim($cols[6] ?? '');
-            $remet   = trim($cols[9] ?? '');
-            $pagador = trim($cols[10] ?? '');
-            $destin  = trim($cols[11] ?? '');
-            $locEnt  = trim($cols[12] ?? '');
-            $uni     = strtoupper(trim($cols[13] ?? ''));
-            $merc    = trim($cols[14] ?? '');
-            $frete   = trim($cols[15] ?? '');
-            $kg      = trim($cols[16] ?? '');
-            $m3      = trim($cols[17] ?? '');
         }
 
         if (!preg_match('/^([A-Z0-9]{3})(\\d{6,7})-\\d{1,2}$/', $ctrcRaw, $mN)) continue;
