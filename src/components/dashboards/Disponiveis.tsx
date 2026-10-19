@@ -5021,7 +5021,6 @@ function ModalDadosOrdemCarregamento({
 
   const [calcDiasOperacao, setCalcDiasOperacao] = useState('1');
   const [calcDiesel, setCalcDiesel] = useState('');
-  const [calcTerceiroKm, setCalcTerceiroKm] = useState('');
   const [calcTerceiroPlaca, setCalcTerceiroPlaca] = useState('');
   const [calcTerceiroTipo, setCalcTerceiroTipo] = useState('');
   const [calcTipoVeiculo, setCalcTipoVeiculo] = useState('');
@@ -5154,18 +5153,19 @@ function ModalDadosOrdemCarregamento({
   const calc = useMemo(() => {
     const km = Number(rotaKm ?? 0) || 0;
     const toNum = (v: any) => {
-      const s = String(v ?? '')
-        .trim()
-        .replace(/\s+/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.');
-      if (!s) return 0;
+      if (v === null || v === undefined) return 0;
+      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      const raw = String(v ?? '').trim();
+      if (!raw) return 0;
+      let s = raw.replace(/\s+/g, '');
+      if (s.includes(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      }
       const n = Number(s);
       return Number.isFinite(n) ? n : 0;
     };
     const diasOp = Math.max(0, Math.floor(toNum(calcDiasOperacao) || 0));
     const diesel = toNum(calcDiesel);
-    const terceiroKm = toNum(calcTerceiroKm);
 
     const p = calcParams || {};
     const vlrDiaria = toNum(p.vlr_diaria);
@@ -5174,26 +5174,31 @@ function ModalDadosOrdemCarregamento({
     const pneus = toNum(p.vlr_pneus_km);
     const fixo = toNum(p.fixo_diario);
     const motor = toNum(p.custo_diario_motorista);
+    const pernoite = toNum(p.custo_pernoite);
 
     const litros = media > 0 ? km / media : 0;
     const custoComb = diesel > 0 ? litros * diesel : 0;
     const custoKm = km * (manut + pneus);
     const custoDia = diasOp * (vlrDiaria + fixo + motor);
-    const totalFrota = custoComb + custoKm + custoDia;
+    const diasP = Math.max(0, diasOp - 1);
+    const custoPernoite = diasP * pernoite;
+    const totalFrota = custoComb + custoKm + custoDia + custoPernoite;
 
-    const totalTerceiro = km * terceiroKm;
+    const totalTerceiro = 0;
 
     return {
       km,
       diasOp,
+      diasP,
       litros,
       custoComb,
       custoKm,
       custoDia,
+      custoPernoite,
       totalFrota,
       totalTerceiro,
     };
-  }, [rotaKm, calcDiasOperacao, calcDiesel, calcTerceiroKm, calcParams]);
+  }, [rotaKm, calcDiasOperacao, calcDiesel, calcParams]);
 
   const salvar = async () => {
     if (saving || loading) return;
@@ -5390,26 +5395,10 @@ function ModalDadosOrdemCarregamento({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 <div className="space-y-1">
                   <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Placa simulação</label>
                   <FilterSelectVeiculo value={calcTerceiroPlaca} onChange={setCalcTerceiroPlaca} placeholder="Buscar placa" />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Terceiro (R$/km)</label>
-                  <Input
-                    className="text-right tabular-nums"
-                    type="text"
-                    inputMode="decimal"
-                    value={calcTerceiroKm}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
-                      const parts = v.split(',');
-                      if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
-                      setCalcTerceiroKm(v);
-                    }}
-                  />
                 </div>
               </div>
             </div>
@@ -5417,9 +5406,11 @@ function ModalDadosOrdemCarregamento({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/20 p-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs font-extrabold text-amber-900 dark:text-amber-200">Previsão Frota</div>
+                  <div className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+                    Previsão Frota{calcTipoVeiculo ? ` - ${calcTipoVeiculo}` : ''}
+                  </div>
                   <div className="text-[11px] text-amber-900/70 dark:text-amber-200/70 font-mono">
-                    {calcLoading ? '...' : (calcTipoVeiculo || '-')}
+                    {calc.km > 0 ? `${calc.km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : '0 km'}
                   </div>
                 </div>
                 <div className="mt-2 text-lg font-extrabold text-amber-900 dark:text-amber-200 tabular-nums">
@@ -5428,6 +5419,7 @@ function ModalDadosOrdemCarregamento({
                 <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-amber-900/80 dark:text-amber-200/80">
                   <div className="flex justify-between gap-2"><span>Combustível</span><span className="font-mono">{calc.custoComb.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between gap-2"><span>Manut/Pneus</span><span className="font-mono">{calc.custoKm.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between gap-2"><span>Pernoite</span><span className="font-mono">{calc.custoPernoite.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between gap-2"><span>Diárias/Fixo/Motor</span><span className="font-mono">{calc.custoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
               </div>
@@ -5442,10 +5434,6 @@ function ModalDadosOrdemCarregamento({
                 </div>
                 <div className="mt-2 text-lg font-extrabold text-sky-900 dark:text-sky-200 tabular-nums">
                   {calc.totalTerceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/80 flex justify-between gap-2">
-                  <span>R$/km</span>
-                  <span className="font-mono">{(Number(String(calcTerceiroKm || '').trim().replace(/\s+/g, '').replace(/\./g, '').replace(',', '.')) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
