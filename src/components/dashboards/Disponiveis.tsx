@@ -2613,10 +2613,16 @@ function CardCarregamento({
   const totalCubagemLocal = qtdeCtesCarreg === 0 ? 0 : ctesParaTotais.reduce((s, c) => s + parseCubagem((c as any)?.cubagem ?? ''), 0);
   const freteTotalsLocal = (qtdeCtesCarreg === 0) ? { cif: 0, fob: 0 } : ctesParaTotais.reduce((acc: { cif: number; fob: number }, c) => {
     const v = parseMoeda(String((c as any)?.vlr_frete ?? (c as any)?.frete ?? ''));
-    const rem = normalizePessoa(String((c as any)?.remetente ?? ''));
+    const tp = String((c as any)?.tp_frete ?? '').trim().toUpperCase();
+    if (tp !== '') {
+      if (tp === 'C') acc.cif += v;
+      else acc.fob += v;
+      return acc;
+    }
     const pag = normalizePessoa(String((c as any)?.pagador ?? ''));
-    if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-    else acc.fob += v;
+    const dest = normalizePessoa(String((c as any)?.destinatario ?? ''));
+    if (pag !== '' && dest !== '' && pag === dest) acc.fob += v;
+    else acc.cif += v;
     return acc;
   }, { cif: 0, fob: 0 });
   const freteCifLocal = freteTotalsLocal.cif;

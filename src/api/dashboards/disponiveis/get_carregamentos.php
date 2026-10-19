@@ -568,6 +568,7 @@ $joinCteDest = "
 
 $selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
 $selVlrFrete = $cteCol('vlr_frete') ? "COALESCE(cte.vlr_frete, c.vlr_frete_cte)" : "c.vlr_frete_cte";
+$selTpFrete = $cteCol('tp_frete') ? "COALESCE(cte.tp_frete::text, '')" : "''";
 $selPeso = $cteCol('peso_real')
     ? ("COALESCE(cte.peso_real" . ($cteCol('peso_calc') ? ", cte.peso_calc" : "") . ", c.peso_cte)")
     : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, c.peso_cte)" : "c.peso_cte");
@@ -653,6 +654,7 @@ $sqlCtes = "
         c.cidade_destino_cte,
         {$selVlrMerc} AS vlr_merc_cte,
         {$selVlrFrete} AS vlr_frete_cte,
+        {$selTpFrete} AS tp_frete_cte,
         {$selPeso} AS peso_cte,
         {$selCub} AS cubagem_cte,
         {$selVol} AS qtde_vol_cte,
@@ -723,6 +725,7 @@ try {
             'cidade'         => $cteRow['cidade_destino_cte'] ?? '',
             'vlr_merc'       => $cteRow['vlr_merc_cte'] ?? '',
             'vlr_frete'      => $cteRow['vlr_frete_cte'] ?? '',
+            'tp_frete'       => $cteRow['tp_frete_cte'] ?? '',
             'peso'           => $cteRow['peso_cte'] ?? '',
             'cubagem'        => $cteRow['cubagem_cte'] ?? '',
             'qtde_vol'       => $cteRow['qtde_vol_cte'] ?? '',
