@@ -4990,12 +4990,14 @@ function ModalDadosOrdemCarregamento({
   unidade,
   placa,
   seqCarregamento,
+  rotaKm,
   onFechar,
   onConcluirSalvar,
 }: {
   unidade: string;
   placa: string;
   seqCarregamento: number;
+  rotaKm: number;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
 }) {
@@ -5016,6 +5018,14 @@ function ModalDadosOrdemCarregamento({
   const [motList, setMotList] = useState<{ cpf: string; nome: string; ddd: string; fone: string }[]>([]);
   const [motLoading, setMotLoading] = useState(false);
   const [motOpen, setMotOpen] = useState(false);
+
+  const [calcDiasOperacao, setCalcDiasOperacao] = useState('1');
+  const [calcDiasPernoite, setCalcDiasPernoite] = useState('0');
+  const [calcDiesel, setCalcDiesel] = useState('');
+  const [calcTerceiroKm, setCalcTerceiroKm] = useState('');
+  const [calcTipoVeiculo, setCalcTipoVeiculo] = useState('');
+  const [calcParams, setCalcParams] = useState<any>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -5087,6 +5097,87 @@ function ModalDadosOrdemCarregamento({
       return null;
     }
   };
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      const cavalo = placaDefinitiva.trim().toUpperCase();
+      if (!cavalo) {
+        setCalcTipoVeiculo('');
+        setCalcParams(null);
+        return;
+      }
+      setCalcLoading(true);
+      try {
+        const vCav = await fetchVeiculo(cavalo);
+        if (!alive) return;
+        const tipo = String(vCav?.tipo ?? '').trim().toUpperCase();
+        setCalcTipoVeiculo(tipo);
+        if (!tipo) { setCalcParams(null); return; }
+        const resp = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
+          true
+        );
+        if (!alive) return;
+        const items = Array.isArray(resp?.items) ? resp.items : [];
+        const it = items.find((x: any) => String(x?.tipo ?? '').trim().toUpperCase() === tipo);
+        setCalcParams(it ?? null);
+      } catch {
+        if (!alive) return;
+        setCalcParams(null);
+      } finally {
+        if (alive) setCalcLoading(false);
+      }
+    };
+    void run();
+    return () => { alive = false; };
+  }, [placaDefinitiva]);
+
+  const calc = useMemo(() => {
+    const km = Number(rotaKm ?? 0) || 0;
+    const toNum = (v: any) => {
+      const s = String(v ?? '').trim();
+      if (!s) return 0;
+      const n = Number(s.replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const diasOp = Math.max(0, Math.floor(toNum(calcDiasOperacao) || 0));
+    const diasP = Math.max(0, Math.floor(toNum(calcDiasPernoite) || 0));
+    const diesel = toNum(calcDiesel);
+    const terceiroKm = toNum(calcTerceiroKm);
+
+    const p = calcParams || {};
+    const vlrDiaria = toNum(p.vlr_diaria);
+    const media = toNum(p.media_consumo);
+    const manut = toNum(p.vlr_manutencao_km);
+    const pneus = toNum(p.vlr_pneus_km);
+    const fixo = toNum(p.fixo_diario);
+    const motor = toNum(p.custo_diario_motorista);
+    const pernoite = toNum(p.custo_pernoite);
+
+    const litros = media > 0 ? km / media : 0;
+    const custoComb = diesel > 0 ? litros * diesel : 0;
+    const custoKm = km * (manut + pneus);
+    const custoDia = diasOp * (vlrDiaria + fixo + motor);
+    const custoPernoite = diasP * pernoite;
+    const totalFrota = custoComb + custoKm + custoDia + custoPernoite;
+
+    const totalTerceiro = km * terceiroKm;
+
+    return {
+      km,
+      diasOp,
+      diasP,
+      litros,
+      custoComb,
+      custoKm,
+      custoDia,
+      custoPernoite,
+      totalFrota,
+      totalTerceiro,
+    };
+  }, [rotaKm, calcDiasOperacao, calcDiasPernoite, calcDiesel, calcTerceiroKm, calcParams]);
 
   const salvar = async () => {
     if (saving || loading) return;
@@ -5231,25 +5322,87 @@ function ModalDadosOrdemCarregamento({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="space-y-1.5 md:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Qtde pallets</label>
               <Input value={qtdePallets} onChange={(e) => setQtdePallets(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
             </div>
-            <div className="space-y-1.5 md:col-span-3">
+            <div className="space-y-1.5 md:col-span-4">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Conferente</label>
               <Input value={conferente} onChange={(e) => setConferente(e.target.value)} maxLength={80} />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Ajudantes</label>
+            <div className="space-y-1.5 md:col-span-4">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Ajudante</label>
               <Input value={ajudantes} onChange={(e) => setAjudantes(e.target.value)} maxLength={120} placeholder="Até 2 nomes" />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 md:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Doca</label>
               <Input value={doca} onChange={(e) => setDoca(e.target.value.toUpperCase())} maxLength={20} />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculadora</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                {calc.km > 0 ? `${calc.km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : '0 km'}
+                {calcTipoVeiculo ? ` · ${calcTipoVeiculo}` : ''}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Dias (operação)</label>
+                <Input value={calcDiasOperacao} onChange={(e) => setCalcDiasOperacao(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Pernoite (dias)</label>
+                <Input value={calcDiasPernoite} onChange={(e) => setCalcDiasPernoite(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Diesel (R$/L)</label>
+                <Input type="number" inputMode="decimal" step="0.01" value={calcDiesel} onChange={(e) => setCalcDiesel(e.target.value)} />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Terceiro (R$/km)</label>
+                <Input type="number" inputMode="decimal" step="0.01" value={calcTerceiroKm} onChange={(e) => setCalcTerceiroKm(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-extrabold text-amber-900 dark:text-amber-200">Previsão Frota</div>
+                  <div className="text-[11px] text-amber-900/70 dark:text-amber-200/70 font-mono">
+                    {calcLoading ? '...' : (calcTipoVeiculo || '-')}
+                  </div>
+                </div>
+                <div className="mt-2 text-lg font-extrabold text-amber-900 dark:text-amber-200 tabular-nums">
+                  {calc.totalFrota.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-amber-900/80 dark:text-amber-200/80">
+                  <div className="flex justify-between gap-2"><span>Combustível</span><span className="font-mono">{calc.custoComb.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between gap-2"><span>Manut/Pneus</span><span className="font-mono">{calc.custoKm.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between gap-2"><span>Diárias/Fixo/Motor</span><span className="font-mono">{calc.custoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between gap-2"><span>Pernoite</span><span className="font-mono">{calc.custoPernoite.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-sky-200 dark:border-sky-900/60 bg-sky-50 dark:bg-sky-950/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-extrabold text-sky-900 dark:text-sky-200">Previsão Terceiro</div>
+                  <div className="text-[11px] text-sky-900/70 dark:text-sky-200/70 font-mono">
+                    {calc.km > 0 ? `${calc.km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : '0 km'}
+                  </div>
+                </div>
+                <div className="mt-2 text-lg font-extrabold text-sky-900 dark:text-sky-200 tabular-nums">
+                  {calc.totalTerceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/80 flex justify-between gap-2">
+                  <span>R$/km</span>
+                  <span className="font-mono">{(Number(String(calcTerceiroKm || '').replace(',', '.')) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -6901,6 +7054,7 @@ function ModalRotaCarregamento({
           unidade={origem}
           placa={String(carregamento.placa_provisoria ?? '').toUpperCase()}
           seqCarregamento={Number((carregamento as any)?.seq_carregamento ?? 0) || 0}
+          rotaKm={Number(routeDistanceKm ?? 0) || 0}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
         />
@@ -7595,6 +7749,19 @@ function CarregamentoArea({
   const [capLoading, setCapLoading] = useState(false);
   const [capSaving, setCapSaving] = useState(false);
   const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
+  const [capFrotaDialogOpen, setCapFrotaDialogOpen] = useState(false);
+  const [capFrotaLoading, setCapFrotaLoading] = useState(false);
+  const [capFrotaSaving, setCapFrotaSaving] = useState(false);
+  const [capFrotaItems, setCapFrotaItems] = useState<{
+    tipo: string;
+    vlr_diaria: string;
+    media_consumo: string;
+    vlr_manutencao_km: string;
+    vlr_pneus_km: string;
+    fixo_diario: string;
+    custo_diario_motorista: string;
+    custo_pernoite: string;
+  }[]>([]);
   const tooltipStyle = useTooltipStyle();
   const isAtivoCarregamento = useCallback((c: Carregamento) => {
     const dt = String((c as any)?.data_finalizacao ?? (c as any)?.dataFinalizacao ?? '').trim();
@@ -7865,10 +8032,98 @@ function CarregamentoArea({
     }
   };
 
+  const loadCapacidadesFrota = async () => {
+    try {
+      setCapFrotaLoading(true);
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message ? String(res.message) : 'Erro ao carregar tabela de frota');
+        setCapFrotaItems([]);
+        return;
+      }
+      const items = Array.isArray(res.items) ? res.items : [];
+      const tipoNorm = (s: any) =>
+        String(s ?? '')
+          .trim()
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+      setCapFrotaItems(
+        items
+          .map((it: any) => ({
+            tipo: String(it?.tipo ?? '').trim(),
+            vlr_diaria: it?.vlr_diaria == null ? '' : String(it.vlr_diaria),
+            media_consumo: it?.media_consumo == null ? '' : String(it.media_consumo),
+            vlr_manutencao_km: it?.vlr_manutencao_km == null ? '' : String(it.vlr_manutencao_km),
+            vlr_pneus_km: it?.vlr_pneus_km == null ? '' : String(it.vlr_pneus_km),
+            fixo_diario: it?.fixo_diario == null ? '' : String(it.fixo_diario),
+            custo_diario_motorista: it?.custo_diario_motorista == null ? '' : String(it.custo_diario_motorista),
+            custo_pernoite: it?.custo_pernoite == null ? '' : String(it.custo_pernoite),
+          }))
+          .filter((it: any) => {
+            const t = tipoNorm(it?.tipo);
+            return t !== 'CAVALO' && t !== 'CAVALO TRUCADO' && t !== 'AVIAO';
+          })
+      );
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar tabela de frota');
+      setCapFrotaItems([]);
+    } finally {
+      setCapFrotaLoading(false);
+    }
+  };
+
+  const salvarCapacidadesFrota = async () => {
+    if (capFrotaSaving) return;
+    try {
+      setCapFrotaSaving(true);
+      const toNum = (v: any) => {
+        const s = String(v ?? '').trim();
+        if (!s) return null;
+        const n = Number(s.replace(',', '.'));
+        return Number.isFinite(n) ? n : null;
+      };
+      const payload = capFrotaItems.map((it) => ({
+        tipo: String(it.tipo ?? '').trim().toUpperCase(),
+        vlr_diaria: toNum(it.vlr_diaria),
+        media_consumo: toNum(it.media_consumo),
+        vlr_manutencao_km: toNum(it.vlr_manutencao_km),
+        vlr_pneus_km: toNum(it.vlr_pneus_km),
+        fixo_diario: toNum(it.fixo_diario),
+        custo_diario_motorista: toNum(it.custo_diario_motorista),
+        custo_pernoite: toNum(it.custo_pernoite),
+      }));
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'salvar_frota', items: payload }) },
+        true
+      );
+      if (!res?.success) {
+        toast.error(res?.message ? String(res.message) : 'Erro ao salvar tabela de frota');
+        return;
+      }
+      toast.success('Tabela de frota atualizada.');
+      setCapFrotaDialogOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar tabela de frota');
+    } finally {
+      setCapFrotaSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (!capDialogOpen) return;
     void loadCapacidades();
   }, [capDialogOpen]);
+
+  useEffect(() => {
+    if (!capFrotaDialogOpen) return;
+    void loadCapacidadesFrota();
+  }, [capFrotaDialogOpen]);
 
   useEffect(() => {
     if (!carregamentosEntregaOpen) return;
@@ -9517,6 +9772,14 @@ function CarregamentoArea({
               >
                 <Gauge className="w-3.5 h-3.5 mr-1.5" />Ajustar capacidades
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-slate-300 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => setCapFrotaDialogOpen(true)}
+              >
+                <Wallet className="w-3.5 h-3.5 mr-1.5" />Ajustar Tabela Frota
+              </Button>
               <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-8 px-2 flex items-center">
                 Arraste um card e solte em outro para juntar setores
               </Badge>
@@ -9661,6 +9924,100 @@ function CarregamentoArea({
             </Button>
             <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={salvarCapacidades} disabled={capLoading || capSaving}>
               {capSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={capFrotaDialogOpen} onOpenChange={setCapFrotaDialogOpen}>
+        <DialogContent className="sm:max-w-[1160px]">
+          <DialogHeader>
+            <DialogTitle>Ajustar Tabela Frota</DialogTitle>
+            <DialogDescription>Define os custos por tipo de veículo para estimativa automática no cálculo de frota.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {capFrotaLoading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando...
+              </div>
+            ) : capFrotaItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-500">Nenhum tipo de veículo encontrado.</div>
+            ) : (
+              <div className="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm min-w-[1180px]">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Tipo</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[170px]">Valor Diária em Operação (R$)</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[160px]">Média por km/Litro</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[140px]">Manutenção R$/km</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[120px]">Pneus R$/km</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[130px]">Custo fixo diário</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[170px]">Custo diário do motorista</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 w-[140px]">Custo Pernoite dia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {capFrotaItems.map((it, idx) => (
+                      <tr key={it.tipo} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="px-3 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{it.tipo}</td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.01" value={it.vlr_diaria} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_diaria: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.01" value={it.media_consumo} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, media_consumo: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.0001" value={it.vlr_manutencao_km} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_manutencao_km: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.0001" value={it.vlr_pneus_km} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_pneus_km: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.01" value={it.fixo_diario} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, fixo_diario: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.01" value={it.custo_diario_motorista} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_diario_motorista: v } : p)));
+                          }} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" inputMode="decimal" step="0.01" value={it.custo_pernoite} onChange={(e) => {
+                            const v = e.target.value;
+                            setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_pernoite: v } : p)));
+                          }} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setCapFrotaDialogOpen(false)} disabled={capFrotaSaving}>
+              Fechar
+            </Button>
+            <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" onClick={salvarCapacidadesFrota} disabled={capFrotaLoading || capFrotaSaving}>
+              {capFrotaSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Salvar
             </Button>
           </div>
