@@ -2529,12 +2529,16 @@ function CardCarregamento({
     setLoadingCteDetalhe(true);
     try {
       const seq_ctes = Array.from(cteDetalheSelecionados.values()).filter(n => Number.isFinite(n) && n > 0);
-      const placaRemocao = isConjunto
-        ? (cteDetalheAbaConjunto === 'placa2' ? placa2 : placa1)
-        : placa1;
+      const seqCarRemocao = isConjunto
+        ? (cteDetalheAbaConjunto === 'placa2' ? Number((carregamentoConjunto as any)?.seq_carregamento ?? 0) : Number((carregamento as any)?.seq_carregamento ?? 0))
+        : Number((carregamento as any)?.seq_carregamento ?? 0);
+      if (!Number.isFinite(seqCarRemocao) || seqCarRemocao <= 0) {
+        toast.error('Não foi possível identificar o seq_carregamento para remover CT-es.');
+        return;
+      }
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', placa: placaRemocao, seq_ctes }) },
+        { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', seq_carregamento: seqCarRemocao, seq_ctes }) },
         true
       );
       if (!res?.success) {
@@ -2543,7 +2547,7 @@ function CardCarregamento({
       }
       const resList = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: placaRemocao }) },
+        { method: 'POST', body: JSON.stringify({ seq_carregamento: seqCarRemocao }) },
         true
       );
       if (resList.success) {

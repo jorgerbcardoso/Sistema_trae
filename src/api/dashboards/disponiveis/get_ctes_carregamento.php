@@ -58,6 +58,12 @@ function parseListaUnidadesCompartCtesCarreg(string $csv): array {
     return array_keys($out);
 }
 
+function cleanSiglaCtesCarreg($v): string {
+    $s = strtoupper(trim((string)$v));
+    $s = preg_replace('/[^A-Z0-9]/', '', $s);
+    return is_string($s) ? $s : '';
+}
+
 function buildMapaDestinoCompartilhadoCtesCarreg($conn, string $tblUnidade): array {
     $map = [];
     $tblUnidade = trim((string)$tblUnidade);
@@ -225,7 +231,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $cubNum   = (float)($row['cubagem'] ?? 0);
     $qtdeVol  = (int)($row['qtde_vol'] ?? 0);
 
-    $destOrig = strtoupper(trim($row['destino_cte'] ?? ''));
+    $destOrig = cleanSiglaCtesCarreg($row['destino_cte'] ?? '');
     $unidFec = strtoupper(trim((string)($row['unidade_fec'] ?? '')));
     $destPainel = ($domainUpper === 'RVE' && $destOrig === 'FEC' && $unidFec !== '') ? $unidFec : $destOrig;
     $destMain = $destPainel !== '' ? (string)($mapDestinoCompart[$destPainel] ?? $destPainel) : '';
@@ -237,6 +243,9 @@ while ($res && ($row = pg_fetch_assoc($res))) {
     $totCub   += $cubNum;
     $totVol   += $qtdeVol;
 
+    $setor = cleanSiglaCtesCarreg($row['setor_cte'] ?? '');
+    if ($setor === '') $setor = cleanSiglaCtesCarreg($row['destino_cte'] ?? '');
+
     $ctes[] = [
         'seq_cte'       => $nroCte,   // compatibilidade com frontend
         'ctrc'          => $ctrc,
@@ -246,7 +255,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'data_prev_ent' => $row['data_prev_ent'] ?? '',
         'sigla_dest'    => $destOrig,
         'sigla_dest_painel' => $destPainel,
-        'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
+        'setor'         => $setor,
         'sigla_dest_principal' => $destMain,
         'sigla_dest_display' => $destDisplay,
         'tp_frete'      => $row['tp_frete'] ?? '',
@@ -314,7 +323,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                 $cubNum   = (float)($row['cubagem'] ?? 0);
                 $qtdeVol  = (int)($row['qtde_vol'] ?? 0);
 
-                $destOrig = strtoupper(trim($row['destino_cte'] ?? ''));
+                $destOrig = cleanSiglaCtesCarreg($row['destino_cte'] ?? '');
                 $unidFec = strtoupper(trim((string)($row['unidade_fec'] ?? '')));
                 $destPainel = ($domainUpper === 'RVE' && $destOrig === 'FEC' && $unidFec !== '') ? $unidFec : $destOrig;
                 $destMain = $destPainel !== '' ? (string)($mapDestinoCompart[$destPainel] ?? $destPainel) : '';
@@ -326,6 +335,9 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                 $totCub   += $cubNum;
                 $totVol   += $qtdeVol;
 
+                $setor = cleanSiglaCtesCarreg($row['setor_cte'] ?? '');
+                if ($setor === '') $setor = cleanSiglaCtesCarreg($row['destino_cte'] ?? '');
+
                 $ctes[] = [
                     'seq_cte'       => $nroCte,
                     'ctrc'          => $ctrc,
@@ -335,7 +347,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                     'data_prev_ent' => $row['data_prev_ent'] ?? '',
                     'sigla_dest'    => $destOrig,
                     'sigla_dest_painel' => $destPainel,
-                    'setor'         => strtoupper(trim((string)($row['setor_cte'] ?? ''))),
+                    'setor'         => $setor,
                     'sigla_dest_principal' => $destMain,
                     'sigla_dest_display' => $destDisplay,
                     'tp_frete'      => $row['tp_frete'] ?? '',

@@ -878,10 +878,16 @@ if ($acao === 'adicionar_ctes') {
             continue;
         }
 
-        $destCteRaw = strtoupper(trim($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? ''));
+        $destCteRaw = strtoupper(trim((string)($cteData['unidadeDest'] ?? $cteData['destinoCte'] ?? $cteData['destino_cte'] ?? $cteData['destino'] ?? '')));
+        $destCteRaw = preg_replace('/[^A-Z0-9]/', '', $destCteRaw);
+        if (!is_string($destCteRaw)) $destCteRaw = '';
+        $destCteRaw = substr($destCteRaw, 0, 30);
         $destCte  = pg_escape_string($conn, $destCteRaw);
         $setorCteRaw = strtoupper(trim((string)($cteData['setor'] ?? $cteData['setor_cte'] ?? '')));
+        $setorCteRaw = preg_replace('/[^A-Z0-9]/', '', $setorCteRaw);
+        if (!is_string($setorCteRaw)) $setorCteRaw = '';
         if ($setorCteRaw === '' && $destCteRaw !== '') $setorCteRaw = $destCteRaw;
+        $setorCteRaw = substr($setorCteRaw, 0, 30);
         $setorCteEsc = pg_escape_string($conn, $setorCteRaw);
         $unidCarRaw = strtoupper(trim(
             $cteData['unidadeCarregamento']
@@ -980,6 +986,15 @@ if ($acao === 'adicionar_ctes') {
     if (preg_match('/^[A-Z0-9]{2,5}$/', $placa)) {
         @pg_query($conn,
             "UPDATE {$tabela}
+             SET setor_cte = regexp_replace(COALESCE(setor_cte, ''), '[^A-Z0-9]', '', 'g'),
+                 destino_cte = regexp_replace(COALESCE(destino_cte, ''), '[^A-Z0-9]', '', 'g')
+             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+               AND data_finalizacao IS NULL
+            "
+        );
+        @pg_query($conn,
+            "UPDATE {$tabela}
              SET setor_cte = destino_cte
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
@@ -995,84 +1010,75 @@ if ($acao === 'adicionar_ctes') {
 
 // ─── Ação: remover CT-e ───────────────────────────────────────────────────────
 if ($acao === 'remover_cte') {
-    $placa  = strtoupper(trim($input['placa'] ?? ''));
+    $seqCarInput = (int)($input['seq_carregamento'] ?? 0);
+    $placa  = strtoupper(trim((string)($input['placa'] ?? '')));
     $nroCte = (int)($input['seq_cte'] ?? $input['nro_cte'] ?? 0);
 
-    if (empty($placa) || $nroCte <= 0) {
-        respondJson(['success' => false, 'message' => 'Placa ou CT-e inválido.']);
+    if ($nroCte <= 0 || ($seqCarInput <= 0 && $placa === '')) {
+        respondJson(['success' => false, 'message' => 'Parâmetros inválidos.']);
     }
 
+    $identSql = ($seqCarInput > 0)
+        ? ("seq_carregamento = " . (int)$seqCarInput)
+        : ("placa_provisoria = '" . pg_escape_string($conn, $placa) . "'");
+
     $seqCarreg = 0;
+    $placaDb = '';
     $destinoCarreg = '';
     $unidadesCarreg = '';
     $setoresEntregaCarreg = '';
     $origemCriacaoCarreg = '';
+
     $resMeta = @pg_query($conn,
-        "SELECT seq_carregamento, destino, unidades, setores_entrega, origem_criacao
+        "SELECT seq_carregamento, placa_provisoria, destino, unidades, setores_entrega, origem_criacao
          FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
            AND data_finalizacao IS NULL
+           AND {$identSql}
          LIMIT 1"
     );
-    if ($resMeta && pg_num_rows($resMeta) > 0) {
-        $rowM = pg_fetch_assoc($resMeta);
-        $seqCarreg = (int)($rowM['seq_carregamento'] ?? 0);
-        $destinoCarreg = (string)($rowM['destino'] ?? '');
-        $unidadesCarreg = (string)($rowM['unidades'] ?? '');
-        $setoresEntregaCarreg = (string)($rowM['setores_entrega'] ?? '');
-        $origemCriacaoCarreg = strtoupper(trim((string)($rowM['origem_criacao'] ?? '')));
+    if (!$resMeta || pg_num_rows($resMeta) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento não encontrado.']);
     }
-    $resSeq = @pg_query($conn,
-        "SELECT seq_carregamento FROM {$tabela}
-         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-           AND data_finalizacao IS NULL
-         LIMIT 1"
-    );
-    if ($resSeq && pg_num_rows($resSeq) > 0) {
-        $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
-    }
-    if ($seqCarreg <= 0) {
-        $seqCarreg = nextSeqCarregamento($conn, $seqName);
-        if ($seqCarreg > 0) {
-            @pg_query($conn,
-                "UPDATE {$tabela}
-                 SET seq_carregamento = {$seqCarreg}
-                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                   AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-                   AND data_finalizacao IS NULL"
-            );
-        }
+    $rowM = pg_fetch_assoc($resMeta);
+    $seqCarreg = (int)($rowM['seq_carregamento'] ?? 0);
+    $placaDb = strtoupper(trim((string)($rowM['placa_provisoria'] ?? '')));
+    $destinoCarreg = (string)($rowM['destino'] ?? '');
+    $unidadesCarreg = (string)($rowM['unidades'] ?? '');
+    $setoresEntregaCarreg = (string)($rowM['setores_entrega'] ?? '');
+    $origemCriacaoCarreg = strtoupper(trim((string)($rowM['origem_criacao'] ?? '')));
+
+    $placaUse = $placa !== '' ? $placa : $placaDb;
+    if ($placaUse === '') {
+        respondJson(['success' => false, 'message' => 'Placa não encontrada para este carregamento.']);
     }
 
     $res = pg_query($conn,
         "DELETE FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-           AND nro_cte = {$nroCte}
-           AND data_finalizacao IS NULL"
+           AND data_finalizacao IS NULL
+           AND {$identSql}
+           AND nro_cte = {$nroCte}"
     );
-
     if (!$res) {
         respondJson(['success' => false, 'message' => 'Erro ao remover CT-e.']);
     }
+    $removidos = pg_affected_rows($res);
 
-    // Se ficou sem CT-es, reinsere sentinela para manter o carregamento visível (somente em andamento)
     $checkRestantes = pg_query($conn,
         "SELECT 1 FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-           AND nro_cte > 0
            AND data_finalizacao IS NULL
+           AND {$identSql}
+           AND nro_cte > 0
          LIMIT 1"
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
         $temEmAndamento = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
                AND data_finalizacao IS NULL
+               AND {$identSql}
              LIMIT 1"
         );
         if ($temEmAndamento && pg_num_rows($temEmAndamento) > 0) {
@@ -1082,17 +1088,30 @@ if ($acao === 'remover_cte') {
             $setoresSql = $setoresEntregaCarreg !== '' ? "'" . pg_escape_string($conn, $setoresEntregaCarreg) . "'" : 'NULL';
             pg_query($conn,
                 "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
-                 VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
+                 VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placaUse) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
             );
         }
     }
 
-    if (empty($placa) || !is_array($seqs)) {
-        respondJson(['success' => false, 'message' => 'Placa ou lista de CT-es inválida.']);
+    respondJson(['success' => true, 'removidos' => $removidos]);
+}
+
+if ($acao === 'remover_ctes') {
+    $seqCarInput = (int)($input['seq_carregamento'] ?? 0);
+    $placa  = strtoupper(trim((string)($input['placa'] ?? '')));
+    $seqsIn = $input['seq_ctes'] ?? $input['seqs'] ?? $input['ctes'] ?? [];
+
+    if (is_string($seqsIn)) {
+        $seqsIn = preg_split('/[^0-9]+/', $seqsIn);
+    }
+    if (!is_array($seqsIn)) $seqsIn = [];
+
+    if ($seqCarInput <= 0 && $placa === '') {
+        respondJson(['success' => false, 'message' => 'seq_carregamento inválido.']);
     }
 
     $ids = [];
-    foreach ($seqs as $v) {
+    foreach ($seqsIn as $v) {
         $n = (int)$v;
         if ($n > 0) $ids[] = $n;
     }
@@ -1101,48 +1120,38 @@ if ($acao === 'remover_cte') {
         respondJson(['success' => false, 'message' => 'Nenhum CT-e válido informado.']);
     }
 
+    $identSql = ($seqCarInput > 0)
+        ? ("seq_carregamento = " . (int)$seqCarInput)
+        : ("placa_provisoria = '" . pg_escape_string($conn, $placa) . "'");
+
     $seqCarreg = 0;
+    $placaDb = '';
     $destinoCarreg = '';
     $unidadesCarreg = '';
     $setoresEntregaCarreg = '';
     $origemCriacaoCarreg = '';
     $resMeta = @pg_query($conn,
-        "SELECT seq_carregamento, destino, unidades, setores_entrega, origem_criacao
+        "SELECT seq_carregamento, placa_provisoria, destino, unidades, setores_entrega, origem_criacao
          FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
            AND data_finalizacao IS NULL
+           AND {$identSql}
          LIMIT 1"
     );
-    if ($resMeta && pg_num_rows($resMeta) > 0) {
-        $rowM = pg_fetch_assoc($resMeta);
-        $seqCarreg = (int)($rowM['seq_carregamento'] ?? 0);
-        $destinoCarreg = (string)($rowM['destino'] ?? '');
-        $unidadesCarreg = (string)($rowM['unidades'] ?? '');
-        $setoresEntregaCarreg = (string)($rowM['setores_entrega'] ?? '');
-        $origemCriacaoCarreg = strtoupper(trim((string)($rowM['origem_criacao'] ?? '')));
+    if (!$resMeta || pg_num_rows($resMeta) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento não encontrado.']);
     }
-    $resSeq = @pg_query($conn,
-        "SELECT seq_carregamento FROM {$tabela}
-         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-           AND data_finalizacao IS NULL
-         LIMIT 1"
-    );
-    if ($resSeq && pg_num_rows($resSeq) > 0) {
-        $seqCarreg = (int)pg_fetch_result($resSeq, 0, 0);
-    }
-    if ($seqCarreg <= 0) {
-        $seqCarreg = nextSeqCarregamento($conn, $seqName);
-        if ($seqCarreg > 0) {
-            @pg_query($conn,
-                "UPDATE {$tabela}
-                 SET seq_carregamento = {$seqCarreg}
-                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                   AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-                   AND data_finalizacao IS NULL"
-            );
-        }
+    $rowM = pg_fetch_assoc($resMeta);
+    $seqCarreg = (int)($rowM['seq_carregamento'] ?? 0);
+    $placaDb = strtoupper(trim((string)($rowM['placa_provisoria'] ?? '')));
+    $destinoCarreg = (string)($rowM['destino'] ?? '');
+    $unidadesCarreg = (string)($rowM['unidades'] ?? '');
+    $setoresEntregaCarreg = (string)($rowM['setores_entrega'] ?? '');
+    $origemCriacaoCarreg = strtoupper(trim((string)($rowM['origem_criacao'] ?? '')));
+
+    $placaUse = $placa !== '' ? $placa : $placaDb;
+    if ($placaUse === '') {
+        respondJson(['success' => false, 'message' => 'Placa não encontrada para este carregamento.']);
     }
 
     pg_query($conn, 'BEGIN');
@@ -1150,7 +1159,8 @@ if ($acao === 'remover_cte') {
     $res = pg_query($conn,
         "DELETE FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
+           AND data_finalizacao IS NULL
+           AND {$identSql}
            AND nro_cte IN ({$idsSql})"
     );
 
@@ -1164,34 +1174,27 @@ if ($acao === 'remover_cte') {
     $checkRestantes = pg_query($conn,
         "SELECT 1 FROM {$tabela}
          WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-           AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
            AND nro_cte > 0
+           AND data_finalizacao IS NULL
+           AND {$identSql}
          LIMIT 1"
     );
     if (!$checkRestantes || pg_num_rows($checkRestantes) === 0) {
-        $origemCriacao = '';
-        $resOrig = pg_query($conn,
-            "SELECT origem_criacao FROM {$tabela}
-             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-             LIMIT 1"
-        );
-        if ($resOrig && pg_num_rows($resOrig) > 0) {
-            $rowO = pg_fetch_assoc($resOrig);
-            $origemCriacao = strtoupper(trim($rowO['origem_criacao'] ?? ''));
-        }
-        if ($origemCriacao === '') $origemCriacao = 'MANUAL';
-        $checkSent = pg_query($conn,
+        $temEmAndamento = pg_query($conn,
             "SELECT 1 FROM {$tabela}
              WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-               AND placa_provisoria = '" . pg_escape_string($conn, $placa) . "'
-               AND nro_cte = 0
+               AND data_finalizacao IS NULL
+               AND {$identSql}
              LIMIT 1"
         );
-        if (!$checkSent || pg_num_rows($checkSent) === 0) {
+        if ($temEmAndamento && pg_num_rows($temEmAndamento) > 0) {
+            $origemCriacao = $origemCriacaoCarreg !== '' ? $origemCriacaoCarreg : 'MANUAL';
+            $destinoSql = $destinoCarreg !== '' ? "'" . pg_escape_string($conn, $destinoCarreg) . "'" : 'NULL';
+            $unidadesSql = $unidadesCarreg !== '' ? "'" . pg_escape_string($conn, $unidadesCarreg) . "'" : 'NULL';
+            $setoresSql = $setoresEntregaCarreg !== '' ? "'" . pg_escape_string($conn, $setoresEntregaCarreg) . "'" : 'NULL';
             pg_query($conn,
-                "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, origem_ssw, origem_criacao, unidade_carregamento)
-                 VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
+                "INSERT INTO {$tabela} (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte, destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
+                 VALUES ('" . pg_escape_string($conn, $unidade) . "', " . ((int)$seqCarreg) . ", '" . pg_escape_string($conn, $placaUse) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME, 0, {$destinoSql}, {$unidadesSql}, {$setoresSql}, NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "')"
             );
         }
     }
