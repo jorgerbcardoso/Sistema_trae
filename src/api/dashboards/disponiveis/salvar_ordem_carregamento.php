@@ -52,21 +52,6 @@ $tblCar = "{$domain}_carregamento";
 
 try {
     $seqCar = $seqCarInput;
-    if ($seqCar <= 0) {
-        $resCar = sql(
-            "SELECT MAX(seq_carregamento) AS seq_carregamento
-             FROM {$tblCar}
-             WHERE unidade = $1
-               AND UPPER(placa_provisoria) = UPPER($2)
-               AND data_finalizacao IS NULL",
-            [$unidade, $placa],
-            $conn
-        );
-        if ($resCar && pg_num_rows($resCar) > 0) {
-            $row = pg_fetch_assoc($resCar);
-            $seqCar = (int)($row['seq_carregamento'] ?? 0);
-        }
-    }
     $useSeq = $seqCar > 0;
 
     @pg_query($conn, 'BEGIN');
@@ -76,11 +61,10 @@ try {
             "UPDATE {$tblCar}
              SET ordem = NULL
              WHERE unidade = $1
-               AND UPPER(placa_provisoria) = UPPER($2)
+               AND seq_carregamento = $2
                AND data_finalizacao IS NULL
-               AND (seq_carregamento = $3 OR seq_carregamento IS NULL)
                AND (nro_cte::text ~ '^[0-9]+$' AND (nro_cte::text)::int > 0)",
-            [$unidade, $placa, $seqCar],
+            [$unidade, $seqCar],
             $conn
         );
     } else {
@@ -105,8 +89,8 @@ try {
             $params = [];
             $p = 1;
             if ($useSeq) {
-                $params = [$unidade, $seqCar, $placa];
-                $p = 4;
+                $params = [$unidade, $seqCar];
+                $p = 3;
             } else {
                 $params = [$unidade, $placa];
                 $p = 3;
@@ -128,9 +112,8 @@ try {
                            seq_carregamento = $2
                       FROM (VALUES " . implode(', ', $vals) . ") AS v(ser_cte, nro_cte, ordem)
                      WHERE car.unidade = $1
-                       AND UPPER(car.placa_provisoria) = UPPER($3)
+                       AND car.seq_carregamento = $2
                        AND car.data_finalizacao IS NULL
-                       AND (car.seq_carregamento = $2 OR car.seq_carregamento IS NULL)
                        AND car.ser_cte = v.ser_cte
                        AND car.nro_cte = v.nro_cte
                 ")

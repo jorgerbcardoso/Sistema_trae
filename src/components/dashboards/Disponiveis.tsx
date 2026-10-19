@@ -6070,9 +6070,11 @@ function ModalRotaCarregamento({
   }, [entregaByKey, paradasOrderEfetiva, transfByUnidade]);
 
   const ordemSyncRef = useRef<{ t: any; sig: string }>({ t: null, sig: '' });
+  const ordemInicialSavedRef = useRef(false);
 
   const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number; ordem: number }[]) => {
-    if (!carregamento?.placa_provisoria) return;
+    const seq = Number(carregamento?.seq_carregamento ?? 0) || 0;
+    if (seq <= 0) return;
     if (!Array.isArray(ctes) || ctes.length === 0) return;
     try {
       await apiFetch(
@@ -6085,12 +6087,24 @@ function ModalRotaCarregamento({
   }, [carregamento?.placa_provisoria, carregamento?.seq_carregamento, origem]);
 
   useEffect(() => {
+    if (ordemInicialSavedRef.current) return;
+    const seq = Number(carregamento?.seq_carregamento ?? 0) || 0;
+    if (seq <= 0) return;
+    const ctesBackend = Array.isArray((dados as any)?.ctes) ? ((dados as any).ctes as any[]) : [];
+    const hasOrdem = ctesBackend.some((c) => (Number(c?.ordem ?? 0) || 0) > 0);
+    if (hasOrdem) { ordemInicialSavedRef.current = true; return; }
+    if (!Array.isArray(ctesOrdem) || ctesOrdem.length === 0) return;
+    ordemInicialSavedRef.current = true;
+    void salvarOrdemCtes(ctesOrdem);
+  }, [carregamento?.seq_carregamento, ctesOrdem, dados, salvarOrdemCtes]);
+
+  useEffect(() => {
     const sig = ctesOrdem.map((c) => `${c.ser_cte}${String(c.nro_cte)}:${String(c.ordem)}`).join('|');
     if (!sig) return;
     if (ordemSyncRef.current.sig === sig) return;
     ordemSyncRef.current.sig = sig;
     if (ordemSyncRef.current.t) clearTimeout(ordemSyncRef.current.t);
-    ordemSyncRef.current.t = setTimeout(() => { void salvarOrdemCtes(ctesOrdem); }, 650);
+    ordemSyncRef.current.t = setTimeout(() => { void salvarOrdemCtes(ctesOrdem); }, 150);
     return () => {
       if (ordemSyncRef.current.t) clearTimeout(ordemSyncRef.current.t);
     };

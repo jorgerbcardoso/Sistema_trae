@@ -192,7 +192,7 @@ if ($destino !== '') $unidadesSet[$destino] = true;
 foreach ($paradasArr as $p) $unidadesSet[$p] = true;
 
 try {
-    $whereSeq = ($seqCarInput > 0) ? " AND (car.seq_carregamento = $3 OR car.seq_carregamento IS NULL)" : "";
+    $whereSeq = ($seqCarInput > 0) ? " AND car.seq_carregamento = $3" : "";
     $params = ($seqCarInput > 0) ? [$unidade, $placa, $seqCarInput] : [$unidade, $placa];
     $q = "
         SELECT
