@@ -5020,9 +5020,10 @@ function ModalDadosOrdemCarregamento({
   const [motOpen, setMotOpen] = useState(false);
 
   const [calcDiasOperacao, setCalcDiasOperacao] = useState('1');
-  const [calcDiasPernoite, setCalcDiasPernoite] = useState('0');
   const [calcDiesel, setCalcDiesel] = useState('');
   const [calcTerceiroKm, setCalcTerceiroKm] = useState('');
+  const [calcTerceiroPlaca, setCalcTerceiroPlaca] = useState('');
+  const [calcTerceiroTipo, setCalcTerceiroTipo] = useState('');
   const [calcTipoVeiculo, setCalcTipoVeiculo] = useState('');
   const [calcParams, setCalcParams] = useState<any>(null);
   const [calcLoading, setCalcLoading] = useState(false);
@@ -5134,6 +5135,22 @@ function ModalDadosOrdemCarregamento({
     return () => { alive = false; };
   }, [placaDefinitiva]);
 
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      const p = calcTerceiroPlaca.trim().toUpperCase();
+      if (!p) {
+        setCalcTerceiroTipo('');
+        return;
+      }
+      const v = await fetchVeiculo(p);
+      if (!alive) return;
+      setCalcTerceiroTipo(String(v?.tipo ?? '').trim().toUpperCase());
+    };
+    void run();
+    return () => { alive = false; };
+  }, [calcTerceiroPlaca]);
+
   const calc = useMemo(() => {
     const km = Number(rotaKm ?? 0) || 0;
     const toNum = (v: any) => {
@@ -5147,7 +5164,6 @@ function ModalDadosOrdemCarregamento({
       return Number.isFinite(n) ? n : 0;
     };
     const diasOp = Math.max(0, Math.floor(toNum(calcDiasOperacao) || 0));
-    const diasP = Math.max(0, Math.floor(toNum(calcDiasPernoite) || 0));
     const diesel = toNum(calcDiesel);
     const terceiroKm = toNum(calcTerceiroKm);
 
@@ -5158,30 +5174,26 @@ function ModalDadosOrdemCarregamento({
     const pneus = toNum(p.vlr_pneus_km);
     const fixo = toNum(p.fixo_diario);
     const motor = toNum(p.custo_diario_motorista);
-    const pernoite = toNum(p.custo_pernoite);
 
     const litros = media > 0 ? km / media : 0;
     const custoComb = diesel > 0 ? litros * diesel : 0;
     const custoKm = km * (manut + pneus);
     const custoDia = diasOp * (vlrDiaria + fixo + motor);
-    const custoPernoite = diasP * pernoite;
-    const totalFrota = custoComb + custoKm + custoDia + custoPernoite;
+    const totalFrota = custoComb + custoKm + custoDia;
 
     const totalTerceiro = km * terceiroKm;
 
     return {
       km,
       diasOp,
-      diasP,
       litros,
       custoComb,
       custoKm,
       custoDia,
-      custoPernoite,
       totalFrota,
       totalTerceiro,
     };
-  }, [rotaKm, calcDiasOperacao, calcDiasPernoite, calcDiesel, calcTerceiroKm, calcParams]);
+  }, [rotaKm, calcDiasOperacao, calcDiesel, calcTerceiroKm, calcParams]);
 
   const salvar = async () => {
     if (saving || loading) return;
@@ -5354,46 +5366,51 @@ function ModalDadosOrdemCarregamento({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Dias (operação)</label>
-                <Input value={calcDiasOperacao} onChange={(e) => setCalcDiasOperacao(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Dias (operação)</label>
+                  <Input value={calcDiasOperacao} onChange={(e) => setCalcDiasOperacao(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Diesel (R$/L)</label>
+                  <Input
+                    className="text-right tabular-nums"
+                    type="text"
+                    inputMode="decimal"
+                    value={calcDiesel}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
+                      const parts = v.split(',');
+                      if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
+                      setCalcDiesel(v);
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Pernoite (dias)</label>
-                <Input value={calcDiasPernoite} onChange={(e) => setCalcDiasPernoite(e.target.value.replace(/[^\d]/g, ''))} inputMode="numeric" />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Diesel (R$/L)</label>
-                <Input
-                  className="text-right tabular-nums"
-                  type="text"
-                  inputMode="decimal"
-                  value={calcDiesel}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
-                    const parts = v.split(',');
-                    if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
-                    setCalcDiesel(v);
-                  }}
-                />
-              </div>
-              <div className="space-y-1 md:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Terceiro (R$/km)</label>
-                <Input
-                  className="text-right tabular-nums"
-                  type="text"
-                  inputMode="decimal"
-                  value={calcTerceiroKm}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
-                    const parts = v.split(',');
-                    if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
-                    setCalcTerceiroKm(v);
-                  }}
-                />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Placa simulação</label>
+                  <FilterSelectVeiculo value={calcTerceiroPlaca} onChange={setCalcTerceiroPlaca} placeholder="Buscar placa" />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Terceiro (R$/km)</label>
+                  <Input
+                    className="text-right tabular-nums"
+                    type="text"
+                    inputMode="decimal"
+                    value={calcTerceiroKm}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
+                      const parts = v.split(',');
+                      if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
+                      setCalcTerceiroKm(v);
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -5412,7 +5429,6 @@ function ModalDadosOrdemCarregamento({
                   <div className="flex justify-between gap-2"><span>Combustível</span><span className="font-mono">{calc.custoComb.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between gap-2"><span>Manut/Pneus</span><span className="font-mono">{calc.custoKm.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                   <div className="flex justify-between gap-2"><span>Diárias/Fixo/Motor</span><span className="font-mono">{calc.custoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                  <div className="flex justify-between gap-2"><span>Pernoite</span><span className="font-mono">{calc.custoPernoite.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                 </div>
               </div>
 
@@ -5421,6 +5437,7 @@ function ModalDadosOrdemCarregamento({
                   <div className="text-xs font-extrabold text-sky-900 dark:text-sky-200">Previsão Terceiro</div>
                   <div className="text-[11px] text-sky-900/70 dark:text-sky-200/70 font-mono">
                     {calc.km > 0 ? `${calc.km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : '0 km'}
+                    {calcTerceiroPlaca.trim() ? ` · ${calcTerceiroPlaca.trim().toUpperCase()}${calcTerceiroTipo ? ` (${calcTerceiroTipo})` : ''}` : ''}
                   </div>
                 </div>
                 <div className="mt-2 text-lg font-extrabold text-sky-900 dark:text-sky-200 tabular-nums">
@@ -8063,13 +8080,22 @@ function CarregamentoArea({
   const loadCapacidadesFrota = async () => {
     try {
       setCapFrotaLoading(true);
-      const toPt = (v: any) => {
-        const s0 = String(v ?? '').trim();
-        if (!s0) return '';
-        const s = s0.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
+      const parseAny = (v: any): number | null => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        const raw = String(v ?? '').trim();
+        if (!raw) return null;
+        let s = raw.replace(/\s+/g, '');
+        if (s.includes(',')) {
+          s = s.replace(/\./g, '').replace(',', '.');
+        }
         const n = Number(s);
-        if (!Number.isFinite(n)) return s0.replace(/\./g, ',');
-        return n.toLocaleString('pt-BR', { useGrouping: false, maximumFractionDigits: 6 });
+        return Number.isFinite(n) ? n : null;
+      };
+      const fmt = (v: any, frac: number) => {
+        const n = parseAny(v);
+        if (n === null) return '';
+        return n.toLocaleString('pt-BR', { useGrouping: false, minimumFractionDigits: frac, maximumFractionDigits: frac });
       };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
@@ -8092,13 +8118,13 @@ function CarregamentoArea({
         items
           .map((it: any) => ({
             tipo: String(it?.tipo ?? '').trim(),
-            vlr_diaria: it?.vlr_diaria == null ? '' : toPt(it.vlr_diaria),
-            media_consumo: it?.media_consumo == null ? '' : toPt(it.media_consumo),
-            vlr_manutencao_km: it?.vlr_manutencao_km == null ? '' : toPt(it.vlr_manutencao_km),
-            vlr_pneus_km: it?.vlr_pneus_km == null ? '' : toPt(it.vlr_pneus_km),
-            fixo_diario: it?.fixo_diario == null ? '' : toPt(it.fixo_diario),
-            custo_diario_motorista: it?.custo_diario_motorista == null ? '' : toPt(it.custo_diario_motorista),
-            custo_pernoite: it?.custo_pernoite == null ? '' : toPt(it.custo_pernoite),
+            vlr_diaria: it?.vlr_diaria == null ? '' : fmt(it.vlr_diaria, 2),
+            media_consumo: it?.media_consumo == null ? '' : fmt(it.media_consumo, 2),
+            vlr_manutencao_km: it?.vlr_manutencao_km == null ? '' : fmt(it.vlr_manutencao_km, 4),
+            vlr_pneus_km: it?.vlr_pneus_km == null ? '' : fmt(it.vlr_pneus_km, 4),
+            fixo_diario: it?.fixo_diario == null ? '' : fmt(it.fixo_diario, 2),
+            custo_diario_motorista: it?.custo_diario_motorista == null ? '' : fmt(it.custo_diario_motorista, 2),
+            custo_pernoite: it?.custo_pernoite == null ? '' : fmt(it.custo_pernoite, 2),
           }))
           .filter((it: any) => {
             const t = tipoNorm(it?.tipo);
@@ -8118,11 +8144,12 @@ function CarregamentoArea({
     try {
       setCapFrotaSaving(true);
       const toNum = (v: any) => {
-        const s = String(v ?? '')
-          .trim()
-          .replace(/\s+/g, '')
-          .replace(/\./g, '')
-          .replace(',', '.');
+        const raw = String(v ?? '').trim().replace(/\s+/g, '');
+        if (!raw) return null;
+        let s = raw;
+        if (s.includes(',')) {
+          s = s.replace(/\./g, '').replace(',', '.');
+        }
         if (!s) return null;
         const n = Number(s);
         return Number.isFinite(n) ? n : null;
