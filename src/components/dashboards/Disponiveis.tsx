@@ -7761,11 +7761,24 @@ function CarregamentoArea({
         return;
       }
       const items = Array.isArray(res.items) ? res.items : [];
-      setCapItems(items.map((it: any) => ({
-        tipo: String(it?.tipo ?? '').trim(),
-        capacidade_ton: it?.capacidade_ton == null ? '' : String(it.capacidade_ton),
-        capacidade_m3: it?.capacidade_m3 == null ? '' : String(it.capacidade_m3),
-      })));
+      const tipoNorm = (s: any) =>
+        String(s ?? '')
+          .trim()
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+      setCapItems(
+        items
+          .map((it: any) => ({
+            tipo: String(it?.tipo ?? '').trim(),
+            capacidade_ton: it?.capacidade_ton == null ? '' : String(it.capacidade_ton),
+            capacidade_m3: it?.capacidade_m3 == null ? '' : String(it.capacidade_m3),
+          }))
+          .filter((it: any) => {
+            const t = tipoNorm(it?.tipo);
+            return t !== 'CAVALO' && t !== 'CAVALO TRUCADO' && t !== 'AVIAO';
+          })
+      );
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar capacidades');
       setCapItems([]);
@@ -10428,13 +10441,23 @@ export function Disponiveis() {
           true
         );
         if (capsRes?.success && Array.isArray(capsRes.items)) {
+          const tipoNorm = (s: any) =>
+            String(s ?? '')
+              .trim()
+              .toUpperCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '');
           capsNorm = capsRes.items
             .map((it: any) => ({
               tipo: String(it?.tipo ?? '').trim().toUpperCase(),
               ton: Number(String(it?.capacidade_ton ?? it?.ton ?? '').replace(',', '.')) || 0,
               m3: Number(String(it?.capacidade_m3 ?? it?.m3 ?? '').replace(',', '.')) || 0,
             }))
-            .filter((c: any) => !!c.tipo && (c.ton > 0 || c.m3 > 0))
+            .filter((c: any) => {
+              const t = tipoNorm(c?.tipo);
+              if (t === 'CAVALO' || t === 'CAVALO TRUCADO' || t === 'AVIAO') return false;
+              return !!c.tipo && (c.ton > 0 || c.m3 > 0);
+            })
             .sort((a: any, b: any) => (a.ton - b.ton) || (a.m3 - b.m3) || a.tipo.localeCompare(b.tipo));
         }
       } catch (e: any) {
