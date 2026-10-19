@@ -4991,6 +4991,8 @@ function ModalDadosOrdemCarregamento({
   placa,
   seqCarregamento,
   rotaKm,
+  capTon,
+  capM3,
   onFechar,
   onConcluirSalvar,
 }: {
@@ -4998,6 +5000,8 @@ function ModalDadosOrdemCarregamento({
   placa: string;
   seqCarregamento: number;
   rotaKm: number;
+  capTon: number | null;
+  capM3: number | null;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
 }) {
@@ -5084,15 +5088,26 @@ function ModalDadosOrdemCarregamento({
   const fetchVeiculo = async (placaBusca: string): Promise<{ placa: string; tipo: string } | null> => {
     const p = String(placaBusca ?? '').trim().toUpperCase();
     if (!p) return null;
+    const pNorm = p.replace(/[^A-Z0-9]/g, '');
+    const normTipo = (s: any) =>
+      String(s ?? '')
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ');
     try {
       const resp = await apiFetch('/sistema/api/search_veiculos.php', {
         method: 'POST',
         body: JSON.stringify({ search: p }),
       });
       if (!resp?.success || !Array.isArray(resp.data)) return null;
-      const found = resp.data.find((v: any) => String(v?.placa ?? '').trim().toUpperCase() === p);
+      const list = resp.data;
+      const found = list.find((v: any) => String(v?.placa ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === pNorm)
+        ?? list.find((v: any) => String(v?.placa ?? '').trim().toUpperCase() === p)
+        ?? list[0];
       if (!found) return null;
-      return { placa: p, tipo: String(found?.tipo ?? '').trim().toUpperCase() };
+      return { placa: String(found?.placa ?? p).trim().toUpperCase(), tipo: normTipo(found?.tipo ?? '') };
     } catch {
       return null;
     }
@@ -5102,18 +5117,8 @@ function ModalDadosOrdemCarregamento({
     let alive = true;
     const run = async () => {
       const cavalo = placaDefinitiva.trim().toUpperCase();
-      if (!cavalo) {
-        setCalcTipoVeiculo('');
-        setCalcParams(null);
-        return;
-      }
       setCalcLoading(true);
       try {
-        const vCav = await fetchVeiculo(cavalo);
-        if (!alive) return;
-        const tipo = String(vCav?.tipo ?? '').trim().toUpperCase();
-        setCalcTipoVeiculo(tipo);
-        if (!tipo) { setCalcParams(null); return; }
         const resp = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
           { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
@@ -5121,8 +5126,51 @@ function ModalDadosOrdemCarregamento({
         );
         if (!alive) return;
         const items = Array.isArray(resp?.items) ? resp.items : [];
-        const it = items.find((x: any) => String(x?.tipo ?? '').trim().toUpperCase() === tipo);
-        setCalcParams(it ?? null);
+        const normTipo2 = (s: any) =>
+          String(s ?? '')
+            .trim()
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ');
+        const parseNum = (v: any): number => {
+          if (v === null || v === undefined) return 0;
+          if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+          const s = String(v ?? '').trim().replace(/\s+/g, '').replace(',', '.');
+          const n = Number(s);
+          return Number.isFinite(n) ? n : 0;
+        };
+        const approxEq = (a: number, b: number) => Math.abs(a - b) <= 0.0005;
+
+        if (cavalo) {
+          const vCav = await fetchVeiculo(cavalo);
+          if (!alive) return;
+          const tipo = String(vCav?.tipo ?? '').trim().toUpperCase();
+          setCalcTipoVeiculo(tipo);
+          if (!tipo) { setCalcParams(null); return; }
+          const tipoN = normTipo2(tipo);
+          const it = items.find((x: any) => normTipo2(x?.tipo ?? '') === tipoN);
+          setCalcParams(it ?? null);
+          return;
+        }
+
+        const ton = capTon !== null && capTon !== undefined ? Number(capTon) : null;
+        const m3 = capM3 !== null && capM3 !== undefined ? Number(capM3) : null;
+        if ((ton === null || !Number.isFinite(ton)) && (m3 === null || !Number.isFinite(m3))) {
+          setCalcTipoVeiculo('');
+          setCalcParams(null);
+          return;
+        }
+        const itByCap = items.find((x: any) => {
+          const t = parseNum(x?.capacidade_ton ?? x?.ton ?? 0);
+          const v = parseNum(x?.capacidade_m3 ?? x?.m3 ?? 0);
+          const okTon = ton === null || !Number.isFinite(ton) ? true : approxEq(t, ton);
+          const okM3 = m3 === null || !Number.isFinite(m3) ? true : approxEq(v, m3);
+          return okTon && okM3;
+        });
+        const tipoCap = String(itByCap?.tipo ?? '').trim().toUpperCase();
+        setCalcTipoVeiculo(tipoCap);
+        setCalcParams(itByCap ?? null);
       } catch {
         if (!alive) return;
         setCalcParams(null);
@@ -5132,7 +5180,7 @@ function ModalDadosOrdemCarregamento({
     };
     void run();
     return () => { alive = false; };
-  }, [placaDefinitiva]);
+  }, [placaDefinitiva, capTon, capM3]);
 
   useEffect(() => {
     let alive = true;
@@ -7088,6 +7136,8 @@ function ModalRotaCarregamento({
           placa={String(carregamento.placa_provisoria ?? '').toUpperCase()}
           seqCarregamento={Number((carregamento as any)?.seq_carregamento ?? 0) || 0}
           rotaKm={Number(routeDistanceKm ?? 0) || 0}
+          capTon={carregamento.capacidade_ton ?? null}
+          capM3={carregamento.capacidade_m3 ?? null}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
         />
