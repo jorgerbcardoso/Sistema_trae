@@ -20,6 +20,7 @@ $unidade = strtoupper(trim(
     ?? ''
 ));
 $placa = strtoupper(trim((string)($input['placa'] ?? '')));
+$seqCarInput = (int)($input['seq_carregamento'] ?? 0);
 
 if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
     respondJson(['success' => false, 'message' => 'Unidade inválida.']);
@@ -148,6 +149,8 @@ $selCliLng = ($clienteOk && $colExists($conn, $tblCliente, 'longitude_entrega') 
 
 $carRow = null;
 try {
+    $whereSeq = $seqCarInput > 0 ? " AND seq_carregamento = $3" : "";
+    $paramsCar = $seqCarInput > 0 ? [$unidade, $placa, $seqCarInput] : [$unidade, $placa];
     $resCar = sql(
         "SELECT
             MAX(seq_carregamento) AS seq_carregamento,
@@ -156,8 +159,9 @@ try {
          FROM {$tblCar}
          WHERE unidade = $1
            AND UPPER(placa_provisoria) = UPPER($2)
-           AND data_finalizacao IS NULL",
-        [$unidade, $placa],
+           AND data_finalizacao IS NULL
+           {$whereSeq}",
+        $paramsCar,
         $conn
     );
     if ($resCar) $carRow = pg_fetch_assoc($resCar);
@@ -188,6 +192,8 @@ if ($destino !== '') $unidadesSet[$destino] = true;
 foreach ($paradasArr as $p) $unidadesSet[$p] = true;
 
 try {
+    $whereSeq = ($seqCarInput > 0) ? " AND (car.seq_carregamento = $3 OR car.seq_carregamento IS NULL)" : "";
+    $params = ($seqCarInput > 0) ? [$unidade, $placa, $seqCarInput] : [$unidade, $placa];
     $q = "
         SELECT
             car.ser_cte,
@@ -224,13 +230,14 @@ try {
         WHERE car.unidade = $1
           AND UPPER(car.placa_provisoria) = UPPER($2)
           AND car.data_finalizacao IS NULL
+          {$whereSeq}
           AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
         ORDER BY
           CASE WHEN car.ordem IS NULL OR car.ordem <= 0 THEN 999999 ELSE car.ordem END,
           car.data_inclusao,
           car.hora_inclusao
     ";
-    $res = sql($q, [$unidade, $placa], $conn);
+    $res = sql($q, $params, $conn);
     while ($res && ($r = pg_fetch_assoc($res))) {
         $destCte = strtoupper(trim((string)($r['destino_cte'] ?? '')));
         if ($destCte !== '' && preg_match('/^[A-Z0-9]{2,5}$/', $destCte)) $unidadesSet[$destCte] = true;

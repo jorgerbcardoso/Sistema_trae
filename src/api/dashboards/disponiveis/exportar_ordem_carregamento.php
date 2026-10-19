@@ -222,7 +222,7 @@ $fmtDdMmYy = function($v) {
 
 $linhasDb = [];
 try {
-    $whereSeq = $seqCar > 0 ? " AND car.seq_carregamento = $3" : "";
+    $whereSeq = $seqCar > 0 ? " AND (car.seq_carregamento = $3 OR car.seq_carregamento IS NULL)" : "";
     $qLinhas = "
         SELECT
             car.ordem,

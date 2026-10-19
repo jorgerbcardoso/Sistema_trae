@@ -11023,7 +11023,7 @@ export function Disponiveis() {
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_rota_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ placa: car.placa_provisoria, unidade: sigla }) },
+        { method: 'POST', body: JSON.stringify({ placa: car.placa_provisoria, unidade: sigla, seq_carregamento: (car as any).seq_carregamento ?? null }) },
         true
       );
       if (res.success) {
