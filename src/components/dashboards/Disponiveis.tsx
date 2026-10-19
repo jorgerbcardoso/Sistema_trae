@@ -5137,9 +5137,13 @@ function ModalDadosOrdemCarregamento({
   const calc = useMemo(() => {
     const km = Number(rotaKm ?? 0) || 0;
     const toNum = (v: any) => {
-      const s = String(v ?? '').trim();
+      const s = String(v ?? '')
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(/\./g, '')
+        .replace(',', '.');
       if (!s) return 0;
-      const n = Number(s.replace(',', '.'));
+      const n = Number(s);
       return Number.isFinite(n) ? n : 0;
     };
     const diasOp = Math.max(0, Math.floor(toNum(calcDiasOperacao) || 0));
@@ -5361,11 +5365,35 @@ function ModalDadosOrdemCarregamento({
               </div>
               <div className="space-y-1">
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Diesel (R$/L)</label>
-                <Input type="number" inputMode="decimal" step="0.01" value={calcDiesel} onChange={(e) => setCalcDiesel(e.target.value)} />
+                <Input
+                  className="text-right tabular-nums"
+                  type="text"
+                  inputMode="decimal"
+                  value={calcDiesel}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
+                    const parts = v.split(',');
+                    if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
+                    setCalcDiesel(v);
+                  }}
+                />
               </div>
               <div className="space-y-1 md:col-span-2">
                 <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">Terceiro (R$/km)</label>
-                <Input type="number" inputMode="decimal" step="0.01" value={calcTerceiroKm} onChange={(e) => setCalcTerceiroKm(e.target.value)} />
+                <Input
+                  className="text-right tabular-nums"
+                  type="text"
+                  inputMode="decimal"
+                  value={calcTerceiroKm}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    let v = raw.replace(/\./g, ',').replace(/[^\d,]/g, '');
+                    const parts = v.split(',');
+                    if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
+                    setCalcTerceiroKm(v);
+                  }}
+                />
               </div>
             </div>
 
@@ -5400,7 +5428,7 @@ function ModalDadosOrdemCarregamento({
                 </div>
                 <div className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/80 flex justify-between gap-2">
                   <span>R$/km</span>
-                  <span className="font-mono">{(Number(String(calcTerceiroKm || '').replace(',', '.')) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono">{(Number(String(calcTerceiroKm || '').trim().replace(/\s+/g, '').replace(/\./g, '').replace(',', '.')) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
@@ -8035,6 +8063,14 @@ function CarregamentoArea({
   const loadCapacidadesFrota = async () => {
     try {
       setCapFrotaLoading(true);
+      const toPt = (v: any) => {
+        const s0 = String(v ?? '').trim();
+        if (!s0) return '';
+        const s = s0.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
+        const n = Number(s);
+        if (!Number.isFinite(n)) return s0.replace(/\./g, ',');
+        return n.toLocaleString('pt-BR', { useGrouping: false, maximumFractionDigits: 6 });
+      };
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/veiculo_capacidade.php`,
         { method: 'POST', body: JSON.stringify({ acao: 'listar' }) },
@@ -8056,13 +8092,13 @@ function CarregamentoArea({
         items
           .map((it: any) => ({
             tipo: String(it?.tipo ?? '').trim(),
-            vlr_diaria: it?.vlr_diaria == null ? '' : String(it.vlr_diaria),
-            media_consumo: it?.media_consumo == null ? '' : String(it.media_consumo),
-            vlr_manutencao_km: it?.vlr_manutencao_km == null ? '' : String(it.vlr_manutencao_km),
-            vlr_pneus_km: it?.vlr_pneus_km == null ? '' : String(it.vlr_pneus_km),
-            fixo_diario: it?.fixo_diario == null ? '' : String(it.fixo_diario),
-            custo_diario_motorista: it?.custo_diario_motorista == null ? '' : String(it.custo_diario_motorista),
-            custo_pernoite: it?.custo_pernoite == null ? '' : String(it.custo_pernoite),
+            vlr_diaria: it?.vlr_diaria == null ? '' : toPt(it.vlr_diaria),
+            media_consumo: it?.media_consumo == null ? '' : toPt(it.media_consumo),
+            vlr_manutencao_km: it?.vlr_manutencao_km == null ? '' : toPt(it.vlr_manutencao_km),
+            vlr_pneus_km: it?.vlr_pneus_km == null ? '' : toPt(it.vlr_pneus_km),
+            fixo_diario: it?.fixo_diario == null ? '' : toPt(it.fixo_diario),
+            custo_diario_motorista: it?.custo_diario_motorista == null ? '' : toPt(it.custo_diario_motorista),
+            custo_pernoite: it?.custo_pernoite == null ? '' : toPt(it.custo_pernoite),
           }))
           .filter((it: any) => {
             const t = tipoNorm(it?.tipo);
@@ -8082,9 +8118,13 @@ function CarregamentoArea({
     try {
       setCapFrotaSaving(true);
       const toNum = (v: any) => {
-        const s = String(v ?? '').trim();
+        const s = String(v ?? '')
+          .trim()
+          .replace(/\s+/g, '')
+          .replace(/\./g, '')
+          .replace(',', '.');
         if (!s) return null;
-        const n = Number(s.replace(',', '.'));
+        const n = Number(s);
         return Number.isFinite(n) ? n : null;
       };
       const payload = capFrotaItems.map((it) => ({
@@ -9961,51 +10001,61 @@ function CarregamentoArea({
                   </thead>
                   <tbody>
                     {capFrotaItems.map((it, idx) => (
+                      (() => {
+                        const normDec = (raw: string) => {
+                          let v = String(raw ?? '').replace(/\./g, ',').replace(/[^\d,]/g, '');
+                          const parts = v.split(',');
+                          if (parts.length > 2) v = `${parts[0]},${parts.slice(1).join('')}`;
+                          return v;
+                        };
+                        return (
                       <tr key={it.tipo} className="border-b border-slate-100 dark:border-slate-800">
                         <td className="px-2 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">{it.tipo}</td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_diaria} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_diaria: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.media_consumo} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, media_consumo: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_manutencao_km} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_manutencao_km: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.vlr_pneus_km} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, vlr_pneus_km: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.fixo_diario} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, fixo_diario: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.custo_diario_motorista} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_diario_motorista: v } : p)));
                           }} />
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input className="h-8 text-xs px-2 text-right tabular-nums" type="text" inputMode="decimal" value={it.custo_pernoite} onChange={(e) => {
-                            const v = e.target.value;
+                            const v = normDec(e.target.value);
                             setCapFrotaItems((prev) => prev.map((p, i) => (i === idx ? { ...p, custo_pernoite: v } : p)));
                           }} />
                         </td>
                       </tr>
+                        );
+                      })()
                     ))}
                   </tbody>
                 </table>
