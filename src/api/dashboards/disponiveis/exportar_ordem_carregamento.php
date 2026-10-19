@@ -62,6 +62,8 @@ $tblCap = "{$domain}_carregamento_capacidade";
 $tblMot = "{$domain}_motorista";
 
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
+@pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
+@pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
 @pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS unidade VARCHAR(10)");
 @pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS placa_definitiva VARCHAR(10)");
@@ -220,6 +222,8 @@ try {
             car.ordem,
             car.ser_cte,
             car.nro_cte,
+            COALESCE(car.setor_cte, '') AS setor_cte,
+            COALESCE(car.setores_entrega, '') AS setores_entrega,
             UPPER(COALESCE(NULLIF(car.destino_cte, ''), NULLIF(car.destino, ''))) AS destino_cte,
             COALESCE(cte.nome_dest, car.destinatario_cte, '') AS destinatario,
             COALESCE(cid.nome, '') AS cidade_entrega,
@@ -246,8 +250,8 @@ try {
           AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
         ORDER BY
           CASE WHEN car.ordem IS NULL OR car.ordem <= 0 THEN 999999 ELSE car.ordem END,
-          car.data_inclusao,
-          car.hora_inclusao
+          car.ser_cte,
+          car.nro_cte
     ";
     $resL = sql($qLinhas, [$unidade, $placa], $conn);
     $idx = 1;
@@ -260,8 +264,9 @@ try {
         $isEntrega = ($destCte !== '' && $destCte === $unidade);
         $setor = '';
         if ($isEntrega) {
-            $setor = strtoupper(trim((string)($r['bairro_entrega'] ?? '')));
-            if ($setor === '') $setor = $destCte;
+            $setor = strtoupper(trim((string)($r['setor_cte'] ?? '')));
+            if ($setor === '') $setor = strtoupper(trim((string)($r['setores_entrega'] ?? '')));
+            if ($setor === '') $setor = strtoupper(trim((string)$placa));
         } else {
             $setor = $destCte;
         }
@@ -786,7 +791,7 @@ $tableHeaderStyle = [
     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']]],
 ];
 
-$sheet->setCellValue('A' . $headerRow, 'Ord.');
+$sheet->setCellValue('A' . $headerRow, 'Par.');
 $sheet->setCellValue('B' . $headerRow, 'Setor');
 $sheet->setCellValue('C' . $headerRow, 'Destinatário');
 $sheet->setCellValue('D' . $headerRow, 'Cidade');
@@ -866,6 +871,8 @@ $totReal = 0.0;
 $totCalc = 0.0;
 $totCub = 0.0;
 $totVol = 0;
+$paradaIdx = 0;
+$paradaKeyPrev = null;
 foreach ($linhas as $item) {
     if (!is_array($item)) continue;
     if ($row >= $totalRow) break;
@@ -890,7 +897,21 @@ foreach ($linhas as $item) {
     if ($cubagem > 0) $totCub += $cubagem;
     if ($qtVol > 0) $totVol += $qtVol;
 
-    $sheet->setCellValue('A' . $row, $ordem > 0 ? $ordem : '');
+    $paradaKey = '';
+    if ($op === 'E') {
+        $paradaKey = strtoupper(trim($endLinha2 . '|' . $cidade));
+    } else {
+        $paradaKey = $destinoCte !== '' ? $destinoCte : strtoupper(trim($cidade));
+    }
+    if ($paradaKey === '' && $ordem > 0) $paradaKey = (string)$ordem;
+    $paradaCell = '';
+    if ($paradaKeyPrev === null || $paradaKey !== $paradaKeyPrev) {
+        $paradaIdx += 1;
+        $paradaCell = (string)$paradaIdx;
+        $paradaKeyPrev = $paradaKey;
+    }
+
+    $sheet->setCellValue('A' . $row, $paradaCell);
     $sheet->setCellValue('B' . $row, $setor);
     $sheet->setCellValue('C' . $row, $destinatario . "\n" . $endLinha2);
     $sheet->setCellValue('D' . $row, $cidade);
