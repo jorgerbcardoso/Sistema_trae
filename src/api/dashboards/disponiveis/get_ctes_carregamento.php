@@ -131,14 +131,14 @@ $joinCte = $cteTableOk
         ? "LEFT JOIN LATERAL (
                SELECT *
                FROM {$tblCte} cte2
-               WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(car.ser_cte))
-                 AND cte2.nro_cte = car.nro_cte
+               WHERE regexp_replace(upper(cte2.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(car.ser_cte::text), '[^A-Z0-9]', '', 'g')
+                 AND CAST(NULLIF(regexp_replace(cte2.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(car.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
                ORDER BY cte2.seq_cte DESC
                LIMIT 1
            ) cte ON TRUE"
         : "LEFT JOIN {$tblCte} cte
-               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
-              AND cte.nro_cte = car.nro_cte")
+               ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(car.ser_cte::text), '[^A-Z0-9]', '', 'g')
+              AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(car.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)")
     : "";
 $joinCidParam = $cidParamOk ? "LEFT JOIN {$tblCidParam} cidp ON cidp.seq_cidade = cte.seq_cidade_entr" : "";
 $selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";

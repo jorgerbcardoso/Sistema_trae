@@ -2417,19 +2417,27 @@ function CardCarregamento({
             const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
             const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
               const v = parseMoeda(String(c?.vlr_frete ?? '0'));
-              const rem = normalizePessoa(String(c?.remetente ?? ''));
+              const tp = String(c?.tp_frete ?? '').trim().toUpperCase();
+              if (tp !== '') {
+                if (tp === 'C') acc.cif += v;
+                else acc.fob += v;
+                return acc;
+              }
               const pag = normalizePessoa(String(c?.nome_pag ?? ''));
-              if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-              else acc.fob += v;
+              const dest = normalizePessoa(String(c?.destinatario ?? ''));
+              if (pag !== '' && dest !== '' && pag === dest) acc.fob += v;
+              else acc.cif += v;
               return acc;
             }, { cif: 0, fob: 0 });
-            setTotaisCard({
+            const nextTotais = {
               peso: normPesoKgTotal(totais?.peso ?? 0),
               cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
               vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
               cif: frete.cif,
               fob: frete.fob,
-            });
+            };
+            totaisCarregamentoCache.set(carregamentoKey, nextTotais);
+            setTotaisCard(nextTotais);
           } catch {}
         } else {
           toast.error(res.message || 'Erro ao carregar CT-es');
@@ -2460,19 +2468,27 @@ function CardCarregamento({
             const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
             const frete = merged.reduce((acc: { cif: number; fob: number }, c: any) => {
               const v = parseMoeda(String(c?.vlr_frete ?? '0'));
-              const rem = normalizePessoa(String(c?.remetente ?? ''));
+              const tp = String(c?.tp_frete ?? '').trim().toUpperCase();
+              if (tp !== '') {
+                if (tp === 'C') acc.cif += v;
+                else acc.fob += v;
+                return acc;
+              }
               const pag = normalizePessoa(String(c?.nome_pag ?? ''));
-              if (rem !== '' && pag !== '' && rem === pag) acc.cif += v;
-              else acc.fob += v;
+              const dest = normalizePessoa(String(c?.destinatario ?? ''));
+              if (pag !== '' && dest !== '' && pag === dest) acc.fob += v;
+              else acc.cif += v;
               return acc;
             }, { cif: 0, fob: 0 });
-            setTotaisCard({
+            const nextTotais = {
               peso: merged.reduce((s: number, c: any) => s + normPesoKgTotal(c?.peso ?? 0), 0),
               cubagem: merged.reduce((s: number, c: any) => s + parseCubagem(String(c?.cubagem ?? '0')), 0),
               vlr_frete: merged.reduce((s: number, c: any) => s + parseMoeda(String(c?.vlr_frete ?? '0')), 0),
               cif: frete.cif,
               fob: frete.fob,
-            });
+            };
+            totaisCarregamentoCache.set(carregamentoKey, nextTotais);
+            setTotaisCard(nextTotais);
           } catch {}
         }
       }
@@ -2606,8 +2622,14 @@ function CardCarregamento({
   const freteDoCarregamento = parseMoeda(String(carregamento.total_frete ?? 0)) + (carregamentoConjunto ? parseMoeda(String(carregamentoConjunto.total_frete ?? 0)) : 0);
   const freteCifDbRaw = (carregamento as any)?.total_frete_cif;
   const freteFobDbRaw = (carregamento as any)?.total_frete_fob;
-  const freteCifDb = (freteCifDbRaw === null || freteCifDbRaw === undefined) ? NaN : Number(freteCifDbRaw);
-  const freteFobDb = (freteFobDbRaw === null || freteFobDbRaw === undefined) ? NaN : Number(freteFobDbRaw);
+  const freteCifDbRaw2 = carregamentoConjunto ? (carregamentoConjunto as any)?.total_frete_cif : null;
+  const freteFobDbRaw2 = carregamentoConjunto ? (carregamentoConjunto as any)?.total_frete_fob : null;
+  const freteCifDb1 = (freteCifDbRaw === null || freteCifDbRaw === undefined) ? NaN : Number(freteCifDbRaw);
+  const freteFobDb1 = (freteFobDbRaw === null || freteFobDbRaw === undefined) ? NaN : Number(freteFobDbRaw);
+  const freteCifDb2 = (freteCifDbRaw2 === null || freteCifDbRaw2 === undefined) ? 0 : Number(freteCifDbRaw2);
+  const freteFobDb2 = (freteFobDbRaw2 === null || freteFobDbRaw2 === undefined) ? 0 : Number(freteFobDbRaw2);
+  const freteCifDb = Number.isFinite(freteCifDb1) ? (freteCifDb1 + (Number.isFinite(freteCifDb2) ? freteCifDb2 : 0)) : NaN;
+  const freteFobDb = Number.isFinite(freteFobDb1) ? (freteFobDb1 + (Number.isFinite(freteFobDb2) ? freteFobDb2 : 0)) : NaN;
   const hasFreteSplitDb = Number.isFinite(freteCifDb) && Number.isFinite(freteFobDb) && (freteCifDb + freteFobDb) > 0;
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');

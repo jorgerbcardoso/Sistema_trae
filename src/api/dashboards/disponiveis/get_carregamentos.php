@@ -568,16 +568,16 @@ $joinCteMatch = $hasSeqCte
         LEFT JOIN LATERAL (
             SELECT *
             FROM {$tblCte} cte2
-            WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte2.nro_cte = c.nro_cte
+            WHERE regexp_replace(upper(cte2.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(c.ser_cte::text), '[^A-Z0-9]', '', 'g')
+              AND CAST(NULLIF(regexp_replace(cte2.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(c.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
             ORDER BY cte2.seq_cte DESC
             LIMIT 1
         ) cte ON TRUE
     ")
     : ("
         LEFT JOIN {$tblCte} cte
-               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte.nro_cte = c.nro_cte
+               ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(c.ser_cte::text), '[^A-Z0-9]', '', 'g')
+              AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(c.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
     ");
 
 $selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
