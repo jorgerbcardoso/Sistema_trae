@@ -2604,6 +2604,11 @@ function CardCarregamento({
   const pesoDoCarregamento = normPesoKgTotal(parsePeso(String(carregamento.total_peso ?? 0)) + (carregamentoConjunto ? parsePeso(String(carregamentoConjunto.total_peso ?? 0)) : 0));
   const cubagemDoCarregamento = parseCubagem(String(carregamento.total_cubagem ?? 0)) + (carregamentoConjunto ? parseCubagem(String(carregamentoConjunto.total_cubagem ?? 0)) : 0);
   const freteDoCarregamento = parseMoeda(String(carregamento.total_frete ?? 0)) + (carregamentoConjunto ? parseMoeda(String(carregamentoConjunto.total_frete ?? 0)) : 0);
+  const freteCifDbRaw = (carregamento as any)?.total_frete_cif;
+  const freteFobDbRaw = (carregamento as any)?.total_frete_fob;
+  const freteCifDb = (freteCifDbRaw === null || freteCifDbRaw === undefined) ? NaN : Number(freteCifDbRaw);
+  const freteFobDb = (freteFobDbRaw === null || freteFobDbRaw === undefined) ? NaN : Number(freteFobDbRaw);
+  const hasFreteSplitDb = Number.isFinite(freteCifDb) && Number.isFinite(freteFobDb) && (freteCifDb + freteFobDb) > 0;
 
   const normalizePessoa = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
   const ctesParaTotais: any[] = isConjunto
@@ -2633,7 +2638,10 @@ function CardCarregamento({
   const freteCalcLocalInicial = freteCifLocal + freteFobLocal;
   let cifInicial: number;
   let fobInicial: number;
-  if (freteDoCarregamento > 0 && freteCalcLocalInicial <= 0) {
+  if (hasFreteSplitDb) {
+    cifInicial = freteCifDb;
+    fobInicial = freteFobDb;
+  } else if (freteDoCarregamento > 0 && freteCalcLocalInicial <= 0) {
     cifInicial = 0;
     fobInicial = freteDoCarregamento;
   } else {
@@ -2830,6 +2838,9 @@ function CardCarregamento({
   if (totaisCard) {
     freteCif = totaisCard.cif;
     freteFob = totaisCard.fob;
+  } else if (hasFreteSplitDb) {
+    freteCif = freteCifDb;
+    freteFob = freteFobDb;
   } else {
     const freteCalcLocal = freteCifLocal + freteFobLocal;
     if (freteDoCarregamento > 0 && freteCalcLocal <= 0) {

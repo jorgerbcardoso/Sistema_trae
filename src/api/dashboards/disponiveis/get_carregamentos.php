@@ -67,7 +67,7 @@ if ($dias <= 0) $dias = 30;
 if ($dias > 90) $dias = 90;
 $dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
 
-$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+$filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(c.ser_cte, '')) <> 'SAS'" : "";
 
 $sqlCarregamentos = "
     SELECT
@@ -194,6 +194,8 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
         'total_frete'      => (float)($row['total_frete'] ?? 0),
+        'total_frete_cif'  => null,
+        'total_frete_fob'  => null,
         'total_mercadoria' => (float)($row['total_mercadoria'] ?? 0),
         'total_peso'       => (float)($row['total_peso'] ?? 0),
         'total_cubagem'    => (float)($row['total_cubagem'] ?? 0),
@@ -586,6 +588,56 @@ $selPeso = $cteCol('peso_real')
     : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, c.peso_cte)" : "c.peso_cte");
 $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, c.cubagem_cte)" : "c.cubagem_cte";
 $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, c.qtde_vol_cte)" : "c.qtde_vol_cte";
+
+$hasTpFreteSplit = $cteCol('tp_frete');
+$tpExprSplit = $hasTpFreteSplit ? "UPPER(BTRIM(COALESCE(cte.tp_frete::text, '')))" : "''";
+$sqlSplitFrete = "
+    SELECT
+        c.seq_carregamento,
+        c.placa_provisoria,
+        COALESCE(SUM(
+            CASE
+                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN
+                    CASE
+                        WHEN {$tpExprSplit} = 'C' THEN ({$selVlrFrete})
+                        WHEN {$tpExprSplit} <> '' THEN 0
+                        WHEN UPPER(BTRIM(COALESCE(c.pagador_cte, ''))) = UPPER(BTRIM(COALESCE(c.destinatario_cte, ''))) THEN 0
+                        ELSE ({$selVlrFrete})
+                    END
+                ELSE 0
+            END
+        ), 0) AS total_frete_cif,
+        COALESCE(SUM(
+            CASE
+                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN
+                    CASE
+                        WHEN {$tpExprSplit} = 'C' THEN 0
+                        WHEN {$tpExprSplit} <> '' THEN ({$selVlrFrete})
+                        WHEN UPPER(BTRIM(COALESCE(c.pagador_cte, ''))) = UPPER(BTRIM(COALESCE(c.destinatario_cte, ''))) THEN ({$selVlrFrete})
+                        ELSE 0
+                    END
+                ELSE 0
+            END
+        ), 0) AS total_frete_fob
+    FROM {$tabelaCarregamento} c
+    {$joinCteMatch}
+    WHERE c.unidade = \$1
+      {$filtroSerieRve}
+    GROUP BY c.seq_carregamento, c.placa_provisoria
+";
+try {
+    $resSplit = sql($sqlSplitFrete, [$unidade], $conn);
+    while ($resSplit && ($r = pg_fetch_assoc($resSplit))) {
+        $seq = ($r['seq_carregamento'] !== null && $r['seq_carregamento'] !== '') ? (int)$r['seq_carregamento'] : 0;
+        $placa = $r['placa_provisoria'] ?? '';
+        $idx = null;
+        if ($seq > 0 && isset($idxPorSeq[$seq])) $idx = $idxPorSeq[$seq];
+        elseif ($placa !== '' && isset($idxPorPlaca[$placa])) $idx = $idxPorPlaca[$placa];
+        if ($idx === null) continue;
+        $carregamentos[$idx]['total_frete_cif'] = (float)($r['total_frete_cif'] ?? 0);
+        $carregamentos[$idx]['total_frete_fob'] = (float)($r['total_frete_fob'] ?? 0);
+    }
+} catch (Exception $e) {}
 
 $selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
 $joinOcorExtra = "
