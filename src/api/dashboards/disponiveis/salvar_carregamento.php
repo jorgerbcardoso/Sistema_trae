@@ -887,10 +887,7 @@ if ($acao === 'adicionar_ctes') {
             ?? $cteData['unidadeRelatorio']
             ?? ''
         ));
-        if ($unidCarRaw === '') {
-            pg_query($conn, 'ROLLBACK');
-            respondJson(['success' => false, 'message' => 'Unidade de carregamento não informada para o CT-e ' . $serCte . $nroCte . '.']);
-        }
+        if ($unidCarRaw === '') $unidCarRaw = $unidade;
         $unidCar  = pg_escape_string($conn, $unidCarRaw);
         $emissaoRaw = trim($cteData['emissao'] ?? '');
         $prevEntRaw = trim($cteData['prevEnt'] ?? '');
