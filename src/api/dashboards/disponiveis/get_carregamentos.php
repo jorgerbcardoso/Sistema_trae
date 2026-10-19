@@ -568,16 +568,16 @@ $joinCteMatch = $hasSeqCte
         LEFT JOIN LATERAL (
             SELECT *
             FROM {$tblCte} cte2
-            WHERE regexp_replace(upper(cte2.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(c.ser_cte::text), '[^A-Z0-9]', '', 'g')
-              AND CAST(NULLIF(regexp_replace(cte2.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(c.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
+            WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte2.nro_cte = c.nro_cte
             ORDER BY cte2.seq_cte DESC
             LIMIT 1
         ) cte ON TRUE
     ")
     : ("
         LEFT JOIN {$tblCte} cte
-               ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(c.ser_cte::text), '[^A-Z0-9]', '', 'g')
-              AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(c.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte.nro_cte = c.nro_cte
     ");
 
 $selVlrMerc = $cteCol('vlr_merc') ? "COALESCE(cte.vlr_merc, c.vlr_merc_cte)" : "c.vlr_merc_cte";
@@ -588,56 +588,6 @@ $selPeso = $cteCol('peso_real')
     : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, c.peso_cte)" : "c.peso_cte");
 $selCub = $cteCol('cubagem') ? "COALESCE(cte.cubagem, c.cubagem_cte)" : "c.cubagem_cte";
 $selVol = $cteCol('qtde_vol') ? "COALESCE(cte.qtde_vol, c.qtde_vol_cte)" : "c.qtde_vol_cte";
-
-$hasTpFreteSplit = $cteCol('tp_frete');
-$tpExprSplit = $hasTpFreteSplit ? "UPPER(BTRIM(COALESCE(cte.tp_frete::text, '')))" : "''";
-$sqlSplitFrete = "
-    SELECT
-        c.seq_carregamento,
-        c.placa_provisoria,
-        COALESCE(SUM(
-            CASE
-                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN
-                    CASE
-                        WHEN {$tpExprSplit} = 'C' THEN ({$selVlrFrete})
-                        WHEN {$tpExprSplit} <> '' THEN 0
-                        WHEN UPPER(BTRIM(COALESCE(c.pagador_cte, ''))) = UPPER(BTRIM(COALESCE(c.destinatario_cte, ''))) THEN 0
-                        ELSE ({$selVlrFrete})
-                    END
-                ELSE 0
-            END
-        ), 0) AS total_frete_cif,
-        COALESCE(SUM(
-            CASE
-                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0) THEN
-                    CASE
-                        WHEN {$tpExprSplit} = 'C' THEN 0
-                        WHEN {$tpExprSplit} <> '' THEN ({$selVlrFrete})
-                        WHEN UPPER(BTRIM(COALESCE(c.pagador_cte, ''))) = UPPER(BTRIM(COALESCE(c.destinatario_cte, ''))) THEN ({$selVlrFrete})
-                        ELSE 0
-                    END
-                ELSE 0
-            END
-        ), 0) AS total_frete_fob
-    FROM {$tabelaCarregamento} c
-    {$joinCteMatch}
-    WHERE c.unidade = \$1
-      {$filtroSerieRve}
-    GROUP BY c.seq_carregamento, c.placa_provisoria
-";
-try {
-    $resSplit = sql($sqlSplitFrete, [$unidade], $conn);
-    while ($resSplit && ($r = pg_fetch_assoc($resSplit))) {
-        $seq = ($r['seq_carregamento'] !== null && $r['seq_carregamento'] !== '') ? (int)$r['seq_carregamento'] : 0;
-        $placa = $r['placa_provisoria'] ?? '';
-        $idx = null;
-        if ($seq > 0 && isset($idxPorSeq[$seq])) $idx = $idxPorSeq[$seq];
-        elseif ($placa !== '' && isset($idxPorPlaca[$placa])) $idx = $idxPorPlaca[$placa];
-        if ($idx === null) continue;
-        $carregamentos[$idx]['total_frete_cif'] = (float)($r['total_frete_cif'] ?? 0);
-        $carregamentos[$idx]['total_frete_fob'] = (float)($r['total_frete_fob'] ?? 0);
-    }
-} catch (Exception $e) {}
 
 $selDestPainel = "UPPER(BTRIM(COALESCE(c.destino_cte, ''))) AS destino_cte_painel,";
 $joinOcorExtra = "
@@ -768,6 +718,22 @@ try {
         $serCte = $cteRow['ser_cte'] ?? '';
         $nroCte = $cteRow['nro_cte'] !== null ? (int)$cteRow['nro_cte'] : 0;
         $ctrc   = ($nroCte > 0 && $serCte !== '') ? ($serCte . str_pad($nroCte, 6, '0', STR_PAD_LEFT)) : '';
+
+        $vlrFreteNum = (float)($cteRow['vlr_frete_cte'] ?? 0);
+        $tpFrete = strtoupper(trim((string)($cteRow['tp_frete_cte'] ?? '')));
+        if ($tpFrete === 'C') {
+            $carregamentos[$idx]['total_frete_cif'] = (float)($carregamentos[$idx]['total_frete_cif'] ?? 0) + $vlrFreteNum;
+        } elseif ($tpFrete !== '') {
+            $carregamentos[$idx]['total_frete_fob'] = (float)($carregamentos[$idx]['total_frete_fob'] ?? 0) + $vlrFreteNum;
+        } else {
+            $pag = strtoupper(trim((string)($cteRow['pagador_cte'] ?? '')));
+            $dest = strtoupper(trim((string)($cteRow['destinatario_cte'] ?? '')));
+            if ($pag !== '' && $dest !== '' && $pag === $dest) {
+                $carregamentos[$idx]['total_frete_fob'] = (float)($carregamentos[$idx]['total_frete_fob'] ?? 0) + $vlrFreteNum;
+            } else {
+                $carregamentos[$idx]['total_frete_cif'] = (float)($carregamentos[$idx]['total_frete_cif'] ?? 0) + $vlrFreteNum;
+            }
+        }
 
         $cteItem = [
             'seq_cte'        => $nroCte,
