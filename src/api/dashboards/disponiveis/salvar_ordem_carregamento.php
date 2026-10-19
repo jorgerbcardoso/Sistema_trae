@@ -64,7 +64,7 @@ try {
             $p = 2;
             $ordSeq = $off + 1;
             foreach ($chunk as $it) {
-                $vals[] = '($' . $p . ', $' . ($p + 1) . ', $' . ($p + 2) . ')';
+                $vals[] = '($' . $p . '::varchar, $' . ($p + 1) . '::int, $' . ($p + 2) . '::int)';
                 $params[] = $it['ser'];
                 $params[] = $it['nro'];
                 $params[] = ((int)($it['ordem'] ?? 0)) > 0 ? (int)$it['ordem'] : $ordSeq;
