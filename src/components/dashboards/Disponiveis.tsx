@@ -1784,7 +1784,7 @@ interface CarregamentoAreaProps {
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onCarregarRota: (carregamento: Carregamento) => void;
+  onCarregarRota: (carregamento: Carregamento, tipoSugestao?: string) => void;
   loadingRota: boolean;
   rotaCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
@@ -2218,7 +2218,7 @@ function CardCarregamento({
   onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
   onRemoverCte: (placa: string, seqCte: number) => void;
   onCarregarSSW: (placa: string) => void;
-  onCarregarRota: (carregamento: Carregamento) => void;
+  onCarregarRota: (carregamento: Carregamento, tipoSugestao?: string) => void;
   loadingRota: boolean;
   rotaCarregamentoPlaca: string | null;
   onRecarregarCarregamentos: () => Promise<void>;
@@ -3547,7 +3547,7 @@ function CardCarregamento({
                 ? 'h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 : `h-8 text-xs border-indigo-300 dark:border-indigo-700 ${loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria ? 'text-indigo-400' : 'text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'}`
             }
-            onClick={() => onCarregarRota(carregamento)}
+            onClick={() => onCarregarRota(carregamento, sugestaoVeiculo ?? undefined)}
             title={qtdeCtesCarreg <= 0 ? 'Carregamento sem CT-es' : 'Ver rota e pontos de entrega do carregamento'}
           >
             {loadingRota && rotaCarregamentoPlaca === carregamento.placa_provisoria
@@ -5011,6 +5011,7 @@ function ModalDadosOrdemCarregamento({
   rotaKm,
   pesoKg,
   cubM3,
+  tipoVeiculoSugestao,
   onFechar,
   onConcluirSalvar,
 }: {
@@ -5020,6 +5021,7 @@ function ModalDadosOrdemCarregamento({
   rotaKm: number;
   pesoKg: number;
   cubM3: number;
+  tipoVeiculoSugestao?: string;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
 }) {
@@ -5143,6 +5145,26 @@ function ModalDadosOrdemCarregamento({
         );
         if (!alive) return;
         const items = Array.isArray(resp?.items) ? resp.items : [];
+        const normTipo = (s: any) =>
+          String(s ?? '')
+            .trim()
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ');
+
+        const tipoForcedRaw = String(tipoVeiculoSugestao ?? '').trim();
+        const tipoForcedN = tipoForcedRaw ? normTipo(tipoForcedRaw) : '';
+
+        if (tipoForcedN) {
+          const found = items.find((c: any) => normTipo(c?.tipo ?? '') === tipoForcedN) ?? null;
+          if (found) {
+            setCalcTipoVeiculo(String(found?.tipo ?? tipoForcedRaw).trim().toUpperCase());
+            setCalcParams(found);
+            return;
+          }
+        }
+
         const sug = sugerirVeiculoPorPesoCub(pesoKg, cubM3, items);
         setCalcTipoVeiculo(String(sug?.tipo ?? '').trim().toUpperCase());
         setCalcParams(sug?.raw ?? null);
@@ -5155,7 +5177,7 @@ function ModalDadosOrdemCarregamento({
     };
     void run();
     return () => { alive = false; };
-  }, [pesoKg, cubM3]);
+  }, [pesoKg, cubM3, tipoVeiculoSugestao]);
 
   useEffect(() => {
     let alive = true;
@@ -5478,10 +5500,12 @@ function ModalDadosOrdemCarregamento({
 function ModalRotaCarregamento({
   carregamento,
   dados,
+  tipoVeiculoSugestao,
   onFechar,
 }: {
   carregamento: Carregamento;
   dados: any;
+  tipoVeiculoSugestao?: string;
   onFechar: () => void;
 }) {
   const [leafletLoaded, setLeafletLoaded] = useState(false);
@@ -7119,6 +7143,7 @@ function ModalRotaCarregamento({
           rotaKm={Number(routeDistanceKm ?? 0) || 0}
           pesoKg={totaisCalc.peso}
           cubM3={totaisCalc.cub}
+          tipoVeiculoSugestao={tipoVeiculoSugestao}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
         />
@@ -10529,6 +10554,7 @@ export function Disponiveis() {
   const [rotaModalAberto, setRotaModalAberto] = useState(false);
   const [rotaCarregamento, setRotaCarregamento] = useState<Carregamento | null>(null);
   const [rotaDados, setRotaDados] = useState<any>(null);
+  const [rotaTipoSugestao, setRotaTipoSugestao] = useState<string>('');
   const [rotaCarregamentoPlaca, setRotaCarregamentoPlaca] = useState<string | null>(null);
   const [loadingRota, setLoadingRota] = useState(false);
 
@@ -11506,10 +11532,11 @@ export function Disponiveis() {
     return best;
   }, []);
 
-  const abrirRota = useCallback(async (car: Carregamento) => {
+  const abrirRota = useCallback(async (car: Carregamento, tipoSugestao?: string) => {
     if (!sigla) return;
     if (loadingRota) return;
     setRotaCarregamentoPlaca(car.placa_provisoria);
+    setRotaTipoSugestao(String(tipoSugestao ?? '').trim());
     setLoadingRota(true);
     try {
       const res = await apiFetch(
@@ -13655,7 +13682,8 @@ export function Disponiveis() {
             <ModalRotaCarregamento
               carregamento={rotaCarregamento}
               dados={rotaDados}
-              onFechar={() => { setRotaModalAberto(false); setRotaCarregamento(null); setRotaDados(null); }}
+              tipoVeiculoSugestao={rotaTipoSugestao}
+              onFechar={() => { setRotaModalAberto(false); setRotaCarregamento(null); setRotaDados(null); setRotaTipoSugestao(''); }}
             />
           )}
 
