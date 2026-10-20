@@ -5563,6 +5563,8 @@ function ModalRotaCarregamento({
   const [geoErrorByKey, setGeoErrorByKey] = useState<Record<string, string>>({});
   const [geoUserLockedByKey, setGeoUserLockedByKey] = useState<Record<string, boolean>>({});
   const [geoRunning, setGeoRunning] = useState(false);
+  const geoRunningRef = useRef(false);
+  const geoCancelRef = useRef(false);
   const [geoHydrated, setGeoHydrated] = useState(false);
   const { confirm: confirmar, dialog: confirmarDialog } = useConfirmDialog();
 
@@ -5573,6 +5575,15 @@ function ModalRotaCarregamento({
   const [dragParadaOver, setDragParadaOver] = useState<string | null>(null);
   const [dadosOrdemAberto, setDadosOrdemAberto] = useState(false);
   const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+
+  const highlightMarker = useCallback((key: string) => {
+    setHighlightedKey(key);
+    const p = pontosOrdenados.find((x) => x.key === key);
+    if (p && mapRef.current) {
+      mapRef.current.setView([p.lat, p.lng], 16);
+    }
+  }, [pontosOrdenados]);
 
   const carregarInfo = dados?.carregamento ?? {};
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
@@ -5920,129 +5931,116 @@ function ModalRotaCarregamento({
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
   };
 
+  // Ref com os valores mais recentes — mantém otimizarOrdemEntregas com identidade estável
+  // (evita rebuild do mapa a cada render e loops de renderização).
+  const otimRefs = useRef({ coordsByKey, paradasOrderEfetiva, origem, unidadesMap, getToken });
+  otimRefs.current = { coordsByKey, paradasOrderEfetiva, origem, unidadesMap, getToken };
+
   const otimizarOrdemEntregas = useCallback(async (override?: Record<string, { lat: number; lng: number }>) => {
-    if (paradasOrderEfetiva.some((k) => k.startsWith('T:'))) return;
-    const entregaKeys = paradasOrderEfetiva.filter((k) => k.startsWith('E:')).map((k) => k.slice(2));
+    const {
+      coordsByKey: coordsNow,
+      paradasOrderEfetiva: paradasNow,
+      origem: origemNow,
+      unidadesMap: unidadesNow,
+      getToken: getTokenNow,
+    } = otimRefs.current;
+
+    if (paradasNow.some((k) => k.startsWith('T:'))) return;
+    const entregaKeys = paradasNow.filter((k) => k.startsWith('E:')).map((k) => k.slice(2));
     if (entregaKeys.length < 2) return;
 
     const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
       const s = String(sigla ?? '').trim().toUpperCase();
       if (!s || s === 'FEC') return null;
-      const u = unidadesMap.get(s);
+      const u = unidadesNow.get(s);
       if (!u) return null;
       if (!Number.isFinite(u.lat as any) || !Number.isFinite(u.lng as any)) return null;
       if ((u.lat as number) === 0 && (u.lng as number) === 0) return null;
       return { lat: u.lat as number, lng: u.lng as number };
     };
 
-    const origemCoord = getUnidCoord(origem);
+    const origemCoord = getUnidCoord(origemNow);
     if (!origemCoord) return;
 
-    const finalSigla = String(unidadesOrdem[unidadesOrdem.length - 1] ?? '').trim().toUpperCase();
-    const finalCoord = finalSigla ? getUnidCoord(finalSigla) : null;
-
     const entregas = entregaKeys
-      .map((k) => ({ key: k, coord: (override?.[k] ?? coordsByKey[k]) || null }))
+      .map((k) => ({ key: k, coord: (override?.[k] ?? coordsNow[k]) || null }))
       .filter((x) => !!x.coord && Number.isFinite((x.coord as any).lat) && Number.isFinite((x.coord as any).lng)) as { key: string; coord: { lat: number; lng: number } }[];
     if (entregas.length < 2) return;
 
-    type P = { kind: 'origem' | 'entrega' | 'final'; key?: string; coord: { lat: number; lng: number } };
-    const input: P[] = [
-      { kind: 'origem', coord: origemCoord },
-      ...entregas.map((e) => ({ kind: 'entrega' as const, key: e.key, coord: e.coord })),
-      ...(finalCoord ? [{ kind: 'final' as const, coord: finalCoord }] : []),
-    ];
-
+    // Ordenação SEMPRE por "vizinho mais próximo", partindo da unidade de origem.
+    // 1) Distância real de estrada via Mapbox Matrix (limite de 25 pontos por requisição).
+    // 2) Fallback geométrico (haversine). Nunca usamos otimização global (TSP), para
+    //    não fazer o veículo "passar na frente" de um ponto próximo.
     let ordemEntregas: string[] | null = null;
     try {
-      const token = getToken();
-      if (token && input.length <= 25) {
+      const token = getTokenNow();
+      if (token && entregas.length + 1 <= 25) {
+        const input: { key?: string; coord: { lat: number; lng: number } }[] = [
+          { coord: origemCoord },
+          ...entregas.map((e) => ({ key: e.key, coord: e.coord })),
+        ];
         const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
         const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${coordsStr}?annotations=distance&access_token=${token}`;
         const resp = await fetch(url);
         const data = await resp.json();
 
-        if (data.code === 'Ok' && Array.isArray(data.distances)) {
+        if (data?.code === 'Ok' && Array.isArray(data.distances)) {
           const distances = data.distances;
-          const unvisited = input.map((_, i) => i).filter(i => input[i].kind === 'entrega');
-          const resultIndices: number[] = [];
+          const unvisited = input.map((_, i) => i).filter((i) => i > 0);
+          const seq: string[] = [];
           let current = 0;
 
           while (unvisited.length > 0) {
-            let bestIdxInUnvisited = 0;
+            let bestPos = 0;
             let minDistance = Number.POSITIVE_INFINITY;
-
             for (let i = 0; i < unvisited.length; i++) {
               const targetIdx = unvisited[i];
-              const d = distances[current][targetIdx];
-              if (d !== null && d < minDistance) {
+              const d = distances?.[current]?.[targetIdx];
+              if (typeof d === 'number' && Number.isFinite(d) && d < minDistance) {
                 minDistance = d;
-                bestIdxInUnvisited = i;
+                bestPos = i;
               }
             }
-
-            const chosenIdx = unvisited[bestIdxInUnvisited];
-            resultIndices.push(chosenIdx);
-            unvisited.splice(bestIdxInUnvisited, 1);
+            const chosenIdx = unvisited[bestPos];
+            const k = input[chosenIdx]?.key;
+            if (k) seq.push(k);
+            unvisited.splice(bestPos, 1);
             current = chosenIdx;
           }
 
-          const keys = resultIndices.map(idx => input[idx].key).filter(Boolean) as string[];
-          if (keys.length >= 2) ordemEntregas = keys;
-        }
-      }
-
-      if (!ordemEntregas) {
-        // Fallback para OSRM trip (global optimization) apenas se o Matrix falhar
-        const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
-        const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=false`;
-        const resp = await fetch(url);
-        const data = await resp.json();
-        const waypoints = Array.isArray(data?.waypoints) ? data.waypoints : null;
-        if (waypoints && waypoints.length === input.length) {
-          const order = waypoints
-            .map((w: any, i: number) => ({ i, o: Number(w?.waypoint_index ?? i) }))
-            .sort((a: any, b: any) => a.o - b.o)
-            .map((x: any) => x.i);
-
-          const keys: string[] = [];
-          for (const idx of order) {
-            const p = input[idx];
-            if (p.kind !== 'entrega' || !p.key) continue;
-            keys.push(p.key);
-          }
-          if (keys.length >= 2) ordemEntregas = keys;
+          if (seq.length >= 2) ordemEntregas = seq;
         }
       }
     } catch {}
 
     if (!ordemEntregas) {
+      // Fallback geométrico: sempre o ponto mais próximo (menor distância em linha reta)
       const restantes = [...entregas];
       const out: string[] = [];
       let cur = origemCoord;
-    while (restantes.length > 0) {
-      let bestIdx = 0;
-      let bestDist = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < restantes.length; i += 1) {
-        const d = calcDist(cur, restantes[i].coord);
-        if (d < bestDist) {
-          bestDist = d;
-          bestIdx = i;
+      while (restantes.length > 0) {
+        let bestIdx = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < restantes.length; i += 1) {
+          const d = calcDist(cur, restantes[i].coord);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
         }
+        const next = restantes[bestIdx];
+        if (next) {
+          out.push(next.key);
+          cur = next.coord;
+        }
+        restantes.splice(bestIdx, 1);
       }
-      const next = restantes[bestIdx];
-      if (next) {
-        out.push(next.key);
-        cur = next.coord;
-      }
-      restantes.splice(bestIdx, 1);
-    }
       if (out.length >= 2) ordemEntregas = out;
     }
 
     if (!ordemEntregas || ordemEntregas.length < 2) return;
     setParadasOrder(ordemEntregas.map((k) => `E:${k}`));
-  }, [calcDist, coordsByKey, origem, paradasOrderEfetiva, setParadasOrder, unidadesMap, unidadesOrdem]);
+  }, []);
 
   const pontosOrdenados = useMemo(() => {
     const getUnidCoord = (sigla: string): { lat: number; lng: number } | null => {
@@ -6095,6 +6093,9 @@ function ModalRotaCarregamento({
   const [xlsxLoading, setXlsxLoading] = useState(false);
 
   useEffect(() => {
+    // Enquanto geocodifica, as coordenadas mudam a cada entrega — evitamos disparar
+    // uma requisição de rota por mudança (o que travava a interface).
+    if (geoRunning) return;
     const fetchRoute = async () => {
       if (pontosOrdenados.length < 2) { setRouteCoords([]); return; }
       setRouteLoading(true);
@@ -6133,7 +6134,7 @@ function ModalRotaCarregamento({
       setRouteLoading(false);
     };
     void fetchRoute().finally(() => setRouteLoading(false));
-  }, [pontosOrdenados]);
+  }, [pontosOrdenados, geoRunning]);
 
   useEffect(() => {
     if (!leafletLoaded) return;
@@ -6157,13 +6158,14 @@ function ModalRotaCarregamento({
     const markers: any[] = [];
     let entregaIdx = 0;
     pontosOrdenados.forEach((p, idx) => {
-      const bg = p.tipo === 'UNIDADE' ? '#2563eb' : '#059669';
+      const isHighlighted = p.key === highlightedKey;
+      const bg = isHighlighted ? '#f59e0b' : (p.tipo === 'UNIDADE' ? '#2563eb' : '#059669');
       const label = p.tipo === 'ENTREGA' ? String(++entregaIdx) : '';
       const icon = L.divIcon({
         className: 'custom-pin-icon',
         html: `
-          <div style="position: relative; width: 30px; height: 40px;">
-            <svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
+          <div style="position: relative; width: ${isHighlighted ? '36px' : '30px'}; height: ${isHighlighted ? '48px' : '40px'}; transition: all 0.2s;">
+            <svg width="${isHighlighted ? '36' : '30'}" height="${isHighlighted ? '48' : '40'}" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <filter id="shadow-rota-${idx}" x="-50%" y="-50%" width="200%" height="200%">
                   <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
@@ -6174,16 +6176,19 @@ function ModalRotaCarregamento({
                     stroke="white"
                     stroke-width="2"
                     filter="url(#shadow-rota-${idx})"/>
-              <circle cx="15" cy="12" r="7" fill="white"/>
-              ${label ? `<text x="15" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="${bg}">${label}</text>` : ''}
+              <circle cx="15" cy="12" r="8.5" fill="white"/>
+              ${label ? `<text x="15" y="17" text-anchor="middle" font-size="12" font-weight="900" fill="black">${label}</text>` : ''}
             </svg>
           </div>
         `,
-        iconSize: [30, 40],
-        iconAnchor: [15, 40],
-        popupAnchor: [0, -40],
+        iconSize: [isHighlighted ? 36 : 30, isHighlighted ? 48 : 40],
+        iconAnchor: [isHighlighted ? 18 : 15, isHighlighted ? 48 : 40],
+        popupAnchor: [0, isHighlighted ? -48 : -40],
       });
       const m = L.marker([p.lat, p.lng], { icon, draggable: p.tipo === 'ENTREGA', autoPan: true }).addTo(map);
+      if (isHighlighted) {
+        try { m.setZIndexOffset(1000); } catch {}
+      }
       if (p.tipo === 'ENTREGA') {
         try { m.dragging.enable(); } catch {}
       }
@@ -6335,7 +6340,7 @@ function ModalRotaCarregamento({
       map.fitBounds(bounds, { padding: [30, 30] });
       didInitialFitRef.current = true;
     }
-  }, [coordsByKey, didInitialFitRef, leafletLoaded, otimizarOrdemEntregas, pontosOrdenados, routeCoords]);
+  }, [coordsByKey, didInitialFitRef, leafletLoaded, otimizarOrdemEntregas, pontosOrdenados, routeCoords, highlightedKey]);
 
   const focarRota = useCallback(() => {
     const L = (window as any).L;
@@ -6650,8 +6655,20 @@ function ModalRotaCarregamento({
     );
   };
 
-  const iniciarGeocoding = async (onlyKeys?: string[]) => {
-    if (geoRunning) return;
+  // Zera (NULL) as coordenadas de entrega dos CT-es deste carregamento no banco.
+  const limparGeolocCarregamento = useCallback(async () => {
+    if (seqCarregamento <= 0) return;
+    try {
+      await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/limpar_geoloc_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ seq_carregamento: seqCarregamento }) },
+        true
+      );
+    } catch {}
+  }, [seqCarregamento]);
+
+  const iniciarGeocoding = async (onlyKeys?: string[], opts?: { reset?: boolean }) => {
+    if (geoRunningRef.current) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
     const onlySet = Array.isArray(onlyKeys) && onlyKeys.length > 0 ? new Set(onlyKeys) : null;
@@ -6660,9 +6677,14 @@ function ModalRotaCarregamento({
       return (geoStatusByKey[g.key] ?? 'pending') === 'pending';
     });
     if (pendentes.length === 0) return;
+    geoRunningRef.current = true;
+    geoCancelRef.current = false;
     setGeoRunning(true);
+    // Acumula as coordenadas encontradas para usar na rota mesmo antes do estado do React atualizar.
+    const acc: Record<string, { lat: number; lng: number }> = opts?.reset ? {} : { ...otimRefs.current.coordsByKey };
     try {
       for (const g of pendentes) {
+        if (geoCancelRef.current) break;
         setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'loading' }));
         setGeoErrorByKey((prev) => {
           const next = { ...prev };
@@ -6682,20 +6704,23 @@ function ModalRotaCarregamento({
             setGeoErrorByKey((prev) => ({ ...prev, [g.key]: 'Não encontrado' }));
             continue;
           }
-          for (const c of g.ctes) {
-            try { await persistirGeoloc(c.ser, c.nro, coord.lat, coord.lng); } catch {}
-          }
+          acc[g.key] = coord;
           setCoordsByKey((prev) => ({ ...prev, [g.key]: coord }));
           setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'ok' }));
-          await new Promise((r) => setTimeout(r, 150));
+          if (Array.isArray(g.ctes) && g.ctes.length > 0) {
+            await Promise.allSettled(g.ctes.map((c: any) => persistirGeoloc(c.ser, c.nro, coord.lat, coord.lng)));
+          }
+          await new Promise((r) => setTimeout(r, 80));
         } catch (e: any) {
           setGeoStatusByKey((prev) => ({ ...prev, [g.key]: 'error' }));
           setGeoErrorByKey((prev) => ({ ...prev, [g.key]: (e?.message || 'Erro') }));
         }
       }
     } finally {
+      geoRunningRef.current = false;
       setGeoRunning(false);
-      void otimizarOrdemEntregas();
+      // Recalcula a melhor rota (sempre o ponto mais próximo a partir da origem) com as coords recém-obtidas.
+      if (!geoCancelRef.current) void otimizarOrdemEntregas(acc);
     }
   };
 
@@ -6718,13 +6743,13 @@ function ModalRotaCarregamento({
   }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey]);
 
   const resetarGeolocalizacoes = useCallback(async () => {
-    if (geoRunning) return;
+    if (geoRunning || geoRunningRef.current) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
 
     const ok = await confirmar({
       title: 'Resetar Geolocalizações e Ordem?',
-      description: 'Isso irá apagar todas as geolocalizações manuais e a ordem salva deste carregamento, permitindo que o sistema recalcule a melhor sequência de entregas. Deseja continuar?',
+      description: 'Isso irá apagar as coordenadas atuais e a ordem salva deste carregamento, buscar as geolocalizações novamente e recalcular a rota pelo ponto mais próximo, partindo da unidade de origem. Deseja continuar?',
       confirmText: 'Resetar Tudo',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -6732,27 +6757,35 @@ function ModalRotaCarregamento({
     if (!ok) return;
 
     const keys = grupos.entrega.map((g) => g.key);
-    autoGeoRef.current = null;
-    
-    // Limpa a ordem no frontend e no backend
+
+    // 1) Zera coordenadas e ordem no frontend
+    setCoordsByKey({});
     setParadasOrder([]);
     ordemInicialSavedRef.current = false;
-    void salvarOrdemCtes([]);
 
-    setGeoErrorByKey((prev) => {
-      const next = { ...(prev || {}) };
-      for (const k of keys) delete next[k];
-      return next;
-    });
-    setGeoStatusByKey((prev) => {
-      const next = { ...(prev || {}) };
+    // 2) Zera a ordem salva e limpa as coordenadas dos CT-es no banco (antes de re-geocodificar)
+    void salvarOrdemCtes([]);
+    await limparGeolocCarregamento();
+
+    // 3) Reinicia o estado de geolocalização
+    setGeoErrorByKey({});
+    setGeoStatusByKey(() => {
+      const next: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
       for (const k of keys) next[k] = 'pending';
       return next;
     });
     setGeoUserLockedByKey({}); // Destrava todos os destinos para permitir re-cálculo
-    
-    void iniciarGeocoding(keys);
-  }, [geoRunning, getToken, grupos.entrega, geoUserLockedByKey, iniciarGeocoding, confirmar, salvarOrdemCtes]);
+
+    // 4) Marca como já processado (evita o auto-geocoding duplicar) e reprocessa + recalcula a rota
+    autoGeoRef.current = carregamento.placa_provisoria;
+    void iniciarGeocoding(keys, { reset: true });
+  }, [geoRunning, getToken, grupos.entrega, limparGeolocCarregamento, iniciarGeocoding, confirmar, salvarOrdemCtes, carregamento.placa_provisoria]);
+
+  // Fechar sempre funciona: cancela a geocodificação em andamento e fecha o dialog.
+  const handleFechar = useCallback(() => {
+    geoCancelRef.current = true;
+    onFechar();
+  }, [onFechar]);
 
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
@@ -6914,7 +6947,7 @@ function ModalRotaCarregamento({
               </p>
             </div>
           </div>
-          <button onClick={!geoRunning ? onFechar : undefined} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" disabled={geoRunning}>
+          <button onClick={handleFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -7052,8 +7085,8 @@ function ModalRotaCarregamento({
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleAberto(k)}
-                          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                          onClick={() => { toggleAberto(k); highlightMarker(k); }}
+                          className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${highlightedKey === k ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
                           title={[
                             g.endereco ? `${g.endereco}${g.bairro ? `, ${g.bairro}` : ''}` : (g.bairro || ''),
                             [g.cep, g.cidade && g.uf ? `${g.cidade}/${g.uf}` : (g.cidade || g.uf)].filter(Boolean).join(' · ')
@@ -7162,8 +7195,8 @@ function ModalRotaCarregamento({
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleAberto(k)}
-                          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-left"
+                          onClick={() => { toggleAberto(k); highlightMarker(k); }}
+                          className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${highlightedKey === k ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
                         >
                           {aberto ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           <div className="flex-1 min-w-0">
