@@ -6384,11 +6384,10 @@ function ModalRotaCarregamento({
 
   const salvarOrdemCtes = useCallback(async (ctes: { ser_cte: string; nro_cte: number; ordem: number }[]) => {
     if (seqCarregamento <= 0) return;
-    if (!Array.isArray(ctes) || ctes.length === 0) return;
     try {
       const resp = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_ordem_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ seq_carregamento: seqCarregamento, ctes }) },
+        { method: 'POST', body: JSON.stringify({ seq_carregamento: seqCarregamento, ctes: Array.isArray(ctes) ? ctes : [] }) },
         true
       );
       if (!resp?.success) {
@@ -6689,6 +6688,7 @@ function ModalRotaCarregamento({
       }
     } finally {
       setGeoRunning(false);
+      void otimizarOrdemEntregas();
     }
   };
 
@@ -6705,16 +6705,28 @@ function ModalRotaCarregamento({
     void iniciarGeocoding();
   }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey, iniciarGeocoding]);
 
-  const resetarGeolocalizacoes = useCallback(() => {
+  const resetarGeolocalizacoes = useCallback(async () => {
     if (geoRunning) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
-    const keys = grupos.entrega.map((g) => g.key).filter((k) => !geoUserLockedByKey[k]);
-    if (keys.length === 0) {
-      toast.info('Nada para resetar: todos os destinos já foram ajustados manualmente.');
-      return;
-    }
+
+    const ok = await confirmar({
+      title: 'Resetar Geolocalizações e Ordem?',
+      description: 'Isso irá apagar todas as geolocalizações manuais e a ordem salva deste carregamento, permitindo que o sistema recalcule a melhor sequência de entregas. Deseja continuar?',
+      confirmText: 'Resetar Tudo',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    const keys = grupos.entrega.map((g) => g.key);
     autoGeoRef.current = null;
+    
+    // Limpa a ordem no frontend e no backend
+    setParadasOrder([]);
+    ordemInicialSavedRef.current = false;
+    void salvarOrdemCtes([]);
+
     setGeoErrorByKey((prev) => {
       const next = { ...(prev || {}) };
       for (const k of keys) delete next[k];
@@ -6725,8 +6737,10 @@ function ModalRotaCarregamento({
       for (const k of keys) next[k] = 'pending';
       return next;
     });
+    setGeoUserLockedByKey({}); // Destrava todos os destinos para permitir re-cálculo
+    
     void iniciarGeocoding(keys);
-  }, [geoRunning, getToken, grupos.entrega, geoUserLockedByKey, iniciarGeocoding]);
+  }, [geoRunning, getToken, grupos.entrega, geoUserLockedByKey, iniciarGeocoding, confirmar, salvarOrdemCtes]);
 
   const totalEnt = grupos.entrega.length;
   const okEnt = grupos.entrega.filter((g) => geoStatusByKey[g.key] === 'ok').length;
