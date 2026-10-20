@@ -5955,28 +5955,44 @@ function ModalRotaCarregamento({
     let ordemEntregas: string[] | null = null;
     try {
       const token = getToken();
-      if (token) {
+      if (token && input.length <= 25) {
         const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
-        const destParam = finalCoord ? '&destination=last' : '';
-        const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordsStr}?source=first${destParam}&roundtrip=false&access_token=${token}&geometries=geojson`;
+        const url = `https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${coordsStr}?annotations=distance&access_token=${token}`;
         const resp = await fetch(url);
         const data = await resp.json();
-        if (data.code === 'Ok' && Array.isArray(data.waypoints)) {
-          const order = data.waypoints
-            .sort((a: any, b: any) => a.waypoint_index - b.waypoint_index)
-            .map((w: any) => w.location_index);
 
-          const keys: string[] = [];
-          for (const idx of order) {
-            const p = input[idx];
-            if (p.kind !== 'entrega' || !p.key) continue;
-            keys.push(p.key);
+        if (data.code === 'Ok' && Array.isArray(data.distances)) {
+          const distances = data.distances;
+          const unvisited = input.map((_, i) => i).filter(i => input[i].kind === 'entrega');
+          const resultIndices: number[] = [];
+          let current = 0;
+
+          while (unvisited.length > 0) {
+            let bestIdxInUnvisited = 0;
+            let minDistance = Number.POSITIVE_INFINITY;
+
+            for (let i = 0; i < unvisited.length; i++) {
+              const targetIdx = unvisited[i];
+              const d = distances[current][targetIdx];
+              if (d !== null && d < minDistance) {
+                minDistance = d;
+                bestIdxInUnvisited = i;
+              }
+            }
+
+            const chosenIdx = unvisited[bestIdxInUnvisited];
+            resultIndices.push(chosenIdx);
+            unvisited.splice(bestIdxInUnvisited, 1);
+            current = chosenIdx;
           }
+
+          const keys = resultIndices.map(idx => input[idx].key).filter(Boolean) as string[];
           if (keys.length >= 2) ordemEntregas = keys;
         }
       }
 
       if (!ordemEntregas) {
+        // Fallback para OSRM trip (global optimization) apenas se o Matrix falhar
         const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
         const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=false`;
         const resp = await fetch(url);
