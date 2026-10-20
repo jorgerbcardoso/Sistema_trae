@@ -5954,24 +5954,48 @@ function ModalRotaCarregamento({
 
     let ordemEntregas: string[] | null = null;
     try {
-      const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
-      const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=false`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-      const waypoints = Array.isArray(data?.waypoints) ? data.waypoints : null;
-      if (waypoints && waypoints.length === input.length) {
-        const order = waypoints
-          .map((w: any, i: number) => ({ i, o: Number(w?.waypoint_index ?? i) }))
-          .sort((a: any, b: any) => a.o - b.o)
-          .map((x: any) => x.i);
+      const token = getToken();
+      if (token) {
+        const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
+        const destParam = finalCoord ? '&destination=last' : '';
+        const url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${coordsStr}?source=first${destParam}&roundtrip=false&access_token=${token}&geometries=geojson`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.code === 'Ok' && Array.isArray(data.waypoints)) {
+          const order = data.waypoints
+            .sort((a: any, b: any) => a.waypoint_index - b.waypoint_index)
+            .map((w: any) => w.location_index);
 
-        const keys: string[] = [];
-        for (const idx of order) {
-          const p = input[idx];
-          if (p.kind !== 'entrega' || !p.key) continue;
-          keys.push(p.key);
+          const keys: string[] = [];
+          for (const idx of order) {
+            const p = input[idx];
+            if (p.kind !== 'entrega' || !p.key) continue;
+            keys.push(p.key);
+          }
+          if (keys.length >= 2) ordemEntregas = keys;
         }
-        if (keys.length >= 2) ordemEntregas = keys;
+      }
+
+      if (!ordemEntregas) {
+        const coordsStr = input.map((p) => `${p.coord.lng},${p.coord.lat}`).join(';');
+        const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=false`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        const waypoints = Array.isArray(data?.waypoints) ? data.waypoints : null;
+        if (waypoints && waypoints.length === input.length) {
+          const order = waypoints
+            .map((w: any, i: number) => ({ i, o: Number(w?.waypoint_index ?? i) }))
+            .sort((a: any, b: any) => a.o - b.o)
+            .map((x: any) => x.i);
+
+          const keys: string[] = [];
+          for (const idx of order) {
+            const p = input[idx];
+            if (p.kind !== 'entrega' || !p.key) continue;
+            keys.push(p.key);
+          }
+          if (keys.length >= 2) ordemEntregas = keys;
+        }
       }
     } catch {}
 
@@ -6052,6 +6076,22 @@ function ModalRotaCarregamento({
       if (pontosOrdenados.length < 2) { setRouteCoords([]); return; }
       setRouteLoading(true);
       try {
+        const token = getToken();
+        if (token) {
+          const coordsStr = pontosOrdenados.map((p) => `${p.lng},${p.lat}`).join(';');
+          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsStr}?overview=full&geometries=geojson&access_token=${token}`;
+          const resp = await fetch(url);
+          const data = await resp.json();
+          const distM = Number(data?.routes?.[0]?.distance ?? 0) || 0;
+          setRouteDistanceKm(distM > 0 ? (distM / 1000) : null);
+          const coordinates = data?.routes?.[0]?.geometry?.coordinates;
+          if (Array.isArray(coordinates) && coordinates.length > 0) {
+            const converted = coordinates.map((c: any) => ({ lat: c[1], lng: c[0] }));
+            setRouteCoords(converted);
+            return;
+          }
+        }
+
         const coordsStr = pontosOrdenados.map((p) => `${p.lng},${p.lat}`).join(';');
         const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
         const resp = await fetch(url);
