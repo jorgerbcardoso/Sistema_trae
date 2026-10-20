@@ -750,7 +750,7 @@ export function FaturamentoClientes() {
   const tooltipBg  = isDark ? '#1e293b' : '#ffffff';
   const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
 
-  const CTE_PAGE_SIZE = 100;
+  const CTE_PAGE_SIZE = 200;
   const cteDialogGridCols = 'grid-cols-[90px_84px_minmax(0,1fr)_100px_80px_55px_110px_110px_130px]';
 
   const parseDDMMYYYY = (s: string) => {
