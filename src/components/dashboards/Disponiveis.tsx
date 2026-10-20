@@ -6020,17 +6020,23 @@ function ModalRotaCarregamento({
       const restantes = [...entregas];
       const out: string[] = [];
       let cur = origemCoord;
-      while (restantes.length > 0) {
-        let bestIdx = 0;
-        let bestDist = Number.POSITIVE_INFINITY;
-        for (let i = 0; i < restantes.length; i += 1) {
-          const d = calcDist(cur, restantes[i].coord);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
+    while (restantes.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < restantes.length; i += 1) {
+        const d = calcDist(cur, restantes[i].coord);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
         }
-        const [next] = restantes.splice(bestIdx, 1);
+      }
+      const next = restantes[bestIdx];
+      if (next) {
         out.push(next.key);
         cur = next.coord;
       }
+      restantes.splice(bestIdx, 1);
+    }
       if (out.length >= 2) ordemEntregas = out;
     }
 
@@ -6693,6 +6699,11 @@ function ModalRotaCarregamento({
     }
   };
 
+  const iniciarGeocodingRef = useRef(iniciarGeocoding);
+  useEffect(() => {
+    iniciarGeocodingRef.current = iniciarGeocoding;
+  }, [iniciarGeocoding]);
+
   useEffect(() => {
     const token = getToken();
     const placa = carregamento.placa_provisoria;
@@ -6703,8 +6714,8 @@ function ModalRotaCarregamento({
     const pendentes = grupos.entrega.filter((g) => (geoStatusByKey[g.key] ?? 'pending') === 'pending');
     if (pendentes.length === 0) return;
     autoGeoRef.current = placa;
-    void iniciarGeocoding();
-  }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey, iniciarGeocoding]);
+    void iniciarGeocodingRef.current();
+  }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey]);
 
   const resetarGeolocalizacoes = useCallback(async () => {
     if (geoRunning) return;
