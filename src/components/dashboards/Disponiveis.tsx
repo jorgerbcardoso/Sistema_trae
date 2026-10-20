@@ -10821,6 +10821,18 @@ export function Disponiveis() {
     return importarCarregamentosBase(opts);
   }, [importarCarregamentosBase]);
 
+  // Única autoexecução periódica do painel: importação dos carregamentos do SSW a cada 5 minutos
+  // Segue rigorosamente a mesma rotina do botão "Imp. carregamentos".
+  useEffect(() => {
+    if (!painelAtivo) return;
+    if (isMTZ) return;
+    if (!sigla) return;
+    const id = window.setInterval(() => {
+      void handleImportarCarregamentos();
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [painelAtivo, isMTZ, sigla, handleImportarCarregamentos]);
+
   const handleImportarVeiculos = useCallback(async () => {
     if (importandoVeiculosRef.current) return { success: false, message: 'Importação já em andamento.' };
     importandoVeiculosRef.current = true;
