@@ -5564,6 +5564,7 @@ function ModalRotaCarregamento({
   const [geoUserLockedByKey, setGeoUserLockedByKey] = useState<Record<string, boolean>>({});
   const [geoRunning, setGeoRunning] = useState(false);
   const [geoHydrated, setGeoHydrated] = useState(false);
+  const { confirm: confirmar, dialog: confirmarDialog } = useConfirmDialog();
 
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
   const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete'>('ctrc');
@@ -6889,6 +6890,7 @@ function ModalRotaCarregamento({
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(1100px,calc(100vw-32px))] h-[min(760px,calc(100vh-100px))] flex flex-col">
+        {confirmarDialog}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2 min-w-0">
             <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
