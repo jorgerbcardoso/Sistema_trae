@@ -5577,14 +5577,6 @@ function ModalRotaCarregamento({
   const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
 
-  const highlightMarker = useCallback((key: string) => {
-    setHighlightedKey(key);
-    const p = pontosOrdenados.find((x) => x.key === key);
-    if (p && mapRef.current) {
-      mapRef.current.setView([p.lat, p.lng], 16);
-    }
-  }, [pontosOrdenados]);
-
   const carregarInfo = dados?.carregamento ?? {};
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
@@ -6086,6 +6078,14 @@ function ModalRotaCarregamento({
 
     return pontos;
   }, [coordsByKey, entregaByKey, origem, paradasOrderEfetiva, unidadesMap, unidadesOrdem]);
+
+  const highlightMarker = useCallback((key: string) => {
+    setHighlightedKey(key);
+    const p = pontosOrdenados.find((x) => x.key === key);
+    if (p && mapRef.current) {
+      mapRef.current.setView([p.lat, p.lng], 16);
+    }
+  }, [pontosOrdenados]);
 
   const [routeCoords, setRouteCoords] = useState<{ lat: number; lng: number }[]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
