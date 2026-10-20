@@ -10353,14 +10353,15 @@ export function Disponiveis() {
   }, [showFilters, isBNR, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
 
   const inicializaOcorrenciasDefault = (base: FiltrosDisponiveis): FiltrosDisponiveis => {
+    if (isBNR) {
+      return { ...base, ultOcorCodigos: ['57', '83', '58', '80', '90', '13', '29', '84', '94'] };
+    }
     if (!todasOcorrenciasCarregadas) return base;
-    const ocultarBNR = new Set(['52', '25', '34', '11']);
     const todas = [
       OCORRENCIA_SEM_CODIGO,
       ...todasOcorrenciasCarregadas.map(o => String(o.codigo))
     ];
-    const filtradas = isBNR ? todas.filter(c => c === OCORRENCIA_SEM_CODIGO || !ocultarBNR.has(c)) : todas;
-    return { ...base, ultOcorCodigos: filtradas };
+    return { ...base, ultOcorCodigos: todas };
   };
 
   useEffect(() => {
@@ -10370,7 +10371,6 @@ export function Disponiveis() {
 
   useEffect(() => {
     if (!isBNR) return;
-    if (todasOcorrenciasCarregadas === null) return;
     if (ultOcorTouched) return;
     setFilters(atual => {
       if (atual.ultOcorCodigos?.length) return atual;
@@ -10380,8 +10380,7 @@ export function Disponiveis() {
       if (atual.ultOcorCodigos?.length) return atual;
       return inicializaOcorrenciasDefault(atual);
     });
-  }, [isBNR, todasOcorrenciasCarregadas, ultOcorTouched]);
-
+  }, [isBNR, ultOcorTouched]);
   const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
@@ -12718,7 +12717,7 @@ export function Disponiveis() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). No BNR: 52/25/34/11 começam desmarcadas</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). No BNR: 57/83/58/80/90/13/29/84/94 vêm marcadas por padrão</p>
                         <OcorrenciasMultiSelect
                           value={tempFilters.ultOcorCodigos}
                           onChange={(value) => {
