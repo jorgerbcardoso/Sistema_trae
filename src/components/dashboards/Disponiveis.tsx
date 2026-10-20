@@ -6141,6 +6141,10 @@ function ModalRotaCarregamento({
     if (!mapContainerRef.current) return;
     const L = (window as any).L;
     if (!L) return;
+    // Durante a geocodificação em lote, cada coordenada nova reconstruiria TODOS os pins
+    // (O(n²)), saturando a thread principal e travando a interface. Desenhamos tudo de uma
+    // vez quando o processo termina (geoRunning volta a false).
+    if (geoRunning) return;
 
     if (!mapRef.current) {
       mapRef.current = L.map(mapContainerRef.current).setView([-15, -55], 4);
@@ -6340,7 +6344,7 @@ function ModalRotaCarregamento({
       map.fitBounds(bounds, { padding: [30, 30] });
       didInitialFitRef.current = true;
     }
-  }, [coordsByKey, didInitialFitRef, leafletLoaded, otimizarOrdemEntregas, pontosOrdenados, routeCoords, highlightedKey]);
+  }, [coordsByKey, didInitialFitRef, geoRunning, leafletLoaded, otimizarOrdemEntregas, pontosOrdenados, routeCoords, highlightedKey]);
 
   const focarRota = useCallback(() => {
     const L = (window as any).L;
@@ -6667,7 +6671,7 @@ function ModalRotaCarregamento({
     } catch {}
   }, [seqCarregamento]);
 
-  const iniciarGeocoding = async (onlyKeys?: string[], opts?: { reset?: boolean }) => {
+  const iniciarGeocoding = async (onlyKeys?: string[]) => {
     if (geoRunningRef.current) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
@@ -6681,7 +6685,7 @@ function ModalRotaCarregamento({
     geoCancelRef.current = false;
     setGeoRunning(true);
     // Acumula as coordenadas encontradas para usar na rota mesmo antes do estado do React atualizar.
-    const acc: Record<string, { lat: number; lng: number }> = opts?.reset ? {} : { ...otimRefs.current.coordsByKey };
+    const acc: Record<string, { lat: number; lng: number }> = { ...otimRefs.current.coordsByKey };
     try {
       for (const g of pendentes) {
         if (geoCancelRef.current) break;
@@ -6743,43 +6747,46 @@ function ModalRotaCarregamento({
   }, [carregamento.placa_provisoria, getToken, geoHydrated, geoRunning, grupos.entrega, geoStatusByKey]);
 
   const resetarGeolocalizacoes = useCallback(async () => {
-    if (geoRunning || geoRunningRef.current) return;
+    if (geoRunningRef.current) return;
     const tokenNow = getToken();
     if (!tokenNow) { toast.error('Token Mapbox não configurado.'); return; }
 
     const ok = await confirmar({
       title: 'Resetar Geolocalizações e Ordem?',
-      description: 'Isso irá apagar as coordenadas atuais e a ordem salva deste carregamento, buscar as geolocalizações novamente e recalcular a rota pelo ponto mais próximo, partindo da unidade de origem. Deseja continuar?',
+      description: 'Isso irá apagar as geolocalizações e a ordem salva deste carregamento e refazer o processo inicial (buscar as geolocalizações novamente e recalcular a rota pelo ponto mais próximo, partindo da unidade de origem). Deseja continuar?',
       confirmText: 'Resetar Tudo',
       cancelText: 'Cancelar',
       variant: 'destructive',
     });
     if (!ok) return;
 
-    const keys = grupos.entrega.map((g) => g.key);
+    // Interrompe qualquer geocodificação em andamento antes de recomeçar.
+    geoCancelRef.current = true;
 
-    // 1) Zera coordenadas e ordem no frontend
-    setCoordsByKey({});
-    setParadasOrder([]);
-    ordemInicialSavedRef.current = false;
-
-    // 2) Zera a ordem salva e limpa as coordenadas dos CT-es no banco (antes de re-geocodificar)
-    void salvarOrdemCtes([]);
+    // 1) Limpa a ordem e as geolocalizações salvas no banco.
+    try { await salvarOrdemCtes([]); } catch {}
     await limparGeolocCarregamento();
 
-    // 3) Reinicia o estado de geolocalização
+    // 2) Zera o estado local — exatamente como um carregamento recém-aberto, sem roteirização.
+    //    Deixamos o efeito de geocodificação automática (processo inicial) detectar os
+    //    pendentes e disparar a busca das coordenadas + o cálculo da rota.
+    autoGeoRef.current = null;
+    geoCancelRef.current = false;
+    geoRunningRef.current = false;
+    ordemSyncRef.current.sig = '';
+    ordemInicialSavedRef.current = false;
+
+    setCoordsByKey({});
+    setParadasOrder([]);
     setGeoErrorByKey({});
+    setGeoUserLockedByKey({});
+    setGeoRunning(false);
     setGeoStatusByKey(() => {
       const next: Record<string, 'pending' | 'loading' | 'ok' | 'error'> = {};
-      for (const k of keys) next[k] = 'pending';
+      for (const g of grupos.entrega) next[g.key] = 'pending';
       return next;
     });
-    setGeoUserLockedByKey({}); // Destrava todos os destinos para permitir re-cálculo
-
-    // 4) Marca como já processado (evita o auto-geocoding duplicar) e reprocessa + recalcula a rota
-    autoGeoRef.current = carregamento.placa_provisoria;
-    void iniciarGeocoding(keys, { reset: true });
-  }, [geoRunning, getToken, grupos.entrega, limparGeolocCarregamento, iniciarGeocoding, confirmar, salvarOrdemCtes, carregamento.placa_provisoria]);
+  }, [getToken, grupos.entrega, limparGeolocCarregamento, confirmar, salvarOrdemCtes]);
 
   // Fechar sempre funciona: cancela a geocodificação em andamento e fecha o dialog.
   const handleFechar = useCallback(() => {
