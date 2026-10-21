@@ -10963,18 +10963,6 @@ export function Disponiveis() {
     return importarCarregamentosBase(opts);
   }, [importarCarregamentosBase]);
 
-  // Única autoexecução periódica do painel: importação dos carregamentos do SSW a cada 5 minutos
-  // Segue rigorosamente a mesma rotina do botão "Imp. carregamentos".
-  useEffect(() => {
-    if (!painelAtivo) return;
-    if (isMTZ) return;
-    if (!sigla) return;
-    const id = window.setInterval(() => {
-      void handleImportarCarregamentos();
-    }, 5 * 60 * 1000);
-    return () => window.clearInterval(id);
-  }, [painelAtivo, isMTZ, sigla, handleImportarCarregamentos]);
-
   const handleImportarVeiculos = useCallback(async () => {
     if (importandoVeiculosRef.current) return { success: false, message: 'Importação já em andamento.' };
     importandoVeiculosRef.current = true;
@@ -11954,14 +11942,15 @@ export function Disponiveis() {
     if (!sigla) return;
     setLoadingInicial(true);
     try {
-      if (carregamentosTransferOpen) {
-        await importarCarregamentosSSWObrigatorio();
-      }
-      await carregar();
+      await importarCarregamentosSSWObrigatorio();
+      await Promise.all([
+        carregar(),
+        carregarEntrega()
+      ]);
     } finally {
       setLoadingInicial(false);
     }
-  }, [sigla, carregamentosTransferOpen, importarCarregamentosSSWObrigatorio, carregar]);
+  }, [sigla, importarCarregamentosSSWObrigatorio, carregar, carregarEntrega]);
 
   const verificarSaidasEmViagem = useCallback(async () => {
     try {
@@ -11978,7 +11967,6 @@ export function Disponiveis() {
   }, []);
 
   useEffect(() => {
-    if (!painelAtivo) return;
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
       return;
@@ -11988,7 +11976,8 @@ export function Disponiveis() {
     void (async () => {
       setLoadingInicial(true);
       try {
-        await carregarCarregamentos();
+        // Importação inicial do SSW e carga dos carregamentos
+        await importarCarregamentosSSWObrigatorio();
         if (!ativo) return;
         await carregar();
         if (!ativo) return;
@@ -11998,7 +11987,7 @@ export function Disponiveis() {
       }
     })();
     return () => { ativo = false; };
-  }, [painelAtivo, sigla, isMTZ, carregar, carregarEntrega, carregarCarregamentos]);
+  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio]);
 
   const hasFiltrosAtivos =
     (filters.unidadeDestino?.length ?? 0) > 0 ||
