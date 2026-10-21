@@ -2860,28 +2860,19 @@ function CardCarregamento({
 
   useEffect(() => {
     if (qtdeCtesCarreg <= 0) return;
-    if (isConjunto) return;
+    // Valor conhecido (cache) apenas como pintura inicial; a rotina abaixo sempre
+    // roda para refletir os CT-es atuais do carregamento (mesma rotina do "Listar").
     const cached = totaisCarregamentoCache.get(carregamentoKey);
-    if (cached) {
-      if (!totaisCard) { setTotaisCard(cached); }
-      return;
-    }
-    const origem = String(carregamento.origem_criacao ?? '').toUpperCase();
-    const precisaRecalcular = origem !== 'MANUAL';
-    if (totaisCard && !precisaRecalcular) return;
+    if (cached) setTotaisCard((prev) => prev ?? cached);
     let alive = true;
     (async () => {
       try {
-        const res = await apiFetch(
+        const fetchLista = async (p: string, seq: any) => apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/get_ctes_carregamento.php`,
-          { method: 'POST', body: JSON.stringify({ placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null }) },
+          { method: 'POST', body: JSON.stringify({ placa: p, seq_carregamento: seq ?? null }) },
           true
         );
-        if (!alive) return;
-        if (!res?.success) return;
-        const totais = res?.totais ?? null;
-        const lista = Array.isArray(res?.ctes) ? res.ctes : [];
-        const frete = lista.reduce((acc: { cif: number; fob: number }, c: any) => {
+        const somarFrete = (lista: any[]) => lista.reduce((acc: { cif: number; fob: number }, c: any) => {
           const v = parseMoeda(String(c?.vlr_frete ?? '0'));
           const tp = String(c?.tp_frete ?? '').trim().toUpperCase();
           if (tp !== '') {
@@ -2895,19 +2886,47 @@ function CardCarregamento({
           else acc.cif += v;
           return acc;
         }, { cif: 0, fob: 0 });
-        const next = {
-          peso: normPesoKgTotal(totais?.peso ?? 0),
-          cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
-          vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
-          cif: frete.cif,
-          fob: frete.fob,
-        };
-        totaisCarregamentoCache.set(carregamentoKey, next);
+
+        let next: { peso: number; cubagem: number; vlr_frete: number; cif: number; fob: number } | null = null;
+        if (isConjunto) {
+          const [r1, r2] = await Promise.all([
+            fetchLista(placa1, carregamento.seq_carregamento ?? null),
+            fetchLista(placa2, carregamentoConjunto?.seq_carregamento ?? null),
+          ]);
+          if (!r1?.success || !r2?.success) return;
+          const merged = [
+            ...(Array.isArray(r1?.ctes) ? r1.ctes : []),
+            ...(Array.isArray(r2?.ctes) ? r2.ctes : []),
+          ];
+          const frete = somarFrete(merged);
+          next = {
+            peso: merged.reduce((s: number, c: any) => s + normPesoKgTotal(c?.peso ?? 0), 0),
+            cubagem: merged.reduce((s: number, c: any) => s + parseCubagem(String(c?.cubagem ?? '0')), 0),
+            vlr_frete: merged.reduce((s: number, c: any) => s + parseMoeda(String(c?.vlr_frete ?? '0')), 0),
+            cif: frete.cif,
+            fob: frete.fob,
+          };
+        } else {
+          const res = await fetchLista(placa1, carregamento.seq_carregamento ?? null);
+          if (!res?.success) return;
+          const totais = res?.totais ?? null;
+          const lista = Array.isArray(res?.ctes) ? res.ctes : [];
+          const frete = somarFrete(lista);
+          next = {
+            peso: normPesoKgTotal(totais?.peso ?? 0),
+            cubagem: parseCubagem(String(totais?.cubagem ?? '0')),
+            vlr_frete: parseMoeda(String(totais?.vlr_frete ?? '0')),
+            cif: frete.cif,
+            fob: frete.fob,
+          };
+          totaisCarregamentoCache.set(carregamentoKey, next);
+        }
+        if (!alive || !next) return;
         setTotaisCard(next);
       } catch {}
     })();
     return () => { alive = false; };
-  }, [carregamentoKey, qtdeCtesCarreg, totaisCard, isConjunto]);
+  }, [carregamentoKey, qtdeCtesCarreg, isConjunto, placa1, placa2]);
 
   const totalPeso =
     (totaisCard && totaisCard.peso > 0) ? totaisCard.peso :
