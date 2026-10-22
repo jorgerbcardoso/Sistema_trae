@@ -109,6 +109,7 @@ $sqlCarregamentos = "
         cap.cap_m3,
         cap.vlr_frete_carreteiro,
         COALESCE(cap.simulado, FALSE) AS simulado,
+        MAX(cap.tp_carregamento) AS tp_carregamento,
         cap.seq_carregamento_conjunto
     FROM {$tabelaCarregamento} c
     LEFT JOIN {$tabelaVeiculo} v
@@ -185,11 +186,18 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $dataFinal = $fimTs !== '' ? substr($fimTs, 0, 10) : ($row['data_finalizacao'] ?? null);
     $horaFinal = $fimTs !== '' ? substr($fimTs, 11, 8) : ($row['hora_finalizacao'] ?? null);
 
+    // Tipo do carregamento: sempre considerar a coluna tp_carregamento; fallback pelo destino.
+    $tpCarreg = strtoupper(trim((string)($row['tp_carregamento'] ?? '')));
+    if ($tpCarreg !== 'T' && $tpCarreg !== 'E') {
+        $tpCarreg = (((string)($row['destino_vazio'] ?? '')) === 't') ? 'E' : 'T';
+    }
+
     $carregamentos[] = [
         'seq_carregamento'  => $seqCarreg,
         'placa_provisoria' => $placa,
         'origem_criacao'   => $origemCriacao,
-        'modo_carregamento' => (((string)($row['destino_vazio'] ?? '')) === 't') ? 'ENTREGA' : 'TRANSFERENCIA',
+        'tp_carregamento'  => $tpCarreg,
+        'modo_carregamento' => ($tpCarreg === 'E') ? 'ENTREGA' : 'TRANSFERENCIA',
         'setores_entrega'  => ($row['setores_entrega'] ?? null),
         'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),

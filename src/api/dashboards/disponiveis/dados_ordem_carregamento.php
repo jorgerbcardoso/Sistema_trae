@@ -155,10 +155,26 @@ if ($acao === 'save') {
         $exists = $res && pg_num_rows($res) > 0;
 
         if (!$exists) {
+            // Tipo do carregamento (T/E): sempre considerar a coluna tp_carregamento; fallback pelo destino.
+            $tpCarreg = 'E';
+            try {
+                $resTp = sql(
+                    "SELECT destino FROM {$tblCar}
+                     WHERE unidade = \$1 AND seq_carregamento = \$2
+                     ORDER BY (CASE WHEN COALESCE(destino, '') <> '' THEN 0 ELSE 1 END)
+                     LIMIT 1",
+                    [$unidade, $seqCarResolved],
+                    $conn
+                );
+                if ($resTp && pg_num_rows($resTp) > 0) {
+                    $destTp = trim((string)pg_fetch_result($resTp, 0, 0));
+                    $tpCarreg = ($destTp === '') ? 'E' : 'T';
+                }
+            } catch (Exception $e) {}
             sql(
-                "INSERT INTO {$tblCap} (unidade, seq_carregamento)
-                 VALUES ($1, $2)",
-                [$unidade, $seqCarResolved],
+                "INSERT INTO {$tblCap} (unidade, seq_carregamento, tp_carregamento)
+                 VALUES ($1, $2, $3)",
+                [$unidade, $seqCarResolved, $tpCarreg],
                 $conn
             );
         }

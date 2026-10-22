@@ -49,6 +49,7 @@ $tabelaUnidade = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS tp_carregamento VARCHAR(1)");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -233,9 +234,9 @@ if ($acao === 'adiar_linha') {
         ");
         $nroLinhaSql = ($nroLinha > 0) ? (string)$nroLinha : 'NULL';
         @pg_query($conn,
-            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
-             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', FALSE, {$nroLinhaSql})
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha, tp_carregamento)
+             VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', FALSE, {$nroLinhaSql}, 'T')
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), tp_carregamento = 'T'"
         );
 
         $ins = sql(
@@ -1242,9 +1243,9 @@ if ($modoAutomatico) {
     ");
     $nroLinhaSql = ($nroLinha > 0) ? (string)$nroLinha : 'NULL';
     @pg_query($conn,
-        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', TRUE, {$nroLinhaSql})
-         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha, tp_carregamento)
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaAuto) . "', TRUE, {$nroLinhaSql}, 'T')
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), tp_carregamento = 'T'"
     );
 
     $inseridos = inserirCtes($conn, $tabela, $unidade, $placaAuto, $login, $dest, $paradasCsv, $ctesSelecionados, $nroLinha, $seqCarreg);
@@ -1380,9 +1381,9 @@ pg_query($conn, 'BEGIN');
     )
 ");
 @pg_query($conn,
-    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha)
-     VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaFinal) . "', TRUE, NULL)
-     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha)"
+    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha, tp_carregamento)
+     VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaFinal) . "', TRUE, NULL, 'T')
+     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), tp_carregamento = 'T'"
 );
 
 $inseridos = inserirCtes($conn, $tabela, $unidade, $placaFinal, $login, $unidadeDestino, $paradasCsv, $ctesSelecionados, 0, $seqCarreg);

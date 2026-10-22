@@ -178,6 +178,7 @@ if ($acao === 'EXCLUIR_INEXISTENTES') {
     @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
     @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
     @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
+    @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS tp_carregamento VARCHAR(1)");
     $origens = $input['origens_ssw'] ?? [];
     if (!is_array($origens)) $origens = [];
     $origens = array_values(array_unique(array_filter(array_map(function ($v) {
@@ -285,6 +286,7 @@ $mapDestinoCompart = buildMapaDestinoCompartilhadoImport($conn, $tblUnidade);
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS tp_carregamento VARCHAR(1)");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -296,6 +298,26 @@ function nextSeqCarregamentoSsw($conn, $seqName) {
     $res = @pg_query($conn, "SELECT nextval('" . pg_escape_string($conn, $seqName) . "') AS seq");
     if (!$res || pg_num_rows($res) === 0) return 0;
     return (int)pg_fetch_result($res, 0, 0);
+}
+
+// Guard SQL: restringe a baixa automática a carregamentos de TRANSFERÊNCIA.
+// Sempre considera a coluna tp_carregamento; fallback para o destino do carregamento.
+function guardTpTransferenciaSsw($tabela, $tabelaCap, $alias) {
+    $alias = preg_replace('/[^A-Za-z0-9_]/', '', (string)$alias);
+    if ($alias === '') $alias = 't';
+    return "AND COALESCE(
+        (SELECT cap.tp_carregamento
+           FROM {$tabelaCap} cap
+          WHERE cap.unidade = {$alias}.unidade
+            AND cap.seq_carregamento IS NOT DISTINCT FROM {$alias}.seq_carregamento
+          LIMIT 1),
+        (CASE WHEN EXISTS (
+            SELECT 1 FROM {$tabela} x
+            WHERE x.unidade = {$alias}.unidade
+              AND x.seq_carregamento IS NOT DISTINCT FROM {$alias}.seq_carregamento
+              AND TRIM(COALESCE(x.destino, '')) <> ''
+        ) THEN 'T' ELSE 'E' END)
+    ) = 'T'";
 }
 
 ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
@@ -1417,9 +1439,9 @@ foreach ($placas_ssw as $placa) {
             )
         ");
         @pg_query($conn,
-            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha)
-             VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', {$nroLinhaCarEsc})
-             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), simulado = FALSE"
+            "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha, tp_carregamento)
+             VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', {$nroLinhaCarEsc}, 'T')
+             ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), simulado = FALSE, tp_carregamento = COALESCE({$tabelaCap}.tp_carregamento, 'T')"
         );
 
         if (empty($ctes)) {
@@ -1628,16 +1650,21 @@ if (count($placasUp) > 0) {
         $raw = (string)($s['raw'] ?? '');
         if ($p === '' || $d === '' || $h === '') continue;
 
+        // A baixa automática por saída do SSW vale apenas para carregamentos de
+        // TRANSFERÊNCIA (tp_carregamento = 'T'). ENTREGAS terão rotina própria.
+        $guardaSomenteTransferencia = guardTpTransferenciaSsw($tabela, $tabelaCap, 't');
+
         $affected = 0;
         try {
             $resUp = sql(
-                "UPDATE {$tabela}
+                "UPDATE {$tabela} t
                  SET data_finalizacao = \$3,
                      hora_finalizacao = \$4,
                      login_finalizacao = \$5
-                 WHERE unidade = \$1
-                   AND data_finalizacao IS NULL
-                   AND UPPER(placa_provisoria) = UPPER(\$2)",
+                 WHERE t.unidade = \$1
+                   AND t.data_finalizacao IS NULL
+                   AND UPPER(t.placa_provisoria) = UPPER(\$2)
+                   {$guardaSomenteTransferencia}",
                 [$unidade, $p, $d, $h, $login],
                 $conn
             );
@@ -1651,13 +1678,14 @@ if (count($placasUp) > 0) {
             if ($suf !== '') {
                 try {
                     $resUp = sql(
-                        "UPDATE {$tabela}
+                        "UPDATE {$tabela} t
                          SET data_finalizacao = \$3,
                              hora_finalizacao = \$4,
                              login_finalizacao = \$5
-                         WHERE unidade = \$1
-                           AND data_finalizacao IS NULL
-                           AND RIGHT(UPPER(placa_provisoria), 4) = RIGHT(UPPER(\$2), 4)",
+                         WHERE t.unidade = \$1
+                           AND t.data_finalizacao IS NULL
+                           AND RIGHT(UPPER(t.placa_provisoria), 4) = RIGHT(UPPER(\$2), 4)
+                           {$guardaSomenteTransferencia}",
                         [$unidade, $p, $d, $h, $login],
                         $conn
                     );
