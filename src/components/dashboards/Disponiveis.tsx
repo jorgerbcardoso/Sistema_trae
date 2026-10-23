@@ -2078,7 +2078,9 @@ function parseMoeda(s: string): number {
     ? cleaned.replace(/\./g, '').replace(',', '.')
     : hasComma
       ? cleaned.replace(',', '.')
-      : cleaned;
+      : (hasDot && /^\-?\d{1,3}(\.\d{3})+$/.test(cleaned))
+        ? cleaned.replace(/\./g, '')
+        : cleaned;
   return parseFloat(normalized) || 0;
 }
 function isAgendamentoSSWFalha(s: string): boolean {

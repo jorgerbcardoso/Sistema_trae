@@ -1380,6 +1380,55 @@ function askMultiple($questions) {
     return floatval ($str);
   }
 
+  // Converte números no formato brasileiro ("." milhar, "," decimal) para float,
+  // aceitando também valores já em formato americano.
+  //  1) remove o separador de milhar
+  //  2) substitui a vírgula decimal por ponto
+  //  3) interpreta como formato americano (float)
+  function parseNumeroBr ($v) {
+    if (is_int($v) || is_float($v)) return (float)$v;
+    $s = trim((string)$v);
+    if ($s === '') return 0.0;
+    $neg = (strpos($s, '-') !== false);
+    $s = preg_replace('/[^0-9,.]/', '', $s);
+    if ($s === '') return 0.0;
+    if (strpos($s, ',') !== false) {
+      $s = str_replace('.', '', $s);   // remove o milhar
+      $s = str_replace(',', '.', $s);  // vírgula -> ponto decimal
+    } elseif (preg_match('/^\d{1,3}(\.\d{3})+$/', $s)) {
+      $s = str_replace('.', '', $s);   // ponto é separador de milhar
+    }
+    $n = (float)$s;
+    if (!is_finite($n)) return 0.0;
+    return $neg ? -abs($n) : $n;
+  }
+
+  // Sincroniza, na tabela de carregamento, os valores do documento (_cte) quando os
+  // gravados estiverem zerados ou MENORES que os do documento (fonte de verdade).
+  // Isso corrige registros antigos cujo frete/peso/cubagem foram gravados a menos.
+  // $unidadeEsc deve vir já escapado; $crit permite restringir (ex.: "AND seq_carregamento = 1").
+  function corrigirValoresDocCte ($conn, $tabela, $unidadeEsc, $ser, $nro, $vlrMerc, $vlrFrete, $peso, $cub, $vol, $crit = '') {
+    $sets = array();
+    $frete  = (float)$vlrFrete;
+    $merc   = (float)$vlrMerc;
+    $pesoCt = (float)$peso;
+    $cubo   = (float)$cub;
+    $volume = (int)$vol;
+    if ($frete > 0)  $sets[] = "vlr_frete_cte = CASE WHEN COALESCE(vlr_frete_cte, 0) < {$frete}  THEN {$frete}  ELSE vlr_frete_cte END";
+    if ($merc > 0)   $sets[] = "vlr_merc_cte = CASE WHEN COALESCE(vlr_merc_cte, 0) < {$merc}   THEN {$merc}   ELSE vlr_merc_cte END";
+    if ($pesoCt > 0) $sets[] = "peso_cte = CASE WHEN COALESCE(peso_cte, 0) < {$pesoCt} THEN {$pesoCt} ELSE peso_cte END";
+    if ($cubo > 0)   $sets[] = "cubagem_cte = CASE WHEN COALESCE(cubagem_cte, 0) < {$cubo}   THEN {$cubo}   ELSE cubagem_cte END";
+    if ($volume > 0) $sets[] = "qtde_vol_cte = CASE WHEN COALESCE(qtde_vol_cte, 0) < {$volume} THEN {$volume} ELSE qtde_vol_cte END";
+    if (empty($sets)) return;
+    $serEsc = pg_escape_string($conn, (string)$ser);
+    $sql = "UPDATE {$tabela} SET " . implode(', ', $sets)
+         . " WHERE unidade = '{$unidadeEsc}'"
+         . " AND UPPER(BTRIM(ser_cte)) = '{$serEsc}'"
+         . " AND nro_cte = " . (int)$nro
+         . ($crit !== '' ? (' ' . $crit) : '');
+    @pg_query($conn, $sql);
+  }
+
   function util ($data)
   {
     global $g_sis;

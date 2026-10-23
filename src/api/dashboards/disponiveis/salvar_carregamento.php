@@ -511,17 +511,15 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                          LIMIT 1"
                     );
                     if ($check && pg_num_rows($check) > 0) {
-                        // Linha já existe: corrige a cubagem quando o valor gravado estiver zerado
-                        $cubDoc = $toFloat($rowC['cubagem'] ?? 0);
-                        if ($cubDoc > 0) {
-                            @pg_query($conn,
-                                "UPDATE {$tabela} SET cubagem_cte = {$cubDoc}
-                                 WHERE unidade = '{$unidadeEsc}'
-                                   AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
-                                   AND nro_cte = {$nro}
-                                   AND (cubagem_cte IS NULL OR cubagem_cte = 0)"
-                            );
-                        }
+                        // Linha já existe: sincroniza valores do documento (_cte) quando o gravado for menor/zerado
+                        corrigirValoresDocCte(
+                            $conn, $tabela, $unidadeEsc, $ser, $nro,
+                            $toFloat($rowC['vlr_merc'] ?? 0),
+                            $toFloat($rowC['vlr_frete'] ?? 0),
+                            $toFloat($rowC['peso'] ?? 0),
+                            $toFloat($rowC['cubagem'] ?? 0),
+                            (int)($rowC['qtde_vol'] ?? 0)
+                        );
                         continue;
                     }
                     $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
@@ -1004,10 +1002,10 @@ if ($acao === 'adicionar_ctes') {
         $pagador    = pg_escape_string($conn, $cteData['pagador'] ?? '');
         $cidade     = pg_escape_string($conn, $cteData['cidade'] ?? '');
 
-        $vlrMerc  = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['vlrNf']  ?? '0'));
-        $vlrFrete = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['frete']  ?? '0'));
-        $peso     = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['peso']   ?? '0'));
-        $cubagem  = str_replace(',', '.', preg_replace('/[^\d.,]/', '', $cteData['cubagem'] ?? '0'));
+        $vlrMerc  = parseNumeroBr($cteData['vlrNf']  ?? '0');
+        $vlrFrete = parseNumeroBr($cteData['frete']  ?? '0');
+        $peso     = parseNumeroBr($cteData['peso']   ?? '0');
+        $cubagem  = parseNumeroBr($cteData['cubagem'] ?? '0');
         $qtdeVol  = (int)($cteData['qtdeVol'] ?? 0);
 
         $vlrMerc  = is_numeric($vlrMerc)  ? (float)$vlrMerc  : 0;
@@ -2180,17 +2178,15 @@ if ($acao === 'verificar_saidas_ssw') {
                                      LIMIT 1"
                                 );
                                 if ($check && pg_num_rows($check) > 0) {
-                                    // Linha já existe: corrige a cubagem quando o valor gravado estiver zerado
-                                    $cubDoc = $toFloat($rowC['cubagem'] ?? 0);
-                                    if ($cubDoc > 0) {
-                                        @pg_query($conn,
-                                            "UPDATE {$tabela} SET cubagem_cte = {$cubDoc}
-                                             WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                                               AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
-                                               AND nro_cte = {$nro}
-                                               AND (cubagem_cte IS NULL OR cubagem_cte = 0)"
-                                        );
-                                    }
+                                    // Linha já existe: sincroniza valores do documento (_cte) quando o gravado for menor/zerado
+                                    corrigirValoresDocCte(
+                                        $conn, $tabela, pg_escape_string($conn, $unidade), $ser, $nro,
+                                        $toFloat($rowC['vlr_merc'] ?? 0),
+                                        $toFloat($rowC['vlr_frete'] ?? 0),
+                                        $toFloat($rowC['peso'] ?? 0),
+                                        $toFloat($rowC['cubagem'] ?? 0),
+                                        (int)($rowC['qtde_vol'] ?? 0)
+                                    );
                                     continue;
                                 }
 
@@ -2706,17 +2702,15 @@ if ($acao === 'atualizar_ctes_ssw') {
                                  LIMIT 1"
                             );
                             if ($check && pg_num_rows($check) > 0) {
-                                // Linha já existe: corrige a cubagem quando o valor gravado estiver zerado
-                                $cubDoc = $toFloat($rowC['cubagem'] ?? 0);
-                                if ($cubDoc > 0) {
-                                    @pg_query($conn,
-                                        "UPDATE {$tabela} SET cubagem_cte = {$cubDoc}
-                                         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                                           AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
-                                           AND nro_cte = {$nro}
-                                           AND (cubagem_cte IS NULL OR cubagem_cte = 0)"
-                                    );
-                                }
+                                // Linha já existe: sincroniza valores do documento (_cte) quando o gravado for menor/zerado
+                                corrigirValoresDocCte(
+                                    $conn, $tabela, pg_escape_string($conn, $unidade), $ser, $nro,
+                                    $toFloat($rowC['vlr_merc'] ?? 0),
+                                    $toFloat($rowC['vlr_frete'] ?? 0),
+                                    $toFloat($rowC['peso'] ?? 0),
+                                    $toFloat($rowC['cubagem'] ?? 0),
+                                    (int)($rowC['qtde_vol'] ?? 0)
+                                );
                                 continue;
                             }
 

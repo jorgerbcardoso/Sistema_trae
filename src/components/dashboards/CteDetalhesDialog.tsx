@@ -109,6 +109,7 @@ const parseNum = (v: any): number => {
   let normalized = cleaned;
   if (hasComma && hasDot) normalized = cleaned.replace(/\./g, '').replace(',', '.');
   else if (hasComma) normalized = cleaned.replace(',', '.');
+  else if (hasDot && /^\-?\d{1,3}(\.\d{3})+$/.test(cleaned)) normalized = cleaned.replace(/\./g, '');
   const n = parseFloat(normalized);
   return Number.isFinite(n) ? n : 0;
 };

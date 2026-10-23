@@ -638,6 +638,10 @@ function normalizarNumero($v) {
         $s = str_replace(',', '.', $s);
         return (float)$s;
     }
+    if (preg_match('/^\\d{1,3}(\\.\\d{3})+$/', $s)) {
+        // sem vírgula: ponto é separador de milhar (ex.: "12.345")
+        $s = str_replace('.', '', $s);
+    }
     return (float)$s;
 }
 
