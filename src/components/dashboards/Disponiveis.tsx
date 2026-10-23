@@ -6659,15 +6659,49 @@ function ModalRotaCarregamento({
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
     if (!token) return null;
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt&types=address,postcode&autocomplete=false`;
-    const resp = await fetch(url);
-    const json = await resp.json();
-    const center = json?.features?.[0]?.center;
-    if (!Array.isArray(center) || center.length < 2) return null;
-    const lng = Number(center[0]);
-    const lat = Number(center[1]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
+
+    // Remove rótulos ("BAIRRO:", "CEP:", "CIDADE:") e normaliza separadores
+    // para aumentar a assertividade da busca.
+    const limpar = (s: string) => String(s ?? '')
+      .replace(/\b(BAIRRO|CEP|CIDADE|ENDERE[CÇ]O|COMPLEMENTO)\s*:/gi, ' ')
+      .replace(/\s*[-–]\s*/g, ', ')
+      .replace(/\s*,\s*/g, ', ')
+      .replace(/(?:,\s*)+/g, ', ')
+      .replace(/^[,\s]+|[,\s]+$/g, '')
+      .trim();
+
+    const base = limpar(query);
+
+    // Extrai CEP e cidade/UF para tentativas progressivas (endereço completo → CEP+cidade → cidade).
+    const mCep = base.match(/(\d{8})/) || base.match(/(\d{5})[\s-]?(\d{3})/);
+    const cep = mCep ? `${mCep[1]}${mCep[2] ?? ''}`.replace(/\D/g, '') : '';
+    const mCidadeUf = base.match(/([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'.\s]*)\s*\/\s*([A-Z]{2})\b/);
+    const cidadeUf = mCidadeUf ? `${mCidadeUf[1].trim()}/${mCidadeUf[2]}` : '';
+
+    const tentativas: string[] = [];
+    if (base) tentativas.push(base);
+    if (cep && cidadeUf) tentativas.push(`${cep}, ${cidadeUf}, BRASIL`);
+    else if (cep) tentativas.push(`${cep}, BRASIL`);
+    if (cidadeUf) tentativas.push(`${cidadeUf}, BRASIL`);
+
+    const vistos = new Set<string>();
+    for (const q of tentativas) {
+      const consulta = q.trim();
+      if (!consulta || vistos.has(consulta)) continue;
+      vistos.add(consulta);
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(consulta)}.json?access_token=${encodeURIComponent(token)}&limit=1&country=BR&language=pt&autocomplete=false`;
+        const resp = await fetch(url);
+        const json = await resp.json();
+        const center = json?.features?.[0]?.center;
+        if (!Array.isArray(center) || center.length < 2) continue;
+        const lng = Number(center[0]);
+        const lat = Number(center[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        return { lat, lng };
+      } catch {}
+    }
+    return null;
   };
 
   const persistirGeoloc = async (ser: string, nro: number, lat: number, lng: number) => {
@@ -6903,9 +6937,9 @@ function ModalRotaCarregamento({
     const totPeso = list.reduce((s, c) => s + (Number(c.peso ?? 0) || 0), 0);
     const totFrete = list.reduce((s, c) => s + (Number(c.frete ?? 0) || 0), 0);
     return (
-      <div className="mt-2 pl-6">
+      <div className="mt-2">
         <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+          <div className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
@@ -6930,7 +6964,7 @@ function ModalRotaCarregamento({
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
                 <span className="text-slate-700 dark:text-slate-200 truncate">{String(c.destinatario ?? '').trim() || '-'}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span>
@@ -6941,7 +6975,7 @@ function ModalRotaCarregamento({
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
             <span className="text-slate-600 dark:text-slate-300">Total</span>
             <span />
             <span />
@@ -7256,6 +7290,14 @@ function ModalRotaCarregamento({
                             title="Mover para baixo"
                           >
                             <ChevronDown className="w-4 h-4 text-slate-500" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`mt-1 h-[26px] w-8 rounded-lg border flex items-center justify-center ${status === 'error' ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
+                            onClick={(e) => { e.stopPropagation(); setGeoEditarKey(g.key); }}
+                            title="Ajustar endereço / informar latitude e longitude"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
                           </button>
                         </div>
                       </div>
