@@ -395,7 +395,21 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
                        AND nro_cte = {$nro}
                      LIMIT 1"
                 );
-                if ($check && pg_num_rows($check) > 0) continue;
+                if ($check && pg_num_rows($check) > 0) {
+                    // Linha já existe: corrige a cubagem quando o valor gravado estiver zerado
+                    $cubDoc = (float)($rowC['cubagem'] ?? 0);
+                    if ($cubDoc > 0) {
+                        @pg_query($conn,
+                            "UPDATE {$tabela} SET cubagem_cte = {$cubDoc}
+                             WHERE unidade = '{$unidadeEsc}'
+                               AND seq_carregamento = {$seqCarreg}
+                               AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
+                               AND nro_cte = {$nro}
+                               AND (cubagem_cte IS NULL OR cubagem_cte = 0)"
+                        );
+                    }
+                    continue;
+                }
 
                 $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
                 $destCteEsc = pg_escape_string($conn, $destCte);

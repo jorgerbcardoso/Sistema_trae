@@ -69,6 +69,52 @@ $dataInicio = date('Y-m-d', strtotime('-' . ($dias - 1) . ' days'));
 
 $filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(c.ser_cte, '')) <> 'SAS'" : "";
 
+// ─── Metadados/join da tabela de CT-es (usado no select base e nas re-agregações) ─
+$tblCte  = "{$domain}_cte";
+$cteCols = null;
+$cteCol = function(string $col) use ($conn, $tblCte, &$cteCols): bool {
+    if ($cteCols === null) {
+        $cteCols = [];
+        try {
+            $resCols = sql(
+                "SELECT column_name
+                 FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND lower(table_name) = lower(\$1)",
+                [$tblCte],
+                $conn
+            );
+            while ($resCols && ($r = pg_fetch_assoc($resCols))) {
+                $name = strtolower(trim((string)($r['column_name'] ?? '')));
+                if ($name !== '') $cteCols[$name] = true;
+            }
+        } catch (Exception $e) {
+            $cteCols = [];
+        }
+    }
+    return isset($cteCols[strtolower($col)]);
+};
+
+$hasSeqCte = $cteCol('seq_cte');
+$joinCteMatch = $hasSeqCte
+    ? ("
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM {$tblCte} cte2
+            WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte2.nro_cte = c.nro_cte
+            ORDER BY cte2.seq_cte DESC
+            LIMIT 1
+        ) cte ON TRUE
+    ")
+    : ("
+        LEFT JOIN {$tblCte} cte
+               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
+              AND cte.nro_cte = c.nro_cte
+    ");
+// Cubagem do documento: fallback quando a cubagem gravada no carregamento for 0
+$selCubDoc = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
+
 $sqlCarregamentos = "
     SELECT
         c.seq_carregamento,
@@ -90,7 +136,7 @@ $sqlCarregamentos = "
         COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0)), 0) AS total_frete,
         COALESCE(SUM(COALESCE(c.vlr_merc_cte, 0)), 0)  AS total_mercadoria,
         COALESCE(SUM(COALESCE(c.peso_cte, 0)), 0)      AS total_peso,
-        COALESCE(SUM(COALESCE(c.cubagem_cte, 0)), 0)   AS total_cubagem,
+        COALESCE(SUM(COALESCE(NULLIF(c.cubagem_cte, 0), {$selCubDoc})), 0) AS total_cubagem,
         MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
         MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
         BOOL_OR(COALESCE(c.adiado, FALSE))       AS adiado,
@@ -116,6 +162,7 @@ $sqlCarregamentos = "
            ON UPPER(v.placa) = UPPER(c.placa_provisoria)
     LEFT JOIN {$tabelaCap} cap
            ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
+    {$joinCteMatch}
     WHERE c.unidade = \$1 {$filtroSerieRve}
     GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha, cap.seq_carregamento_conjunto
 ";
@@ -460,18 +507,19 @@ if ($modo === 'calendario') {
         if (($out['success'] ?? false) && $added > 0) {
             $did += 1;
             try {
-                $filtroSerieRve = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(ser_cte, '')) <> 'SAS'" : "";
+                $filtroSerieRveAgg = (strtoupper($domain) === 'RVE') ? " AND UPPER(COALESCE(c.ser_cte, '')) <> 'SAS'" : "";
                 $resAgg = sql(
                     "SELECT
-                        COUNT(*) FILTER (WHERE nro_cte > 0) AS total_ctes,
-                        COALESCE(SUM(COALESCE(vlr_frete_cte, 0)), 0) AS total_frete,
-                        COALESCE(SUM(COALESCE(vlr_merc_cte, 0)), 0)  AS total_mercadoria,
-                        COALESCE(SUM(COALESCE(peso_cte, 0)), 0)      AS total_peso,
-                        COALESCE(SUM(COALESCE(cubagem_cte, 0)), 0)   AS total_cubagem
-                     FROM {$tabelaCarregamento}
-                     WHERE unidade = $1
-                       AND seq_carregamento = $2
-                       {$filtroSerieRve}",
+                        COUNT(*) FILTER (WHERE c.nro_cte > 0) AS total_ctes,
+                        COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0)), 0) AS total_frete,
+                        COALESCE(SUM(COALESCE(c.vlr_merc_cte, 0)), 0)  AS total_mercadoria,
+                        COALESCE(SUM(COALESCE(c.peso_cte, 0)), 0)      AS total_peso,
+                        COALESCE(SUM(COALESCE(NULLIF(c.cubagem_cte, 0), {$selCubDoc})), 0) AS total_cubagem
+                     FROM {$tabelaCarregamento} c
+                     {$joinCteMatch}
+                     WHERE c.unidade = $1
+                       AND c.seq_carregamento = $2
+                       {$filtroSerieRveAgg}",
                     [$unidade, $seq],
                     $conn
                 );
@@ -544,49 +592,7 @@ if (count($rotas) > 0) {
 }
 
 // ─── Busca CT-es de cada carregamento ─────────────────────────────────────────
-$tblCte = "{$domain}_cte";
 $tblOcor = "{$domain}_ocorrencia";
-$cteCols = null;
-$cteCol = function(string $col) use ($conn, $tblCte, &$cteCols): bool {
-    if ($cteCols === null) {
-        $cteCols = [];
-        try {
-            $resCols = sql(
-                "SELECT column_name
-                 FROM information_schema.columns
-                 WHERE table_schema = 'public'
-                   AND lower(table_name) = lower(\$1)",
-                [$tblCte],
-                $conn
-            );
-            while ($resCols && ($r = pg_fetch_assoc($resCols))) {
-                $name = strtolower(trim((string)($r['column_name'] ?? '')));
-                if ($name !== '') $cteCols[$name] = true;
-            }
-        } catch (Exception $e) {
-            $cteCols = [];
-        }
-    }
-    return isset($cteCols[strtolower($col)]);
-};
-
-$hasSeqCte = $cteCol('seq_cte');
-$joinCteMatch = $hasSeqCte
-    ? ("
-        LEFT JOIN LATERAL (
-            SELECT *
-            FROM {$tblCte} cte2
-            WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte2.nro_cte = c.nro_cte
-            ORDER BY cte2.seq_cte DESC
-            LIMIT 1
-        ) cte ON TRUE
-    ")
-    : ("
-        LEFT JOIN {$tblCte} cte
-               ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(c.ser_cte))
-              AND cte.nro_cte = c.nro_cte
-    ");
 
 $selVlrMerc = "c.vlr_merc_cte";
 $selVlrFrete = "c.vlr_frete_cte";
