@@ -43,6 +43,7 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  SquareX,
   Car,
   X,
   Share2,
@@ -436,7 +437,9 @@ function TabelaCtes({
   ctesSelecionados,
   ctesNoCarregamento,
   ctesJaCarregados,
+  ctesParaRemover,
   onToggleCte,
+  onToggleRemover,
   onToggleTodos,
 }: {
   ctes: Cte[];
@@ -445,7 +448,9 @@ function TabelaCtes({
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
+  ctesParaRemover?: Set<number>;
   onToggleCte?: (cte: Cte) => void;
+  onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   if (ctes.length === 0) return null;
@@ -600,7 +605,10 @@ function TabelaCtes({
       {emApontamento && (
         <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
           <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
+          <span>
+            Clique nos CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>.
+            Clique nos CT-es <span className="font-semibold text-emerald-700 dark:text-emerald-400">já apontados (✓)</span> para desapontá-los.
+          </span>
         </div>
       )}
       <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 overflow-x-auto">
@@ -690,8 +698,11 @@ function TabelaCtes({
             const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
             const selecionado = ctesSelecionados?.has(cteId(cte)) ?? false;
-            const bloqueado = jaNoCarregamento || jaEmOutro;
-            const rowBg = jaNoCarregamento
+            const marcadoRemover = jaNoCarregamento && (ctesParaRemover?.has(cteId(cte)) ?? false);
+            const bloqueado = jaEmOutro;
+            const rowBg = marcadoRemover
+              ? 'bg-rose-50 dark:bg-rose-950/30'
+              : jaNoCarregamento
               ? 'bg-emerald-50 dark:bg-emerald-950/20'
               : jaEmOutro
               ? 'bg-slate-100 dark:bg-slate-800/60 opacity-60'
@@ -702,11 +713,20 @@ function TabelaCtes({
               <tr
                 key={i}
                 className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(cte) : undefined}
+                onClick={
+                  !emApontamento || bloqueado
+                    ? undefined
+                    : jaNoCarregamento
+                      ? (onToggleRemover ? () => onToggleRemover(cte) : undefined)
+                      : (onToggleCte ? () => onToggleCte(cte) : undefined)
+                }
+                title={marcadoRemover ? 'Clique para manter este CT-e no carregamento' : (jaNoCarregamento ? 'Clique para desapontar este CT-e do carregamento' : undefined)}
               >
                 {emApontamento && (
                   <td className="px-3 py-2 text-center">
-                    {jaNoCarregamento ? (
+                    {marcadoRemover ? (
+                      <SquareX className="w-4 h-4 text-rose-500 mx-auto" />
+                    ) : jaNoCarregamento ? (
                       <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
                     ) : jaEmOutro ? (
                       <Truck className="w-4 h-4 text-slate-400 mx-auto" />
@@ -730,7 +750,9 @@ function TabelaCtes({
                         <Info className="w-3.5 h-3.5" />
                       </button>
                     </CteDetalhesDialog>
-                    {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
+                    {marcadoRemover ? (
+                      <span className="text-[10px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-1 py-0.5 rounded" title="Será desapontado ao confirmar">Remover</span>
+                    ) : jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
                 </td>
@@ -783,7 +805,9 @@ function GrupoDestinoCard({
   ctesSelecionados,
   ctesNoCarregamento,
   ctesJaCarregados,
+  ctesParaRemover,
   onToggleCte,
+  onToggleRemover,
   onToggleTodos,
 }: {
   grupo: GrupoDestino;
@@ -793,7 +817,9 @@ function GrupoDestinoCard({
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
+  ctesParaRemover?: Set<number>;
   onToggleCte?: (cte: Cte) => void;
+  onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -992,12 +1018,12 @@ function GrupoDestinoCard({
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
+                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este destino.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaCtes ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCte} onToggleTodos={onToggleTodos} />
+                ? <TabelaCtes ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e em trânsito para este destino.</p>
             )}
             {abaAtiva === 'coletas' && (
@@ -1279,7 +1305,9 @@ function TabelaEntrega({
   ctesSelecionados,
   ctesNoCarregamento,
   ctesJaCarregados,
+  ctesParaRemover,
   onToggleCte,
+  onToggleRemover,
   onToggleTodos,
 }: {
   ctes: CteEntrega[];
@@ -1288,7 +1316,9 @@ function TabelaEntrega({
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
+  ctesParaRemover?: Set<number>;
   onToggleCte?: (cte: Cte) => void;
+  onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   if (ctes.length === 0) return null;
@@ -1372,7 +1402,10 @@ function TabelaEntrega({
       {emApontamento && (
         <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
           <CheckSquare className="w-3.5 h-3.5 shrink-0" />
-          Selecione os CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>
+          <span>
+            Clique nos CT-es para adicionar ao carregamento <strong>{modoApontamento}</strong>.
+            Clique nos CT-es <span className="font-semibold text-emerald-700 dark:text-emerald-400">já apontados (✓)</span> para desapontá-los.
+          </span>
         </div>
       )}
       <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
@@ -1431,8 +1464,11 @@ function TabelaEntrega({
             const placaOutro = ctesJaCarregados?.get(cteId(cte));
             const jaEmOutro = !!placaOutro && !jaNoCarregamento;
             const selecionado = ctesSelecionados?.has(cteId(cte)) ?? false;
-            const bloqueado = jaNoCarregamento || jaEmOutro;
-            const rowBg = jaNoCarregamento
+            const marcadoRemover = jaNoCarregamento && (ctesParaRemover?.has(cteId(cte)) ?? false);
+            const bloqueado = jaEmOutro;
+            const rowBg = marcadoRemover
+              ? 'bg-rose-50 dark:bg-rose-950/30'
+              : jaNoCarregamento
               ? 'bg-emerald-50 dark:bg-emerald-950/20'
               : jaEmOutro
               ? 'bg-slate-100 dark:bg-slate-800/60 opacity-60'
@@ -1443,11 +1479,20 @@ function TabelaEntrega({
               <tr
                 key={i}
                 className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${rowBg} ${emApontamento && !bloqueado ? 'cursor-pointer' : jaEmOutro ? 'cursor-not-allowed' : ''}`}
-                onClick={emApontamento && !bloqueado && onToggleCte ? () => onToggleCte(toCteFull(cte)) : undefined}
+                onClick={
+                  !emApontamento || bloqueado
+                    ? undefined
+                    : jaNoCarregamento
+                      ? (onToggleRemover ? () => onToggleRemover(toCteFull(cte)) : undefined)
+                      : (onToggleCte ? () => onToggleCte(toCteFull(cte)) : undefined)
+                }
+                title={marcadoRemover ? 'Clique para manter este CT-e no carregamento' : (jaNoCarregamento ? 'Clique para desapontar este CT-e do carregamento' : undefined)}
               >
                 {emApontamento && (
                   <td className="px-3 py-2 text-center">
-                    {jaNoCarregamento ? (
+                    {marcadoRemover ? (
+                      <SquareX className="w-4 h-4 text-rose-500 mx-auto" />
+                    ) : jaNoCarregamento ? (
                       <CheckSquare className="w-4 h-4 text-emerald-500 mx-auto" />
                     ) : jaEmOutro ? (
                       <Truck className="w-4 h-4 text-slate-400 mx-auto" />
@@ -1472,7 +1517,9 @@ function TabelaEntrega({
                       </button>
                     </CteDetalhesDialog>
                     {cte.agendObrig && <span className="text-orange-500 font-bold" title="Agendamento obrigatório">S</span>}
-                    {jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
+                    {marcadoRemover ? (
+                      <span className="text-[10px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-1 py-0.5 rounded" title="Será desapontado ao confirmar">Remover</span>
+                    ) : jaNoCarregamento && <span className="text-emerald-500 font-bold" title="Já neste carregamento">✓</span>}
                     {jaEmOutro && <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded font-mono" title={`Carregado em ${placaOutro}`}>{placaOutro}</span>}
                   </div>
                 </td>
@@ -1525,7 +1572,9 @@ function GrupoSetorCard({
   ctesSelecionados,
   ctesNoCarregamento,
   ctesJaCarregados,
+  ctesParaRemover,
   onToggleCte,
+  onToggleRemover,
   onToggleTodos,
 }: {
   grupo: GrupoSetor;
@@ -1535,7 +1584,9 @@ function GrupoSetorCard({
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
   ctesJaCarregados?: Map<number, string>;
+  ctesParaRemover?: Set<number>;
   onToggleCte?: (cte: Cte) => void;
+  onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -1557,6 +1608,10 @@ function GrupoSetorCard({
 
   const onToggleCteSetor = onToggleCte
     ? (cte: Cte) => onToggleCte({ ...cte, setor: grupo.setor, unidadeDest: grupo.setor })
+    : undefined;
+
+  const onToggleRemoverSetor = onToggleRemover
+    ? (cte: Cte) => onToggleRemover({ ...cte, setor: grupo.setor, unidadeDest: grupo.setor })
     : undefined;
 
   const onToggleTodosSetor = onToggleTodos
@@ -1741,12 +1796,12 @@ function GrupoSetorCard({
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCteSetor} onToggleTodos={onToggleTodosSetor} />
+                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} onToggleCte={onToggleCteSetor} onToggleTodos={onToggleTodosSetor} />
+                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
             )}
           </div>
@@ -10694,6 +10749,8 @@ export function Disponiveis() {
   const [loadingCarregamentosCalendario, setLoadingCarregamentosCalendario] = useState(false);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
+  // CT-es já apontados no carregamento-alvo marcados para remoção (desapontamento)
+  const [ctesParaRemover, setCtesParaRemover] = useState<Map<number, Cte>>(new Map());
   const [importandoCarregamentos, setImportandoCarregamentos] = useState(false);
   const [importacaoAutomatica, setImportacaoAutomatica] = useState(true);
   const [obrigarPlacasReais, setObrigarPlacasReais] = useState(false);
@@ -10774,6 +10831,9 @@ export function Disponiveis() {
     }
     return m;
   }, [carregamentos]);
+
+  // IDs dos CT-es marcados para desapontamento (para destaque nas listas)
+  const ctesParaRemoverIds = React.useMemo(() => new Set(ctesParaRemover.keys()), [ctesParaRemover]);
 
   const todosCtes = React.useMemo(() => {
     const lista: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[] = [];
@@ -11334,6 +11394,7 @@ export function Disponiveis() {
       if (res.success) {
         toast.success(`Carregamento ${placa} finalizado.`);
         if (modoApontamento === placa) setModoApontamento(null);
+        setCtesParaRemover(new Map());
         await carregarCarregamentos();
         return true;
       } else {
@@ -11367,6 +11428,7 @@ export function Disponiveis() {
       if (res.success) {
         toast.success(`Carregamento ${placa} excluído.`);
         if (modoApontamento === placa) setModoApontamento(null);
+        setCtesParaRemover(new Map());
         await carregarCarregamentos();
         return true;
       } else {
@@ -11639,7 +11701,8 @@ export function Disponiveis() {
   }, [carregarCarregamentos]);
 
   const handleConfirmarApontamento = useCallback(async () => {
-    if (!modoApontamento || ctesSelecionados.size === 0) return;
+    if (!modoApontamento) return;
+    if (ctesSelecionados.size === 0 && ctesParaRemover.size === 0) return;
     try {
       const seqCar = Number(
         carregamentos.find(c => String(c.placa_provisoria ?? '').trim().toUpperCase() === String(modoApontamento ?? '').trim().toUpperCase())?.seq_carregamento ?? 0
@@ -11648,46 +11711,87 @@ export function Disponiveis() {
         toast.error('Não foi possível identificar o seq_carregamento deste carregamento.');
         return;
       }
-      const ctesPayload = Array.from(ctesSelecionados.values()).map(c => ({
-        seqCte: c.seqCte ?? 0,
-        nroCte: c.nroCte,
-        serCte: c.serCte,
-        setor: String((c as any).setor ?? (c as any).setor_cte ?? (c as any).setorCte ?? (c as any).setorEntrega ?? (c as any).unidadeDest ?? '').trim(),
-        emissao: c.emissao,
-        prevEnt: c.prevEnt,
-        remetente: c.remetente,
-        destinatario: c.destinatario,
-        pagador: c.pagador,
-        cidade: `${c.cidade}/${c.uf}`,
-        vlrNf: c.vlrNf,
-        frete: c.frete,
-        peso: c.peso,
-        cubagem: c.cubagem,
-        qtdeVol: c.qtdeVol,
-        unidadeDest: c.unidadeDest,
-        unidadeCarregamento: c.unidadeCarregamento ?? (c as any).unidadeCarregamento ?? (c as any).unidade_carregamento ?? (c as any).unidadeRelatorio ?? (c as any).unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
-      }));
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', seq_carregamento: seqCar, ctes: ctesPayload }) },
-        true
-      );
-      if (res.success) {
-        toast.success(`${res.adicionados ?? ctesSelecionados.size} CT-e(s) adicionado(s) ao carregamento ${modoApontamento}.`);
-        setCtesSelecionados(new Map());
-        setModoApontamento(null);
-        await carregarCarregamentos();
-      } else {
-        toast.error(res.message || 'Erro ao adicionar CT-es');
+
+      // 1) Desaponta primeiro (libera capacidade antes de adicionar os novos)
+      let removidos = 0;
+      if (ctesParaRemover.size > 0) {
+        const nros = Array.from(ctesParaRemover.values())
+          .map(c => Number((c as any)?.nroCte ?? 0))
+          .filter(n => Number.isFinite(n) && n > 0);
+        if (nros.length > 0) {
+          const resDel = await apiFetch(
+            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+            { method: 'POST', body: JSON.stringify({ acao: 'remover_ctes', seq_carregamento: seqCar, seq_ctes: nros }) },
+            true
+          );
+          if (!resDel?.success) {
+            toast.error(resDel?.message || 'Erro ao desapontar CT-es');
+            return;
+          }
+          removidos = Number(resDel?.removidos ?? nros.length) || 0;
+        }
       }
+
+      // 2) Adiciona os novos
+      let adicionados = 0;
+      if (ctesSelecionados.size > 0) {
+        const ctesPayload = Array.from(ctesSelecionados.values()).map(c => ({
+          seqCte: c.seqCte ?? 0,
+          nroCte: c.nroCte,
+          serCte: c.serCte,
+          setor: String((c as any).setor ?? (c as any).setor_cte ?? (c as any).setorCte ?? (c as any).setorEntrega ?? (c as any).unidadeDest ?? '').trim(),
+          emissao: c.emissao,
+          prevEnt: c.prevEnt,
+          remetente: c.remetente,
+          destinatario: c.destinatario,
+          pagador: c.pagador,
+          cidade: `${c.cidade}/${c.uf}`,
+          vlrNf: c.vlrNf,
+          frete: c.frete,
+          peso: c.peso,
+          cubagem: c.cubagem,
+          qtdeVol: c.qtdeVol,
+          unidadeDest: c.unidadeDest,
+          unidadeCarregamento: c.unidadeCarregamento ?? (c as any).unidadeCarregamento ?? (c as any).unidade_carregamento ?? (c as any).unidadeRelatorio ?? (c as any).unidadeOrigem ?? (c as any).sigla_emit ?? (c as any).siglaEmit ?? '',
+        }));
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+          { method: 'POST', body: JSON.stringify({ acao: 'adicionar_ctes', seq_carregamento: seqCar, ctes: ctesPayload }) },
+          true
+        );
+        if (!res.success) {
+          toast.error(res.message || 'Erro ao adicionar CT-es');
+          return;
+        }
+        adicionados = Number(res.adicionados ?? ctesSelecionados.size) || 0;
+      }
+
+      const partes: string[] = [];
+      if (adicionados > 0) partes.push(`${adicionados} CT-e(s) adicionado(s)`);
+      if (removidos > 0) partes.push(`${removidos} CT-e(s) desapontado(s)`);
+      toast.success(`${partes.length > 0 ? partes.join(' e ') : 'Nenhuma alteração'} no carregamento ${modoApontamento}.`);
+      setCtesSelecionados(new Map());
+      setCtesParaRemover(new Map());
+      setModoApontamento(null);
+      await carregarCarregamentos();
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao adicionar CT-es');
+      toast.error(e.message || 'Erro ao apontar CT-es');
     }
-  }, [modoApontamento, ctesSelecionados, carregarCarregamentos, carregamentos]);
+  }, [modoApontamento, ctesSelecionados, ctesParaRemover, carregarCarregamentos, carregamentos]);
 
   const toggleCte = useCallback((cte: Cte) => {
     const id = cteId(cte);
     setCtesSelecionados(prev => {
+      const next = new Map(prev);
+      if (next.has(id)) next.delete(id);
+      else next.set(id, cte);
+      return next;
+    });
+  }, []);
+
+  const toggleCteRemover = useCallback((cte: Cte) => {
+    const id = cteId(cte);
+    setCtesParaRemover(prev => {
       const next = new Map(prev);
       if (next.has(id)) next.delete(id);
       else next.set(id, cte);
@@ -13823,8 +13927,8 @@ export function Disponiveis() {
             confirmar={confirmar}
             perguntarTexto={perguntarTexto}
             modoApontamento={modoApontamento}
-            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); }}
-            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
+            onIniciarApontamento={placa => { setModoApontamento(placa); setCtesSelecionados(new Map()); setCtesParaRemover(new Map()); }}
+            onCancelarApontamento={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setCtesParaRemover(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}
             onCriarCarregamento={handleCriarCarregamento}
             onCarregamentoAutomaticoEntrega={handleCarregamentoAutomaticoEntrega}
             onFinalizarCarregamento={handleFinalizarCarregamento}
@@ -13885,16 +13989,23 @@ export function Disponiveis() {
             </div>
           )}
 
-          {modoApontamento && ctesSelecionados.size > 0 && (
+          {modoApontamento && (ctesSelecionados.size > 0 || ctesParaRemover.size > 0) && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
               <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="text-sm text-amber-800 dark:text-amber-300 flex-1">
-                <strong>{ctesSelecionados.size}</strong> CT-e{ctesSelecionados.size !== 1 ? 's' : ''} selecionado{ctesSelecionados.size !== 1 ? 's' : ''} para <strong>{modoApontamento}</strong>
+                {ctesSelecionados.size > 0 && (
+                  <><strong>{ctesSelecionados.size}</strong> para adicionar</>
+                )}
+                {ctesSelecionados.size > 0 && ctesParaRemover.size > 0 && ' · '}
+                {ctesParaRemover.size > 0 && (
+                  <><strong>{ctesParaRemover.size}</strong> para remover</>
+                )}
+                {' '}· carregamento <strong>{modoApontamento}</strong>
               </span>
               <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-8" onClick={handleConfirmarApontamento}>
                 <CheckSquare className="w-3.5 h-3.5 mr-1.5" />Confirmar
               </Button>
-              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}>
+              <Button size="sm" variant="outline" className="text-xs h-8 border-amber-300 text-amber-700 dark:text-amber-400" onClick={() => { setModoApontamento(null); setCtesSelecionados(new Map()); setCtesParaRemover(new Map()); setDadosHub(null); setHubCarregamentoPlaca(null); }}>
                 Cancelar
               </Button>
             </div>
@@ -14020,7 +14131,7 @@ export function Disponiveis() {
                                   ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                                   : undefined;
                                 return grupos.map((g, i) => (
-                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                                 ));
                               })()}
                             </div>
@@ -14164,7 +14275,9 @@ export function Disponiveis() {
                             ctesSelecionados={ctesSelecionados}
                             ctesNoCarregamento={ctesNoCarregamentoAtual}
                             ctesJaCarregados={ctesJaCarregados}
+                            ctesParaRemover={ctesParaRemoverIds}
                             onToggleCte={toggleCte}
+                            onToggleRemover={toggleCteRemover}
                             onToggleTodos={toggleTodos}
                           />
                         ));
@@ -14234,7 +14347,7 @@ export function Disponiveis() {
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return grupos.map((g, i) => (
-                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>
@@ -14300,7 +14413,7 @@ export function Disponiveis() {
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return gruposSetor.map((g, i) => (
-                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} onToggleCte={toggleCte} onToggleTodos={toggleTodos} />
+                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>
