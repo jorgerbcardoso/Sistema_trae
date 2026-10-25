@@ -11165,35 +11165,16 @@ export function Disponiveis() {
       };
     })();
 
+    // Base = exatamente os CT-es visíveis na lista do painel (respeita os filtros do usuário:
+    // ocorrência padrão do domínio, seleção de ocorrências, período de previsão e tempo em armazém).
     const ctesBase = (() => {
-      const tempoArmazemDe = (() => {
-        const s = (filters.tempoArmazemDe ?? '').trim();
-        if (!s) return null;
-        const n = parseInt(s, 10);
-        return Number.isFinite(n) ? Math.max(0, n) : null;
-      })();
-      const tempoArmazemAte = (() => {
-        const s = (filters.tempoArmazemAte ?? '').trim();
-        if (!s) return null;
-        const n = parseInt(s, 10);
-        return Number.isFinite(n) ? Math.max(0, n) : null;
-      })();
-      const list = dadosEntrega?.ctes ? [...dadosEntrega.ctes] : [];
+      const list = [...ctesEntregaFiltrados];
+      if (periodoPrevEntTs.iniTs === null && periodoPrevEntTs.fimTs === null) return list;
       return list.filter((cte) => {
-        if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
-        if (periodoPrevEntTs.iniTs !== null || periodoPrevEntTs.fimTs !== null) {
-          const ts = parsePrevEntTs(String((cte as any).prevEnt ?? ''));
-          if (!Number.isFinite(ts)) return false;
-          if (periodoPrevEntTs.iniTs !== null && ts < periodoPrevEntTs.iniTs) return false;
-          if (periodoPrevEntTs.fimTs !== null && ts > periodoPrevEntTs.fimTs) return false;
-        }
-        if (tempoArmazemDe !== null || tempoArmazemAte !== null) {
-          if (cte.emTransito) return false;
-          const dias = diasNoArmazem(cte.chegadaUnid);
-          if (dias === null) return false;
-          if (tempoArmazemDe !== null && dias < tempoArmazemDe) return false;
-          if (tempoArmazemAte !== null && dias > tempoArmazemAte) return false;
-        }
+        const ts = parsePrevEntTs(String((cte as any).prevEnt ?? ''));
+        if (!Number.isFinite(ts)) return false;
+        if (periodoPrevEntTs.iniTs !== null && ts < periodoPrevEntTs.iniTs) return false;
+        if (periodoPrevEntTs.fimTs !== null && ts > periodoPrevEntTs.fimTs) return false;
         return true;
       });
     })();
@@ -11374,7 +11355,7 @@ export function Disponiveis() {
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erro ao carregar setores.' };
     }
-  }, [carregarCarregamentos, dadosEntrega, filters.tempoArmazemDe, filters.tempoArmazemAte, unidadeAtual]);
+  }, [carregarCarregamentos, dadosEntrega, filters.periodoPrevisaoInicio, filters.periodoPrevisaoFim, filters.tempoArmazemDe, filters.tempoArmazemAte, filters.ultOcorCodigos, ultOcorTouched, isBNR, dominioUsuario, unidadeAtual]);
 
   const handleFinalizarCarregamento = useCallback(async (placa: string) => {
     const ok = await confirmar({
@@ -11458,8 +11439,8 @@ export function Disponiveis() {
     const silent = opts?.silent ?? false;
     const forcarMinFrete = opts?.forcarMinFrete ?? false;
     try {
-      // Envia os CT-es disponíveis (do relatório 019) para o backend filtrar e inserir
-      const ctesDisponiveis = (dados?.ctes ?? []).map(c => {
+      // Envia apenas os CT-es visíveis no painel (respeitando os filtros do usuário)
+      const ctesDisponiveis = ctesTransferFiltrados.map(c => {
         const anyC: any = c as any;
         const unidadeDest = (anyC.unidadeDest ?? anyC.destinoCte ?? anyC.destino_cte ?? anyC.unidDest ?? anyC.destino ?? '') as string;
         const serCte = (anyC.serCte ?? anyC.ser_cte ?? '') as string;
@@ -11535,7 +11516,7 @@ export function Disponiveis() {
       if (!silent) toast.error(e.message || 'Erro ao iniciar carregamento automático');
       return { ok: false, message: e?.message || 'Erro ao iniciar carregamento automático' };
     }
-  }, [carregarCarregamentos, dados, confirmar, unidadeAtual]);
+  }, [carregarCarregamentos, dados, dadosHub, filters.unidadeDestino, filters.ultOcorCodigos, filters.periodoEmissaoInicio, filters.periodoEmissaoFim, filters.periodoPrevisaoInicio, filters.periodoPrevisaoFim, filters.tempoArmazemDe, filters.tempoArmazemAte, ultOcorTouched, isBNR, dominioUsuario, confirmar, unidadeAtual]);
 
   const handleCarregarLinhaHoje = useCallback(async (nroLinha: number) => {
     if (carregandoNroLinhaHoje) return;
@@ -13912,7 +13893,7 @@ export function Disponiveis() {
             sigla={sigla}
             loginUsuario={String(user?.username ?? '')}
             carregamentos={carregamentos}
-            ctesDisponiveisEntrega={dadosEntrega?.ctes ?? []}
+            ctesDisponiveisEntrega={ctesEntregaFiltrados}
             loadingCarregamentos={loadingCarregamentos}
             carregamentosTransferOpen={carregamentosTransferOpen}
             setCarregamentosTransferOpen={setCarregamentosTransferOpen}
