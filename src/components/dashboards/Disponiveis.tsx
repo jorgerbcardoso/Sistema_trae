@@ -3923,61 +3923,62 @@ function CardCarregamento({
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {cteDetalheLista.map((cte, idx) => {
                       const id = Number((cte as any).seq_cte ?? 0);
                       const checked = id > 0 && cteDetalheSelecionados.has(id);
                       const isLido = !!(cte as any).lido;
                       return (
-                      <div
-                        key={idx}
-                        className={`grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
-                          isLido ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="self-center"
-                          checked={checked}
-                          onChange={(e) => {
-                            const nextChecked = e.target.checked;
-                            setCteDetalheSelecionados(prev => {
-                              const next = new Set(prev);
-                              if (id > 0) {
-                                if (nextChecked) next.add(id);
-                                else next.delete(id);
-                              }
-                              return next;
-                            });
-                          }}
-                        />
-                        <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
-                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{primeiraNfNfs(String((cte as any).nfs ?? '')) || '-'}</span>
-                        <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
-                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
-                        <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
-                        {isEntregaCteDetalhe ? (
-                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">
-                            {String((cte as any).setor ?? '').trim() || '-'}
+                        <div
+                          key={id > 0 ? id : idx}
+                          className={`grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
+                            isLido ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="self-center"
+                            checked={checked}
+                            onChange={(e) => {
+                              const nextChecked = e.target.checked;
+                              setCteDetalheSelecionados(prev => {
+                                const next = new Set(prev);
+                                if (id > 0) {
+                                  if (nextChecked) next.add(id);
+                                  else next.delete(id);
+                                }
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ctrc}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{primeiraNfNfs(String((cte as any).nfs ?? '')) || '-'}</span>
+                          <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">{cte.unidade_carregamento || '-'}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao || '-'}</span>
+                          <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_prev_ent || '-'}</span>
+                          {isEntregaCteDetalhe ? (
+                            <span className="self-center font-mono text-xs text-slate-600 dark:text-slate-400">
+                              {String((cte as any).setor ?? '').trim() || '-'}
+                            </span>
+                          ) : (
+                            <span
+                              className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
+                              title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
+                            >
+                              {(cte as any).sigla_dest_painel ?? cte.sigla_dest ?? '-'}
+                            </span>
+                          )}
+                          <span className="self-center truncate text-slate-600 dark:text-slate-300">
+                            {(isEntregaCteDetalhe ? (cte as any).destinatario : cte.nome_pag) || '-'}
                           </span>
-                        ) : (
-                          <span
-                            className="self-center font-mono text-xs text-slate-600 dark:text-slate-400"
-                            title={(cte as any).sigla_dest_principal && (cte as any).sigla_dest_principal !== cte.sigla_dest ? `Hub: ${(cte as any).sigla_dest_principal}` : undefined}
-                          >
-                            {(cte as any).sigla_dest_painel ?? cte.sigla_dest ?? '-'}
-                          </span>
-                        )}
-                        <span className="self-center truncate text-slate-600 dark:text-slate-300">
-                          {(isEntregaCteDetalhe ? (cte as any).destinatario : cte.nome_pag) || '-'}
-                        </span>
-                        <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{
-                          (() => {
-                            const v = normPesoKgCte(cte.peso ?? 0);
-                            return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                          })()
-                        }</span>
-                        <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
-                      </div>
+                          <span className="self-center text-right font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">{cte.vlr_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{
+                            (() => {
+                              const v = normPesoKgCte(cte.peso ?? 0);
+                              return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            })()
+                          }</span>
+                          <span className="self-center text-right font-mono text-xs text-slate-600 dark:text-slate-400">{cte.cubagem.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+                        </div>
                       );
                     })}
                   </div>
