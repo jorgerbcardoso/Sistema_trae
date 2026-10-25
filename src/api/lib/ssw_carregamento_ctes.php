@@ -368,92 +368,32 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
     $loginFinalStr = trim((string)($carBase['login_finalizacao'] ?? ''));
     if ($loginFinalStr === '') $loginFinalStr = $login;
 
-    $added = 0;
+    $updated = 0;
     if (count($cteAll) > 0) {
         @pg_query($conn, 'BEGIN');
         try {
             $unidadeEsc = pg_escape_string($conn, $unidade);
-            $placaEsc = pg_escape_string($conn, $placaReq);
-            $loginEsc = pg_escape_string($conn, $login);
-            $destCarEsc = pg_escape_string($conn, $destinoCarreg);
-            $unidCarEsc = pg_escape_string($conn, $unidadesCarreg);
-            $setorCarEsc = pg_escape_string($conn, $setoresEntregaCarreg);
-            $origemEsc = pg_escape_string($conn, $origemCriacao);
-            $dataFinEsc = pg_escape_string($conn, $dataFinalStr);
-            $horaFinEsc = pg_escape_string($conn, $horaFinalStr);
-            $loginFinEsc = pg_escape_string($conn, $loginFinalStr);
+            $seqCarregEsc = (int)$seqCarreg;
 
             foreach ($cteAll as $rowC) {
                 $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
                 $nro = (int)($rowC['nro_cte'] ?? 0);
                 if ($ser === '' || $nro <= 0) continue;
-                $check = @pg_query($conn,
-                    "SELECT 1 FROM {$tabela}
+
+                // Apenas marca como LIDO se o CT-e já existir no carregamento do Presto
+                $resUpd = @pg_query($conn,
+                    "UPDATE {$tabela}
+                     SET lido = TRUE
                      WHERE unidade = '{$unidadeEsc}'
-                       AND seq_carregamento = {$seqCarreg}
+                       AND seq_carregamento = {$seqCarregEsc}
                        AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
                        AND nro_cte = {$nro}
-                     LIMIT 1"
+                       AND COALESCE(lido, FALSE) = FALSE"
                 );
-                if ($check && pg_num_rows($check) > 0) {
-                    // Linha já existe: sincroniza valores do documento (_cte) quando o gravado for menor/zerado
-                    if (function_exists('corrigirValoresDocCte')) {
-                        corrigirValoresDocCte(
-                            $conn, $tabela, $unidadeEsc, $ser, $nro,
-                            (float)($rowC['vlr_merc'] ?? 0),
-                            (float)($rowC['vlr_frete'] ?? 0),
-                            (float)($rowC['peso'] ?? 0),
-                            (float)($rowC['cubagem'] ?? 0),
-                            (int)($rowC['qtde_vol'] ?? 0),
-                            "AND seq_carregamento = {$seqCarreg}"
-                        );
-                    }
-                    continue;
+                
+                if ($resUpd && pg_affected_rows($resUpd) > 0) {
+                    $updated += 1;
                 }
-
-                $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
-                $destCteEsc = pg_escape_string($conn, $destCte);
-                $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
-                $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
-                $emissaoSql = $emissaoVal !== '' ? "'" . pg_escape_string($conn, $emissaoVal) . "'::date" : 'NULL';
-                $prevSql = $prevVal !== '' ? "'" . pg_escape_string($conn, $prevVal) . "'::date" : 'NULL';
-                $vlrMerc = (float)($rowC['vlr_merc'] ?? 0);
-                $vlrFrete = (float)($rowC['vlr_frete'] ?? 0);
-                $peso = (float)($rowC['peso'] ?? 0);
-                $cub = (float)($rowC['cubagem'] ?? 0);
-                $vol = (int)($rowC['qtde_vol'] ?? 0);
-                $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
-                $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
-                $pagador = pg_escape_string($conn, (string)($rowC['pagador'] ?? ''));
-                $cidadeDest = pg_escape_string($conn, (string)($rowC['cidade_destino'] ?? ''));
-
-                @pg_query($conn,
-                    "INSERT INTO {$tabela}
-                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                      ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
-                      remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-                      vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                      destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento,
-                      data_finalizacao, hora_finalizacao, login_finalizacao)
-                     VALUES
-                     ('{$unidadeEsc}', {$seqCarreg}, '{$placaEsc}', '{$loginEsc}', CURRENT_DATE, CURRENT_TIME,
-                      '" . pg_escape_string($conn, $ser) . "', {$nro}, '{$destCteEsc}', {$emissaoSql}, {$prevSql},
-                      '{$remetente}', '{$destinatario}', '{$pagador}', '{$cidadeDest}',
-                      {$vlrMerc}, {$vlrFrete}, {$peso}, {$cub}, {$vol},
-                      '{$destCarEsc}', '{$unidCarEsc}', '{$setorCarEsc}', NULL, '{$origemEsc}', '{$unidadeEsc}',
-                      '{$dataFinEsc}'::date, '{$horaFinEsc}'::time, '{$loginFinEsc}')"
-                );
-                $added += 1;
-            }
-
-            if ($added > 0) {
-                @pg_query($conn,
-                    "DELETE FROM {$tabela}
-                     WHERE unidade = '{$unidadeEsc}'
-                       AND seq_carregamento = {$seqCarreg}
-                       AND nro_cte = 0
-                       AND data_finalizacao IS NULL"
-                );
             }
 
             @pg_query($conn, 'COMMIT');
@@ -466,7 +406,8 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
         'success' => true,
         'qtd_ssw' => $qtdSsw,
         'qtd_presto' => $qtdPresto,
-        'added' => $added,
+        'added' => 0,
+        'updated' => $updated,
         'debug' => [
             'manifestos_count' => $manifestosCount,
             'manifestos_xml_ok' => $manifestosXmlOk,

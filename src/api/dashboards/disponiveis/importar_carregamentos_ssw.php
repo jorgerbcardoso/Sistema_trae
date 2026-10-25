@@ -168,6 +168,13 @@ function buildMapaDestinoCompartilhadoImport($conn, string $tblUnidade): array {
 $acao = strtoupper(trim((string)($input['acao'] ?? '')));
 $autoImportarVeiculos = (bool)($input['auto_importar_veiculos'] ?? false);
 $ignorarVeiculosFaltantes = (bool)($input['ignorar_veiculos_faltantes'] ?? false);
+$resolverConflito = $input['resolver_conflito'] ?? null;
+$resolverConflitoPlaca = strtoupper(trim((string)(
+    (is_array($resolverConflito) ? ($resolverConflito['placa_ssw'] ?? $resolverConflito['placa'] ?? '') : ($input['resolver_conflito_placa'] ?? ''))
+)));
+$resolverConflitoAcao = strtoupper(trim((string)(
+    (is_array($resolverConflito) ? ($resolverConflito['acao'] ?? '') : ($input['resolver_conflito_acao'] ?? ''))
+)));
 $obrigarPlacasReaisRaw = $input['obrigar_placas_reais'] ?? false;
 $obrigarPlacasReais = ($obrigarPlacasReaisRaw === true || $obrigarPlacasReaisRaw === 1 || $obrigarPlacasReaisRaw === '1' || strtoupper(trim((string)$obrigarPlacasReaisRaw)) === 'S');
 if ($acao === 'EXCLUIR_INEXISTENTES') {
@@ -1055,6 +1062,11 @@ foreach ($placas_ssw as $placa) {
 
     $__dbg('C', 'placa loop', ['placa' => $placa, 'temInfo' => isset($carregamentos[$placa]), 'ctes_info' => isset($carregamentos[$placa]) ? count(($carregamentos[$placa]['ctes'] ?? [])) : null]);
 
+    if ($resolverConflitoAcao === 'IGNORAR' && $resolverConflitoPlaca !== '' && $placa === $resolverConflitoPlaca) {
+        $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Ignorado por decisão do usuário (conflito de placa/CT-es).'];
+        continue;
+    }
+
     if ($obrigarPlacasReais && in_array($placa, $veiculosFaltantes, true)) {
         $logs[] = ['placa' => $placa, 'status' => 'ignorado', 'msg' => 'Veículo não cadastrado. Placa ignorada (Obrigar placas reais).'];
         continue;
@@ -1385,6 +1397,118 @@ foreach ($placas_ssw as $placa) {
     $nroLinhaCarEsc = ($preservarCabecalhoRve ? 'NULL' : (($nroLinhaCar > 0) ? (string)$nroLinhaCar : 'NULL'));
     $destinoInsertEsc = $preservarCabecalhoRve ? 'NULL' : $destinoCarEsc;
     $unidadesInsertEsc = $preservarCabecalhoRve ? 'NULL' : $unidadesCarEsc;
+
+    if (!$ja_existe && is_array($ctes) && count($ctes) > 0) {
+        $pairs = [];
+        foreach ($ctes as $cte_info) {
+            $ser = strtoupper(trim((string)($cte_info['ser_cte'] ?? '')));
+            $ser = preg_replace('/[^A-Z0-9]/', '', $ser);
+            $nro = (int)($cte_info['nro_cte'] ?? 0);
+            if ($ser === '' || $nro <= 0) continue;
+            $pairs[$ser . '|' . $nro] = ['ser' => $ser, 'nro' => $nro];
+        }
+        $pairs = array_values($pairs);
+        if (count($pairs) > 0) {
+            $seqs = [];
+            foreach (array_chunk($pairs, 400) as $chunk) {
+                $params = [];
+                $vals = [];
+                $p = 1;
+                foreach ($chunk as $it) {
+                    $vals[] = "($" . $p . ", $" . ($p + 1) . ")";
+                    $params[] = (string)$it['ser'];
+                    $params[] = (int)$it['nro'];
+                    $p += 2;
+                }
+                $paramUnidade = $p;
+                $params[] = $unidade;
+                $p += 1;
+                $whereSeq = '';
+                if ($seqCarreg > 0) {
+                    $paramSeq = $p;
+                    $params[] = (int)$seqCarreg;
+                    $p += 1;
+                    $whereSeq = " AND COALESCE(c.seq_carregamento, 0) <> $" . $paramSeq;
+                }
+                $q = "
+                    WITH req(ser_cte, nro_cte) AS (VALUES " . implode(',', $vals) . ")
+                    SELECT DISTINCT
+                        COALESCE(c.seq_carregamento, 0) AS seq_carregamento,
+                        UPPER(BTRIM(COALESCE(c.placa_provisoria, ''))) AS placa_provisoria
+                    FROM {$tabela} c
+                    JOIN req
+                      ON UPPER(BTRIM(COALESCE(c.ser_cte, ''))) = req.ser_cte
+                     AND c.nro_cte = req.nro_cte
+                    WHERE c.unidade = $" . $paramUnidade . "
+                      AND c.data_finalizacao IS NULL
+                      {$whereSeq}
+                ";
+                $resC = @pg_query_params($conn, $q, $params);
+                if ($resC) {
+                    while ($r = pg_fetch_assoc($resC)) {
+                        $seq = (int)($r['seq_carregamento'] ?? 0);
+                        if ($seq <= 0) continue;
+                        $pl = strtoupper(trim((string)($r['placa_provisoria'] ?? '')));
+                        $seqs[$seq] = $pl;
+                    }
+                }
+            }
+
+            if (count($seqs) > 1) {
+                respondJson([
+                    'success' => false,
+                    'message' => 'Conflito: CT-es já estão distribuídos em mais de um carregamento aberto no Presto.',
+                    'blocked' => true,
+                    'conflitos' => array_map(function ($seq) use ($seqs) {
+                        return ['seq_carregamento' => $seq, 'placa_provisoria' => $seqs[$seq] ?? ''];
+                    }, array_keys($seqs)),
+                    'placa_ssw' => $placa,
+                ]);
+            }
+
+            if (count($seqs) === 1) {
+                $seqAlvo = (int)array_key_first($seqs);
+                $placaPrestoAtual = (string)($seqs[$seqAlvo] ?? '');
+                if ($resolverConflitoAcao === 'TROCAR_PLACA' && $resolverConflitoPlaca !== '' && $placa === $resolverConflitoPlaca) {
+                    @pg_query($conn, 'BEGIN');
+                    try {
+                        @pg_query($conn,
+                            "UPDATE {$tabela}
+                             SET placa_provisoria = '{$placaProvEsc}',
+                                 origem_ssw = '{$placaEsc}',
+                                 origem_criacao = 'SSW'
+                             WHERE UPPER(unidade) = '{$unidadeEsc}'
+                               AND seq_carregamento = {$seqAlvo}
+                               AND data_finalizacao IS NULL"
+                        );
+                        @pg_query($conn,
+                            "UPDATE {$tabelaCap}
+                             SET placa_provisoria = '{$placaProvEsc}'
+                             WHERE UPPER(unidade) = '{$unidadeEsc}'
+                               AND seq_carregamento = {$seqAlvo}"
+                        );
+                        @pg_query($conn, 'COMMIT');
+                        $logs[] = ['placa' => $placa, 'status' => 'atualizado', 'msg' => "Conflito resolvido: placa do carregamento {$placaPrestoAtual} alterada para {$placaProvisoriaSalvar}."];
+                        continue;
+                    } catch (Exception $e) {
+                        @pg_query($conn, 'ROLLBACK');
+                    }
+                }
+
+                respondJson([
+                    'success' => false,
+                    'needs_confirm' => true,
+                    'message' => 'Conflito: CT-es já estão em um carregamento aberto no Presto com outra placa.',
+                    'conflito' => [
+                        'placa_ssw' => $placa,
+                        'placa_presto' => $placaPrestoAtual,
+                        'seq_carregamento' => $seqAlvo,
+                        'placa_sugerida' => $placaProvisoriaSalvar,
+                    ],
+                ]);
+            }
+        }
+    }
 
     pg_query($conn, 'BEGIN');
     try {

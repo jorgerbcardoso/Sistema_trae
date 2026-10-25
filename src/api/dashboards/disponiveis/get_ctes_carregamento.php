@@ -95,6 +95,7 @@ $unidade = strtoupper(trim(
 
 $conn = connect();
 $tabela = "{$domain}_carregamento";
+$tabelaCap = "{$domain}_carregamento_capacidade";
 $tblCte = "{$domain}_cte";
 $cteTableOk = tabelaExisteCtesCarreg($conn, $tblCte);
 $hasSeqCte = false;
@@ -150,6 +151,7 @@ $joinCidParam = $cidParamOk ? "LEFT JOIN {$tblCidParam} cidp ON cidp.seq_cidade 
 $selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";
 $selUnidFec = $cidParamOk ? "COALESCE(cidp.unidade, '') AS unidade_fec," : "'' AS unidade_fec,";
 $selTpFrete = ($cteTableOk && $hasTpFrete) ? "COALESCE(cte.tp_frete::text, '') AS tp_frete," : "'' AS tp_frete,";
+$joinCap = "LEFT JOIN {$tabelaCap} cap ON cap.unidade = car.unidade AND cap.seq_carregamento = car.seq_carregamento";
 
 $sql = "
     SELECT
@@ -203,8 +205,17 @@ $sql = "
         COALESCE(car.vlr_frete_cte, 0)  AS vlr_frete,
         COALESCE(car.peso_cte, 0)       AS peso,
         COALESCE(car.cubagem_cte, 0)    AS cubagem,
-        COALESCE(car.qtde_vol_cte, 0)   AS qtde_vol
+        COALESCE(car.qtde_vol_cte, 0)   AS qtde_vol,
+        CASE
+            WHEN COALESCE(
+                NULLIF(UPPER(BTRIM(COALESCE(cap.tp_carregamento, ''))), ''),
+                CASE WHEN TRIM(COALESCE(car.destino, '')) = '' THEN 'E' ELSE 'T' END
+            ) = 'E'
+                THEN COALESCE(car.bipado, FALSE)
+            ELSE COALESCE(car.lido, FALSE)
+        END AS lido
     FROM {$tabela} car
+    {$joinCap}
     {$joinCte}
     {$joinCidParam}
     WHERE {$whereSql}
@@ -267,6 +278,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'peso'          => round($pesoNum, 2),
         'cubagem'       => round($cubNum, 3),
         'qtde_vol'      => $qtdeVol,
+        'lido'          => ((string)($row['lido'] ?? '') === 't'),
     ];
 }
 
@@ -306,7 +318,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
         }
 
         $out = ssw_restore_ctes_carregamento($conn, $domain, $unidade, ($currentUser['username'] ?? $auth['user']['username'] ?? ''), $rowBase, $dtRef);
-        if (($out['success'] ?? false) && (int)($out['added'] ?? 0) > 0) {
+        if (($out['success'] ?? false) && ((int)($out['added'] ?? 0) > 0 || (int)($out['updated'] ?? 0) > 0)) {
             $res = sql($sql, $params, $conn);
             $ctes = [];
             $totFrete = 0.0;
@@ -359,6 +371,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                     'peso'          => round($pesoNum, 2),
                     'cubagem'       => round($cubNum, 3),
                     'qtde_vol'      => $qtdeVol,
+                    'lido'          => ((string)($row['lido'] ?? '') === 't'),
                 ];
             }
         }

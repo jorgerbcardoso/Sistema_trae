@@ -41,6 +41,10 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS bipado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_inicio_bipagem DATE");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_inicio_bipagem TIME");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_inicio_bipagem VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -712,8 +716,8 @@ if ($acao === 'criar') {
     $tpCarreg = ($destino === '') ? 'E' : 'T';
     @pg_query($conn,
         "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha, tp_carregamento)
-         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', FALSE, NULL, '{$tpCarreg}')
-         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = FALSE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), tp_carregamento = '{$tpCarreg}'"
+         VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', TRUE, NULL, '{$tpCarreg}')
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria, simulado = TRUE, nro_linha = COALESCE(EXCLUDED.nro_linha, {$tabelaCap}.nro_linha), tp_carregamento = '{$tpCarreg}'"
     );
 
     pg_query($conn, 'COMMIT');
@@ -799,15 +803,6 @@ if ($acao === 'iniciar_simulacao') {
     pg_query($conn, 'BEGIN');
     try {
         sql(
-            "DELETE FROM {$tabela}
-             WHERE unidade = \$1
-               AND seq_carregamento = \$2
-               AND data_finalizacao IS NULL",
-            [$unidade, $seqCarreg],
-            $conn
-        );
-
-        sql(
             "UPDATE {$tabelaCap}
              SET placa_provisoria = \$1,
                  simulado = FALSE
@@ -818,13 +813,11 @@ if ($acao === 'iniciar_simulacao') {
         );
 
         sql(
-            "INSERT INTO {$tabela}
-             (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-              nro_cte, destino, unidades, origem_ssw, origem_criacao, unidade_carregamento)
-             VALUES
-             (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME,
-              0, \$5, \$6, NULL, 'AUTO', \$7)",
-            [$unidade, $seqCarreg, $placaNova, $login, $destinoCarreg, $unidadesCarreg, $unidade],
+            "UPDATE {$tabela}
+             SET placa_provisoria = \$1
+             WHERE unidade = \$2
+               AND seq_carregamento = \$3",
+            [$placaNova, $unidade, $seqCarreg],
             $conn
         );
 
@@ -2686,6 +2679,7 @@ if ($acao === 'atualizar_ctes_ssw') {
                     ];
                 }
 
+                $updated = 0;
                 if (count($cteAll) > 0) {
                     pg_query($conn, 'BEGIN');
                     try {
@@ -2693,71 +2687,21 @@ if ($acao === 'atualizar_ctes_ssw') {
                             $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
                             $nro = (int)($rowC['nro_cte'] ?? 0);
                             if ($ser === '' || $nro <= 0) continue;
-                            $check = pg_query($conn,
-                                "SELECT 1 FROM {$tabela}
+
+                            // Apenas marca como LIDO se o CT-e já existir no carregamento do Presto
+                            $resUpd = pg_query($conn,
+                                "UPDATE {$tabela}
+                                 SET lido = TRUE
                                  WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                                   AND UPPER(placa_provisoria) = '" . pg_escape_string($conn, $placaReq) . "'
+                                   AND seq_carregamento = {$seqCarreg}
                                    AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
                                    AND nro_cte = {$nro}
-                                 LIMIT 1"
+                                   AND COALESCE(lido, FALSE) = FALSE"
                             );
-                            if ($check && pg_num_rows($check) > 0) {
-                                // Linha já existe: sincroniza valores do documento (_cte) quando o gravado for menor/zerado
-                                corrigirValoresDocCte(
-                                    $conn, $tabela, pg_escape_string($conn, $unidade), $ser, $nro,
-                                    $toFloat($rowC['vlr_merc'] ?? 0),
-                                    $toFloat($rowC['vlr_frete'] ?? 0),
-                                    $toFloat($rowC['peso'] ?? 0),
-                                    $toFloat($rowC['cubagem'] ?? 0),
-                                    (int)($rowC['qtde_vol'] ?? 0)
-                                );
-                                continue;
+
+                            if ($resUpd && pg_affected_rows($resUpd) > 0) {
+                                $updated += 1;
                             }
-
-                            $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
-                            $destCteEsc = pg_escape_string($conn, $destCte);
-                            $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
-                            $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
-                            $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
-                            $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
-                            $vlrMerc = $toFloat($rowC['vlr_merc'] ?? 0);
-                            $vlrFrete = $toFloat($rowC['vlr_frete'] ?? 0);
-                            $peso = $toFloat($rowC['peso'] ?? 0);
-                            $cub = $toFloat($rowC['cubagem'] ?? 0);
-                            $vol = (int)($rowC['qtde_vol'] ?? 0);
-                            $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
-                            $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
-                            $pagador = pg_escape_string($conn, (string)($rowC['pagador'] ?? ''));
-                            $cidadeDest = pg_escape_string($conn, (string)($rowC['cidade_destino'] ?? ''));
-
-                            $resIns = pg_query($conn,
-                                "INSERT INTO {$tabela}
-                                 (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-                                  ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
-                                  remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
-                                  vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                                  destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento,
-                                  data_finalizacao, hora_finalizacao, login_finalizacao)
-                                 VALUES
-                                 ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaReq) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
-                                  '" . pg_escape_string($conn, $ser) . "', {$nro}, '{$destCteEsc}', {$emissaoSql}, {$prevSql},
-                                  '{$remetente}', '{$destinatario}', '{$pagador}', '{$cidadeDest}',
-                                  {$vlrMerc}, {$vlrFrete}, {$peso}, {$cub}, {$vol},
-                                  '" . pg_escape_string($conn, strtoupper(trim((string)$destinoCarreg))) . "', '" . pg_escape_string($conn, strtoupper(trim((string)$unidadesCarreg))) . "', '" . pg_escape_string($conn, (string)$setoresEntregaCarreg) . "', NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "',
-                                  '{$dataFinal}'::date, '" . pg_escape_string($conn, $horaFinal) . "'::time, '" . pg_escape_string($conn, $loginFinal) . "')"
-                            );
-                            if (!$resIns) continue;
-                            $added += 1;
-                        }
-
-                        if ($added > 0) {
-                            pg_query($conn,
-                                "DELETE FROM {$tabela}
-                                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
-                                   AND UPPER(placa_provisoria) = '" . pg_escape_string($conn, $placaReq) . "'
-                                   AND nro_cte = 0
-                                   AND data_finalizacao IS NULL"
-                            );
                         }
                         pg_query($conn, 'COMMIT');
                     } catch (Exception $e) {
@@ -2773,13 +2717,314 @@ if ($acao === 'atualizar_ctes_ssw') {
         'placa' => $placaReq,
         'qtd_ssw' => $qtdSsw,
         'qtd_presto' => $qtdPresto,
-        'added' => $added,
+        'added' => 0,
+        'updated' => $updated ?? 0,
         'debug' => [
             'manifestos_count' => $manifestosCount,
             'manifestos_xml_ok' => $manifestosXmlOk,
             'pairs_count' => $pairsCount,
             'cte_found_count' => $cteFoundCount,
         ],
+    ]);
+}
+
+if ($acao === 'atualizar_bipagens_entrega') {
+    $extractXml = function ($html) {
+        $html = (string)$html;
+        if ($html === '') return null;
+        $inicio = strpos($html, '<?xml');
+        if ($inicio === false) $inicio = strpos($html, '<xml');
+        if ($inicio === false) {
+            $dec = @urldecode($html);
+            if ($dec && $dec !== $html) {
+                $inicio = strpos($dec, '<?xml');
+                if ($inicio === false) $inicio = strpos($dec, '<xml');
+                if ($inicio !== false) $html = $dec;
+            }
+        }
+        if ($inicio === false) return null;
+        $fim = strrpos($html, '</xml>');
+        if ($fim === false) return null;
+        return substr($html, $inicio, ($fim + 6) - $inicio);
+    };
+
+    $domainUpper = strtoupper((string)$domain);
+    $placasPrestoMap = [];
+    try {
+        $resPresto = sql(
+            "SELECT DISTINCT UPPER(BTRIM(c.placa_provisoria)) AS placa
+             FROM {$tabela} c
+             LEFT JOIN {$tabelaCap} cap
+                    ON cap.unidade = c.unidade AND cap.seq_carregamento = c.seq_carregamento
+             WHERE c.unidade = \$1
+               AND c.data_finalizacao IS NULL
+               AND COALESCE(cap.simulado, FALSE) = FALSE
+               AND (TRIM(COALESCE(c.destino, '')) = '' OR UPPER(COALESCE(cap.tp_carregamento, '')) = 'E')",
+            [$unidade],
+            $conn
+        );
+        while ($resPresto && ($row = pg_fetch_assoc($resPresto))) {
+            $p = strtoupper(trim((string)($row['placa'] ?? '')));
+            if ($p !== '') $placasPrestoMap[$p] = true;
+        }
+    } catch (Exception $e) {
+        $placasPrestoMap = [];
+    }
+    if (count($placasPrestoMap) === 0) {
+        respondJson(['success' => true, 'updated' => 0, 'placas' => [], 'placas_presto' => []]);
+    }
+
+    try {
+        require_ssw();
+        ssw_login($domain);
+    } catch (Exception $e) {
+        respondJson(['success' => false, 'message' => 'Falha ao autenticar no SSW.']);
+    }
+
+    $strTroca = '';
+    try {
+        $strTroca = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
+    } catch (Exception $e) {
+        $strTroca = '';
+    }
+    if (substr((string)$strTroca, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (troca unidade): ' . (string)$strTroca]);
+    }
+
+    $xmlRaw = '';
+    try {
+        $xmlRaw = ssw_go('https://sistema.ssw.inf.br/bin/ssw0197?act=PREP_IMP&entrega_dificil=N&prioritario=N&tp_carregamento=&qtde=2');
+    } catch (Exception $e) {
+        $xmlRaw = '';
+    }
+    if (substr((string)$xmlRaw, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (0197 PREP_IMP): ' . (string)$xmlRaw]);
+    }
+
+    $xmlStr = $extractXml($xmlRaw);
+    if ($xmlStr === null) {
+        respondJson(['success' => false, 'message' => 'Resposta inválida do SSW (0197 PREP_IMP).']);
+    }
+    $xml = @simplexml_load_string($xmlStr);
+    if ($xml === false) {
+        respondJson(['success' => false, 'message' => 'XML inválido do SSW (0197 PREP_IMP).']);
+    }
+
+    $rows = $xml->xpath('//r') ?: [];
+    $placasMap = [];
+    foreach ($rows as $r) {
+        $p = strtoupper(trim((string)($r->f0 ?? '')));
+        $p = preg_replace('/[^A-Z0-9]/', '', $p);
+        if ($p === '') continue;
+        $placasMap[$p] = true;
+    }
+    $placas = array_keys($placasMap);
+    if (count($placas) === 0) {
+        respondJson(['success' => true, 'updated' => 0, 'placas' => []]);
+    }
+
+    $mapPlacaRelParaDb = [];
+    $placasConsulta = [];
+    $placasConsultaMap = [];
+    foreach ($placas as $pRel) {
+        $pRel = strtoupper(trim((string)$pRel));
+        if ($pRel === '') continue;
+        $placaDb = $pRel;
+
+        if ($domainUpper === 'RVE' && preg_match('/^[A-Z0-9]{3}[A-Z0-9]{4}$/', $pRel)) {
+            $suf = substr($pRel, 3, 4);
+            if ($suf !== '') {
+                $candCap = '';
+                try {
+                    $resCap = sql(
+                        "SELECT cap.placa_provisoria
+                         FROM {$tabelaCap} cap
+                         LEFT JOIN {$tabela} c
+                                ON c.unidade = cap.unidade AND c.seq_carregamento = cap.seq_carregamento
+                         WHERE cap.unidade = \$1
+                           AND RIGHT(UPPER(BTRIM(cap.placa_provisoria)), 4) = \$2
+                           AND COALESCE(cap.simulado, FALSE) = FALSE
+                         GROUP BY cap.placa_provisoria, cap.seq_carregamento
+                         HAVING BOOL_OR(c.data_finalizacao IS NULL) OR COUNT(c.seq_carregamento) = 0
+                         ORDER BY COALESCE(BOOL_OR(c.data_finalizacao IS NULL), FALSE) DESC,
+                                  cap.seq_carregamento DESC
+                         LIMIT 1",
+                        [$unidade, $suf],
+                        $conn
+                    );
+                    if ($resCap && pg_num_rows($resCap) > 0) {
+                        $candCap = strtoupper(trim((string)pg_fetch_result($resCap, 0, 0)));
+                    }
+                } catch (Exception $e) {
+                    $candCap = '';
+                }
+
+                if ($candCap !== '') {
+                    $placaDb = $candCap;
+                } else {
+                    $candVeic = '';
+                    try {
+                        $resVeic = sql(
+                            "SELECT placa
+                             FROM {$tabelaVeiculo}
+                             WHERE RIGHT(UPPER(BTRIM(placa)), 4) = \$1
+                               AND UPPER(BTRIM(COALESCE(tipo, ''))) <> 'CAVALO'
+                             ORDER BY (CASE WHEN UPPER(BTRIM(COALESCE(tipo, ''))) IN ('CAMINHAO','CAMINHÃO','CAMINHONETE','TRUCK','CARRETA') THEN 0 ELSE 1 END),
+                                      LENGTH(BTRIM(placa)) ASC,
+                                      UPPER(BTRIM(placa)) ASC
+                             LIMIT 1",
+                            [$suf],
+                            $conn
+                        );
+                        if ($resVeic && pg_num_rows($resVeic) > 0) {
+                            $candVeic = strtoupper(trim((string)pg_fetch_result($resVeic, 0, 0)));
+                        }
+                    } catch (Exception $e) {
+                        $candVeic = '';
+                    }
+                    if ($candVeic !== '') $placaDb = $candVeic;
+                }
+            }
+        }
+
+        $mapPlacaRelParaDb[$pRel] = $placaDb;
+        if (isset($placasPrestoMap[$placaDb])) {
+            $placasConsulta[] = $pRel;
+            $placasConsultaMap[$pRel] = true;
+        }
+    }
+
+    if (count($placasConsulta) === 0) {
+        respondJson([
+            'success' => true,
+            'updated' => 0,
+            'placas_presto' => array_keys($placasPrestoMap),
+            'placas_ssw' => $placas,
+            'placas' => [],
+        ]);
+    }
+
+    try {
+        foreach ($placasConsulta as $pRel) {
+            $pRel = strtoupper(trim((string)$pRel));
+            if ($pRel === '') continue;
+            $pDb = strtoupper(trim((string)($mapPlacaRelParaDb[$pRel] ?? $pRel)));
+            if ($pDb === '') continue;
+            @pg_query($conn,
+                "UPDATE {$tabela}
+                 SET data_inicio_bipagem = COALESCE(data_inicio_bipagem, CURRENT_DATE),
+                     hora_inicio_bipagem = COALESCE(hora_inicio_bipagem, CURRENT_TIME),
+                     login_inicio_bipagem = COALESCE(NULLIF(login_inicio_bipagem, ''), '" . pg_escape_string($conn, $login) . "')
+                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                   AND UPPER(placa_provisoria) = '" . pg_escape_string($conn, $pDb) . "'
+                   AND data_finalizacao IS NULL"
+            );
+        }
+    } catch (Exception $e) {}
+
+    $act = 'SR_IMP|' . implode('|', $placasConsulta);
+    $txt = '';
+    try {
+        $txt = ssw_go('https://sistema.ssw.inf.br/bin/ssw0197?act=' . $act);
+    } catch (Exception $e) {
+        $txt = '';
+    }
+    if (substr((string)$txt, 0, 5) === '<foc ') {
+        respondJson(['success' => false, 'message' => 'Erro SSW (0197 SR_IMP): ' . (string)$txt]);
+    }
+    $txt = (string)$txt;
+    if (trim($txt) === '') {
+        respondJson(['success' => true, 'updated' => 0, 'placas' => $placas]);
+    }
+
+    $porPlaca = [];
+    $placaAtual = '';
+    $lines = preg_split("/\r\n|\n|\r/", $txt);
+    if (!is_array($lines)) $lines = [];
+    foreach ($lines as $line) {
+        $line = rtrim((string)$line);
+        if (preg_match('/^\s*PLACA\s+PROVISORIA:\s*(.+)\s*$/i', $line, $m)) {
+            $placaAtual = strtoupper(trim((string)($m[1] ?? '')));
+            $placaAtual = preg_replace('/[^A-Z0-9]/', '', $placaAtual);
+            if ($placaAtual === '' || !isset($placasConsultaMap[$placaAtual])) {
+                $placaAtual = '';
+                continue;
+            }
+            if (!isset($porPlaca[$placaAtual])) $porPlaca[$placaAtual] = [];
+            continue;
+        }
+        if ($placaAtual === '') continue;
+        $lineTrim = ltrim($line);
+        if ($lineTrim === '' || $lineTrim[0] === '-' || $lineTrim[0] === '*') continue;
+        $parts = preg_split('/\s+/', trim($lineTrim));
+        if (!is_array($parts) || count($parts) === 0) continue;
+        $ctrc = strtoupper(trim((string)($parts[0] ?? '')));
+        if ($ctrc === '' || strlen($ctrc) < 5) continue;
+        $ctrcClean = preg_replace('/[^A-Z0-9]/', '', $ctrc);
+        if (!preg_match('/^([A-Z]{3})(\d{6})/', $ctrcClean, $mC)) continue;
+        $ser = strtoupper($mC[1]);
+        $nro = (int)$mC[2];
+        if ($nro <= 0) continue;
+        $k = $ser . '|' . $nro;
+        $porPlaca[$placaAtual][$k] = ['ser' => $ser, 'nro' => $nro];
+    }
+
+    $updated = 0;
+    $placasNoRel = array_keys($porPlaca);
+    if (count($porPlaca) > 0) {
+        $tabelaEsc = $tabela;
+        $tabelaCapEsc = $tabelaCap;
+        pg_query($conn, 'BEGIN');
+        try {
+            foreach ($porPlaca as $placaRel => $pairs) {
+                $placaRel = strtoupper(trim((string)$placaRel));
+                if ($placaRel === '' || !is_array($pairs) || count($pairs) === 0) continue;
+                $placaDb = (string)($mapPlacaRelParaDb[$placaRel] ?? $placaRel);
+                $placaDb = strtoupper(trim($placaDb));
+                if ($placaDb === '') continue;
+                foreach ($pairs as $it) {
+                    $ser = strtoupper(trim((string)($it['ser'] ?? '')));
+                    $nro = (int)($it['nro'] ?? 0);
+                    if ($ser === '' || $nro <= 0) continue;
+
+                    $resUpd = pg_query($conn,
+                        "UPDATE {$tabelaEsc}
+                         SET bipado = TRUE
+                         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                           AND UPPER(placa_provisoria) = '" . pg_escape_string($conn, $placaDb) . "'
+                           AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
+                           AND nro_cte = {$nro}
+                           AND data_finalizacao IS NULL
+                           AND COALESCE(bipado, FALSE) = FALSE
+                           AND (
+                               TRIM(COALESCE(destino, '')) = ''
+                               OR EXISTS (
+                                   SELECT 1
+                                   FROM {$tabelaCapEsc} cap
+                                   WHERE cap.unidade = {$tabelaEsc}.unidade
+                                     AND cap.seq_carregamento = {$tabelaEsc}.seq_carregamento
+                                     AND UPPER(COALESCE(cap.tp_carregamento, '')) = 'E'
+                                   LIMIT 1
+                               )
+                           )"
+                    );
+
+                    if ($resUpd && pg_affected_rows($resUpd) > 0) $updated += (int)pg_affected_rows($resUpd);
+                }
+            }
+            pg_query($conn, 'COMMIT');
+        } catch (Exception $e) {
+            pg_query($conn, 'ROLLBACK');
+        }
+    }
+
+    respondJson([
+        'success' => true,
+        'placas' => $placasConsulta,
+        'placas_presto' => array_keys($placasPrestoMap),
+        'placas_ssw' => $placas,
+        'placas_relatorio' => $placasNoRel,
+        'updated' => $updated,
     ]);
 }
 

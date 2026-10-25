@@ -3537,6 +3537,29 @@ function CardCarregamento({
               label="Cubagem (m³)"
             />
             <BarraFreteSegmentada cif={freteCif} fob={freteFob} minimo={carregamento.vlr_min_frete ?? null} />
+            
+            {/* Barra de Bipagem (CT-es Lidos) */}
+            {(!isSimulado || (Number((carregamento as any).total_lidos) > 0)) && (
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1 gap-2">
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Bipagem (Conferência)</span>
+                  <span className="text-[10px] font-bold whitespace-nowrap text-slate-700 dark:text-slate-300">
+                    {Number((carregamento as any).total_lidos) || 0} / {Number(carregamento.total_ctes) || 0} ({((Number((carregamento as any).total_lidos) || 0) / (Number(carregamento.total_ctes) || 1) * 100).toFixed(0)}%)
+                  </span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                  <div
+                    className="h-2.5 rounded-full transition-all duration-700 ease-out"
+                    style={{ 
+                      width: `${Math.min(100, (Number((carregamento as any).total_lidos) || 0) / (Number(carregamento.total_ctes) || 1) * 100)}%`, 
+                      backgroundColor: '#10b981' 
+                    }}
+                    title={`Bipagens: ${Number((carregamento as any).total_lidos) || 0} de ${Number(carregamento.total_ctes) || 0}`}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 min-w-0">
               {(() => {
                 const totalFrete = (Number.isFinite(freteCif) ? freteCif : 0) + (Number.isFinite(freteFob) ? freteFob : 0);
@@ -3586,7 +3609,7 @@ function CardCarregamento({
               <X className="w-3.5 h-3.5 mr-1" />Canc.
             </Button>
           )}
-          {!!(carregamento as any).simulado && !isEntregaCarreg ? (
+          {!!(carregamento as any).simulado ? (
             <Button
               size="sm"
               className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white text-xs"
@@ -3900,13 +3923,15 @@ function CardCarregamento({
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {cteDetalheListaOrdenada.map((cte, idx) => {
                       const id = Number((cte as any).seq_cte ?? 0);
                       const checked = id > 0 && cteDetalheSelecionados.has(id);
+                      const isLido = !!(cte as any).lido;
                       return (
                       <div
                         key={idx}
-                        className="grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                        className={`grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
+                          isLido ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                        }`}
                       >
                         <input
                           type="checkbox"
@@ -7751,21 +7776,27 @@ function ModalCarregamentoAutomaticoEntrega({
   ctes,
   onConfirmar,
   onFechar,
+  initialPrevisaoInicio,
+  initialPrevisaoFim,
 }: {
   setores: GrupoSetor[];
   ctes: any[];
   onConfirmar: (setores: string[], opts: { previsaoInicio: string; previsaoFim: string }) => Promise<void>;
   onFechar: () => void;
+  initialPrevisaoInicio?: string;
+  initialPrevisaoFim?: string;
 }) {
   const [busca, setBusca] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(() => new Set());
-  const [previsaoModo, setPrevisaoModo] = useState<'periodo' | 'ate'>('periodo');
+  const [previsaoModo, setPrevisaoModo] = useState<'periodo' | 'ate'>(initialPrevisaoInicio ? 'periodo' : 'ate');
   const [previsaoInicio, setPrevisaoInicio] = useState(() => {
+    if (initialPrevisaoInicio) return initialPrevisaoInicio;
     const d = new Date();
     d.setFullYear(d.getFullYear() - 2);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [previsaoFim, setPrevisaoFim] = useState(() => {
+    if (initialPrevisaoFim) return initialPrevisaoFim;
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -10470,6 +10501,8 @@ function CarregamentoArea({
           })()}
           ctes={ctesDisponiveisEntrega}
           onConfirmar={handleCarregarAutomaticoEntrega}
+          initialPrevisaoInicio={filters.periodoPrevisaoInicio}
+          initialPrevisaoFim={filters.periodoPrevisaoFim}
         />
       )}
       {modalAutomaticoModo === 'transferencia' && (
@@ -10747,6 +10780,8 @@ export function Disponiveis() {
   const [loadingCarregamentos, setLoadingCarregamentos] = useState(false);
   const [carregamentosCalendario, setCarregamentosCalendario] = useState<Carregamento[]>([]);
   const [loadingCarregamentosCalendario, setLoadingCarregamentosCalendario] = useState(false);
+  const carregamentosRef = useRef<Carregamento[]>([]);
+  useEffect(() => { carregamentosRef.current = carregamentos; }, [carregamentos]);
   const [modoApontamento, setModoApontamento] = useState<string | null>(null);
   const [ctesSelecionados, setCtesSelecionados] = useState<Map<number, Cte>>(new Map());
   // CT-es já apontados no carregamento-alvo marcados para remoção (desapontamento)
@@ -11004,6 +11039,56 @@ export function Disponiveis() {
     finally { setLoadingCarregamentos(false); }
   }, [sigla]);
 
+  const autoBipagemEntregaRunningRef = useRef(false);
+  const autoBipagemEntregaIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const atualizarBipagensEntregaSilencioso = useCallback(async () => {
+    if (autoBipagemEntregaRunningRef.current) return;
+    const unidadeSel = String(sigla ?? '').trim().toUpperCase();
+    if (!unidadeSel) return;
+
+    const lista = carregamentosRef.current ?? [];
+    const temEntrega = Array.isArray(lista) && lista.some((c: any) => {
+      const tp = String(c?.tp_carregamento ?? '').trim().toUpperCase();
+      const modo = String(c?.modo_carregamento ?? '').trim().toUpperCase();
+      const sim = !!(c as any)?.simulado;
+      return !sim && (tp === 'E' || modo === 'ENTREGA');
+    });
+    if (!temEntrega) return;
+
+    autoBipagemEntregaRunningRef.current = true;
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_bipagens_entrega', unidade: unidadeSel }) },
+        true
+      );
+      if (res?.success) {
+        const updated = Number(res.updated ?? 0) || 0;
+        if (updated > 0) {
+          await carregarCarregamentos();
+        }
+      }
+    } catch (e) {
+    } finally {
+      autoBipagemEntregaRunningRef.current = false;
+    }
+  }, [sigla, carregarCarregamentos]);
+
+  useEffect(() => {
+    if (!painelAtivo) return;
+    if (!sigla) return;
+    if (autoBipagemEntregaIntervalRef.current) clearInterval(autoBipagemEntregaIntervalRef.current);
+    void atualizarBipagensEntregaSilencioso();
+    autoBipagemEntregaIntervalRef.current = setInterval(() => {
+      void atualizarBipagensEntregaSilencioso();
+    }, 5 * 60 * 1000);
+    return () => {
+      if (autoBipagemEntregaIntervalRef.current) clearInterval(autoBipagemEntregaIntervalRef.current);
+      autoBipagemEntregaIntervalRef.current = null;
+    };
+  }, [painelAtivo, sigla, atualizarBipagensEntregaSilencioso]);
+
   const carregarCarregamentosCalendario = useCallback(async () => {
     setLoadingCarregamentosCalendario(true);
     try {
@@ -11043,6 +11128,30 @@ export function Disponiveis() {
         { method: 'POST', body: JSON.stringify(body) },
         true
       );
+      if (res?.needs_confirm && res?.conflito?.placa_ssw) {
+        const placaSsw = String(res.conflito.placa_ssw ?? '').trim().toUpperCase();
+        const placaPresto = String(res.conflito.placa_presto ?? '').trim().toUpperCase();
+        const placaSugerida = String(res.conflito.placa_sugerida ?? placaSsw).trim().toUpperCase();
+        const ok = await confirmar({
+          title: 'Conflito de carregamento',
+          description:
+            `O carregamento "${placaSsw}" está ativo no TMS, mas os CT-es já estão em um carregamento aberto no Presto (${placaPresto}).\n\nDeseja trocar a placa do Presto para "${placaSugerida}" ou ignorar esse carregamento?`,
+          confirmText: 'Trocar placa',
+          cancelText: 'Ignorar',
+        });
+        const resolver_conflito = { placa_ssw: placaSsw, acao: ok ? 'TROCAR_PLACA' : 'IGNORAR' };
+        const res2 = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
+          { method: 'POST', body: JSON.stringify({ ...body, resolver_conflito }) },
+          true
+        );
+        if (res2?.success) {
+          await carregarCarregamentos();
+        } else if (res2?.blocked) {
+          toast.error(res2?.message || 'Conflito em mais de um carregamento. Resolver manualmente.');
+        }
+        return res2;
+      }
       if (res?.success) {
         await carregarCarregamentos();
       }
@@ -11061,7 +11170,7 @@ export function Disponiveis() {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
     }
-  }, [carregarCarregamentos]);
+  }, [carregarCarregamentos, confirmar]);
 
   const handleImportarCarregamentos = useCallback(async (opts?: { silent?: boolean }) => {
     return importarCarregamentosBase(opts);

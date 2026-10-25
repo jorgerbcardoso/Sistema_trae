@@ -42,6 +42,11 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS adiado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS setores_entrega TEXT");
 @pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS lido BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS bipado BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS data_inicio_bipagem DATE");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS hora_inicio_bipagem TIME");
+@pg_query($conn, "ALTER TABLE {$tabelaCarregamento} ADD COLUMN IF NOT EXISTS login_inicio_bipagem VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS vlr_frete_carreteiro NUMERIC");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
@@ -133,6 +138,20 @@ $sqlCarregamentos = "
                 ELSE 0
             END
         ) AS total_ctes,
+        SUM(
+            CASE
+                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0 AND COALESCE(c.lido, FALSE) = TRUE) THEN 1
+                ELSE 0
+            END
+        ) AS total_lidos_transfer,
+        SUM(
+            CASE
+                WHEN (c.nro_cte::text ~ '^[0-9]+$' AND (c.nro_cte::text)::int > 0 AND COALESCE(c.bipado, FALSE) = TRUE) THEN 1
+                ELSE 0
+            END
+        ) AS total_bipados,
+        MIN(c.data_inicio_bipagem) AS data_inicio_bipagem,
+        MIN(c.hora_inicio_bipagem) AS hora_inicio_bipagem,
         COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0)), 0) AS total_frete,
         COALESCE(SUM(COALESCE(c.vlr_merc_cte, 0)), 0)  AS total_mercadoria,
         COALESCE(SUM(COALESCE(c.peso_cte, 0)), 0)      AS total_peso,
@@ -248,6 +267,10 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'setores_entrega'  => ($row['setores_entrega'] ?? null),
         'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
+        'total_lidos'      => ($tpCarreg === 'E')
+            ? (int)($row['total_bipados'] ?? 0)
+            : (int)($row['total_lidos_transfer'] ?? 0),
+        'bipagem_iniciada' => (($row['data_inicio_bipagem'] ?? null) !== null && (string)($row['data_inicio_bipagem'] ?? '') !== ''),
         'total_frete'      => (float)($row['total_frete'] ?? 0),
         'total_frete_cif'  => null,
         'total_frete_fob'  => null,
