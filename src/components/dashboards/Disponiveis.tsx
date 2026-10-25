@@ -60,6 +60,7 @@ import {
   CircleHelp,
   ArrowUpDown,
   Info,
+  Route,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -3216,7 +3217,7 @@ function CardCarregamento({
 
   const origemTag = (() => {
     const o = (carregamento.origem_criacao ?? null);
-    if (o === 'SSW') return { label: 'SSW', className: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' };
+    if (o === 'SSW') return { label: 'TMS', className: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200' };
     if (o === 'AUTO') return { label: 'Auto', className: 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200' };
     if (o === 'MANUAL') return { label: 'Manual', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' };
     return null;
@@ -7674,11 +7675,11 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
         setEtapa('resultado');
         await onConcluir();
       } else {
-        toast.error(res.message || 'Erro ao importar carregamentos do SSW');
+        toast.error(res.message || 'Erro ao importar carregamentos do TMS');
         onFechar();
       }
     } catch (e: any) {
-      toast.error(e.message || 'Erro ao importar carregamentos do SSW');
+      toast.error(e.message || 'Erro ao importar carregamentos do TMS');
       onFechar();
     }
   };
@@ -7697,7 +7698,7 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
             <FileDown className="w-5 h-5 text-sky-500" />
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Importar Carregamentos do SSW</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Importar Carregamentos do TMS</h3>
           </div>
           {etapa !== 'carregando' && (
             <button onClick={onFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
@@ -7710,7 +7711,7 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
           {etapa === 'confirmar' && (
             <div className="space-y-4">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                O sistema irá reimportar os carregamentos do SSW para a sua unidade, atualizando o Presto.
+                O sistema irá reimportar os carregamentos do TMS para a sua unidade, atualizando o Presto.
               </p>
               <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
                 <div className="flex items-start gap-3">
@@ -7718,7 +7719,7 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
                   <div>
                     <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Reimportação automática</p>
                     <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                      Antes de importar, o sistema remove os registros anteriores vindos do SSW e traz novamente os dados. Apontamentos manuais permanecem.
+                      Antes de importar, o sistema remove os registros anteriores vindos do TMS e traz novamente os dados. Apontamentos manuais permanecem.
                     </p>
                   </div>
                 </div>
@@ -7729,7 +7730,7 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
           {etapa === 'carregando' && (
             <div className="flex flex-col items-center justify-center py-8 gap-4">
               <Loader2 className="w-10 h-10 animate-spin text-sky-500" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Importando carregamentos do SSW...</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Importando carregamentos do TMS...</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 text-center">Isso pode levar alguns segundos. Não feche esta janela.</p>
             </div>
           )}
@@ -7737,7 +7738,7 @@ function ModalImportarSSW({ onFechar, onConcluir, onExecutar }: { onFechar: () =
           {etapa === 'resultado' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {placasSSW.length} placa{placasSSW.length !== 1 ? 's' : ''} encontrada{placasSSW.length !== 1 ? 's' : ''} no SSW. Resultado:
+                {placasSSW.length} placa{placasSSW.length !== 1 ? 's' : ''} encontrada{placasSSW.length !== 1 ? 's' : ''} no TMS. Resultado:
               </p>
               <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                 {logs.map((log, i) => (
@@ -9091,9 +9092,9 @@ function CarregamentoArea({
           const manOk = Number(dbg.manifestos_xml_ok ?? 0) || 0;
           const pairs = Number(dbg.pairs_count ?? 0) || 0;
           const found = Number(dbg.cte_found_count ?? 0) || 0;
-          toast.error(`SSW ${qtdSsw} · Presto ${qtdPresto} · +0. Debug: manifestos ${manCount} (ok ${manOk}) · chaves ${pairs} · CT-es no banco ${found}.`);
+          toast.error(`TMS ${qtdSsw} · Presto ${qtdPresto} · +0. Debug: manifestos ${manCount} (ok ${manOk}) · chaves ${pairs} · CT-es no banco ${found}.`);
         } else {
-          toast.success(`CT-es atualizados: +${added} (SSW ${qtdSsw} · Presto ${qtdPresto}).`);
+          toast.success(`CT-es atualizados: +${added} (TMS ${qtdSsw} · Presto ${qtdPresto}).`);
         }
         await onRecarregarCarregamentos();
         if (calCtesOpen) {
@@ -9509,7 +9510,7 @@ function CarregamentoArea({
                                     e.stopPropagation();
                                     void atualizarCtesCarregamento(c);
                                   }}
-                                  title="Atualizar CT-es (SSW)"
+                                  title="Atualizar CT-es (TMS)"
                                 >
                                   <RefreshCw className={`w-4 h-4 ${calAtualizandoCtes ? 'animate-spin' : ''}`} />
                                 </button>
@@ -11166,7 +11167,7 @@ export function Disponiveis() {
       }
       return res;
     } catch (e: any) {
-      return { success: false, message: e?.message || 'Erro ao importar carregamentos do SSW' };
+      return { success: false, message: e?.message || 'Erro ao importar carregamentos do TMS' };
     } finally {
       importandoCarregamentosRef.current = false;
       setImportandoCarregamentos(false);
@@ -11182,7 +11183,7 @@ export function Disponiveis() {
     importandoVeiculosRef.current = true;
     setImportandoVeiculos(true);
     try {
-      toast.info('Importando veículos do SSW...');
+      toast.info('Importando veículos do TMS...');
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/importar_carregamentos_ssw.php`,
         { method: 'POST', body: JSON.stringify({ acao: 'IMPORTAR_VEICULOS' }) },
@@ -11891,7 +11892,7 @@ export function Disponiveis() {
   }, []);
 
   const handleCarregarSSW = useCallback((_placa: string) => {
-    toast.info('Em breve: integração com SSW para carregar o manifesto.');
+    toast.info('Em breve: integração com TMS para carregar o manifesto.');
   }, []);
 
   const getDestinoCarregamento = useCallback((car: Carregamento): string | null => {
@@ -12199,7 +12200,7 @@ export function Disponiveis() {
         true
       );
       if (res?.success && (Number(res.updated ?? 0) || 0) > 0) {
-        toast.info(`${res.updated} registro(s) finalizado(s) automaticamente (saída detectada no SSW).`);
+        toast.info(`${res.updated} registro(s) finalizado(s) automaticamente (saída detectada no TMS).`);
       }
     } catch (e: any) {
     }
@@ -12996,7 +12997,7 @@ export function Disponiveis() {
                   <DialogHeader>
                     <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
                     <DialogDescription className="text-slate-600 dark:text-slate-400">
-                      Os filtros são aplicados após carregar os dados do SSW (não alteram a importação).
+                      Os filtros são aplicados após carregar os dados do TMS (não alteram a importação).
                     </DialogDescription>
                   </DialogHeader>
 
@@ -13165,10 +13166,10 @@ export function Disponiveis() {
                 <DialogContent className="sm:max-w-[920px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
                   <DialogHeader>
                     <DialogTitle className="text-slate-900 dark:text-slate-100">
-                      Manual · Simulador de Carregamentos
+                      Manual · Carregamentos e Rota
                     </DialogTitle>
                     <DialogDescription className="text-slate-600 dark:text-slate-400">
-                      Como usar o painel de “Disponíveis no Armazém” para montar, simular, iniciar (TMS) e acompanhar carregamentos.
+                      Como usar o painel de “Disponíveis no Armazém” para montar, simular, iniciar (TMS), importar e acompanhar carregamentos.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -13193,6 +13194,22 @@ export function Disponiveis() {
                         </div>
                       </div>
 
+                      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-4">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                              Começar rápido (fluxo padrão)
+                            </p>
+                            <ul className="mt-2 space-y-1 text-xs text-emerald-900/80 dark:text-emerald-200/80">
+                              <li className="flex gap-2"><span className="font-black">1.</span><span>Importe os carregamentos do TMS (para trazer o que está em operação).</span></li>
+                              <li className="flex gap-2"><span className="font-black">2.</span><span>Use Apontar para adicionar/remover CT-es no carregamento.</span></li>
+                              <li className="flex gap-2"><span className="font-black">3.</span><span>Use Rota para otimizar a ordem de entrega e gerar a Ordem de Carregamento.</span></li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
                       {dominioUsuario === 'RVE' && (
                         <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-4">
                           <div className="flex items-start gap-3">
@@ -13202,11 +13219,11 @@ export function Disponiveis() {
                                 Regra de placa no domínio RVE (4 últimos caracteres)
                               </p>
                               <p className="text-xs text-indigo-800 dark:text-indigo-300 mt-1">
-                                No RVE, o sistema usa os 4 últimos caracteres da placa para relacionar veículo/capacidade e para agrupar importações do SSW.
+                                No RVE, o sistema usa os 4 últimos caracteres da placa para relacionar veículo/capacidade e para agrupar importações do TMS.
                               </p>
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-slate-900/40 p-3">
-                                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Na importação do SSW</p>
+                                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Na importação do TMS</p>
                                   <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
                                     <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se a placa vier no formato de 7 caracteres (ex.: ABC1D23), o sistema considera os 4 últimos (ex.: 1D23).</span></li>
                                     <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se existir carregamento em aberto com a mesma terminação (4 últimos), ele pode ser reaproveitado/agrupado.</span></li>
@@ -13217,7 +13234,7 @@ export function Disponiveis() {
                                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Ao editar / digitar placa</p>
                                   <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
                                     <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Mantenha os 4 últimos caracteres coerentes com o veículo real quando quiser “casar” com capacidades/placas do cadastro.</span></li>
-                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Carregamentos simulados não são alterados pela importação do SSW.</span></li>
+                                    <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Carregamentos simulados não são alterados pela importação do TMS.</span></li>
                                     <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Alguns destinos podem ser ignorados no RVE (ex.: SAL, DK4, TNE, DEV, e regras específicas SAO↔CAM).</span></li>
                                   </ul>
                                 </div>
@@ -13236,7 +13253,7 @@ export function Disponiveis() {
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">1) Carregamentos (topo)</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                              Área para criar carregamentos (manual/automático), importar do SSW, iniciar via TMS, finalizar e apontar CT-es.
+                              Área para criar carregamentos (manual/automático), importar do TMS, iniciar via TMS, finalizar e apontar CT-es.
                             </p>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
@@ -13289,7 +13306,13 @@ export function Disponiveis() {
                             <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
                               <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Iniciar (TMS)</p>
                               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                                Converte a simulação para início operacional: limpa a simulação e pede a placa verdadeira. Depois, importa do SSW para alimentar os dados reais.
+                                Converte a simulação para início operacional: limpa a simulação e pede a placa verdadeira. Depois, importe do TMS para alimentar os dados reais.
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Rota</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                                Abre o módulo de roteirização: organiza as entregas por melhor sequência, mostra o mapa e gera a Ordem de Carregamento.
                               </p>
                             </div>
                             <div className="rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3">
@@ -13305,21 +13328,29 @@ export function Disponiveis() {
                       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
                         <div className="flex items-center gap-2">
                           <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Importação do SSW</p>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Importação (TMS)</p>
                         </div>
                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Importar carregamentos</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                              Atualiza os carregamentos vindos do SSW. O painel pode limpar dados antigos do SSW e trazer novamente os dados atuais.
+                              Atualiza os carregamentos vindos do TMS. O painel pode limpar dados antigos e trazer novamente os dados atuais.
                             </p>
                           </div>
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Importação automática</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                              Se habilitada, reimporta periodicamente para manter a tela sincronizada com o SSW.
+                              Se habilitada, reimporta periodicamente para manter a tela sincronizada com o TMS.
                             </p>
                           </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Conflito de placa / CT-es</p>
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se um carregamento do TMS ainda não existe no Presto, ele entra de qualquer maneira.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se os CT-es já estiverem em um carregamento aberto no Presto com outra placa, o sistema pergunta: trocar a placa do Presto para a placa do TMS ou ignorar esse carregamento.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Se os CT-es estiverem espalhados em mais de um carregamento aberto, o sistema bloqueia e avisa para resolver manualmente.</span></li>
+                          </ul>
                         </div>
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                           <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Placas fictícias e “Obrigar placas reais”</p>
@@ -13331,9 +13362,45 @@ export function Disponiveis() {
                           </ul>
                         </div>
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática (SSW)</p>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática (TMS)</p>
                           <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                            Ao abrir o painel, o sistema pode verificar placas “em andamento” que já saíram para viagem no SSW e finalizar automaticamente com a data/hora informada.
+                            Ao abrir o painel, o sistema pode verificar placas “em andamento” que já saíram para viagem no TMS e finalizar automaticamente com a data/hora informada.
+                          </p>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Bipagem e barra de progresso</p>
+                          <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>O progresso do card avança conforme os CT-es vão sendo lidos no TMS.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>O sistema atualiza silenciosamente as barras a cada 5 minutos.</span></li>
+                            <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>A atualização só considera carregamentos que estão “iniciados” (placa aparece como carregando no TMS) e que batem com a placa do carregamento no Presto (no RVE, usa os 4 últimos caracteres).</span></li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Route className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Rota (roteirização) e Ordem de Carregamento</p>
+                        </div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Para que serve</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Calcula uma sequência de entregas por distância real de estrada, desenha o trajeto no mapa e gera a Ordem de Carregamento.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Regras importantes</p>
+                            <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                              <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>A ordem usa a regra de “vizinho mais próximo” (sempre escolhe o próximo ponto mais perto do ponto atual).</span></li>
+                              <li className="flex gap-2"><span className="text-indigo-600 dark:text-indigo-400 font-black">•</span><span>Ajustes manuais de geolocalização (arrastar pin/editar) são preservados e afetam a próxima otimização.</span></li>
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Ordem de Carregamento</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                            O módulo salva a ordem dos CT-es no carregamento e usa essa sequência nos relatórios e na conferência operacional.
                           </p>
                         </div>
                       </div>
@@ -13449,7 +13516,7 @@ export function Disponiveis() {
                           <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Atualizar</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                              O botão Atualizar no topo recarrega os dados de transferência/SSW para manter a tela sincronizada.
+                              O botão Atualizar no topo recarrega os dados de transferência/importação para manter a tela sincronizada.
                             </p>
                           </div>
                         </div>
@@ -13682,11 +13749,11 @@ export function Disponiveis() {
                 className="text-xs h-8 border-rose-300 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (importandoCarregamentos) { toast.error('Aguarde: atualização do SSW em andamento.'); return; }
+                  if (importandoCarregamentos) { toast.error('Aguarde: atualização do TMS em andamento.'); return; }
                   void handleImportarVeiculos();
                 }}
                 disabled={importandoVeiculos}
-                title="Importar proprietários, veículos e motoristas do SSW"
+                title="Importar proprietários, veículos e motoristas do TMS"
               >
                 {importandoVeiculos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Truck className="w-3.5 h-3.5 mr-1.5" />}
                 Importar veículos recentes
@@ -14250,7 +14317,7 @@ export function Disponiveis() {
                   <div className="flex items-center gap-3 mb-3">
                     <Loader2 className="w-5 h-5 animate-spin text-amber-600 dark:text-amber-400 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Gerando relatório no SSW...</p>
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Gerando relatório no TMS...</p>
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">O relatório está sendo processado. Isso pode levar até 1 minuto.</p>
                     </div>
                   </div>
