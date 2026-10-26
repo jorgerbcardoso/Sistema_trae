@@ -307,6 +307,57 @@ interface Carregamento {
   ctes: CteCarregamento[];
 }
 
+type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
+
+type LinhaCarregamento = {
+  nro_linha: number;
+  nome: string;
+  sigla_emit: string;
+  sigla_dest: string;
+  unidades: string;
+  destino_centralizadora?: boolean;
+  unidades_compart?: string;
+  km_ida: number | null;
+  km_volta: number | null;
+  vlr_min_frete?: number | null;
+  multi_carr_diario?: boolean;
+  carrega_seg?: boolean;
+  carrega_ter?: boolean;
+  carrega_qua?: boolean;
+  carrega_qui?: boolean;
+  carrega_sex?: boolean;
+  carrega_sab?: boolean;
+  carrega_dom?: boolean;
+};
+
+type LinhaHojeStatus = {
+  podeCarregar: boolean;
+  motivoBloqueio: string | null;
+  freteTotalDestino: number;
+  pesoKgDestino: number;
+  cubagemDestino: number;
+  atingiuMinFrete: boolean;
+};
+
+type ResumoMassaLinha = {
+  nro_linha: number;
+  placa: string;
+  destino: string;
+  intermediarias: string;
+  status: 'criado' | 'erro';
+  msg: string;
+};
+
+type SobrasCarregamento = {
+  placa: string;
+  destino: string;
+  paradas: string[];
+  nro_linha?: number;
+  sobras: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
+  capacidade?: { peso_kg?: number; cubagem?: number };
+  uso?: { peso_kg?: number; cubagem?: number; frete?: number };
+};
+
 /** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
 const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
@@ -4092,57 +4143,6 @@ function CardCarregamento({
     </div>
   );
 }
-
-type LogImportacao = { placa: string; status: 'importado' | 'sobrescrito' | 'ignorado' | 'aviso' | 'erro'; msg: string };
-
-type LinhaCarregamento = {
-  nro_linha: number;
-  nome: string;
-  sigla_emit: string;
-  sigla_dest: string;
-  unidades: string;
-  destino_centralizadora?: boolean;
-  unidades_compart?: string;
-  km_ida: number | null;
-  km_volta: number | null;
-  vlr_min_frete?: number | null;
-  multi_carr_diario?: boolean;
-  carrega_seg?: boolean;
-  carrega_ter?: boolean;
-  carrega_qua?: boolean;
-  carrega_qui?: boolean;
-  carrega_sex?: boolean;
-  carrega_sab?: boolean;
-  carrega_dom?: boolean;
-};
-
-type LinhaHojeStatus = {
-  podeCarregar: boolean;
-  motivoBloqueio: string | null;
-  freteTotalDestino: number;
-  pesoKgDestino: number;
-  cubagemDestino: number;
-  atingiuMinFrete: boolean;
-};
-
-type ResumoMassaLinha = {
-  nro_linha: number;
-  placa: string;
-  destino: string;
-  intermediarias: string;
-  status: 'criado' | 'erro';
-  msg: string;
-};
-
-type SobrasCarregamento = {
-  placa: string;
-  destino: string;
-  paradas: string[];
-  nro_linha?: number;
-  sobras: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
-  capacidade?: { peso_kg?: number; cubagem?: number };
-  uso?: { peso_kg?: number; cubagem?: number; frete?: number };
-};
 
 function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, perguntarTexto, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
   onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
