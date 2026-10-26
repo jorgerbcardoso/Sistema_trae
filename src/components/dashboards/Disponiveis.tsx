@@ -358,6 +358,36 @@ type SobrasCarregamento = {
   uso?: { peso_kg?: number; cubagem?: number; frete?: number };
 };
 
+type ModalCarregamentoAutomaticoProps = {
+  onConfirmar: (
+    placa: string,
+    unidadeDestino: string,
+    paradas: string[],
+    nroLinha?: number,
+    opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }
+  ) => Promise<{
+    ok: boolean;
+    placa?: string;
+    message?: string;
+    resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
+    destino?: string;
+    paradas?: string[];
+    nro_linha?: number;
+    sobras?: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
+    capacidade?: { peso_kg?: number; cubagem?: number };
+    uso?: { peso_kg?: number; cubagem?: number; frete?: number };
+  }>;
+  onFechar: () => void;
+  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
+  perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
+  linhasOrigem: LinhaCarregamento[];
+  loadingLinhasOrigem: boolean;
+  carregamentos: Carregamento[];
+  siglaUnidade: string;
+  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
+};
+
 /** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
 const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
@@ -4144,29 +4174,8 @@ function CardCarregamento({
   );
 }
 
-function ModalCarregamentoAutomatico({ onConfirmar, onFechar, confirmar, perguntarTexto, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas }: {
-  onConfirmar: (placa: string, unidadeDestino: string, paradas: string[], nroLinha?: number, opts?: { recarregar?: boolean; silent?: boolean; forcarMinFrete?: boolean }) => Promise<{
-    ok: boolean;
-    placa?: string;
-    message?: string;
-    resumo?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
-    resumoDestinos?: { unidade: string; qtd: number; peso_kg?: number; cubagem?: number; frete?: number }[];
-    destino?: string;
-    paradas?: string[];
-    nro_linha?: number;
-    sobras?: { qtd: number; peso_kg?: number; cubagem?: number; frete?: number };
-    capacidade?: { peso_kg?: number; cubagem?: number };
-    uso?: { peso_kg?: number; cubagem?: number; frete?: number };
-  }>;
-  onFechar: () => void;
-  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
-  perguntarTexto: (opts: PromptDialogOptions) => Promise<string | null>;
-  linhasOrigem: LinhaCarregamento[];
-  loadingLinhasOrigem: boolean;
-  carregamentos: Carregamento[];
-  siglaUnidade: string;
-  totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
-}) {
+function ModalCarregamentoAutomatico(props: ModalCarregamentoAutomaticoProps) {
+  const { onConfirmar, onFechar, confirmar, perguntarTexto, linhasOrigem, loadingLinhasOrigem, carregamentos, siglaUnidade, totalsPorUnidadeParaLinhas } = props;
   const [modo, setModo] = useState<'automatico' | 'manual'>('automatico');
   const [placa, setPlaca] = useState('');
   const [unidadeDestino, setUnidadeDestino] = useState('');
