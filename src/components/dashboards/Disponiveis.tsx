@@ -5544,6 +5544,9 @@ function ModalDadosOrdemCarregamento({
     }
   };
 
+  const bloqueandoTela = saving;
+  const bloqueioTexto = saving ? 'Salvando...' : 'Processando...';
+
   return (
     <>
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
