@@ -3945,11 +3945,13 @@ function CardCarregamento({
                       const id = Number((cte as any).seq_cte ?? 0);
                       const checked = id > 0 && cteDetalheSelecionados.has(id);
                       const isLido = !!(cte as any).lido;
+                      const isBipado = !!(cte as any).bipado;
+                      const isVerde = isLido || isBipado;
                       return (
                         <div
                           key={id > 0 ? id : idx}
                           className={`grid grid-cols-[28px_105px_70px_45px_70px_80px_70px_minmax(180px,1fr)_90px_75px_75px] gap-2 px-3 py-2 text-[13px] hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
-                            isLido ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                            isVerde ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
                           }`}
                         >
                           <input

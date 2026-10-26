@@ -206,6 +206,7 @@ $sql = "
         COALESCE(car.peso_cte, 0)       AS peso,
         COALESCE(car.cubagem_cte, 0)    AS cubagem,
         COALESCE(car.qtde_vol_cte, 0)   AS qtde_vol,
+        COALESCE(car.bipado, FALSE)    AS bipado,
         CASE
             WHEN COALESCE(
                 NULLIF(UPPER(BTRIM(COALESCE(cap.tp_carregamento, ''))), ''),
@@ -278,6 +279,7 @@ while ($res && ($row = pg_fetch_assoc($res))) {
         'peso'          => round($pesoNum, 2),
         'cubagem'       => round($cubNum, 3),
         'qtde_vol'      => $qtdeVol,
+        'bipado'        => ((string)($row['bipado'] ?? '') === 't'),
         'lido'          => ((string)($row['lido'] ?? '') === 't'),
     ];
 }
@@ -371,6 +373,7 @@ if (count($ctes) === 0 && $seqCarreg > 0) {
                     'peso'          => round($pesoNum, 2),
                     'cubagem'       => round($cubNum, 3),
                     'qtde_vol'      => $qtdeVol,
+                    'bipado'        => ((string)($row['bipado'] ?? '') === 't'),
                     'lido'          => ((string)($row['lido'] ?? '') === 't'),
                 ];
             }
