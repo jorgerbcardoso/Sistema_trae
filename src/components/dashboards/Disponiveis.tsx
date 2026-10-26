@@ -3522,6 +3522,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
     'Processando...';
 
   return (
+    <>
     <div className={`rounded-xl border-2 transition-all duration-200 ${bordaCardClass} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
