@@ -5544,6 +5544,7 @@ function ModalDadosOrdemCarregamento({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(860px,calc(100vw-32px))] max-h-[calc(100vh-120px)] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
