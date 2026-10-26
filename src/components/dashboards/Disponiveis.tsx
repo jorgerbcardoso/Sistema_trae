@@ -1969,6 +1969,8 @@ interface CarregamentoAreaProps {
   todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
   cteKeysDisponiveisTransferencia: Set<string>;
   cteKeysDisponiveisEntrega: Set<string>;
+  initialPrevisaoInicio: string;
+  initialPrevisaoFim: string;
 }
 
 function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
@@ -8273,6 +8275,8 @@ function CarregamentoArea({
   todosCtes,
   cteKeysDisponiveisTransferencia,
   cteKeysDisponiveisEntrega,
+  initialPrevisaoInicio,
+  initialPrevisaoFim,
 }: CarregamentoAreaProps) {
   const [modalCriarModo, setModalCriarModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
@@ -10744,8 +10748,8 @@ function CarregamentoArea({
           })()}
           ctes={ctesDisponiveisEntrega}
           onConfirmar={handleCarregarAutomaticoEntrega}
-          initialPrevisaoInicio={filters.periodoPrevisaoInicio}
-          initialPrevisaoFim={filters.periodoPrevisaoFim}
+          initialPrevisaoInicio={initialPrevisaoInicio}
+          initialPrevisaoFim={initialPrevisaoFim}
         />
       )}
       {modalAutomaticoModo === 'transferencia' && (
@@ -14358,6 +14362,8 @@ export function Disponiveis() {
             todosCtes={todosCtes}
             cteKeysDisponiveisTransferencia={cteKeysDisponiveisTransferencia}
             cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
+            initialPrevisaoInicio={filters.periodoPrevisaoInicio}
+            initialPrevisaoFim={filters.periodoPrevisaoFim}
           />
 
           {hubModalAberto && hubModalCarregamento && (
