@@ -61,6 +61,7 @@ import {
   ArrowUpDown,
   Info,
   Route,
+  Split,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -779,7 +780,7 @@ function TabelaCtes({
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
-                <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
@@ -1546,7 +1547,7 @@ function TabelaEntrega({
                 </td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parsePeso(cte.peso)) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className={`px-3 py-2 text-right ${parseMoeda(cte.frete) > 3000 ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
                 {tipo === 'transito' && (
                   <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{formatarDataTabelaSemAno(cte.prevChegada)}</td>
@@ -2315,6 +2316,7 @@ function CardCarregamento({
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
   const [loadingCteDetalhe, setLoadingCteDetalhe] = useState(false);
+  const [separandoCteDetalheSetores, setSeparandoCteDetalheSetores] = useState(false);
   const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
@@ -2329,6 +2331,12 @@ function CardCarregamento({
   const placa1 = String(carregamento.placa_provisoria ?? '').trim().toUpperCase();
   const placa2 = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
   const isConjunto = !!placa2;
+  const podeSepararPorSetores = React.useMemo(() => {
+    if (isConjunto) return false;
+    if (!isEntregaCteDetalhe) return false;
+    const parts = String(setoresEntregaCteDetalhe ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    return parts.length > 1;
+  }, [isConjunto, isEntregaCteDetalhe, setoresEntregaCteDetalhe]);
 
   const cteDetalheListaOrdenada = React.useMemo(() => {
     const parseBrDate = (v: any): number => {
@@ -2722,6 +2730,39 @@ function CardCarregamento({
     a.download = `ctes_${String(titulo ?? 'exportacao').replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const separarCarregamentoPorSetores = async () => {
+    if (!podeSepararPorSetores) return;
+    if (!placa1) return;
+    const ok = await confirmar({
+      title: 'Separar por setores?',
+      description: 'O carregamento será dividido em um card por setor, mantendo a mesma placa. Os CT-es serão redistribuídos pelo setor e os parâmetros do veículo serão copiados. Esta ação não altera o carregamento no TMS.',
+      confirmText: 'Separar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    setSeparandoCteDetalheSetores(true);
+    try {
+      const res = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'separar_entrega_setores', placa: placa1 }) },
+        true
+      );
+      if (res?.success) {
+        const created = Number(res?.created ?? 0) || 0;
+        toast.success(created > 0 ? `Separado em ${created + 1} carregamentos (por setor).` : 'Carregamento separado.');
+        setCteDetalheDialogOpen(false);
+        await onRecarregarCarregamentos();
+      } else {
+        toast.error(res?.message || 'Falha ao separar carregamento por setores.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao separar carregamento por setores.');
+    } finally {
+      setSeparandoCteDetalheSetores(false);
+    }
   };
   const ativo = modoApontamento === placa1;
   const carregamentoKey = `${carregamento.seq_carregamento ?? ''}|${placa1}`;
@@ -3390,7 +3431,14 @@ function CardCarregamento({
 
   const bordaCardClass = `${bordaBaseClass} ${ativoRingClass}`;
 
+  const bloqueandoTela = iniciandoSimulacao || finalizando;
+  const bloqueioTexto =
+    iniciandoSimulacao ? 'Iniciando carregamento...' :
+    finalizando ? 'Finalizando carregamento...' :
+    'Processando...';
+
   return (
+    <>
     <div className={`rounded-xl border-2 transition-all duration-200 ${bordaCardClass} bg-white dark:bg-slate-900 overflow-hidden`}>
       <div className="px-4 pt-4 pb-3">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 mb-2">
@@ -3861,10 +3909,22 @@ function CardCarregamento({
                 size="sm"
                 onClick={exportarCteDetalheCSV}
                 className="gap-1.5"
-                disabled={loadingCteDetalhe}
+                disabled={loadingCteDetalhe || separandoCteDetalheSetores}
               >
                 <FileDown className="w-4 h-4" />
                 Exportar CSV
+              </Button>
+            )}
+            {podeSepararPorSetores && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={separarCarregamentoPorSetores}
+                className="gap-1.5"
+                disabled={loadingCteDetalhe || separandoCteDetalheSetores}
+              >
+                <Split className="w-4 h-4" />
+                Separar por Setores
               </Button>
             )}
             <Button
@@ -3872,7 +3932,7 @@ function CardCarregamento({
               size="sm"
               onClick={removerCtesSelecionados}
               className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-              disabled={loadingCteDetalhe || cteDetalheSelecionados.size === 0}
+              disabled={loadingCteDetalhe || separandoCteDetalheSetores || cteDetalheSelecionados.size === 0}
             >
               <Trash2 className="w-4 h-4" />
               Excluir selecionados
@@ -5672,6 +5732,15 @@ function ModalDadosOrdemCarregamento({
         </div>
       </div>
     </div>
+    {bloqueandoTela ? (
+      <div className="fixed inset-0 z-[100000] bg-slate-950/20 backdrop-blur-sm flex items-center justify-center">
+        <div className="px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+          <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+          <span>{bloqueioTexto}</span>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 
@@ -10752,6 +10821,7 @@ export function Disponiveis() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [bloqueioOperacao, setBloqueioOperacao] = useState<string | null>(null);
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [todasOcorrenciasCarregadas, setTodasOcorrenciasCarregadas] = useState<{ codigo: number }[] | null>(null);
@@ -11637,6 +11707,7 @@ export function Disponiveis() {
       variant: 'destructive',
     });
     if (!ok) return false;
+    setBloqueioOperacao('Finalizando carregamento...');
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -11656,6 +11727,8 @@ export function Disponiveis() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao finalizar');
       return false;
+    } finally {
+      setBloqueioOperacao(null);
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
 
@@ -11671,6 +11744,7 @@ export function Disponiveis() {
       variant: 'destructive',
     });
     if (!ok) return false;
+    setBloqueioOperacao('Excluindo carregamento...');
     try {
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
@@ -11690,6 +11764,8 @@ export function Disponiveis() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir');
       return false;
+    } finally {
+      setBloqueioOperacao(null);
     }
   }, [carregarCarregamentos, modoApontamento, confirmar]);
 
@@ -14763,6 +14839,14 @@ export function Disponiveis() {
       ) : null}
       {confirmarDialog}
       {perguntarTextoDialog}
+      {bloqueioOperacao ? (
+        <div className="fixed inset-0 z-[100000] bg-slate-950/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <Loader2 className="w-4 h-4 animate-spin text-slate-500" />
+            <span>{bloqueioOperacao}</span>
+          </div>
+        </div>
+      ) : null}
     </DashboardLayout>
   );
 }
