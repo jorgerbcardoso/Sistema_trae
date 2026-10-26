@@ -9173,6 +9173,8 @@ function CarregamentoArea({
   const atualizarCtesCarregamento = async (c: Carregamento) => {
     const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
     if (!placa || calAtualizandoCtes || calAutoAtualizandoVazios) return;
+    const tp = String((c as any)?.tp_carregamento ?? '').trim().toUpperCase();
+    if (calTipo === 'entrega' || tp === 'E') { toast.error('Disponível apenas para Transferência.'); return; }
     const dataRef = toKey((c as any)?.data_finalizacao ?? '');
     setCalAtualizandoCtes(true);
     try {
@@ -9216,6 +9218,7 @@ function CarregamentoArea({
   useEffect(() => {
     if (calAutoAtualizandoVazios) return;
     if (!sigla) return;
+    if (calTipo === 'entrega') return;
     if (loadingCarregamentosCalendario) return;
     const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
     if (list.length === 0) return;
@@ -9226,6 +9229,8 @@ function CarregamentoArea({
     calAutoAtualKeyRef.current = key;
 
     const vazios = list.filter((c: any) => {
+      const tp = String(c?.tp_carregamento ?? '').trim().toUpperCase();
+      if (tp === 'E') return false;
       const fim = toKey(c?.data_finalizacao ?? c?.dataFinalizacao ?? '');
       if (!fim) return false;
       const qtd = Number(c?.total_ctes ?? c?.totalCtes ?? 0) || 0;
@@ -9623,7 +9628,7 @@ function CarregamentoArea({
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
                           <td className="px-2 py-2 text-center">
                             <div className="inline-flex items-center gap-1">
-                              {isFinalizado ? (
+                                {isFinalizado && calTipo !== 'entrega' && String((c as any)?.tp_carregamento ?? '').trim().toUpperCase() !== 'E' ? (
                                 <button
                                   type="button"
                                   disabled={calAtualizandoCtes || calAutoAtualizandoVazios}
@@ -9830,7 +9835,7 @@ function CarregamentoArea({
                                 Finalizar
                               </Button>
                             ) : null}
-                            {fimK ? (
+                            {fimK && calTipo !== 'entrega' && String((c as any)?.tp_carregamento ?? '').trim().toUpperCase() !== 'E' ? (
                               <Button
                                 type="button"
                                 variant="outline"

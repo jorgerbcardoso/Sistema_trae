@@ -2325,7 +2325,15 @@ if ($acao === 'atualizar_ctes_ssw') {
     }
     if ($dtRef === null) $dtRef = new DateTime();
 
-    $ddmmaa = $dtRef->format('dmy');
+    $tpCarregamento = (trim((string)$setoresEntregaCarreg) !== '' || trim((string)$destinoCarreg) === '') ? 'E' : 'T';
+    if ($tpCarregamento !== 'T') {
+        respondJson(['success' => false, 'message' => 'Disponível apenas para Transferência.']);
+    }
+
+    $dtHoje = new DateTime();
+    $dtIni = (clone $dtHoje)->modify('-4 days');
+    $ddIni = $dtIni->format('dmy');
+    $ddFin = $dtHoje->format('dmy');
 
     $extractXml = function ($html) {
         $html = (string)$html;
@@ -2389,8 +2397,8 @@ if ($acao === 'atualizar_ctes_ssw') {
     };
 
     $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
-        "&t_data_saida_ini=" . rawurlencode($ddmmaa) .
-        "&t_data_saida_fin=" . rawurlencode($ddmmaa);
+        "&t_data_saida_ini=" . rawurlencode($ddIni) .
+        "&t_data_saida_fin=" . rawurlencode($ddFin);
 
     $html = '';
     try {
@@ -2411,29 +2419,73 @@ if ($acao === 'atualizar_ctes_ssw') {
         respondJson(['success' => false, 'message' => 'SSW: XML inválido.']);
     }
 
-    $info = [
-        'saida' => null,
-        'qtd' => 0,
-        'manifestos' => [],
-    ];
+    $info = ['saida' => null, 'qtd' => 0, 'manifestos' => []];
     $rows = $xml->xpath('//r');
     if ($rows && count($rows) > 0) {
+        $regF3 = [];
+        $regF2 = [];
         foreach ($rows as $r) {
             $f3 = strtoupper(trim((string)($r->f3 ?? '')));
             $f2 = strtoupper(trim((string)($r->f2 ?? '')));
-            $placa = $f3 !== '' ? $f3 : $f2;
-            if ($placa !== $placaReq) continue;
             $f11 = trim((string)($r->f11 ?? ''));
             $dt = $f11 !== '' ? $parseDt($f11) : null;
-            if ($dt !== null) {
-                if ($info['saida'] === null || $dt->getTimestamp() < $info['saida']->getTimestamp()) $info['saida'] = $dt;
-            }
             $f8Raw = trim((string)($r->f8 ?? ''));
             $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-            if ($f8Num > 0) $info['qtd'] += $f8Num;
+            $f16 = strtoupper(trim((string)($r->f16 ?? '')));
             $f17 = trim((string)($r->f17 ?? ''));
-            $seqMan = (string)preg_replace('/[^\d]/', '', $f17);
-            if ($seqMan !== '') $info['manifestos'][$seqMan] = true;
+            $mans = [];
+            if ($f17 !== '') {
+                $mm = null;
+                if (preg_match_all('/\d+/', $f17, $mm)) {
+                    foreach (($mm[0] ?? []) as $sx) {
+                        $sx = (string)$sx;
+                        if ($sx !== '') $mans[$sx] = true;
+                    }
+                }
+            }
+
+            $reg = [
+                'dt' => $dt,
+                'ts' => ($dt instanceof DateTime) ? $dt->getTimestamp() : 0,
+                'status' => $f16,
+                'qtd' => $f8Num,
+                'manifestos' => $mans,
+            ];
+
+            if ($f3 !== '' && $f3 === $placaReq) $regF3[] = $reg;
+            elseif ($f2 !== '' && $f2 === $placaReq) $regF2[] = $reg;
+        }
+
+        $cands = count($regF3) > 0 ? $regF3 : $regF2;
+        if (count($cands) > 0) {
+            $best = null;
+            foreach ($cands as $x) {
+                if (strpos((string)($x['status'] ?? ''), 'AUTORIZADO') === false) continue;
+                if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
+            }
+            if ($best === null) {
+                foreach ($cands as $x) {
+                    if (strpos((string)($x['status'] ?? ''), 'ENCERRADO') === false) continue;
+                    if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
+                }
+            }
+            if ($best === null) {
+                foreach ($cands as $x) {
+                    if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
+                }
+            }
+
+            if ($best !== null) {
+                $info['saida'] = $best['dt'] ?? null;
+                $info['qtd'] = (int)($best['qtd'] ?? 0);
+                $mans = $best['manifestos'] ?? [];
+                if (is_array($mans)) {
+                    foreach (array_keys($mans) as $sx) {
+                        $sx = (string)$sx;
+                        if ($sx !== '') $info['manifestos'][$sx] = true;
+                    }
+                }
+            }
         }
     }
 
