@@ -298,6 +298,7 @@ interface Carregamento {
   capacidade_m3: number | null;
   vlr_min_frete?: number | null;
   vlr_frete_carreteiro?: number | null;
+  custo_entrega?: number | null;
   seq_carregamento_conjunto?: number | null;
   destino?: string | null;
   destinos_card?: string | null;
@@ -1889,10 +1890,11 @@ function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: num
 
 function BarraFreteSegmentada({ cif, fob, minimo }: { cif: number; fob: number; minimo?: number | null }) {
   const total = (Number.isFinite(cif) ? cif : 0) + (Number.isFinite(fob) ? fob : 0);
-  const pctCif = total > 0 ? Math.max(0, Math.min((cif / total) * 100, 100)) : 0;
-  const pctFob = total > 0 ? Math.max(0, Math.min((fob / total) * 100, 100)) : 0;
   const minVal = minimo && Number.isFinite(minimo) && minimo > 0 ? minimo : null;
-  const abaixoMin = minVal !== null && total > 0 && total < minVal;
+  const base = Math.max(total, minVal ?? 0, 1);
+  const pctCif = base > 0 ? Math.max(0, Math.min(((Number.isFinite(cif) ? cif : 0) / base) * 100, 100)) : 0;
+  const pctFob = base > 0 ? Math.max(0, Math.min(((Number.isFinite(fob) ? fob : 0) / base) * 100, 100)) : 0;
+  const abaixoMin = minVal !== null && total < minVal;
   const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   return (
     <div className="flex-1 min-w-0">
@@ -1902,7 +1904,15 @@ function BarraFreteSegmentada({ cif, fob, minimo }: { cif: number; fob: number; 
           {fmt(total)}{minVal !== null ? ` / mín. ${fmt(minVal)}` : ''}
         </span>
       </div>
-      <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex">
+      <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden relative">
+        {minVal !== null ? (
+          <div
+            className="absolute top-0 bottom-0 w-[2px] bg-slate-800/40 dark:bg-slate-200/40"
+            style={{ left: `calc(${Math.max(0, Math.min((minVal / base) * 100, 100))}% - 1px)` }}
+            title={`Mínimo: ${fmt(minVal)}`}
+          />
+        ) : null}
+        <div className="w-full h-3 flex">
         <div
           className="h-3"
           style={{ width: `${pctCif}%`, backgroundImage: 'linear-gradient(90deg, #059669, #10b981)' }}
@@ -1913,6 +1923,7 @@ function BarraFreteSegmentada({ cif, fob, minimo }: { cif: number; fob: number; 
           style={{ width: `${pctFob}%`, backgroundImage: 'linear-gradient(90deg, #b45309, #f59e0b)' }}
           title={`FOB: ${fmt(fob)}`}
         />
+        </div>
       </div>
       <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
         <span className="whitespace-nowrap">CIF: <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{fmt(cif)}</span></span>
@@ -2855,7 +2866,7 @@ function CardCarregamento({
     const capTonNum = novaCapTon !== '' ? parseFloat(novaCapTon) : null;
     const capM3Num = novaCapM3 !== '' ? parseFloat(novaCapM3) : null;
     const vlrMinNum = novaVlrMinFrete !== '' ? parseFloat(novaVlrMinFrete) : null;
-    const vlrTerNum = novaVlrFreteCarreteiro !== '' ? parseFloat(novaVlrFreteCarreteiro) : null;
+    const vlrTerNum = isEntregaCarreg ? null : (novaVlrFreteCarreteiro !== '' ? parseFloat(novaVlrFreteCarreteiro) : null);
     const mudouTon = capTonNum !== null && carregamento.capacidade_ton !== null
       ? Math.abs(capTonNum - carregamento.capacidade_ton) > 0.0001
       : capTonNum !== carregamento.capacidade_ton;
@@ -2865,9 +2876,11 @@ function CardCarregamento({
     const mudouMinFrete = vlrMinNum !== null && carregamento.vlr_min_frete !== null && carregamento.vlr_min_frete !== undefined
       ? Math.abs(vlrMinNum - (carregamento.vlr_min_frete as number)) > 0.0001
       : vlrMinNum !== (carregamento.vlr_min_frete ?? null);
-    const mudouFreteTer = vlrTerNum !== null && carregamento.vlr_frete_carreteiro !== null && carregamento.vlr_frete_carreteiro !== undefined
-      ? Math.abs(vlrTerNum - (carregamento.vlr_frete_carreteiro as number)) > 0.0001
-      : vlrTerNum !== (carregamento.vlr_frete_carreteiro ?? null);
+    const mudouFreteTer = isEntregaCarreg ? false : (
+      vlrTerNum !== null && carregamento.vlr_frete_carreteiro !== null && carregamento.vlr_frete_carreteiro !== undefined
+        ? Math.abs(vlrTerNum - (carregamento.vlr_frete_carreteiro as number)) > 0.0001
+        : vlrTerNum !== (carregamento.vlr_frete_carreteiro ?? null)
+    );
 
     if (mudouTon || mudouM3 || mudouMinFrete || mudouFreteTer) {
       const linhas: string[] = [];
@@ -3489,10 +3502,12 @@ function CardCarregamento({
                 <label className="text-[10px] text-slate-500 dark:text-slate-400">Min. Frete (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrMinFrete} onChange={e => setNovaVlrMinFrete(e.target.value)} placeholder="Ex: 3500" />
               </div>
-              <div className="min-w-0">
-                <label className="text-[10px] text-slate-500 dark:text-slate-400">Frete Ter. (R$)</label>
-                <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrFreteCarreteiro} onChange={e => setNovaVlrFreteCarreteiro(e.target.value)} placeholder="Ex: 1200" />
-              </div>
+              {!isEntregaCarreg ? (
+                <div className="min-w-0">
+                  <label className="text-[10px] text-slate-500 dark:text-slate-400">Frete Ter. (R$)</label>
+                  <input type="number" min="0" step="0.01" className="w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" value={novaVlrFreteCarreteiro} onChange={e => setNovaVlrFreteCarreteiro(e.target.value)} placeholder="Ex: 1200" />
+                </div>
+              ) : null}
             </div>
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditandoCapacidade(false)}>Cancelar</Button>
@@ -3539,6 +3554,34 @@ function CardCarregamento({
             />
             <BarraFreteSegmentada cif={freteCif} fob={freteFob} minimo={carregamento.vlr_min_frete ?? null} />
             
+            {!isEntregaCarreg ? (
+              <div className="flex-1 min-w-0">
+                {(() => {
+                  const totalFrete = (Number.isFinite(freteCif) ? freteCif : 0) + (Number.isFinite(freteFob) ? freteFob : 0);
+                  const ter = Number(carregamento.vlr_frete_carreteiro ?? 0) || 0;
+                  const pct = totalFrete > 0 ? Math.max(0, Math.min((ter / totalFrete) * 100, 100)) : 0;
+                  const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Frete Ter. (R$)</span>
+                        <span className="text-[10px] font-bold whitespace-nowrap text-slate-700 dark:text-slate-300">
+                          {fmt(ter)}{totalFrete > 0 ? ` (${pct.toFixed(0)}%)` : ''}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-2.5 rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${pct}%`, backgroundImage: 'linear-gradient(90deg, #dc2626, #f87171)' }}
+                          title={totalFrete > 0 ? `Frete Terceiro: ${fmt(ter)} (${pct.toFixed(0)}%)` : `Frete Terceiro: ${fmt(ter)}`}
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : null}
+
             {/* Barra de Bipagem (CT-es Lidos) */}
             {(!isSimulado || (Number((carregamento as any).total_lidos) > 0)) && (
               <div className="flex-1 min-w-0">
@@ -3551,41 +3594,15 @@ function CardCarregamento({
                 <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                   <div
                     className="h-2.5 rounded-full transition-all duration-700 ease-out"
-                    style={{ 
-                      width: `${Math.min(100, (Number((carregamento as any).total_lidos) || 0) / (Number(carregamento.total_ctes) || 1) * 100)}%`, 
-                      backgroundColor: '#10b981' 
+                    style={{
+                      width: `${Math.min(100, (Number((carregamento as any).total_lidos) || 0) / (Number(carregamento.total_ctes) || 1) * 100)}%`,
+                      backgroundColor: '#10b981'
                     }}
                     title={`Bipagens: ${Number((carregamento as any).total_lidos) || 0} de ${Number(carregamento.total_ctes) || 0}`}
                   />
                 </div>
               </div>
             )}
-
-            <div className="flex-1 min-w-0">
-              {(() => {
-                const totalFrete = (Number.isFinite(freteCif) ? freteCif : 0) + (Number.isFinite(freteFob) ? freteFob : 0);
-                const ter = Number(carregamento.vlr_frete_carreteiro ?? 0) || 0;
-                const pct = totalFrete > 0 ? Math.max(0, Math.min((ter / totalFrete) * 100, 100)) : 0;
-                const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                return (
-                  <>
-                    <div className="flex items-center justify-between mb-1 gap-2">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Frete Ter. (R$)</span>
-                      <span className="text-[10px] font-bold whitespace-nowrap text-slate-700 dark:text-slate-300">
-                        {fmt(ter)}{totalFrete > 0 ? ` (${pct.toFixed(0)}%)` : ''}
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                      <div
-                        className="h-2.5 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${pct}%`, backgroundImage: 'linear-gradient(90deg, #dc2626, #f87171)' }}
-                        title={totalFrete > 0 ? `Frete Terceiro: ${fmt(ter)} (${pct.toFixed(0)}%)` : `Frete Terceiro: ${fmt(ter)}`}
-                      />
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
           </div>
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -3669,7 +3686,7 @@ function CardCarregamento({
             size="sm"
             variant="outline"
             className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-            onClick={() => { setNovaCapTon(normalizeCapTon(carregamento.capacidade_ton)?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setNovaVlrFreteCarreteiro(carregamento.vlr_frete_carreteiro?.toString() ?? ''); setEditandoCapacidade(v => !v); }}
+            onClick={() => { setNovaCapTon(normalizeCapTon(carregamento.capacidade_ton)?.toString() ?? ''); setNovaCapM3(carregamento.capacidade_m3?.toString() ?? ''); setNovaVlrMinFrete(carregamento.vlr_min_frete?.toString() ?? ''); setNovaVlrFreteCarreteiro(isEntregaCarreg ? '' : (carregamento.vlr_frete_carreteiro?.toString() ?? '')); setEditandoCapacidade(v => !v); }}
             title="Editar Parâmetros do Carregamento."
           >
             <Gauge className="w-3.5 h-3.5 mr-1" />Param.
@@ -5114,6 +5131,7 @@ function ModalDadosOrdemCarregamento({
   rotaKm,
   pesoKg,
   cubM3,
+  resumoSetoresEntrega,
   tipoVeiculoSugestao,
   onFechar,
   onConcluirSalvar,
@@ -5124,6 +5142,7 @@ function ModalDadosOrdemCarregamento({
   rotaKm: number;
   pesoKg: number;
   cubM3: number;
+  resumoSetoresEntrega: { setor: string; ctes: number; clientes: number }[];
   tipoVeiculoSugestao?: string;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
@@ -5153,6 +5172,8 @@ function ModalDadosOrdemCarregamento({
   const [calcTipoVeiculo, setCalcTipoVeiculo] = useState('');
   const [calcParams, setCalcParams] = useState<any>(null);
   const [calcLoading, setCalcLoading] = useState(false);
+  const [calcTerceiroInfo, setCalcTerceiroInfo] = useState<{ total: number; parcelaSetores: number; diaria: number } | null>(null);
+  const [calcTerceiroLoading, setCalcTerceiroLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -5288,6 +5309,7 @@ function ModalDadosOrdemCarregamento({
       const p = calcTerceiroPlaca.trim().toUpperCase();
       if (!p) {
         setCalcTerceiroTipo('');
+        setCalcTerceiroInfo(null);
         return;
       }
       const v = await fetchVeiculo(p);
@@ -5297,6 +5319,46 @@ function ModalDadosOrdemCarregamento({
     void run();
     return () => { alive = false; };
   }, [calcTerceiroPlaca]);
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => {
+      const p = calcTerceiroPlaca.trim().toUpperCase();
+      if (!p) {
+        setCalcTerceiroInfo(null);
+        return;
+      }
+      if (!Array.isArray(resumoSetoresEntrega) || resumoSetoresEntrega.length === 0) {
+        setCalcTerceiroInfo(null);
+        return;
+      }
+      setCalcTerceiroLoading(true);
+      try {
+        const resp = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/calc_custo_entrega_terceiro.php`,
+          { method: 'POST', body: JSON.stringify({ unidade, placa_simulacao: p, setores: resumoSetoresEntrega }) },
+          true
+        );
+        if (!alive) return;
+        if (!resp?.success) {
+          setCalcTerceiroInfo(null);
+          return;
+        }
+        setCalcTerceiroInfo({
+          total: Number(resp.total ?? 0) || 0,
+          parcelaSetores: Number(resp.parcela_setores ?? 0) || 0,
+          diaria: Number(resp.diaria ?? 0) || 0,
+        });
+      } catch {
+        if (!alive) return;
+        setCalcTerceiroInfo(null);
+      } finally {
+        if (alive) setCalcTerceiroLoading(false);
+      }
+    };
+    const t = setTimeout(run, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [calcTerceiroPlaca, resumoSetoresEntrega, unidade]);
 
   const calc = useMemo(() => {
     const km = Number(rotaKm ?? 0) || 0;
@@ -5332,7 +5394,7 @@ function ModalDadosOrdemCarregamento({
     const custoPernoite = diasP * pernoite;
     const totalFrota = custoComb + custoKm + custoDia + custoPernoite;
 
-    const totalTerceiro = 0;
+    const totalTerceiro = Number(calcTerceiroInfo?.total ?? 0) || 0;
 
     return {
       km,
@@ -5346,7 +5408,7 @@ function ModalDadosOrdemCarregamento({
       totalFrota,
       totalTerceiro,
     };
-  }, [rotaKm, calcDiasOperacao, calcDiesel, calcParams]);
+  }, [rotaKm, calcDiasOperacao, calcDiesel, calcParams, calcTerceiroInfo]);
 
   const salvar = async () => {
     if (saving || loading) return;
@@ -5581,7 +5643,18 @@ function ModalDadosOrdemCarregamento({
                   </div>
                 </div>
                 <div className="mt-2 text-lg font-extrabold text-sky-900 dark:text-sky-200 tabular-nums">
-                  {calc.totalTerceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {calcTerceiroLoading ? '…' : calc.totalTerceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/80 space-y-0.5">
+                  {calcTerceiroPlaca.trim() && !calcTerceiroLoading && !calcTerceiroInfo ? (
+                    <div className="text-red-700 dark:text-red-300">Não foi possível calcular para esta placa.</div>
+                  ) : null}
+                  {calcTerceiroInfo ? (
+                    <>
+                      <div className="flex justify-between gap-2"><span>Entregas (setores)</span><span className="font-mono">{calcTerceiroInfo.parcelaSetores.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                      <div className="flex justify-between gap-2"><span>Diária (maior setor)</span><span className="font-mono">{calcTerceiroInfo.diaria.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -5859,6 +5932,23 @@ function ModalRotaCarregamento({
 
     return { entrega: listEntrega, transferencia: listTransf };
   }, [dados, unidadesMap, unidadesOrdem]);
+
+  const resumoSetoresEntrega = useMemo(() => {
+    const out: { setor: string; ctes: number; clientes: number }[] = [];
+    for (const g of (grupos?.entrega || [])) {
+      const setor = String((g as any)?.unidade ?? '').trim().toUpperCase();
+      if (!setor) continue;
+      const ctes = Array.isArray((g as any)?.ctes) ? (g as any).ctes : [];
+      const clientesSet = new Set<string>();
+      for (const c of ctes) {
+        const d = String((c as any)?.destinatario ?? '').trim().toUpperCase();
+        if (d) clientesSet.add(d);
+      }
+      out.push({ setor, ctes: ctes.length, clientes: clientesSet.size });
+    }
+    out.sort((a, b) => a.setor.localeCompare(b.setor));
+    return out;
+  }, [grupos]);
 
   const transfByUnidade = useMemo(() => new Map(grupos.transferencia.map((g) => [g.unidade, g])), [grupos.transferencia]);
   const entregaByKey = useMemo(() => new Map(grupos.entrega.map((g) => [g.key, g])), [grupos.entrega]);
@@ -7411,6 +7501,7 @@ function ModalRotaCarregamento({
           rotaKm={Number(routeDistanceKm ?? 0) || 0}
           pesoKg={totaisCalc.peso}
           cubM3={totaisCalc.cub}
+          resumoSetoresEntrega={resumoSetoresEntrega}
           tipoVeiculoSugestao={tipoVeiculoSugestao}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
@@ -8929,6 +9020,7 @@ function CarregamentoArea({
     return ultimosDias.map((d) => {
       let frete = 0;
       let freteTer = 0;
+      let custoEntrega = 0;
       let merc = 0;
       let peso = 0;
       let cub = 0;
@@ -8939,7 +9031,11 @@ function CarregamentoArea({
         const c = (x as any).c as Carregamento;
         const c2 = getCalConjunto(c);
         frete += (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
-        freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        if (calTipo === 'entrega') {
+          custoEntrega += (Number((c as any).custo_entrega ?? 0) || 0) + (c2 ? (Number((c2 as any).custo_entrega ?? 0) || 0) : 0);
+        } else {
+          freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        }
         merc += (Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0);
         peso += (Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0);
         cub += (Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0);
@@ -8971,13 +9067,14 @@ function CarregamentoArea({
         label: d === hojeKey ? 'HOJE' : fmtDiaBr(d),
         frete,
         freteTer,
+        custoEntrega,
         merc,
         peso,
         cub,
         avgTempoMin,
       };
     });
-  }, [ultimosDias, calNorm, hojeKey, getCalConjunto]);
+  }, [ultimosDias, calNorm, hojeKey, getCalConjunto, calTipo]);
 
   type CalSortCol =
     | 'placa'
@@ -9224,8 +9321,9 @@ function CarregamentoArea({
     const getNum = (c: Carregamento): number => {
       switch (calSortCol) {
         case 'frete': return soma(c, 'total_frete');
-        case 'frete_ter': return soma(c, 'vlr_frete_carreteiro');
+        case 'frete_ter': return calTipo === 'entrega' ? soma(c, 'custo_entrega') : soma(c, 'vlr_frete_carreteiro');
         case 'frete_ter_pct': {
+          if (calTipo === 'entrega') return 0;
           const total = soma(c, 'total_frete');
           const ter = soma(c, 'vlr_frete_carreteiro');
           return total > 0 ? (ter / total) * 100 : 0;
@@ -9271,15 +9369,19 @@ function CarregamentoArea({
       (acc, c) => {
         const c2 = getCalConjunto(c);
         acc.frete += (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
-        acc.freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        if (calTipo === 'entrega') {
+          acc.custoEntrega += (Number((c as any).custo_entrega ?? 0) || 0) + (c2 ? (Number((c2 as any).custo_entrega ?? 0) || 0) : 0);
+        } else {
+          acc.freteTer += (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+        }
         acc.merc += (Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0);
         acc.peso += (Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0);
         acc.cub += (Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0);
         return acc;
       },
-      { frete: 0, freteTer: 0, merc: 0, peso: 0, cub: 0 }
+      { frete: 0, freteTer: 0, custoEntrega: 0, merc: 0, peso: 0, cub: 0 }
     );
-  }, [calSorted, getCalConjunto]);
+  }, [calSorted, getCalConjunto, calTipo]);
 
   const totalPages = Math.max(1, Math.ceil(calSorted.length / pageSize));
   const calPageSafe = Math.min(Math.max(calPage, 1), totalPages);
@@ -9402,6 +9504,11 @@ function CarregamentoArea({
                 <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">{fmtDiaBrAno(diaSel)}</div>
                 <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-300">
                   <span>Frete: <span className="font-mono font-semibold">{fmtMoney(calTotals.frete)}</span></span>
+                  {calTipo === 'entrega' ? (
+                    <span>Custo Ent.: <span className="font-mono font-semibold">{fmtMoney((calTotals as any).custoEntrega ?? 0)}</span></span>
+                  ) : (
+                    <span>Frete Ter.: <span className="font-mono font-semibold">{fmtMoney((calTotals as any).freteTer ?? 0)}</span></span>
+                  )}
                   <span>Merc.: <span className="font-mono font-semibold">{fmtMoney(calTotals.merc)}</span></span>
                   <span>Registros: <span className="font-mono font-semibold">{calSorted.length}</span></span>
                 </div>
@@ -9417,8 +9524,14 @@ function CarregamentoArea({
                       <th className="px-3 py-2 text-left"><CalTh col="placa">Placa</CalTh></th>
                       <th className="px-3 py-2 text-left"><CalTh col="destino">Destino</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="frete" align="right">Frete (R$)</CalTh></th>
-                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Frete Ter. (R$)</CalTh></th>
-                      <th className="px-3 py-2 text-right"><CalTh col="frete_ter_pct" align="right">% Ter.</CalTh></th>
+                      {calTipo === 'entrega' ? (
+                        <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Custo Ent. (R$)</CalTh></th>
+                      ) : (
+                        <>
+                          <th className="px-3 py-2 text-right"><CalTh col="frete_ter" align="right">Frete Ter. (R$)</CalTh></th>
+                          <th className="px-3 py-2 text-right"><CalTh col="frete_ter_pct" align="right">% Ter.</CalTh></th>
+                        </>
+                      )}
                       <th className="px-3 py-2 text-right"><CalTh col="merc" align="right">Mercadoria (R$)</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="peso" align="right">Peso</CalTh></th>
                       <th className="px-3 py-2 text-right"><CalTh col="cub" align="right">Cubagem</CalTh></th>
@@ -9431,7 +9544,7 @@ function CarregamentoArea({
                   <tbody>
                     {calPageItems.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
+                        <td colSpan={calTipo === 'entrega' ? 11 : 12} className="px-3 py-6 text-center text-[11px] text-slate-500 dark:text-slate-400">Nenhum carregamento para o dia.</td>
                       </tr>
                     ) : calPageItems.map((c) => {
                       const c2 = getCalConjunto(c);
@@ -9447,6 +9560,7 @@ function CarregamentoArea({
                       const isFinalizado = !!fimK;
                       const freteTotal = (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
                       const freteTer = (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+                      const custoEntrega = (Number((c as any).custo_entrega ?? 0) || 0) + (c2 ? (Number((c2 as any).custo_entrega ?? 0) || 0) : 0);
                       const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
                       const pctClass = pctTer < 30
                         ? 'text-emerald-700 dark:text-emerald-400'
@@ -9491,8 +9605,14 @@ function CarregamentoArea({
                             })()}
                           </td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTotal)}</td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTer)}</td>
-                          <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
+                          {calTipo === 'entrega' ? (
+                            <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(custoEntrega)}</td>
+                          ) : (
+                            <>
+                              <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo(freteTer)}</td>
+                              <td className={`px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</td>
+                            </>
+                          )}
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtMoneySemSimbolo((Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0))}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum((Number(c.total_peso ?? 0) || 0) + (c2 ? (Number(c2.total_peso ?? 0) || 0) : 0), 2)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{fmtNum((Number(c.total_cubagem ?? 0) || 0) + (c2 ? (Number(c2.total_cubagem ?? 0) || 0) : 0), 3)}</td>
@@ -9536,10 +9656,16 @@ function CarregamentoArea({
                     <tr className="bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700">
                       <td className="px-3 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200" colSpan={2}>Total</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.frete)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.freteTer)}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {calTotals.frete > 0 ? `${Math.max(0, Math.min((calTotals.freteTer / calTotals.frete) * 100, 999)).toFixed(0)}%` : '—'}
-                      </td>
+                      {calTipo === 'entrega' ? (
+                        <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo((calTotals as any).custoEntrega ?? 0)}</td>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.freteTer)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                            {calTotals.frete > 0 ? `${Math.max(0, Math.min((calTotals.freteTer / calTotals.frete) * 100, 999)).toFixed(0)}%` : '—'}
+                          </td>
+                        </>
+                      )}
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtMoneySemSimbolo(calTotals.merc)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.peso, 2)}</td>
                       <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{fmtNum(calTotals.cub, 3)}</td>
@@ -9584,6 +9710,7 @@ function CarregamentoArea({
                     const durMin = iniTs != null ? Math.max(0, Math.round((end - iniTs) / 60000)) : null;
                     const freteTotal = (Number(c.total_frete ?? 0) || 0) + (c2 ? (Number(c2.total_frete ?? 0) || 0) : 0);
                     const freteTer = (Number((c as any).vlr_frete_carreteiro ?? 0) || 0) + (c2 ? (Number((c2 as any).vlr_frete_carreteiro ?? 0) || 0) : 0);
+                    const custoEntrega = (Number((c as any).custo_entrega ?? 0) || 0) + (c2 ? (Number((c2 as any).custo_entrega ?? 0) || 0) : 0);
                     const pctTer = freteTotal > 0 ? Math.max(0, Math.min((freteTer / freteTotal) * 100, 999)) : 0;
                     const pctClass = pctTer < 30
                       ? 'text-emerald-700 dark:text-emerald-400'
@@ -9592,6 +9719,7 @@ function CarregamentoArea({
                         : pctTer <= 80
                           ? 'text-orange-700 dark:text-orange-400'
                           : 'text-red-700 dark:text-red-400';
+                    const isEnt = isEntregaCarregamento(c);
                     const linhaNum = Number(c.nro_linha ?? 0) || 0;
                     const linhaNome = String(c.linha_nome ?? '').trim();
                     const linhaLabel = linhaNum > 0 ? `${String(linhaNum).padStart(3, '0')}${linhaNome ? ` - ${linhaNome}` : ''}` : '-';
@@ -9635,14 +9763,23 @@ function CarregamentoArea({
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Frete total (R$)</div>
                             <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(freteTotal)}</div>
                           </div>
-                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
-                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Frete Ter. (R$)</div>
-                            <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(freteTer)}</div>
-                          </div>
-                          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
-                            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">% Ter.</div>
-                            <div className={`text-sm font-mono font-semibold ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</div>
-                          </div>
+                          {isEnt ? (
+                            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Custo entrega (R$)</div>
+                              <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(custoEntrega)}</div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Frete Ter. (R$)</div>
+                                <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney(freteTer)}</div>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
+                                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">% Ter.</div>
+                                <div className={`text-sm font-mono font-semibold ${freteTotal > 0 ? pctClass : 'text-slate-500 dark:text-slate-400'}`}>{freteTotal > 0 ? `${pctTer.toFixed(0)}%` : '—'}</div>
+                              </div>
+                            </>
+                          )}
                           <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2">
                             <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Mercadoria (R$)</div>
                             <div className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{fmtMoney((Number(c.total_mercadoria ?? 0) || 0) + (c2 ? (Number(c2.total_mercadoria ?? 0) || 0) : 0))}</div>
@@ -9864,6 +10001,7 @@ function CarregamentoArea({
                           const key = String(name || '');
                           if (key === 'Frete total') return [fmtMoney(n), key];
                           if (key === 'Frete Ter.') return [fmtMoney(n), key];
+                          if (key === 'Custo Ent.') return [fmtMoney(n), key];
                           if (key === 'Valor Merc.') return [fmtMoney(n), key];
                           if (key === 'Cubagem') return [fmtNum(n, 3), `${key} (m³)`];
                           if (key === 'Peso') return [fmtNum(n, 2), `${key} (Kg)`];
@@ -9876,7 +10014,9 @@ function CarregamentoArea({
                         <Line type="monotone" dataKey="frete" name="Frete total" stroke="#4f46e5" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
                       {calVolMode === 'frete' && (
-                        <Line type="monotone" dataKey="freteTer" name="Frete Ter." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        calTipo === 'entrega'
+                          ? <Line type="monotone" dataKey="custoEntrega" name="Custo Ent." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                          : <Line type="monotone" dataKey="freteTer" name="Frete Ter." stroke="#dc2626" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                       )}
                       {calVolMode === 'peso' && (
                         <Line type="monotone" dataKey="peso" name="Peso" stroke="#7c3aed" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
@@ -10165,9 +10305,15 @@ function CarregamentoArea({
               >
                 <Wallet className="w-3.5 h-3.5 mr-1.5" />Ajustar Tabela Frota
               </Button>
-              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-8 px-2 flex items-center">
-                Arraste um card e solte em outro para juntar setores
-              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                onClick={() => setModalImportarAberto(true)}
+                disabled={importandoCarregamentos || importandoVeiculos}
+              >
+                <FileDown className="w-3.5 h-3.5 mr-1.5" />Imp. carregamentos
+              </Button>
             </div>
 
             {carregamentosEntregaVisiveis.length === 0 && !loadingCarregamentos ? (
@@ -10177,8 +10323,14 @@ function CarregamentoArea({
                 <p className="text-xs mt-0.5">Clique em "Carr. Manual" para começar</p>
               </div>
             ) : (
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {carregamentosEntregaVisiveis.map((c, i) => {
+              <div className="p-4">
+                <div className="flex justify-end mb-3">
+                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[11px] h-7 px-2 flex items-center">
+                    Arraste um card e solte em outro para juntar setores
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {carregamentosEntregaVisiveis.map((c, i) => {
                   const placa = String(c.placa_provisoria ?? '').trim().toUpperCase();
                   const isOver = !!dragEntregaOver && placa === dragEntregaOver;
                   const isDragging = !!dragEntregaOrigem && placa === dragEntregaOrigem;
@@ -10237,7 +10389,8 @@ function CarregamentoArea({
                     />
                   </div>
                   );
-                })}
+                  })}
+                </div>
               </div>
             )}
           </>

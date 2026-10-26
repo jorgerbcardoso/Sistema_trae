@@ -290,6 +290,7 @@ $mapDestinoCompart = buildMapaDestinoCompartilhadoImport($conn, $tblUnidade);
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
 @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
+@pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS bipado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS nro_linha INT");
@@ -1631,6 +1632,7 @@ foreach ($placas_ssw as $placa) {
                              peso_cte = {$pesoVal},
                              cubagem_cte = {$cubVal},
                              qtde_vol_cte = {$qtdeVol},
+                             bipado = TRUE,
                              origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
                              data_finalizacao = NULL,
                              hora_finalizacao = NULL,
@@ -1672,6 +1674,7 @@ foreach ($placas_ssw as $placa) {
                                      peso_cte = {$pesoVal},
                                      cubagem_cte = {$cubVal},
                                      qtde_vol_cte = {$qtdeVol},
+                                     bipado = TRUE,
                                      origem_criacao = '" . pg_escape_string($conn, $origemCriacaoSalvar) . "',
                                      data_finalizacao = NULL,
                                      hora_finalizacao = NULL,
@@ -1719,14 +1722,14 @@ foreach ($placas_ssw as $placa) {
                       ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
                       remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
                       vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
-                      origem_ssw, origem_criacao, unidade_carregamento)
+                      bipado, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
                      ('{$unidadeEsc}', {$seqCarreg}, '{$placaProvEsc}', '{$loginEsc}', {$dataIncSql}, {$horaIncSql},
                       {$destinoInsertEsc}, {$unidadesInsertEsc},
                       '{$ser}', {$nro}, '{$destinoCte}', {$emissaoSql}, {$prevEntSql},
                       '{$remetente}', '{$destinat}', '{$pagador}', '{$cidade}',
                       {$vlrMerc}, {$vlrFrete}, {$pesoVal}, {$cubVal}, {$qtdeVol},
-                      '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
+                      TRUE, '{$placaEsc}', '" . pg_escape_string($conn, $origemCriacaoSalvar) . "', '{$unidadeEsc}')"
                 );
                 if (!$resIns) throw new Exception(pg_last_error($conn));
                 $inseridos++;

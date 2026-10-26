@@ -159,7 +159,7 @@ if ($acao === 'save') {
             $tpCarreg = 'E';
             try {
                 $resTp = sql(
-                    "SELECT destino FROM {$tblCar}
+                    "SELECT destino, COALESCE(setores_entrega, '') AS setores_entrega FROM {$tblCar}
                      WHERE unidade = \$1 AND seq_carregamento = \$2
                      ORDER BY (CASE WHEN COALESCE(destino, '') <> '' THEN 0 ELSE 1 END)
                      LIMIT 1",
@@ -167,8 +167,10 @@ if ($acao === 'save') {
                     $conn
                 );
                 if ($resTp && pg_num_rows($resTp) > 0) {
-                    $destTp = trim((string)pg_fetch_result($resTp, 0, 0));
-                    $tpCarreg = ($destTp === '') ? 'E' : 'T';
+                    $rowTp = pg_fetch_assoc($resTp);
+                    $setoresTp = trim((string)($rowTp['setores_entrega'] ?? ''));
+                    $destTp = trim((string)($rowTp['destino'] ?? ''));
+                    $tpCarreg = ($setoresTp !== '' || $destTp === '') ? 'E' : 'T';
                 }
             } catch (Exception $e) {}
             sql(
@@ -215,4 +217,3 @@ if ($acao === 'save') {
 }
 
 respondJson(['success' => false, 'message' => 'Ação inválida.']);
-

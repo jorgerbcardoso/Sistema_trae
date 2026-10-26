@@ -61,6 +61,7 @@ $tabelaUnidade      = "{$domain}_unidade";
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS conferente VARCHAR(80)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS ajudantes VARCHAR(120)");
 @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS doca VARCHAR(20)");
+@pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS custo_entrega NUMERIC");
 
 $seqName = "{$domain}_seq_carregamento_seq";
 @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
@@ -173,6 +174,7 @@ $sqlCarregamentos = "
         cap.cap_ton,
         cap.cap_m3,
         cap.vlr_frete_carreteiro,
+        cap.custo_entrega,
         COALESCE(cap.simulado, FALSE) AS simulado,
         MAX(cap.tp_carregamento) AS tp_carregamento,
         cap.seq_carregamento_conjunto
@@ -183,7 +185,7 @@ $sqlCarregamentos = "
            ON cap.unidade = \$1 AND cap.seq_carregamento = c.seq_carregamento
     {$joinCteMatch}
     WHERE c.unidade = \$1 {$filtroSerieRve}
-    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.simulado, cap.nro_linha, cap.seq_carregamento_conjunto
+    GROUP BY c.seq_carregamento, c.placa_provisoria, v.capacidade_ton, v.capacidade_m3, cap.cap_ton, cap.cap_m3, cap.vlr_frete_carreteiro, cap.custo_entrega, cap.simulado, cap.nro_linha, cap.seq_carregamento_conjunto
 ";
 
 if ($modo === 'calendario') {
@@ -228,6 +230,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $capTon = $row['cap_ton'] !== null ? (float)$row['cap_ton'] : ($row['capacidade_ton'] !== null ? (float)$row['capacidade_ton'] : null);
     $capM3  = $row['cap_m3']  !== null ? (float)$row['cap_m3']  : ($row['capacidade_m3']  !== null ? (float)$row['capacidade_m3']  : null);
     $vlrFreteCarreteiro = ($row['vlr_frete_carreteiro'] !== null && $row['vlr_frete_carreteiro'] !== '') ? (float)$row['vlr_frete_carreteiro'] : null;
+    $custoEntrega = ($row['custo_entrega'] !== null && $row['custo_entrega'] !== '') ? (float)$row['custo_entrega'] : null;
     $vlrMinFrete = null;
 
     if ($capTon === null || $capTon <= 0) $capTon = 27.0;
@@ -252,11 +255,18 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
     $dataFinal = $fimTs !== '' ? substr($fimTs, 0, 10) : ($row['data_finalizacao'] ?? null);
     $horaFinal = $fimTs !== '' ? substr($fimTs, 11, 8) : ($row['hora_finalizacao'] ?? null);
 
-    // Tipo do carregamento: sempre considerar a coluna tp_carregamento; fallback pelo destino.
+    // Tipo do carregamento: sempre considerar a coluna tp_carregamento; fallback por setores_entrega/destino.
     $tpCarreg = strtoupper(trim((string)($row['tp_carregamento'] ?? '')));
-    if ($tpCarreg !== 'T' && $tpCarreg !== 'E') {
+    $setoresEntregaRaw = trim((string)($row['setores_entrega'] ?? ''));
+    if ($setoresEntregaRaw !== '') {
+        $tpCarreg = 'E';
+    } elseif ($tpCarreg !== 'T' && $tpCarreg !== 'E') {
         $tpCarreg = (((string)($row['destino_vazio'] ?? '')) === 't') ? 'E' : 'T';
     }
+
+    $totalLidosTransfer = (int)($row['total_lidos_transfer'] ?? 0);
+    $totalBipados = (int)($row['total_bipados'] ?? 0);
+    $totalLidos = max($totalLidosTransfer, $totalBipados);
 
     $carregamentos[] = [
         'seq_carregamento'  => $seqCarreg,
@@ -267,9 +277,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'setores_entrega'  => ($row['setores_entrega'] ?? null),
         'simulado'         => ((string)($row['simulado'] ?? '') === 't'),
         'total_ctes'       => (int)($row['total_ctes'] ?? 0),
-        'total_lidos'      => ($tpCarreg === 'E')
-            ? (int)($row['total_bipados'] ?? 0)
-            : (int)($row['total_lidos_transfer'] ?? 0),
+        'total_lidos'      => $totalLidos,
         'bipagem_iniciada' => (($row['data_inicio_bipagem'] ?? null) !== null && (string)($row['data_inicio_bipagem'] ?? '') !== ''),
         'total_frete'      => (float)($row['total_frete'] ?? 0),
         'total_frete_cif'  => null,
@@ -289,6 +297,7 @@ while ($resCarregamentos && ($row = pg_fetch_assoc($resCarregamentos))) {
         'capacidade_m3'    => $capM3,
         'vlr_min_frete'    => $vlrMinFrete,
         'vlr_frete_carreteiro' => $vlrFreteCarreteiro,
+        'custo_entrega'    => ($tpCarreg === 'E') ? $custoEntrega : null,
         'seq_carregamento_conjunto' => ($row['seq_carregamento_conjunto'] !== null && $row['seq_carregamento_conjunto'] !== '') ? (int)$row['seq_carregamento_conjunto'] : null,
         'destino'          => $destino !== '' ? $destino : null,
         'paradas'          => $paradas !== '' ? $paradas : null,
