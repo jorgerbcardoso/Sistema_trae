@@ -388,6 +388,29 @@ type ModalCarregamentoAutomaticoProps = {
   totalsPorUnidadeParaLinhas: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }>;
 };
 
+type CardCarregamentoProps = {
+  carregamento: Carregamento;
+  carregamentoConjunto?: Carregamento | null;
+  unidadeAtual: string;
+  todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
+  cteKeysDisponiveisTransferencia: Set<string>;
+  cteKeysDisponiveisEntrega: Set<string>;
+  veiculoCapacidades?: { tipo: string; capacidade_ton: number; capacidade_m3: number }[];
+  modoApontamento: string | null;
+  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
+  onIniciarApontamento: (placa: string) => void;
+  onCancelarApontamento: () => void;
+  onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
+  onRemoverCte: (placa: string, seqCte: number) => void;
+  onCarregarSSW: (placa: string) => void;
+  onCarregarRota: (carregamento: Carregamento, tipoSugestao?: string) => void;
+  loadingRota: boolean;
+  rotaCarregamentoPlaca: string | null;
+  onRecarregarCarregamentos: () => Promise<void>;
+  onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
+  importandoCarregamentos: boolean;
+};
+
 /** Retorna o ID canônico de um CT-e para uso em seleção/apontamento.
  *  Prefere seqCte (PK do banco) quando disponível, cai em nroCte como fallback. */
 const cteId = (cte: Cte): number => (cte.seqCte && cte.seqCte > 0) ? cte.seqCte : cte.nroCte;
@@ -2333,49 +2356,29 @@ function escolherIntermediariasLinha(
   return filtradas.slice(0, Math.max(0, limite));
 }
 
-function CardCarregamento({
-  carregamento,
-  carregamentoConjunto,
-  unidadeAtual,
-  todosCtes,
-  cteKeysDisponiveisTransferencia,
-  cteKeysDisponiveisEntrega,
-  veiculoCapacidades,
-  modoApontamento,
-  confirmar,
-  onIniciarApontamento,
-  onCancelarApontamento,
-  onExcluirCarregamento,
-  onRemoverCte,
-  onCarregarSSW,
-  onCarregarRota,
-  loadingRota,
-  rotaCarregamentoPlaca,
-  onRecarregarCarregamentos,
-  onImportarCarregamentos,
-  importandoCarregamentos,
-}: {
-  carregamento: Carregamento;
-  carregamentoConjunto?: Carregamento | null;
-  unidadeAtual: string;
-  todosCtes: { nroCte: number; seqCte?: number; ctrc: string; destinatario: string; cidade: string; peso: string; cubagem: string }[];
-  cteKeysDisponiveisTransferencia: Set<string>;
-  cteKeysDisponiveisEntrega: Set<string>;
-  veiculoCapacidades?: { tipo: string; capacidade_ton: number; capacidade_m3: number }[];
-  modoApontamento: string | null;
-  confirmar: (opts: ConfirmDialogOptions) => Promise<boolean>;
-  onIniciarApontamento: (placa: string) => void;
-  onCancelarApontamento: () => void;
-  onExcluirCarregamento: (carregamento: Carregamento) => Promise<boolean>;
-  onRemoverCte: (placa: string, seqCte: number) => void;
-  onCarregarSSW: (placa: string) => void;
-  onCarregarRota: (carregamento: Carregamento, tipoSugestao?: string) => void;
-  loadingRota: boolean;
-  rotaCarregamentoPlaca: string | null;
-  onRecarregarCarregamentos: () => Promise<void>;
-  onImportarCarregamentos: (opts?: { auto_importar_veiculos?: boolean; ignorar_veiculos_faltantes?: boolean }) => Promise<any>;
-  importandoCarregamentos: boolean;
-}) {
+function CardCarregamento(props: CardCarregamentoProps) {
+  const {
+    carregamento,
+    carregamentoConjunto,
+    unidadeAtual,
+    todosCtes,
+    cteKeysDisponiveisTransferencia,
+    cteKeysDisponiveisEntrega,
+    veiculoCapacidades,
+    modoApontamento,
+    confirmar,
+    onIniciarApontamento,
+    onCancelarApontamento,
+    onExcluirCarregamento,
+    onRemoverCte,
+    onCarregarSSW,
+    onCarregarRota,
+    loadingRota,
+    rotaCarregamentoPlaca,
+    onRecarregarCarregamentos,
+    onImportarCarregamentos,
+    importandoCarregamentos,
+  } = props;
   const [editarPlacaDialogOpen, setEditarPlacaDialogOpen] = useState(false);
   const [editarPlacaTipo, setEditarPlacaTipo] = useState<'real' | 'ficticia'>('real');
   const [editarPlacaReal, setEditarPlacaReal] = useState('');
