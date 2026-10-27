@@ -5730,6 +5730,12 @@ function ModalDadosOrdemCarregamento({
                   {calcTerceiroLoading ? '…' : calc.totalTerceiro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div className="mt-1 text-[11px] text-sky-900/80 dark:text-sky-200/80 space-y-0.5">
+                  {calcTerceiroLoading ? (
+                    <div className="flex items-center gap-2 text-sky-900/70 dark:text-sky-200/70">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Calculando custo do terceiro...</span>
+                    </div>
+                  ) : null}
                   {calcTerceiroPlaca.trim() && !calcTerceiroLoading && !calcTerceiroInfo ? (
                     <div className="text-red-700 dark:text-red-300">Não foi possível calcular para esta placa.</div>
                   ) : null}

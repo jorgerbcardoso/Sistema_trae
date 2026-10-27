@@ -31,6 +31,7 @@ import { ConferenciaSaidas } from './relatorios/ConferenciaSaidas';
 import { ControleTransbordo } from './relatorios/ControleTransbordo';
 import { TotaisVendedores } from './relatorios/TotaisVendedores';
 import { FretesExpedidosRecebidos } from './relatorios/FretesExpedidosRecebidos';
+import { RelacaoCTes } from './relatorios/RelacaoCTes';
 import { GestaoMenu } from './admin/GestaoMenu';
 import { ParametrosEmpresa } from './admin/ParametrosEmpresa';
 
@@ -155,6 +156,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'relatorios/ControleTransbordo': ControleTransbordo,
   'relatorios/TotaisVendedores': TotaisVendedores,
   'relatorios/FretesExpedidosRecebidos': FretesExpedidosRecebidos,
+  'relatorios/RelacaoCTes': RelacaoCTes,
   
   // ============================================
   // ADMINISTRAÇÃO

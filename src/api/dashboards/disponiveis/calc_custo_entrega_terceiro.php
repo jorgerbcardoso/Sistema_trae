@@ -139,18 +139,13 @@ $getCsv = function(string $domain, string $unidade): array {
     }
 
     $csv = '';
+
     try {
-        $csv = ssw_go('https://sistema.ssw.inf.br/bin/ssw0422?act=' . urlencode($chosen) . '&filename=' . urlencode($chosen) . '&path=xml&down=1&nw=1');
+        $csv = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($chosen) . '&filename=' . urlencode($chosen) . '&path=xml&down=1&nw=1');
     } catch (Exception $e) {
         $csv = '';
     }
-    if (trim((string)$csv) === '') {
-        try {
-            $csv = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($chosen) . '&filename=' . urlencode($chosen) . '&path=xml&down=1&nw=1');
-        } catch (Exception $e) {
-            $csv = '';
-        }
-    }
+
     if (trim((string)$csv) === '') {
         return ['ok' => false, 'message' => 'Falha ao baixar arquivo.'];
     }
