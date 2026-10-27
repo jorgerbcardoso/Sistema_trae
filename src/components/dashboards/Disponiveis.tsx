@@ -5963,7 +5963,7 @@ function ModalRotaCarregamento({
       const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
       const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '').split('/')[0].trim();
-      const setorEntrega = normKey((c as any)?.setor_cte ?? (c as any)?.setor ?? '');
+      const setorEntrega = normKey((c as any)?.setor_cte ?? (c as any)?.setor ?? (c as any)?.setorCte ?? (c as any)?.setorEntrega ?? (c as any)?.unidadeDest ?? (c as any)?.unidade_dest ?? '');
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
       const ordem = Number(c?.ordem ?? 0) || 0;
@@ -6032,7 +6032,7 @@ function ModalRotaCarregamento({
     for (const g of (grupos?.entrega || [])) {
       const ctes = Array.isArray((g as any)?.ctes) ? (g as any).ctes : [];
       for (const c of ctes) {
-        const setorRaw = String((c as any)?.setor ?? (c as any)?.setor_cte ?? '').trim().toUpperCase();
+        const setorRaw = String((c as any)?.setor_cte ?? (c as any)?.setor ?? (c as any)?.setorCte ?? (c as any)?.setorEntrega ?? (c as any)?.unidadeDest ?? (c as any)?.unidade_dest ?? '').trim().toUpperCase();
         const setor = setorRaw || '999';
         const cur = map.get(setor) ?? { ctes: 0, clientes: new Set<string>() };
         cur.ctes += 1;
