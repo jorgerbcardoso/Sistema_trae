@@ -12435,6 +12435,9 @@ export function Disponiveis() {
 
   const handleAtualizarTransferencia = useCallback(async () => {
     if (!sigla) return;
+    if (loadingInicial) return;
+    if (bloqueioOperacao) return;
+    setBloqueioOperacao('Atualizando...');
     setLoadingInicial(true);
     try {
       await importarCarregamentosSSWObrigatorio();
@@ -12444,8 +12447,9 @@ export function Disponiveis() {
       ]);
     } finally {
       setLoadingInicial(false);
+      setBloqueioOperacao(null);
     }
-  }, [sigla, importarCarregamentosSSWObrigatorio, carregar, carregarEntrega]);
+  }, [sigla, loadingInicial, bloqueioOperacao, importarCarregamentosSSWObrigatorio, carregar, carregarEntrega]);
 
   const verificarSaidasEmViagem = useCallback(async () => {
     try {
@@ -13803,10 +13807,10 @@ export function Disponiveis() {
               variant="outline"
               size="sm"
               onClick={() => { void handleAtualizarTransferencia(); }}
-              disabled={loading || !sigla}
+              disabled={loadingInicial || loading || !!bloqueioOperacao || !sigla}
               className="dark:border-slate-600"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {(loadingInicial || loading || !!bloqueioOperacao) ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               <span className="ml-1.5">Atualizar</span>
             </Button>
           )}
