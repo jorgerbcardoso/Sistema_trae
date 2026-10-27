@@ -12749,13 +12749,10 @@ export function Disponiveis() {
         const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
         const jaExiste = jaExistePlaca || jaExisteLinha;
 
-        const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
-
         const motivos: string[] = [];
         if (jaExisteLinha) motivos.push(`Linha ${String(nro).padStart(3, '0')} já possui carregamento iniciado.`);
         if (jaExistePlaca) motivos.push(`Carregamento ${placaAuto} já existe.`);
-        if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
-        const bloqueada = jaExiste || bloqueadaPorDireta;
+        const bloqueada = jaExiste;
 
         status[nro] = {
           podeCarregar: !bloqueada,
