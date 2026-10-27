@@ -13,9 +13,10 @@ interface AdminLayoutProps {
   children: ReactNode;
   title: string;
   description?: string;
+  companyFirst?: boolean;
 }
 
-export function AdminLayout({ children, title, description }: AdminLayoutProps) {
+export function AdminLayout({ children, title, description, companyFirst }: AdminLayoutProps) {
   const { user, logout, clientConfig } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -73,9 +74,9 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               className="h-6 md:h-8 w-6 md:w-8 object-contain" 
             />
             <div className="flex-1 min-w-0 hidden md:block">
-              <h1 className="text-foreground header-title-reduced truncate">{title}</h1>
+              <h1 className="text-foreground header-title-reduced truncate">{companyFirst ? (user?.client_name || title) : title}</h1>
               <p className="text-muted-foreground header-subtitle-reduced hidden md:block truncate">
-                {description || user?.client_name}
+                {companyFirst ? title : (description || user?.client_name)}
               </p>
             </div>
           </div>

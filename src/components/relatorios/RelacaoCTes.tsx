@@ -5,14 +5,15 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { Download, Filter, Loader2, Search, X } from 'lucide-react';
+import { Download, Loader2, Search, X } from 'lucide-react';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { toast } from 'sonner';
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
   Cell,
   Legend,
@@ -48,7 +49,7 @@ type SortKey =
   | 'cubagem'
   | 'qtde_vol';
 
-type SerieModo = 'frete' | 'merc' | 'ctes' | 'todas';
+type SerieModo = 'frete' | 'merc' | 'ctes' | 'custo' | 'frete_custo';
 
 interface UnidadeItem {
   sigla: string;
@@ -176,7 +177,6 @@ export function RelacaoCTes() {
 
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
   const [page, setPage] = useState(1);
   const pageSize = 100;
@@ -184,20 +184,21 @@ export function RelacaoCTes() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'data_emissao', dir: 'desc' });
-  const [serieModo, setSerieModo] = useState<SerieModo>('todas');
+  const [serieModo, setSerieModo] = useState<SerieModo>('frete');
+  const [serieUnidModo, setSerieUnidModo] = useState<'paralelo' | 'empilhado'>('paralelo');
 
   const [rows, setRows] = useState<LinhaCte[]>([]);
   const [donutUnidades, setDonutUnidades] = useState<Array<{ name: string; value: number }>>([]);
   const [donutClientes, setDonutClientes] = useState<Array<{ name: string; value: number }>>([]);
-  const [serie, setSerie] = useState<Array<{ dia: string; qtde_ctes: number; vlr_frete: number; vlr_merc: number }>>([]);
+  const [serie, setSerie] = useState<Array<{ dia: string; qtde_ctes: number; vlr_frete: number; vlr_merc: number; vlr_custo: number }>>([]);
+  const [serieUnidades, setSerieUnidades] = useState<Array<{ dia: string; unid: string; qtde_ctes: number }>>([]);
 
   const [cteDialogOpen, setCteDialogOpen] = useState(false);
   const [cteDialogData, setCteDialogData] = useState<CteDetalhesData | null>(null);
 
   const [filters, setFilters] = useState<RelacaoFilters>(() => {
     const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 29);
+    const start = new Date(end.getFullYear(), end.getMonth(), 1);
     return {
       emissaoIni: fmtIso(start),
       emissaoFim: fmtIso(end),
@@ -283,6 +284,7 @@ export function RelacaoCTes() {
         setDonutUnidades([]);
         setDonutClientes([]);
         setSerie([]);
+        setSerieUnidades([]);
         setTotal(0);
         setTotalPages(1);
         return;
@@ -292,6 +294,7 @@ export function RelacaoCTes() {
       setDonutUnidades(Array.isArray(res?.donuts?.unidades) ? res.donuts.unidades : []);
       setDonutClientes(Array.isArray(res?.donuts?.clientes) ? res.donuts.clientes : []);
       setSerie(Array.isArray(res?.serie) ? res.serie : []);
+      setSerieUnidades(Array.isArray(res?.serie_unidades) ? res.serie_unidades : []);
       setTotal(Number(res.total ?? 0) || 0);
       setTotalPages(Number(res.totalPages ?? 1) || 1);
       setPage(Number(res.page ?? pageToLoad) || pageToLoad);
@@ -398,21 +401,78 @@ export function RelacaoCTes() {
   const serieData = useMemo(() => {
     return serie.map((it) => ({
       ...it,
+      vlr_custo: Number(it.vlr_custo || 0) || 0,
+      vlr_frete_custo: (Number(it.vlr_frete || 0) || 0) + (Number(it.vlr_custo || 0) || 0),
       label: fmtDateBR(it.dia),
     }));
   }, [serie]);
 
   const donutColors = ['#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f97316', '#10b981', '#eab308'];
 
-  const syncTempFromCurrent = () => {
-    setTempFilters(filters);
-    setSelUnidOrigem(filters.unidadesOrigem.map((s) => ({ sigla: s })));
-    setSelUnidDestino(filters.unidadesDestino.map((s) => ({ sigla: s })));
-    setSelPagadores(filters.cnpjsPagadores.map((c) => ({ cnpj: c, nome: c })));
-    setSelRemetentes(filters.cnpjsRemetentes.map((c) => ({ cnpj: c, nome: c })));
-    setSelDestinatarios(filters.cnpjsDestinatarios.map((c) => ({ cnpj: c, nome: c })));
-    setSelMercadoria(filters.codMercadoria ? { codigo: filters.codMercadoria, descricao: String(filters.codMercadoria) } : null);
-    setSelVendedor(filters.vendedorLogin ? { login: filters.vendedorLogin, nome: filters.vendedorLogin } : null);
+  const serieUnidKeys = useMemo(() => {
+    const present = new Set(serieUnidades.map((x) => String(x.unid || '')).filter((s) => s !== ''));
+    const ordered = donutUnidades.map((d) => d.name).filter((n) => present.has(n));
+    const rest = Array.from(present)
+      .filter((n) => !ordered.includes(n))
+      .sort((a, b) => a.localeCompare(b));
+    return [...ordered, ...rest];
+  }, [donutUnidades, serieUnidades]);
+
+  const serieUnidData = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const it of serieUnidades) {
+      const dia = String(it.dia || '').slice(0, 10);
+      if (!dia) continue;
+      const unid = String(it.unid || '').trim() || '—';
+      const qtde = Number(it.qtde_ctes || 0) || 0;
+      let row = m.get(dia);
+      if (!row) {
+        row = { dia, label: fmtDateBR(dia) };
+        m.set(dia, row);
+      }
+      row[unid] = qtde;
+    }
+    const arr = Array.from(m.values()).sort((a, b) => String(a.dia).localeCompare(String(b.dia)));
+    for (const row of arr) {
+      for (const k of serieUnidKeys) {
+        if (row[k] == null) row[k] = 0;
+      }
+    }
+    return arr;
+  }, [serieUnidKeys, serieUnidades]);
+
+  const resetFiltros = () => {
+    setSelUnidOrigem([]);
+    setSelUnidDestino([]);
+    setSelPagadores([]);
+    setSelRemetentes([]);
+    setSelDestinatarios([]);
+    setSelMercadoria(null);
+    setSelVendedor(null);
+    const end = new Date();
+    const start = new Date(end.getFullYear(), end.getMonth(), 1);
+    setTempFilters({
+      emissaoIni: fmtIso(start),
+      emissaoFim: fmtIso(end),
+      prevEntregaIni: '',
+      prevEntregaFim: '',
+      entregaIni: '',
+      entregaFim: '',
+      unidadesOrigem: [],
+      unidadesDestino: [],
+      cnpjsPagadores: [],
+      cnpjsRemetentes: [],
+      cnpjsDestinatarios: [],
+      codMercadoria: null,
+      tpDocumento: 'TODOS',
+      tpFrete: '',
+      liquidacao: '',
+      entrega: '',
+      serCte: '',
+      nroCte: '',
+      nroNf: '',
+      vendedorLogin: '',
+    });
   };
 
   const aplicarFiltros = () => {
@@ -427,7 +487,6 @@ export function RelacaoCTes() {
       vendedorLogin: selVendedor ? selVendedor.login : '',
     };
     setFilters(next);
-    setShowFilters(false);
     setPage(1);
     carregar(1, sort, next);
   };
@@ -522,35 +581,509 @@ export function RelacaoCTes() {
   );
 
   return (
-    <AdminLayout>
+    <AdminLayout title="RELAÇÃO DE CT-es" companyFirst>
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Relação de CT-es</h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">Consulta completa com filtros avançados, indicadores e exportação.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2 dark:border-slate-700"
-              onClick={() => {
-                syncTempFromCurrent();
-                setShowFilters(true);
-              }}
-            >
-              <Filter className="w-4 h-4" />
-              Filtros
-            </Button>
-            <Button variant="outline" className="gap-2 dark:border-slate-700" disabled={exporting} onClick={exportarCsv}>
-              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Exportar CSV
-            </Button>
-            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white" disabled={loading} onClick={() => carregar(1, sort, filters)}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Atualizar
-            </Button>
-          </div>
         </div>
+
+        <details open className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+          <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filtros</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Defina o período e demais critérios, depois clique em Gerar.</div>
+            </div>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : null}
+          </summary>
+
+          <div className="p-4 space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/60 dark:bg-slate-900/40">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de emissão</div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end.getFullYear(), end.getMonth(), 1);
+                        setTempFilters((p) => ({ ...p, emissaoIni: fmtIso(start), emissaoFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => setTempFilters((p) => ({ ...p, emissaoIni: todayIso(), emissaoFim: todayIso() }))}
+                    >
+                      Hoje
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Início</Label>
+                    <Input type="date" value={tempFilters.emissaoIni} onChange={(e) => setTempFilters((p) => ({ ...p, emissaoIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
+                    <Input type="date" value={tempFilters.emissaoFim} onChange={(e) => setTempFilters((p) => ({ ...p, emissaoFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de previsão de entrega</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Início</Label>
+                    <Input type="date" value={tempFilters.prevEntregaIni} onChange={(e) => setTempFilters((p) => ({ ...p, prevEntregaIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
+                    <Input type="date" value={tempFilters.prevEntregaFim} onChange={(e) => setTempFilters((p) => ({ ...p, prevEntregaFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de entrega/baixa</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Início</Label>
+                    <Input type="date" value={tempFilters.entregaIni} onChange={(e) => setTempFilters((p) => ({ ...p, entregaIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
+                    <Input type="date" value={tempFilters.entregaFim} onChange={(e) => setTempFilters((p) => ({ ...p, entregaFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Unidades de origem</div>
+                <Input
+                  value={searchUnidOrigem}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchUnidOrigem(v);
+                    buscarUnidades(v, 'origem');
+                  }}
+                  placeholder="Buscar unidade..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optUnidOrigem.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optUnidOrigem.map((u) => (
+                      <button
+                        key={u.sigla}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelUnidOrigem((p) => (p.some((x) => x.sigla === u.sigla) ? p : [...p, u]));
+                          setSearchUnidOrigem('');
+                          setOptUnidOrigem([]);
+                        }}
+                      >
+                        <span className="font-mono font-semibold">{u.sigla}</span> <span className="text-slate-600 dark:text-slate-300">{u.nome || ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selUnidOrigem.map((u) => (
+                    <Badge key={u.sigla} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
+                      <span className="font-mono">{u.sigla}</span>
+                      <button type="button" className="ml-1" onClick={() => setSelUnidOrigem((p) => p.filter((x) => x.sigla !== u.sigla))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Unidades de destino</div>
+                <Input
+                  value={searchUnidDestino}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchUnidDestino(v);
+                    buscarUnidades(v, 'destino');
+                  }}
+                  placeholder="Buscar unidade..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optUnidDestino.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optUnidDestino.map((u) => (
+                      <button
+                        key={u.sigla}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelUnidDestino((p) => (p.some((x) => x.sigla === u.sigla) ? p : [...p, u]));
+                          setSearchUnidDestino('');
+                          setOptUnidDestino([]);
+                        }}
+                      >
+                        <span className="font-mono font-semibold">{u.sigla}</span> <span className="text-slate-600 dark:text-slate-300">{u.nome || ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selUnidDestino.map((u) => (
+                    <Badge key={u.sigla} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
+                      <span className="font-mono">{u.sigla}</span>
+                      <button type="button" className="ml-1" onClick={() => setSelUnidDestino((p) => p.filter((x) => x.sigla !== u.sigla))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Clientes pagadores</div>
+                <Input
+                  value={searchPagador}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchPagador(v);
+                    buscarClientes(v, 'pag');
+                  }}
+                  placeholder="Buscar pelo nome..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optPagadores.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optPagadores.map((c) => (
+                      <button
+                        key={c.cnpj}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelPagadores((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
+                          setSearchPagador('');
+                          setOptPagadores([]);
+                        }}
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selPagadores.map((c) => (
+                    <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
+                      <span className="truncate max-w-[220px]">{c.nome}</span>
+                      <button type="button" className="ml-1 shrink-0" onClick={() => setSelPagadores((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Remetentes</div>
+                <Input
+                  value={searchRemetente}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchRemetente(v);
+                    buscarClientes(v, 'rem');
+                  }}
+                  placeholder="Buscar pelo nome..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optRemetentes.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optRemetentes.map((c) => (
+                      <button
+                        key={c.cnpj}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelRemetentes((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
+                          setSearchRemetente('');
+                          setOptRemetentes([]);
+                        }}
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selRemetentes.map((c) => (
+                    <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
+                      <span className="truncate max-w-[220px]">{c.nome}</span>
+                      <button type="button" className="ml-1 shrink-0" onClick={() => setSelRemetentes((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Destinatários</div>
+                <Input
+                  value={searchDestinatario}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchDestinatario(v);
+                    buscarClientes(v, 'dest');
+                  }}
+                  placeholder="Buscar pelo nome..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optDestinatarios.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optDestinatarios.map((c) => (
+                      <button
+                        key={c.cnpj}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelDestinatarios((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
+                          setSearchDestinatario('');
+                          setOptDestinatarios([]);
+                        }}
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selDestinatarios.map((c) => (
+                    <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
+                      <span className="truncate max-w-[220px]">{c.nome}</span>
+                      <button type="button" className="ml-1 shrink-0" onClick={() => setSelDestinatarios((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Mercadoria</div>
+                <Input
+                  value={searchMercadoria}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchMercadoria(v);
+                    buscarMercadorias(v);
+                  }}
+                  placeholder="Buscar mercadoria..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optMercadorias.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optMercadorias.map((m) => (
+                      <button
+                        key={m.codigo}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelMercadoria(m);
+                          setSearchMercadoria('');
+                          setOptMercadorias([]);
+                        }}
+                      >
+                        <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{String(m.codigo)}</div>
+                        <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{m.descricao}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2">
+                  {selMercadoria ? (
+                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
+                      <span className="font-mono">{String(selMercadoria.codigo)}</span>
+                      <span className="truncate max-w-[220px]">{selMercadoria.descricao}</span>
+                      <button type="button" className="ml-1 shrink-0" onClick={() => setSelMercadoria(null)}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ) : (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Nenhuma selecionada</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Vendedor</div>
+                <Input
+                  value={searchVendedor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchVendedor(v);
+                    buscarVendedores(v);
+                  }}
+                  placeholder="Buscar vendedor..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optVendedores.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optVendedores.map((v) => (
+                      <button
+                        key={v.login}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelVendedor(v);
+                          setSearchVendedor('');
+                          setOptVendedores([]);
+                        }}
+                      >
+                        <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{v.login}</div>
+                        <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{v.nome}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selVendedor ? (
+                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
+                      <span className="font-mono">{selVendedor.login}</span>
+                      <button type="button" className="ml-1" onClick={() => setSelVendedor(null)}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
+                      <span>Todos</span>
+                    </Badge>
+                  )}
+                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
+                    <button type="button" onClick={() => setSelVendedor({ login: '__sem_vendedor__', nome: 'Sem vendedor' })}>
+                      Sem vendedor
+                    </button>
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Tipo de documento</Label>
+                    <Select value={tempFilters.tpDocumento} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpDocumento: v }))}>
+                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TP_DOCUMENTO_OPTIONS.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
+                    <Select value={tempFilters.tpFrete || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpFrete: v === 'T' ? '' : (v as any) }))}>
+                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="T">Todos</SelectItem>
+                        <SelectItem value="C">CIF</SelectItem>
+                        <SelectItem value="F">FOB</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Liquidação</Label>
+                    <Select value={tempFilters.liquidacao || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, liquidacao: v === 'T' ? '' : (v as any) }))}>
+                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="T">Todos</SelectItem>
+                        <SelectItem value="P">Pendentes</SelectItem>
+                        <SelectItem value="L">Liquidados</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Entrega</Label>
+                    <Select value={tempFilters.entrega || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, entrega: v === 'T' ? '' : (v as any) }))}>
+                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="T">Todos</SelectItem>
+                        <SelectItem value="P">Pendentes</SelectItem>
+                        <SelectItem value="E">Entregues</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Série</Label>
+                    <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 dark:text-slate-200">Número</Label>
+                    <Input value={tempFilters.nroCte} onChange={(e) => setTempFilters((p) => ({ ...p, nroCte: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">NF (dentro do campo nfs)</Label>
+                  <Input value={tempFilters.nroNf} onChange={(e) => setTempFilters((p) => ({ ...p, nroNf: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" placeholder="Digite o número da NF" />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+              <Button type="button" variant="outline" className="dark:border-slate-700" disabled={loading} onClick={resetFiltros}>
+                Limpar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white gap-2" disabled={loading} onClick={aplicarFiltros}>
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Gerar
+                </Button>
+                {total > 0 ? (
+                  <Button type="button" variant="outline" className="gap-2 dark:border-slate-700" disabled={exporting || loading} onClick={exportarCsv}>
+                    {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Exportar CSV
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </details>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -564,11 +1097,12 @@ export function RelacaoCTes() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutUnidades} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                      <Pie data={donutUnidades} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
                         {donutUnidades.map((_e, idx) => (
-                          <Cell key={idx} fill={donutColors[idx % donutColors.length]} />
+                          <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                     </PieChart>
                   </ResponsiveContainer>
@@ -588,11 +1122,12 @@ export function RelacaoCTes() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutClientes} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                      <Pie data={donutClientes} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
                         {donutClientes.map((_e, idx) => (
-                          <Cell key={idx} fill={donutColors[idx % donutColors.length]} />
+                          <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                     </PieChart>
                   </ResponsiveContainer>
@@ -611,9 +1146,6 @@ export function RelacaoCTes() {
               </div>
               <Tabs value={serieModo} onValueChange={(v) => setSerieModo(v as SerieModo)}>
                 <TabsList className="h-8">
-                  <TabsTrigger value="todas" className="text-xs h-7">
-                    Todas
-                  </TabsTrigger>
                   <TabsTrigger value="frete" className="text-xs h-7">
                     Frete
                   </TabsTrigger>
@@ -622,6 +1154,12 @@ export function RelacaoCTes() {
                   </TabsTrigger>
                   <TabsTrigger value="ctes" className="text-xs h-7">
                     Qtde
+                  </TabsTrigger>
+                  <TabsTrigger value="custo" className="text-xs h-7">
+                    Custo
+                  </TabsTrigger>
+                  <TabsTrigger value="frete_custo" className="text-xs h-7">
+                    Frete+Custo
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -639,10 +1177,66 @@ export function RelacaoCTes() {
                     <YAxis tick={{ fontSize: 11 }} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <RechartsTooltip contentStyle={tooltipStyle as any} />
-                    {serieModo === 'todas' || serieModo === 'frete' ? <Line type="monotone" dataKey="vlr_frete" name="Frete" stroke="#6366f1" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'todas' || serieModo === 'merc' ? <Line type="monotone" dataKey="vlr_merc" name="Merc." stroke="#f97316" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'todas' || serieModo === 'ctes' ? <Line type="monotone" dataKey="qtde_ctes" name="CT-es" stroke="#10b981" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'frete' ? <Line type="monotone" dataKey="vlr_frete" name="Frete" stroke="#6366f1" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'merc' ? <Line type="monotone" dataKey="vlr_merc" name="Merc." stroke="#f97316" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'ctes' ? <Line type="monotone" dataKey="qtde_ctes" name="CT-es" stroke="#10b981" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'custo' ? <Line type="monotone" dataKey="vlr_custo" name="Custo" stroke="#ef4444" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'frete_custo' ? <Line type="monotone" dataKey="vlr_frete_custo" name="Frete + Custo" stroke="#8b5cf6" strokeWidth={2} dot={false} /> : null}
                   </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
+          <CardHeader className="pb-0">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</CardTitle>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Top 5 origens + demais</div>
+              </div>
+              <Tabs value={serieUnidModo} onValueChange={(v) => setSerieUnidModo(v as any)}>
+                <TabsList className="h-8">
+                  <TabsTrigger value="paralelo" className="text-xs h-7">
+                    Paralelo
+                  </TabsTrigger>
+                  <TabsTrigger value="empilhado" className="text-xs h-7">
+                    Empilhado
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-3">
+            <div className="h-[320px]">
+              {serieUnidData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-sm text-slate-400">—</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  {serieUnidModo === 'empilhado' ? (
+                    <AreaChart data={serieUnidData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <RechartsTooltip contentStyle={tooltipStyle as any} />
+                      {serieUnidKeys.map((k, idx) => (
+                        <Area key={k} type="monotone" dataKey={k} name={k} stackId="1" stroke={donutColors[idx % donutColors.length]} fill={donutColors[idx % donutColors.length]} fillOpacity={0.25} />
+                      ))}
+                    </AreaChart>
+                  ) : (
+                    <LineChart data={serieUnidData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <RechartsTooltip contentStyle={tooltipStyle as any} />
+                      {serieUnidKeys.map((k, idx) => (
+                        <Line key={k} type="monotone" dataKey={k} name={k} stroke={donutColors[idx % donutColors.length]} strokeWidth={2} dot={false} />
+                      ))}
+                    </LineChart>
+                  )}
                 </ResponsiveContainer>
               )}
             </div>
@@ -767,535 +1361,6 @@ export function RelacaoCTes() {
             </div>
           </CardContent>
         </Card>
-
-        <Dialog open={showFilters} onOpenChange={setShowFilters}>
-          <DialogContent className="sm:max-w-[980px] bg-white dark:bg-slate-900 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 dark:text-slate-100">Filtros</DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400">Escolha períodos, partes, unidades e opções de consulta.</DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-y-auto pr-2 space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/60 dark:bg-slate-900/40">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de emissão</div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
-                        onClick={() => {
-                          const end = new Date();
-                          const start = new Date();
-                          start.setDate(end.getDate() - 29);
-                          setTempFilters((p) => ({ ...p, emissaoIni: fmtIso(start), emissaoFim: fmtIso(end) }));
-                        }}
-                      >
-                        30 dias
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
-                        onClick={() => setTempFilters((p) => ({ ...p, emissaoIni: todayIso(), emissaoFim: todayIso() }))}
-                      >
-                        Hoje
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Início</Label>
-                      <Input type="date" value={tempFilters.emissaoIni} onChange={(e) => setTempFilters((p) => ({ ...p, emissaoIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
-                      <Input type="date" value={tempFilters.emissaoFim} onChange={(e) => setTempFilters((p) => ({ ...p, emissaoFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de previsão de entrega</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Início</Label>
-                      <Input type="date" value={tempFilters.prevEntregaIni} onChange={(e) => setTempFilters((p) => ({ ...p, prevEntregaIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
-                      <Input type="date" value={tempFilters.prevEntregaFim} onChange={(e) => setTempFilters((p) => ({ ...p, prevEntregaFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de entrega/baixa</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Início</Label>
-                      <Input type="date" value={tempFilters.entregaIni} onChange={(e) => setTempFilters((p) => ({ ...p, entregaIni: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Fim</Label>
-                      <Input type="date" value={tempFilters.entregaFim} onChange={(e) => setTempFilters((p) => ({ ...p, entregaFim: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Unidades de origem</div>
-                  <Input
-                    value={searchUnidOrigem}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchUnidOrigem(v);
-                      buscarUnidades(v, 'origem');
-                    }}
-                    placeholder="Buscar unidade..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optUnidOrigem.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optUnidOrigem.map((u) => (
-                        <button
-                          key={u.sigla}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelUnidOrigem((p) => (p.some((x) => x.sigla === u.sigla) ? p : [...p, u]));
-                            setSearchUnidOrigem('');
-                            setOptUnidOrigem([]);
-                          }}
-                        >
-                          <span className="font-mono font-semibold">{u.sigla}</span> <span className="text-slate-600 dark:text-slate-300">{u.nome || ''}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selUnidOrigem.map((u) => (
-                      <Badge key={u.sigla} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
-                        <span className="font-mono">{u.sigla}</span>
-                        <button type="button" className="ml-1" onClick={() => setSelUnidOrigem((p) => p.filter((x) => x.sigla !== u.sigla))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Unidades de destino</div>
-                  <Input
-                    value={searchUnidDestino}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchUnidDestino(v);
-                      buscarUnidades(v, 'destino');
-                    }}
-                    placeholder="Buscar unidade..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optUnidDestino.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optUnidDestino.map((u) => (
-                        <button
-                          key={u.sigla}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelUnidDestino((p) => (p.some((x) => x.sigla === u.sigla) ? p : [...p, u]));
-                            setSearchUnidDestino('');
-                            setOptUnidDestino([]);
-                          }}
-                        >
-                          <span className="font-mono font-semibold">{u.sigla}</span> <span className="text-slate-600 dark:text-slate-300">{u.nome || ''}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selUnidDestino.map((u) => (
-                      <Badge key={u.sigla} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
-                        <span className="font-mono">{u.sigla}</span>
-                        <button type="button" className="ml-1" onClick={() => setSelUnidDestino((p) => p.filter((x) => x.sigla !== u.sigla))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Clientes pagadores</div>
-                  <Input
-                    value={searchPagador}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchPagador(v);
-                      buscarClientes(v, 'pag');
-                    }}
-                    placeholder="Buscar pelo nome..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optPagadores.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optPagadores.map((c) => (
-                        <button
-                          key={c.cnpj}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelPagadores((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
-                            setSearchPagador('');
-                            setOptPagadores([]);
-                          }}
-                        >
-                          <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
-                          <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selPagadores.map((c) => (
-                      <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
-                        <span className="truncate max-w-[220px]">{c.nome}</span>
-                        <button type="button" className="ml-1 shrink-0" onClick={() => setSelPagadores((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Remetentes</div>
-                  <Input
-                    value={searchRemetente}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchRemetente(v);
-                      buscarClientes(v, 'rem');
-                    }}
-                    placeholder="Buscar pelo nome..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optRemetentes.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optRemetentes.map((c) => (
-                        <button
-                          key={c.cnpj}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelRemetentes((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
-                            setSearchRemetente('');
-                            setOptRemetentes([]);
-                          }}
-                        >
-                          <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
-                          <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selRemetentes.map((c) => (
-                      <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
-                        <span className="truncate max-w-[220px]">{c.nome}</span>
-                        <button type="button" className="ml-1 shrink-0" onClick={() => setSelRemetentes((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Destinatários</div>
-                  <Input
-                    value={searchDestinatario}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchDestinatario(v);
-                      buscarClientes(v, 'dest');
-                    }}
-                    placeholder="Buscar pelo nome..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optDestinatarios.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optDestinatarios.map((c) => (
-                        <button
-                          key={c.cnpj}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelDestinatarios((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
-                            setSearchDestinatario('');
-                            setOptDestinatarios([]);
-                          }}
-                        >
-                          <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
-                          <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selDestinatarios.map((c) => (
-                      <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
-                        <span className="truncate max-w-[220px]">{c.nome}</span>
-                        <button type="button" className="ml-1 shrink-0" onClick={() => setSelDestinatarios((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Mercadoria</div>
-                  <Input
-                    value={searchMercadoria}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchMercadoria(v);
-                      buscarMercadorias(v);
-                    }}
-                    placeholder="Buscar mercadoria..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optMercadorias.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optMercadorias.map((m) => (
-                        <button
-                          key={m.codigo}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelMercadoria(m);
-                            setSearchMercadoria('');
-                            setOptMercadorias([]);
-                          }}
-                        >
-                          <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{String(m.codigo)}</div>
-                          <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{m.descricao}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    {selMercadoria ? (
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
-                        <span className="font-mono">{String(selMercadoria.codigo)}</span>
-                        <span className="truncate max-w-[220px]">{selMercadoria.descricao}</span>
-                        <button type="button" className="ml-1 shrink-0" onClick={() => setSelMercadoria(null)}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ) : (
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Nenhuma selecionada</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Vendedor</div>
-                  <Input
-                    value={searchVendedor}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearchVendedor(v);
-                      buscarVendedores(v);
-                    }}
-                    placeholder="Buscar vendedor..."
-                    className="dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  {optVendedores.length > 0 && (
-                    <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                      {optVendedores.map((v) => (
-                        <button
-                          key={v.login}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                          onClick={() => {
-                            setSelVendedor(v);
-                            setSearchVendedor('');
-                            setOptVendedores([]);
-                          }}
-                        >
-                          <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{v.login}</div>
-                          <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{v.nome}</div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selVendedor ? (
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
-                        <span className="font-mono">{selVendedor.login}</span>
-                        <button type="button" className="ml-1" onClick={() => setSelVendedor(null)}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
-                        <span>Todos</span>
-                      </Badge>
-                    )}
-                    <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
-                      <button type="button" onClick={() => setSelVendedor({ login: '__sem_vendedor__', nome: 'Sem vendedor' })}>
-                        Sem vendedor
-                      </button>
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Tipo de documento</Label>
-                      <Select value={tempFilters.tpDocumento} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpDocumento: v }))}>
-                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TP_DOCUMENTO_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {t}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
-                      <Select value={tempFilters.tpFrete || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpFrete: v === 'T' ? '' : (v as any) }))}>
-                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="T">Todos</SelectItem>
-                          <SelectItem value="C">CIF</SelectItem>
-                          <SelectItem value="F">FOB</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Liquidação</Label>
-                      <Select value={tempFilters.liquidacao || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, liquidacao: v === 'T' ? '' : (v as any) }))}>
-                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="T">Todos</SelectItem>
-                          <SelectItem value="P">Pendentes</SelectItem>
-                          <SelectItem value="L">Liquidados</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Entrega</Label>
-                      <Select value={tempFilters.entrega || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, entrega: v === 'T' ? '' : (v as any) }))}>
-                        <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="T">Todos</SelectItem>
-                          <SelectItem value="P">Pendentes</SelectItem>
-                          <SelectItem value="E">Entregues</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Série</Label>
-                      <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-200">Número</Label>
-                      <Input value={tempFilters.nroCte} onChange={(e) => setTempFilters((p) => ({ ...p, nroCte: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">NF (dentro do campo nfs)</Label>
-                    <Input value={tempFilters.nroNf} onChange={(e) => setTempFilters((p) => ({ ...p, nroNf: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" placeholder="Digite o número da NF" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="dark:border-slate-700"
-                onClick={() => {
-                  setSelUnidOrigem([]);
-                  setSelUnidDestino([]);
-                  setSelPagadores([]);
-                  setSelRemetentes([]);
-                  setSelDestinatarios([]);
-                  setSelMercadoria(null);
-                  setSelVendedor(null);
-                  const end = new Date();
-                  const start = new Date();
-                  start.setDate(end.getDate() - 29);
-                  setTempFilters({
-                    emissaoIni: fmtIso(start),
-                    emissaoFim: fmtIso(end),
-                    prevEntregaIni: '',
-                    prevEntregaFim: '',
-                    entregaIni: '',
-                    entregaFim: '',
-                    unidadesOrigem: [],
-                    unidadesDestino: [],
-                    cnpjsPagadores: [],
-                    cnpjsRemetentes: [],
-                    cnpjsDestinatarios: [],
-                    codMercadoria: null,
-                    tpDocumento: 'TODOS',
-                    tpFrete: '',
-                    liquidacao: '',
-                    entrega: '',
-                    serCte: '',
-                    nroCte: '',
-                    nroNf: '',
-                    vendedorLogin: '',
-                  });
-                }}
-              >
-                Limpar
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" className="dark:border-slate-700" onClick={() => setShowFilters(false)}>
-                  Cancelar
-                </Button>
-                <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={aplicarFiltros}>
-                  Aplicar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         <CteDetalhesDialog cte={cteDialogData} open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
           <span />

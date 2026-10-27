@@ -342,6 +342,7 @@ while ($listRes && ($r = pg_fetch_assoc($listRes))) {
 $donutUnid = [];
 $donutCli = [];
 $serie = [];
+$serieUnid = [];
 
 $donutUnidRes = sql($cteLatest . "
     SELECT
@@ -354,10 +355,13 @@ $donutUnidRes = sql($cteLatest . "
 ", $params, $conn);
 
 $sumTop = 0;
+$topUnids = [];
 while ($donutUnidRes && ($r = pg_fetch_assoc($donutUnidRes))) {
     $v = (int)($r['total'] ?? 0);
     $sumTop += $v;
-    $donutUnid[] = ['name' => (string)($r['label'] ?? '—'), 'value' => $v];
+    $label = (string)($r['label'] ?? '—');
+    $donutUnid[] = ['name' => $label, 'value' => $v];
+    $topUnids[] = $label;
 }
 if ($total > $sumTop) {
     $donutUnid[] = ['name' => 'DEMAIS', 'value' => ($total - $sumTop)];
@@ -388,7 +392,20 @@ $serieRes = sql($cteLatest . "
         cte.data_emissao AS dia,
         COUNT(*)::int AS qtde_ctes,
         COALESCE(SUM(cte.vlr_frete), 0)::numeric AS vlr_frete,
-        COALESCE(SUM(cte.vlr_merc), 0)::numeric AS vlr_merc
+        COALESCE(SUM(cte.vlr_merc), 0)::numeric AS vlr_merc,
+        COALESCE(SUM(
+            COALESCE(cte.custo_seguro, 0)
+          + COALESCE(cte.custo_icms, 0)
+          + COALESCE(cte.custo_pis_cofins, 0)
+          + COALESCE(cte.custo_gris, 0)
+          + COALESCE(cte.custo_pedagio, 0)
+          + COALESCE(cte.custo_expedicao, 0)
+          + COALESCE(cte.custo_transbordo, 0)
+          + COALESCE(cte.custo_vendedor, 0)
+          + COALESCE(cte.custo_recepcao, 0)
+          + COALESCE(cte.custo_desp_div, 0)
+          + COALESCE(cte.custo_transferencia_real, 0)
+        ), 0)::numeric AS vlr_custo
     FROM cte
     GROUP BY 1
     ORDER BY 1
@@ -400,6 +417,38 @@ while ($serieRes && ($r = pg_fetch_assoc($serieRes))) {
         'qtde_ctes' => (int)($r['qtde_ctes'] ?? 0),
         'vlr_frete' => (float)($r['vlr_frete'] ?? 0),
         'vlr_merc' => (float)($r['vlr_merc'] ?? 0),
+        'vlr_custo' => (float)($r['vlr_custo'] ?? 0),
+    ];
+}
+
+$inTopUnids = '';
+if (is_array($topUnids) && count($topUnids) > 0) {
+    $quoted = [];
+    foreach ($topUnids as $u) {
+        $quoted[] = pg_escape_literal($conn, (string)$u);
+    }
+    $inTopUnids = implode(',', $quoted);
+}
+
+$serieUnidRes = sql($cteLatest . "
+    SELECT
+        cte.data_emissao AS dia,
+        CASE
+            WHEN " . ($inTopUnids !== '' ? "COALESCE(NULLIF(UPPER(BTRIM(cte.sigla_emit)), ''), '—') IN ($inTopUnids)" : "false") . "
+            THEN COALESCE(NULLIF(UPPER(BTRIM(cte.sigla_emit)), ''), '—')
+            ELSE 'DEMAIS'
+        END AS unid,
+        COUNT(*)::int AS qtde_ctes
+    FROM cte
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+", $params, $conn);
+
+while ($serieUnidRes && ($r = pg_fetch_assoc($serieUnidRes))) {
+    $serieUnid[] = [
+        'dia' => (string)($r['dia'] ?? ''),
+        'unid' => (string)($r['unid'] ?? ''),
+        'qtde_ctes' => (int)($r['qtde_ctes'] ?? 0),
     ];
 }
 
@@ -417,4 +466,5 @@ respondJson([
         'clientes' => $donutCli,
     ],
     'serie' => $serie,
+    'serie_unidades' => $serieUnid,
 ]);
