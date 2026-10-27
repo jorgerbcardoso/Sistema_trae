@@ -12,8 +12,19 @@ import { Download, Filter, Loader2, Search, X } from 'lucide-react';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { toast } from 'sonner';
-import { Pie, PieChart, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Line, LineChart, CartesianGrid, XAxis, YAxis, Legend } from 'recharts';
+import {
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useTooltipStyle } from '../dashboards/CustomTooltip';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { CteDetalhesDialog, type CteDetalhesData } from '../dashboards/CteDetalhesDialog';
