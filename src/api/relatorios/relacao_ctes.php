@@ -120,10 +120,28 @@ if ($codMerc !== '' && preg_match('/^\d+$/', $codMerc)) {
     $params[] = (int)$codMerc;
 }
 
-$tpDoc = strtoupper(trim((string)($filters['tpDocumento'] ?? '')));
-if ($tpDoc !== '' && $tpDoc !== 'TODOS') {
-    $where[] = "UPPER(COALESCE(cte.tp_documento, '')) = $" . $p++;
-    $params[] = $tpDoc;
+$tpDocIn = $filters['tpDocumento'] ?? '';
+if (is_array($tpDocIn)) {
+    $docs = [];
+    foreach ($tpDocIn as $d) {
+        $t = strtoupper(trim((string)$d));
+        if ($t !== '' && $t !== 'TODOS') $docs[$t] = true;
+    }
+    $docs = array_keys($docs);
+    if (count($docs) > 0) {
+        $ph = [];
+        foreach ($docs as $d) {
+            $ph[] = '$' . $p++;
+            $params[] = $d;
+        }
+        $where[] = "UPPER(COALESCE(cte.tp_documento, '')) IN (" . implode(',', $ph) . ")";
+    }
+} else {
+    $tpDoc = strtoupper(trim((string)$tpDocIn));
+    if ($tpDoc !== '' && $tpDoc !== 'TODOS') {
+        $where[] = "UPPER(COALESCE(cte.tp_documento, '')) = $" . $p++;
+        $params[] = $tpDoc;
+    }
 }
 
 $tpFrete = strtoupper(trim((string)($filters['tpFrete'] ?? '')));
@@ -344,47 +362,56 @@ $donutCli = [];
 $serie = [];
 $serieUnid = [];
 
+$totalFrete = 0.0;
+$totalFreteRes = sql($cteLatest . "
+    SELECT COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
+    FROM cte
+", $params, $conn);
+if ($totalFreteRes && ($r = pg_fetch_assoc($totalFreteRes))) {
+    $totalFrete = (float)($r['total'] ?? 0);
+}
+
 $donutUnidRes = sql($cteLatest . "
     SELECT
         COALESCE(NULLIF(UPPER(BTRIM(cte.sigla_emit)), ''), '—') AS label,
-        COUNT(*)::int AS total
+        COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
     FROM cte
     GROUP BY 1
     ORDER BY total DESC, label ASC
     LIMIT 5
 ", $params, $conn);
 
-$sumTop = 0;
+$sumTop = 0.0;
 $topUnids = [];
 while ($donutUnidRes && ($r = pg_fetch_assoc($donutUnidRes))) {
-    $v = (int)($r['total'] ?? 0);
+    $v = (float)($r['total'] ?? 0);
     $sumTop += $v;
     $label = (string)($r['label'] ?? '—');
     $donutUnid[] = ['name' => $label, 'value' => $v];
     $topUnids[] = $label;
 }
-if ($total > $sumTop) {
-    $donutUnid[] = ['name' => 'DEMAIS', 'value' => ($total - $sumTop)];
+if ($totalFrete > $sumTop) {
+    $donutUnid[] = ['name' => 'DEMAIS', 'value' => ($totalFrete - $sumTop)];
 }
 
 $donutCliRes = sql($cteLatest . "
     SELECT
         COALESCE(NULLIF(BTRIM(cte.nome_pag), ''), '—') AS label,
-        COUNT(*)::int AS total
+        COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
     FROM cte
     GROUP BY 1
     ORDER BY total DESC, label ASC
     LIMIT 5
 ", $params, $conn);
 
-$sumTop = 0;
+$sumTop = 0.0;
 while ($donutCliRes && ($r = pg_fetch_assoc($donutCliRes))) {
-    $v = (int)($r['total'] ?? 0);
+    $v = (float)($r['total'] ?? 0);
     $sumTop += $v;
     $donutCli[] = ['name' => (string)($r['label'] ?? '—'), 'value' => $v];
 }
-if ($total > $sumTop) {
-    $donutCli[] = ['name' => 'DEMAIS', 'value' => ($total - $sumTop)];
+if ($totalFrete > $sumTop) {
+    $donutCli[] = ['name' => 'DEMAIS', 'value' => ($totalFrete - $sumTop)];
 }
 
 $serieRes = sql($cteLatest . "
@@ -438,7 +465,7 @@ $serieUnidRes = sql($cteLatest . "
             THEN COALESCE(NULLIF(UPPER(BTRIM(cte.sigla_emit)), ''), '—')
             ELSE 'DEMAIS'
         END AS unid,
-        COUNT(*)::int AS qtde_ctes
+        COALESCE(SUM(cte.vlr_frete), 0)::numeric AS vlr_frete
     FROM cte
     GROUP BY 1, 2
     ORDER BY 1, 2
@@ -448,7 +475,7 @@ while ($serieUnidRes && ($r = pg_fetch_assoc($serieUnidRes))) {
     $serieUnid[] = [
         'dia' => (string)($r['dia'] ?? ''),
         'unid' => (string)($r['unid'] ?? ''),
-        'qtde_ctes' => (int)($r['qtde_ctes'] ?? 0),
+        'vlr_frete' => (float)($r['vlr_frete'] ?? 0),
     ];
 }
 

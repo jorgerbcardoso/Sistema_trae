@@ -114,10 +114,28 @@ if ($codMerc !== '' && preg_match('/^\d+$/', $codMerc)) {
     $params[] = (int)$codMerc;
 }
 
-$tpDoc = strtoupper(trim((string)($filters['tpDocumento'] ?? '')));
-if ($tpDoc !== '' && $tpDoc !== 'TODOS') {
-    $where[] = "UPPER(COALESCE(cte.tp_documento, '')) = $" . $p++;
-    $params[] = $tpDoc;
+$tpDocIn = $filters['tpDocumento'] ?? '';
+if (is_array($tpDocIn)) {
+    $docs = [];
+    foreach ($tpDocIn as $d) {
+        $t = strtoupper(trim((string)$d));
+        if ($t !== '' && $t !== 'TODOS') $docs[$t] = true;
+    }
+    $docs = array_keys($docs);
+    if (count($docs) > 0) {
+        $ph = [];
+        foreach ($docs as $d) {
+            $ph[] = '$' . $p++;
+            $params[] = $d;
+        }
+        $where[] = "UPPER(COALESCE(cte.tp_documento, '')) IN (" . implode(',', $ph) . ")";
+    }
+} else {
+    $tpDoc = strtoupper(trim((string)$tpDocIn));
+    if ($tpDoc !== '' && $tpDoc !== 'TODOS') {
+        $where[] = "UPPER(COALESCE(cte.tp_documento, '')) = $" . $p++;
+        $params[] = $tpDoc;
+    }
 }
 
 $tpFrete = strtoupper(trim((string)($filters['tpFrete'] ?? '')));
@@ -319,4 +337,3 @@ while ($res && ($r = pg_fetch_assoc($res))) {
 
 fclose($out);
 exit;
-

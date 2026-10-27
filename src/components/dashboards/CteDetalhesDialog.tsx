@@ -223,6 +223,23 @@ export interface CteDetalhesDialogProps {
 }
 
 export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange }: CteDetalhesDialogProps) {
+  if (!cte) {
+    return <>{children}</>;
+  }
+  return <CteDetalhesDialogInner cte={cte} open={openProp} onOpenChange={onOpenChange}>{children}</CteDetalhesDialogInner>;
+}
+
+function CteDetalhesDialogInner({
+  cte,
+  children,
+  open: openProp,
+  onOpenChange,
+}: {
+  cte: CteDetalhesData;
+  children: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const tooltipStyle = useTooltipStyle();
 
   const parcelas = useMemo<CteCustoParcela[]>(() => (cte ? calcularParcelasCusto(cte) : []), [cte]);
@@ -249,10 +266,6 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
     for (const c of CUSTO_CAMPOS) m[c.label] = c.cor;
     return m;
   }, []);
-
-  if (!cte) {
-    return <>{children}</>;
-  }
 
   const ctrcDisplay = cte.ctrc || (cte.serCte && cte.nroCte ? `${cte.serCte}${String(cte.nroCte).padStart(6, '0')}` : '');
   const temCusto = custoTotal > 0 || donutData.length > 0;

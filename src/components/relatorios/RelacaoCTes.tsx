@@ -5,9 +5,10 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
+import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { Download, Loader2, Search, X } from 'lucide-react';
+import { ChevronDown, Download, Loader2, Search, X } from 'lucide-react';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { toast } from 'sonner';
@@ -84,7 +85,7 @@ interface RelacaoFilters {
   cnpjsRemetentes: string[];
   cnpjsDestinatarios: string[];
   codMercadoria: number | null;
-  tpDocumento: string;
+  tpDocumento: string[];
   tpFrete: '' | 'C' | 'F';
   liquidacao: '' | 'P' | 'L';
   entrega: '' | 'P' | 'E';
@@ -191,7 +192,7 @@ export function RelacaoCTes() {
   const [donutUnidades, setDonutUnidades] = useState<Array<{ name: string; value: number }>>([]);
   const [donutClientes, setDonutClientes] = useState<Array<{ name: string; value: number }>>([]);
   const [serie, setSerie] = useState<Array<{ dia: string; qtde_ctes: number; vlr_frete: number; vlr_merc: number; vlr_custo: number }>>([]);
-  const [serieUnidades, setSerieUnidades] = useState<Array<{ dia: string; unid: string; qtde_ctes: number }>>([]);
+  const [serieUnidades, setSerieUnidades] = useState<Array<{ dia: string; unid: string; vlr_frete: number }>>([]);
 
   const [cteDialogOpen, setCteDialogOpen] = useState(false);
   const [cteDialogData, setCteDialogData] = useState<CteDetalhesData | null>(null);
@@ -212,7 +213,7 @@ export function RelacaoCTes() {
       cnpjsRemetentes: [],
       cnpjsDestinatarios: [],
       codMercadoria: null,
-      tpDocumento: 'TODOS',
+      tpDocumento: [],
       tpFrete: '',
       liquidacao: '',
       entrega: '',
@@ -409,14 +410,28 @@ export function RelacaoCTes() {
 
   const donutColors = ['#6366f1', '#8b5cf6', '#a855f7', '#ec4899', '#f97316', '#10b981', '#eab308'];
 
+  const donutUnidadesData = useMemo(() => {
+    const arr = [...donutUnidades];
+    const idx = arr.findIndex((d) => d.name === 'DEMAIS');
+    if (idx >= 0) arr.push(arr.splice(idx, 1)[0]);
+    return arr;
+  }, [donutUnidades]);
+
+  const donutClientesData = useMemo(() => {
+    const arr = [...donutClientes];
+    const idx = arr.findIndex((d) => d.name === 'DEMAIS');
+    if (idx >= 0) arr.push(arr.splice(idx, 1)[0]);
+    return arr;
+  }, [donutClientes]);
+
   const serieUnidKeys = useMemo(() => {
     const present = new Set(serieUnidades.map((x) => String(x.unid || '')).filter((s) => s !== ''));
-    const ordered = donutUnidades.map((d) => d.name).filter((n) => present.has(n));
+    const ordered = donutUnidadesData.map((d) => d.name).filter((n) => present.has(n));
     const rest = Array.from(present)
       .filter((n) => !ordered.includes(n))
       .sort((a, b) => a.localeCompare(b));
     return [...ordered, ...rest];
-  }, [donutUnidades, serieUnidades]);
+  }, [donutUnidadesData, serieUnidades]);
 
   const serieUnidData = useMemo(() => {
     const m = new Map<string, any>();
@@ -424,13 +439,13 @@ export function RelacaoCTes() {
       const dia = String(it.dia || '').slice(0, 10);
       if (!dia) continue;
       const unid = String(it.unid || '').trim() || '—';
-      const qtde = Number(it.qtde_ctes || 0) || 0;
+      const vlr = Number(it.vlr_frete || 0) || 0;
       let row = m.get(dia);
       if (!row) {
         row = { dia, label: fmtDateBR(dia) };
         m.set(dia, row);
       }
-      row[unid] = qtde;
+      row[unid] = vlr;
     }
     const arr = Array.from(m.values()).sort((a, b) => String(a.dia).localeCompare(String(b.dia)));
     for (const row of arr) {
@@ -464,7 +479,7 @@ export function RelacaoCTes() {
       cnpjsRemetentes: [],
       cnpjsDestinatarios: [],
       codMercadoria: null,
-      tpDocumento: 'TODOS',
+      tpDocumento: [],
       tpFrete: '',
       liquidacao: '',
       entrega: '',
@@ -569,6 +584,11 @@ export function RelacaoCTes() {
     }, 250);
   };
 
+  useEffect(() => {
+    buscarMercadorias('');
+    buscarVendedores('');
+  }, []);
+
   const SortBtn = ({ k, label, align = 'left', defaultDir = 'asc' }: { k: SortKey; label: string; align?: 'left' | 'right' | 'center'; defaultDir?: SortDir }) => (
     <button
       type="button"
@@ -590,13 +610,16 @@ export function RelacaoCTes() {
           </div>
         </div>
 
-        <details open className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+        <details open className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
           <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filtros</div>
               <div className="text-xs text-slate-500 dark:text-slate-400">Defina o período e demais critérios, depois clique em Gerar.</div>
             </div>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : null}
+            <div className="flex items-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : null}
+              <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
+            </div>
           </summary>
 
           <div className="p-4 space-y-5">
@@ -623,6 +646,20 @@ export function RelacaoCTes() {
                       variant="outline"
                       size="sm"
                       className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                        setTempFilters((p) => ({ ...p, emissaoIni: fmtIso(start), emissaoFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês Anterior
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
                       onClick={() => setTempFilters((p) => ({ ...p, emissaoIni: todayIso(), emissaoFim: todayIso() }))}
                     >
                       Hoje
@@ -642,7 +679,47 @@ export function RelacaoCTes() {
               </div>
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de previsão de entrega</div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de previsão de entrega</div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end.getFullYear(), end.getMonth(), 1);
+                        setTempFilters((p) => ({ ...p, prevEntregaIni: fmtIso(start), prevEntregaFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                        setTempFilters((p) => ({ ...p, prevEntregaIni: fmtIso(start), prevEntregaFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês Anterior
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => setTempFilters((p) => ({ ...p, prevEntregaIni: todayIso(), prevEntregaFim: todayIso() }))}
+                    >
+                      Hoje
+                    </Button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-slate-700 dark:text-slate-200">Início</Label>
@@ -656,7 +733,47 @@ export function RelacaoCTes() {
               </div>
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Período de entrega/baixa</div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de entrega/baixa</div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const end = new Date();
+                        const start = new Date(end.getFullYear(), end.getMonth(), 1);
+                        setTempFilters((p) => ({ ...p, entregaIni: fmtIso(start), entregaFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+                        setTempFilters((p) => ({ ...p, entregaIni: fmtIso(start), entregaFim: fmtIso(end) }));
+                      }}
+                    >
+                      Mês Anterior
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 dark:border-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => setTempFilters((p) => ({ ...p, entregaIni: todayIso(), entregaFim: todayIso() }))}
+                    >
+                      Hoje
+                    </Button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-slate-700 dark:text-slate-200">Início</Label>
@@ -900,25 +1017,23 @@ export function RelacaoCTes() {
                   placeholder="Buscar mercadoria..."
                   className="dark:border-slate-700 dark:bg-slate-900"
                 />
-                {optMercadorias.length > 0 && (
-                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                    {optMercadorias.map((m) => (
+                <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                  {optMercadorias.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">—</div>
+                  ) : (
+                    optMercadorias.map((m) => (
                       <button
                         key={m.codigo}
                         type="button"
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                        onClick={() => {
-                          setSelMercadoria(m);
-                          setSearchMercadoria('');
-                          setOptMercadorias([]);
-                        }}
+                        onClick={() => setSelMercadoria(m)}
                       >
                         <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{String(m.codigo)}</div>
                         <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{m.descricao}</div>
                       </button>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
                 <div className="mt-2">
                   {selMercadoria ? (
                     <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
@@ -946,25 +1061,23 @@ export function RelacaoCTes() {
                   placeholder="Buscar vendedor..."
                   className="dark:border-slate-700 dark:bg-slate-900"
                 />
-                {optVendedores.length > 0 && (
-                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
-                    {optVendedores.map((v) => (
+                <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                  {optVendedores.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">—</div>
+                  ) : (
+                    optVendedores.map((v) => (
                       <button
                         key={v.login}
                         type="button"
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-                        onClick={() => {
-                          setSelVendedor(v);
-                          setSearchVendedor('');
-                          setOptVendedores([]);
-                        }}
+                        onClick={() => setSelVendedor(v)}
                       >
                         <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">{v.login}</div>
                         <div className="text-xs text-slate-600 dark:text-slate-300 truncate">{v.nome}</div>
                       </button>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selVendedor ? (
                     <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1">
@@ -990,18 +1103,36 @@ export function RelacaoCTes() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-slate-700 dark:text-slate-200">Tipo de documento</Label>
-                    <Select value={tempFilters.tpDocumento} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpDocumento: v }))}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TP_DOCUMENTO_OPTIONS.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 max-h-44 overflow-auto">
+                      <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                        <Checkbox
+                          checked={tempFilters.tpDocumento.length === 0}
+                          onCheckedChange={(v) => {
+                            if (v) setTempFilters((p) => ({ ...p, tpDocumento: [] }));
+                          }}
+                        />
+                        <span className="text-sm text-slate-700 dark:text-slate-200">Todos</span>
+                      </label>
+                      {TP_DOCUMENTO_OPTIONS.filter((t) => t !== 'TODOS').map((t) => {
+                        const checked = tempFilters.tpDocumento.includes(t);
+                        return (
+                          <label key={t} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) => {
+                                setTempFilters((p) => {
+                                  const set = new Set(p.tpDocumento);
+                                  if (v) set.add(t);
+                                  else set.delete(t);
+                                  return { ...p, tpDocumento: Array.from(set) };
+                                });
+                              }}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-200">{t}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
@@ -1092,13 +1223,13 @@ export function RelacaoCTes() {
             </CardHeader>
             <CardContent className="pt-3">
               <div className="h-[240px]">
-                {donutUnidades.length === 0 ? (
+                {donutUnidadesData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-400">—</div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutUnidades} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
-                        {donutUnidades.map((_e, idx) => (
+                      <Pie data={donutUnidadesData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
+                        {donutUnidadesData.map((_e, idx) => (
                           <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
@@ -1117,13 +1248,13 @@ export function RelacaoCTes() {
             </CardHeader>
             <CardContent className="pt-3">
               <div className="h-[240px]">
-                {donutClientes.length === 0 ? (
+                {donutClientesData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-slate-400">—</div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutClientes} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
-                        {donutClientes.map((_e, idx) => (
+                      <Pie data={donutClientesData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
+                        {donutClientesData.map((_e, idx) => (
                           <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
@@ -1141,7 +1272,7 @@ export function RelacaoCTes() {
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
-                <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução no período</CardTitle>
+                <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução no Período</CardTitle>
                 <div className="text-xs text-slate-500 dark:text-slate-400">{total.toLocaleString('pt-BR')} CT-es</div>
               </div>
               <Tabs value={serieModo} onValueChange={(v) => setSerieModo(v as SerieModo)}>
@@ -1171,18 +1302,41 @@ export function RelacaoCTes() {
                 <div className="h-full flex items-center justify-center text-sm text-slate-400">—</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={serieData}>
+                  <AreaChart data={serieData}>
+                    <defs>
+                      <linearGradient id="gradFrete" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradMerc" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradQtde" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradCusto" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <RechartsTooltip contentStyle={tooltipStyle as any} />
-                    {serieModo === 'frete' ? <Line type="monotone" dataKey="vlr_frete" name="Frete" stroke="#6366f1" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'merc' ? <Line type="monotone" dataKey="vlr_merc" name="Merc." stroke="#f97316" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'ctes' ? <Line type="monotone" dataKey="qtde_ctes" name="CT-es" stroke="#10b981" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'custo' ? <Line type="monotone" dataKey="vlr_custo" name="Custo" stroke="#ef4444" strokeWidth={2} dot={false} /> : null}
-                    {serieModo === 'frete_custo' ? <Line type="monotone" dataKey="vlr_frete_custo" name="Frete + Custo" stroke="#8b5cf6" strokeWidth={2} dot={false} /> : null}
-                  </LineChart>
+                    {serieModo === 'frete' ? <Area type="monotone" dataKey="vlr_frete" name="Frete" stroke="#6366f1" fill="url(#gradFrete)" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'merc' ? <Area type="monotone" dataKey="vlr_merc" name="Merc." stroke="#f97316" fill="url(#gradMerc)" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'ctes' ? <Area type="monotone" dataKey="qtde_ctes" name="CT-es" stroke="#10b981" fill="url(#gradQtde)" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'custo' ? <Area type="monotone" dataKey="vlr_custo" name="Custo" stroke="#ef4444" fill="url(#gradCusto)" strokeWidth={2} dot={false} /> : null}
+                    {serieModo === 'frete_custo' ? (
+                      <>
+                        <Area type="monotone" dataKey="vlr_frete" name="Frete" stroke="#6366f1" fill="url(#gradFrete)" strokeWidth={2} dot={false} />
+                        <Area type="monotone" dataKey="vlr_custo" name="Custo" stroke="#ef4444" fill="url(#gradCusto)" strokeWidth={2} dot={false} />
+                      </>
+                    ) : null}
+                  </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
@@ -1194,7 +1348,7 @@ export function RelacaoCTes() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">Evolução por Unidade</CardTitle>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Top 5 origens + demais</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Frete total por unidade (origem) · Top 5 + demais</div>
               </div>
               <Tabs value={serieUnidModo} onValueChange={(v) => setSerieUnidModo(v as any)}>
                 <TabsList className="h-8">
@@ -1218,7 +1372,7 @@ export function RelacaoCTes() {
                     <AreaChart data={serieUnidData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis tick={{ fontSize: 11 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                       {serieUnidKeys.map((k, idx) => (
@@ -1229,7 +1383,7 @@ export function RelacaoCTes() {
                     <LineChart data={serieUnidData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis tick={{ fontSize: 11 }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                       {serieUnidKeys.map((k, idx) => (
@@ -1362,7 +1516,14 @@ export function RelacaoCTes() {
           </CardContent>
         </Card>
 
-        <CteDetalhesDialog cte={cteDialogData} open={cteDialogOpen} onOpenChange={setCteDialogOpen}>
+        <CteDetalhesDialog
+          cte={cteDialogData}
+          open={cteDialogOpen && !!cteDialogData}
+          onOpenChange={(o) => {
+            setCteDialogOpen(o);
+            if (!o) setCteDialogData(null);
+          }}
+        >
           <span />
         </CteDetalhesDialog>
       </div>
