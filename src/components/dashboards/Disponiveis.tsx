@@ -5927,7 +5927,7 @@ function ModalRotaCarregamento({
       cep: string;
       cidade: string;
       uf: string;
-      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -5936,7 +5936,7 @@ function ModalRotaCarregamento({
       tipo: 'TRANSFERENCIA';
       unidade: string;
       titulo: string;
-      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -5963,10 +5963,11 @@ function ModalRotaCarregamento({
       const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
       const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '').split('/')[0].trim();
+      const setorEntrega = normKey((c as any)?.setor_cte ?? (c as any)?.setor ?? '');
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
       const ordem = Number(c?.ordem ?? 0) || 0;
-      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
+      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
 
       if (hasEndereco) {
         const baseTitulo = destinatario;
@@ -6027,18 +6028,24 @@ function ModalRotaCarregamento({
   }, [dados, unidadesMap, unidadesOrdem]);
 
   const resumoSetoresEntrega = useMemo(() => {
-    const out: { setor: string; ctes: number; clientes: number }[] = [];
+    const map = new Map<string, { ctes: number; clientes: Set<string> }>();
     for (const g of (grupos?.entrega || [])) {
-      const setor = String((g as any)?.unidade ?? '').trim().toUpperCase();
-      if (!setor) continue;
       const ctes = Array.isArray((g as any)?.ctes) ? (g as any).ctes : [];
-      const clientesSet = new Set<string>();
       for (const c of ctes) {
+        const setorRaw = String((c as any)?.setor ?? (c as any)?.setor_cte ?? '').trim().toUpperCase();
+        const setor = setorRaw || '999';
+        const cur = map.get(setor) ?? { ctes: 0, clientes: new Set<string>() };
+        cur.ctes += 1;
         const d = String((c as any)?.destinatario ?? '').trim().toUpperCase();
-        if (d) clientesSet.add(d);
+        if (d) cur.clientes.add(d);
+        map.set(setor, cur);
       }
-      out.push({ setor, ctes: ctes.length, clientes: clientesSet.size });
     }
+    const out: { setor: string; ctes: number; clientes: number }[] = Array.from(map.entries()).map(([setor, v]) => ({
+      setor,
+      ctes: v.ctes,
+      clientes: v.clientes.size,
+    }));
     out.sort((a, b) => a.setor.localeCompare(b.setor));
     return out;
   }, [grupos]);
