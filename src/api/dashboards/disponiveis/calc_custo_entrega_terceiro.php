@@ -21,6 +21,8 @@ $unidade = strtoupper(trim(
     ?? '')
 ));
 $placaSim = strtoupper(trim((string)($input['placa_simulacao'] ?? '')));
+$seqCarreg = (int)($input['seq_carregamento'] ?? 0);
+$placaCarreg = strtoupper(trim((string)($input['placa_carregamento'] ?? '')));
 $setores = $input['setores'] ?? null;
 
 if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
@@ -28,9 +30,6 @@ if ($unidade === '' || !preg_match('/^[A-Z0-9]{2,5}$/', $unidade)) {
 }
 if ($placaSim === '' || !preg_match('/^[A-Z0-9]{6,10}$/', preg_replace('/[^A-Z0-9]/', '', $placaSim))) {
     respondJson(['success' => false, 'message' => 'Placa inválida.']);
-}
-if (!is_array($setores) || count($setores) === 0) {
-    respondJson(['success' => false, 'message' => 'Setores não informados.']);
 }
 
 $normPlate = function(string $p): string {
@@ -48,15 +47,49 @@ $toFloat = function($v): float {
 };
 
 $setorMap = [];
-foreach ($setores as $it) {
-    if (!is_array($it)) continue;
-    $setor = strtoupper(trim((string)($it['setor'] ?? '')));
-    if ($setor === '') continue;
-    $ctes = (int)($it['ctes'] ?? 0);
-    $clientes = (int)($it['clientes'] ?? 0);
-    if ($ctes < 0) $ctes = 0;
-    if ($clientes < 0) $clientes = 0;
-    $setorMap[$setor] = ['ctes' => $ctes, 'clientes' => $clientes];
+
+if ($seqCarreg > 0) {
+    $conn = connect();
+    $tblCar = "{$domain}_carregamento";
+    try {
+        $res = sql(
+            "SELECT
+                COALESCE(NULLIF(UPPER(BTRIM(setor_cte)), ''), '999') AS setor,
+                COUNT(*)::int AS ctes,
+                COUNT(DISTINCT NULLIF(UPPER(BTRIM(destinatario_cte)), ''))::int AS clientes
+             FROM {$tblCar}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+               AND COALESCE(nro_cte, 0) <> 0
+             GROUP BY 1",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        while ($res && ($row = pg_fetch_assoc($res))) {
+            $set = strtoupper(trim((string)($row['setor'] ?? '')));
+            if ($set === '') $set = '999';
+            $ctes = (int)($row['ctes'] ?? 0);
+            $clientes = (int)($row['clientes'] ?? 0);
+            if ($ctes < 0) $ctes = 0;
+            if ($clientes < 0) $clientes = 0;
+            $setorMap[$set] = ['ctes' => $ctes, 'clientes' => $clientes];
+        }
+    } catch (Exception $e) {
+    }
+}
+
+if (count($setorMap) === 0 && is_array($setores)) {
+    foreach ($setores as $it) {
+        if (!is_array($it)) continue;
+        $setor = strtoupper(trim((string)($it['setor'] ?? '')));
+        if ($setor === '') continue;
+        $ctes = (int)($it['ctes'] ?? 0);
+        $clientes = (int)($it['clientes'] ?? 0);
+        if ($ctes < 0) $ctes = 0;
+        if ($clientes < 0) $clientes = 0;
+        $setorMap[$setor] = ['ctes' => $ctes, 'clientes' => $clientes];
+    }
 }
 if (count($setorMap) === 0) {
     respondJson(['success' => false, 'message' => 'Setores inválidos.']);
@@ -229,10 +262,11 @@ respondJson([
     'success' => true,
     'placa' => $placaSim,
     'unidade' => $unidade,
+    'seq_carregamento' => $seqCarreg,
+    'placa_carregamento' => $placaCarreg,
     'arquivo' => (string)($respCsv['file'] ?? ''),
     'parcela_setores' => $parcelaSetores,
     'diaria' => $diariaMax,
     'total' => $total,
     'detalhes' => $detalhes,
 ]);
-

@@ -5416,7 +5416,7 @@ function ModalDadosOrdemCarregamento({
       try {
         const resp = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/calc_custo_entrega_terceiro.php`,
-          { method: 'POST', body: JSON.stringify({ unidade, placa_simulacao: p, setores: resumoSetoresEntrega }) },
+          { method: 'POST', body: JSON.stringify({ unidade, placa_simulacao: p, seq_carregamento: seqCarregamento, placa_carregamento: placa }) },
           true
         );
         if (!alive) return;
