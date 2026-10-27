@@ -235,7 +235,7 @@ $cteLatest = "
             custo_recepcao,
             custo_desp_div,
             custo_transferencia_real
-        FROM {$tblCte}
+        FROM {$tblCte} cte
         {$whereSql}
         ORDER BY ser_cte, nro_cte, seq_cte DESC
     )

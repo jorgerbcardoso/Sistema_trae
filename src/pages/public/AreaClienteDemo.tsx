@@ -19,7 +19,6 @@ import {
   FileDown,
   FileText,
   Gauge,
-  MapPin,
   Package,
   Receipt,
   Search,
@@ -328,20 +327,32 @@ export default function AreaClienteDemo() {
 
   const [view, setView] = useState<PortalView>('dashboard');
   const [q, setQ] = useState('');
+  const [trackingStatus, setTrackingStatus] = useState<'TODOS' | 'OK' | 'WARN' | 'DONE'>('TODOS');
+  const [trackingOrigem, setTrackingOrigem] = useState('');
+  const [trackingDestino, setTrackingDestino] = useState('');
   const [selectedId, setSelectedId] = useState<string>(REMESSAS[0]?.id ?? '');
 
   const remessasFiltradas = useMemo(() => {
+    let base = REMESSAS;
+    if (trackingStatus !== 'TODOS') {
+      const tipo = trackingStatus === 'OK' ? 'ok' : (trackingStatus === 'WARN' ? 'warn' : 'done');
+      base = base.filter((r) => r.statusTipo === tipo);
+    }
+    const o = trackingOrigem.trim().toUpperCase();
+    if (o) base = base.filter((r) => r.origem.toUpperCase().includes(o));
+    const d = trackingDestino.trim().toUpperCase();
+    if (d) base = base.filter((r) => r.destino.toUpperCase().includes(d));
     const s = q.trim().toUpperCase();
-    if (!s) return REMESSAS;
-    return REMESSAS.filter((r) => {
+    if (!s) return base;
+    return base.filter((r) => {
       const alvo = [r.id, r.ctrc, r.nf, r.origem, r.destino, r.statusLabel].join(' ').toUpperCase();
       return alvo.includes(s);
     });
-  }, [q]);
+  }, [q, trackingDestino, trackingOrigem, trackingStatus]);
 
   const remessaSel = useMemo(() => {
-    return REMESSAS.find((r) => r.id === selectedId) ?? REMESSAS[0];
-  }, [selectedId]);
+    return remessasFiltradas.find((r) => r.id === selectedId) ?? remessasFiltradas[0];
+  }, [remessasFiltradas, selectedId]);
 
   const primaryStyle = { '--portal-primary': tenant.corPrimaria, '--portal-secondary': tenant.corSecundaria } as React.CSSProperties;
 
@@ -685,6 +696,7 @@ export default function AreaClienteDemo() {
               </div>
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {REMESSAS.length > 0 ? (
                 <Card className="border-slate-200 dark:border-slate-800">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -712,7 +724,9 @@ export default function AreaClienteDemo() {
                     ))}
                   </CardContent>
                 </Card>
+                ) : null}
 
+                {FATURAS.length > 0 ? (
                 <Card className="border-slate-200 dark:border-slate-800">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -744,6 +758,7 @@ export default function AreaClienteDemo() {
                     </div>
                   </CardContent>
                 </Card>
+                ) : null}
               </div>
             </div>
           )}
@@ -757,50 +772,87 @@ export default function AreaClienteDemo() {
                     Rastreamento
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-4">
+                <CardContent className={cn('grid grid-cols-1 gap-4', remessasFiltradas.length > 0 ? 'xl:grid-cols-[360px_minmax(0,1fr)]' : '')}>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por CTRC, NF, origem, destino..." className="pl-9" />
                       </div>
-                      <Button variant="outline" className="gap-2" onClick={() => toast.message('Busca avançada (demo)')}>
-                        <MapPin className="w-4 h-4" />
-                        Filtros
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => { setQ(''); setTrackingStatus('TODOS'); setTrackingOrigem(''); setTrackingDestino(''); }}
+                      >
+                        Limpar
                       </Button>
                     </div>
-                    <ScrollArea className="h-[60vh] pr-3">
-                      <div className="space-y-2">
-                        {remessasFiltradas.map((r) => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => setSelectedId(r.id)}
-                            className={cn(
-                              'w-full rounded-xl border p-3 text-left transition-colors',
-                              r.id === selectedId
-                                ? 'border-[var(--portal-primary)] bg-slate-50 dark:bg-slate-900/40'
-                                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/30'
-                            )}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-900/40">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1.5">
+                          <Label>Status</Label>
+                          <select
+                            value={trackingStatus}
+                            onChange={(e) => setTrackingStatus(e.target.value as typeof trackingStatus)}
+                            className="w-full h-9 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-sm"
                           >
-                            <div className="flex items-center gap-2">
-                              <div className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{r.ctrc}</div>
-                              <Badge className={cn('text-[10px] h-5 px-2', statusBadgeVariant(r.statusTipo))}>{r.statusLabel}</Badge>
-                              <span className="ml-auto text-[11px] text-slate-500 dark:text-slate-400">Prev. {r.previsaoEntrega}</span>
-                            </div>
-                            <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
-                              {r.origem} <ChevronRight className="inline w-3 h-3 mx-1 opacity-60" /> {r.destino}
-                            </div>
-                            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">
-                              <span className="font-mono">{r.nf}</span>
-                              <span>{r.volume} vol · {num.format(r.pesoKg)} kg</span>
-                            </div>
-                          </button>
-                        ))}
+                            <option value="TODOS">Todos</option>
+                            <option value="OK">Em trânsito</option>
+                            <option value="WARN">Atenção</option>
+                            <option value="DONE">Entregue</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Origem</Label>
+                          <Input value={trackingOrigem} onChange={(e) => setTrackingOrigem(e.target.value)} placeholder="Filtrar origem" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Destino</Label>
+                          <Input value={trackingDestino} onChange={(e) => setTrackingDestino(e.target.value)} placeholder="Filtrar destino" />
+                        </div>
                       </div>
-                    </ScrollArea>
+                    </div>
+
+                    {remessasFiltradas.length > 0 ? (
+                      <ScrollArea className="h-[60vh] pr-3">
+                        <div className="space-y-2">
+                          {remessasFiltradas.map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setSelectedId(r.id)}
+                              className={cn(
+                                'w-full rounded-xl border p-3 text-left transition-colors',
+                                r.id === selectedId
+                                  ? 'border-[var(--portal-primary)] bg-slate-50 dark:bg-slate-900/40'
+                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/30'
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{r.ctrc}</div>
+                                <Badge className={cn('text-[10px] h-5 px-2', statusBadgeVariant(r.statusTipo))}>{r.statusLabel}</Badge>
+                                <span className="ml-auto text-[11px] text-slate-500 dark:text-slate-400">Prev. {r.previsaoEntrega}</span>
+                              </div>
+                              <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+                                {r.origem} <ChevronRight className="inline w-3 h-3 mx-1 opacity-60" /> {r.destino}
+                              </div>
+                              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">
+                                <span className="font-mono">{r.nf}</span>
+                                <span>{r.volume} vol · {num.format(r.pesoKg)} kg</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Nenhuma remessa encontrada</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Ajuste a busca ou os filtros acima.</div>
+                      </div>
+                    )}
                   </div>
 
+                  {remessasFiltradas.length > 0 ? (
                   <div className="min-w-0 space-y-3">
                     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
                       <div className="flex flex-wrap items-start gap-3">
@@ -854,6 +906,7 @@ export default function AreaClienteDemo() {
                       </CardContent>
                     </Card>
                   </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
