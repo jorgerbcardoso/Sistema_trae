@@ -11385,6 +11385,10 @@ export function Disponiveis() {
         true
       );
       if (res?.needs_confirm && res?.conflito?.placa_ssw) {
+        if (opts?.silent) {
+          toast.info('Conflito detectado na importação do TMS. Abra o modal de importação para resolver.');
+          return res;
+        }
         const placaSsw = String(res.conflito.placa_ssw ?? '').trim().toUpperCase();
         const placaPresto = String(res.conflito.placa_presto ?? '').trim().toUpperCase();
         const placaSugerida = String(res.conflito.placa_sugerida ?? placaSsw).trim().toUpperCase();
@@ -12480,18 +12484,24 @@ export function Disponiveis() {
     void (async () => {
       setLoadingInicial(true);
       try {
-        // Importação inicial do SSW e carga dos carregamentos
-        await importarCarregamentosSSWObrigatorio();
-        if (!ativo) return;
-        await carregar();
-        if (!ativo) return;
-        await carregarEntrega();
+        await Promise.all([
+          carregar(),
+          carregarEntrega(),
+          carregarCarregamentos(),
+        ]);
       } finally {
         if (ativo) setLoadingInicial(false);
       }
     })();
+
+    if (importacaoAutomatica) {
+      setTimeout(() => {
+        if (!ativo) return;
+        void handleImportarCarregamentos({ silent: true });
+      }, 0);
+    }
     return () => { ativo = false; };
-  }, [sigla, isMTZ, carregar, carregarEntrega, importarCarregamentosSSWObrigatorio]);
+  }, [sigla, isMTZ, importacaoAutomatica, carregar, carregarEntrega, carregarCarregamentos, handleImportarCarregamentos]);
 
   const hasFiltrosAtivos =
     (filters.unidadeDestino?.length ?? 0) > 0 ||
