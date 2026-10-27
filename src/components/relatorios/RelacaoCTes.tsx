@@ -145,6 +145,12 @@ const fmtDateBR = (iso?: string) => {
   const [y, m, d] = s.split('-');
   return `${d}/${m}/${y.slice(2)}`;
 };
+const fmtDateBRNoYear = (iso?: string) => {
+  const s = String(iso || '').slice(0, 10);
+  if (!s || !/^\d{4}\-\d{2}\-\d{2}$/.test(s)) return '—';
+  const [, m, d] = s.split('-');
+  return `${d}/${m}`;
+};
 const fmtMoney = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtKg = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const fmtM3 = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -359,6 +365,10 @@ export function RelacaoCTes() {
   };
 
   const openCte = (r: LinhaCte) => {
+    const nfiscal = String(r.nfs || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter((x) => x !== '')[0];
     const data: CteDetalhesData = {
       serCte: r.ser_cte,
       nroCte: r.nro_cte,
@@ -373,7 +383,7 @@ export function RelacaoCTes() {
       pagador: r.nome_pag,
       destinatario: r.nome_dest,
       placaColeta: r.placa_coleta,
-      nfiscal: '',
+      nfiscal: nfiscal || '',
       frete: r.vlr_frete,
       vlrMerc: r.vlr_merc,
       pesoReal: r.peso_real,
@@ -626,7 +636,7 @@ export function RelacaoCTes() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 bg-slate-50/60 dark:bg-slate-900/40">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de emissão</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Emissão</div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -680,7 +690,7 @@ export function RelacaoCTes() {
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de previsão de entrega</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Prev. Entr</div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -734,7 +744,7 @@ export function RelacaoCTes() {
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Período de entrega/baixa</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Entr./Baixa</div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -1099,98 +1109,97 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Tipo de documento</Label>
-                    <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 max-h-44 overflow-auto">
-                      <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                        <Checkbox
-                          checked={tempFilters.tpDocumento.length === 0}
-                          onCheckedChange={(v) => {
-                            if (v) setTempFilters((p) => ({ ...p, tpDocumento: [] }));
-                          }}
-                        />
-                        <span className="text-sm text-slate-700 dark:text-slate-200">Todos</span>
-                      </label>
-                      {TP_DOCUMENTO_OPTIONS.filter((t) => t !== 'TODOS').map((t) => {
-                        const checked = tempFilters.tpDocumento.includes(t);
-                        return (
-                          <label key={t} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(v) => {
-                                setTempFilters((p) => {
-                                  const set = new Set(p.tpDocumento);
-                                  if (v) set.add(t);
-                                  else set.delete(t);
-                                  return { ...p, tpDocumento: Array.from(set) };
-                                });
-                              }}
-                            />
-                            <span className="text-sm text-slate-700 dark:text-slate-200">{t}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
-                    <Select value={tempFilters.tpFrete || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpFrete: v === 'T' ? '' : (v as any) }))}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="T">Todos</SelectItem>
-                        <SelectItem value="C">CIF</SelectItem>
-                        <SelectItem value="F">FOB</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tipo de documento</div>
+                <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 max-h-52 overflow-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2">
+                    <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                      <Checkbox
+                        checked={tempFilters.tpDocumento.length === 0}
+                        onCheckedChange={(v) => {
+                          if (v) setTempFilters((p) => ({ ...p, tpDocumento: [] }));
+                        }}
+                      />
+                      <span className="text-sm text-slate-700 dark:text-slate-200">Todos</span>
+                    </label>
+                    {TP_DOCUMENTO_OPTIONS.filter((t) => t !== 'TODOS').map((t) => {
+                      const checked = tempFilters.tpDocumento.includes(t);
+                      return (
+                        <label key={t} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              setTempFilters((p) => {
+                                const set = new Set(p.tpDocumento);
+                                if (v) set.add(t);
+                                else set.delete(t);
+                                return { ...p, tpDocumento: Array.from(set) };
+                              });
+                            }}
+                          />
+                          <span className="text-sm text-slate-700 dark:text-slate-200">{t}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Liquidação</Label>
-                    <Select value={tempFilters.liquidacao || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, liquidacao: v === 'T' ? '' : (v as any) }))}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="T">Todos</SelectItem>
-                        <SelectItem value="P">Pendentes</SelectItem>
-                        <SelectItem value="L">Liquidados</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Entrega</Label>
-                    <Select value={tempFilters.entrega || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, entrega: v === 'T' ? '' : (v as any) }))}>
-                      <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="T">Todos</SelectItem>
-                        <SelectItem value="P">Pendentes</SelectItem>
-                        <SelectItem value="E">Entregues</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Série</Label>
-                    <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 dark:text-slate-200">Número</Label>
-                    <Input value={tempFilters.nroCte} onChange={(e) => setTempFilters((p) => ({ ...p, nroCte: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
-                  </div>
-                </div>
-
+            <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2">
-                  <Label className="text-slate-700 dark:text-slate-200">NF (dentro do campo nfs)</Label>
+                  <Label className="text-slate-700 dark:text-slate-200">Tipo de frete</Label>
+                  <Select value={tempFilters.tpFrete || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, tpFrete: v === 'T' ? '' : (v as any) }))}>
+                    <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="T">Todos</SelectItem>
+                      <SelectItem value="C">CIF</SelectItem>
+                      <SelectItem value="F">FOB</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">Liquidação</Label>
+                  <Select value={tempFilters.liquidacao || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, liquidacao: v === 'T' ? '' : (v as any) }))}>
+                    <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="T">Todos</SelectItem>
+                      <SelectItem value="P">Pendentes</SelectItem>
+                      <SelectItem value="L">Liquidados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">Entrega</Label>
+                  <Select value={tempFilters.entrega || 'T'} onValueChange={(v) => setTempFilters((p) => ({ ...p, entrega: v === 'T' ? '' : (v as any) }))}>
+                    <SelectTrigger className="dark:border-slate-700 dark:bg-slate-900">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="T">Todos</SelectItem>
+                      <SelectItem value="P">Pendentes</SelectItem>
+                      <SelectItem value="E">Entregues</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">Série</Label>
+                  <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">Número</Label>
+                  <Input value={tempFilters.nroCte} onChange={(e) => setTempFilters((p) => ({ ...p, nroCte: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">NF</Label>
                   <Input value={tempFilters.nroNf} onChange={(e) => setTempFilters((p) => ({ ...p, nroNf: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" placeholder="Digite o número da NF" />
                 </div>
               </div>
@@ -1405,17 +1414,22 @@ export function RelacaoCTes() {
                 {rows.length} registros • {page}/{totalPages}
               </Badge>
             </div>
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-900/25 dark:text-blue-200 border border-blue-100 dark:border-blue-900/40">
+                Clique sobre a linha para ver detalhes do documento
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="max-h-[85vh] overflow-y-auto overflow-x-hidden relative">
               <table className="w-full text-sm table-fixed">
                 <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-10">
                   <tr className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    <th className="px-3 py-2 text-left w-[90px]">
-                      <SortBtn k="data_emissao" label="Emissão" defaultDir="desc" />
-                    </th>
                     <th className="px-3 py-2 text-left w-[94px]">
                       <SortBtn k="ser_cte" label="CT-e" />
+                    </th>
+                    <th className="px-3 py-2 text-left w-[90px]">
+                      <SortBtn k="data_emissao" label="Emissão" defaultDir="desc" />
                     </th>
                     <th className="px-3 py-2 text-left w-[70px]">
                       <SortBtn k="sigla_emit" label="Orig." />
@@ -1423,15 +1437,13 @@ export function RelacaoCTes() {
                     <th className="px-3 py-2 text-left w-[70px]">
                       <SortBtn k="sigla_dest" label="Dest." />
                     </th>
-                    <th className="px-3 py-2 text-left w-[120px]">
+                    <th className="px-3 py-2 text-left w-[90px]">
                       <SortBtn k="data_prev_ent" label="Prev. Ent." defaultDir="desc" />
                     </th>
-                    <th className="px-3 py-2 text-left w-[90px]">
+                    <th className="px-3 py-2 text-left w-[80px]">
                       <SortBtn k="data_entrega" label="Entrega" defaultDir="desc" />
                     </th>
                     <th className="px-3 py-2 text-left">Pagador</th>
-                    <th className="px-3 py-2 text-left">Remetente</th>
-                    <th className="px-3 py-2 text-left">Destinatário</th>
                     <th className="px-3 py-2 text-right w-[110px]">
                       <SortBtn k="vlr_merc" label="Vlr. Merc." align="right" defaultDir="desc" />
                     </th>
@@ -1447,13 +1459,12 @@ export function RelacaoCTes() {
                     <th className="px-3 py-2 text-right w-[60px]">
                       <SortBtn k="qtde_vol" label="Vol" align="right" defaultDir="desc" />
                     </th>
-                    <th className="px-3 py-2 text-center w-[78px]">Liq.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
+                      <td colSpan={12} className="px-3 py-10 text-center text-slate-400 dark:text-slate-500">
                         {loading ? 'Carregando...' : 'Nenhum CT-e encontrado com os filtros atuais.'}
                       </td>
                     </tr>
@@ -1467,23 +1478,18 @@ export function RelacaoCTes() {
                           onClick={() => openCte(r)}
                           title="Clique para ver detalhes"
                         >
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_emissao)}</td>
                           <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{ctrc}</td>
+                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_emissao)}</td>
                           <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{r.sigla_emit || '—'}</td>
                           <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{r.sigla_dest || '—'}</td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_prev_ent)}</td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBR(r.data_entrega)}</td>
+                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBRNoYear(r.data_prev_ent)}</td>
+                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBRNoYear(r.data_entrega)}</td>
                           <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 truncate">{r.nome_pag || '—'}</td>
-                          <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 truncate">{r.nome_emit || '—'}</td>
-                          <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 truncate">{r.nome_dest || '—'}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_merc)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_frete)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtKg(r.peso_real)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtM3(r.cubagem)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{(r.qtde_vol || 0).toLocaleString('pt-BR')}</td>
-                          <td className="px-3 py-2 text-center whitespace-nowrap">
-                            {r.liquidado ? <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 text-[11px]">SIM</Badge> : <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 text-[11px]">NÃO</Badge>}
-                          </td>
                         </tr>
                       );
                     })
