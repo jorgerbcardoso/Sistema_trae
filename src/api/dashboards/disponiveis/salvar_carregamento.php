@@ -887,6 +887,17 @@ if ($acao === 'iniciar_simulacao') {
             $conn
         );
 
+        if (strtoupper(trim((string)$domain)) === 'RVE') {
+            sql(
+                "DELETE FROM {$tabela}
+                 WHERE unidade = \$1
+                   AND seq_carregamento = \$2
+                   AND COALESCE(nro_cte, 0) <> 0",
+                [$unidade, $seqCarreg],
+                $conn
+            );
+        }
+
         pg_query($conn, 'COMMIT');
         respondJson(['success' => true]);
     } catch (Exception $e) {

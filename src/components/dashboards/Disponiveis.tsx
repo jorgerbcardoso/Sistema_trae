@@ -2477,7 +2477,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
   const abrirIniciarSimulacao = async () => {
     const ok = await confirmar({
       title: 'Iniciar carregamento via TMS?',
-      description: 'Atenção: a simulação do carregamento será limpa, para início do carregamento atráves do TMS, por bipagem ou manualmente.',
+      description: 'Atenção: o carregamento será iniciado via TMS. Os CT-es serão preenchidos conforme conferência (bipagem) ou apontamento manual.',
       confirmText: 'Continuar',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -4289,12 +4289,17 @@ function ModalCarregamentoAutomatico(props: ModalCarregamentoAutomaticoProps) {
       const jaExistePlaca = placaAuto ? placasExistentes.has(placaAuto) : false;
       const jaExisteLinha = nro > 0 && linhasEmCarregamento.has(nro);
       const jaExiste = jaExistePlaca || jaExisteLinha;
-      const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
+      // Regra antiga (DESATIVADA):
+      // Antes bloqueávamos linhas com intermediárias quando a linha direta do mesmo destino final já atingia
+      // a capacidade mínima (67m³ / 27t). Isso evitava "duplicar" rotas, mas na prática impedia montar
+      // carregamentos intermediados mesmo com carga disponível. Mantido aqui só como referência.
+      // const bloqueadaPorDireta = intermediarias.length > 0 && diretaLotaPorDestino.has(dest);
+      const bloqueadaPorDireta = false;
 
       const motivos: string[] = [];
       if (jaExisteLinha) motivos.push(`Linha ${String(nro).padStart(3, '0')} já possui carregamento iniciado.`);
       if (jaExistePlaca) motivos.push(`Carregamento ${placaAuto} já existe.`);
-      if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
+      // if (bloqueadaPorDireta) motivos.push('Linha direta já atinge a capacidade mínima (67m³ / 27t) para o destino final.');
 
       const bloqueada = jaExiste || bloqueadaPorDireta;
       out[nro] = {
