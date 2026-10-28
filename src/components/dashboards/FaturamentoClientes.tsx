@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AreaChart,
   Area,
+  Bar,
+  BarChart,
   LineChart,
   Line,
   XAxis,
@@ -1078,7 +1080,7 @@ export function FaturamentoClientes() {
                     <div className="space-y-2">
                       <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{titulo}</div>
                       <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-800">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-px">
                           <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-indigo-50 dark:from-slate-900/90 dark:to-indigo-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Receita`)}>
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-indigo-400" />
                             <div className="relative flex items-center gap-3">
@@ -1094,14 +1096,14 @@ export function FaturamentoClientes() {
                                   const showEst = est > 0 && Math.abs(est - (Number(tt?.total_frete ?? 0) || 0)) > 0.01;
                                   return (
                                     <>
-                                      <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap`}>{v}</div>
+                                      <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap leading-tight`}>{v}</div>
                                       {metaPeriodo > 0 && (
-                                        <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                                        <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap leading-tight">
                                           Meta {fmtBRL(metaPeriodo)} · {Math.round(pctMeta)}%
                                         </div>
                                       )}
                                       {showEst && (
-                                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap leading-tight">
                                           Est. {fmtBRL(est)}
                                         </div>
                                       )}
@@ -1140,37 +1142,28 @@ export function FaturamentoClientes() {
                               </div>
                             </div>
                           </div>
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — CT-es`)}>
+                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-cyan-50 dark:from-slate-900/90 dark:to-cyan-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Indicadores`)}>
                             <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-cyan-400" />
-                            <div className="relative flex items-center gap-3">
+                            <div className="relative flex items-start gap-3">
                               <div className="p-2"><Truck className="h-5 w-5 text-cyan-700 dark:text-cyan-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
-                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtNum(Number(tt?.qtde_ctes ?? 0))}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-blue-50 dark:from-slate-900/90 dark:to-blue-900/10 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Clientes`)}>
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 bg-blue-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><Users className="h-5 w-5 text-blue-700 dark:text-blue-300" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
-                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtNum(Number(tt?.qtde_clientes ?? 0))}</div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="relative overflow-hidden p-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900/90 dark:to-slate-900/40 cursor-pointer" role="button" onClick={() => abrirPeriodoAtual(`${titulo} — Ticket`)}>
-                            <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-15 bg-slate-400" />
-                            <div className="relative flex items-center gap-3">
-                              <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
-                              <div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
-                                {(() => {
-                                  const v = fmtBRL(tk);
-                                  const cls = v.length >= 18 ? 'text-sm' : 'text-base';
-                                  return <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap`}>{v}</div>;
-                                })()}
+                              <div className="min-w-0">
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">CT-es · Clientes · Ticket</div>
+                                <div className="mt-0.5 grid grid-cols-3 gap-2">
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">CT-es</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtNum(Number(tt?.qtde_ctes ?? 0))}</div>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Clientes</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                                      {Number(tt?.qtde_clientes ?? 0) > 0 ? fmtNum(Number(tt?.qtde_clientes ?? 0)) : '—'}
+                                    </div>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
+                                    <div className="text-sm font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRL(tk)}</div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1511,6 +1504,67 @@ export function FaturamentoClientes() {
                             formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{v}</span>}
                           />
                         </PieChart>
+                      </ResponsiveContainer>
+                    );
+                  })()}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    Meta por Unidade (período)
+                  </h3>
+                  {unidades.length === 0 ? (
+                    <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Sem dados</div>
+                  ) : (() => {
+                    const list = [...unidades].sort((a, b) => (b.total_frete || 0) - (a.total_frete || 0));
+                    const top = list.slice(0, 10);
+                    const rest = list.slice(10);
+                    if (rest.length > 0) {
+                      top.push({
+                        sigla: 'Demais',
+                        total_frete: rest.reduce((s, u) => s + (Number(u.total_frete ?? 0) || 0), 0),
+                        meta_periodo: rest.reduce((s, u) => s + (Number(u.meta_periodo ?? 0) || 0), 0),
+                      } as any);
+                    }
+                    const data = top.map((u: any) => {
+                      const meta = Number(u.meta_periodo ?? 0) || 0;
+                      const frete = Number(u.total_frete ?? 0) || 0;
+                      return {
+                        sigla: String(u.sigla ?? ''),
+                        meta,
+                        frete,
+                        pct: meta > 0 ? (frete / meta) * 100 : 0,
+                      };
+                    });
+                    return (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={data} margin={{ top: 6, right: 14, left: 0, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                          <XAxis dataKey="sigla" tick={{ fill: textColor, fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={40} />
+                          <YAxis tick={{ fill: textColor, fontSize: 11 }} tickFormatter={v => `R$${(Number(v) / 1000).toFixed(0)}k`} />
+                          <RechartsTooltip
+                            contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                            formatter={(v: number, key: string, props: any) => {
+                              const p = props?.payload ?? {};
+                              if (key === 'meta') return [fmtBRL(Number(v) || 0), `Meta${p.meta > 0 ? '' : ' (0)'}`];
+                              if (key === 'frete') {
+                                const meta = Number(p.meta ?? 0) || 0;
+                                const pct = Number(p.pct ?? 0) || 0;
+                                const metaTxt = meta > 0 ? ` · ${Math.round(pct)}%` : '';
+                                return [fmtBRL(Number(v) || 0), `Receita${metaTxt}`];
+                              }
+                              return [fmtBRL(Number(v) || 0), key];
+                            }}
+                          />
+                          <Legend
+                            iconType="circle"
+                            iconSize={8}
+                            formatter={(v) => <span style={{ color: textColor, fontSize: 11 }}>{String(v)}</span>}
+                          />
+                          <Bar dataKey="meta" name="Meta" fill="#94a3b8" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="frete" name="Receita" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                        </BarChart>
                       </ResponsiveContainer>
                     );
                   })()}
