@@ -370,15 +370,24 @@ $serieUnid = [];
 
 $totalFrete = 0.0;
 $totalMerc = 0.0;
+$totalPeso = 0.0;
+$totalCubagem = 0.0;
+$totalVol = 0;
 $totRes = sql($cteLatest . "
     SELECT
         COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total_frete,
-        COALESCE(SUM(cte.vlr_merc), 0)::numeric AS total_merc
+        COALESCE(SUM(cte.vlr_merc), 0)::numeric AS total_merc,
+        COALESCE(SUM(cte.peso_real), 0)::numeric AS total_peso_real,
+        COALESCE(SUM(cte.cubagem), 0)::numeric AS total_cubagem,
+        COALESCE(SUM(cte.qtde_vol), 0)::numeric AS total_vol
     FROM cte
 ", $params, $conn);
 if ($totRes && ($r = pg_fetch_assoc($totRes))) {
     $totalFrete = (float)($r['total_frete'] ?? 0);
     $totalMerc = (float)($r['total_merc'] ?? 0);
+    $totalPeso = (float)($r['total_peso_real'] ?? 0);
+    $totalCubagem = (float)($r['total_cubagem'] ?? 0);
+    $totalVol = (int)($r['total_vol'] ?? 0);
 }
 
 $donutUnidRes = sql($cteLatest . "
@@ -497,6 +506,9 @@ respondJson([
     'totalPages' => $totalPages,
     'total_frete' => $totalFrete,
     'total_merc' => $totalMerc,
+    'total_peso_real' => $totalPeso,
+    'total_cubagem' => $totalCubagem,
+    'total_vol' => $totalVol,
     'sortKey' => $sortKey,
     'sortDir' => $sortDir,
     'rows' => $rows,

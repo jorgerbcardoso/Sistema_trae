@@ -192,6 +192,9 @@ export function RelacaoCTes() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalFrete, setTotalFrete] = useState(0);
   const [totalMerc, setTotalMerc] = useState(0);
+  const [totalPeso, setTotalPeso] = useState(0);
+  const [totalCubagem, setTotalCubagem] = useState(0);
+  const [totalVol, setTotalVol] = useState(0);
 
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'data_emissao', dir: 'desc' });
   const [serieModo, setSerieModo] = useState<SerieModo>('frete');
@@ -300,6 +303,9 @@ export function RelacaoCTes() {
         setTotalPages(1);
         setTotalFrete(0);
         setTotalMerc(0);
+        setTotalPeso(0);
+        setTotalCubagem(0);
+        setTotalVol(0);
         return;
       }
 
@@ -312,6 +318,9 @@ export function RelacaoCTes() {
       setTotalPages(Number(res.totalPages ?? 1) || 1);
       setTotalFrete(Number(res.total_frete ?? 0) || 0);
       setTotalMerc(Number(res.total_merc ?? 0) || 0);
+      setTotalPeso(Number(res.total_peso_real ?? 0) || 0);
+      setTotalCubagem(Number(res.total_cubagem ?? 0) || 0);
+      setTotalVol(Number(res.total_vol ?? 0) || 0);
       setPage(Number(res.page ?? pageToLoad) || pageToLoad);
     } catch (e: any) {
       toast.error('Erro ao carregar relação', { description: e?.message || 'Falha inesperada.' });
@@ -432,15 +441,43 @@ export function RelacaoCTes() {
     const arr = [...donutUnidades];
     const idx = arr.findIndex((d) => d.name === 'DEMAIS');
     if (idx >= 0) arr.push(arr.splice(idx, 1)[0]);
-    return arr;
+    const total = arr.reduce((s, d) => s + (Number(d.value || 0) || 0), 0);
+    return arr.map((d) => {
+      const v = Number(d.value || 0) || 0;
+      return { ...d, value: v, percent: total > 0 ? v / total : 0 };
+    });
   }, [donutUnidades]);
 
   const donutClientesData = useMemo(() => {
     const arr = [...donutClientes];
     const idx = arr.findIndex((d) => d.name === 'DEMAIS');
     if (idx >= 0) arr.push(arr.splice(idx, 1)[0]);
-    return arr;
+    const total = arr.reduce((s, d) => s + (Number(d.value || 0) || 0), 0);
+    return arr.map((d) => {
+      const v = Number(d.value || 0) || 0;
+      return { ...d, value: v, percent: total > 0 ? v / total : 0 };
+    });
   }, [donutClientes]);
+
+  const renderDonutPercent = (p: any) => {
+    const percent = Number(p?.percent || 0) || 0;
+    if (percent < 0.035) return null;
+    const cx = Number(p?.cx || 0) || 0;
+    const cy = Number(p?.cy || 0) || 0;
+    const midAngle = Number(p?.midAngle || 0) || 0;
+    const innerRadius = Number(p?.innerRadius || 0) || 0;
+    const outerRadius = Number(p?.outerRadius || 0) || 0;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
+    const rad = Math.PI / 180;
+    const x = cx + radius * Math.cos(-midAngle * rad);
+    const y = cy + radius * Math.sin(-midAngle * rad);
+    const label = `${Math.round(percent * 100)}%`;
+    return (
+      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="currentColor" fontSize={11} fontWeight={600}>
+        {label}
+      </text>
+    );
+  };
 
   const serieUnidKeys = useMemo(() => {
     const present = new Set(serieUnidades.map((x) => String(x.unid || '')).filter((s) => s !== ''));
@@ -1262,12 +1299,29 @@ export function RelacaoCTes() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutUnidadesData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
+                      <Pie
+                        data={donutUnidadesData as any}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        stroke="none"
+                        labelLine={false}
+                        label={renderDonutPercent as any}
+                      >
                         {donutUnidadesData.map((_e, idx) => (
                           <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Legend
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value: any, entry: any) => {
+                          const percent = Number(entry?.payload?.percent || 0) || 0;
+                          const pct = percent > 0 ? ` (${Math.round(percent * 100)}%)` : '';
+                          return `${String(value)}${pct}`;
+                        }}
+                      />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                     </PieChart>
                   </ResponsiveContainer>
@@ -1287,12 +1341,29 @@ export function RelacaoCTes() {
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={donutClientesData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} stroke="none">
+                      <Pie
+                        data={donutClientesData as any}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        stroke="none"
+                        labelLine={false}
+                        label={renderDonutPercent as any}
+                      >
                         {donutClientesData.map((_e, idx) => (
                           <Cell key={idx} fill={donutColors[idx % donutColors.length]} stroke="none" />
                         ))}
                       </Pie>
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Legend
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value: any, entry: any) => {
+                          const percent = Number(entry?.payload?.percent || 0) || 0;
+                          const pct = percent > 0 ? ` (${Math.round(percent * 100)}%)` : '';
+                          return `${String(value)}${pct}`;
+                        }}
+                      />
                       <RechartsTooltip contentStyle={tooltipStyle as any} />
                     </PieChart>
                   </ResponsiveContainer>
@@ -1522,19 +1593,27 @@ export function RelacaoCTes() {
                     })
                   )}
                 </tbody>
+                <tfoot className="sticky bottom-0 z-10">
+                  <tr className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2 text-left">Totais</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(totalMerc)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtMoney(totalFrete)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtKg(totalPeso)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{fmtM3(totalCubagem)}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">{totalVol.toLocaleString('pt-BR')}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between bg-slate-50 dark:bg-slate-900/80">
-              <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
-                <span>
-                  CT-es: <span className="font-semibold text-slate-700 dark:text-slate-200">{total.toLocaleString('pt-BR')}</span>
-                </span>
-                <span>
-                  Frete: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(totalFrete)}</span>
-                </span>
-                <span>
-                  Vlr. Merc.: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(totalMerc)}</span>
-                </span>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Registros: <span className="font-semibold text-slate-700 dark:text-slate-200">{total.toLocaleString('pt-BR')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={loading || page <= 1} onClick={() => { setPage(1); carregar(1, sort, filters); }}>
