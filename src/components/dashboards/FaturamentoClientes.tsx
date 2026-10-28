@@ -121,6 +121,10 @@ interface ClienteRanking {
   qtde_cif: number;
   qtde_fob: number;
   is_grupo?: boolean;
+  meta_mensal?: number;
+  meta_periodo?: number;
+  pct_meta?: number;
+  estimativa_frete?: number;
 }
 
 type PdfClienteItem = {
@@ -137,6 +141,10 @@ type PdfClienteItem = {
 interface Totais {
   qtde_ctes: number;
   total_frete: number;
+  meta_mensal?: number;
+  meta_periodo?: number;
+  pct_meta?: number;
+  estimativa_frete?: number;
   total_custos?: number;
   total_resultado?: number;
   custo_seguro?: number;
@@ -186,6 +194,10 @@ interface UnidadeFat {
   total_custos?: number;
   total_resultado?: number;
   qtde_ctes: number;
+  meta_mensal?: number;
+  meta_periodo?: number;
+  pct_meta?: number;
+  estimativa_frete?: number;
 }
 
 interface ClienteOpcao {
@@ -251,6 +263,139 @@ export function FaturamentoClientes() {
   const [pdfItems, setPdfItems] = useState<PdfClienteItem[]>([]);
   const [pdfShowQtdCtes, setPdfShowQtdCtes] = useState(true);
   const [pdfShowFaturamento, setPdfShowFaturamento] = useState(true);
+
+  const [metaClientesOpen, setMetaClientesOpen] = useState(false);
+  const [metaClientesSearch, setMetaClientesSearch] = useState('');
+  const [metaClientesOnlyWithMeta, setMetaClientesOnlyWithMeta] = useState(false);
+  const [metaClientesLoading, setMetaClientesLoading] = useState(false);
+  const [metaClientesItems, setMetaClientesItems] = useState<any[]>([]);
+  const [metaClientesDraft, setMetaClientesDraft] = useState<Record<string, string>>({});
+
+  const [metaUnidadesOpen, setMetaUnidadesOpen] = useState(false);
+  const [metaUnidadesSearch, setMetaUnidadesSearch] = useState('');
+  const [metaUnidadesOnlyWithMeta, setMetaUnidadesOnlyWithMeta] = useState(false);
+  const [metaUnidadesLoading, setMetaUnidadesLoading] = useState(false);
+  const [metaUnidadesItems, setMetaUnidadesItems] = useState<any[]>([]);
+  const [metaUnidadesDraft, setMetaUnidadesDraft] = useState<Record<string, string>>({});
+
+  const parseNumBR = (v: string): number => {
+    let s = String(v ?? '').trim();
+    if (!s) return 0;
+    s = s.replace(/[^\d,.\-]/g, '');
+    if (!s) return 0;
+    const hasComma = s.includes(',');
+    if (hasComma) s = s.replace(/\./g, '').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const carregarMetasClientes = useCallback(async () => {
+    setMetaClientesLoading(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_clientes_list.php`,
+        { method: 'POST', body: JSON.stringify({ search: metaClientesSearch, onlyWithMeta: metaClientesOnlyWithMeta }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao carregar metas de clientes');
+        setMetaClientesItems([]);
+        setMetaClientesDraft({});
+        return;
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      setMetaClientesItems(items);
+      setMetaClientesDraft(() => {
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const cnpj = String(it?.cnpj ?? '');
+          const m = Number(it?.meta_mensal ?? 0) || 0;
+          next[cnpj] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        }
+        return next;
+      });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar metas de clientes');
+      setMetaClientesItems([]);
+      setMetaClientesDraft({});
+    } finally {
+      setMetaClientesLoading(false);
+    }
+  }, [metaClientesSearch, metaClientesOnlyWithMeta]);
+
+  const salvarMetaCliente = useCallback(async (cnpj: string, raw: string) => {
+    const meta = parseNumBR(raw);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_cliente_set.php`,
+        { method: 'POST', body: JSON.stringify({ cnpj, meta_mensal: meta > 0 ? meta : null }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao salvar meta');
+        return;
+      }
+      toast.success('Meta salva.');
+      await carregarMetasClientes();
+      await carregarDados(filters, groupBy);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar meta');
+    }
+  }, [carregarMetasClientes, carregarDados, filters, groupBy]);
+
+  const carregarMetasUnidades = useCallback(async () => {
+    setMetaUnidadesLoading(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_unidades_list.php`,
+        { method: 'POST', body: JSON.stringify({ search: metaUnidadesSearch, onlyWithMeta: metaUnidadesOnlyWithMeta }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao carregar metas de unidades');
+        setMetaUnidadesItems([]);
+        setMetaUnidadesDraft({});
+        return;
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      setMetaUnidadesItems(items);
+      setMetaUnidadesDraft(() => {
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const sigla = String(it?.sigla ?? '');
+          const m = Number(it?.meta_mensal ?? 0) || 0;
+          next[sigla] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        }
+        return next;
+      });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar metas de unidades');
+      setMetaUnidadesItems([]);
+      setMetaUnidadesDraft({});
+    } finally {
+      setMetaUnidadesLoading(false);
+    }
+  }, [metaUnidadesSearch, metaUnidadesOnlyWithMeta]);
+
+  const salvarMetaUnidade = useCallback(async (sigla: string, raw: string) => {
+    const meta = parseNumBR(raw);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_unidade_set.php`,
+        { method: 'POST', body: JSON.stringify({ sigla, meta_mensal: meta > 0 ? meta : null }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao salvar meta');
+        return;
+      }
+      toast.success('Meta salva.');
+      await carregarMetasUnidades();
+      await carregarDados(filters, groupBy);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar meta');
+    }
+  }, [carregarMetasUnidades, carregarDados, filters, groupBy]);
 
   const resolveLogoUrlAbs = (url: string) => {
     if (!url) return '';
@@ -846,27 +991,45 @@ export function FaturamentoClientes() {
                 : `Análise de resultado por cliente pagador — top ${filters.topN} por valor de frete`}
             </p>
           </div>
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
-            <button
-              onClick={() => setGroupBy('grupos')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                groupBy === 'grupos'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+              <button
+                onClick={() => setGroupBy('grupos')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  groupBy === 'grupos'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Grupos
+              </button>
+              <button
+                onClick={() => setGroupBy('clientes')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  groupBy === 'clientes'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Clientes
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setMetaClientesOpen(true); void carregarMetasClientes(); }}
+              className="dark:border-slate-600 dark:hover:bg-slate-800"
             >
-              Grupos
-            </button>
-            <button
-              onClick={() => setGroupBy('clientes')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                groupBy === 'clientes'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
+              Configurar Metas por Cliente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setMetaUnidadesOpen(true); void carregarMetasUnidades(); }}
+              className="dark:border-slate-600 dark:hover:bg-slate-800"
             >
-              Clientes
-            </button>
+              Configurar Metas por Unidade
+            </Button>
           </div>
         </div>
 
@@ -902,6 +1065,10 @@ export function FaturamentoClientes() {
                   }, { qtde_ctes: 0, total_frete: 0, total_custos: 0, total_resultado: 0, qtde_clientes: rankBase.length });
                   const rankTicket = rankTot.qtde_ctes > 0 ? rankTot.total_frete / rankTot.qtde_ctes : 0;
                   const rankLabel = filters.cnpjsPagadores.length > 0 ? `Selecionados (${rankBase.length})` : `Top ${filters.topN}`;
+                  const rankMetaPeriodo = rankBase.reduce((s, c) => s + (Number(c.meta_periodo ?? 0) || 0), 0);
+                  const rankPctMeta = rankMetaPeriodo > 0 ? (rankTot.total_frete / rankMetaPeriodo) * 100 : 0;
+                  const rankEstimativa = rankBase.reduce((s, c) => s + (Number(c.estimativa_frete ?? 0) || 0), 0);
+                  const rankTotWithMeta = { ...rankTot, meta_periodo: rankMetaPeriodo, pct_meta: rankPctMeta, estimativa_frete: rankEstimativa };
 
                   const abrirPeriodoAtual = (titulo: string) => {
                     abrirCteDialog(titulo, 'periodo', '', undefined, { filters: filtersGeral });
@@ -918,7 +1085,29 @@ export function FaturamentoClientes() {
                               <div className="p-2"><Wallet className="h-5 w-5 text-indigo-700 dark:text-indigo-300" /></div>
                               <div>
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Receita</div>
-                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(Number(tt?.total_frete ?? 0))}</div>
+                                {(() => {
+                                  const v = fmtBRL(Number(tt?.total_frete ?? 0));
+                                  const cls = v.length >= 18 ? 'text-sm' : 'text-base';
+                                  const metaPeriodo = Number(tt?.meta_periodo ?? 0) || 0;
+                                  const pctMeta = Number(tt?.pct_meta ?? 0) || 0;
+                                  const est = Number(tt?.estimativa_frete ?? 0) || 0;
+                                  const showEst = est > 0 && Math.abs(est - (Number(tt?.total_frete ?? 0) || 0)) > 0.01;
+                                  return (
+                                    <>
+                                      <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap`}>{v}</div>
+                                      {metaPeriodo > 0 && (
+                                        <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                                          Meta {fmtBRL(metaPeriodo)} · {Math.round(pctMeta)}%
+                                        </div>
+                                      )}
+                                      {showEst && (
+                                        <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                          Est. {fmtBRL(est)}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -928,7 +1117,11 @@ export function FaturamentoClientes() {
                               <div className="p-2"><Calculator className="h-5 w-5 text-orange-700 dark:text-orange-300" /></div>
                               <div>
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Custos</div>
-                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(Number(tt?.total_custos ?? 0))}</div>
+                                {(() => {
+                                  const v = fmtBRL(Number(tt?.total_custos ?? 0));
+                                  const cls = v.length >= 18 ? 'text-sm' : 'text-base';
+                                  return <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap`}>{v}</div>;
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -938,7 +1131,12 @@ export function FaturamentoClientes() {
                               <div className="p-2"><TrendingUp className="h-5 w-5 text-emerald-700 dark:text-emerald-300" /></div>
                               <div>
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Resultado</div>
-                                <div className={`text-base font-bold whitespace-nowrap ${(Number(tt?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200'}`}>{fmtBRLCompact(Number(tt?.total_resultado ?? 0))}</div>
+                                {(() => {
+                                  const v = fmtBRL(Number(tt?.total_resultado ?? 0));
+                                  const cls = v.length >= 18 ? 'text-sm' : 'text-base';
+                                  const color = (Number(tt?.total_resultado ?? 0) >= 0) ? 'text-emerald-700 dark:text-emerald-200' : 'text-red-700 dark:text-red-200';
+                                  return <div className={`${cls} font-bold whitespace-nowrap ${color}`}>{v}</div>;
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -968,7 +1166,11 @@ export function FaturamentoClientes() {
                               <div className="p-2"><ChevronRight className="h-5 w-5 text-slate-700 dark:text-slate-200" /></div>
                               <div>
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Ticket</div>
-                                <div className="text-base font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">{fmtBRLCompact(tk)}</div>
+                                {(() => {
+                                  const v = fmtBRL(tk);
+                                  const cls = v.length >= 18 ? 'text-sm' : 'text-base';
+                                  return <div className={`${cls} font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap`}>{v}</div>;
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -983,7 +1185,7 @@ export function FaturamentoClientes() {
                         <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Resumo</div>
                       </div>
 
-                      {renderResumoRow(rankLabel, rankTot, rankTicket)}
+                      {renderResumoRow(rankLabel, rankTotWithMeta, rankTicket)}
                       {renderResumoRow('Total da empresa', t, ticket)}
                     </div>
                   );
@@ -1057,6 +1259,14 @@ export function FaturamentoClientes() {
                                   <span>Ticket: {fmtBRL(c.ticket_medio)}</span>
                                   <span>·</span>
                                   <span>{pct.toFixed(1)}% do total</span>
+                                  {(Number(c.meta_periodo ?? 0) || 0) > 0 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] px-1 py-0 h-4 border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                    >
+                                      Meta {Math.round(Number(c.pct_meta ?? 0) || 0)}%
+                                    </Badge>
+                                  )}
                                   {c.qtde_cif > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">CIF {c.qtde_cif}</Badge>}
                                   {c.qtde_fob > 0 && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">FOB {c.qtde_fob}</Badge>}
                                 </div>
@@ -1253,7 +1463,7 @@ export function FaturamentoClientes() {
                     const totalGeral = totais?.total_frete ?? 0;
                     const demaisU = totalGeral - totalTop5u;
                     const pieDataU = [
-                      ...top5u.map(u => ({ sigla: u.sigla, value: u.total_frete })),
+                      ...top5u.map(u => ({ sigla: u.sigla, value: u.total_frete, pct_meta: u.pct_meta, meta_periodo: u.meta_periodo })),
                       ...(demaisU > 0 ? [{ sigla: 'Demais', value: demaisU }] : []),
                     ];
                     return (
@@ -1286,7 +1496,14 @@ export function FaturamentoClientes() {
                           </Pie>
                           <RechartsTooltip
                             contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
-                            formatter={(v: number, _: any, props: any) => [`${props.payload.sigla}: ${fmtBRL(v)}`]}
+                            formatter={(v: number, _: any, props: any) => {
+                              const p = props?.payload ?? {};
+                              const sigla = String(p?.sigla ?? '');
+                              const pctMeta = Number(p?.pct_meta ?? 0) || 0;
+                              const metaPeriodo = Number(p?.meta_periodo ?? 0) || 0;
+                              const metaTxt = metaPeriodo > 0 ? ` · Meta ${Math.round(pctMeta)}%` : '';
+                              return [`${sigla}: ${fmtBRL(v)}${metaTxt}`];
+                            }}
                           />
                           <Legend
                             iconType="circle"
@@ -2387,6 +2604,172 @@ export function FaturamentoClientes() {
                 </Button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={metaClientesOpen} onOpenChange={setMetaClientesOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Configurar Metas por Cliente</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Metas são mensais. Em visão por grupo, configure a meta no CNPJ principal do grupo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Input
+                value={metaClientesSearch}
+                onChange={(e) => setMetaClientesSearch(e.target.value)}
+                placeholder="Buscar cliente/grupo..."
+                className="pl-9 dark:bg-slate-800 dark:border-slate-700"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={metaClientesOnlyWithMeta} onCheckedChange={setMetaClientesOnlyWithMeta} />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Somente com meta</span>
+            </div>
+            <Button variant="outline" onClick={() => void carregarMetasClientes()} className="dark:border-slate-700 dark:hover:bg-slate-800">
+              Buscar
+            </Button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {metaClientesLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Carregando...</span>
+              </div>
+            ) : metaClientesItems.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Nenhum registro</div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {metaClientesItems.map((it: any) => {
+                  const cnpj = String(it?.cnpj ?? '');
+                  const nome = String(it?.nome ?? '');
+                  const isPrincipal = Boolean(it?.is_principal_grupo);
+                  const v = metaClientesDraft[cnpj] ?? '';
+                  return (
+                    <div key={cnpj} className="px-4 py-3 bg-white dark:bg-slate-900 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{nome || cnpj}</div>
+                          {isPrincipal && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 border-indigo-300 text-indigo-600 dark:text-indigo-400">
+                              Grupo
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">CNPJ: {cnpj}</div>
+                      </div>
+                      <Input
+                        value={v}
+                        onChange={(e) => setMetaClientesDraft((prev) => ({ ...prev, [cnpj]: e.target.value }))}
+                        placeholder="0,00"
+                        className="w-[160px] dark:bg-slate-800 dark:border-slate-700 text-right font-mono"
+                      />
+                      <Button size="sm" onClick={() => void salvarMetaCliente(cnpj, metaClientesDraft[cnpj] ?? '')} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                        Salvar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setMetaClientesDraft((prev) => ({ ...prev, [cnpj]: '' }));
+                          void salvarMetaCliente(cnpj, '');
+                        }}
+                        className="dark:border-slate-700"
+                        title="Remover meta"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={metaUnidadesOpen} onOpenChange={setMetaUnidadesOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Configurar Metas por Unidade</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Metas são mensais. No painel, a meta da empresa é a soma das metas das unidades.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Input
+                value={metaUnidadesSearch}
+                onChange={(e) => setMetaUnidadesSearch(e.target.value)}
+                placeholder="Buscar unidade..."
+                className="pl-9 dark:bg-slate-800 dark:border-slate-700"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={metaUnidadesOnlyWithMeta} onCheckedChange={setMetaUnidadesOnlyWithMeta} />
+              <span className="text-sm text-slate-700 dark:text-slate-300">Somente com meta</span>
+            </div>
+            <Button variant="outline" onClick={() => void carregarMetasUnidades()} className="dark:border-slate-700 dark:hover:bg-slate-800">
+              Buscar
+            </Button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {metaUnidadesLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Carregando...</span>
+              </div>
+            ) : metaUnidadesItems.length === 0 ? (
+              <div className="flex items-center justify-center py-10 text-slate-400 text-sm">Nenhum registro</div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {metaUnidadesItems.map((it: any) => {
+                  const sigla = String(it?.sigla ?? '');
+                  const nome = String(it?.nome ?? '');
+                  const v = metaUnidadesDraft[sigla] ?? '';
+                  return (
+                    <div key={sigla} className="px-4 py-3 bg-white dark:bg-slate-900 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                          {sigla} — {nome || 'Sem nome'}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">CNPJ: {String(it?.cnpj ?? '')}</div>
+                      </div>
+                      <Input
+                        value={v}
+                        onChange={(e) => setMetaUnidadesDraft((prev) => ({ ...prev, [sigla]: e.target.value }))}
+                        placeholder="0,00"
+                        className="w-[160px] dark:bg-slate-800 dark:border-slate-700 text-right font-mono"
+                      />
+                      <Button size="sm" onClick={() => void salvarMetaUnidade(sigla, metaUnidadesDraft[sigla] ?? '')} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                        Salvar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setMetaUnidadesDraft((prev) => ({ ...prev, [sigla]: '' }));
+                          void salvarMetaUnidade(sigla, '');
+                        }}
+                        className="dark:border-slate-700"
+                        title="Remover meta"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -198,6 +198,135 @@ if (count($cnpjsSelecionados) > 0) {
     $whereClauseClientes = $whereClause;
 }
 
+$tblCliente = "{$domain}_cliente";
+$tblUnidade = "{$domain}_unidade";
+
+$colExists = function ($tbl, $col) use ($conn) {
+    $res = null;
+    try {
+        $res = sql(
+            "SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = lower($1)
+               AND column_name = $2
+             LIMIT 1",
+            [$tbl, $col],
+            $conn
+        );
+    } catch (Exception $e) {}
+    return ($res && pg_num_rows($res) > 0);
+};
+
+$parseYmd = function ($s) {
+    $s = trim((string)$s);
+    if ($s === '') return null;
+    $dt = DateTime::createFromFormat('Y-m-d', $s);
+    if ($dt === false) return null;
+    $dt->setTime(0, 0, 0);
+    return $dt;
+};
+
+$periodoIniDt = $parseYmd($periodoIniRaw);
+$periodoFimDt = $parseYmd($periodoFimRaw);
+if ($periodoIniDt === null || $periodoFimDt === null) {
+    try {
+        $iniTs = isset($ini) ? (int)$ini : strtotime('-30 days');
+        $fimTs = isset($fim) ? (int)$fim : strtotime(date('Y-m-d'));
+        $periodoIniDt = new DateTime(date('Y-m-d', $iniTs));
+        $periodoFimDt = new DateTime(date('Y-m-d', $fimTs));
+        $periodoIniDt->setTime(0, 0, 0);
+        $periodoFimDt->setTime(0, 0, 0);
+    } catch (Throwable $e) {
+        $periodoIniDt = new DateTime(date('Y-m-d'));
+        $periodoFimDt = new DateTime(date('Y-m-d'));
+        $periodoIniDt->setTime(0, 0, 0);
+        $periodoFimDt->setTime(0, 0, 0);
+    }
+}
+
+$todayDt = new DateTime(date('Y-m-d'));
+$todayDt->setTime(0, 0, 0);
+$periodoFimCalc = (clone $periodoFimDt);
+if ($periodoFimCalc->getTimestamp() > $todayDt->getTimestamp()) $periodoFimCalc = (clone $todayDt);
+
+$businessDaysBetween = function (DateTime $a, DateTime $b): int {
+    $start = (clone $a);
+    $end = (clone $b);
+    if ($start->getTimestamp() > $end->getTimestamp()) {
+        $tmp = $start;
+        $start = $end;
+        $end = $tmp;
+    }
+    $start->setTime(0, 0, 0);
+    $end->setTime(0, 0, 0);
+    $cnt = 0;
+    while ($start->getTimestamp() <= $end->getTimestamp()) {
+        $dow = (int)$start->format('N');
+        if ($dow >= 1 && $dow <= 5) $cnt += 1;
+        $start->modify('+1 day');
+    }
+    return $cnt;
+};
+
+$businessDaysInMonth = function (int $year, int $month) use ($businessDaysBetween): int {
+    $ini = DateTime::createFromFormat('Y-m-d', sprintf('%04d-%02d-01', $year, $month));
+    if ($ini === false) return 0;
+    $fim = (clone $ini);
+    $fim->modify('last day of this month');
+    return $businessDaysBetween($ini, $fim);
+};
+
+$metaPeriodoFromMensal = function (float $metaMensal) use ($businessDaysBetween, $businessDaysInMonth, $periodoIniDt, $periodoFimCalc): float {
+    if (!is_finite($metaMensal) || $metaMensal <= 0) return 0.0;
+    $ini = (clone $periodoIniDt);
+    $fim = (clone $periodoFimCalc);
+    if ($ini->getTimestamp() > $fim->getTimestamp()) {
+        $tmp = $ini;
+        $ini = $fim;
+        $fim = $tmp;
+    }
+    $total = 0.0;
+    $cursor = DateTime::createFromFormat('Y-m-d', $ini->format('Y-m-01'));
+    if ($cursor === false) return 0.0;
+    $cursor->setTime(0, 0, 0);
+    while ($cursor->getTimestamp() <= $fim->getTimestamp()) {
+        $year = (int)$cursor->format('Y');
+        $month = (int)$cursor->format('m');
+        $mIni = DateTime::createFromFormat('Y-m-d', sprintf('%04d-%02d-01', $year, $month));
+        if ($mIni === false) break;
+        $mFim = (clone $mIni);
+        $mFim->modify('last day of this month');
+        $pIni = ($ini->getTimestamp() > $mIni->getTimestamp()) ? (clone $ini) : (clone $mIni);
+        $pFim = ($fim->getTimestamp() < $mFim->getTimestamp()) ? (clone $fim) : (clone $mFim);
+        if ($pIni->getTimestamp() <= $pFim->getTimestamp()) {
+            $bdPart = $businessDaysBetween($pIni, $pFim);
+            $bdMonth = $businessDaysInMonth($year, $month);
+            if ($bdMonth > 0 && $bdPart > 0) $total += $metaMensal * ((float)$bdPart / (float)$bdMonth);
+        }
+        $cursor->modify('+1 month');
+    }
+    return $total;
+};
+
+$estimativaFromPeriodo = function (float $receitaPeriodo) use ($businessDaysBetween, $businessDaysInMonth, $periodoIniDt, $periodoFimCalc): float {
+    if (!is_finite($receitaPeriodo) || $receitaPeriodo <= 0) return 0.0;
+    $ini = (clone $periodoIniDt);
+    $fim = (clone $periodoFimCalc);
+    if ($ini->getTimestamp() > $fim->getTimestamp()) {
+        $tmp = $ini;
+        $ini = $fim;
+        $fim = $tmp;
+    }
+    if ($ini->format('Y-m') !== $fim->format('Y-m')) return $receitaPeriodo;
+    $year = (int)$ini->format('Y');
+    $month = (int)$ini->format('m');
+    $bdPart = $businessDaysBetween($ini, $fim);
+    $bdMonth = $businessDaysInMonth($year, $month);
+    if ($bdPart <= 0 || $bdMonth <= 0) return $receitaPeriodo;
+    return $receitaPeriodo * ((float)$bdMonth / (float)$bdPart);
+};
+
 // ============================================================
 // RANKING: modo GRUPOS ou CLIENTES
 // ============================================================
@@ -495,6 +624,99 @@ while ($row = pg_fetch_assoc($resultEvolUnidades)) {
     $unidadesSiglas[$sigla] = true;
 }
 
+$metaCliOk = $colExists($tblCliente, 'meta_mensal');
+$metaUniOk = $colExists($tblUnidade, 'meta_mensal');
+
+$metaCliMap = [];
+if ($metaCliOk && count($clientes) > 0) {
+    $keys = [];
+    foreach ($clientes as $c) {
+        $k = trim((string)($c['cnpj'] ?? ''));
+        if ($k !== '') $keys[$k] = true;
+    }
+    $keys = array_keys($keys);
+    if (count($keys) > 0) {
+        $ph = [];
+        $pp = [];
+        $pi = 1;
+        foreach ($keys as $k) { $ph[] = '$' . $pi++; $pp[] = $k; }
+        $resM = @pg_query_params(
+            $conn,
+            "SELECT cnpj, COALESCE(meta_mensal, 0) AS meta_mensal
+             FROM {$tblCliente}
+             WHERE cnpj IN (" . implode(',', $ph) . ")",
+            $pp
+        );
+        if ($resM) {
+            while ($r = pg_fetch_assoc($resM)) {
+                $k = trim((string)($r['cnpj'] ?? ''));
+                $metaCliMap[$k] = (float)($r['meta_mensal'] ?? 0);
+            }
+        }
+    }
+}
+
+foreach ($clientes as $i => $c) {
+    $cnpj = trim((string)($c['cnpj'] ?? ''));
+    $metaMensal = $metaCliOk ? (float)($metaCliMap[$cnpj] ?? 0) : 0.0;
+    $metaPeriodo = $metaPeriodoFromMensal($metaMensal);
+    $totalFrete = (float)($c['total_frete'] ?? 0);
+    $clientes[$i]['meta_mensal'] = $metaMensal;
+    $clientes[$i]['meta_periodo'] = $metaPeriodo;
+    $clientes[$i]['pct_meta'] = ($metaPeriodo > 0) ? (($totalFrete / $metaPeriodo) * 100.0) : 0.0;
+    $clientes[$i]['estimativa_frete'] = $estimativaFromPeriodo($totalFrete);
+}
+
+$metaUniMap = [];
+if ($metaUniOk && count($unidades) > 0) {
+    $keys = [];
+    foreach ($unidades as $u) {
+        $k = strtoupper(trim((string)($u['sigla'] ?? '')));
+        if ($k !== '') $keys[$k] = true;
+    }
+    $keys = array_keys($keys);
+    if (count($keys) > 0) {
+        $ph = [];
+        $pp = [];
+        $pi = 1;
+        foreach ($keys as $k) { $ph[] = '$' . $pi++; $pp[] = $k; }
+        $resM = @pg_query_params(
+            $conn,
+            "SELECT UPPER(BTRIM(sigla)) AS sigla, COALESCE(meta_mensal, 0) AS meta_mensal
+             FROM {$tblUnidade}
+             WHERE UPPER(BTRIM(sigla)) IN (" . implode(',', $ph) . ")",
+            $pp
+        );
+        if ($resM) {
+            while ($r = pg_fetch_assoc($resM)) {
+                $k = strtoupper(trim((string)($r['sigla'] ?? '')));
+                $metaUniMap[$k] = (float)($r['meta_mensal'] ?? 0);
+            }
+        }
+    }
+}
+
+foreach ($unidades as $i => $u) {
+    $sigla = strtoupper(trim((string)($u['sigla'] ?? '')));
+    $metaMensal = $metaUniOk ? (float)($metaUniMap[$sigla] ?? 0) : 0.0;
+    $metaPeriodo = $metaPeriodoFromMensal($metaMensal);
+    $totalFrete = (float)($u['total_frete'] ?? 0);
+    $unidades[$i]['meta_mensal'] = $metaMensal;
+    $unidades[$i]['meta_periodo'] = $metaPeriodo;
+    $unidades[$i]['pct_meta'] = ($metaPeriodo > 0) ? (($totalFrete / $metaPeriodo) * 100.0) : 0.0;
+    $unidades[$i]['estimativa_frete'] = $estimativaFromPeriodo($totalFrete);
+}
+
+$metaEmpresaMensal = 0.0;
+if ($metaUniOk) {
+    $resSum = @pg_query($conn, "SELECT SUM(COALESCE(meta_mensal, 0)) AS meta FROM {$tblUnidade}");
+    if ($resSum && pg_num_rows($resSum) > 0) $metaEmpresaMensal = (float)(pg_fetch_result($resSum, 0, 0) ?? 0);
+}
+$metaEmpresaPeriodo = $metaPeriodoFromMensal((float)$metaEmpresaMensal);
+$freteEmpresaPeriodo = (float)($rowTotais['total_frete'] ?? 0);
+$pctMetaEmpresa = ($metaEmpresaPeriodo > 0) ? (($freteEmpresaPeriodo / $metaEmpresaPeriodo) * 100.0) : 0.0;
+$estimativaEmpresa = $estimativaFromPeriodo($freteEmpresaPeriodo);
+
 respondJson([
     'success' => true,
     'data' => [
@@ -504,6 +726,10 @@ respondJson([
         'totais'             => [
             'qtde_ctes'     => (int)($rowTotais['qtde_ctes'] ?? 0),
             'total_frete'   => (float)($rowTotais['total_frete'] ?? 0),
+            'meta_mensal'   => (float)$metaEmpresaMensal,
+            'meta_periodo'  => (float)$metaEmpresaPeriodo,
+            'pct_meta'      => (float)$pctMetaEmpresa,
+            'estimativa_frete' => (float)$estimativaEmpresa,
             'total_custos'  => (float)($rowTotais['total_custos'] ?? 0),
             'total_resultado' => (float)($rowTotais['total_resultado'] ?? 0),
             'total_merc'    => (float)($rowTotais['total_merc'] ?? 0),
