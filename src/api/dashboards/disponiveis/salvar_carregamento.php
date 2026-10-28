@@ -2970,6 +2970,31 @@ if ($acao === 'atualizar_ctes_ssw') {
         }
     }
 
+    try {
+        $selPesoUpd = $cteCol('peso_real') ? "COALESCE(cte.peso_real, 0)" : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, 0)" : "0");
+        $selCubUpd = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
+        sql(
+            "UPDATE {$tabela} t
+             SET peso_cte = c.peso_real,
+                 cubagem_cte = c.cubagem
+             FROM LATERAL (
+                 SELECT {$selPesoUpd} AS peso_real,
+                        {$selCubUpd} AS cubagem
+                 FROM {$tblCte} cte
+                 WHERE UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(t.ser_cte))
+                   AND cte.nro_cte = t.nro_cte
+                 ORDER BY cte.seq_cte DESC
+                 LIMIT 1
+             ) c
+             WHERE t.unidade = $1
+               AND UPPER(t.placa_provisoria) = $2
+               AND t.nro_cte > 0
+               AND COALESCE(BTRIM(t.ser_cte), '') <> ''",
+            [$unidade, $placaReq],
+            $conn
+        );
+    } catch (Exception $e) {}
+
     respondJson([
         'success' => true,
         'placa' => $placaReq,
