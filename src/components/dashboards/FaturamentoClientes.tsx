@@ -289,114 +289,6 @@ export function FaturamentoClientes() {
     return Number.isFinite(n) ? n : 0;
   };
 
-  const carregarMetasClientes = useCallback(async () => {
-    setMetaClientesLoading(true);
-    try {
-      const r = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_clientes_list.php`,
-        { method: 'POST', body: JSON.stringify({ search: metaClientesSearch, onlyWithMeta: metaClientesOnlyWithMeta }) },
-        true
-      );
-      if (!r?.success) {
-        toast.error(r?.message || 'Erro ao carregar metas de clientes');
-        setMetaClientesItems([]);
-        setMetaClientesDraft({});
-        return;
-      }
-      const items = Array.isArray(r.items) ? r.items : [];
-      setMetaClientesItems(items);
-      setMetaClientesDraft(() => {
-        const next: Record<string, string> = {};
-        for (const it of items) {
-          const cnpj = String(it?.cnpj ?? '');
-          const m = Number(it?.meta_mensal ?? 0) || 0;
-          next[cnpj] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-        }
-        return next;
-      });
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao carregar metas de clientes');
-      setMetaClientesItems([]);
-      setMetaClientesDraft({});
-    } finally {
-      setMetaClientesLoading(false);
-    }
-  }, [metaClientesSearch, metaClientesOnlyWithMeta]);
-
-  const salvarMetaCliente = useCallback(async (cnpj: string, raw: string) => {
-    const meta = parseNumBR(raw);
-    try {
-      const r = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_cliente_set.php`,
-        { method: 'POST', body: JSON.stringify({ cnpj, meta_mensal: meta > 0 ? meta : null }) },
-        true
-      );
-      if (!r?.success) {
-        toast.error(r?.message || 'Erro ao salvar meta');
-        return;
-      }
-      toast.success('Meta salva.');
-      await carregarMetasClientes();
-      await carregarDados(filters, groupBy);
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao salvar meta');
-    }
-  }, [carregarMetasClientes, carregarDados, filters, groupBy]);
-
-  const carregarMetasUnidades = useCallback(async () => {
-    setMetaUnidadesLoading(true);
-    try {
-      const r = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_unidades_list.php`,
-        { method: 'POST', body: JSON.stringify({ search: metaUnidadesSearch, onlyWithMeta: metaUnidadesOnlyWithMeta }) },
-        true
-      );
-      if (!r?.success) {
-        toast.error(r?.message || 'Erro ao carregar metas de unidades');
-        setMetaUnidadesItems([]);
-        setMetaUnidadesDraft({});
-        return;
-      }
-      const items = Array.isArray(r.items) ? r.items : [];
-      setMetaUnidadesItems(items);
-      setMetaUnidadesDraft(() => {
-        const next: Record<string, string> = {};
-        for (const it of items) {
-          const sigla = String(it?.sigla ?? '');
-          const m = Number(it?.meta_mensal ?? 0) || 0;
-          next[sigla] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-        }
-        return next;
-      });
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao carregar metas de unidades');
-      setMetaUnidadesItems([]);
-      setMetaUnidadesDraft({});
-    } finally {
-      setMetaUnidadesLoading(false);
-    }
-  }, [metaUnidadesSearch, metaUnidadesOnlyWithMeta]);
-
-  const salvarMetaUnidade = useCallback(async (sigla: string, raw: string) => {
-    const meta = parseNumBR(raw);
-    try {
-      const r = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_unidade_set.php`,
-        { method: 'POST', body: JSON.stringify({ sigla, meta_mensal: meta > 0 ? meta : null }) },
-        true
-      );
-      if (!r?.success) {
-        toast.error(r?.message || 'Erro ao salvar meta');
-        return;
-      }
-      toast.success('Meta salva.');
-      await carregarMetasUnidades();
-      await carregarDados(filters, groupBy);
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao salvar meta');
-    }
-  }, [carregarMetasUnidades, carregarDados, filters, groupBy]);
-
   const resolveLogoUrlAbs = (url: string) => {
     if (!url) return '';
     if (/^https?:\/\//i.test(url)) return url;
@@ -712,6 +604,114 @@ export function FaturamentoClientes() {
       setLoading(false);
     }
   }, []);
+
+  const carregarMetasClientes = useCallback(async () => {
+    setMetaClientesLoading(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_clientes_list.php`,
+        { method: 'POST', body: JSON.stringify({ search: metaClientesSearch, onlyWithMeta: metaClientesOnlyWithMeta }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao carregar metas de clientes');
+        setMetaClientesItems([]);
+        setMetaClientesDraft({});
+        return;
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      setMetaClientesItems(items);
+      setMetaClientesDraft(() => {
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const cnpj = String(it?.cnpj ?? '');
+          const m = Number(it?.meta_mensal ?? 0) || 0;
+          next[cnpj] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        }
+        return next;
+      });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar metas de clientes');
+      setMetaClientesItems([]);
+      setMetaClientesDraft({});
+    } finally {
+      setMetaClientesLoading(false);
+    }
+  }, [metaClientesSearch, metaClientesOnlyWithMeta]);
+
+  const salvarMetaCliente = useCallback(async (cnpj: string, raw: string) => {
+    const meta = parseNumBR(raw);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_cliente_set.php`,
+        { method: 'POST', body: JSON.stringify({ cnpj, meta_mensal: meta > 0 ? meta : null }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao salvar meta');
+        return;
+      }
+      toast.success('Meta salva.');
+      await carregarMetasClientes();
+      await carregarDados(filters, groupBy);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar meta');
+    }
+  }, [carregarMetasClientes, carregarDados, filters, groupBy]);
+
+  const carregarMetasUnidades = useCallback(async () => {
+    setMetaUnidadesLoading(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/metas_unidades_list.php`,
+        { method: 'POST', body: JSON.stringify({ search: metaUnidadesSearch, onlyWithMeta: metaUnidadesOnlyWithMeta }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao carregar metas de unidades');
+        setMetaUnidadesItems([]);
+        setMetaUnidadesDraft({});
+        return;
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      setMetaUnidadesItems(items);
+      setMetaUnidadesDraft(() => {
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const sigla = String(it?.sigla ?? '');
+          const m = Number(it?.meta_mensal ?? 0) || 0;
+          next[sigla] = m > 0 ? m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        }
+        return next;
+      });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar metas de unidades');
+      setMetaUnidadesItems([]);
+      setMetaUnidadesDraft({});
+    } finally {
+      setMetaUnidadesLoading(false);
+    }
+  }, [metaUnidadesSearch, metaUnidadesOnlyWithMeta]);
+
+  const salvarMetaUnidade = useCallback(async (sigla: string, raw: string) => {
+    const meta = parseNumBR(raw);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/faturamento-clientes/meta_unidade_set.php`,
+        { method: 'POST', body: JSON.stringify({ sigla, meta_mensal: meta > 0 ? meta : null }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao salvar meta');
+        return;
+      }
+      toast.success('Meta salva.');
+      await carregarMetasUnidades();
+      await carregarDados(filters, groupBy);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar meta');
+    }
+  }, [carregarMetasUnidades, carregarDados, filters, groupBy]);
 
   useEffect(() => {
     carregarDados(filters, groupBy);
