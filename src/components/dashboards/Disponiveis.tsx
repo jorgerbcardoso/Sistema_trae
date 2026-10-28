@@ -9294,12 +9294,7 @@ function CarregamentoArea({
         const qtdPresto = Number(res.qtd_presto ?? 0) || 0;
         const added = Number(res.added ?? 0) || 0;
         if (qtdSsw > 0 && qtdPresto !== qtdSsw && added === 0) {
-          const dbg = res?.debug ?? {};
-          const manCount = Number(dbg.manifestos_count ?? 0) || 0;
-          const manOk = Number(dbg.manifestos_xml_ok ?? 0) || 0;
-          const pairs = Number(dbg.pairs_count ?? 0) || 0;
-          const found = Number(dbg.cte_found_count ?? 0) || 0;
-          toast.error(`TMS ${qtdSsw} · Presto ${qtdPresto} · +0. Debug: manifestos ${manCount} (ok ${manOk}) · chaves ${pairs} · CT-es no banco ${found}.`);
+          toast.error(`Nenhum CT-e foi incluído. TMS ${qtdSsw} · Presto ${qtdPresto}.`);
         } else {
           toast.success(`CT-es atualizados: +${added} (TMS ${qtdSsw} · Presto ${qtdPresto}).`);
         }

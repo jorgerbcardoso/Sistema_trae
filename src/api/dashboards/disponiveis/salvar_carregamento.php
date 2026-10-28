@@ -2378,18 +2378,24 @@ if ($acao === 'atualizar_ctes_ssw') {
     try {
         $resCarBase = sql(
             "SELECT
-                seq_carregamento,
-                destino,
-                unidades,
-                setores_entrega,
-                origem_criacao,
-                data_finalizacao,
-                hora_finalizacao,
-                login_finalizacao
-             FROM {$tabela}
-             WHERE unidade = $1
-               AND UPPER(placa_provisoria) = $2
-             ORDER BY data_inclusao DESC, hora_inclusao DESC
+                t.seq_carregamento,
+                t.destino,
+                t.unidades,
+                t.setores_entrega,
+                t.origem_criacao,
+                t.data_finalizacao,
+                t.hora_finalizacao,
+                t.login_finalizacao,
+                (
+                    SELECT MIN((x.data_inclusao::timestamp + x.hora_inclusao::time))
+                    FROM {$tabela} x
+                    WHERE x.unidade = t.unidade
+                      AND x.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
+                ) AS dt_inclusao
+             FROM {$tabela} t
+             WHERE t.unidade = $1
+               AND UPPER(t.placa_provisoria) = $2
+             ORDER BY t.data_inclusao DESC, t.hora_inclusao DESC
              LIMIT 1",
             [$unidade, $placaReq],
             $conn
@@ -2408,6 +2414,12 @@ if ($acao === 'atualizar_ctes_ssw') {
     $origemCriacao = strtoupper(trim((string)($rowBase['origem_criacao'] ?? '')));
     if ($origemCriacao === '') $origemCriacao = 'SSW';
 
+    $dtInclusao = null;
+    $dtInclusaoRaw = trim((string)($rowBase['dt_inclusao'] ?? ''));
+    if ($dtInclusaoRaw !== '') {
+        try { $dtInclusao = new DateTime($dtInclusaoRaw); } catch (Exception $e) { $dtInclusao = null; }
+    }
+
     $dataFinalDb = trim((string)($rowBase['data_finalizacao'] ?? ''));
     if ($dtRef === null && $dataFinalDb !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $dataFinalDb, $m)) {
         $dtRef = DateTime::createFromFormat('Y-m-d', $m[1] . '-' . $m[2] . '-' . $m[3]);
@@ -2419,10 +2431,14 @@ if ($acao === 'atualizar_ctes_ssw') {
         respondJson(['success' => false, 'message' => 'Disponível apenas para Transferência.']);
     }
 
+    $dtCriacao = $dtInclusao instanceof DateTime ? $dtInclusao : ($dtRef instanceof DateTime ? $dtRef : new DateTime());
+    $dtIni = (clone $dtCriacao);
+    $dtFin = (clone $dtCriacao)->modify('+2 days');
     $dtHoje = new DateTime();
-    $dtIni = (clone $dtHoje)->modify('-4 days');
+    if ($dtFin->format('Y-m-d') > $dtHoje->format('Y-m-d')) $dtFin = $dtHoje;
+    if ($dtIni->format('Y-m-d') > $dtFin->format('Y-m-d')) $dtIni = (clone $dtFin);
     $ddIni = $dtIni->format('dmy');
-    $ddFin = $dtHoje->format('dmy');
+    $ddFin = $dtFin->format('dmy');
 
     $extractXml = function ($html) {
         $html = (string)$html;
@@ -2527,13 +2543,16 @@ if ($acao === 'atualizar_ctes_ssw') {
             $f16 = strtoupper(trim((string)($r->f16 ?? '')));
             $f17 = trim((string)($r->f17 ?? ''));
             $mans = [];
-            if ($f17 !== '') {
+            if ($f17 !== '' && stripos($f16, 'CANCELADO') === false && stripos($f17, 'CANCELADO') === false) {
                 $mm = null;
-                if (preg_match_all('/\d+/', $f17, $mm)) {
+                if (preg_match_all('/\d+/', $f17, $mm) && count(($mm[0] ?? [])) > 0) {
                     foreach (($mm[0] ?? []) as $sx) {
                         $sx = (string)$sx;
                         if ($sx !== '') $mans[$sx] = true;
                     }
+                } else {
+                    $sx = trim($f17);
+                    if ($sx !== '') $mans[$sx] = true;
                 }
             }
 
@@ -2558,29 +2577,26 @@ if ($acao === 'atualizar_ctes_ssw') {
 
         $cands = count($regF3) > 0 ? $regF3 : $regF2;
         if (count($cands) > 0) {
-            $refDate = ($dtRef instanceof DateTime) ? $dtRef->format('Y-m-d') : '';
-            $sameDay = [];
-            if ($refDate !== '') {
-                foreach ($cands as $x) {
-                    $dt = $x['dt'] ?? null;
-                    if ($dt instanceof DateTime && $dt->format('Y-m-d') === $refDate) $sameDay[] = $x;
-                }
+            $createdTs = ($dtInclusao instanceof DateTime) ? $dtInclusao->getTimestamp() : 0;
+            $cutTs = $createdTs > 0 ? max(0, $createdTs - (5 * 60)) : 0;
+
+            $groups = [];
+            foreach ($cands as $x) {
+                $ts = (int)($x['ts'] ?? 0);
+                if ($ts <= 0) continue;
+                if ($cutTs > 0 && $ts <= $cutTs) continue;
+                if (!isset($groups[$ts])) $groups[$ts] = [];
+                $groups[$ts][] = $x;
             }
-            $use = count($sameDay) > 0 ? $sameDay : $cands;
 
-            $filterByStatus = function(array $arr, string $needle): array {
-                $out = [];
-                foreach ($arr as $x) {
-                    if (strpos((string)($x['status'] ?? ''), $needle) === false) continue;
-                    $out[] = $x;
-                }
-                return $out;
-            };
+            $selectedTs = 0;
+            foreach (array_keys($groups) as $ts) {
+                $ts = (int)$ts;
+                if ($ts <= 0) continue;
+                if ($selectedTs === 0 || $ts < $selectedTs) $selectedTs = $ts;
+            }
 
-            $useAut = $filterByStatus($use, 'AUTORIZADO');
-            $useEnc = $filterByStatus($use, 'ENCERRADO');
-            if (count($useAut) > 0) $use = $useAut;
-            else if (count($useEnc) > 0) $use = $useEnc;
+            $use = $selectedTs > 0 ? ($groups[$selectedTs] ?? []) : $cands;
 
             $saidaBest = null;
             $qtdSum = 0;
@@ -2589,7 +2605,7 @@ if ($acao === 'atualizar_ctes_ssw') {
                 $qtdSum += (int)($x['qtd'] ?? 0);
                 $dt = $x['dt'] ?? null;
                 if ($dt instanceof DateTime) {
-                    if ($saidaBest === null || (int)($x['ts'] ?? 0) > (int)($saidaBest['ts'] ?? 0)) $saidaBest = $x;
+                    if ($saidaBest === null || (int)($x['ts'] ?? 0) < (int)($saidaBest['ts'] ?? 0)) $saidaBest = $x;
                 }
                 $mans = $x['manifestos'] ?? [];
                 if (is_array($mans)) {
@@ -2867,6 +2883,7 @@ if ($acao === 'atualizar_ctes_ssw') {
                     ];
                 }
 
+                $added = 0;
                 $updated = 0;
                 if (count($cteAll) > 0) {
                     pg_query($conn, 'BEGIN');
@@ -2876,20 +2893,73 @@ if ($acao === 'atualizar_ctes_ssw') {
                             $nro = (int)($rowC['nro_cte'] ?? 0);
                             if ($ser === '' || $nro <= 0) continue;
 
-                            // Apenas marca como LIDO se o CT-e já existir no carregamento do Presto
-                            $resUpd = pg_query($conn,
-                                "UPDATE {$tabela}
-                                 SET lido = TRUE
+                            $check = pg_query($conn,
+                                "SELECT 1 FROM {$tabela}
                                  WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
                                    AND seq_carregamento = {$seqCarreg}
                                    AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
                                    AND nro_cte = {$nro}
-                                   AND COALESCE(lido, FALSE) = FALSE"
+                                 LIMIT 1"
                             );
-
-                            if ($resUpd && pg_affected_rows($resUpd) > 0) {
-                                $updated += 1;
+                            if ($check && pg_num_rows($check) > 0) {
+                                corrigirValoresDocCte(
+                                    $conn,
+                                    $tabela,
+                                    pg_escape_string($conn, $unidade),
+                                    $ser,
+                                    $nro,
+                                    $toFloat($rowC['vlr_merc'] ?? 0),
+                                    $toFloat($rowC['vlr_frete'] ?? 0),
+                                    $toFloat($rowC['peso'] ?? 0),
+                                    $toFloat($rowC['cubagem'] ?? 0),
+                                    (int)($rowC['qtde_vol'] ?? 0)
+                                );
+                                continue;
                             }
+
+                            $destCte = strtoupper(trim((string)($rowC['destino_cte'] ?? '')));
+                            $destCteEsc = pg_escape_string($conn, $destCte);
+                            $emissaoVal = trim((string)($rowC['data_emissao'] ?? ''));
+                            $prevVal = trim((string)($rowC['data_prev_ent'] ?? ''));
+                            $emissaoSql = $emissaoVal !== '' ? ("'" . pg_escape_string($conn, $emissaoVal) . "'::date") : 'NULL';
+                            $prevSql = $prevVal !== '' ? ("'" . pg_escape_string($conn, $prevVal) . "'::date") : 'NULL';
+                            $vlrMerc = $toFloat($rowC['vlr_merc'] ?? 0);
+                            $vlrFrete = $toFloat($rowC['vlr_frete'] ?? 0);
+                            $peso = $toFloat($rowC['peso'] ?? 0);
+                            $cub = $toFloat($rowC['cubagem'] ?? 0);
+                            $vol = (int)($rowC['qtde_vol'] ?? 0);
+                            $remetente = pg_escape_string($conn, (string)($rowC['remetente'] ?? ''));
+                            $destinatario = pg_escape_string($conn, (string)($rowC['destinatario'] ?? ''));
+                            $pagador = pg_escape_string($conn, (string)($rowC['pagador'] ?? ''));
+                            $cidadeDest = pg_escape_string($conn, (string)($rowC['cidade_destino'] ?? ''));
+
+                            $resIns = pg_query($conn,
+                                "INSERT INTO {$tabela}
+                                 (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                                  ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                                  remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                                  vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+                                  destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento,
+                                  data_finalizacao, hora_finalizacao, login_finalizacao)
+                                 VALUES
+                                 ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placaReq) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
+                                  '" . pg_escape_string($conn, $ser) . "', {$nro}, '{$destCteEsc}', {$emissaoSql}, {$prevSql},
+                                  '{$remetente}', '{$destinatario}', '{$pagador}', '{$cidadeDest}',
+                                  {$vlrMerc}, {$vlrFrete}, {$peso}, {$cub}, {$vol},
+                                  '" . pg_escape_string($conn, strtoupper(trim((string)$destinoCarreg))) . "', '" . pg_escape_string($conn, strtoupper(trim((string)$unidadesCarreg))) . "', '" . pg_escape_string($conn, (string)$setoresEntregaCarreg) . "', NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '" . pg_escape_string($conn, $unidade) . "',
+                                  '{$dataFinal}'::date, '{$horaFinal}'::time, '" . pg_escape_string($conn, $loginFinal) . "')"
+                            );
+                            if (!$resIns) throw new Exception('insert');
+                            $added += 1;
+                        }
+
+                        if ($added > 0) {
+                            pg_query($conn,
+                                "DELETE FROM {$tabela}
+                                 WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+                                   AND seq_carregamento = {$seqCarreg}
+                                   AND nro_cte = 0"
+                            );
                         }
                         pg_query($conn, 'COMMIT');
                     } catch (Exception $e) {
@@ -2905,7 +2975,7 @@ if ($acao === 'atualizar_ctes_ssw') {
         'placa' => $placaReq,
         'qtd_ssw' => $qtdSsw,
         'qtd_presto' => $qtdPresto,
-        'added' => 0,
+        'added' => $added ?? 0,
         'updated' => $updated ?? 0,
         'debug' => [
             'manifestos_count' => $manifestosCount,
