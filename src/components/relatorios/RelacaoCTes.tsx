@@ -1044,7 +1044,7 @@ export function RelacaoCTes() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-[340px]">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Mercadoria</div>
                 <Input
                   value={searchMercadoria}
@@ -1088,7 +1088,7 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-[340px]">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Vendedor</div>
                 <Input
                   value={searchVendedor}
@@ -1138,7 +1138,7 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-[340px]">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tipo de documento</div>
                 <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 flex-1 min-h-0 overflow-auto">
                   <div className="flex flex-col">
