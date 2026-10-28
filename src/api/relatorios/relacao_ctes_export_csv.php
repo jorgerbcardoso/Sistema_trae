@@ -41,6 +41,7 @@ $conn = connect();
 $tblCte = "{$domain}_cte";
 $tblLiq = "{$domain}_cte_liq";
 $tblVc = "{$domain}_vendedor_cliente";
+$tblGc = "{$domain}_grupo_cliente";
 
 $where = [];
 $params = [];
@@ -107,6 +108,31 @@ $addInText("cte.sigla_dest", $filters['unidadesDestino'] ?? [], '/^[A-Z0-9]{2,5}
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')", $filters['cnpjsPagadores'] ?? [], $digits);
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_emit::text, ''), '\\\\D', '', 'g')", $filters['cnpjsRemetentes'] ?? [], $digits);
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_dest::text, ''), '\\\\D', '', 'g')", $filters['cnpjsDestinatarios'] ?? [], $digits);
+
+$gruposPag = $filters['gruposPagadores'] ?? [];
+if (is_array($gruposPag) && count($gruposPag) > 0) {
+    $vals = [];
+    foreach ($gruposPag as $it) {
+        $v = $digits($it);
+        if ($v === '' || strlen($v) !== 14) continue;
+        $vals[$v] = true;
+    }
+    $vals = array_keys($vals);
+    if (count($vals) > 0) {
+        $ph = [];
+        foreach ($vals as $v) { $ph[] = '$' . $p++; $params[] = $v; }
+        $phSql = implode(', ', $ph);
+        $where[] = "(
+            regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g') IN ({$phSql})
+            OR EXISTS (
+                SELECT 1
+                FROM {$tblGc} gc
+                WHERE regexp_replace(COALESCE(gc.cnpj::text, ''), '\\\\D', '', 'g') = regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')
+                  AND regexp_replace(COALESCE(gc.cnpj_principal::text, ''), '\\\\D', '', 'g') IN ({$phSql})
+            )
+        )";
+    }
+}
 
 $codMerc = (string)($filters['codMercadoria'] ?? '');
 if ($codMerc !== '' && preg_match('/^\d+$/', $codMerc)) {

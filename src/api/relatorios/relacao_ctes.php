@@ -13,6 +13,8 @@ if ($domain === '' || !preg_match('/^[a-z0-9_]+$/', $domain)) {
 
 $input = getRequestInput();
 $filters = is_array($input['filters'] ?? null) ? $input['filters'] : [];
+$donutClientesModo = strtolower(trim((string)($input['donutClientesModo'] ?? 'clientes')));
+$donutClientesModo = $donutClientesModo === 'grupos' ? 'grupos' : 'clientes';
 
 $page = (int)($input['page'] ?? 1);
 $pageSize = (int)($input['pageSize'] ?? 100);
@@ -47,6 +49,7 @@ $conn = connect();
 $tblCte = "{$domain}_cte";
 $tblLiq = "{$domain}_cte_liq";
 $tblVc = "{$domain}_vendedor_cliente";
+$tblGc = "{$domain}_grupo_cliente";
 
 $where = [];
 $params = [];
@@ -113,6 +116,31 @@ $addInText("cte.sigla_dest", $filters['unidadesDestino'] ?? [], '/^[A-Z0-9]{2,5}
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')", $filters['cnpjsPagadores'] ?? [], $digits);
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_emit::text, ''), '\\\\D', '', 'g')", $filters['cnpjsRemetentes'] ?? [], $digits);
 $addInRaw("regexp_replace(COALESCE(cte.cnpj_dest::text, ''), '\\\\D', '', 'g')", $filters['cnpjsDestinatarios'] ?? [], $digits);
+
+$gruposPag = $filters['gruposPagadores'] ?? [];
+if (is_array($gruposPag) && count($gruposPag) > 0) {
+    $vals = [];
+    foreach ($gruposPag as $it) {
+        $v = $digits($it);
+        if ($v === '' || strlen($v) !== 14) continue;
+        $vals[$v] = true;
+    }
+    $vals = array_keys($vals);
+    if (count($vals) > 0) {
+        $ph = [];
+        foreach ($vals as $v) { $ph[] = '$' . $p++; $params[] = $v; }
+        $phSql = implode(', ', $ph);
+        $where[] = "(
+            regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g') IN ({$phSql})
+            OR EXISTS (
+                SELECT 1
+                FROM {$tblGc} gc
+                WHERE regexp_replace(COALESCE(gc.cnpj::text, ''), '\\\\D', '', 'g') = regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')
+                  AND regexp_replace(COALESCE(gc.cnpj_principal::text, ''), '\\\\D', '', 'g') IN ({$phSql})
+            )
+        )";
+    }
+}
 
 $codMerc = (string)($filters['codMercadoria'] ?? '');
 if ($codMerc !== '' && preg_match('/^\d+$/', $codMerc)) {
@@ -414,13 +442,27 @@ if ($totalFrete > $sumTop) {
 }
 
 $donutCliRes = sql($cteLatest . "
-    SELECT
-        COALESCE(NULLIF(BTRIM(cte.nome_pag), ''), '—') AS label,
-        COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
-    FROM cte
-    GROUP BY 1
-    ORDER BY total DESC, label ASC
-    LIMIT 5
+    " . ($donutClientesModo === 'grupos'
+        ? "
+            SELECT
+                COALESCE(NULLIF(BTRIM(principal.nome), ''), NULLIF(BTRIM(cte.nome_pag), ''), '—') AS label,
+                COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
+            FROM cte
+            LEFT JOIN {$tblGc} gc ON cte.cnpj_pag = gc.cnpj
+            LEFT JOIN {$domain}_cliente principal ON principal.cnpj = COALESCE(gc.cnpj_principal, cte.cnpj_pag)
+            GROUP BY 1
+            ORDER BY total DESC, label ASC
+            LIMIT 5
+        "
+        : "
+            SELECT
+                COALESCE(NULLIF(BTRIM(cte.nome_pag), ''), '—') AS label,
+                COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
+            FROM cte
+            GROUP BY 1
+            ORDER BY total DESC, label ASC
+            LIMIT 5
+        ") . "
 ", $params, $conn);
 
 $sumTop = 0.0;

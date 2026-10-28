@@ -81,6 +81,7 @@ interface RelacaoFilters {
   entregaFim: string;
   unidadesOrigem: string[];
   unidadesDestino: string[];
+  gruposPagadores: string[];
   cnpjsPagadores: string[];
   cnpjsRemetentes: string[];
   cnpjsDestinatarios: string[];
@@ -195,6 +196,7 @@ export function RelacaoCTes() {
   const [totalPeso, setTotalPeso] = useState(0);
   const [totalCubagem, setTotalCubagem] = useState(0);
   const [totalVol, setTotalVol] = useState(0);
+  const [donutClientesModo, setDonutClientesModo] = useState<'clientes' | 'grupos'>('clientes');
 
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'data_emissao', dir: 'desc' });
   const [serieModo, setSerieModo] = useState<SerieModo>('frete');
@@ -221,6 +223,7 @@ export function RelacaoCTes() {
       entregaFim: '',
       unidadesOrigem: [],
       unidadesDestino: [],
+      gruposPagadores: [],
       cnpjsPagadores: [],
       cnpjsRemetentes: [],
       cnpjsDestinatarios: [],
@@ -241,6 +244,7 @@ export function RelacaoCTes() {
 
   const [selUnidOrigem, setSelUnidOrigem] = useState<UnidadeItem[]>([]);
   const [selUnidDestino, setSelUnidDestino] = useState<UnidadeItem[]>([]);
+  const [selGruposPagadores, setSelGruposPagadores] = useState<ClienteItem[]>([]);
   const [selPagadores, setSelPagadores] = useState<ClienteItem[]>([]);
   const [selRemetentes, setSelRemetentes] = useState<ClienteItem[]>([]);
   const [selDestinatarios, setSelDestinatarios] = useState<ClienteItem[]>([]);
@@ -249,6 +253,7 @@ export function RelacaoCTes() {
 
   const [searchUnidOrigem, setSearchUnidOrigem] = useState('');
   const [searchUnidDestino, setSearchUnidDestino] = useState('');
+  const [searchGrupoPagador, setSearchGrupoPagador] = useState('');
   const [searchPagador, setSearchPagador] = useState('');
   const [searchRemetente, setSearchRemetente] = useState('');
   const [searchDestinatario, setSearchDestinatario] = useState('');
@@ -257,6 +262,7 @@ export function RelacaoCTes() {
 
   const [optUnidOrigem, setOptUnidOrigem] = useState<UnidadeItem[]>([]);
   const [optUnidDestino, setOptUnidDestino] = useState<UnidadeItem[]>([]);
+  const [optGruposPagadores, setOptGruposPagadores] = useState<ClienteItem[]>([]);
   const [optPagadores, setOptPagadores] = useState<ClienteItem[]>([]);
   const [optRemetentes, setOptRemetentes] = useState<ClienteItem[]>([]);
   const [optDestinatarios, setOptDestinatarios] = useState<ClienteItem[]>([]);
@@ -265,13 +271,15 @@ export function RelacaoCTes() {
 
   const unidTimer = useRef<any>(null);
   const cliTimer = useRef<any>(null);
+  const grupoTimer = useRef<any>(null);
   const mercTimer = useRef<any>(null);
   const vendTimer = useRef<any>(null);
 
-  const carregar = async (p?: number, s?: { key: SortKey; dir: SortDir }, f?: RelacaoFilters) => {
+  const carregar = async (p?: number, s?: { key: SortKey; dir: SortDir }, f?: RelacaoFilters, donutModo?: 'clientes' | 'grupos') => {
     const pageToLoad = p ?? page;
     const sortToLoad = s ?? sort;
     const filt = f ?? filters;
+    const donutToSend = donutModo ?? donutClientesModo;
     try {
       setLoading(true);
       const res = await apiFetch(
@@ -283,6 +291,7 @@ export function RelacaoCTes() {
             pageSize,
             sortKey: sortToLoad.key,
             sortDir: sortToLoad.dir,
+            donutClientesModo: donutToSend,
             filters: {
               ...filt,
               codMercadoria: filt.codMercadoria ?? '',
@@ -514,6 +523,7 @@ export function RelacaoCTes() {
   const resetFiltros = () => {
     setSelUnidOrigem([]);
     setSelUnidDestino([]);
+    setSelGruposPagadores([]);
     setSelPagadores([]);
     setSelRemetentes([]);
     setSelDestinatarios([]);
@@ -530,6 +540,7 @@ export function RelacaoCTes() {
       entregaFim: '',
       unidadesOrigem: [],
       unidadesDestino: [],
+      gruposPagadores: [],
       cnpjsPagadores: [],
       cnpjsRemetentes: [],
       cnpjsDestinatarios: [],
@@ -551,6 +562,7 @@ export function RelacaoCTes() {
       ...tempFilters,
       unidadesOrigem: selUnidOrigem.map((u) => u.sigla),
       unidadesDestino: selUnidDestino.map((u) => u.sigla),
+      gruposPagadores: selGruposPagadores.map((c) => c.cnpj),
       cnpjsPagadores: selPagadores.map((c) => c.cnpj),
       cnpjsRemetentes: selRemetentes.map((c) => c.cnpj),
       cnpjsDestinatarios: selDestinatarios.map((c) => c.cnpj),
@@ -600,6 +612,24 @@ export function RelacaoCTes() {
         if (target === 'pag') setOptPagadores([]);
         if (target === 'rem') setOptRemetentes([]);
         if (target === 'dest') setOptDestinatarios([]);
+      }
+    }, 250);
+  };
+
+  const buscarGruposPagadores = (term: string) => {
+    if (grupoTimer.current) clearTimeout(grupoTimer.current);
+    grupoTimer.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/relatorios/search_grupos_clientes.php`,
+          { method: 'POST', body: JSON.stringify({ search: term }) },
+          true
+        );
+        const list = Array.isArray(res?.grupos) ? res.grupos : [];
+        const mapped: ClienteItem[] = list.map((c: any) => ({ cnpj: String(c.cnpj || ''), nome: String(c.nome || '') }));
+        setOptGruposPagadores(mapped);
+      } catch {
+        setOptGruposPagadores([]);
       }
     }, 250);
   };
@@ -673,22 +703,48 @@ export function RelacaoCTes() {
               <div className="text-xs text-slate-500 dark:text-slate-400">Defina o período e demais critérios, depois clique em Gerar.</div>
             </div>
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center gap-2"
-                onClickCapture={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                <Button type="button" variant="outline" size="sm" className="h-8 dark:border-slate-700" disabled={loading} onClick={resetFiltros}>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 dark:border-slate-700"
+                  disabled={loading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    resetFiltros();
+                  }}
+                >
                   Limpar
                 </Button>
-                <Button type="button" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white gap-2" disabled={loading} onClick={aplicarFiltros}>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                  disabled={loading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    aplicarFiltros();
+                  }}
+                >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   Gerar
                 </Button>
                 {total > 0 ? (
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-2 dark:border-slate-700" disabled={exporting || loading} onClick={exportarCsv}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-2 dark:border-slate-700"
+                    disabled={exporting || loading}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      exportarCsv();
+                    }}
+                  >
                     {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                     Exportar CSV
                   </Button>
@@ -949,7 +1005,50 @@ export function RelacaoCTes() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Grupo de clientes</div>
+                <Input
+                  value={searchGrupoPagador}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSearchGrupoPagador(v);
+                    buscarGruposPagadores(v);
+                  }}
+                  placeholder="Buscar pelo nome..."
+                  className="dark:border-slate-700 dark:bg-slate-900"
+                />
+                {optGruposPagadores.length > 0 && (
+                  <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                    {optGruposPagadores.map((c) => (
+                      <button
+                        key={c.cnpj}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setSelGruposPagadores((p) => (p.some((x) => x.cnpj === c.cnpj) ? p : [...p, c]));
+                          setSearchGrupoPagador('');
+                          setOptGruposPagadores([]);
+                        }}
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{c.nome}</div>
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">{c.cnpj}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selGruposPagadores.map((c) => (
+                    <Badge key={c.cnpj} className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 gap-1 max-w-full">
+                      <span className="truncate max-w-[220px]">{c.nome}</span>
+                      <button type="button" className="ml-1 shrink-0" onClick={() => setSelGruposPagadores((p) => p.filter((x) => x.cnpj !== c.cnpj))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Clientes pagadores</div>
                 <Input
@@ -1332,7 +1431,27 @@ export function RelacaoCTes() {
 
           <Card className="border-slate-200 dark:border-slate-800 overflow-hidden">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">CT-es por Cliente (pagador)</CardTitle>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <CardTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100">Receita por Cliente</CardTitle>
+                <Tabs
+                  value={donutClientesModo}
+                  onValueChange={(v) => {
+                    const next = v === 'grupos' ? 'grupos' : 'clientes';
+                    setDonutClientesModo(next);
+                    setPage(1);
+                    carregar(1, sort, filters, next);
+                  }}
+                >
+                  <TabsList className="h-8">
+                    <TabsTrigger value="clientes" className="text-xs h-7">
+                      Cliente
+                    </TabsTrigger>
+                    <TabsTrigger value="grupos" className="text-xs h-7">
+                      Grupo
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
             </CardHeader>
             <CardContent className="pt-3">
               <div className="h-[240px]">
