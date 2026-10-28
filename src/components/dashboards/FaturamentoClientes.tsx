@@ -994,6 +994,22 @@ export function FaturamentoClientes() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setMetaClientesOpen(true); void carregarMetasClientes(); }}
+              className="dark:border-slate-600 dark:hover:bg-slate-800"
+            >
+              Configurar Metas por Cliente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setMetaUnidadesOpen(true); void carregarMetasUnidades(); }}
+              className="dark:border-slate-600 dark:hover:bg-slate-800"
+            >
+              Configurar Metas por Unidade
+            </Button>
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
               <button
                 onClick={() => setGroupBy('grupos')}
@@ -1016,22 +1032,6 @@ export function FaturamentoClientes() {
                 Clientes
               </button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setMetaClientesOpen(true); void carregarMetasClientes(); }}
-              className="dark:border-slate-600 dark:hover:bg-slate-800"
-            >
-              Configurar Metas por Cliente
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setMetaUnidadesOpen(true); void carregarMetasUnidades(); }}
-              className="dark:border-slate-600 dark:hover:bg-slate-800"
-            >
-              Configurar Metas por Unidade
-            </Button>
           </div>
         </div>
 
