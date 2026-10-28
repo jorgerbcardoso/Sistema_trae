@@ -18,9 +18,9 @@ $sortKey = strtolower(trim((string)($input['sortKey'] ?? 'data_emissao')));
 $sortDir = strtolower(trim((string)($input['sortDir'] ?? 'desc'))) === 'asc' ? 'asc' : 'desc';
 
 $allowedSort = [
-    'data_emissao' => 'cte.data_emissao',
-    'data_prev_ent' => 'cte.data_prev_ent',
-    'data_entrega' => 'cte.data_entrega',
+    'data_emissao' => "NULLIF(cte.data_emissao::text, '')::timestamp",
+    'data_prev_ent' => "NULLIF(cte.data_prev_ent::text, '')::timestamp",
+    'data_entrega' => "NULLIF(cte.data_entrega::text, '')::timestamp",
     'ser_cte' => 'cte.ser_cte',
     'nro_cte' => 'cte.nro_cte',
     'sigla_emit' => 'cte.sigla_emit',
@@ -176,6 +176,12 @@ if ($nroNf !== '') {
     }
 }
 
+$dacte = preg_replace('/\D/', '', (string)($filters['dacte'] ?? ''));
+if ($dacte !== '') {
+    $where[] = "COALESCE(cte.chave_cte::text, '') ILIKE $" . $p++;
+    $params[] = '%' . $dacte . '%';
+}
+
 $vendedorLogin = trim((string)($filters['vendedorLogin'] ?? ''));
 if ($vendedorLogin !== '') {
     if ($vendedorLogin === '__sem_vendedor__') {
@@ -211,7 +217,6 @@ $sql = "
         cte.nro_cte,
         cte.tp_documento,
         cte.tp_frete,
-        cte.status,
         cte.data_emissao,
         cte.data_prev_ent,
         cte.data_entrega,
@@ -270,43 +275,22 @@ if ($out === false) {
     respondJson(['success' => false, 'message' => 'Falha ao gerar arquivo.'], 500);
 }
 
-$headerRow = [
-    'seq_cte',
-    'ser_cte',
-    'nro_cte',
-    'tp_documento',
-    'tp_frete',
-    'status',
-    'data_emissao',
-    'data_prev_ent',
-    'data_entrega',
-    'data_chegada_unid',
-    'sigla_emit',
-    'sigla_dest',
-    'unid_atual',
-    'nome_emit',
-    'nome_pag',
-    'nome_dest',
-    'cnpj_emit',
-    'cnpj_pag',
-    'cnpj_dest',
-    'cod_mercadoria',
-    'qtde_vol',
+$fmtNumBr = function($v, int $decimals = 2): string {
+    $s = trim((string)$v);
+    if ($s === '') return '';
+    $s = str_replace(',', '.', $s);
+    if (!is_numeric($s)) return trim((string)$v);
+    return number_format((float)$s, $decimals, ',', '.');
+};
+
+$fmt2Keys = [
     'cubagem',
-    'peso_real',
-    'peso_calc',
     'vlr_frete',
     'vlr_merc',
     'vlr_icms',
     'vlr_pis_cofins',
     'vlr_expedicao',
     'vlr_recepcao',
-    'placa_coleta',
-    'nfs',
-    'cep_entrega',
-    'endereco_entrega',
-    'bairro_entrega',
-    'loc_dif_ent',
     'custo_seguro',
     'custo_icms',
     'custo_pis_cofins',
@@ -318,19 +302,80 @@ $headerRow = [
     'custo_recepcao',
     'custo_desp_div',
     'custo_transferencia_real',
-    'liquidado',
 ];
 
-fputcsv($out, $headerRow, ';');
+$columns = [
+    ['k' => 'seq_cte', 'h' => 'Seq CT-e'],
+    ['k' => 'ser_cte', 'h' => 'Série'],
+    ['k' => 'nro_cte', 'h' => 'Número'],
+    ['k' => 'tp_documento', 'h' => 'Tipo de Documento'],
+    ['k' => 'tp_frete', 'h' => 'Tipo de Frete'],
+    ['k' => 'data_emissao', 'h' => 'Emissão'],
+    ['k' => 'data_prev_ent', 'h' => 'Previsão de Entrega'],
+    ['k' => 'data_entrega', 'h' => 'Entrega'],
+    ['k' => 'data_chegada_unid', 'h' => 'Chegada na Unidade'],
+    ['k' => 'sigla_emit', 'h' => 'Unidade Origem'],
+    ['k' => 'sigla_dest', 'h' => 'Unidade Destino'],
+    ['k' => 'unid_atual', 'h' => 'Unidade Atual'],
+    ['k' => 'nome_emit', 'h' => 'Remetente'],
+    ['k' => 'nome_pag', 'h' => 'Pagador'],
+    ['k' => 'nome_dest', 'h' => 'Destinatário'],
+    ['k' => 'cnpj_emit', 'h' => 'CNPJ Remetente'],
+    ['k' => 'cnpj_pag', 'h' => 'CNPJ Pagador'],
+    ['k' => 'cnpj_dest', 'h' => 'CNPJ Destinatário'],
+    ['k' => 'cod_mercadoria', 'h' => 'Código Mercadoria'],
+    ['k' => 'qtde_vol', 'h' => 'Volumes'],
+    ['k' => 'cubagem', 'h' => 'Cubagem'],
+    ['k' => 'peso_real', 'h' => 'Peso Real'],
+    ['k' => 'peso_calc', 'h' => 'Peso Calculado'],
+    ['k' => 'vlr_frete', 'h' => 'Frete'],
+    ['k' => 'vlr_merc', 'h' => 'Valor da Mercadoria'],
+    ['k' => 'vlr_icms', 'h' => 'ICMS'],
+    ['k' => 'vlr_pis_cofins', 'h' => 'PIS/COFINS'],
+    ['k' => 'vlr_expedicao', 'h' => 'Expedição (Valor)'],
+    ['k' => 'vlr_recepcao', 'h' => 'Recepção (Valor)'],
+    ['k' => 'placa_coleta', 'h' => 'Placa de Coleta'],
+    ['k' => 'nfs', 'h' => 'NFs'],
+    ['k' => 'cep_entrega', 'h' => 'CEP de Entrega'],
+    ['k' => 'endereco_entrega', 'h' => 'Endereço de Entrega'],
+    ['k' => 'bairro_entrega', 'h' => 'Bairro de Entrega'],
+    ['k' => 'loc_dif_ent', 'h' => 'Local Dif. Entrega'],
+    ['k' => 'custo_seguro', 'h' => 'Custo Seguro'],
+    ['k' => 'custo_icms', 'h' => 'Custo ICMS'],
+    ['k' => 'custo_pis_cofins', 'h' => 'Custo PIS/COFINS'],
+    ['k' => 'custo_gris', 'h' => 'Custo GRIS'],
+    ['k' => 'custo_pedagio', 'h' => 'Custo Pedágio'],
+    ['k' => 'custo_expedicao', 'h' => 'Custo Expedição'],
+    ['k' => 'custo_transbordo', 'h' => 'Custo Transbordo'],
+    ['k' => 'custo_vendedor', 'h' => 'Custo Vendedor'],
+    ['k' => 'custo_recepcao', 'h' => 'Custo Recepção'],
+    ['k' => 'custo_desp_div', 'h' => 'Custo Desp. Diversas'],
+    ['k' => 'custo_transferencia_real', 'h' => 'Custo Transferência Real'],
+    ['k' => 'liquidado', 'h' => 'Liquidado'],
+];
+
+fputcsv($out, array_map(fn($c) => $c['h'], $columns), ';');
 
 while ($res && ($r = pg_fetch_assoc($res))) {
     $row = [];
-    foreach ($headerRow as $k) {
+    foreach ($columns as $c) {
+        $k = $c['k'];
         if ($k === 'liquidado') {
             $row[] = pgBoolToPHP($r[$k] ?? false) ? 'S' : 'N';
-        } else {
-            $row[] = $r[$k] ?? '';
+            continue;
         }
+        if ($k === 'tp_frete') {
+            $v = strtoupper(trim((string)($r[$k] ?? '')));
+            if ($v === 'C') $row[] = 'CIF';
+            elseif ($v === 'F') $row[] = 'FOB';
+            else $row[] = $r[$k] ?? '';
+            continue;
+        }
+        if (in_array($k, $fmt2Keys, true)) {
+            $row[] = $fmtNumBr($r[$k] ?? '', 2);
+            continue;
+        }
+        $row[] = $r[$k] ?? '';
     }
     fputcsv($out, $row, ';');
 }

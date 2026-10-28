@@ -92,6 +92,7 @@ interface RelacaoFilters {
   serCte: string;
   nroCte: string;
   nroNf: string;
+  dacte: string;
   vendedorLogin: string;
 }
 
@@ -189,6 +190,8 @@ export function RelacaoCTes() {
   const pageSize = 100;
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalFrete, setTotalFrete] = useState(0);
+  const [totalMerc, setTotalMerc] = useState(0);
 
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'data_emissao', dir: 'desc' });
   const [serieModo, setSerieModo] = useState<SerieModo>('frete');
@@ -226,6 +229,7 @@ export function RelacaoCTes() {
       serCte: '',
       nroCte: '',
       nroNf: '',
+      dacte: '',
       vendedorLogin: '',
     };
   });
@@ -294,6 +298,8 @@ export function RelacaoCTes() {
         setSerieUnidades([]);
         setTotal(0);
         setTotalPages(1);
+        setTotalFrete(0);
+        setTotalMerc(0);
         return;
       }
 
@@ -304,6 +310,8 @@ export function RelacaoCTes() {
       setSerieUnidades(Array.isArray(res?.serie_unidades) ? res.serie_unidades : []);
       setTotal(Number(res.total ?? 0) || 0);
       setTotalPages(Number(res.totalPages ?? 1) || 1);
+      setTotalFrete(Number(res.total_frete ?? 0) || 0);
+      setTotalMerc(Number(res.total_merc ?? 0) || 0);
       setPage(Number(res.page ?? pageToLoad) || pageToLoad);
     } catch (e: any) {
       toast.error('Erro ao carregar relação', { description: e?.message || 'Falha inesperada.' });
@@ -496,6 +504,7 @@ export function RelacaoCTes() {
       serCte: '',
       nroCte: '',
       nroNf: '',
+      dacte: '',
       vendedorLogin: '',
     });
   };
@@ -620,14 +629,34 @@ export function RelacaoCTes() {
           </div>
         </div>
 
-        <details open className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+        <details className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
           <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filtros</div>
               <div className="text-xs text-slate-500 dark:text-slate-400">Defina o período e demais critérios, depois clique em Gerar.</div>
             </div>
-            <div className="flex items-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : null}
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center gap-2"
+                onClickCapture={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <Button type="button" variant="outline" size="sm" className="h-8 dark:border-slate-700" disabled={loading} onClick={resetFiltros}>
+                  Limpar
+                </Button>
+                <Button type="button" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-white gap-2" disabled={loading} onClick={aplicarFiltros}>
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Gerar
+                </Button>
+                {total > 0 ? (
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-2 dark:border-slate-700" disabled={exporting || loading} onClick={exportarCsv}>
+                    {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Exportar CSV
+                  </Button>
+                ) : null}
+              </div>
               <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
             </div>
           </summary>
@@ -744,7 +773,7 @@ export function RelacaoCTes() {
 
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Entr./Baixa</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Entrega/Baixa</div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -1109,9 +1138,9 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tipo de documento</div>
-                <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 max-h-52 overflow-auto">
+                <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 flex-1 min-h-0 overflow-auto">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2">
                     <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                       <Checkbox
@@ -1189,7 +1218,7 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="space-y-2">
                   <Label className="text-slate-700 dark:text-slate-200">Série</Label>
                   <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
@@ -1202,24 +1231,20 @@ export function RelacaoCTes() {
                   <Label className="text-slate-700 dark:text-slate-200">NF</Label>
                   <Input value={tempFilters.nroNf} onChange={(e) => setTempFilters((p) => ({ ...p, nroNf: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" placeholder="Digite o número da NF" />
                 </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-              <Button type="button" variant="outline" className="dark:border-slate-700" disabled={loading} onClick={resetFiltros}>
-                Limpar
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button type="button" className="bg-blue-600 hover:bg-blue-700 text-white gap-2" disabled={loading} onClick={aplicarFiltros}>
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  Gerar
-                </Button>
-                {total > 0 ? (
-                  <Button type="button" variant="outline" className="gap-2 dark:border-slate-700" disabled={exporting || loading} onClick={exportarCsv}>
-                    {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                    Exportar CSV
-                  </Button>
-                ) : null}
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-200">DACTE</Label>
+                  <Input
+                    value={tempFilters.dacte}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 44);
+                      setTempFilters((p) => ({ ...p, dacte: v }));
+                    }}
+                    maxLength={44}
+                    inputMode="numeric"
+                    className="dark:border-slate-700 dark:bg-slate-900 font-mono"
+                    placeholder="44 dígitos"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1483,7 +1508,9 @@ export function RelacaoCTes() {
                           <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{r.sigla_emit || '—'}</td>
                           <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{r.sigla_dest || '—'}</td>
                           <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBRNoYear(r.data_prev_ent)}</td>
-                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">{fmtDateBRNoYear(r.data_entrega)}</td>
+                          <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            {String(r.data_entrega || '').slice(0, 10) ? fmtDateBRNoYear(r.data_entrega) : ''}
+                          </td>
                           <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-200 truncate">{r.nome_pag || '—'}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_merc)}</td>
                           <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap text-slate-700 dark:text-slate-200">{fmtMoney(r.vlr_frete)}</td>
@@ -1498,8 +1525,16 @@ export function RelacaoCTes() {
               </table>
             </div>
             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2 md:flex-row md:items-center md:justify-between bg-slate-50 dark:bg-slate-900/80">
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                Total: <span className="font-semibold text-slate-700 dark:text-slate-200">{total.toLocaleString('pt-BR')}</span>
+              <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                <span>
+                  CT-es: <span className="font-semibold text-slate-700 dark:text-slate-200">{total.toLocaleString('pt-BR')}</span>
+                </span>
+                <span>
+                  Frete: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(totalFrete)}</span>
+                </span>
+                <span>
+                  Vlr. Merc.: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(totalMerc)}</span>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="dark:border-slate-700" disabled={loading || page <= 1} onClick={() => { setPage(1); carregar(1, sort, filters); }}>

@@ -24,9 +24,9 @@ $sortKey = strtolower(trim((string)($input['sortKey'] ?? 'data_emissao')));
 $sortDir = strtolower(trim((string)($input['sortDir'] ?? 'desc'))) === 'asc' ? 'asc' : 'desc';
 
 $allowedSort = [
-    'data_emissao' => 'cte.data_emissao',
-    'data_prev_ent' => 'cte.data_prev_ent',
-    'data_entrega' => 'cte.data_entrega',
+    'data_emissao' => "NULLIF(cte.data_emissao::text, '')::timestamp",
+    'data_prev_ent' => "NULLIF(cte.data_prev_ent::text, '')::timestamp",
+    'data_entrega' => "NULLIF(cte.data_entrega::text, '')::timestamp",
     'ser_cte' => 'cte.ser_cte',
     'nro_cte' => 'cte.nro_cte',
     'sigla_emit' => 'cte.sigla_emit',
@@ -180,6 +180,12 @@ if ($nroNf !== '') {
         $where[] = "COALESCE(cte.nfs, '') ILIKE $" . $p++;
         $params[] = '%' . $nfDigits . '%';
     }
+}
+
+$dacte = preg_replace('/\D/', '', (string)($filters['dacte'] ?? ''));
+if ($dacte !== '') {
+    $where[] = "COALESCE(cte.chave_cte::text, '') ILIKE $" . $p++;
+    $params[] = '%' . $dacte . '%';
 }
 
 $vendedorLogin = trim((string)($filters['vendedorLogin'] ?? ''));
@@ -363,12 +369,16 @@ $serie = [];
 $serieUnid = [];
 
 $totalFrete = 0.0;
-$totalFreteRes = sql($cteLatest . "
-    SELECT COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total
+$totalMerc = 0.0;
+$totRes = sql($cteLatest . "
+    SELECT
+        COALESCE(SUM(cte.vlr_frete), 0)::numeric AS total_frete,
+        COALESCE(SUM(cte.vlr_merc), 0)::numeric AS total_merc
     FROM cte
 ", $params, $conn);
-if ($totalFreteRes && ($r = pg_fetch_assoc($totalFreteRes))) {
-    $totalFrete = (float)($r['total'] ?? 0);
+if ($totRes && ($r = pg_fetch_assoc($totRes))) {
+    $totalFrete = (float)($r['total_frete'] ?? 0);
+    $totalMerc = (float)($r['total_merc'] ?? 0);
 }
 
 $donutUnidRes = sql($cteLatest . "
@@ -485,6 +495,8 @@ respondJson([
     'pageSize' => $pageSize,
     'total' => $total,
     'totalPages' => $totalPages,
+    'total_frete' => $totalFrete,
+    'total_merc' => $totalMerc,
     'sortKey' => $sortKey,
     'sortDir' => $sortDir,
     'rows' => $rows,
