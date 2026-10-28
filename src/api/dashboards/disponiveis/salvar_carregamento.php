@@ -2712,7 +2712,8 @@ if ($acao === 'atualizar_ctes_ssw') {
     $manifestosXmlOk = 0;
     $pairsCount = 0;
     $cteFoundCount = 0;
-    if ($qtdSsw > 0 && $qtdPresto !== $qtdSsw && count($manifestos) > 0) {
+    $doSync = ($qtdSsw > 0 && $qtdPresto !== $qtdSsw);
+    if (count($manifestos) > 0) {
         $toFloat = function ($v) {
             $s = trim((string)$v);
             if ($s === '') return 0.0;
@@ -2885,7 +2886,7 @@ if ($acao === 'atualizar_ctes_ssw') {
 
                 $added = 0;
                 $updated = 0;
-                if (count($cteAll) > 0) {
+                if ($doSync && count($cteAll) > 0) {
                     pg_query($conn, 'BEGIN');
                     try {
                         foreach ($cteAll as $rowC) {
@@ -2971,28 +2972,29 @@ if ($acao === 'atualizar_ctes_ssw') {
     }
 
     try {
-        $selPesoUpd = $cteCol('peso_real') ? "COALESCE(cte.peso_real, 0)" : ($cteCol('peso_calc') ? "COALESCE(cte.peso_calc, 0)" : "0");
-        $selCubUpd = $cteCol('cubagem') ? "COALESCE(cte.cubagem, 0)" : "0";
-        sql(
-            "UPDATE {$tabela} t
-             SET peso_cte = c.peso_real,
-                 cubagem_cte = c.cubagem
-             FROM LATERAL (
-                 SELECT {$selPesoUpd} AS peso_real,
-                        {$selCubUpd} AS cubagem
+        if ($seqCarreg > 0) {
+            $setVlrMerc = $cteCol('vlr_merc') ? "cte.vlr_merc" : "t.vlr_merc_cte";
+            $setVlrFrete = $cteCol('vlr_frete') ? "cte.vlr_frete" : "t.vlr_frete_cte";
+            $setPeso = $cteCol('peso_real') ? "cte.peso_real" : ($cteCol('peso_calc') ? "cte.peso_calc" : "t.peso_cte");
+            $setVol = $cteCol('qtde_vol') ? "cte.qtde_vol" : "t.qtde_vol_cte";
+            $setCub = $cteCol('cubagem') ? "cte.cubagem" : "t.cubagem_cte";
+
+            sql(
+                "UPDATE {$tabela} t
+                 SET vlr_merc_cte = {$setVlrMerc},
+                     vlr_frete_cte = {$setVlrFrete},
+                     peso_cte = {$setPeso},
+                     qtde_vol_cte = {$setVol},
+                     cubagem_cte = {$setCub}
                  FROM {$tblCte} cte
                  WHERE regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(t.ser_cte::text), '[^A-Z0-9]', '', 'g')
                    AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(t.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
-                 ORDER BY cte.seq_cte DESC
-                 LIMIT 1
-             ) c
-             WHERE t.unidade = $1
-               AND UPPER(t.placa_provisoria) = $2
-               AND t.nro_cte > 0
-               AND COALESCE(BTRIM(t.ser_cte), '') <> ''",
-            [$unidade, $placaReq],
-            $conn
-        );
+                   AND t.unidade = $1
+                   AND t.seq_carregamento = $2",
+                [$unidade, $seqCarreg],
+                $conn
+            );
+        }
     } catch (Exception $e) {}
 
     respondJson([
