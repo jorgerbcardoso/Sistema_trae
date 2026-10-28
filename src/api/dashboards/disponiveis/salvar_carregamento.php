@@ -2558,34 +2558,51 @@ if ($acao === 'atualizar_ctes_ssw') {
 
         $cands = count($regF3) > 0 ? $regF3 : $regF2;
         if (count($cands) > 0) {
-            $best = null;
-            foreach ($cands as $x) {
-                if (strpos((string)($x['status'] ?? ''), 'AUTORIZADO') === false) continue;
-                if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
-            }
-            if ($best === null) {
+            $refDate = ($dtRef instanceof DateTime) ? $dtRef->format('Y-m-d') : '';
+            $sameDay = [];
+            if ($refDate !== '') {
                 foreach ($cands as $x) {
-                    if (strpos((string)($x['status'] ?? ''), 'ENCERRADO') === false) continue;
-                    if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
+                    $dt = $x['dt'] ?? null;
+                    if ($dt instanceof DateTime && $dt->format('Y-m-d') === $refDate) $sameDay[] = $x;
                 }
             }
-            if ($best === null) {
-                foreach ($cands as $x) {
-                    if ($best === null || (int)($x['ts'] ?? 0) > (int)($best['ts'] ?? 0)) $best = $x;
-                }
-            }
+            $use = count($sameDay) > 0 ? $sameDay : $cands;
 
-            if ($best !== null) {
-                $info['saida'] = $best['dt'] ?? null;
-                $info['qtd'] = (int)($best['qtd'] ?? 0);
-                $mans = $best['manifestos'] ?? [];
+            $filterByStatus = function(array $arr, string $needle): array {
+                $out = [];
+                foreach ($arr as $x) {
+                    if (strpos((string)($x['status'] ?? ''), $needle) === false) continue;
+                    $out[] = $x;
+                }
+                return $out;
+            };
+
+            $useAut = $filterByStatus($use, 'AUTORIZADO');
+            $useEnc = $filterByStatus($use, 'ENCERRADO');
+            if (count($useAut) > 0) $use = $useAut;
+            else if (count($useEnc) > 0) $use = $useEnc;
+
+            $saidaBest = null;
+            $qtdSum = 0;
+            $mansAll = [];
+            foreach ($use as $x) {
+                $qtdSum += (int)($x['qtd'] ?? 0);
+                $dt = $x['dt'] ?? null;
+                if ($dt instanceof DateTime) {
+                    if ($saidaBest === null || (int)($x['ts'] ?? 0) > (int)($saidaBest['ts'] ?? 0)) $saidaBest = $x;
+                }
+                $mans = $x['manifestos'] ?? [];
                 if (is_array($mans)) {
                     foreach (array_keys($mans) as $sx) {
                         $sx = (string)$sx;
-                        if ($sx !== '') $info['manifestos'][$sx] = true;
+                        if ($sx !== '') $mansAll[$sx] = true;
                     }
                 }
             }
+
+            if ($saidaBest !== null) $info['saida'] = $saidaBest['dt'] ?? null;
+            $info['qtd'] = $qtdSum;
+            foreach (array_keys($mansAll) as $sx) $info['manifestos'][(string)$sx] = true;
         }
     }
 
