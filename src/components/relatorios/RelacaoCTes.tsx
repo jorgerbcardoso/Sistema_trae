@@ -1044,7 +1044,7 @@ export function RelacaoCTes() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Mercadoria</div>
                 <Input
                   value={searchMercadoria}
@@ -1056,7 +1056,7 @@ export function RelacaoCTes() {
                   placeholder="Buscar mercadoria..."
                   className="dark:border-slate-700 dark:bg-slate-900"
                 />
-                <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                <div className="mt-2 flex-1 min-h-0 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
                   {optMercadorias.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">—</div>
                   ) : (
@@ -1088,7 +1088,7 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Vendedor</div>
                 <Input
                   value={searchVendedor}
@@ -1100,7 +1100,7 @@ export function RelacaoCTes() {
                   placeholder="Buscar vendedor..."
                   className="dark:border-slate-700 dark:bg-slate-900"
                 />
-                <div className="mt-2 max-h-52 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
+                <div className="mt-2 flex-1 min-h-0 overflow-auto rounded-md border border-slate-200 dark:border-slate-800">
                   {optVendedores.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">—</div>
                   ) : (
@@ -1141,7 +1141,7 @@ export function RelacaoCTes() {
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 flex flex-col h-full">
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Tipo de documento</div>
                 <div className="rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 flex-1 min-h-0 overflow-auto">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2">
+                  <div className="flex flex-col">
                     <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
                       <Checkbox
                         checked={tempFilters.tpDocumento.length === 0}
@@ -1218,7 +1218,7 @@ export function RelacaoCTes() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                 <div className="space-y-2">
                   <Label className="text-slate-700 dark:text-slate-200">Série</Label>
                   <Input value={tempFilters.serCte} onChange={(e) => setTempFilters((p) => ({ ...p, serCte: e.target.value.toUpperCase() }))} className="dark:border-slate-700 dark:bg-slate-900" />
@@ -1231,7 +1231,7 @@ export function RelacaoCTes() {
                   <Label className="text-slate-700 dark:text-slate-200">NF</Label>
                   <Input value={tempFilters.nroNf} onChange={(e) => setTempFilters((p) => ({ ...p, nroNf: e.target.value }))} className="dark:border-slate-700 dark:bg-slate-900" placeholder="Digite o número da NF" />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label className="text-slate-700 dark:text-slate-200">DACTE</Label>
                   <Input
                     value={tempFilters.dacte}
