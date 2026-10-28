@@ -435,7 +435,7 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                 $f0 = strtoupper(trim((string)($rm->f0 ?? '')));
                 if ($f0 === '') continue;
                 $f0Clean = preg_replace('/[^A-Z0-9]/', '', $f0);
-                if (!preg_match('/^([A-Z]{3})(\d{6})/', $f0Clean, $mC)) continue;
+                if (!preg_match('/^([A-Z]{3})(\d{6,9})/', $f0Clean, $mC)) continue;
                 $ser = strtoupper($mC[1]);
                 $nro = (int)$mC[2];
                 if ($nro <= 0) continue;
@@ -2981,8 +2981,8 @@ if ($acao === 'atualizar_ctes_ssw') {
                  SELECT {$selPesoUpd} AS peso_real,
                         {$selCubUpd} AS cubagem
                  FROM {$tblCte} cte
-                 WHERE UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(t.ser_cte))
-                   AND cte.nro_cte = t.nro_cte
+                 WHERE regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(t.ser_cte::text), '[^A-Z0-9]', '', 'g')
+                   AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(t.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
                  ORDER BY cte.seq_cte DESC
                  LIMIT 1
              ) c
