@@ -13968,7 +13968,7 @@ export function Disponiveis() {
                   <button
                     type="button"
                     className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
-                    onClick={() => { setShowConfiguracoes(false); setCapDialogOpen(true); }}
+                    onClick={() => { setCapDialogOpen(true); setShowConfiguracoes(false); }}
                   >
                     <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-3">
                       <Gauge className="w-6 h-6 text-indigo-700 dark:text-indigo-300" />
@@ -13980,7 +13980,7 @@ export function Disponiveis() {
                   <button
                     type="button"
                     className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
-                    onClick={() => { setShowConfiguracoes(false); setCapFrotaDialogOpen(true); }}
+                    onClick={() => { setCapFrotaDialogOpen(true); setShowConfiguracoes(false); }}
                   >
                     <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
                       <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
@@ -13992,7 +13992,7 @@ export function Disponiveis() {
                   <button
                     type="button"
                     className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
-                    onClick={() => { setShowConfiguracoes(false); setFreteDispDialogOpen(true); void loadFreteDisponivel(); }}
+                    onClick={() => { setFreteDispDialogOpen(true); setShowConfiguracoes(false); void loadFreteDisponivel(); }}
                   >
                     <div className="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mb-3">
                       <div className="relative w-12 h-12 flex items-center justify-center">

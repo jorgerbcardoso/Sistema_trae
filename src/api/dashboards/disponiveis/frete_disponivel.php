@@ -5,8 +5,7 @@ handleOptionsRequest();
 validateRequestMethod('POST');
 
 $auth = authenticateAndGetUser();
-$domain = $auth['domain'];
-$login = $auth['login'];
+$domain = (string)($auth['domain'] ?? '');
 
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $domain)) {
     respondJson(['success' => false, 'message' => 'Domínio inválido.']);
@@ -29,6 +28,7 @@ $tbl = "{$domain}_frete_disponivel";
         PRIMARY KEY (sigla_emit, sigla_carregamento)
      )"
 );
+@pg_query($conn, "CREATE UNIQUE INDEX IF NOT EXISTS {$tbl}_uq1 ON {$tbl} (sigla_emit, sigla_carregamento)");
 
 if ($acao === 'list') {
     $res = @pg_query($conn, "SELECT sigla_emit, sigla_carregamento, percentual FROM {$tbl} ORDER BY sigla_carregamento, sigla_emit");
@@ -61,14 +61,23 @@ if ($acao === 'upsert') {
             if ($emit === '' || $car === '' || !is_finite($perc)) continue;
             if ($perc < 0) $perc = 0.0;
             if ($perc > 1000) $perc = 1000.0;
-            sql(
-                "INSERT INTO {$tbl} (sigla_emit, sigla_carregamento, percentual)
-                 VALUES ($1, $2, $3)
-                 ON CONFLICT (sigla_emit, sigla_carregamento)
-                 DO UPDATE SET percentual = EXCLUDED.percentual",
+            $resUp = sql(
+                "UPDATE {$tbl}
+                 SET percentual = $3
+                 WHERE sigla_emit = $1
+                   AND sigla_carregamento = $2",
                 [$emit, $car, $perc],
                 $conn
             );
+            $aff = $resUp ? @pg_affected_rows($resUp) : 0;
+            if (!$aff) {
+                sql(
+                    "INSERT INTO {$tbl} (sigla_emit, sigla_carregamento, percentual)
+                     VALUES ($1, $2, $3)",
+                    [$emit, $car, $perc],
+                    $conn
+                );
+            }
             $count++;
         }
         pg_query($conn, 'COMMIT');
@@ -91,4 +100,3 @@ if ($acao === 'delete') {
 }
 
 respondJson(['success' => false, 'message' => 'Ação inválida.']);
-
