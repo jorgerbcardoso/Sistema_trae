@@ -275,7 +275,7 @@ foreach ($unidadesCompart as $siglaHub) {
                 if (count($arr) < 5) continue;
 
                 $ctrc = $getCell($arr, $idx, ['CTRC/GAI/PAL']);
-                if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+                if (!preg_match('/^[A-Z0-9]{3}\d{6}-\d$/', $ctrc)) continue;
 
                 $tipo        = $getCell($arr, $idx, ['T']);
                 $autor       = $getCell($arr, $idx, ['AUTORIZACAO']);
@@ -416,7 +416,7 @@ foreach ($unidadesCompart as $siglaHub) {
                 }
 
                 $ctrc = trim(substr($linha, 0, 13));
-                if (!preg_match('/^[A-Z]{3}\d{6}-\d$/', $ctrc)) continue;
+                if (!preg_match('/^[A-Z0-9]{3}\d{6}-\d$/', $ctrc)) continue;
 
                 $tipo        = trim(substr($linha, 14, 1));
                 $autor       = trim(substr($linha, 16, 5));
