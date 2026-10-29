@@ -58,6 +58,7 @@ import {
   Wallet,
   RotateCcw,
   CircleHelp,
+  Settings,
   ArrowUpDown,
   Info,
   Route,
@@ -8054,7 +8055,11 @@ function ModalCarregamentoAutomaticoEntrega({
   }, [ctes, periodoTs.iniTs, periodoTs.fimTs]);
 
   const setoresFiltrados = useMemo(() => {
-    const b = busca.trim().toUpperCase();
+    const bRaw = busca.trim().toUpperCase();
+    const b = bRaw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]/g, '');
     const list = [...(setores ?? [])];
     list.sort((a, b) => {
       const ca = countsPorSetor.get(String(a.setor ?? '').trim().toUpperCase()) ?? 0;
@@ -8071,7 +8076,11 @@ function ModalCarregamentoAutomaticoEntrega({
         .filter(Boolean)
         .join(' ')
         .toUpperCase();
-      return alvo.includes(b);
+      const alvoNorm = alvo
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9]/g, '');
+      return alvoNorm.includes(b);
     });
     return base.filter((s) => {
       const k = String(s.setor ?? '').trim().toUpperCase();
@@ -8108,7 +8117,7 @@ function ModalCarregamentoAutomaticoEntrega({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl mx-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-emerald-500" />
@@ -8119,14 +8128,14 @@ function ModalCarregamentoAutomaticoEntrega({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-3">
+        <div className="px-6 py-5 space-y-3 overflow-y-auto flex-1 min-h-0">
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Buscar setor</label>
             <input
               type="text"
               value={busca}
               onChange={(e) => setBusca(e.target.value.toUpperCase())}
-              placeholder="Ex: CENTRO"
+              placeholder="Ex: CENTRO ou 001"
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
               autoFocus
             />
@@ -8229,7 +8238,7 @@ function ModalCarregamentoAutomaticoEntrega({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 px-6 pb-5 justify-end">
+        <div className="flex flex-wrap gap-2 px-6 pb-5 justify-end shrink-0">
           <Button variant="outline" onClick={onFechar}>Cancelar</Button>
           <Button
             variant="outline"
@@ -9948,6 +9957,19 @@ function CarregamentoArea({
                                 Atualizar CT-es
                               </Button>
                             ) : null}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={loadingRota || (((Number((c as any)?.qtde_ctes_presto ?? c.qtde_ctes ?? 0) || 0) + (c2 ? (Number((c2 as any)?.qtde_ctes_presto ?? c2.qtde_ctes ?? 0) || 0) : 0)) <= 0)}
+                              onClick={() => {
+                                void onCarregarRota(c);
+                                setCalDetalheOpen(false);
+                              }}
+                              title={(((Number((c as any)?.qtde_ctes_presto ?? c.qtde_ctes ?? 0) || 0) + (c2 ? (Number((c2 as any)?.qtde_ctes_presto ?? c2.qtde_ctes ?? 0) || 0) : 0)) <= 0) ? 'Carregamento sem CT-es' : 'Ver rota e reimprimir ordem'}
+                            >
+                              Rota
+                            </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => void abrirCtesCarregamento(c)}>
                               Ver CT-es
                             </Button>
@@ -10400,22 +10422,6 @@ function CarregamentoArea({
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs h-8 border-slate-300 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => setCapDialogOpen(true)}
-              >
-                <Gauge className="w-3.5 h-3.5 mr-1.5" />Ajustar capacidades
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-xs h-8 border-slate-300 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                onClick={() => setCapFrotaDialogOpen(true)}
-              >
-                <Wallet className="w-3.5 h-3.5 mr-1.5" />Ajustar Tabela Frota
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
                 className="text-xs h-8 border-sky-300 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30"
                 onClick={() => setModalImportarAberto(true)}
                 disabled={importandoCarregamentos || importandoVeiculos}
@@ -10680,6 +10686,117 @@ function CarregamentoArea({
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={freteDispDialogOpen}
+        onOpenChange={(v) => {
+          setFreteDispDialogOpen(v);
+          if (v) void loadFreteDisponivel();
+        }}
+      >
+        <DialogContent className="sm:max-w-[820px]">
+          <DialogHeader>
+            <DialogTitle>Frete disponível (frete real)</DialogTitle>
+            <DialogDescription>
+              Define o percentual de frete disponível para contratação de terceiros por unidade de emissão × unidade de operação.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[140px_160px_140px_120px] gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. emissão</Label>
+                <Input value={freteDispNewEmit} onChange={(e) => setFreteDispNewEmit(e.target.value.toUpperCase())} placeholder="Ex: REC" maxLength={20} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. operação</Label>
+                <Input value={freteDispNewCar} onChange={(e) => setFreteDispNewCar(e.target.value.toUpperCase())} placeholder="Ex: SSA" maxLength={20} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-600 dark:text-slate-400">Percentual</Label>
+                <Input value={freteDispNewPerc} onChange={(e) => setFreteDispNewPerc(e.target.value)} placeholder="Ex: 60" inputMode="decimal" />
+              </div>
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                disabled={freteDispSaving}
+                onClick={async () => {
+                  await upsertFreteDisponivel(freteDispNewEmit, freteDispNewCar, freteDispNewPerc);
+                  setFreteDispNewEmit('');
+                  setFreteDispNewCar('');
+                  setFreteDispNewPerc('');
+                }}
+              >
+                {freteDispSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Salvar
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="grid grid-cols-[140px_160px_140px_140px] gap-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">
+                <span>Emissão</span>
+                <span>Operação</span>
+                <span className="text-right">Percentual</span>
+                <span className="text-right">Ações</span>
+              </div>
+              <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {freteDispLoading ? (
+                  <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Carregando...
+                  </div>
+                ) : freteDispItems.length === 0 ? (
+                  <div className="px-3 py-6 text-xs text-slate-400 text-center">—</div>
+                ) : (
+                  freteDispItems.map((it) => {
+                    const emit = String(it.sigla_emit ?? '').trim().toUpperCase();
+                    const car = String(it.sigla_carregamento ?? '').trim().toUpperCase();
+                    const key = `${emit}|${car}`;
+                    const raw = freteDispEdits[key] ?? '';
+                    return (
+                      <div key={key} className="grid grid-cols-[140px_160px_140px_140px] gap-2 px-3 py-2 items-center text-xs">
+                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{emit}</span>
+                        <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{car}</span>
+                        <Input
+                          className="h-8 text-xs px-2 text-right font-mono tabular-nums"
+                          value={raw}
+                          onChange={(e) => setFreteDispEdits((prev) => ({ ...prev, [key]: e.target.value }))}
+                          inputMode="decimal"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            disabled={freteDispSaving}
+                            onClick={() => void upsertFreteDisponivel(emit, car, freteDispEdits[key] ?? '')}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                            disabled={freteDispSaving}
+                            onClick={() => void deleteFreteDisponivel(emit, car)}
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setFreteDispDialogOpen(false)} disabled={freteDispSaving}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={resumoEntregaOpen} onOpenChange={setResumoEntregaOpen}>
         <DialogContent className="sm:max-w-[760px]">
           <DialogHeader>
@@ -10853,11 +10970,119 @@ export function Disponiveis() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [showConfiguracoes, setShowConfiguracoes] = useState(false);
   const [bloqueioOperacao, setBloqueioOperacao] = useState<string | null>(null);
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [todasOcorrenciasCarregadas, setTodasOcorrenciasCarregadas] = useState<{ codigo: number }[] | null>(null);
   const [ultOcorTouched, setUltOcorTouched] = useState(false);
+
+  const [freteDispDialogOpen, setFreteDispDialogOpen] = useState(false);
+  const [freteDispLoading, setFreteDispLoading] = useState(false);
+  const [freteDispSaving, setFreteDispSaving] = useState(false);
+  const [freteDispItems, setFreteDispItems] = useState<{ sigla_emit: string; sigla_carregamento: string; percentual: number }[]>([]);
+  const [freteDispEdits, setFreteDispEdits] = useState<Record<string, string>>({});
+  const [freteDispNewEmit, setFreteDispNewEmit] = useState('');
+  const [freteDispNewCar, setFreteDispNewCar] = useState('');
+  const [freteDispNewPerc, setFreteDispNewPerc] = useState('');
+
+  const parsePercentualBR = (raw: string): number => {
+    let s = String(raw ?? '').trim();
+    if (!s) return 0;
+    s = s.replace(/[^\d,.\-]/g, '');
+    if (!s) return 0;
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const loadFreteDisponivel = useCallback(async () => {
+    setFreteDispLoading(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/frete_disponivel.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'list' }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao carregar frete disponível');
+        setFreteDispItems([]);
+        setFreteDispEdits({});
+        return;
+      }
+      const items = Array.isArray(r.items) ? r.items : [];
+      setFreteDispItems(items);
+      setFreteDispEdits(() => {
+        const next: Record<string, string> = {};
+        for (const it of items) {
+          const emit = String(it?.sigla_emit ?? '').trim().toUpperCase();
+          const car = String(it?.sigla_carregamento ?? '').trim().toUpperCase();
+          const key = `${emit}|${car}`;
+          const p = Number(it?.percentual ?? 0) || 0;
+          next[key] = p > 0 ? p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        }
+        return next;
+      });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao carregar frete disponível');
+      setFreteDispItems([]);
+      setFreteDispEdits({});
+    } finally {
+      setFreteDispLoading(false);
+    }
+  }, []);
+
+  const upsertFreteDisponivel = useCallback(async (emit: string, car: string, percRaw: string) => {
+    const siglaEmit = String(emit ?? '').trim().toUpperCase();
+    const siglaCar = String(car ?? '').trim().toUpperCase();
+    if (!siglaEmit || !siglaCar) {
+      toast.error('Informe a unidade de emissão e a unidade de operação.');
+      return;
+    }
+    const perc = parsePercentualBR(percRaw);
+    setFreteDispSaving(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/frete_disponivel.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'upsert', items: [{ sigla_emit: siglaEmit, sigla_carregamento: siglaCar, percentual: perc }] }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao salvar frete disponível');
+        return;
+      }
+      toast.success('Configuração salva.');
+      await loadFreteDisponivel();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar frete disponível');
+    } finally {
+      setFreteDispSaving(false);
+    }
+  }, [loadFreteDisponivel]);
+
+  const deleteFreteDisponivel = useCallback(async (emit: string, car: string) => {
+    const siglaEmit = String(emit ?? '').trim().toUpperCase();
+    const siglaCar = String(car ?? '').trim().toUpperCase();
+    if (!siglaEmit || !siglaCar) return;
+    setFreteDispSaving(true);
+    try {
+      const r = await apiFetch(
+        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/frete_disponivel.php`,
+        { method: 'POST', body: JSON.stringify({ acao: 'delete', sigla_emit: siglaEmit, sigla_carregamento: siglaCar }) },
+        true
+      );
+      if (!r?.success) {
+        toast.error(r?.message || 'Erro ao excluir');
+        return;
+      }
+      toast.success('Removido.');
+      await loadFreteDisponivel();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao excluir');
+    } finally {
+      setFreteDispSaving(false);
+    }
+  }, [loadFreteDisponivel]);
 
   useEffect(() => {
     if (!(showFilters || isBNR) || todasOcorrenciasCarregadas !== null) return;
@@ -13821,6 +14046,79 @@ export function Disponiveis() {
                 </DialogContent>
               </Dialog>
             </>
+          )}
+          {!isMTZ && (
+            <Dialog open={showConfiguracoes} onOpenChange={setShowConfiguracoes}>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Configurações"
+                        className="relative dark:border-slate-600 dark:hover:bg-slate-800 print:hidden"
+                      >
+                        <Settings className="w-4 h-4 text-slate-700 dark:text-slate-200" />
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Configurações</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="sm:max-w-[920px] bg-white dark:bg-slate-900">
+                <DialogHeader>
+                  <DialogTitle className="text-slate-900 dark:text-slate-100">Configurações</DialogTitle>
+                  <DialogDescription className="text-slate-600 dark:text-slate-400">
+                    Cadastros e parâmetros operacionais do painel.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2">
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
+                    onClick={() => { setShowConfiguracoes(false); setCapDialogOpen(true); }}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-3">
+                      <Gauge className="w-6 h-6 text-indigo-700 dark:text-indigo-300" />
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Capacidades por tipo</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Capacidade padrão (Ton / m³) por tipo de veículo</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
+                    onClick={() => { setShowConfiguracoes(false); setCapFrotaDialogOpen(true); }}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-3">
+                      <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Tabela Frota</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Custos por tipo de veículo (estimativa de frota)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors p-4 text-left"
+                    onClick={() => { setShowConfiguracoes(false); setFreteDispDialogOpen(true); void loadFreteDisponivel(); }}
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mb-3">
+                      <div className="relative w-12 h-12 flex items-center justify-center">
+                        <DollarSign className="w-6 h-6 text-sky-700 dark:text-sky-300" />
+                        <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 text-[10px] font-black text-sky-700 dark:text-sky-300 flex items-center justify-center">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Frete disponível</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Percentual de frete “real” por emissão × operação</div>
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
           {!isMTZ && (
             <Button

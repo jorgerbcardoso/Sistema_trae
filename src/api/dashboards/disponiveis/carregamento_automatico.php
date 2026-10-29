@@ -321,8 +321,15 @@ if ($acao === 'reativar_adiado') {
 
     pg_query($conn, 'BEGIN');
     try {
-        sql("DELETE FROM {$tabela} WHERE unidade = \$1 AND seq_carregamento = \$2 AND data_finalizacao IS NULL", [$unidade, $seq], $conn);
-        sql("DELETE FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seq], $conn);
+        sql(
+            "UPDATE {$tabela}
+             SET adiado = FALSE
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL",
+            [$unidade, $seq],
+            $conn
+        );
         pg_query($conn, 'COMMIT');
     } catch (Exception $e) {
         pg_query($conn, 'ROLLBACK');

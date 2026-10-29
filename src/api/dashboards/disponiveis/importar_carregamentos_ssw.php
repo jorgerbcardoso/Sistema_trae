@@ -1533,8 +1533,17 @@ foreach ($placas_ssw as $placa) {
                 while ($rowDup = pg_fetch_assoc($resDup)) {
                     $seqDup = (int)($rowDup['seq_carregamento'] ?? 0);
                     if ($seqDup <= 0) continue;
-                    sql("DELETE FROM {$tabela} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seqDup], $conn);
-                    sql("DELETE FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2", [$unidade, $seqDup], $conn);
+                    sql(
+                        "UPDATE {$tabela}
+                         SET data_finalizacao = CURRENT_DATE,
+                             hora_finalizacao = CURRENT_TIME,
+                             login_finalizacao = \$3
+                         WHERE unidade = \$1
+                           AND seq_carregamento = \$2
+                           AND data_finalizacao IS NULL",
+                        [$unidade, $seqDup, $login],
+                        $conn
+                    );
                 }
             }
         }
