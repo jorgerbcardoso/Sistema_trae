@@ -10686,117 +10686,6 @@ function CarregamentoArea({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={freteDispDialogOpen}
-        onOpenChange={(v) => {
-          setFreteDispDialogOpen(v);
-          if (v) void loadFreteDisponivel();
-        }}
-      >
-        <DialogContent className="sm:max-w-[820px]">
-          <DialogHeader>
-            <DialogTitle>Frete disponível (frete real)</DialogTitle>
-            <DialogDescription>
-              Define o percentual de frete disponível para contratação de terceiros por unidade de emissão × unidade de operação.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-[140px_160px_140px_120px] gap-2 items-end">
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. emissão</Label>
-                <Input value={freteDispNewEmit} onChange={(e) => setFreteDispNewEmit(e.target.value.toUpperCase())} placeholder="Ex: REC" maxLength={20} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. operação</Label>
-                <Input value={freteDispNewCar} onChange={(e) => setFreteDispNewCar(e.target.value.toUpperCase())} placeholder="Ex: SSA" maxLength={20} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600 dark:text-slate-400">Percentual</Label>
-                <Input value={freteDispNewPerc} onChange={(e) => setFreteDispNewPerc(e.target.value)} placeholder="Ex: 60" inputMode="decimal" />
-              </div>
-              <Button
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                disabled={freteDispSaving}
-                onClick={async () => {
-                  await upsertFreteDisponivel(freteDispNewEmit, freteDispNewCar, freteDispNewPerc);
-                  setFreteDispNewEmit('');
-                  setFreteDispNewCar('');
-                  setFreteDispNewPerc('');
-                }}
-              >
-                {freteDispSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Salvar
-              </Button>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="grid grid-cols-[140px_160px_140px_140px] gap-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">
-                <span>Emissão</span>
-                <span>Operação</span>
-                <span className="text-right">Percentual</span>
-                <span className="text-right">Ações</span>
-              </div>
-              <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                {freteDispLoading ? (
-                  <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Carregando...
-                  </div>
-                ) : freteDispItems.length === 0 ? (
-                  <div className="px-3 py-6 text-xs text-slate-400 text-center">—</div>
-                ) : (
-                  freteDispItems.map((it) => {
-                    const emit = String(it.sigla_emit ?? '').trim().toUpperCase();
-                    const car = String(it.sigla_carregamento ?? '').trim().toUpperCase();
-                    const key = `${emit}|${car}`;
-                    const raw = freteDispEdits[key] ?? '';
-                    return (
-                      <div key={key} className="grid grid-cols-[140px_160px_140px_140px] gap-2 px-3 py-2 items-center text-xs">
-                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{emit}</span>
-                        <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{car}</span>
-                        <Input
-                          className="h-8 text-xs px-2 text-right font-mono tabular-nums"
-                          value={raw}
-                          onChange={(e) => setFreteDispEdits((prev) => ({ ...prev, [key]: e.target.value }))}
-                          inputMode="decimal"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            disabled={freteDispSaving}
-                            onClick={() => void upsertFreteDisponivel(emit, car, freteDispEdits[key] ?? '')}
-                          >
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
-                            disabled={freteDispSaving}
-                            onClick={() => void deleteFreteDisponivel(emit, car)}
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setFreteDispDialogOpen(false)} disabled={freteDispSaving}>
-              Fechar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={resumoEntregaOpen} onOpenChange={setResumoEntregaOpen}>
         <DialogContent className="sm:max-w-[760px]">
           <DialogHeader>
@@ -14120,6 +14009,116 @@ export function Disponiveis() {
               </DialogContent>
             </Dialog>
           )}
+          <Dialog
+            open={freteDispDialogOpen}
+            onOpenChange={(v) => {
+              setFreteDispDialogOpen(v);
+              if (v) void loadFreteDisponivel();
+            }}
+          >
+            <DialogContent className="sm:max-w-[820px]">
+              <DialogHeader>
+                <DialogTitle>Frete disponível (frete real)</DialogTitle>
+                <DialogDescription>
+                  Define o percentual de frete disponível para contratação de terceiros por unidade de emissão × unidade de operação.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[140px_160px_140px_120px] gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. emissão</Label>
+                    <Input value={freteDispNewEmit} onChange={(e) => setFreteDispNewEmit(e.target.value.toUpperCase())} placeholder="Ex: REC" maxLength={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Unid. operação</Label>
+                    <Input value={freteDispNewCar} onChange={(e) => setFreteDispNewCar(e.target.value.toUpperCase())} placeholder="Ex: SSA" maxLength={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Percentual</Label>
+                    <Input value={freteDispNewPerc} onChange={(e) => setFreteDispNewPerc(e.target.value)} placeholder="Ex: 60" inputMode="decimal" />
+                  </div>
+                  <Button
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    disabled={freteDispSaving}
+                    onClick={async () => {
+                      await upsertFreteDisponivel(freteDispNewEmit, freteDispNewCar, freteDispNewPerc);
+                      setFreteDispNewEmit('');
+                      setFreteDispNewCar('');
+                      setFreteDispNewPerc('');
+                    }}
+                  >
+                    {freteDispSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Salvar
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="grid grid-cols-[140px_160px_140px_140px] gap-2 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">
+                    <span>Emissão</span>
+                    <span>Operação</span>
+                    <span className="text-right">Percentual</span>
+                    <span className="text-right">Ações</span>
+                  </div>
+                  <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                    {freteDispLoading ? (
+                      <div className="px-3 py-6 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Carregando...
+                      </div>
+                    ) : freteDispItems.length === 0 ? (
+                      <div className="px-3 py-6 text-xs text-slate-400 text-center">—</div>
+                    ) : (
+                      freteDispItems.map((it) => {
+                        const emit = String(it.sigla_emit ?? '').trim().toUpperCase();
+                        const car = String(it.sigla_carregamento ?? '').trim().toUpperCase();
+                        const key = `${emit}|${car}`;
+                        const raw = freteDispEdits[key] ?? '';
+                        return (
+                          <div key={key} className="grid grid-cols-[140px_160px_140px_140px] gap-2 px-3 py-2 items-center text-xs">
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{emit}</span>
+                            <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{car}</span>
+                            <Input
+                              className="h-8 text-xs px-2 text-right font-mono tabular-nums"
+                              value={raw}
+                              onChange={(e) => setFreteDispEdits((prev) => ({ ...prev, [key]: e.target.value }))}
+                              inputMode="decimal"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2"
+                                disabled={freteDispSaving}
+                                onClick={() => void upsertFreteDisponivel(emit, car, freteDispEdits[key] ?? '')}
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                                disabled={freteDispSaving}
+                                onClick={() => void deleteFreteDisponivel(emit, car)}
+                              >
+                                Remover
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setFreteDispDialogOpen(false)} disabled={freteDispSaving}>
+                  Fechar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           {!isMTZ && (
             <Button
               variant="outline"
