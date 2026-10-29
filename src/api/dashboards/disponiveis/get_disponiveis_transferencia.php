@@ -1066,6 +1066,7 @@ if (!empty($coletas)) {
 }
 
 $placaColetaMap = [];
+$destNomeMap = [];
 if (!empty($ctes)) {
     $tableCte = strtolower($domain) . '_cte';
     $tableOk = false;
@@ -1095,7 +1096,7 @@ if (!empty($ctes)) {
                 $i += 2;
             }
 
-            $q = "SELECT cte.ser_cte, cte.nro_cte, cte.placa_coleta
+            $q = "SELECT cte.ser_cte, cte.nro_cte, cte.placa_coleta, cte.nome_dest
                   FROM {$tableCte} cte
                   JOIN (VALUES " . implode(',', $values) . ") v(ser_cte, nro_cte)
                     ON v.ser_cte = cte.ser_cte AND v.nro_cte = (cte.nro_cte::text)";
@@ -1107,6 +1108,8 @@ if (!empty($ctes)) {
                     if ($ser === '' || $nro <= 0) continue;
                     $pc = trim((string)($r['placa_coleta'] ?? ''));
                     $placaColetaMap[$ser . '|' . $nro] = $pc;
+                    $nd = trim((string)($r['nome_dest'] ?? ''));
+                    if ($nd !== '') $destNomeMap[$ser . '|' . $nro] = $nd;
                 }
             }
         }
@@ -1117,6 +1120,8 @@ if (!empty($ctes)) {
         $nro = (int)($c['nroCte'] ?? 0);
         if ($ser === '' || $nro <= 0) continue;
         $ctes[$i]['placaColeta'] = $placaColetaMap[$ser . '|' . $nro] ?? '';
+        $nd = $destNomeMap[$ser . '|' . $nro] ?? '';
+        if ($nd !== '') $ctes[$i]['destinatario'] = $nd;
     }
 }
 

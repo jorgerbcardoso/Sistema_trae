@@ -232,6 +232,7 @@ interface GrupoSetor {
   totalPeso: number;
   totalCubagem: number;
   totalFrete: number;
+  totalDisp: number;
   totalVlrNf: number;
 }
 
@@ -246,6 +247,7 @@ interface GrupoDestino {
   totalPeso: number;
   totalCubagem: number;
   totalFrete: number;
+  totalDisp: number;
   totalVlrNf: number;
 }
 
@@ -549,6 +551,7 @@ function TabelaCtes({
   onToggleCte,
   onToggleRemover,
   onToggleTodos,
+  getDispFrete,
 }: {
   ctes: Cte[];
   tipo: 'armazem' | 'transito';
@@ -560,6 +563,7 @@ function TabelaCtes({
   onToggleCte?: (cte: Cte) => void;
   onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
+  getDispFrete?: (cte: Cte) => number;
 }) {
   if (ctes.length === 0) return null;
   const emApontamento = !!modoApontamento;
@@ -764,7 +768,7 @@ function TabelaCtes({
           <Badge className="ml-2 bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-[10px]">{contagemColeta.sem}</Badge>
         </Button>
       </div>
-      <table className="w-full text-[11px]">
+      <table className="w-full text-[10px]">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
             {emApontamento && (
@@ -782,21 +786,23 @@ function TabelaCtes({
                 </button>
               </th>
             )}
-            <th className="px-3 py-2 text-left"><ThBtn col="ctrc">CTRC</ThBtn></th>
-            <th className="px-3 py-2 text-right w-[86px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="chegadaUnid">Chegada</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="remetente">Remetente</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="ultOcor">Últ. Ocor.</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="cidadeUf">Cidade/UF</ThBtn></th>
-            <th className="px-3 py-2 text-right"><ThBtn col="vlrNf" align="right">Vlr. NF</ThBtn></th>
-            <th className="px-3 py-2 text-right"><ThBtn col="frete" align="right">Frete</ThBtn></th>
-            <th className="px-3 py-2 text-right"><ThBtn col="peso" align="right">Peso</ThBtn></th>
-            <th className="px-3 py-2 text-right"><ThBtn col="cubagem" align="right">M³</ThBtn></th>
-            <th className="px-3 py-2 text-right"><ThBtn col="qtdeVol" align="right">Vol.</ThBtn></th>
-            <th className="px-3 py-2 text-left"><ThBtn col="manifesto">Manifesto</ThBtn></th>
-            {tipo === 'transito' && <th className="px-3 py-2 text-left"><ThBtn col="prevChegada">Prev. Chegada</ThBtn></th>}
+            <th className="px-2 py-2 text-left"><ThBtn col="ctrc">CTRC</ThBtn></th>
+            <th className="px-2 py-2 text-right w-[74px]"><ThBtn col="nfiscal" align="right">NF</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="emissao">Emissão</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="chegadaUnid">Chegada</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="prevEnt">Prev. Ent.</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="remetente">Remet.</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="destinatario">Dest.</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="ultOcor">Últ. Ocor.</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="cidadeUf">Cidade/UF</ThBtn></th>
+            <th className="px-2 py-2 text-right"><ThBtn col="vlrNf" align="right">Vlr. NF</ThBtn></th>
+            <th className="px-2 py-2 text-right"><ThBtn col="frete" align="right">Frete</ThBtn></th>
+            <th className="px-2 py-2 text-right font-semibold text-slate-600 dark:text-slate-400">Disp.</th>
+            <th className="px-2 py-2 text-right"><ThBtn col="peso" align="right">Peso</ThBtn></th>
+            <th className="px-2 py-2 text-right"><ThBtn col="cubagem" align="right">M³</ThBtn></th>
+            <th className="px-2 py-2 text-right"><ThBtn col="qtdeVol" align="right">Vol.</ThBtn></th>
+            <th className="px-2 py-2 text-left"><ThBtn col="manifesto">Manif.</ThBtn></th>
+            {tipo === 'transito' && <th className="px-2 py-2 text-left"><ThBtn col="prevChegada">Prev. Cheg.</ThBtn></th>}
             <th className="px-3 py-2 text-center"><ThBtn col="indicadorSaida" align="center">Saída</ThBtn></th>
           </tr>
         </thead>
@@ -872,9 +878,10 @@ function TabelaCtes({
                   {cte.chegadaUnid ? formatarDataTabelaSemAno(cte.chegadaUnid) : ''}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{formatarDataTabelaSemAno(cte.prevEnt)}</td>
-                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[90px] truncate">{cte.remetente}</td>
+                <td className="px-2 py-2 text-slate-700 dark:text-slate-300 max-w-[85px] truncate">{cte.remetente}</td>
+                <td className="px-2 py-2 text-slate-700 dark:text-slate-300 max-w-[85px] truncate">{cte.destinatario}</td>
                 <td
-                  className="px-3 py-2 text-slate-700 dark:text-slate-300 max-w-[110px] truncate"
+                  className="px-2 py-2 text-slate-700 dark:text-slate-300 max-w-[110px] truncate"
                   title={
                     cte.descUltOcor
                       ? `${(cte.codUltOcor ?? '').trim() ? `${String(cte.codUltOcor ?? '').trim()} - ` : ''}${cte.descUltOcor}${(cte.dataUltOcor ?? '').trim() ? ` (${String(cte.dataUltOcor ?? '').trim()})` : ''}`
@@ -886,6 +893,9 @@ function TabelaCtes({
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
                 <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className="px-2 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
+                  {(getDispFrete ? getDispFrete(cte) : parseMoeda(cte.frete)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
@@ -917,6 +927,7 @@ function GrupoDestinoCard({
   onToggleCte,
   onToggleRemover,
   onToggleTodos,
+  getDispFrete,
 }: {
   grupo: GrupoDestino;
   maxPeso: number;
@@ -929,6 +940,7 @@ function GrupoDestinoCard({
   onToggleCte?: (cte: Cte) => void;
   onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
+  getDispFrete?: (cte: Cte) => number;
 }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito' | 'coletas'>('armazem');
@@ -985,6 +997,7 @@ function GrupoDestinoCard({
       'Cidade/UF',
       'Vlr. NF',
       'Frete (R$)',
+      'Disp. (R$)',
       'Peso (kg)',
       'Cubagem (m³)',
       'Volumes',
@@ -1008,6 +1021,7 @@ function GrupoDestinoCard({
         esc(`${c.cidade}/${c.uf}`),
         fmtMoeda(parseMoeda(c.vlrNf)),
         fmtMoeda(parseMoeda(c.frete)),
+        fmtMoeda(getDispFrete ? getDispFrete(c) : parseMoeda(c.frete)),
         fmtNum(parsePeso(c.peso), 2),
         fmtNum(parseCubagem(c.cubagem), 3),
         esc(c.qtdeVol),
@@ -1030,7 +1044,7 @@ function GrupoDestinoCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}
+        style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -1084,6 +1098,9 @@ function GrupoDestinoCard({
           {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalDisp.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
           {grupo.totalVlrNf.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-center pl-1">
@@ -1126,12 +1143,12 @@ function GrupoDestinoCard({
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
+                ? <TabelaCtes ctes={grupo.armazem} tipo="armazem" getDispFrete={getDispFrete} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este destino.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaCtes ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
+                ? <TabelaCtes ctes={grupo.transito} tipo="transito" getDispFrete={getDispFrete} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCte} onToggleRemover={onToggleRemover} onToggleTodos={onToggleTodos} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e em trânsito para este destino.</p>
             )}
             {abaAtiva === 'coletas' && (
@@ -1409,6 +1426,7 @@ const TabelaEntregaColunas: { key: ColunaOrdemEntrega | null; label: string; ali
 function TabelaEntrega({
   ctes,
   tipo,
+  getDispFrete,
   modoApontamento,
   ctesSelecionados,
   ctesNoCarregamento,
@@ -1420,6 +1438,7 @@ function TabelaEntrega({
 }: {
   ctes: CteEntrega[];
   tipo: 'armazem' | 'transito';
+  getDispFrete?: (cte: CteEntrega) => number;
   modoApontamento?: string | null;
   ctesSelecionados?: Map<number, Cte>;
   ctesNoCarregamento?: Set<number>;
@@ -1503,7 +1522,7 @@ function TabelaEntrega({
   };
 
   const thClass = (align?: 'left' | 'right' | 'center') =>
-    `px-3 py-2 font-semibold select-none hover:text-slate-900 dark:hover:text-slate-200 transition-colors ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`;
+    `px-2 py-2 font-semibold select-none hover:text-slate-900 dark:hover:text-slate-200 transition-colors ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`;
 
   return (
     <div className="overflow-x-auto">
@@ -1529,7 +1548,7 @@ function TabelaEntrega({
           </button>
         )}
       </div>
-      <table className="w-full text-[11px]">
+      <table className="w-full text-[10px]">
         <thead>
           <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
             {emApontamento && (
@@ -1559,6 +1578,7 @@ function TabelaEntrega({
             <th className={thClass('right')} onClick={() => trocarOrdem('peso')} title="Ordenar por Peso">Peso{seta('peso')}</th>
             <th className={thClass('right')} onClick={() => trocarOrdem('cubagem')} title="Ordenar por Cubagem">M³{seta('cubagem')}</th>
             <th className={thClass('right')} onClick={() => trocarOrdem('frete')} title="Ordenar por Frete">Frete{seta('frete')}</th>
+            <th className={thClass('right')}>Disp.</th>
             <th className={thClass('left')} onClick={() => trocarOrdem('ultOcor')} title="Ordenar por Última Ocorrência">Últ. Ocorrência{seta('ultOcor')}</th>
             {tipo === 'transito' && (
               <th className={thClass('left')} onClick={() => trocarOrdem('prevChegada')} title="Ordenar por Previsão de Chegada">Prev. Chegada{seta('prevChegada')}</th>
@@ -1653,6 +1673,9 @@ function TabelaEntrega({
                 <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parsePeso(cte.peso)) + ' kg' : '-'}</td>
                 <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
                 <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className="px-2 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                  {(getDispFrete ? getDispFrete(cte) : parseMoeda(cte.frete)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[160px] truncate" title={cte.descUltOcor}>{cte.descUltOcor || '-'}</td>
                 {tipo === 'transito' && (
                   <td className="px-3 py-2 text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">{formatarDataTabelaSemAno(cte.prevChegada)}</td>
@@ -1684,6 +1707,7 @@ function GrupoSetorCard({
   onToggleCte,
   onToggleRemover,
   onToggleTodos,
+  getDispFrete,
 }: {
   grupo: GrupoSetor;
   maxPeso: number;
@@ -1696,6 +1720,7 @@ function GrupoSetorCard({
   onToggleCte?: (cte: Cte) => void;
   onToggleRemover?: (cte: Cte) => void;
   onToggleTodos?: (ctes: Cte[], selecionar: boolean) => void;
+  getDispFrete?: (cte: CteEntrega) => number;
 }) {
   const [aberto, setAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState<'armazem' | 'transito'>('armazem');
@@ -1764,6 +1789,7 @@ function GrupoSetorCard({
       'Agendamento',
       'Vlr. Merc.',
       'Frete (R$)',
+      'Disp. (R$)',
       'Peso (kg)',
       'Cubagem (m³)',
       'Volumes',
@@ -1796,6 +1822,7 @@ function GrupoSetorCard({
         esc(formatAgendamento(c.agendamento || '', (c as any).data_prev_ent)),
         fmtMoeda(parseMoeda(c.vlrMerc)),
         fmtMoeda(parseMoeda(c.frete)),
+        fmtMoeda(getDispFrete ? getDispFrete(c) : parseMoeda(c.frete)),
         fmtNum(parsePeso(c.peso), 2),
         fmtNum(parseCubagem(c.cubagem), 3),
         esc(c.qtdeVol || ''),
@@ -1821,7 +1848,7 @@ function GrupoSetorCard({
     <div className="overflow-hidden">
       <button
         className="w-full grid px-4 py-2.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
-        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}
+        style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 120px 60px' }}
         onClick={() => setAberto(!aberto)}
       >
         <span className="flex items-center">
@@ -1866,6 +1893,9 @@ function GrupoSetorCard({
           {grupo.totalFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
+          {grupo.totalDisp.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="flex items-center justify-end text-right font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 pr-3">
           {grupo.totalVlrNf.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="flex items-center justify-center pl-1">
@@ -1904,12 +1934,12 @@ function GrupoSetorCard({
           <div className="bg-white dark:bg-slate-900 p-2">
             {abaAtiva === 'armazem' && (
               grupo.armazem.length > 0
-                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
+                ? <TabelaEntrega ctes={grupo.armazem} tipo="armazem" getDispFrete={getDispFrete} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e no armazém para este setor.</p>
             )}
             {abaAtiva === 'transito' && (
               grupo.transito.length > 0
-                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
+                ? <TabelaEntrega ctes={grupo.transito} tipo="transito" getDispFrete={getDispFrete} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamento} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemover} onToggleCte={onToggleCteSetor} onToggleRemover={onToggleRemoverSetor} onToggleTodos={onToggleTodosSetor} />
                 : <p className="text-center text-slate-400 py-6 text-sm">Nenhum CT-e a caminho para este setor.</p>
             )}
           </div>
@@ -5244,6 +5274,7 @@ function ModalDadosOrdemCarregamento({
   const [conferente, setConferente] = useState('');
   const [ajudantes, setAjudantes] = useState('');
   const [doca, setDoca] = useState('');
+  const [freteDisponivel, setFreteDisponivel] = useState(0);
 
   const [motBusca, setMotBusca] = useState('');
   const [motList, setMotList] = useState<{ cpf: string; nome: string; ddd: string; fone: string }[]>([]);
@@ -5272,6 +5303,7 @@ function ModalDadosOrdemCarregamento({
         );
         if (!alive) return;
         if (resp?.success && resp?.data) {
+          setFreteDisponivel(Number(resp.data.frete_disponivel ?? 0) || 0);
           setPlacaDefinitiva(String(resp.data.placa_definitiva ?? '').toUpperCase());
           setPlacaCarreta(String(resp.data.placa_carreta ?? '').toUpperCase());
           setCpfMotorista(String(resp.data.cpf_motorista ?? ''));
@@ -5663,7 +5695,12 @@ function ModalDadosOrdemCarregamento({
 
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-3 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculadora</div>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculadora</div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-300 font-mono tabular-nums whitespace-nowrap">
+                  Disponível: R$ {freteDisponivel.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                 {calc.km > 0 ? `${calc.km.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km` : '0 km'}
                 {calcTipoVeiculo ? ` · ${calcTipoVeiculo}` : ''}
@@ -10982,6 +11019,59 @@ export function Disponiveis() {
   }, [loadFreteDisponivel]);
 
   useEffect(() => {
+    void loadFreteDisponivel();
+  }, [loadFreteDisponivel]);
+
+  const freteDispPctByEmit = useMemo(() => {
+    const car = String(unidadeAtual ?? '').trim().toUpperCase();
+    const m = new Map<string, number>();
+    for (const it of (freteDispItems ?? [])) {
+      const emit = String((it as any)?.sigla_emit ?? '').trim().toUpperCase();
+      const carreg = String((it as any)?.sigla_carregamento ?? '').trim().toUpperCase();
+      if (!emit || !carreg) continue;
+      if (carreg !== car) continue;
+      const p = Number((it as any)?.percentual ?? 0);
+      if (!Number.isFinite(p)) continue;
+      m.set(emit, p);
+    }
+    return m;
+  }, [freteDispItems, unidadeAtual]);
+
+  const calcularFreteDisponivel = useCallback((emitRaw: string, frete: number): number => {
+    const emit = String(emitRaw ?? '').trim().toUpperCase();
+    const p = freteDispPctByEmit.get(emit);
+    const pct = Number.isFinite(p as any) ? (Number(p) || 0) : 100;
+    const fator = (pct > 0 ? pct : 0) / 100;
+    return (Number.isFinite(frete) ? frete : 0) * fator;
+  }, [freteDispPctByEmit]);
+
+  const getCteEmitSigla = useCallback((cte: any): string => {
+    const raw =
+      cte?.sigla_emit ??
+      cte?.siglaEmit ??
+      cte?.unidadeOrigem ??
+      cte?.unidade_origem ??
+      cte?.unidadeCarregamento ??
+      cte?.unidade_carregamento ??
+      '';
+    return String(raw ?? '').trim().toUpperCase();
+  }, []);
+
+  const getDispTransfer = useCallback((cte: Cte): number => {
+    const emit = getCteEmitSigla(cte as any);
+    const frete = parseMoeda(String((cte as any)?.frete ?? '0'));
+    const hasReg = freteDispPctByEmit.has(emit);
+    return calcularFreteDisponivel(hasReg ? emit : '', frete);
+  }, [calcularFreteDisponivel, freteDispPctByEmit, getCteEmitSigla]);
+
+  const getDispEntrega = useCallback((cte: CteEntrega): number => {
+    const emit = getCteEmitSigla(cte as any);
+    const frete = parseMoeda(String((cte as any)?.frete ?? '0'));
+    const hasReg = freteDispPctByEmit.has(emit);
+    return calcularFreteDisponivel(hasReg ? emit : '', frete);
+  }, [calcularFreteDisponivel, freteDispPctByEmit, getCteEmitSigla]);
+
+  useEffect(() => {
     if (!(showFilters || isBNR) || todasOcorrenciasCarregadas !== null) return;
     let ativo = true;
     (async () => {
@@ -12994,7 +13084,7 @@ export function Disponiveis() {
     const addCte = (cte: Cte) => {
       const key = cte.unidadeDest;
       if (!map[key]) {
-        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
+        map[key] = { sigla: key, nome: cte.nomeDest, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalDisp: 0, totalVlrNf: 0 };
       }
       if (cte.emTransito) {
         map[key].transito.push(cte);
@@ -13006,6 +13096,7 @@ export function Disponiveis() {
       map[key].totalPeso    += parsePeso(cte.peso);
       map[key].totalCubagem += parseCubagem(cte.cubagem);
       map[key].totalFrete   += parseMoeda(cte.frete);
+      map[key].totalDisp    += getDispTransfer(cte);
       map[key].totalVlrNf   += parseMoeda(cte.vlrNf);
     };
     for (const cte of ctesTransferFiltrados) addCte(cte);
@@ -13015,7 +13106,7 @@ export function Disponiveis() {
         const nomeGrupo = key === 'SEM DESTINO'
           ? (coleta.cidadeDest || key)
           : (String((coleta as any).nomeDest ?? '').trim() || key);
-        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalVlrNf: 0 };
+        map[key] = { sigla: key, nome: nomeGrupo, armazem: [], transito: [], coletas: [], totalCtes: 0, totalVol: 0, totalPeso: 0, totalCubagem: 0, totalFrete: 0, totalDisp: 0, totalVlrNf: 0 };
       }
       map[key].coletas.push(coleta);
       const pesoColeta = parsePeso(coleta.peso);
@@ -13040,7 +13131,7 @@ export function Disponiveis() {
         default:             return mult * (b.totalCtes - a.totalCtes);
       }
     });
-  }, [dados, ctesTransferFiltrados, coletasTransferFiltradas, ordemCol, ordemDir]);
+  }, [dados, ctesTransferFiltrados, coletasTransferFiltradas, ordemCol, ordemDir, getDispTransfer]);
 
   const totalArmazem  = ctesTransferFiltrados.filter(c => !c.emTransito).length ?? 0;
   const totalTransito = ctesTransferFiltrados.filter(c => c.emTransito).length ?? 0;
@@ -13072,6 +13163,7 @@ export function Disponiveis() {
           totalPeso: 0,
           totalCubagem: 0,
           totalFrete: 0,
+          totalDisp: 0,
           totalVlrNf: 0,
         };
       } else {
@@ -13089,12 +13181,13 @@ export function Disponiveis() {
       map[key].totalPeso    += parsePeso(cte.peso);
       map[key].totalCubagem += parseCubagem(cte.cubagem);
       map[key].totalFrete   += parseMoeda(cte.frete);
+      map[key].totalDisp    += getDispEntrega(cte);
       map[key].totalVlrNf   += parseMoeda(cte.vlrMerc);
     }
     const lista = Object.values(map);
     if (ordemColSetor === null) return lista.sort((a, b) => b.totalCtes - a.totalCtes);
     return lista.sort((a, b) => compararGrupoSetor(a, b, ordemColSetor, ordemDirSetor));
-  }, [dadosEntrega, ctesEntregaFiltrados, ordemColSetor, ordemDirSetor]);
+  }, [dadosEntrega, ctesEntregaFiltrados, ordemColSetor, ordemDirSetor, getDispEntrega]);
 
   const totalEntregaArmazem  = ctesEntregaFiltrados.filter(c => !c.emTransito).length ?? 0;
   const totalEntregaTransito = ctesEntregaFiltrados.filter(c => c.emTransito).length ?? 0;
@@ -13167,6 +13260,7 @@ export function Disponiveis() {
       'Cidade/UF',
       'Vlr. NF',
       'Frete (R$)',
+      'Disp. (R$)',
       'Peso (kg)',
       'Cubagem (m³)',
       'Volumes',
@@ -13188,6 +13282,7 @@ export function Disponiveis() {
       esc(`${c.cidade}/${c.uf}`),
       fmtMoeda(parseMoeda(c.vlrNf)),
       fmtMoeda(parseMoeda(c.frete)),
+      fmtMoeda(getDispTransfer(c)),
       fmtNum(parsePeso(c.peso), 2),
       fmtNum(parseCubagem(c.cubagem), 3),
       esc(c.qtdeVol),
@@ -13209,6 +13304,7 @@ export function Disponiveis() {
       esc(`${c.cidade}/${c.uf}`),
       fmtMoeda(parseMoeda(c.vlrNf)),
       fmtMoeda(parseMoeda(c.frete)),
+      fmtMoeda(getDispTransfer(c)),
       fmtNum(parsePeso(c.peso), 2),
       fmtNum(parseCubagem(c.cubagem), 3),
       esc(c.qtdeVol),
@@ -13297,6 +13393,7 @@ export function Disponiveis() {
       'Agendamento',
       'Vlr. Merc.',
       'Frete (R$)',
+      'Disp. (R$)',
       'Peso (kg)',
       'Cubagem (m³)',
       'Volumes',
@@ -13329,6 +13426,7 @@ export function Disponiveis() {
         esc(formatAgendamento(c.agendamento || '', (c as any).data_prev_ent)),
         fmtMoeda(parseMoeda(c.vlrMerc)),
         fmtMoeda(parseMoeda(c.frete)),
+        fmtMoeda(getDispEntrega(c)),
         fmtNum(parsePeso(c.peso), 2),
         fmtNum(parseCubagem(c.cubagem), 3),
         esc(c.qtdeVol || ''),
@@ -13661,6 +13759,36 @@ export function Disponiveis() {
                             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">2) Disponíveis (abaixo)</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                               Listas por destino (transferência) e por setor (entrega), com totais, indicadores e exportação CSV.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                        <div className="flex items-center gap-2">
+                          <Settings className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Configurações (engrenagem)</p>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                          O ícone de Configurações reúne cadastros que afetam a calculadora, a capacidade e os valores de referência do painel.
+                        </p>
+                        <div className="mt-3 grid gap-3 md:grid-cols-3">
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Capacidades por tipo</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Define capacidade padrão (Ton / m³) por tipo de veículo. Impacta barras de capacidade e sugestões.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Tabela Frota</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Define custos por tipo de veículo (diária, consumo, manutenção). Impacta a comparação Frota × Terceiro.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Frete disponível (frete real)</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              Define o percentual de frete disponível por unidade de emissão × unidade de operação. Impacta o “Disponível” na Ordem de Carregamento.
                             </p>
                           </div>
                         </div>
@@ -14856,7 +14984,7 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}>
+                            style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 120px 60px' }}>
                             <span />
                             <ThBtn col="sigla">Destino</ThBtn>
                             <span />
@@ -14868,6 +14996,7 @@ export function Disponiveis() {
                             <ThBtn col="totalPeso" align="center">Peso</ThBtn>
                             <ThBtn col="totalCubagem" align="center">Cubagem</ThBtn>
                             <ThBtn col="totalFrete" align="right">Frete (R$)</ThBtn>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Disp. (R$)</span>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
@@ -14879,7 +15008,7 @@ export function Disponiveis() {
                                   ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                                   : undefined;
                                 return grupos.map((g, i) => (
-                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
+                                  <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} getDispFrete={getDispTransfer} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                                 ));
                               })()}
                             </div>
@@ -14989,7 +15118,7 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
+                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 120px 60px' }}>
                             <span />
                             <ThBtnSetor col="setor">Setor</ThBtnSetor>
                             <span />
@@ -15000,6 +15129,7 @@ export function Disponiveis() {
                             <ThBtnSetor col="totalPeso" align="center">Peso</ThBtnSetor>
                             <ThBtnSetor col="totalCubagem" align="center">Cubagem</ThBtnSetor>
                             <ThBtnSetor col="totalFrete" align="right">Frete (R$)</ThBtnSetor>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Disp. (R$)</span>
                             <ThBtnSetor col="totalVlrNf" align="right">Vlr NF (R$)</ThBtnSetor>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
@@ -15019,6 +15149,7 @@ export function Disponiveis() {
                             grupo={g}
                             maxPeso={maxPeso}
                             maxCubagem={maxCubagem}
+                            getDispFrete={getDispEntrega}
                             modoApontamento={modoApontamento}
                             ctesSelecionados={ctesSelecionados}
                             ctesNoCarregamento={ctesNoCarregamentoAtual}
@@ -15074,7 +15205,7 @@ export function Disponiveis() {
                   </div>
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 60px' }}>
+                      style={{ gridTemplateColumns: '28px 80px minmax(0,1fr) 80px 70px 70px 60px 70px 78px 78px 120px 120px 120px 60px' }}>
                       <span /><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Destino</span><span />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Perf. saída</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Piso</span>
@@ -15084,6 +15215,7 @@ export function Disponiveis() {
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Peso</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">Cubagem</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Frete (R$)</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Disp. (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Vlr NF (R$)</span>
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                     </div>
@@ -15095,7 +15227,7 @@ export function Disponiveis() {
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return grupos.map((g, i) => (
-                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
+                          <GrupoDestinoCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} getDispFrete={getDispTransfer} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>
@@ -15136,7 +15268,7 @@ export function Disponiveis() {
                       return (
                         <>
                           <div className="grid bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 px-4 py-2"
-                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 60px' }}>
+                            style={{ gridTemplateColumns: '28px 60px minmax(0,1fr) 70px 70px 70px 70px minmax(80px,1fr) minmax(80px,1fr) 120px 120px 120px 60px' }}>
                             <span />
                             <ThBtnSetor col="setor">Setor</ThBtnSetor>
                             <span />
@@ -15147,6 +15279,7 @@ export function Disponiveis() {
                             <ThBtnSetor col="totalPeso" align="center">Peso</ThBtnSetor>
                             <ThBtnSetor col="totalCubagem" align="center">Cubagem</ThBtnSetor>
                             <ThBtnSetor col="totalFrete" align="right">Frete (R$)</ThBtnSetor>
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">Disp. (R$)</span>
                             <ThBtnSetor col="totalVlrNf" align="right">Vlr NF (R$)</ThBtnSetor>
                             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">CSV</span>
                           </div>
@@ -15161,7 +15294,7 @@ export function Disponiveis() {
                           ? new Set(carregamentos.find(c => c.placa_provisoria === modoApontamento)?.ctes.map(c => c.seq_cte) ?? [])
                           : undefined;
                         return gruposSetor.map((g, i) => (
-                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
+                          <GrupoSetorCard key={i} grupo={g} maxPeso={maxPeso} maxCubagem={maxCubagem} getDispFrete={getDispEntrega} modoApontamento={modoApontamento} ctesSelecionados={ctesSelecionados} ctesNoCarregamento={ctesNoCarregamentoAtual} ctesJaCarregados={ctesJaCarregados} ctesParaRemover={ctesParaRemoverIds} onToggleCte={toggleCte} onToggleRemover={toggleCteRemover} onToggleTodos={toggleTodos} />
                         ));
                       })()}
                     </div>

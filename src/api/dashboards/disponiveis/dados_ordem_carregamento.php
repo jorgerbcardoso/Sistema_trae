@@ -35,6 +35,7 @@ $conn = connect();
 $tblCar = "{$domain}_carregamento";
 $tblCap = "{$domain}_carregamento_capacidade";
 $tblMot = "{$domain}_motorista";
+$tblFreteDisp = "{$domain}_frete_disponivel";
 
 @pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS unidade VARCHAR(10)");
 @pg_query($conn, "ALTER TABLE {$tblCap} ADD COLUMN IF NOT EXISTS seq_carregamento INT");
@@ -75,6 +76,26 @@ if ($seqCarResolved <= 0) {
 
 if ($acao === 'get') {
     try {
+        $freteDisponivel = 0.0;
+        try {
+            $resFd = sql(
+                "SELECT
+                    COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0) * (COALESCE(fd.percentual, 100)::numeric / 100.0)), 0) AS frete_disponivel
+                 FROM {$tblCar} c
+                 LEFT JOIN {$tblFreteDisp} fd
+                   ON fd.sigla_emit = c.ser_cte
+                  AND fd.sigla_carregamento = $1
+                 WHERE c.unidade = $1
+                   AND c.seq_carregamento = $2
+                   AND COALESCE(c.nro_cte, 0) <> 0",
+                [$unidade, $seqCarResolved],
+                $conn
+            );
+            if ($resFd && pg_num_rows($resFd) > 0) {
+                $rowFd = pg_fetch_assoc($resFd);
+                $freteDisponivel = (float)($rowFd['frete_disponivel'] ?? 0);
+            }
+        } catch (Exception $e) {}
         $res = sql(
             "SELECT
                 placa_definitiva,
@@ -108,6 +129,7 @@ if ($acao === 'get') {
             'success' => true,
             'seq_carregamento' => $seqCarResolved,
             'data' => [
+                'frete_disponivel' => $freteDisponivel,
                 'placa_definitiva' => strtoupper(trim((string)($row['placa_definitiva'] ?? ''))),
                 'placa_carreta' => strtoupper(trim((string)($row['placa_carreta'] ?? ''))),
                 'cpf_motorista' => $cpf,
