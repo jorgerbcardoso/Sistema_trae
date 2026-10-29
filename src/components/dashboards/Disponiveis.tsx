@@ -508,11 +508,11 @@ const BG_INDICADOR: Record<string, string> = {
 const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
   const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(kb < 100 ? 1 : 0)} KB`;
+  if (kb < 1024) return `${kb.toLocaleString('pt-BR', { minimumFractionDigits: kb < 100 ? 1 : 0, maximumFractionDigits: kb < 100 ? 1 : 0 })} KB`;
   const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(mb < 100 ? 1 : 0)} MB`;
+  if (mb < 1024) return `${mb.toLocaleString('pt-BR', { minimumFractionDigits: mb < 100 ? 1 : 0, maximumFractionDigits: mb < 100 ? 1 : 0 })} MB`;
   const gb = mb / 1024;
-  return `${gb.toFixed(gb < 100 ? 1 : 0)} GB`;
+  return `${gb.toLocaleString('pt-BR', { minimumFractionDigits: gb < 100 ? 1 : 0, maximumFractionDigits: gb < 100 ? 1 : 0 })} GB`;
 };
 
 function IndicadorDot({ cor, title }: { cor: string | null; title?: string }) {
@@ -891,14 +891,14 @@ function TabelaCtes({
                   {cte.descUltOcor || '-'}
                 </td>
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{cte.cidade}/{cte.uf}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.vlrNf}</td>
-                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{fmtMoedaBR(parseMoeda(cte.vlrNf))}</td>
+                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{fmtMoedaBR(parseMoeda(cte.frete))}</td>
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300">
                   {(getDispFrete ? getDispFrete(cte) : parseMoeda(cte.frete)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso}</td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{fmtNumBR(parsePeso(cte.peso), 0, 2)}</td>
+                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem ? fmtNumBR(parseCubagem(cte.cubagem), 0, 4) : '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.qtdeVol ? fmtIntBR(Number(cte.qtdeVol)) : '-'}</td>
                 <td className="px-3 py-2 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{stripDv(cte.manifesto || '-') || '-'}</td>
                 {tipo === 'transito' && (
                   <td className={`px-3 py-2 font-semibold ${cte.atrasoTransf ? TEXTO_INDICADOR[cte.atrasoTransf] : ''}`}>{formatarDataTabelaSemAno(cte.prevChegada)}</td>
@@ -1089,7 +1089,7 @@ function GrupoDestinoCard({
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #312e81, #4338ca, #6366f1)' }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{fmtNumBR(grupo.totalCubagem, 2, 2)}m³</span>
               </div>
             );
           })()}
@@ -1670,9 +1670,9 @@ function TabelaEntrega({
                     );
                   })()}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? Math.round(parsePeso(cte.peso)) + ' kg' : '-'}</td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem || '-'}</td>
-                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{cte.frete}</td>
+                <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{cte.peso ? `${fmtIntBR(Math.round(parsePeso(cte.peso)))} kg` : '-'}</td>
+                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">{cte.cubagem ? fmtNumBR(parseCubagem(cte.cubagem), 0, 4) : '-'}</td>
+                <td className={`px-3 py-2 text-right ${((parsePeso(String(cte.peso ?? '0')) >= 4000) || (parseCubagem(String(cte.cubagem ?? '0')) >= 13.33)) ? 'text-orange-600 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>{fmtMoedaBR(parseMoeda(cte.frete))}</td>
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
                   {(getDispFrete ? getDispFrete(cte) : parseMoeda(cte.frete)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
@@ -1884,7 +1884,7 @@ function GrupoSetorCard({
             return (
               <div className="relative w-full h-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out" style={{ width: `${pctCubagem}%`, background: 'linear-gradient(90deg, #064e3b, #047857, #059669)' }} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{grupo.totalCubagem.toFixed(2)}m³</span>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow z-10">{fmtNumBR(grupo.totalCubagem, 2, 2)}m³</span>
               </div>
             );
           })()}
@@ -2016,7 +2016,7 @@ function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: num
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
         <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
-          {valor.toFixed(valor >= 10 ? 1 : 2)} / {capacidade.toFixed(capacidade >= 10 ? 1 : 2)}
+          {fmtNumBR(valor, valor >= 10 ? 1 : 2, valor >= 10 ? 1 : 2)} / {fmtNumBR(capacidade, capacidade >= 10 ? 1 : 2, capacidade >= 10 ? 1 : 2)}
           {' '}({pct.toFixed(0)}%)
         </span>
       </div>
@@ -2291,6 +2291,15 @@ function parseMoeda(s: string): number {
         ? cleaned.replace(/\./g, '')
         : cleaned;
   return parseFloat(normalized) || 0;
+}
+function fmtMoedaBR(n: number): string {
+  return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtNumBR(n: number, min: number, max: number): string {
+  return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: min, maximumFractionDigits: max });
+}
+function fmtIntBR(n: number): string {
+  return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 }
 function isAgendamentoSSWFalha(s: string): boolean {
   const raw = String(s ?? '').trim();
@@ -3775,7 +3784,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
         ) : (
           <div className="flex gap-4 mb-3 text-xs text-slate-500 dark:text-slate-400">
             <span><Weight className="w-3 h-3 inline mr-1" />{((Number(totalPeso) || 0) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ton</span>
-            <span><Box className="w-3 h-3 inline mr-1" />{totalCubagem.toFixed(3)}m³</span>
+            <span><Box className="w-3 h-3 inline mr-1" />{fmtNumBR(totalCubagem, 3, 3)}m³</span>
           </div>
         )}
 
@@ -5243,6 +5252,7 @@ function ModalDadosOrdemCarregamento({
   unidade,
   placa,
   seqCarregamento,
+  freteOriginal,
   rotaKm,
   pesoKg,
   cubM3,
@@ -5254,6 +5264,7 @@ function ModalDadosOrdemCarregamento({
   unidade: string;
   placa: string;
   seqCarregamento: number;
+  freteOriginal: number;
   rotaKm: number;
   pesoKg: number;
   cubM3: number;
@@ -5697,8 +5708,16 @@ function ModalDadosOrdemCarregamento({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculadora</div>
-                <div className="text-[11px] text-slate-600 dark:text-slate-300 font-mono tabular-nums whitespace-nowrap">
-                  Disponível: R$ {freteDisponivel.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <Badge className="bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100 text-[11px] font-mono tabular-nums">
+                    Frete: R$ {fmtMoedaBR(Number(freteOriginal) || 0)}
+                  </Badge>
+                  <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 text-[11px] font-mono tabular-nums">
+                    Disp.: R$ {fmtMoedaBR(Number(freteDisponivel) || 0)}
+                  </Badge>
+                  <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 text-[11px] font-mono tabular-nums">
+                    {freteOriginal > 0 ? `${Math.max(0, Math.min((freteDisponivel / freteOriginal) * 100, 999)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '—'}
+                  </Badge>
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
@@ -6622,7 +6641,7 @@ function ModalRotaCarregamento({
             const keyEnc = aAjustar?.getAttribute('data-key') || '';
             const key = decodeURIComponent(keyEnc);
             const cur = key ? coordsByKey[key] : null;
-            const pre = cur ? `${Number(cur.lat).toFixed(6)},${Number(cur.lng).toFixed(6)}` : '';
+            const pre = cur ? `${Number(cur.lat).toFixed(6).replace('.', ',')},${Number(cur.lng).toFixed(6).replace('.', ',')}` : '';
             const ans = window.prompt('Informe latitude e longitude (ex: -29.123456,-51.123456)', pre);
             if (!ans) return;
             const parts = ans.split(/[\s;]+/).join(' ').split(',').map((x) => x.trim()).filter(Boolean);
@@ -7646,6 +7665,7 @@ function ModalRotaCarregamento({
           unidade={origem}
           placa={String(carregamento.placa_provisoria ?? '').toUpperCase()}
           seqCarregamento={Number((carregamento as any)?.seq_carregamento ?? 0) || 0}
+          freteOriginal={Number(totaisLista.frete ?? 0) || 0}
           rotaKm={Number(routeDistanceKm ?? 0) || 0}
           pesoKg={totaisCalc.peso}
           cubM3={totaisCalc.cub}
@@ -9449,7 +9469,7 @@ function CarregamentoArea({
     const n = Number(v);
     if (!Number.isFinite(n)) return '0';
     const abs = Math.abs(n);
-    if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000_000) return `${fmtNum(n / 1_000_000, 1)}M`;
     if (abs >= 1_000) return `${Math.round(n / 1_000)}k`;
     return String(Math.round(n));
   };
@@ -14369,8 +14389,8 @@ export function Disponiveis() {
             ];
 
             const cardsSimples = [
-              { valor: `${(totalGeralPeso / 1000).toFixed(1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
-              { valor: `${totalGeralCubagem.toFixed(1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
+              { valor: `${fmtNumBR(totalGeralPeso / 1000, 1, 1)}t`,  label: 'Peso Total', icon: Weight,  corBg: 'bg-amber-100 dark:bg-amber-900/40',  corTexto: 'text-amber-600 dark:text-amber-400' },
+              { valor: `${fmtNumBR(totalGeralCubagem, 1, 1)} m³`,       label: 'Cubagem',    icon: Box,     corBg: 'bg-teal-100 dark:bg-teal-900/40',   corTexto: 'text-teal-600 dark:text-teal-400' },
               { valor: totalGeralFrete.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), label: 'Valor de Frete',      icon: Wallet,     corBg: 'bg-sky-100 dark:bg-sky-900/40',      corTexto: 'text-sky-600 dark:text-sky-400' },
               { valor: totalGeralMercadoria.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), label: 'Valor de Mercadoria', icon: DollarSign, corBg: 'bg-emerald-100 dark:bg-emerald-900/40', corTexto: 'text-emerald-600 dark:text-emerald-400' },
               { valor: totalGeralVol.toLocaleString('pt-BR'), label: 'Volumes',    icon: Package, corBg: 'bg-purple-100 dark:bg-purple-900/40', corTexto: 'text-purple-600 dark:text-purple-400' },
