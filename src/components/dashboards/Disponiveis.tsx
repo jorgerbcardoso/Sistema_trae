@@ -1972,6 +1972,10 @@ interface CarregamentoAreaProps {
   cteKeysDisponiveisEntrega: Set<string>;
   initialPrevisaoInicio: string;
   initialPrevisaoFim: string;
+  capDialogOpen: boolean;
+  setCapDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  capFrotaDialogOpen: boolean;
+  setCapFrotaDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 function BarraCapacidade({ valor, capacidade, corGradient, label }: { valor: number; capacidade: number; corGradient: string; label: string }) {
@@ -8307,6 +8311,10 @@ function CarregamentoArea({
   cteKeysDisponiveisEntrega,
   initialPrevisaoInicio,
   initialPrevisaoFim,
+  capDialogOpen,
+  setCapDialogOpen,
+  capFrotaDialogOpen,
+  setCapFrotaDialogOpen,
 }: CarregamentoAreaProps) {
   const [modalCriarModo, setModalCriarModo] = useState<'transferencia' | 'entrega' | null>(null);
   const [modalAutomaticoModo, setModalAutomaticoModo] = useState<'transferencia' | 'entrega' | null>(null);
@@ -8316,11 +8324,9 @@ function CarregamentoArea({
   const [excluindoTodosEntrega, setExcluindoTodosEntrega] = useState(false);
   const [resumoEntregaOpen, setResumoEntregaOpen] = useState(false);
   const [resumoEntregaItens, setResumoEntregaItens] = useState<{ setor: string; placa: string; inseridos: number; fora: number; cap_tipo?: string }[]>([]);
-  const [capDialogOpen, setCapDialogOpen] = useState(false);
   const [capLoading, setCapLoading] = useState(false);
   const [capSaving, setCapSaving] = useState(false);
   const [capItems, setCapItems] = useState<{ tipo: string; capacidade_ton: string; capacidade_m3: string }[]>([]);
-  const [capFrotaDialogOpen, setCapFrotaDialogOpen] = useState(false);
   const [capFrotaLoading, setCapFrotaLoading] = useState(false);
   const [capFrotaSaving, setCapFrotaSaving] = useState(false);
   const [capFrotaItems, setCapFrotaItems] = useState<{
@@ -10860,6 +10866,8 @@ export function Disponiveis() {
   const [showFilters, setShowFilters] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [showConfiguracoes, setShowConfiguracoes] = useState(false);
+  const [capDialogOpen, setCapDialogOpen] = useState(false);
+  const [capFrotaDialogOpen, setCapFrotaDialogOpen] = useState(false);
   const [bloqueioOperacao, setBloqueioOperacao] = useState<string | null>(null);
   const [filters, setFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
   const [tempFilters, setTempFilters] = useState<FiltrosDisponiveis>(filtrosVazios);
@@ -14688,6 +14696,10 @@ export function Disponiveis() {
             cteKeysDisponiveisEntrega={cteKeysDisponiveisEntrega}
             initialPrevisaoInicio={filters.periodoPrevisaoInicio}
             initialPrevisaoFim={filters.periodoPrevisaoFim}
+            capDialogOpen={capDialogOpen}
+            setCapDialogOpen={setCapDialogOpen}
+            capFrotaDialogOpen={capFrotaDialogOpen}
+            setCapFrotaDialogOpen={setCapFrotaDialogOpen}
           />
 
           {hubModalAberto && hubModalCarregamento && (
