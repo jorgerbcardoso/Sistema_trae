@@ -5262,6 +5262,7 @@ function ModalDadosOrdemCarregamento({
   tipoVeiculoSugestao,
   onFechar,
   onConcluirSalvar,
+  onConcluirSalvarPorDestino,
 }: {
   unidade: string;
   placa: string;
@@ -5274,6 +5275,7 @@ function ModalDadosOrdemCarregamento({
   tipoVeiculoSugestao?: string;
   onFechar: () => void;
   onConcluirSalvar: () => Promise<void>;
+  onConcluirSalvarPorDestino?: () => Promise<void>;
 }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -5540,7 +5542,7 @@ function ModalDadosOrdemCarregamento({
     };
   }, [rotaKm, calcDiasOperacao, calcDiesel, calcParams, calcTerceiroInfo]);
 
-  const salvar = async () => {
+  const salvar = async (concluir: () => Promise<void>) => {
     if (saving || loading) return;
     const cavalo = placaDefinitiva.trim().toUpperCase();
     const carreta = placaCarreta.trim().toUpperCase();
@@ -5591,7 +5593,7 @@ function ModalDadosOrdemCarregamento({
       }
       toast.success('Dados salvos.');
       onFechar();
-      await onConcluirSalvar();
+      await concluir();
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar dados da ordem.');
     } finally {
@@ -5816,7 +5818,15 @@ function ModalDadosOrdemCarregamento({
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200 dark:border-slate-700">
           <Button variant="outline" onClick={!saving ? onFechar : undefined} disabled={saving}>Cancelar</Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void salvar(); }} disabled={saving || loading}>
+          <Button
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            onClick={() => { void salvar(onConcluirSalvarPorDestino ?? onConcluirSalvar); }}
+            disabled={saving || loading}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
+            Gerar 1 por Destino
+          </Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void salvar(onConcluirSalvar); }} disabled={saving || loading}>
             {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
             Salvar e gerar
           </Button>
@@ -7032,6 +7042,237 @@ function ModalRotaCarregamento({
     }
   }, [xlsxLoading, grupos.entrega, grupos.transferencia, pontosOrdenados, unidadesOrdem, unidadesMap, origem, carregamento.placa_provisoria, routeDistanceKm]);
 
+  const exportarOrdemCarregamentoPorDestino = useCallback(async () => {
+    if (xlsxLoading) return;
+    setXlsxLoading(true);
+    try {
+      await salvarOrdemCtes(ctesOrdem);
+      const entregaByKey = new Map(grupos.entrega.map((g) => [g.key, g]));
+      const entregaKeysEmOrdem: string[] = [];
+      for (const p of pontosOrdenados) {
+        if (p.tipo !== 'ENTREGA') continue;
+        const key = String(p.key ?? '');
+        const groupKey = key.startsWith('E:') ? key.slice(2) : '';
+        if (!groupKey) continue;
+        if (entregaKeysEmOrdem.includes(groupKey)) continue;
+        entregaKeysEmOrdem.push(groupKey);
+      }
+
+      const entregaKeysPorUnidade = new Map<string, string[]>();
+      for (const k of entregaKeysEmOrdem) {
+        const g = entregaByKey.get(k);
+        if (!g) continue;
+        const u = String(g.unidade ?? '').toUpperCase();
+        if (!entregaKeysPorUnidade.has(u)) entregaKeysPorUnidade.set(u, []);
+        entregaKeysPorUnidade.get(u)!.push(k);
+      }
+
+      const transfByUnidade = new Map(grupos.transferencia.map((g) => [String(g.unidade ?? '').toUpperCase(), g]));
+      const linhas: any[] = [];
+      const addLinhas = (setor: string, destinatario: string, cidade: string, ctes: any[]) => {
+        for (const c of ctes) {
+          linhas.push({
+            setor,
+            destinatario,
+            cidade,
+            ctrc: c?.ctrc ?? '',
+            peso: c?.peso ?? 0,
+            cubagem: c?.cubagem ?? 0,
+            volume: c?.qtde_vol ?? 0,
+            obs: '',
+          });
+        }
+      };
+
+      for (const uSigla of unidadesOrdem.slice(1)) {
+        const unidade = String(uSigla ?? '').toUpperCase();
+        if (unidade !== 'FEC') {
+          const tg = transfByUnidade.get(unidade);
+          if (tg) {
+            const uNome = unidadesMap.get(unidade)?.nome ?? '';
+            const destinatario = `UNIDADE ${unidade}${uNome ? ` - ${uNome}` : ''}`;
+            addLinhas(unidade, destinatario, uNome, tg.ctes);
+          }
+        }
+
+        const keys = entregaKeysPorUnidade.get(unidade) ?? [];
+        for (const k of keys) {
+          const g = entregaByKey.get(k);
+          if (!g) continue;
+          const cidade = [g.cidade, g.uf].filter(Boolean).join('/');
+          const destinatario = g.destinatario || g.titulo || 'ENTREGA';
+          addLinhas(unidade || g.unidade || '', destinatario, cidade, g.ctes);
+        }
+      }
+
+      for (const k of entregaKeysEmOrdem) {
+        const g = entregaByKey.get(k);
+        if (!g) continue;
+        const u = String(g.unidade ?? '').toUpperCase();
+        if (unidadesOrdem.includes(u)) continue;
+        const cidade = [g.cidade, g.uf].filter(Boolean).join('/');
+        const destinatario = g.destinatario || g.titulo || 'ENTREGA';
+        addLinhas(u || g.unidade || '', destinatario, cidade, g.ctes);
+      }
+
+      const destinos: string[] = [];
+      const seen = new Set<string>();
+      for (const uSigla of unidadesOrdem.slice(1)) {
+        const u = String(uSigla ?? '').toUpperCase().trim();
+        if (!u || u === 'FEC') continue;
+        if (!transfByUnidade.get(u)) continue;
+        if (seen.has(u)) continue;
+        seen.add(u);
+        destinos.push(u);
+      }
+      for (const k of entregaKeysEmOrdem) {
+        const g = entregaByKey.get(k);
+        if (!g) continue;
+        const ctes = Array.isArray((g as any)?.ctes) ? ((g as any).ctes as any[]) : [];
+        for (const c of ctes) {
+          const setorRaw = String((c as any)?.setor_cte ?? (c as any)?.setor ?? (c as any)?.setorCte ?? (c as any)?.setorEntrega ?? '').trim().toUpperCase();
+          const setor = setorRaw || String(carregamento.placa_provisoria ?? '').toUpperCase();
+          if (!setor) continue;
+          if (seen.has(setor)) continue;
+          seen.add(setor);
+          destinos.push(setor);
+        }
+      }
+      if (destinos.length === 0) {
+        throw new Error('Nenhum destino encontrado para gerar as planilhas.');
+      }
+
+      const rotaTxt = unidadesOrdem.filter(Boolean).join(' → ');
+      const mapImage = await (async () => {
+        try {
+          const map = mapRef.current;
+          if (!map || !map.getContainer) return null;
+          const container = map.getContainer() as HTMLElement;
+          if (!container) return null;
+          const cRect = container.getBoundingClientRect();
+          const w = Math.max(1, Math.floor(cRect.width));
+          const h = Math.max(1, Math.floor(cRect.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          const waitLoaded = async (img: HTMLImageElement) => {
+            if (img.complete && img.naturalWidth > 0) return;
+            await new Promise<void>((resolve) => {
+              const onDone = () => { cleanup(); resolve(); };
+              const cleanup = () => {
+                img.removeEventListener('load', onDone);
+                img.removeEventListener('error', onDone);
+              };
+              img.addEventListener('load', onDone);
+              img.addEventListener('error', onDone);
+            });
+          };
+
+          const tiles = Array.from(container.querySelectorAll('img.leaflet-tile')) as HTMLImageElement[];
+          await Promise.all(tiles.map(waitLoaded));
+          for (const img of tiles) {
+            if (!img.complete || img.naturalWidth <= 0) continue;
+            const r = img.getBoundingClientRect();
+            const x = r.left - cRect.left;
+            const y = r.top - cRect.top;
+            ctx.drawImage(img, x, y, r.width, r.height);
+          }
+
+          const drawSvgEl = async (svgEl: SVGSVGElement, x: number, y: number, width: number, height: number) => {
+            const cloned = svgEl.cloneNode(true) as SVGSVGElement;
+            cloned.setAttribute('width', String(width));
+            cloned.setAttribute('height', String(height));
+            const rawStyle = cloned.getAttribute('style') || '';
+            const cleanStyle = rawStyle
+              .replace(/transform\s*:[^;]+;?/gi, '')
+              .replace(/translate3d\s*\([^)]*\)/gi, '')
+              .replace(/translate\s*\([^)]*\)/gi, '')
+              .trim();
+            if (cleanStyle !== rawStyle) cloned.setAttribute('style', cleanStyle);
+            cloned.removeAttribute('transform');
+            (cloned as any).style && ((cloned as any).style.transform = '');
+            const svg = new XMLSerializer().serializeToString(cloned);
+            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            try {
+              const img = new Image();
+              await new Promise<void>((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = url;
+              });
+              if (img.width > 0 && img.height > 0) {
+                ctx.drawImage(img, x, y, width, height);
+              }
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          };
+
+          const overlaySvg = container.querySelector('.leaflet-overlay-pane svg') as SVGSVGElement | null;
+          if (overlaySvg) {
+            const r = overlaySvg.getBoundingClientRect();
+            await drawSvgEl(overlaySvg, r.left - cRect.left, r.top - cRect.top, r.width, r.height);
+          }
+
+          const markerSvgs = Array.from(container.querySelectorAll('.leaflet-marker-pane .leaflet-marker-icon svg')) as SVGSVGElement[];
+          for (const svgEl of markerSvgs) {
+            const iconEl = svgEl.closest('.leaflet-marker-icon') as HTMLElement | null;
+            if (!iconEl) continue;
+            const r = iconEl.getBoundingClientRect();
+            await drawSvgEl(svgEl, r.left - cRect.left, r.top - cRect.top, r.width, r.height);
+          }
+
+          return canvas.toDataURL('image/png');
+        } catch {
+          return null;
+        }
+      })();
+
+      const token = localStorage.getItem('auth_token');
+      const baseName = `ordem_carregamento_${carregamento.placa_provisoria}_${new Date().toISOString().split('T')[0]}`;
+      for (const destino of destinos) {
+        const resp = await fetch(
+          `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/exportar_ordem_carregamento.php`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, rota: rotaTxt, rota_km: routeDistanceKm, linhas, map_image: mapImage, destino }),
+          }
+        );
+        if (!resp.ok) {
+          const txt = await resp.text();
+          try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
+          catch { throw new Error('Erro ao exportar planilha'); }
+        }
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+          const txt = await resp.text();
+          try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
+          catch { throw new Error('Erro ao exportar planilha'); }
+        }
+
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const destSafe = String(destino).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24);
+        a.href = url;
+        a.download = `${baseName}${destSafe ? `_${destSafe}` : ''}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+      toast.success(`Planilhas geradas: ${destinos.length}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao gerar planilha.');
+    } finally {
+      setXlsxLoading(false);
+    }
+  }, [xlsxLoading, grupos.entrega, grupos.transferencia, pontosOrdenados, unidadesOrdem, unidadesMap, origem, carregamento.placa_provisoria, carregamento.seq_carregamento, routeDistanceKm, salvarOrdemCtes, ctesOrdem]);
+
   const geocodeEndereco = async (query: string): Promise<{ lat: number; lng: number } | null> => {
     const token = getToken();
     if (!token) return null;
@@ -7749,6 +7990,7 @@ function ModalRotaCarregamento({
           tipoVeiculoSugestao={tipoVeiculoSugestao}
           onFechar={() => setDadosOrdemAberto(false)}
           onConcluirSalvar={exportarOrdemCarregamento}
+          onConcluirSalvarPorDestino={exportarOrdemCarregamentoPorDestino}
         />
       )}
       {geoEditarKey && (

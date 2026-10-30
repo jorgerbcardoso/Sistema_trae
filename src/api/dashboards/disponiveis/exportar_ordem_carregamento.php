@@ -323,6 +323,45 @@ if (is_array($linhasDb)) {
     $linhas = $linhasDb;
 }
 
+$destinoFiltro = strtoupper(trim((string)($input['destino'] ?? '')));
+if ($destinoFiltro !== '') {
+    $linTmpFil = is_array($linhas) ? $linhas : [];
+    $linTmpFil = array_values(array_filter($linTmpFil, function($it) use ($destinoFiltro) {
+        $s = strtoupper(trim((string)($it['setor'] ?? $it['destino_cte'] ?? '')));
+        return $s !== '' && $s === $destinoFiltro;
+    }));
+    if (count($linTmpFil) === 0) {
+        respondJson(['success' => false, 'message' => 'Nenhuma linha encontrada para o destino informado.'], 400);
+    }
+    $linhas = $linTmpFil;
+}
+
+$destinosTxt = '';
+try {
+    if ($destinoFiltro !== '') {
+        $destinosTxt = $destinoFiltro;
+    } else {
+    $seen = [];
+    $destinos = [];
+    $linTmp = is_array($linhas) ? $linhas : [];
+    usort($linTmp, function($a, $b) {
+        $oa = (int)($a['ordem'] ?? 0);
+        $ob = (int)($b['ordem'] ?? 0);
+        return $oa <=> $ob;
+    });
+    foreach ($linTmp as $it) {
+        $s = strtoupper(trim((string)($it['setor'] ?? $it['destino_cte'] ?? '')));
+        if ($s === '') continue;
+        if (isset($seen[$s])) continue;
+        $seen[$s] = true;
+        $destinos[] = $s;
+    }
+    $destinosTxt = implode(', ', $destinos);
+    }
+} catch (Exception $e) {
+    $destinosTxt = '';
+}
+
 $unidNome = '';
 try {
     $resUn = sql(
@@ -447,7 +486,7 @@ $styleGrid = [
     ],
 ];
 
-$applyHeader = function($ws) use ($styleGrid, $styleDarkBar, $styleDarkBarRight, $styleLabel, $styleValue, $unidade, $unidNome, $seqCar, $darkBlue, $darkBlue2, $lightBlue, $inputBg, $gridBorder, $logoUrl) {
+$applyHeader = function($ws) use ($styleGrid, $styleDarkBar, $styleDarkBarRight, $styleLabel, $styleValue, $unidade, $unidNome, $destinosTxt, $seqCar, $darkBlue, $darkBlue2, $lightBlue, $inputBg, $gridBorder, $logoUrl) {
     $ws->getRowDimension(1)->setRowHeight(24);
     $ws->getRowDimension(2)->setRowHeight(18);
     $ws->getRowDimension(3)->setRowHeight(16);
@@ -478,7 +517,7 @@ $applyHeader = function($ws) use ($styleGrid, $styleDarkBar, $styleDarkBarRight,
     $ws->setCellValue('G5', 'TIPO DE OPERAÇÃO');
     $ws->setCellValue('I5', 'SIGLA');
     $ws->setCellValue('J5', 'Nº:');
-    $ws->setCellValue('K5', 'UNIDADE / CD');
+    $ws->setCellValue('K5', 'DESTINOS');
     $ws->getStyle('A5:L5')->applyFromArray($styleLabel);
 
     $ws->mergeCells('A6:C6');
@@ -490,7 +529,8 @@ $applyHeader = function($ws) use ($styleGrid, $styleDarkBar, $styleDarkBarRight,
     $ws->setCellValue('G6', 'ENTREGA');
     $ws->setCellValue('I6', $unidade);
     $ws->setCellValue('J6', $seqCar > 0 ? $seqCar : '');
-    $ws->setCellValue('K6', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+    $ws->setCellValue('K6', $destinosTxt !== '' ? $destinosTxt : trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+    $ws->getStyle('K6:L6')->getAlignment()->setWrapText(true);
     $ws->getStyle('A6:L6')->applyFromArray($styleValue);
 
     $ws->getStyle('A5:L6')->applyFromArray($styleGrid);
@@ -580,7 +620,7 @@ $sheet->setCellValue('D5', 'DATA DO CARREGAMENTO');
 $sheet->setCellValue('G5', 'TIPO DE OPERAÇÃO');
 $sheet->setCellValue('I5', 'SIGLA');
 $sheet->setCellValue('J5', 'Nº:');
-$sheet->setCellValue('K5', 'UNIDADE / CD');
+$sheet->setCellValue('K5', 'DESTINOS');
 $sheet->getStyle('A5:L5')->applyFromArray($styleLabel);
 
 $sheet->mergeCells('A6:C6');
@@ -592,7 +632,8 @@ $sheet->setCellValue('D6', date('d/m/Y'));
 $sheet->setCellValue('G6', 'ENTREGA');
 $sheet->setCellValue('I6', $unidade);
 $sheet->setCellValue('J6', $seqCar > 0 ? $seqCar : '');
-$sheet->setCellValue('K6', trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+$sheet->setCellValue('K6', $destinosTxt !== '' ? $destinosTxt : trim($unidNome !== '' ? ($unidade . ' - ' . $unidNome) : $unidade));
+$sheet->getStyle('K6:L6')->getAlignment()->setWrapText(true);
 $sheet->getStyle('A6:L6')->applyFromArray($styleValue);
 
 $sheet->getStyle('A5:L6')->applyFromArray($styleGrid);
