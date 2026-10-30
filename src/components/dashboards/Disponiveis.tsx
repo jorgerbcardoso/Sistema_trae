@@ -5907,7 +5907,7 @@ function ModalRotaCarregamento({
   const { confirm: confirmar, dialog: confirmarDialog } = useConfirmDialog();
 
   const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
-  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete'>('ctrc');
+  const [cteRotaSortKey, setCteRotaSortKey] = useState<'ctrc' | 'pagador' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete'>('ctrc');
   const [cteRotaSortDir, setCteRotaSortDir] = useState<'asc' | 'desc'>('asc');
   const [dragParadaKey, setDragParadaKey] = useState<string | null>(null);
   const [dragParadaOver, setDragParadaOver] = useState<string | null>(null);
@@ -5915,6 +5915,25 @@ function ModalRotaCarregamento({
   const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   const [rotaMaximizada, setRotaMaximizada] = useState(false);
+
+  useEffect(() => {
+    if (!leafletLoaded) return;
+    const t = window.setTimeout(() => {
+      try { mapRef.current?.invalidateSize?.(true); } catch {}
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [leafletLoaded, rotaMaximizada]);
+
+  useEffect(() => {
+    if (!leafletLoaded) return;
+    if (!mapContainerRef.current) return;
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      try { mapRef.current?.invalidateSize?.(true); } catch {}
+    });
+    ro.observe(mapContainerRef.current);
+    return () => ro.disconnect();
+  }, [leafletLoaded]);
 
   const carregarInfo = dados?.carregamento ?? {};
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
@@ -5999,7 +6018,7 @@ function ModalRotaCarregamento({
       cep: string;
       cidade: string;
       uf: string;
-      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; pagador: string; destinatario: string; nfs: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -6008,7 +6027,7 @@ function ModalRotaCarregamento({
       tipo: 'TRANSFERENCIA';
       unidade: string;
       titulo: string;
-      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; destinatario: string }[];
+      ctes: { ser: string; nro: number; ordem: number; ctrc: string; destino: string; setor: string; emissao: string; prev: string; peso: number; frete: number; cubagem: number; qtde_vol: number; cidade: string; pagador: string; destinatario: string; nfs: string }[];
       lat: number | null;
       lng: number | null;
     }>();
@@ -6025,6 +6044,7 @@ function ModalRotaCarregamento({
       const cep = normEnd(c?.cep_entrega ?? '');
       const cidade = normEnd(c?.cidade_entrega ?? '');
       const uf = normEnd(c?.uf_entrega ?? '');
+      const pagador = normEnd(c?.pagador ?? c?.pagador_cte ?? '');
       const destinatario = normEnd(c?.destinatario ?? '');
       const isFec = unidadeDestino === 'FEC';
       const hasEnderecoReal = endereco !== '' || bairro !== '' || cep !== '' || cidade !== '' || uf !== '';
@@ -6040,7 +6060,7 @@ function ModalRotaCarregamento({
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
       const ordem = Number(c?.ordem ?? 0) || 0;
-      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario, nfs };
+      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, pagador, destinatario, nfs };
 
       if (isEntregaCte) {
         const baseTitulo = destinatario;
@@ -7246,7 +7266,7 @@ function ModalRotaCarregamento({
     });
   }, [defaultParadasOrder]);
 
-  const toggleCteRotaSort = (key: 'ctrc' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete') => {
+  const toggleCteRotaSort = (key: 'ctrc' | 'pagador' | 'destinatario' | 'emissao' | 'prev' | 'cidade' | 'peso' | 'frete') => {
     setCteRotaSortKey((prev) => {
       if (prev === key) {
         setCteRotaSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -7286,13 +7306,14 @@ function ModalRotaCarregamento({
     const only = n.replace(/\D+/g, '');
     return only || n || '-';
   };
-  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number; cidade?: string; destinatario?: string; cubagem?: number; qtde_vol?: number; nfs?: string }[]) => {
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number; cidade?: string; pagador?: string; destinatario?: string; cubagem?: number; qtde_vol?: number; nfs?: string }[]) => {
     const list = [...items];
     const dir = cteRotaSortDir === 'asc' ? 1 : -1;
     const cmpStr = (a: string, b: string) => a.localeCompare(b);
     const cmpNum = (a: number, b: number) => a - b;
     list.sort((a, b) => {
       if (cteRotaSortKey === 'ctrc') return cmpStr(String(a.ctrc ?? ''), String(b.ctrc ?? '')) * dir;
+      if (cteRotaSortKey === 'pagador') return cmpStr(String((a as any).pagador ?? ''), String((b as any).pagador ?? '')) * dir;
       if (cteRotaSortKey === 'destinatario') return cmpStr(String(a.destinatario ?? ''), String(b.destinatario ?? '')) * dir;
       if (cteRotaSortKey === 'emissao') return cmpStr(String(a.emissao ?? ''), String(b.emissao ?? '')) * dir;
       if (cteRotaSortKey === 'prev') return cmpStr(String(a.prev ?? ''), String(b.prev ?? '')) * dir;
@@ -7305,8 +7326,8 @@ function ModalRotaCarregamento({
     const totVol = list.reduce((s, c) => s + (Number((c as any).qtde_vol ?? 0) || 0), 0);
     const totCub = list.reduce((s, c) => s + (Number((c as any).cubagem ?? 0) || 0), 0);
     const gridCols = rotaMaximizada
-      ? 'grid-cols-[minmax(84px,auto)_64px_minmax(0,1.2fr)_44px_minmax(0,1fr)_52px_58px_64px_72px]'
-      : 'grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px]';
+      ? 'grid-cols-[minmax(84px,auto)_56px_minmax(0,1fr)_minmax(0,1fr)_44px_44px_minmax(0,1fr)_44px_58px_64px_72px]'
+      : 'grid-cols-[minmax(84px,auto)_minmax(0,1fr)_minmax(0,1fr)_44px_44px_minmax(0,1fr)_64px_72px]';
     return (
       <div className="mt-2">
         <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -7315,14 +7336,15 @@ function ModalRotaCarregamento({
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             {rotaMaximizada ? <span>NF</span> : null}
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('pagador')}>
+              Pagador{cteRotaSortKey === 'pagador' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('destinatario')}>
               Destinatário{cteRotaSortKey === 'destinatario' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
-            {!rotaMaximizada ? (
-              <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
-                Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
-              </button>
-            ) : null}
+            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
+              Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+            </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('prev')}>
               Prev{cteRotaSortKey === 'prev' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
@@ -7343,8 +7365,9 @@ function ModalRotaCarregamento({
               <div key={`${c.ser}-${c.nro}`} className={`grid ${gridCols} gap-1.5 px-2 py-1 text-[11px]`}>
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
                 {rotaMaximizada ? <span className="font-mono text-slate-700 dark:text-slate-200">{primeiraNfNumero((c as any).nfs)}</span> : null}
+                <span className="text-slate-700 dark:text-slate-200 truncate">{String((c as any).pagador ?? '').trim() || '-'}</span>
                 <span className="text-slate-700 dark:text-slate-200 truncate">{String(c.destinatario ?? '').trim() || '-'}</span>
-                {!rotaMaximizada ? <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span> : null}
+                <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span>
                 <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.prev ?? ''))}</span>
                 <span className="text-slate-600 dark:text-slate-400 truncate">{String(c.cidade ?? '').trim() || '-'}</span>
                 {rotaMaximizada ? <span className="text-right font-mono text-slate-700 dark:text-slate-200">{fmtIntBR(Number((c as any).qtde_vol ?? 0) || 0)}</span> : null}
@@ -7361,6 +7384,8 @@ function ModalRotaCarregamento({
             {!rotaMaximizada ? <span /> : null}
             <span />
             <span />
+            <span />
+            {rotaMaximizada ? <span /> : null}
             {rotaMaximizada ? <span className="text-right font-mono">{fmtIntBR(totVol)}</span> : null}
             {rotaMaximizada ? <span className="text-right font-mono">{fmtNumBR(totCub, 3, 3)}</span> : null}
             <span className="text-right font-mono">{totPeso.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
@@ -7396,7 +7421,7 @@ function ModalRotaCarregamento({
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               title={rotaMaximizada ? 'Restaurar' : 'Maximizar'}
             >
-              {rotaMaximizada ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+              {rotaMaximizada ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
             <button onClick={handleFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" title="Fechar">
               <X className="w-5 h-5" />
