@@ -31,6 +31,7 @@ if ($placa === '') {
 
 $conn = connect();
 $tblCar = "{$domain}_carregamento";
+$tblCap = "{$domain}_carregamento_capacidade";
 $tblUnid = "{$domain}_unidade";
 $tblCte = "{$domain}_cte";
 $tblCliente = "{$domain}_cliente";
@@ -185,6 +186,24 @@ if ($destino !== '' && preg_match('/^[A-Z0-9]{2,5}$/', $destino)) {
 }
 
 $seqCar = ($carRow['seq_carregamento'] !== null && $carRow['seq_carregamento'] !== '') ? (int)$carRow['seq_carregamento'] : null;
+$tpCarregamento = 'E';
+if ($seqCar !== null && $seqCar > 0) {
+    try {
+        $resTp = sql(
+            "SELECT COALESCE(tp_carregamento, '') AS tp_carregamento
+             FROM {$tblCap}
+             WHERE unidade = $1 AND seq_carregamento = $2
+             LIMIT 1",
+            [$unidade, $seqCar],
+            $conn
+        );
+        if ($resTp && pg_num_rows($resTp) > 0) {
+            $rowTp = pg_fetch_assoc($resTp);
+            $tp = strtoupper(trim((string)($rowTp['tp_carregamento'] ?? '')));
+            if ($tp === 'T' || $tp === 'E') $tpCarregamento = $tp;
+        }
+    } catch (Exception $e) {}
+}
 
 $rows = [];
 $unidadesSet = [$unidade => true];
@@ -324,6 +343,7 @@ respondJson([
         'seq_carregamento' => $seqCar,
         'placa' => $placa,
         'unidade_origem' => $unidade,
+        'tp_carregamento' => $tpCarregamento,
         'destino' => $destino !== '' ? $destino : null,
         'paradas' => $paradasArr,
     ],

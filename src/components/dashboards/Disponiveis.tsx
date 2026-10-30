@@ -5916,6 +5916,8 @@ function ModalRotaCarregamento({
   const carregarInfo = dados?.carregamento ?? {};
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
+  const tpCarregamento = String((carregarInfo as any)?.tp_carregamento ?? '').trim().toUpperCase();
+  const isTransferCarreg = tpCarregamento === 'T';
   const paradas = Array.isArray(carregarInfo?.paradas) ? (carregarInfo.paradas as string[]) : [];
   const totaisCalc = useMemo(() => {
     const list = Array.isArray(dados?.ctes) ? dados.ctes : [];
@@ -6013,6 +6015,7 @@ function ModalRotaCarregamento({
       const nro = Number(c?.nro_cte ?? 0);
       const destinoCte = normKey((c as any)?.destino_cte_painel ?? c?.destino_cte ?? '');
       const unidadeDestino = (isValidSigla(destinoCte) ? destinoCte : (unidadesOrdem[unidadesOrdem.length - 1] ?? ''));
+      const isEntregaCte = unidadeDestino !== '' && unidadeDestino === origem;
 
       const endereco = normEnd(c?.endereco_entrega ?? '');
       const bairro = normEnd(c?.bairro_entrega ?? '');
@@ -6022,7 +6025,6 @@ function ModalRotaCarregamento({
       const destinatario = normEnd(c?.destinatario ?? '');
       const isFec = unidadeDestino === 'FEC';
       const hasEnderecoReal = endereco !== '' || bairro !== '' || cep !== '' || cidade !== '' || uf !== '';
-      const hasEndereco = hasEnderecoReal || isFec;
 
       const ctrc = padCte(ser, nro);
       const peso = c?.peso !== null && c?.peso !== undefined && String(c.peso) !== '' ? parsePeso(String(c.peso)) : 0;
@@ -6036,12 +6038,14 @@ function ModalRotaCarregamento({
       const ordem = Number(c?.ordem ?? 0) || 0;
       const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
 
-      if (hasEndereco) {
+      if (isEntregaCte) {
         const baseTitulo = destinatario;
         const query = (isFec && !hasEnderecoReal) ? '' : buildGeoQuery({ endereco, bairro, cep, cidade, uf });
-        const key = (isFec && !hasEnderecoReal)
+        const key = isTransferCarreg
           ? `${unidadeDestino}|${ctrc || `${ser}-${nro}`}`
-          : `${unidadeDestino}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`;
+          : ((isFec && !hasEnderecoReal)
+            ? `${unidadeDestino}|${ctrc || `${ser}-${nro}`}`
+            : `${unidadeDestino}|${endereco}|${bairro}|${cep}|${cidade}|${uf}`);
         const g = destinosEntrega.get(key) ?? {
           key,
           tipo: 'ENTREGA' as const,
@@ -6092,7 +6096,7 @@ function ModalRotaCarregamento({
     listTransf.sort((a, b) => ((ordemIdx.get(a.unidade) ?? 999) - (ordemIdx.get(b.unidade) ?? 999)) || a.titulo.localeCompare(b.titulo));
 
     return { entrega: listEntrega, transferencia: listTransf };
-  }, [dados, unidadesMap, unidadesOrdem]);
+  }, [dados, isTransferCarreg, origem, unidadesMap, unidadesOrdem]);
 
   const resumoSetoresEntrega = useMemo(() => {
     const map = new Map<string, { ctes: number; clientes: Set<string> }>();
@@ -6123,6 +6127,13 @@ function ModalRotaCarregamento({
   const defaultParadasOrder = useMemo(() => {
     const out: string[] = [];
     const used = new Set<string>();
+    if (isTransferCarreg) {
+      for (const e of grupos.entrega.filter((g) => g.unidade === origem)) {
+        const k = `E:${e.key}`;
+        out.push(k);
+        used.add(k);
+      }
+    }
     for (let i = 1; i < unidadesOrdem.length; i++) {
       const u = unidadesOrdem[i];
       const t = transfByUnidade.get(u);
@@ -6183,7 +6194,7 @@ function ModalRotaCarregamento({
       if (oa !== ob) return oa - ob;
       return (idxBase.get(a) ?? 0) - (idxBase.get(b) ?? 0);
     });
-  }, [entregaByKey, grupos.entrega, grupos.transferencia, transfByUnidade, unidadesOrdem]);
+  }, [entregaByKey, grupos.entrega, grupos.transferencia, isTransferCarreg, origem, transfByUnidade, unidadesOrdem]);
 
   const [paradasOrder, setParadasOrder] = useState<string[]>([]);
   const lastPlacaProvisoriaRef = useRef<string | null>(null);
