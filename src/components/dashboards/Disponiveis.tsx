@@ -63,6 +63,8 @@ import {
   Info,
   Route,
   Split,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '../ui/dialog';
@@ -5912,6 +5914,7 @@ function ModalRotaCarregamento({
   const [dadosOrdemAberto, setDadosOrdemAberto] = useState(false);
   const [geoEditarKey, setGeoEditarKey] = useState<string | null>(null);
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  const [rotaMaximizada, setRotaMaximizada] = useState(false);
 
   const carregarInfo = dados?.carregamento ?? {};
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
@@ -6031,12 +6034,13 @@ function ModalRotaCarregamento({
       const frete = c?.vlr_frete !== null && c?.vlr_frete !== undefined && String(c.vlr_frete) !== '' ? parseMoeda(String(c.vlr_frete)) : 0;
       const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
+      const nfs = norm(c?.nfs ?? '');
       const cidadeDestino = norm(c?.cidade_entrega ?? c?.cidade_destino_cte ?? '').split('/')[0].trim();
       const setorEntrega = normKey((c as any)?.setor_cte ?? (c as any)?.setor ?? (c as any)?.setorCte ?? (c as any)?.setorEntrega ?? (c as any)?.unidadeDest ?? (c as any)?.unidade_dest ?? '');
       const emissao = norm(c?.data_emissao ?? '');
       const prev = norm(c?.data_prev_ent ?? '');
       const ordem = Number(c?.ordem ?? 0) || 0;
-      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario };
+      const itemCte = { ser, nro, ordem, ctrc, destino: unidadeDestino, setor: setorEntrega, emissao, prev, peso: Number.isFinite(peso) ? peso : 0, frete: Number.isFinite(frete) ? frete : 0, cubagem: Number.isFinite(cubagem) ? cubagem : 0, qtde_vol: Number.isFinite(qtdeVol) ? qtdeVol : 0, cidade: cidadeDestino, destinatario, nfs };
 
       if (isEntregaCte) {
         const baseTitulo = destinatario;
@@ -7272,7 +7276,17 @@ function ModalRotaCarregamento({
     const m = f.match(/^(\d{2}\/\d{2})/);
     return m?.[1] ? m[1] : f;
   };
-  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number; cidade?: string; destinatario?: string }[]) => {
+  const primeiraNfNumero = (nfs: any): string => {
+    const s = String(nfs ?? '').trim();
+    if (!s) return '-';
+    const first = s.split(',')[0]?.trim() || '';
+    if (!first) return '-';
+    const parts = first.split('/').map((x) => x.trim()).filter(Boolean);
+    const n = (parts.length >= 2 ? parts[1] : parts[0]) || '';
+    const only = n.replace(/\D+/g, '');
+    return only || n || '-';
+  };
+  const renderCtes = (items: { ser: string; nro: number; ctrc: string; destino: string; emissao: string; prev: string; peso?: number; frete?: number; cidade?: string; destinatario?: string; cubagem?: number; qtde_vol?: number; nfs?: string }[]) => {
     const list = [...items];
     const dir = cteRotaSortDir === 'asc' ? 1 : -1;
     const cmpStr = (a: string, b: string) => a.localeCompare(b);
@@ -7288,25 +7302,35 @@ function ModalRotaCarregamento({
     });
     const totPeso = list.reduce((s, c) => s + (Number(c.peso ?? 0) || 0), 0);
     const totFrete = list.reduce((s, c) => s + (Number(c.frete ?? 0) || 0), 0);
+    const totVol = list.reduce((s, c) => s + (Number((c as any).qtde_vol ?? 0) || 0), 0);
+    const totCub = list.reduce((s, c) => s + (Number((c as any).cubagem ?? 0) || 0), 0);
+    const gridCols = rotaMaximizada
+      ? 'grid-cols-[minmax(84px,auto)_64px_minmax(0,1.2fr)_44px_minmax(0,1fr)_52px_58px_64px_72px]'
+      : 'grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px]';
     return (
       <div className="mt-2">
         <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+          <div className={`grid ${gridCols} gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300`}>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('ctrc')}>
               CT-e{cteRotaSortKey === 'ctrc' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
+            {rotaMaximizada ? <span>NF</span> : null}
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('destinatario')}>
               Destinatário{cteRotaSortKey === 'destinatario' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
-            <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
-              Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
-            </button>
+            {!rotaMaximizada ? (
+              <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('emissao')}>
+                Emissão{cteRotaSortKey === 'emissao' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
+              </button>
+            ) : null}
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('prev')}>
               Prev{cteRotaSortKey === 'prev' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
             <button type="button" className="text-left hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('cidade')}>
               Cidade{cteRotaSortKey === 'cidade' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
+            {rotaMaximizada ? <span className="text-right">Vol.</span> : null}
+            {rotaMaximizada ? <span className="text-right">Cub.</span> : null}
             <button type="button" className="text-right hover:text-slate-800 dark:hover:text-slate-100" onClick={() => toggleCteRotaSort('peso')}>
               Peso (kg){cteRotaSortKey === 'peso' ? (cteRotaSortDir === 'asc' ? <ChevronDown className="w-3 h-3 inline ml-1 rotate-180" /> : <ChevronDown className="w-3 h-3 inline ml-1" />) : null}
             </button>
@@ -7316,23 +7340,29 @@ function ModalRotaCarregamento({
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {list.map((c) => (
-              <div key={`${c.ser}-${c.nro}`} className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 text-[11px]">
+              <div key={`${c.ser}-${c.nro}`} className={`grid ${gridCols} gap-1.5 px-2 py-1 text-[11px]`}>
                 <span className="font-mono text-slate-700 dark:text-slate-200 truncate">{c.ctrc || `${c.ser}${String(c.nro).padStart(6, '0')}`}</span>
+                {rotaMaximizada ? <span className="font-mono text-slate-700 dark:text-slate-200">{primeiraNfNumero((c as any).nfs)}</span> : null}
                 <span className="text-slate-700 dark:text-slate-200 truncate">{String(c.destinatario ?? '').trim() || '-'}</span>
-                <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span>
+                {!rotaMaximizada ? <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.emissao ?? ''))}</span> : null}
                 <span className="text-slate-600 dark:text-slate-400">{formatDataDDMM(String(c.prev ?? ''))}</span>
                 <span className="text-slate-600 dark:text-slate-400 truncate">{String(c.cidade ?? '').trim() || '-'}</span>
+                {rotaMaximizada ? <span className="text-right font-mono text-slate-700 dark:text-slate-200">{fmtIntBR(Number((c as any).qtde_vol ?? 0) || 0)}</span> : null}
+                {rotaMaximizada ? <span className="text-right font-mono text-slate-700 dark:text-slate-200">{fmtNumBR(Number((c as any).cubagem ?? 0) || 0, 3, 3)}</span> : null}
                 <span className="text-right font-mono text-slate-700 dark:text-slate-200">{(Number(c.peso ?? 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 <span className="text-right font-mono text-slate-700 dark:text-slate-200">{(Number(c.frete ?? 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-[minmax(84px,auto)_minmax(0,1.4fr)_44px_44px_minmax(0,1fr)_64px_72px] gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+          <div className={`grid ${gridCols} gap-1.5 px-2 py-1 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-200`}>
             <span className="text-slate-600 dark:text-slate-300">Total</span>
+            {rotaMaximizada ? <span /> : null}
+            <span />
+            {!rotaMaximizada ? <span /> : null}
             <span />
             <span />
-            <span />
-            <span />
+            {rotaMaximizada ? <span className="text-right font-mono">{fmtIntBR(totVol)}</span> : null}
+            {rotaMaximizada ? <span className="text-right font-mono">{fmtNumBR(totCub, 3, 3)}</span> : null}
             <span className="text-right font-mono">{totPeso.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
             <span className="text-right font-mono">{totFrete.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
@@ -7344,8 +7374,8 @@ function ModalRotaCarregamento({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(1100px,calc(100vw-32px))] h-[min(760px,calc(100vh-100px))] flex flex-col">
+    <div className={`fixed inset-0 z-[9999] flex bg-black/50 backdrop-blur-sm ${rotaMaximizada ? 'items-stretch justify-stretch' : 'items-center justify-center'}`}>
+      <div className={`bg-white dark:bg-slate-900 flex flex-col ${rotaMaximizada ? 'w-full h-full rounded-none border-0 shadow-none' : 'rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[min(1100px,calc(100vw-32px))] h-[min(760px,calc(100vh-100px))]'}`}>
         {confirmarDialog}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-2 min-w-0">
@@ -7359,9 +7389,19 @@ function ModalRotaCarregamento({
               </p>
             </div>
           </div>
-          <button onClick={handleFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setRotaMaximizada((v) => !v)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              title={rotaMaximizada ? 'Restaurar' : 'Maximizar'}
+            >
+              {rotaMaximizada ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+            <button onClick={handleFechar} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors" title="Fechar">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
@@ -7411,7 +7451,7 @@ function ModalRotaCarregamento({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_520px]">
+        <div className={`flex-1 min-h-0 grid grid-cols-1 ${rotaMaximizada ? 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_520px]'}`}>
           <div className="min-h-0 p-4">
             <div className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden relative">
               {!leafletLoaded && (

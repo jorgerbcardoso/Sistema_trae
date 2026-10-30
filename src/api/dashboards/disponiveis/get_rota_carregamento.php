@@ -119,6 +119,7 @@ $hasLngEntrega = $cteOk && $colExists($conn, $tblCte, 'longitude_entrega');
 $hasLocEntDif = $cteOk && $colExists($conn, $tblCte, 'loc_ent_dif');
 $hasLocDifEnt = $cteOk && $colExists($conn, $tblCte, 'loc_dif_ent');
 $hasCnpjEmit = $cteOk && $colExists($conn, $tblCte, 'cnpj_emit');
+$hasNfs = $cteOk && $colExists($conn, $tblCte, 'nfs');
 
 $joinCte = $cteOk ? "
         LEFT JOIN {$tblCte} cte
@@ -149,6 +150,7 @@ $selLocEntDif = $hasLocEntDif
     ? "COALESCE(cte.loc_ent_dif, '') AS loc_ent_dif,"
     : ($hasLocDifEnt ? "COALESCE(cte.loc_dif_ent, '') AS loc_ent_dif," : "'' AS loc_ent_dif,");
 $selCnpjEmit = $hasCnpjEmit ? "COALESCE(cte.cnpj_emit, '') AS cnpj_emit," : "'' AS cnpj_emit,";
+$selNfs = $hasNfs ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";
 $selCliLat = ($clienteOk && $colExists($conn, $tblCliente, 'latitude_entrega') && $hasCnpjEmit) ? "cli.latitude_entrega AS cli_latitude_entrega," : "NULL AS cli_latitude_entrega,";
 $selCliLng = ($clienteOk && $colExists($conn, $tblCliente, 'longitude_entrega') && $hasCnpjEmit) ? "cli.longitude_entrega AS cli_longitude_entrega" : "NULL AS cli_longitude_entrega";
 
@@ -244,6 +246,7 @@ try {
             {$selLngEntrega}
             {$selLocEntDif}
             {$selCnpjEmit}
+            {$selNfs}
             {$selCliLat}
             {$selCliLng}
         FROM {$tblCar} car
@@ -280,6 +283,7 @@ try {
             'peso' => ($r['peso'] !== null && $r['peso'] !== '') ? (float)$r['peso'] : 0.0,
             'cubagem' => ($r['cubagem'] !== null && $r['cubagem'] !== '') ? (float)$r['cubagem'] : 0.0,
             'qtde_vol' => ($r['qtde_vol'] !== null && $r['qtde_vol'] !== '') ? (int)$r['qtde_vol'] : 0,
+            'nfs' => (string)($r['nfs'] ?? ''),
             'cep_entrega' => (string)($r['cep_entrega'] ?? ''),
             'endereco_entrega' => (string)($r['endereco_entrega'] ?? ''),
             'bairro_entrega' => (string)($r['bairro_entrega'] ?? ''),
