@@ -5409,6 +5409,23 @@ function ModalDadosOrdemCarregamento({
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/\s+/g, ' ');
 
+        const placaDef = placaDefinitiva.trim().toUpperCase();
+        if (placaDef) {
+          const v = await fetchVeiculo(placaDef);
+          if (!alive) return;
+          const tipoPlacaRaw = String(v?.tipo ?? '').trim().toUpperCase();
+          const tipoPlacaN = tipoPlacaRaw ? normTipo(tipoPlacaRaw) : '';
+          if (tipoPlacaN) {
+            const found = items.find((c: any) => normTipo(c?.tipo ?? '') === tipoPlacaN) ?? null;
+            if (found) {
+              setCalcTipoVeiculo(String(found?.tipo ?? tipoPlacaRaw).trim().toUpperCase());
+              setCalcParams(found);
+              return;
+            }
+            setCalcTipoVeiculo(tipoPlacaRaw);
+          }
+        }
+
         const tipoForcedRaw = String(tipoVeiculoSugestao ?? '').trim();
         const tipoForcedN = tipoForcedRaw ? normTipo(tipoForcedRaw) : '';
 
@@ -5433,7 +5450,7 @@ function ModalDadosOrdemCarregamento({
     };
     void run();
     return () => { alive = false; };
-  }, [pesoKg, cubM3, tipoVeiculoSugestao]);
+  }, [pesoKg, cubM3, tipoVeiculoSugestao, placaDefinitiva]);
 
   useEffect(() => {
     let alive = true;
@@ -5818,6 +5835,10 @@ function ModalDadosOrdemCarregamento({
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200 dark:border-slate-700">
           <Button variant="outline" onClick={!saving ? onFechar : undefined} disabled={saving}>Cancelar</Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void salvar(onConcluirSalvar); }} disabled={saving || loading}>
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
+            Salvar e gerar
+          </Button>
           <Button
             className="bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={() => { void salvar(onConcluirSalvarPorDestino ?? onConcluirSalvar); }}
@@ -5825,10 +5846,6 @@ function ModalDadosOrdemCarregamento({
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
             Gerar 1 por Destino
-          </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { void salvar(onConcluirSalvar); }} disabled={saving || loading}>
-            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5 mr-1.5" />}
-            Salvar e gerar
           </Button>
         </div>
       </div>
