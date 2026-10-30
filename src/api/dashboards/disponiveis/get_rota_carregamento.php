@@ -124,6 +124,10 @@ $joinCte = $cteOk ? "
         LEFT JOIN {$tblCte} cte
                ON cte.ser_cte = car.ser_cte
               AND cte.nro_cte = car.nro_cte
+              AND NOT (
+                    UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO'
+                AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999'
+              )
 " : "";
 $joinCliente = ($clienteOk && $hasCnpjEmit) ? "
         LEFT JOIN {$tblCliente} cli

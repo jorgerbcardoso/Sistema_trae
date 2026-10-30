@@ -199,6 +199,7 @@ function getRealProfitabilityData($dominio, $period, $viewMode, $startDate, $end
     $query = "SELECT COALESCE(SUM(vlr_frete), 0) as total
               FROM {$dominio}_cte
               WHERE status <> 'C'
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit;
 
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -352,9 +353,9 @@ function getMonthlyProfitabilityMetrics($g_sql, $dominio, $data_ini, $data_fin, 
              "custo_vendedor + custo_recepcao + custo_desp_div";
 
     $query = "SELECT " .
-             " (SELECT SUM (vlr_frete)   FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as receita," .
-             " (SELECT SUM ($custo)      FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as custo_operacional," .
-             " (SELECT SUM (vlr_icms)    FROM {$dominio}_cte     WHERE status <> 'C' AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as imposto," .
+             " (SELECT SUM (vlr_frete)   FROM {$dominio}_cte     WHERE status <> 'C' AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as receita," .
+             " (SELECT SUM ($custo)      FROM {$dominio}_cte     WHERE status <> 'C' AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as custo_operacional," .
+             " (SELECT SUM (vlr_icms)    FROM {$dominio}_cte     WHERE status <> 'C' AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') AND data_emissao BETWEEN $1 AND $2{$filtroEmit}) as imposto," .
              " (SELECT SUM (d.vlr_parcela) FROM {$dominio}_despesa d INNER JOIN {$dominio}_evento e ON d.evento = e.evento WHERE d.status <> 'C' AND COALESCE(e.considerar, 'S') <> 'N' AND d.data_pgto BETWEEN $1 AND $2{$filtroDespesa}) as despesas";
 
     $result = pg_query_params($g_sql, $query, [$data_ini, $data_fin]);
@@ -409,6 +410,7 @@ function getUnitProfitability($g_sql, $dominio, $startDate, $endDate, $receitaTo
                 COALESCE(SUM(vlr_frete), 0) as receita
               FROM {$dominio}_cte
               WHERE status <> 'C'
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1
               ORDER BY 2 DESC

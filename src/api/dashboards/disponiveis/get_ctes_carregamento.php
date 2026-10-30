@@ -140,12 +140,20 @@ $joinCte = $cteTableOk
                FROM {$tblCte} cte2
                WHERE UPPER(BTRIM(cte2.ser_cte)) = UPPER(BTRIM(car.ser_cte))
                  AND cte2.nro_cte = car.nro_cte
+                 AND NOT (
+                       UPPER(BTRIM(COALESCE(cte2.tp_documento, ''))) = 'PRES SERVICO'
+                   AND UPPER(BTRIM(COALESCE(cte2.ser_cte, ''))) = '999'
+                 )
                ORDER BY cte2.seq_cte DESC
                LIMIT 1
            ) cte ON TRUE"
         : "LEFT JOIN {$tblCte} cte
                ON UPPER(BTRIM(cte.ser_cte)) = UPPER(BTRIM(car.ser_cte))
-              AND cte.nro_cte = car.nro_cte")
+              AND cte.nro_cte = car.nro_cte
+              AND NOT (
+                    UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO'
+                AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999'
+              )")
     : "";
 $joinCidParam = $cidParamOk ? "LEFT JOIN {$tblCidParam} cidp ON cidp.seq_cidade = cte.seq_cidade_entr" : "";
 $selNfs = $cteTableOk ? "COALESCE(cte.nfs, '') AS nfs," : "'' AS nfs,";

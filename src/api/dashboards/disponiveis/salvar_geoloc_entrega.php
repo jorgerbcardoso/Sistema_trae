@@ -92,6 +92,10 @@ try {
              FROM {$tblCte}
              WHERE ser_cte = $1
                AND nro_cte = $2
+               AND NOT (
+                     UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO'
+                 AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999'
+               )
              LIMIT 1",
             [$ser, $nro],
             $conn

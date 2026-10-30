@@ -247,6 +247,7 @@ function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate, 
     $query = "SELECT COALESCE(SUM(vlr_frete), 0) as total 
               FROM {$dominio}_cte 
               WHERE status <> 'C' 
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit;
     
     $result = pg_query_params($g_sql, $query, [$startDate, $endDate]);
@@ -260,6 +261,7 @@ function getRealRevenueData($dominio, $period, $viewMode, $startDate, $endDate, 
                      {$colAgrup} AS unid
               FROM {$dominio}_cte
               WHERE status <> 'C'
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 2
               ORDER BY 1 DESC
@@ -368,6 +370,7 @@ function getMonthlyRevenueByUnits($g_sql, $dominio, $data_ini, $data_fin, $unids
                 COUNT(*) AS total_ctes
               FROM {$dominio}_cte
               WHERE status <> 'C'
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1";
 
@@ -409,6 +412,7 @@ function getPeriodTotalsByUnits($g_sql, $dominio, $startDate, $endDate, $unids, 
                 COALESCE(SUM(vlr_frete), 0) AS total
               FROM {$dominio}_cte
               WHERE status <> 'C'
+                AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999')
                 AND data_emissao BETWEEN $1 AND $2" . $filtroEmit . "
               GROUP BY 1";
 

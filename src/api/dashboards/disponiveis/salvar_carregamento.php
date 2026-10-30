@@ -522,6 +522,10 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                     JOIN {$tblCte} cte
                       ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
                      AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
+                     AND NOT (
+                           UPPER(BTRIM(COALESCE(cte.tp_documento::text, ''))) = 'PRES SERVICO'
+                       AND regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = '999'
+                     )
                     {$joinCidade}
                 ";
                 $resC = @pg_query_params($conn, $q, $params);
@@ -2247,6 +2251,10 @@ if ($acao === 'verificar_saidas_ssw') {
                                 JOIN {$tblCte} cte
                                   ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
                                  AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
+                                 AND NOT (
+                                       UPPER(BTRIM(COALESCE(cte.tp_documento::text, ''))) = 'PRES SERVICO'
+                                   AND regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = '999'
+                                 )
                                 {$joinCidade}
                             ";
                             $resC = @pg_query_params($conn, $q, $params);
@@ -2889,6 +2897,10 @@ if ($acao === 'atualizar_ctes_ssw') {
                         JOIN {$tblCte} cte
                           ON regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = req.ser_cte
                          AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = req.nro_cte
+                         AND NOT (
+                               UPPER(BTRIM(COALESCE(cte.tp_documento::text, ''))) = 'PRES SERVICO'
+                           AND regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = '999'
+                         )
                         {$joinCidade}
                     ";
                     $resC = @pg_query_params($conn, $q, $params);
@@ -3025,6 +3037,10 @@ if ($acao === 'atualizar_ctes_ssw') {
                  FROM {$tblCte} cte
                  WHERE regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(t.ser_cte::text), '[^A-Z0-9]', '', 'g')
                    AND CAST(NULLIF(regexp_replace(cte.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT) = CAST(NULLIF(regexp_replace(t.nro_cte::text, '[^0-9]', '', 'g'), '') AS INT)
+                   AND NOT (
+                         UPPER(BTRIM(COALESCE(cte.tp_documento::text, ''))) = 'PRES SERVICO'
+                     AND regexp_replace(upper(cte.ser_cte::text), '[^A-Z0-9]', '', 'g') = '999'
+                   )
                    AND t.unidade = $1
                    AND t.seq_carregamento = $2",
                 [$unidade, $seqCarreg],

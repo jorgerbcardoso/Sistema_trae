@@ -248,6 +248,10 @@ try {
         LEFT JOIN {$tblCte} cte
                ON cte.ser_cte = car.ser_cte
               AND cte.nro_cte = car.nro_cte
+              AND NOT (
+                    UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO'
+                AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999'
+              )
         LEFT JOIN cidade cid
                ON cid.seq_cidade = cte.seq_cidade_entr
         WHERE car.unidade = $1

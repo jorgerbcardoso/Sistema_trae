@@ -128,6 +128,7 @@ $buildEvolucao = function(string $where, array $params) use ($conn, $domain, $co
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
+$whereConditions[] = "NOT (UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999')";
 
 if (!empty($filters['periodoEmissaoInicio'])) {
     $whereConditions[] = 'cte.data_emissao >= $' . $paramIndex++;

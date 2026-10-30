@@ -35,7 +35,11 @@ try {
             AND car.data_finalizacao IS NULL
             AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
             AND car.ser_cte = cte.ser_cte
-            AND car.nro_cte = cte.nro_cte",
+            AND car.nro_cte = cte.nro_cte
+            AND NOT (
+                  UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO'
+              AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999'
+            )",
         [$seqCar],
         $conn
     );

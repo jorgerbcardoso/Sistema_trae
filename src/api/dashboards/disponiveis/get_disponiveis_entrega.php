@@ -388,6 +388,10 @@ if (!empty($ctes)) {
               ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
              AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
              AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
+             AND NOT (
+                   UPPER(BTRIM(COALESCE(c.tp_documento, ''))) = 'PRES SERVICO'
+               AND UPPER(BTRIM(COALESCE(c.ser_cte, ''))) = '999'
+             )
             ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST
         ";
         $resEmi = @pg_query_params($g_sql, $q, $params);
@@ -424,6 +428,10 @@ if (!empty($ctes)) {
                   ON r.ctrc ~ '^[A-Za-z0-9]{3}[0-9]{6}'
                  AND UPPER(BTRIM(c.ser_cte)) = UPPER(SUBSTRING(r.ctrc FROM 1 FOR 3))
                  AND c.nro_cte = CAST(SUBSTRING(r.ctrc FROM 4 FOR 6) AS int)
+                 AND NOT (
+                       UPPER(BTRIM(COALESCE(c.tp_documento, ''))) = 'PRES SERVICO'
+                   AND UPPER(BTRIM(COALESCE(c.ser_cte, ''))) = '999'
+                 )
                 ORDER BY UPPER(BTRIM(c.ser_cte)), c.nro_cte, c.data_emissao DESC NULLS LAST
             ";
             $resEmi = @pg_query_params($g_sql, $qBase, $params);

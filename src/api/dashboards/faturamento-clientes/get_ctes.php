@@ -51,6 +51,7 @@ $costExpr = '(' . implode(' + ', $costExprParts) . ')';
 $params     = [];
 $paramIndex = 1;
 $whereConditions = ["cte.status <> 'C'"];
+$whereConditions[] = "NOT (UPPER(BTRIM(COALESCE(cte.tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(cte.ser_cte, ''))) = '999')";
 
 if ($tipo === 'periodo' || $tipo === 'cliente' || $tipo === 'unidade' || $tipo === 'grupo') {
     if (!empty($filters['periodoEmissaoInicio'])) {

@@ -231,6 +231,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
 
     $query = "SELECT SUM (vlr_frete) FROM {$dominio}_cte " .
              " WHERE status <> 'C' " .
+               " AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') " .
                " AND data_emissao BETWEEN '$startDate' AND '$endDate'" .
                $filtroEmit;
 
@@ -298,7 +299,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
                                 ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
                                 $monthLabel);
 
-      $query = "SELECT SUM (vlr_frete) FROM {$dominio}_cte WHERE status <> 'C' AND data_emissao BETWEEN '$data_ini' AND '$data_fin'" . $filtroEmit;
+      $query = "SELECT SUM (vlr_frete) FROM {$dominio}_cte WHERE status <> 'C' AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') AND data_emissao BETWEEN '$data_ini' AND '$data_fin'" . $filtroEmit;
       $result = sql ($g_sql, $query);
       $row = pg_fetch_array ($result);
       $receitaMes = (float)$row['sum'];
@@ -328,6 +329,7 @@ function getMockOverviewData($period, $startDate, $endDate) {
     $query = "SELECT SUM(vlr_frete), {$colAgrup} AS unid " .
               " FROM {$dominio}_cte " .
              " WHERE status <> 'C' " .
+              " AND NOT (UPPER(BTRIM(COALESCE(tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE(ser_cte, ''))) = '999') " .
                " AND data_emissao BETWEEN '$startDate' AND '$endDate' " .
                $filtroEmit .
              " GROUP BY 2 ORDER BY 1 DESC LIMIT 5";

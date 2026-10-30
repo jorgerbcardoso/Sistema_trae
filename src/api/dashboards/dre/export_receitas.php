@@ -56,6 +56,7 @@ $query = "SELECT ser_cte, nro_cte, to_char (data_emissao, 'DD/MM/YY') AS emissao
          " WHERE $dominio" . "_cte.seq_cidade_emit = cid_emit.seq_cidade " .
            " AND $dominio" . "_cte.seq_cidade_entr = cid_entr.seq_cidade " .
            " AND $dominio" . "_cte.status <> 'C' " .
+           " AND NOT (UPPER(BTRIM(COALESCE($dominio" . "_cte.tp_documento, ''))) = 'PRES SERVICO' AND UPPER(BTRIM(COALESCE($dominio" . "_cte.ser_cte, ''))) = '999') " .
            " AND $dominio" . "_cte.data_emissao BETWEEN $1 AND $2";
 
 // ✅ NOVO: Adicionar filtro por unidade (CIF emitidos + FOB recebidos)
