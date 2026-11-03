@@ -54,6 +54,7 @@ $addDateRange = function(string $col, $ini, $fim) use (&$where, &$params, &$p) {
     $fim = trim((string)$fim);
     if ($ini !== '' && preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $ini)) {
         $where[] = "{$col} >= $" . $p++;
+        
         $params[] = $ini;
     }
     if ($fim !== '' && preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $fim)) {

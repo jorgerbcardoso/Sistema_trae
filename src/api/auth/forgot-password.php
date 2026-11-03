@@ -184,9 +184,19 @@ try {
     
     if (!$emailResult['success']) {
         error_log("[FORGOT-PASSWORD] Erro ao enviar email: " . $emailResult['message']);
-        // 🔥 TEMPORÁRIO: RETORNAR ERRO PARA DEBUG
+
+        $stmt = pg_prepare($conn, "invalidate_new_token",
+            "UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND token = $2");
+        if ($stmt) {
+            @pg_execute($conn, "invalidate_new_token", [$user['id'], $token]);
+        }
+
         closeDBConnection($conn);
-        returnError('ERRO EMAIL: ' . $emailResult['message'], 500);
+        returnSuccess([
+            'success' => true,
+            'message' => 'Se o email existir em nossa base, você receberá um link para redefinir sua senha',
+            'expires_in' => '1 hora'
+        ]);
     }
     
     // ============================================

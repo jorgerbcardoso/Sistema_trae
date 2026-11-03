@@ -9616,10 +9616,6 @@ function CarregamentoArea({
   const [calCtesLista, setCalCtesLista] = useState<any[]>([]);
   const [calCtesTotais, setCalCtesTotais] = useState<any>(null);
   const [calCtesPlacas, setCalCtesPlacas] = useState<null | { placa1: string; placa2: string }>(null);
-  const [calAtualizandoCtes, setCalAtualizandoCtes] = useState(false);
-  const [calAutoAtualizandoVazios, setCalAutoAtualizandoVazios] = useState(false);
-  const [calAutoAtualProgress, setCalAutoAtualProgress] = useState<{ total: number; done: number; ok: number; fail: number } | null>(null);
-  const calAutoAtualKeyRef = useRef('');
   const [calVolMode, setCalVolMode] = useState<'frete' | 'peso' | 'cub' | 'merc'>('frete');
 
   const abrirDetalheCarregamento = (c: Carregamento) => {
@@ -9682,104 +9678,6 @@ function CarregamentoArea({
       setCalCtesLoading(false);
     }
   };
-
-  const atualizarCtesCarregamento = async (c: Carregamento) => {
-    const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
-    if (!placa || calAtualizandoCtes || calAutoAtualizandoVazios) return;
-    const tp = String((c as any)?.tp_carregamento ?? '').trim().toUpperCase();
-    if (calTipo === 'entrega' || tp === 'E') { toast.error('Disponível apenas para Transferência.'); return; }
-    const dataRef = toKey((c as any)?.data_finalizacao ?? '');
-    setCalAtualizandoCtes(true);
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'atualizar_ctes_ssw', placa, data_ref: dataRef || null }) },
-        true
-      );
-      if (res?.success) {
-        const qtdSsw = Number(res.qtd_ssw ?? 0) || 0;
-        const qtdPresto = Number(res.qtd_presto ?? 0) || 0;
-        const added = Number(res.added ?? 0) || 0;
-        if (qtdSsw > 0 && qtdPresto !== qtdSsw && added === 0) {
-          toast.error(`Nenhum CT-e foi incluído. TMS ${qtdSsw} · Presto ${qtdPresto}.`);
-        } else {
-          toast.success(`CT-es atualizados: +${added} (TMS ${qtdSsw} · Presto ${qtdPresto}).`);
-        }
-        await onRecarregarCarregamentos();
-        if (calCtesOpen) {
-          await abrirCtesCarregamento(c);
-        }
-      } else {
-        toast.error(res?.message || 'Falha ao atualizar CT-es');
-      }
-    } catch (e: any) {
-      toast.error(e?.message || 'Falha ao atualizar CT-es');
-    } finally {
-      setCalAtualizandoCtes(false);
-    }
-  };
-
-  useEffect(() => {
-    calAutoAtualKeyRef.current = '';
-  }, [sigla]);
-
-  useEffect(() => {
-    if (calAutoAtualizandoVazios) return;
-    if (!sigla) return;
-    if (calTipo === 'entrega') return;
-    if (loadingCarregamentosCalendario) return;
-    const list = Array.isArray(carregamentosCalendario) ? carregamentosCalendario : [];
-    if (list.length === 0) return;
-    const d = new Date();
-    const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const key = `${String(sigla).trim().toUpperCase()}|${hoje}`;
-    if (calAutoAtualKeyRef.current === key) return;
-    calAutoAtualKeyRef.current = key;
-
-    const vazios = list.filter((c: any) => {
-      const tp = String(c?.tp_carregamento ?? '').trim().toUpperCase();
-      if (tp === 'E') return false;
-      const fim = toKey(c?.data_finalizacao ?? c?.dataFinalizacao ?? '');
-      if (!fim) return false;
-      const qtd = Number(c?.total_ctes ?? c?.totalCtes ?? 0) || 0;
-      return qtd <= 0;
-    });
-    if (vazios.length === 0) return;
-
-    void (async () => {
-      setCalAutoAtualizandoVazios(true);
-      setCalAutoAtualProgress({ total: vazios.length, done: 0, ok: 0, fail: 0 });
-      toast.info(`Encontrados ${vazios.length} carregamento(s) finalizado(s) vazio(s). Atualizando CT-es... isso pode demorar.`);
-      let ok = 0;
-      let fail = 0;
-      for (let i = 0; i < vazios.length; i += 1) {
-        const c = vazios[i] as any;
-        const placa = String(c?.placa_provisoria ?? '').trim().toUpperCase();
-        const dataRef = toKey(c?.data_finalizacao ?? c?.dataFinalizacao ?? '') || null;
-        if (!placa) {
-          fail += 1;
-          setCalAutoAtualProgress({ total: vazios.length, done: i + 1, ok, fail });
-          continue;
-        }
-        try {
-          const res = await apiFetch(
-            `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-            { method: 'POST', body: JSON.stringify({ acao: 'atualizar_ctes_ssw', placa, data_ref: dataRef }) },
-            true
-          );
-          if (res?.success) ok += 1;
-          else fail += 1;
-        } catch (e) {
-          fail += 1;
-        }
-        setCalAutoAtualProgress({ total: vazios.length, done: i + 1, ok, fail });
-      }
-      await onRecarregarCarregamentosCalendario();
-      toast.success(`Atualização concluída: ${ok}/${vazios.length}.`);
-      setCalAutoAtualizandoVazios(false);
-      setCalAutoAtualProgress(null);
-    })();
-  }, [sigla, carregamentosCalendario, loadingCarregamentosCalendario, calAutoAtualizandoVazios, onRecarregarCarregamentosCalendario]);
 
   useEffect(() => {
     setCalPage(1);
@@ -9977,12 +9875,6 @@ function CarregamentoArea({
               </button>
             </div>
             {loadingCarregamentosCalendario ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : null}
-            {calAutoAtualizandoVazios && calAutoAtualProgress ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Atualizando CT-es vazios {calAutoAtualProgress.done}/{calAutoAtualProgress.total}
-              </span>
-            ) : null}
           </div>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${calOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -10136,20 +10028,6 @@ function CarregamentoArea({
                           <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">{durMin != null ? fmtDuracao(durMin) : ''}</td>
                           <td className="px-2 py-2 text-center">
                             <div className="inline-flex items-center gap-1">
-                                {isFinalizado && calTipo !== 'entrega' && String((c as any)?.tp_carregamento ?? '').trim().toUpperCase() !== 'E' ? (
-                                <button
-                                  type="button"
-                                  disabled={calAtualizandoCtes || calAutoAtualizandoVazios}
-                                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-indigo-200 dark:hover:border-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 ${(calAtualizandoCtes || calAutoAtualizandoVazios) ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void atualizarCtesCarregamento(c);
-                                  }}
-                                  title="Atualizar CT-es (TMS)"
-                                >
-                                  <RefreshCw className={`w-4 h-4 ${calAtualizandoCtes ? 'animate-spin' : ''}`} />
-                                </button>
-                              ) : null}
                               <button
                                 type="button"
                                 className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-transparent hover:border-red-200 dark:hover:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500"
@@ -10341,18 +10219,6 @@ function CarregamentoArea({
                                 }}
                               >
                                 Finalizar
-                              </Button>
-                            ) : null}
-                            {fimK && calTipo !== 'entrega' && String((c as any)?.tp_carregamento ?? '').trim().toUpperCase() !== 'E' ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={calAtualizandoCtes || calAutoAtualizandoVazios}
-                                onClick={() => void atualizarCtesCarregamento(c)}
-                              >
-                                {calAtualizandoCtes ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-                                Atualizar CT-es
                               </Button>
                             ) : null}
                             <Button
@@ -13035,20 +12901,6 @@ export function Disponiveis() {
     }
   }, [sigla, loadingInicial, bloqueioOperacao, importarCarregamentosSSWObrigatorio, carregar, carregarEntrega]);
 
-  const verificarSaidasEmViagem = useCallback(async () => {
-    try {
-      const res = await apiFetch(
-        `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'verificar_saidas_ssw' }) },
-        true
-      );
-      if (res?.success && (Number(res.updated ?? 0) || 0) > 0) {
-        toast.info(`${res.updated} registro(s) finalizado(s) automaticamente (saída detectada no TMS).`);
-      }
-    } catch (e: any) {
-    }
-  }, []);
-
   useEffect(() => {
     if (isMTZ) {
       toast.error('Acesso não permitido para a unidade MTZ. Faça login em uma unidade específica.');
@@ -14246,9 +14098,9 @@ export function Disponiveis() {
                           </ul>
                         </div>
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática (TMS)</p>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Finalização automática</p>
                           <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                            Ao abrir o painel, o sistema pode verificar placas “em andamento” que já saíram para viagem no TMS e finalizar automaticamente com a data/hora informada.
+                            A finalização automática de carregamentos é feita por rotina no servidor (não pelo painel).
                           </p>
                         </div>
                         <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
