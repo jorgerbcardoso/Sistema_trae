@@ -29,11 +29,14 @@ export interface CteDetalhesData {
   remetente?: string;
   pagador?: string;
   destinatario?: string;
+  cnpjEmit?: string;
+  cnpjPag?: string;
   cnpjDest?: string;
   endereco?: string;
   cidade?: string;
   bairro?: string;
   cep?: string;
+  cidadeEmitente?: string;
   cidadeEntrega?: string;
   unidadeEntrega?: string;
   cepEntrega?: string;
@@ -132,6 +135,7 @@ function IndicadorDot({ cor, title }: { cor: string | null | undefined; title?: 
 
 function Campo({ label, valor, icon: Icon, mono, highlight }: { label: string; valor?: React.ReactNode; icon?: any; mono?: boolean; highlight?: boolean }) {
   const vazio = valor === undefined || valor === null || valor === '' || (typeof valor === 'string' && valor.trim() === '');
+  const isSimple = typeof valor === 'string' || typeof valor === 'number';
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 flex items-center gap-1">
@@ -142,7 +146,7 @@ function Campo({ label, valor, icon: Icon, mono, highlight }: { label: string; v
         <span className="text-xs text-slate-300 dark:text-slate-600">-</span>
       ) : (
         <span
-          className={`text-xs truncate ${mono ? 'font-mono tabular-nums' : ''} ${
+          className={`text-xs ${isSimple ? 'truncate' : ''} ${mono ? 'font-mono tabular-nums' : ''} ${
             highlight ? 'font-semibold text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'
           }`}
         >
@@ -343,27 +347,45 @@ function CteDetalhesDialogInner({
               contentClassName="pt-1 pb-0"
               preview={
                 <>
-                  <Campo label="Destinatário" valor={cte.destinatario} icon={Package} />
-                  <Campo label="Pagador" valor={cte.pagador} icon={DollarSign} />
+                  <Campo
+                    label="Destinatário"
+                    valor={
+                      <div className="flex flex-col min-w-0 leading-tight">
+                        <span className="truncate">{cte.destinatario}</span>
+                        {String(cte.cnpjDest ?? '').trim() ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{String(cte.cnpjDest ?? '').trim()}</span> : null}
+                      </div>
+                    }
+                    icon={Package}
+                  />
+                  <Campo
+                    label="Pagador"
+                    valor={
+                      <div className="flex flex-col min-w-0 leading-tight">
+                        <span className="truncate">{cte.pagador}</span>
+                        {String(cte.cnpjPag ?? '').trim() ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{String(cte.cnpjPag ?? '').trim()}</span> : null}
+                      </div>
+                    }
+                    icon={DollarSign}
+                  />
                 </>
               }
             >
-              <Campo label="Remetente" valor={cte.remetente} icon={Building2} />
-              {cte.cnpjDest && <Campo label="CNPJ Dest." valor={cte.cnpjDest} mono />}
-              {(cte.unidadeDest || cte.nomeDest) && (
-                <Campo
-                  label="Unid. Destino"
-                  valor={
-                    <span>
-                      <strong className="font-semibold">{cte.unidadeDest}</strong>
-                      {cte.nomeDest && cte.nomeDest !== cte.unidadeDest ? ` · ${cte.nomeDest}` : ''}
-                    </span>
-                  }
-                />
-              )}
+              <Campo
+                label="Remetente"
+                valor={
+                  <div className="flex flex-col min-w-0 leading-tight">
+                    <span className="truncate">{cte.remetente}</span>
+                    {String(cte.cnpjEmit ?? '').trim() ? <span className="text-[10px] text-slate-400 dark:text-slate-500">{String(cte.cnpjEmit ?? '').trim()}</span> : null}
+                  </div>
+                }
+                icon={Building2}
+              />
               <Campo
                 label="Cidade"
-                valor={[cte.bairro, [cte.cidade, cte.uf].filter(Boolean).join('/'), cte.cep].filter(Boolean).join(' · ')}
+                valor={
+                  String(cte.cidadeEmitente ?? '').trim()
+                  || [cte.bairro, [cte.cidade, cte.uf].filter(Boolean).join('/'), cte.cep].filter(Boolean).join(' · ')
+                }
                 icon={MapPin}
               />
             </SecaoRecolhivel>
@@ -410,7 +432,7 @@ function CteDetalhesDialogInner({
                 preview={
                   <>
                     <Campo label="Cidade" valor={cte.cidadeEntrega} icon={MapPin} />
-                    <Campo label="Unidade" valor={cte.unidadeEntrega} />
+                    <Campo label="Unidade" valor={cte.unidadeEntrega || cte.unidadeDest} />
                   </>
                 }
               >

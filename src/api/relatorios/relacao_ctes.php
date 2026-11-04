@@ -48,6 +48,7 @@ $orderBy = $allowedSort[$sortKey] ?? 'cte.data_emissao';
 $conn = connect();
 $tblCte = "{$domain}_cte";
 $tblLiq = "{$domain}_cte_liq";
+$tblCli = "{$domain}_cliente";
 $tblVc = "{$domain}_vendedor_cliente";
 $tblGc = "{$domain}_grupo_cliente";
 
@@ -250,6 +251,7 @@ $cteLatest = "
             cnpj_pag,
             sigla_emit,
             sigla_dest,
+            seq_cidade_entr,
             cod_mercadoria,
             qtde_vol,
             cubagem,
@@ -316,6 +318,9 @@ $listSql = $cteLatest . "
         cte.nome_pag,
         cte.nome_emit,
         cte.nome_dest,
+        cte.cnpj_emit,
+        cte.cnpj_dest,
+        cte.cnpj_pag,
         cte.cod_mercadoria,
         COALESCE(cte.qtde_vol, 0) AS qtde_vol,
         COALESCE(cte.cubagem, 0) AS cubagem,
@@ -328,6 +333,10 @@ $listSql = $cteLatest . "
         cte.cep_entrega,
         cte.endereco_entrega,
         cte.bairro_entrega,
+        COALESCE(cid_entr.nome, '') AS cidade_entrega,
+        COALESCE(cid_entr.uf, '') AS uf_entrega,
+        COALESCE(cid_emit.nome, '') AS cidade_emit,
+        COALESCE(cid_emit.uf, '') AS uf_emit,
         COALESCE(cte.custo_seguro, 0) AS custo_seguro,
         COALESCE(cte.custo_icms, 0) AS custo_icms,
         COALESCE(cte.custo_pis_cofins, 0) AS custo_pis_cofins,
@@ -341,6 +350,10 @@ $listSql = $cteLatest . "
         COALESCE(cte.custo_transferencia_real, 0) AS custo_transferencia_real,
         EXISTS (SELECT 1 FROM {$tblLiq} liq WHERE liq.seq_cte = cte.seq_cte) AS liquidado
     FROM cte
+    LEFT JOIN cidade cid_entr ON cid_entr.seq_cidade = cte.seq_cidade_entr
+    LEFT JOIN {$tblCli} cli_emit
+           ON regexp_replace(COALESCE(cli_emit.cnpj::text, ''), '\\\\D', '', 'g') = regexp_replace(COALESCE(cte.cnpj_emit::text, ''), '\\\\D', '', 'g')
+    LEFT JOIN cidade cid_emit ON cid_emit.seq_cidade = cli_emit.seq_cidade
     ORDER BY {$orderBy} {$sortDir}, cte.seq_cte DESC
     LIMIT {$pageSize} OFFSET {$offset}
 ";
@@ -364,6 +377,9 @@ while ($listRes && ($r = pg_fetch_assoc($listRes))) {
         'nome_pag' => (string)($r['nome_pag'] ?? ''),
         'nome_emit' => (string)($r['nome_emit'] ?? ''),
         'nome_dest' => (string)($r['nome_dest'] ?? ''),
+        'cnpj_emit' => (string)($r['cnpj_emit'] ?? ''),
+        'cnpj_dest' => (string)($r['cnpj_dest'] ?? ''),
+        'cnpj_pag' => (string)($r['cnpj_pag'] ?? ''),
         'cod_mercadoria' => isset($r['cod_mercadoria']) ? (int)$r['cod_mercadoria'] : null,
         'qtde_vol' => (int)($r['qtde_vol'] ?? 0),
         'cubagem' => (float)($r['cubagem'] ?? 0),
@@ -376,6 +392,10 @@ while ($listRes && ($r = pg_fetch_assoc($listRes))) {
         'cep_entrega' => (string)($r['cep_entrega'] ?? ''),
         'endereco_entrega' => (string)($r['endereco_entrega'] ?? ''),
         'bairro_entrega' => (string)($r['bairro_entrega'] ?? ''),
+        'cidade_entrega' => (string)($r['cidade_entrega'] ?? ''),
+        'uf_entrega' => (string)($r['uf_entrega'] ?? ''),
+        'cidade_emit' => (string)($r['cidade_emit'] ?? ''),
+        'uf_emit' => (string)($r['uf_emit'] ?? ''),
         'custo_seguro' => (float)($r['custo_seguro'] ?? 0),
         'custo_icms' => (float)($r['custo_icms'] ?? 0),
         'custo_pis_cofins' => (float)($r['custo_pis_cofins'] ?? 0),

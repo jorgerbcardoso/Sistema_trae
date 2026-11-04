@@ -113,6 +113,9 @@ interface LinhaCte {
   nome_pag: string;
   nome_emit: string;
   nome_dest: string;
+  cnpj_emit: string;
+  cnpj_dest: string;
+  cnpj_pag: string;
   cod_mercadoria: number | null;
   qtde_vol: number;
   cubagem: number;
@@ -125,6 +128,10 @@ interface LinhaCte {
   cep_entrega: string;
   endereco_entrega: string;
   bairro_entrega: string;
+  cidade_entrega: string;
+  uf_entrega: string;
+  cidade_emit: string;
+  uf_emit: string;
   custo_seguro: number;
   custo_icms: number;
   custo_pis_cofins: number;
@@ -405,9 +412,14 @@ export function RelacaoCTes() {
       unidAtual: r.unid_atual,
       unidadeOrigem: r.sigla_emit,
       unidadeDest: r.sigla_dest,
+      unidadeEntrega: r.sigla_dest,
       remetente: r.nome_emit,
       pagador: r.nome_pag,
       destinatario: r.nome_dest,
+      cnpjEmit: r.cnpj_emit,
+      cnpjPag: r.cnpj_pag,
+      cnpjDest: r.cnpj_dest,
+      cidadeEmitente: [String(r.cidade_emit || '').trim(), String(r.uf_emit || '').trim()].filter(Boolean).join('/'),
       placaColeta: r.placa_coleta,
       nfiscal: nfiscal || '',
       frete: r.vlr_frete,
@@ -416,6 +428,7 @@ export function RelacaoCTes() {
       pesoCalc: r.peso_calc,
       cubagem: r.cubagem,
       qtdeVol: r.qtde_vol,
+      cidadeEntrega: [String(r.cidade_entrega || '').trim(), String(r.uf_entrega || '').trim()].filter(Boolean).join('/'),
       cepEntrega: r.cep_entrega,
       enderecoEntrega: r.endereco_entrega,
       bairroEntrega: r.bairro_entrega,
