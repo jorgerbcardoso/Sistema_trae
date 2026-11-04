@@ -406,6 +406,7 @@ export function RelacaoCTes() {
       serCte: r.ser_cte,
       nroCte: r.nro_cte,
       seqCte: r.seq_cte,
+      tpDocumento: r.tp_documento,
       emissao: fmtDateBR(r.data_emissao),
       prevEnt: fmtDateBR(r.data_prev_ent),
       chegadaUnid: fmtDateBR(r.data_chegada_unid),

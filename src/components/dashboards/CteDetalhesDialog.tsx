@@ -17,6 +17,7 @@ export interface CteDetalhesData {
   serCte?: string;
   nroCte?: number | string;
   seqCte?: number;
+  tpDocumento?: string;
   emissao?: string;
   chegadaUnid?: string;
   unidAtual?: string;
@@ -245,6 +246,7 @@ function CteDetalhesDialogInner({
   onOpenChange?: (open: boolean) => void;
 }) {
   const tooltipStyle = useTooltipStyle();
+  const tpDoc = String((cte as any)?.tpDocumento ?? (cte as any)?.tp_documento ?? '').trim();
 
   const parcelas = useMemo<CteCustoParcela[]>(() => (cte ? calcularParcelasCusto(cte) : []), [cte]);
   const custoTotal = useMemo(() => (cte ? calcularCustoTotal(cte) : 0), [cte]);
@@ -301,7 +303,14 @@ function CteDetalhesDialogInner({
                 <FileText className="w-3.5 h-3.5" />
               </div>
               <div className="flex flex-col">
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wide">{ctrcDisplay || 'CT-e'}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wide truncate">{ctrcDisplay || 'CT-e'}</span>
+                  {tpDoc ? (
+                    <Badge className="bg-slate-100 dark:bg-slate-900/35 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-[10px] h-5 px-1.5 font-medium">
+                      {tpDoc}
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
             </DialogTitle>
           </div>
