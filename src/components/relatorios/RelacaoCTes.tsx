@@ -687,15 +687,8 @@ export function RelacaoCTes() {
   );
 
   return (
-    <AdminLayout title="RELAÇÃO DE CT-es" companyFirst>
+    <AdminLayout title="RELAÇÃO DE CT-es">
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Relação de CT-es</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Consulta completa com filtros avançados, indicadores e exportação.</p>
-          </div>
-        </div>
-
         <details className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
           <summary className="px-4 py-3 cursor-pointer select-none flex items-center justify-between gap-3">
             <div className="min-w-0">

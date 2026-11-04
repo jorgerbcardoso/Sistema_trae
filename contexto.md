@@ -32,6 +32,16 @@ COMO ADICIONAR UMA NOVA TELA/FUNCIONALIDADE (RESUMO PRÁTICO):
 
 PADRÕES DE CÓDIGO CRÍTICOS:
 
+0. CABEÇALHO PADRÃO (TELAS)
+   - O cabeçalho deve sempre mostrar:
+     - Linha 1: nome da funcionalidade (título da tela)
+     - Linha 2: nome da empresa (client_name)
+   - Para telas que usam `AdminLayout`:
+     - Passe `title="NOME DA TELA"` e NÃO use `companyFirst`
+     - Não crie um segundo `<h1>`/título duplicado dentro do conteúdo da página
+   - Para telas que usam `DashboardLayout`:
+     - Passe `title="NOME DA TELA"` e `description={user?.client_name}`
+
 1. INTERAÇÃO COM BANCO DE DADOS (PHP):
    - NUNCA use as funções nativas `pg_query`, `pg_connect`, `pg_fetch_assoc`, etc.
    - SEMPRE utilize a função wrapper `sql($query, $params=[])` disponível no `config.php`.
