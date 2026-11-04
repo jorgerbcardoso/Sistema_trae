@@ -332,7 +332,6 @@ $fmt2Keys = [
 ];
 
 $columns = [
-    ['k' => 'seq_cte', 'h' => 'Seq CT-e'],
     ['k' => 'ser_cte', 'h' => 'Série'],
     ['k' => 'nro_cte', 'h' => 'Número'],
     ['k' => 'tp_documento', 'h' => 'Tipo de Documento'],
@@ -381,6 +380,7 @@ $columns = [
     ['k' => 'liquidado', 'h' => 'Liquidado'],
 ];
 
+fwrite($out, "\xEF\xBB\xBF");
 fputcsv($out, array_map(fn($c) => $c['h'], $columns), ';');
 
 while ($res && ($r = pg_fetch_assoc($res))) {
