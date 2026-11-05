@@ -332,8 +332,7 @@ $fmt2Keys = [
 ];
 
 $columns = [
-    ['k' => 'ser_cte', 'h' => 'Série'],
-    ['k' => 'nro_cte', 'h' => 'Número'],
+    ['k' => 'ctrc', 'h' => 'CT-e'],
     ['k' => 'tp_documento', 'h' => 'Tipo de Documento'],
     ['k' => 'tp_frete', 'h' => 'Tipo de Frete'],
     ['k' => 'data_emissao', 'h' => 'Emissão'],
@@ -387,6 +386,15 @@ while ($res && ($r = pg_fetch_assoc($res))) {
     $row = [];
     foreach ($columns as $c) {
         $k = $c['k'];
+        if ($k === 'ctrc') {
+            $ser = strtoupper(trim((string)($r['ser_cte'] ?? '')));
+            $nro = (string)($r['nro_cte'] ?? '');
+            $nroNum = (int)preg_replace('/\D/', '', $nro);
+            $base = ($ser !== '' ? $ser : '') . str_pad((string)$nroNum, 6, '0', STR_PAD_LEFT);
+            $dv = calc_dv_mod11($nroNum);
+            $row[] = ($ser !== '' && $nroNum > 0) ? ($base . '-' . $dv) : '';
+            continue;
+        }
         if ($k === 'liquidado') {
             $row[] = pgBoolToPHP($r[$k] ?? false) ? 'S' : 'N';
             continue;

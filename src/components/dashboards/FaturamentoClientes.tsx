@@ -41,6 +41,7 @@ import { usePageTitle } from '../../hooks/usePageTitle';
 import { useTheme } from '../ThemeProvider';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
+import { formatCteComDv } from '../../utils/cteUtils';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -747,7 +748,7 @@ export function FaturamentoClientes() {
       }
       const header = ['CT-e', 'Emissão', 'Pagador', 'Destinatário', 'Unidade', 'Vlr.Merc', 'Peso(kg)', 'Volumes', 'Frete', 'Custos', 'Resultado'];
       const rows = lista.map((c: any) => [
-        `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
+        formatCteComDv(c.ser_cte ?? '', c.nro_cte ?? 0),
         c.data_emissao,
         `"${(c.nome_pag || '').replace(/"/g, '""')}"`,
         `"${(c.nome_dest || '').replace(/"/g, '""')}"`,

@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
+import { formatCteComDv } from '../../utils/cteUtils';
 import { useTooltipStyle } from './CustomTooltip';
 import {
   AlertCircle,
@@ -500,7 +501,7 @@ export function CondicaoArmazens() {
     ];
 
     const rowsCsv = lista.map((r) => {
-      const cte = fmtCte(r.ser_cte, r.nro_cte);
+      const cte = formatCteComDv(r.ser_cte ?? '', r.nro_cte ?? 0);
       return [
         csvEscape(r.unid_atual ?? ''),
         csvEscape(cte),
@@ -553,7 +554,7 @@ export function CondicaoArmazens() {
 
     const rowsCsv = lista.map((r) => {
       const sigla = String(r.unid_atual ?? '').trim().toUpperCase();
-      const cte = fmtCte(r.ser_cte, r.nro_cte);
+      const cte = formatCteComDv(r.ser_cte ?? '', r.nro_cte ?? 0);
       const ult = r.ult_ocor_codigo !== null ? String(r.ult_ocor_codigo) : '';
       const tipo = String(r.ult_ocor_tipo ?? '').trim().toUpperCase();
       const tipoLabel = TIPOS_OCOR[tipo]?.label ?? (tipo ? tipo : '');

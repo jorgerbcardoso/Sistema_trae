@@ -11,6 +11,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { apiFetch } from '../../utils/apiUtils';
+import { formatCteComDv } from '../../utils/cteUtils';
 import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
 import {
@@ -368,7 +369,7 @@ export function PainelRetidos() {
       'Última Ocorrência'
     ];
     const rows = ctes.map((cte) => [
-      `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`,
+      formatCteComDv(cte.ser_cte ?? '', cte.nro_cte ?? 0),
       cte.nfs,
       cte.data_emissao,
       cte.data_ocorrencia_82,

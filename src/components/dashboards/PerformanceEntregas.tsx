@@ -25,6 +25,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { apiFetch } from '../../utils/apiUtils';
+import { formatCteBase } from '../../utils/cteUtils';
 import {
   Dialog,
   DialogContent,
@@ -208,7 +209,7 @@ export function PerformanceEntregas() {
 
   usePageTitle('Performance de Entregas');
 
-  const fmtCte = (ser: string, nro: string) => `${String(ser ?? '').trim()} ${String(nro ?? '').trim()}`.trim();
+  const fmtCte = (ser: string, nro: string) => formatCteBase(ser, nro);
 
   const fmtBRL = (v: any) => {
     const n = typeof v === 'number' ? v : Number(v);

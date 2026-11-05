@@ -5,6 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Package, Truck, Building2, MapPin, Weight, Box, CalendarDays, DollarSign, FileText, Car, AlertCircle } from 'lucide-react';
 import { useTooltipStyle } from './CustomTooltip';
+import { formatCteComDvFromAny } from '../../utils/cteUtils';
 
 export interface CteCustoParcela {
   key: string;
@@ -273,7 +274,7 @@ function CteDetalhesDialogInner({
     return m;
   }, []);
 
-  const ctrcDisplay = cte.ctrc || (cte.serCte && cte.nroCte ? `${cte.serCte}${String(cte.nroCte).padStart(6, '0')}` : '');
+  const ctrcDisplay = formatCteComDvFromAny({ ctrc: cte.ctrc, serCte: cte.serCte, nroCte: cte.nroCte });
   const temCusto = custoTotal > 0 || donutData.length > 0;
   const temEntrega = Boolean(
     String(cte.cidadeEntrega ?? '').trim()

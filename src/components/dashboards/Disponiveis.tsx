@@ -13,6 +13,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch, apiFetchWithProgress } from '../../utils/apiUtils';
+import { formatCteComDvFromAny } from '../../utils/cteUtils';
 import { toast } from 'sonner';
 import { UnidadesMultiSelect } from '../admin/UnidadesMultiSelect';
 import { OCORRENCIA_SEM_CODIGO, OcorrenciasMultiSelect } from '../admin/OcorrenciasMultiSelect';
@@ -1012,7 +1013,7 @@ function GrupoDestinoCard({
       const situacao = c.emTransito ? 'EM TRÂNSITO' : 'NO ARMAZÉM';
       return [
         esc(grupo.sigla),
-        esc(c.ctrc),
+        esc(formatCteComDvFromAny({ ctrc: c.ctrc, serCte: c.serCte, nroCte: c.nroCte })),
         esc(c.nfiscal || ''),
         esc(situacao),
         esc(c.emissao),
@@ -1809,7 +1810,7 @@ function GrupoSetorCard({
       const ultOcor = [c.codUltOcor, c.descUltOcor].filter(Boolean).join(' - ');
       return [
         esc(grupo.setor),
-        esc(c.ctrc),
+        esc(formatCteComDvFromAny({ ctrc: c.ctrc, serCte: c.serCte, nroCte: c.nroCte })),
         esc(c.emissao || ''),
         esc(c.chegadaUnid || ''),
         esc(diasParado(c.chegadaUnid || '')),
@@ -2841,7 +2842,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
       : ['CTRC', 'NFs', 'Carr.', 'Emissão', 'Prev. Entr..', 'Dest.', 'Pagador', 'Frete (R$)', 'Peso (Kg)', 'Cub. (m³)'];
     const rows = lista.map((c: any) => {
       const base = [
-        c.ctrc,
+        formatCteComDvFromAny({ ctrc: c.ctrc }),
         `"${String(c.nfs ?? '').replace(/"/g, '""')}"`,
         `"${String(c.unidade_carregamento ?? '')}"`,
         c.data_emissao,
@@ -13479,7 +13480,7 @@ export function Disponiveis() {
 
     const rowsArmazem = ctesArmazem.map((c) => [
       esc(c.unidadeDest),
-      esc(c.ctrc),
+      esc(formatCteComDvFromAny({ ctrc: c.ctrc, serCte: c.serCte, nroCte: c.nroCte })),
       esc(c.nfiscal || ''),
       esc('NO ARMAZÉM'),
       esc(c.emissao),
@@ -13501,7 +13502,7 @@ export function Disponiveis() {
 
     const rowsTransito = ctesTransito.map((c) => [
       esc(c.unidadeDest),
-      esc(c.ctrc),
+      esc(formatCteComDvFromAny({ ctrc: c.ctrc, serCte: c.serCte, nroCte: c.nroCte })),
       esc(c.nfiscal || ''),
       esc('EM TRÂNSITO'),
       esc(c.emissao),
@@ -13618,7 +13619,7 @@ export function Disponiveis() {
       const ultOcor = [c.codUltOcor, c.descUltOcor].filter(Boolean).join(' - ');
       return [
         esc(c.setor || ''),
-        esc(c.ctrc),
+        esc(formatCteComDvFromAny({ ctrc: c.ctrc, serCte: c.serCte, nroCte: c.nroCte })),
         esc(c.emissao || ''),
         esc(c.chegadaUnid || ''),
         esc(diasParado(c.chegadaUnid || '')),

@@ -26,6 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
+import { formatCteComDv } from '../../utils/cteUtils';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -932,7 +933,7 @@ export function CentralAgendamento() {
   const exportarCSV = (lista: Cte[], nomeArquivo: string) => {
     const header = ['CTRC', 'NFs', 'Pagador', 'Destinatário', 'CNPJ', 'Emissão', 'Prev. Entrega', 'Últ. Ocorrência', 'Dt. Últ. Ocor.'];
     const rows = lista.map((c) => [
-      `${c.ser_cte}${String(c.nro_cte).padStart(6, '0')}`,
+      formatCteComDv(c.ser_cte ?? '', c.nro_cte ?? 0),
       c.nfs || '',
       c.nome_pag || '',
       c.nome_dest || '',
@@ -970,7 +971,7 @@ export function CentralAgendamento() {
       'Frete',
     ];
     const rows = lista.map((agenda) => [
-      `${agenda.ser_cte}${String(agenda.nro_cte).padStart(6, '0')}`,
+      formatCteComDv(agenda.ser_cte ?? '', agenda.nro_cte ?? 0),
       agenda.nfs ? agenda.nfs.split(',')[0].trim() : '',
       String(agenda.qtde_entregas ?? 0),
       agenda.nome_pag || '',

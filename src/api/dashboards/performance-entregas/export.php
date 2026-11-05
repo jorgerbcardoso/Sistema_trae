@@ -337,8 +337,7 @@ echo "\xEF\xBB\xBF";
 
 // Cabeçalho
 $headers = [
-    'Série CTRC',
-    'Número CTRC',
+    'CT-e',
     'NFs',
     'Emissão',
     'Remetente',
@@ -359,8 +358,10 @@ echo implode(';', $headers) . "\n";
 
 // Dados
 while ($row = pg_fetch_assoc($result)) {
-    $line = [$row['ser_cte'],
-             $row['nro_cte'],
+    $ser = strtoupper(trim((string)($row['ser_cte'] ?? '')));
+    $nroNum = (int)preg_replace('/\D/', '', (string)($row['nro_cte'] ?? ''));
+    $ctrc = ($ser !== '' && $nroNum > 0) ? ($ser . str_pad((string)$nroNum, 6, '0', STR_PAD_LEFT) . '-' . calc_dv_mod11($nroNum)) : '';
+    $line = [$ctrc,
              $row['nfs'],
              $row['data_emissao'],
              $row['nome_emit'],
@@ -399,8 +400,7 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
     echo "\xEF\xBB\xBF";
 
     // Cabeçalho
-    $headers = ['Série CTRC',
-                'Número CTRC',
+    $headers = ['CT-e',
                 'NFs',
                 'Emissão',
                 'Remetente',
@@ -421,6 +421,7 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
     // Gerar 10 linhas mockadas
     for ($i = 1; $i <= 10; $i++) {
         $numero = str_pad($i, 6, '0', STR_PAD_LEFT);
+        $ctrc = 'MCK' . $numero . '-' . calc_dv_mod11($i);
         $dataEmissao = date('d/m/Y', strtotime("-" . rand(1, 30) . " days"));
         $dataPrev = date('d/m/Y', strtotime("-" . rand(0, 15) . " days"));
 
@@ -439,8 +440,7 @@ function generateMockCSV($statusEntrega, $dataPrevisao, $unidade, $coluna) {
         }
 
         $line = [
-            'SPO',
-            $numero,
+            $ctrc,
             'NF' . str_pad((string)rand(1, 999999), 6, '0', STR_PAD_LEFT),
             $dataEmissao,
             'EMPRESA REMETENTE LTDA',

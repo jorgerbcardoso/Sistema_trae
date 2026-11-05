@@ -42,6 +42,10 @@ PADRÕES DE CÓDIGO CRÍTICOS:
    - Para telas que usam `DashboardLayout`:
      - Passe `title="NOME DA TELA"` e `description={user?.client_name}`
 
+0.1. CT-e (PADRÕES DE FORMATAÇÃO)
+   - Em TODAS as impressões em CSV, o CT-e deve ser exibido como: `SER` + `NRO(6 dígitos)` + `-` + `DV(mod 11)` (ex.: `ABC123456-7`)
+   - Em listas/tabelas da UI, sempre exibir o `nro_cte` com 6 dígitos (zeros à esquerda) (ex.: `000123`)
+
 1. INTERAÇÃO COM BANCO DE DADOS (PHP):
    - NUNCA use as funções nativas `pg_query`, `pg_connect`, `pg_fetch_assoc`, etc.
    - SEMPRE utilize a função wrapper `sql($query, $params=[])` disponível no `config.php`.
