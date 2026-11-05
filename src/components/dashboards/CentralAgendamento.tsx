@@ -12,6 +12,7 @@ import {
   ChevronsUpDown,
   Download,
   Filter, 
+  Info,
   Loader2, 
   Mail,
   Search, 
@@ -26,7 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
-import { formatCteComDv } from '../../utils/cteUtils';
+import { formatCteBase, formatCteComDv } from '../../utils/cteUtils';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -40,6 +41,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../ui/dialog';
+import { CteDetalhesDialog } from './CteDetalhesDialog';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -1353,9 +1355,21 @@ export function CentralAgendamento() {
                                   >
                                     <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                   </button>
-                                  <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
-                                    {agenda.ser_cte}{String(agenda.nro_cte).padStart(6, '0')}
-                                  </span>
+                                  <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                    <div className="flex items-center gap-1.5 flex-nowrap">
+                                      {formatCteBase(agenda.ser_cte, agenda.nro_cte)}
+                                      <CteDetalhesDialog cte={{ serCte: agenda.ser_cte, nroCte: agenda.nro_cte, ctrc: formatCteBase(agenda.ser_cte, agenda.nro_cte), destinatario: agenda.nome_dest, pagador: agenda.nome_pag, endereco: agenda.endereco_entrega, prevEnt: agenda.data_prev_ent }}>
+                                        <button
+                                          type="button"
+                                          className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                          onClick={(e) => { e.stopPropagation(); }}
+                                          title="Detalhes do CT-e"
+                                        >
+                                          <Info className="w-3.5 h-3.5" />
+                                        </button>
+                                      </CteDetalhesDialog>
+                                    </div>
+                                  </div>
                                   <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
                                     {agenda.nfs ? agenda.nfs.split(',')[0].trim() : '-'}
                                   </span>
@@ -1391,9 +1405,21 @@ export function CentralAgendamento() {
                                           key={`${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
                                           className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
                                         >
-                                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
-                                            {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                                          </span>
+                                          <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                            <div className="flex items-center gap-1.5 flex-nowrap">
+                                              {formatCteBase(cte.ser_cte, cte.nro_cte)}
+                                              <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: formatCteBase(cte.ser_cte, cte.nro_cte), remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, cidadeEntrega: cte.cidade_uf_entrega, endereco: enderecoEntrega, prevEnt: cte.data_prev_ent, dataUltOcor: cte.data_ult_ocor, descUltOcor: cte.ult_ocor }}>
+                                                <button
+                                                  type="button"
+                                                  className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                                  onClick={(e) => { e.stopPropagation(); }}
+                                                  title="Detalhes do CT-e"
+                                                >
+                                                  <Info className="w-3.5 h-3.5" />
+                                                </button>
+                                              </CteDetalhesDialog>
+                                            </div>
+                                          </div>
                                           <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
                                             {cte.nfs ? firstNF(cte.nfs) : '-'}
                                           </span>
@@ -1428,7 +1454,21 @@ export function CentralAgendamento() {
                                     />
                                   </div>
                                 )}
-                                <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                                <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                  <div className="flex items-center gap-1.5 flex-nowrap">
+                                    {formatCteBase(cte.ser_cte, cte.nro_cte)}
+                                    <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: formatCteBase(cte.ser_cte, cte.nro_cte), remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, cnpjDest: cte.cnpj_dest, emissao: cte.data_emissao, prevEnt: cte.data_prev_ent, descUltOcor: cte.ult_ocor }}>
+                                      <button
+                                        type="button"
+                                        className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                        onClick={(e) => { e.stopPropagation(); }}
+                                        title="Detalhes do CT-e"
+                                      >
+                                        <Info className="w-3.5 h-3.5" />
+                                      </button>
+                                    </CteDetalhesDialog>
+                                  </div>
+                                </div>
                                 <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
                                 <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                                 <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>
@@ -1600,9 +1640,21 @@ export function CentralAgendamento() {
                                   >
                                     <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                   </button>
-                                  <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
-                                    {agenda.ser_cte}{String(agenda.nro_cte).padStart(6, '0')}
-                                  </span>
+                                  <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                    <div className="flex items-center gap-1.5 flex-nowrap">
+                                      {formatCteBase(agenda.ser_cte, agenda.nro_cte)}
+                                      <CteDetalhesDialog cte={{ serCte: agenda.ser_cte, nroCte: agenda.nro_cte, ctrc: formatCteBase(agenda.ser_cte, agenda.nro_cte), destinatario: agenda.nome_dest, pagador: agenda.nome_pag, endereco: agenda.endereco_entrega, prevEnt: agenda.data_prev_ent }}>
+                                        <button
+                                          type="button"
+                                          className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                          onClick={(e) => { e.stopPropagation(); }}
+                                          title="Detalhes do CT-e"
+                                        >
+                                          <Info className="w-3.5 h-3.5" />
+                                        </button>
+                                      </CteDetalhesDialog>
+                                    </div>
+                                  </div>
                                   <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
                                     {agenda.nfs ? agenda.nfs.split(',')[0].trim() : '-'}
                                   </span>
@@ -1638,9 +1690,21 @@ export function CentralAgendamento() {
                                           key={`cal-ag-${agenda.agenda_id}-${cte.ser_cte}-${cte.nro_cte}`}
                                           className="grid grid-cols-[90px_110px_110px_minmax(0,1fr)_minmax(0,1fr)_110px_110px_minmax(0,1fr)] gap-2 px-12 py-2 text-xs text-slate-600 dark:text-slate-300"
                                         >
-                                          <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
-                                            {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                                          </span>
+                                          <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                            <div className="flex items-center gap-1.5 flex-nowrap">
+                                              {formatCteBase(cte.ser_cte, cte.nro_cte)}
+                                              <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: formatCteBase(cte.ser_cte, cte.nro_cte), remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, cidadeEntrega: cte.cidade_uf_entrega, endereco: enderecoEntrega, prevEnt: cte.data_prev_ent, dataUltOcor: cte.data_ult_ocor, descUltOcor: cte.ult_ocor }}>
+                                                <button
+                                                  type="button"
+                                                  className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                                  onClick={(e) => { e.stopPropagation(); }}
+                                                  title="Detalhes do CT-e"
+                                                >
+                                                  <Info className="w-3.5 h-3.5" />
+                                                </button>
+                                              </CteDetalhesDialog>
+                                            </div>
+                                          </div>
                                           <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">
                                             {cte.nfs ? firstNF(cte.nfs) : '-'}
                                           </span>
@@ -1663,7 +1727,21 @@ export function CentralAgendamento() {
                               key={`cal-${cte.ser_cte}-${cte.nro_cte}`}
                               className="grid grid-cols-[90px_110px_minmax(0,1fr)_minmax(0,1fr)_120px_100px_100px_minmax(0,1fr)] gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50"
                             >
-                              <span className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                              <div className="font-mono text-xs self-center text-slate-700 dark:text-slate-300">
+                                <div className="flex items-center gap-1.5 flex-nowrap">
+                                  {formatCteBase(cte.ser_cte, cte.nro_cte)}
+                                  <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: formatCteBase(cte.ser_cte, cte.nro_cte), remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, cnpjDest: cte.cnpj_dest, emissao: cte.data_emissao, prevEnt: cte.data_prev_ent, descUltOcor: cte.ult_ocor }}>
+                                    <button
+                                      type="button"
+                                      className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                      onClick={(e) => { e.stopPropagation(); }}
+                                      title="Detalhes do CT-e"
+                                    >
+                                      <Info className="w-3.5 h-3.5" />
+                                    </button>
+                                  </CteDetalhesDialog>
+                                </div>
+                              </div>
                               <span className="font-mono text-xs self-center text-slate-500 dark:text-slate-400 truncate">{cte.nfs ? cte.nfs.split(',')[0].trim() : '-'}</span>
                               <span className="truncate self-center text-slate-700 dark:text-slate-300">{cte.nome_pag || '-'}</span>
                               <span className="truncate self-center font-medium text-slate-900 dark:text-slate-100">{cte.nome_dest || '-'}</span>

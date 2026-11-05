@@ -14,6 +14,7 @@ import { apiFetch } from '../../utils/apiUtils';
 import { formatCteComDv } from '../../utils/cteUtils';
 import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
+import { CteDetalhesDialog } from './CteDetalhesDialog';
 import {
   PieChart, Pie, Cell, LineChart, Line, Area, AreaChart,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
@@ -23,7 +24,7 @@ import {
   Loader2, FileSpreadsheet, PackageX, PackageCheck,
   Weight, DollarSign, Filter, RefreshCw,
   Calendar, Building2, FileText, Users, Truck,
-  X, Check, ChevronDown, Download
+  X, Check, ChevronDown, Download, Info
 } from 'lucide-react';
 
 interface Filters {
@@ -692,7 +693,21 @@ export function PainelRetidos() {
                             className={`grid gap-2 px-4 py-2 text-[11px] ${cte.is_ativo ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}
                             style={{ gridTemplateColumns: '90px 70px 70px 80px 105px 100px 100px 70px 30px 90px 90px 70px' }}
                           >
-                            <span className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                            <div className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">
+                              <div className="flex items-center gap-1.5 flex-nowrap">
+                                {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                                <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`, remetente: cte.nome_remetente, destinatario: cte.nome_destinatario, pagador: cte.nome_pagador, cidadeEntrega: cte.cidade_dest && cte.uf_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '', nfs: cte.nfs, emissao: cte.data_emissao, dataUltOcor: cte.data_ocorrencia_82, descUltOcor: cte.ult_ocor }}>
+                                  <button
+                                    type="button"
+                                    className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                    onClick={(e) => { e.stopPropagation(); }}
+                                    title="Detalhes do CT-e"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </CteDetalhesDialog>
+                              </div>
+                            </div>
                             <span className="self-center text-slate-500 dark:text-slate-400">{getFirstNfNumber(cte.nfs)}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                             <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>
@@ -857,7 +872,21 @@ export function PainelRetidos() {
                         className="grid gap-2 px-4 py-2 text-[11px]"
                         style={{ gridTemplateColumns: '90px 70px 70px 80px 70px 150px 100px 100px 70px 30px 90px 90px 70px' }}
                       >
-                        <span className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                        <div className="font-mono text-[10px] self-center text-slate-700 dark:text-slate-300">
+                          <div className="flex items-center gap-1.5 flex-nowrap">
+                            {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                            <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`, remetente: cte.nome_remetente, destinatario: cte.nome_destinatario, pagador: cte.nome_pagador, cidadeEntrega: cte.cidade_dest && cte.uf_dest ? `${cte.cidade_dest}/${cte.uf_dest}` : '', nfs: cte.nfs, emissao: cte.data_emissao, dataUltOcor: cte.data_ocorrencia_82, descUltOcor: cte.ult_ocor }}>
+                              <button
+                                type="button"
+                                className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                onClick={(e) => { e.stopPropagation(); }}
+                                title="Detalhes do CT-e"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
+                            </CteDetalhesDialog>
+                          </div>
+                        </div>
                         <span className="self-center text-slate-500 dark:text-slate-400">{getFirstNfNumber(cte.nfs)}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_emissao}</span>
                         <span className="self-center text-slate-500 dark:text-slate-400">{cte.data_ocorrencia_82}</span>

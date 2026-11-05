@@ -42,6 +42,7 @@ import { useTheme } from '../ThemeProvider';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { formatCteComDv } from '../../utils/cteUtils';
+import { CteDetalhesDialog } from './CteDetalhesDialog';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -2350,7 +2351,21 @@ export function FaturamentoClientes() {
                           key={idx}
                           className={`grid ${cteDialogGridCols} items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50`}
                         >
-                          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}</span>
+                          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
+                              <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`, remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, nfs: cte.nfs, emissao: cte.data_emissao, prevEnt: cte.data_prev_ent, dataEnt: cte.data_entrega, cidadeEntrega: cte.cidade_uf_entrega }}>
+                                <button
+                                  type="button"
+                                  className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                  onClick={(e) => { e.stopPropagation(); }}
+                                  title="Detalhes do CT-e"
+                                >
+                                  <Info className="w-3.5 h-3.5" />
+                                </button>
+                              </CteDetalhesDialog>
+                            </span>
+                          </span>
                           <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</span>
                           <span className="truncate text-slate-700 dark:text-slate-300">{cte.nome_dest || cte.nome_pag || '-'}</span>
                           <span className="text-right font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">{fmtBRL(cte.vlr_merc)}</span>

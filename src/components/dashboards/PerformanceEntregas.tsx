@@ -26,6 +26,7 @@ import { Label } from '../ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { apiFetch } from '../../utils/apiUtils';
 import { formatCteBase } from '../../utils/cteUtils';
+import { CteDetalhesDialog } from './CteDetalhesDialog';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,8 @@ import {
   Calendar,
   TrendingUp,
   Building2,
-  CircleHelp
+  CircleHelp,
+  Info
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ENVIRONMENT } from '../../config/environment';
@@ -1585,7 +1587,21 @@ export function PerformanceEntregas() {
                             <td className="px-3 py-2 whitespace-nowrap">
                               <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{sigla}</span>
                             </td>
-                            <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">{cte}</td>
+                            <td className="px-3 py-2 font-mono text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 flex-nowrap">
+                                {cte}
+                                <CteDetalhesDialog cte={{ serCte: r.ser_cte, nroCte: r.nro_cte, ctrc: cte, remetente: r.nome_emit, destinatario: r.nome_dest, pagador: r.nome_pag, unidadeDest: r.sigla_dest }}>
+                                  <button
+                                    type="button"
+                                    className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                    onClick={(e) => { e.stopPropagation(); }}
+                                    title="Detalhes do CT-e"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </CteDetalhesDialog>
+                              </div>
+                            </td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{r.prev || '—'}</td>
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap text-xs">{r.entrega || '—'}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums whitespace-nowrap">

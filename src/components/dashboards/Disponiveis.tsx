@@ -856,7 +856,7 @@ function TabelaCtes({
                 )}
                 <td className="px-3 py-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                   <div className="flex items-center gap-1.5 flex-nowrap">
-                    {stripDv(cte.ctrc)}
+                    {stripDv(formatCteComDvFromAny({ ctrc: cte.ctrc, serCte: cte.serCte, nroCte: cte.nroCte }))}
                     <CteDetalhesDialog cte={cte}>
                       <button
                         type="button"

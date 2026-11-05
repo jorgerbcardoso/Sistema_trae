@@ -854,8 +854,11 @@ if ($acao === 'iniciar_simulacao') {
     $setoresEntregaCarreg = null;
     $origemCriacao = null;
     $unidadeCarregamento = null;
+    $dataInclusaoBase = null;
+    $horaInclusaoBase = null;
+    $loginInclusaoBase = null;
     $resInfo = sql(
-        "SELECT destino, unidades, setores_entrega, origem_criacao, unidade_carregamento
+        "SELECT destino, unidades, setores_entrega, origem_criacao, unidade_carregamento, data_inclusao, hora_inclusao, login_inclusao
          FROM {$tabela}
          WHERE unidade = \$1
            AND seq_carregamento = \$2
@@ -872,11 +875,17 @@ if ($acao === 'iniciar_simulacao') {
         $setoresEntregaCarreg = ($rowI['setores_entrega'] ?? null);
         $origemCriacao = ($rowI['origem_criacao'] ?? null);
         $unidadeCarregamento = ($rowI['unidade_carregamento'] ?? null);
+        $dataInclusaoBase = ($rowI['data_inclusao'] ?? null);
+        $horaInclusaoBase = ($rowI['hora_inclusao'] ?? null);
+        $loginInclusaoBase = ($rowI['login_inclusao'] ?? null);
         $destinoCarreg = ($destinoCarreg !== null && trim((string)$destinoCarreg) !== '') ? strtoupper(trim((string)$destinoCarreg)) : null;
         $unidadesCarreg = ($unidadesCarreg !== null && trim((string)$unidadesCarreg) !== '') ? strtoupper(trim((string)$unidadesCarreg)) : null;
         $setoresEntregaCarreg = ($setoresEntregaCarreg !== null && trim((string)$setoresEntregaCarreg) !== '') ? (string)$setoresEntregaCarreg : null;
         $origemCriacao = ($origemCriacao !== null && trim((string)$origemCriacao) !== '') ? strtoupper(trim((string)$origemCriacao)) : null;
         $unidadeCarregamento = ($unidadeCarregamento !== null && trim((string)$unidadeCarregamento) !== '') ? strtoupper(trim((string)$unidadeCarregamento)) : null;
+        $dataInclusaoBase = ($dataInclusaoBase !== null && trim((string)$dataInclusaoBase) !== '') ? (string)$dataInclusaoBase : null;
+        $horaInclusaoBase = ($horaInclusaoBase !== null && trim((string)$horaInclusaoBase) !== '') ? (string)$horaInclusaoBase : null;
+        $loginInclusaoBase = ($loginInclusaoBase !== null && trim((string)$loginInclusaoBase) !== '') ? (string)$loginInclusaoBase : null;
     }
 
     pg_query($conn, 'BEGIN');
@@ -925,14 +934,17 @@ if ($acao === 'iniciar_simulacao') {
                 $setoresIns = $setoresEntregaCarreg !== null ? $setoresEntregaCarreg : '';
                 $origemIns = $origemCriacao !== null ? $origemCriacao : 'SSW';
                 $unidCarIns = $unidadeCarregamento !== null ? $unidadeCarregamento : $unidade;
+                $dtBase = $dataInclusaoBase !== null ? $dataInclusaoBase : date('Y-m-d');
+                $hrBase = $horaInclusaoBase !== null ? $horaInclusaoBase : date('H:i:s');
+                $lgBase = $loginInclusaoBase !== null ? $loginInclusaoBase : $login;
 
                 sql(
                     "INSERT INTO {$tabela}
                      (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte,
                       destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
                      VALUES
-                     (\$1, \$2, \$3, \$4, CURRENT_DATE, CURRENT_TIME, 0, \$5, \$6, \$7, NULL, \$8, \$9)",
-                    [$unidade, $seqCarreg, $placaNova, $login, $destinoIns, $unidadesIns, $setoresIns, $origemIns, $unidCarIns],
+                     (\$1, \$2, \$3, \$4, \$5, \$6, 0, \$7, \$8, \$9, NULL, \$10, \$11)",
+                    [$unidade, $seqCarreg, $placaNova, $lgBase, $dtBase, $hrBase, $destinoIns, $unidadesIns, $setoresIns, $origemIns, $unidCarIns],
                     $conn
                 );
             }
