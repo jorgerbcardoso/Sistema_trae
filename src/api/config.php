@@ -159,6 +159,23 @@ function isValidEmail($email) {
     return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
 
+function calc_dv_mod11($numero): int {
+    $s = preg_replace('/\D/', '', (string)$numero);
+    if ($s === '') return 0;
+    $peso = 2;
+    $soma = 0;
+    for ($i = strlen($s) - 1; $i >= 0; $i--) {
+        $d = (int)$s[$i];
+        $soma += $d * $peso;
+        $peso++;
+        if ($peso > 9) $peso = 2;
+    }
+    $mod = $soma % 11;
+    $dv = 11 - $mod;
+    if ($dv === 10 || $dv === 11) $dv = 0;
+    return $dv;
+}
+
 /**
  * Remover acentos e caracteres especiais de uma string
  * Útil para buscas em bases de dados sem acentuação
