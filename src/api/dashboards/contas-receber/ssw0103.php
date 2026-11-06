@@ -210,13 +210,23 @@ try {
             return trim($s);
         };
 
+        $isHeaderRow = static function(array $row) use ($normKey): bool {
+            $cells = array_map(static fn($c) => $normKey((string)$c), $row);
+            $hasCtrc = in_array('CTRC', $cells, true);
+            $hasFrete = in_array('FRETE', $cells, true);
+            $hasNumeroCte = in_array('NUMERO CT E NFPS', $cells, true) || in_array('NRO CTE', $cells, true) || in_array('SERIE CTE', $cells, true);
+            return $hasCtrc && ($hasFrete || $hasNumeroCte);
+        };
+
         $header = [];
         $idx = [];
         foreach ($lines as $l) {
             $row = str_getcsv($l, $delimiter);
             if (empty($row)) continue;
             $row[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$row[0]);
-            if (trim((string)$row[0]) !== '1') continue;
+            $tipo = trim((string)$row[0]);
+            if (!in_array($tipo, ['0', '1'], true)) continue;
+            if (!$isHeaderRow($row)) continue;
             $header = $row;
             foreach ($header as $i => $h) {
                 $k = trim((string)$h);
@@ -240,6 +250,14 @@ try {
             return trim((string)($row[$pos] ?? ''));
         };
 
+        $getCellAny = static function(array $row, array $idx, array $cols) use ($getCell): string {
+            foreach ($cols as $c) {
+                $v = $getCell($row, $idx, (string)$c);
+                if ($v !== '') return $v;
+            }
+            return '';
+        };
+
         $toMoney = static function(string $v): float {
             $s = trim(str_replace("\xC2\xA0", '', $v));
             if ($s === '') return 0.0;
@@ -251,6 +269,16 @@ try {
             return (float)$s;
         };
 
+        $types = [];
+        foreach ($lines as $l) {
+            $row = str_getcsv($l, $delimiter);
+            if (empty($row)) continue;
+            $row[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$row[0]);
+            $t = trim((string)($row[0] ?? ''));
+            if ($t !== '') $types[$t] = true;
+        }
+        $dataTipo = isset($types['2']) ? '2' : (isset($types['1']) ? '1' : '2');
+
         $rowsOut = [];
         $freteTotal = 0.0;
         $updatedAt = null;
@@ -260,7 +288,7 @@ try {
             $row[0] = preg_replace('/^\xEF\xBB\xBF/u', '', (string)$row[0]);
             $tipo = trim((string)$row[0]);
 
-            if ($tipo === '0' && $updatedAt === null) {
+            if ($tipo === '0' && $updatedAt === null && !$isHeaderRow($row)) {
                 if (isset($row[6]) && isset($row[7])) {
                     $d = trim((string)$row[6]);
                     $h = trim((string)$row[7]);
@@ -269,34 +297,48 @@ try {
                 continue;
             }
 
-            if ($tipo !== '2') continue;
+            if ($tipo !== $dataTipo) continue;
 
-            $frete = $toMoney($getCell($row, $idx, 'FRETE'));
+            $frete = $toMoney($getCellAny($row, $idx, ['FRETE', 'VALOR_FRETE', 'VALOR FRETE']));
             $freteTotal += $frete;
 
+            $numeroCte = $getCellAny($row, $idx, ['NUMERO CT-e/NFPS', 'NUMERO CT-E/NFPS', 'NUMERO CT E/NFPS']);
+            if ($numeroCte === '') {
+                $serie = $getCellAny($row, $idx, ['SERIE_CTE', 'SERIE CTE']);
+                $nro = $getCellAny($row, $idx, ['NRO_CTE', 'NRO CTE']);
+                if ($serie !== '' || $nro !== '') $numeroCte = trim($serie . $nro);
+            }
+
+            $nfiscal = $getCellAny($row, $idx, ['NFISCAL']);
+            if ($nfiscal === '') {
+                $serieNf = $getCellAny($row, $idx, ['SERIE_NOTA_FISCAL', 'SERIE NOTA FISCAL']);
+                $nroNf = $getCellAny($row, $idx, ['NRO_NOTA_FISCAL', 'NRO NOTA FISCAL']);
+                if ($serieNf !== '' || $nroNf !== '') $nfiscal = trim($serieNf . $nroNf);
+            }
+
             $rowsOut[] = [
-                'em' => $getCell($row, $idx, 'EM'),
-                'ctrc' => $getCell($row, $idx, 'CTRC'),
-                'numero_cte' => $getCell($row, $idx, 'NUMERO CT-e/NFPS'),
-                'pagador' => $getCell($row, $idx, 'PAGADOR'),
-                'cnpj_pagador' => $getCell($row, $idx, 'CNPJ PAGADOR'),
-                'cob' => $getCell($row, $idx, 'COB'),
-                'dest' => $getCell($row, $idx, 'DEST'),
-                'unidade_responsavel' => $getCell($row, $idx, 'UNIDADE RESPONSAVEL'),
-                'filial_cobranca' => $getCell($row, $idx, 'FILIAL COBRANCA'),
-                'unidade_cobranca' => mb_substr(trim((string)$getCell($row, $idx, 'FILIAL COBRANCA')), 0, 3, 'UTF-8'),
-                'banco' => $getCell($row, $idx, 'BANCO'),
+                'em' => $getCellAny($row, $idx, ['EM', 'EMPR_OCOR', 'EMPR OCOR']),
+                'ctrc' => $getCellAny($row, $idx, ['CTRC']),
+                'numero_cte' => $numeroCte,
+                'pagador' => $getCellAny($row, $idx, ['PAGADOR', 'NOME_PAGADOR', 'NOME PAGADOR']),
+                'cnpj_pagador' => $getCellAny($row, $idx, ['CNPJ PAGADOR', 'CNPJ_PAGADOR']),
+                'cob' => $getCellAny($row, $idx, ['COB']),
+                'dest' => $getCellAny($row, $idx, ['DEST']),
+                'unidade_responsavel' => $getCellAny($row, $idx, ['UNIDADE RESPONSAVEL', 'UNID_OCOR', 'UNID OCOR']),
+                'filial_cobranca' => $getCellAny($row, $idx, ['FILIAL COBRANCA']),
+                'unidade_cobranca' => mb_substr(trim((string)$getCellAny($row, $idx, ['FILIAL COBRANCA'])), 0, 3, 'UTF-8'),
+                'banco' => $getCellAny($row, $idx, ['BANCO']),
                 'frete' => $frete,
-                'emissao' => $getCell($row, $idx, 'EMISSAO'),
-                'nfiscal' => $getCell($row, $idx, 'NFISCAL'),
-                'tip' => $getCell($row, $idx, 'TIP'),
-                'pre_fatu' => $getCell($row, $idx, 'PRE-FATU'),
-                'ult_ocor' => $getCell($row, $idx, 'ULT. OCOR'),
-                'chave_cte' => $getCell($row, $idx, 'CHAVE CTE'),
-                'data_entrega' => $getCell($row, $idx, 'DATA ENTREGA'),
-                'prev_entrega' => $getCell($row, $idx, 'PREVISAO DE ENTREGA'),
-                'comp_entrega_escaneado' => $getCell($row, $idx, 'COMPROVANTE DE ENTREGA ESCANEADO'),
-                'observacao' => $getCell($row, $idx, 'OBSERVACAO'),
+                'emissao' => $getCellAny($row, $idx, ['EMISSAO', 'EMISSAO_CTRC', 'EMISSAO CTRC']),
+                'nfiscal' => $nfiscal,
+                'tip' => $getCellAny($row, $idx, ['TIP']),
+                'pre_fatu' => $getCellAny($row, $idx, ['PRE-FATU', 'PRE FATU']),
+                'ult_ocor' => $getCellAny($row, $idx, ['ULT. OCOR', 'DESCRICAO_OCOR', 'DESCRICAO OCOR', 'COD_OCOR', 'COD OCOR']),
+                'chave_cte' => $getCellAny($row, $idx, ['CHAVE CTE', 'CHAVE_CTE']),
+                'data_entrega' => $getCellAny($row, $idx, ['DATA ENTREGA', 'DATA_ENTREGA']),
+                'prev_entrega' => $getCellAny($row, $idx, ['PREVISAO DE ENTREGA', 'PREVISAO_DE_ENTREGA']),
+                'comp_entrega_escaneado' => $getCellAny($row, $idx, ['COMPROVANTE DE ENTREGA ESCANEADO', 'COMPROVANTE_DE_ENTREGA_ESCANEADO']),
+                'observacao' => $getCellAny($row, $idx, ['OBSERVACAO', 'COMPLEMENTO_OCOR', 'COMPLEMENTO OCOR']),
             ];
         }
 
@@ -321,11 +363,11 @@ try {
         . '&t_tp_cli_fat=T'
         . '&t_situacao_ctrc=I'
         . '&t_periodicidade=T'
-        . '&t_rel_lista=C'
+        . '&t_rel_lista=t'
         . '&t_cons_bloqueados=N'
         . '&t_cons_a_vista=N'
         . '&t_tp_classificacao=F'
-        . '&t_excel=S'
+        . '&t_excel=s'
         . '&t_ler_morto=S';
 
     if ($step === 'START' || $step === 'RUN') {
