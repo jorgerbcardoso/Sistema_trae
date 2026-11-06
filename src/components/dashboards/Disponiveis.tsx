@@ -11298,7 +11298,7 @@ export function Disponiveis() {
   }, [calcularFreteDisponivel, freteDispPctByEmit, getCteEmitSigla]);
 
   useEffect(() => {
-    if (!(showFilters || isBNR) || todasOcorrenciasCarregadas !== null) return;
+    if (!showFilters || todasOcorrenciasCarregadas !== null) return;
     let ativo = true;
     (async () => {
       try {
@@ -11326,12 +11326,9 @@ export function Disponiveis() {
       }
     })();
     return () => { ativo = false; };
-  }, [showFilters, isBNR, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
+  }, [showFilters, todasOcorrenciasCarregadas, user?.domain, dominioUsuario]);
 
   const inicializaOcorrenciasDefault = (base: FiltrosDisponiveis): FiltrosDisponiveis => {
-    if (isBNR) {
-      return { ...base, ultOcorCodigos: ['57', '83', '58', '80', '90', '13', '29', '84', '94'] };
-    }
     if (!todasOcorrenciasCarregadas) return base;
     const todas = [
       OCORRENCIA_SEM_CODIGO,
@@ -11344,19 +11341,6 @@ export function Disponiveis() {
     if (!showFilters) return;
     setTempFilters(filters);
   }, [showFilters, filters]);
-
-  useEffect(() => {
-    if (!isBNR) return;
-    if (ultOcorTouched) return;
-    setFilters(atual => {
-      if (atual.ultOcorCodigos?.length) return atual;
-      return inicializaOcorrenciasDefault(atual);
-    });
-    setTempFilters(atual => {
-      if (atual.ultOcorCodigos?.length) return atual;
-      return inicializaOcorrenciasDefault(atual);
-    });
-  }, [isBNR, ultOcorTouched]);
   const [linhasOrigem, setLinhasOrigem] = useState<LinhaCarregamento[]>([]);
   const [loadingLinhasOrigem, setLoadingLinhasOrigem] = useState(false);
   const [linhasHojeDialogOpen, setLinhasHojeDialogOpen] = useState(false);
@@ -13812,7 +13796,7 @@ export function Disponiveis() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega). No BNR: 57/83/58/80/90/13/29/84/94 vêm marcadas por padrão</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aplica-se a CT-es de disponíveis (transferência e entrega).</p>
                         <OcorrenciasMultiSelect
                           value={tempFilters.ultOcorCodigos}
                           onChange={(value) => {
