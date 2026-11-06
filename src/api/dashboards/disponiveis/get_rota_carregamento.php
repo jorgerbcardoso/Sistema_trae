@@ -161,7 +161,7 @@ try {
     $resCar = sql(
         "SELECT
             MAX(seq_carregamento) AS seq_carregamento,
-            MAX(COALESCE(NULLIF(destino, ''), NULLIF(destino_cte, ''))) AS destino,
+            MAX(COALESCE(NULLIF(destino, ''), '')) AS destino,
             MAX(COALESCE(NULLIF(unidades, ''), '')) AS paradas
          FROM {$tblCar}
          WHERE unidade = $1
@@ -192,7 +192,7 @@ if ($destino !== '' && preg_match('/^[A-Z0-9]{2,5}$/', $destino)) {
 }
 
 $seqCar = ($carRow['seq_carregamento'] !== null && $carRow['seq_carregamento'] !== '') ? (int)$carRow['seq_carregamento'] : null;
-$tpCarregamento = 'E';
+$tpCarregamento = ($destino === '' || $destino === $unidade) ? 'E' : 'T';
 if ($seqCar !== null && $seqCar > 0) {
     try {
         $resTp = sql(
@@ -210,6 +210,7 @@ if ($seqCar !== null && $seqCar > 0) {
         }
     } catch (Exception $e) {}
 }
+if ($destino === '' || $destino === $unidade) $tpCarregamento = 'E';
 
 $rows = [];
 $unidadesSet = [$unidade => true];

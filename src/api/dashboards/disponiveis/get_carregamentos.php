@@ -168,7 +168,10 @@ $sqlCarregamentos = "
         MIN((c.data_inclusao::timestamp + c.hora_inclusao::time)) AS inicio_ts,
         MAX((c.data_finalizacao::timestamp + c.hora_finalizacao::time)) AS fim_ts,
         BOOL_OR(COALESCE(c.adiado, FALSE))       AS adiado,
-        BOOL_OR(TRIM(COALESCE(c.destino, '')) = '') AS destino_vazio,
+        BOOL_OR(
+            TRIM(UPPER(COALESCE(c.destino, ''))) = ''
+            OR TRIM(UPPER(COALESCE(c.destino, ''))) = UPPER($1)
+        ) AS destino_vazio,
         MIN(c.login_inclusao)                   AS login_criacao,
         MAX(c.data_finalizacao)                 AS data_finalizacao,
         MAX(c.hora_finalizacao)                 AS hora_finalizacao,

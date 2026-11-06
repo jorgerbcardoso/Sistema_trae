@@ -3417,8 +3417,9 @@ function CardCarregamento(props: CardCarregamentoProps) {
   const isSimulado = Boolean((carregamento as any).simulado);
   const modoDeclarado = String((carregamento as any).modo_carregamento ?? '').trim().toUpperCase();
   const setoresEntrega = String((carregamento as any).setores_entrega ?? '').trim();
-  const isEntregaCarreg = modoDeclarado === 'ENTREGA' || (setoresEntrega !== '' && String(carregamento.destino ?? '').trim() === '');
-  const isTransferCarreg = modoDeclarado === 'TRANSFERENCIA' || (!isEntregaCarreg && !setoresEntrega);
+  const destinoCarreg = String(carregamento.destino ?? '').trim().toUpperCase();
+  const isEntregaCarreg = modoDeclarado === 'ENTREGA' || destinoCarreg === '' || destinoCarreg === String(unidadeAtual ?? '').trim().toUpperCase();
+  const isTransferCarreg = modoDeclarado === 'TRANSFERENCIA' || !isEntregaCarreg;
 
   useEffect(() => {
     if (!isTransferCarreg) return;
@@ -3510,27 +3511,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
   })();
 
   const carregamentoIniciado = !isSimulado && !isEntregaCarreg && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
-
-  const tipoCounts = useMemo(() => {
-    const un = (unidadeAtual ?? '').trim().toUpperCase();
-    let entrega = 0;
-    let transf = 0;
-    for (const c of carregamento.ctes) {
-      const d = ((c as any).destino_cte_painel ?? c.destino_cte ?? (c as any).unidadeDest ?? (c as any).destino ?? '').trim().toUpperCase();
-      if (!d) continue;
-      if (un && d === un) entrega += 1;
-      else transf += 1;
-    }
-    return { entrega, transf };
-  }, [carregamento.ctes, unidadeAtual]);
-
-  const temEntrega = isEntregaCarreg || tipoCounts.entrega > 0;
-  const temTransferencia = (!isEntregaCarreg && (isTransferCarreg || tipoCounts.transf > 0));
-  const dominante = isEntregaCarreg
-    ? 'ENTREGA'
-    : temEntrega || temTransferencia
-      ? (tipoCounts.entrega > tipoCounts.transf ? 'ENTREGA' : 'TRANSFERENCIA')
-      : (carregamentoIniciado ? 'TRANSFERENCIA' : null);
+  const dominante = isEntregaCarreg ? 'ENTREGA' : 'TRANSFERENCIA';
 
   const sugestaoVeiculo = useMemo(() => {
     if (!isEntregaCarreg) return null;
@@ -5969,7 +5950,10 @@ function ModalRotaCarregamento({
   const seqCarregamento = Number((carregarInfo as any)?.seq_carregamento ?? (carregamento as any)?.seq_carregamento ?? 0) || 0;
   const origem = String(carregarInfo?.unidade_origem ?? '').toUpperCase();
   const tpCarregamento = String((carregarInfo as any)?.tp_carregamento ?? '').trim().toUpperCase();
-  const isTransferCarreg = tpCarregamento === 'T';
+  const destinoCarregamento = String((carregarInfo as any)?.destino ?? '').trim().toUpperCase();
+  const isEntregaCarreg = tpCarregamento === 'E' || destinoCarregamento === '' || (origem !== '' && destinoCarregamento === origem);
+  const isTransferCarreg = !isEntregaCarreg;
+  const isCarregamentoManual = String((carregarInfo as any)?.origem_criacao ?? (carregamento as any)?.origem_criacao ?? '').trim().toUpperCase() === 'MANUAL';
   const paradas = Array.isArray(carregarInfo?.paradas) ? (carregarInfo.paradas as string[]) : [];
   const totaisCalc = useMemo(() => {
     const list = Array.isArray(dados?.ctes) ? dados.ctes : [];
@@ -6066,8 +6050,8 @@ function ModalRotaCarregamento({
       const ser = normKey(c?.ser_cte ?? '');
       const nro = Number(c?.nro_cte ?? 0);
       const destinoCte = normKey((c as any)?.destino_cte_painel ?? c?.destino_cte ?? '');
-      const unidadeDestino = (isValidSigla(destinoCte) ? destinoCte : (unidadesOrdem[unidadesOrdem.length - 1] ?? ''));
-      const isEntregaCte = unidadeDestino !== '' && unidadeDestino === origem;
+      const unidadeDestino = isEntregaCarreg ? origem : (isValidSigla(destinoCte) ? destinoCte : (unidadesOrdem[unidadesOrdem.length - 1] ?? ''));
+      const isEntregaCte = isEntregaCarreg;
 
       const endereco = normEnd(c?.endereco_entrega ?? '');
       const bairro = normEnd(c?.bairro_entrega ?? '');
@@ -6663,7 +6647,7 @@ function ModalRotaCarregamento({
         const salvarCoordGrupo = async (lat: number, lng: number) => {
           if (!groupKey) return;
           setCoordsByKey((prev) => ({ ...(prev || {}), [groupKey]: { lat, lng } }));
-          void otimizarOrdemEntregas({ [groupKey]: { lat, lng } });
+          if (!isCarregamentoManual) void otimizarOrdemEntregas({ [groupKey]: { lat, lng } });
           setGeoStatusByKey((prev) => ({ ...(prev || {}), [groupKey]: 'ok' }));
           setGeoErrorByKey((prev) => {
             const next = { ...(prev || {}) };
@@ -7414,7 +7398,7 @@ function ModalRotaCarregamento({
       geoRunningRef.current = false;
       setGeoRunning(false);
       // Recalcula a melhor rota (sempre o ponto mais próximo a partir da origem) com as coords recém-obtidas.
-      if (!geoCancelRef.current) void otimizarOrdemEntregas(acc);
+      if (!geoCancelRef.current && !isCarregamentoManual) void otimizarOrdemEntregas(acc);
     }
   };
 
@@ -8744,8 +8728,11 @@ function CarregamentoArea({
     if (modo === 'ENTREGA') return true;
     const setores = String((c as any)?.setores_entrega ?? (c as any)?.setoresEntrega ?? '').trim();
     if (setores) return true;
+    const destino = String((c as any)?.destino ?? '').trim().toUpperCase();
+    const un = String(sigla ?? '').trim().toUpperCase();
+    if (destino === '' || (un !== '' && destino === un)) return true;
     return false;
-  }, []);
+  }, [sigla]);
 
   const hojeKeyAdiado = React.useMemo(() => {
     const d = new Date();
@@ -12534,10 +12521,11 @@ export function Disponiveis() {
       // 2) Adiciona os novos
       let adicionados = 0;
       if (ctesSelecionados.size > 0) {
-        const ctesPayload = Array.from(ctesSelecionados.values()).map(c => ({
+        const ctesPayload = Array.from(ctesSelecionados.values()).map((c, idx) => ({
           seqCte: c.seqCte ?? 0,
           nroCte: c.nroCte,
           serCte: c.serCte,
+          ordem: idx + 1,
           setor: String((c as any).setor ?? (c as any).setor_cte ?? (c as any).setorCte ?? (c as any).setorEntrega ?? (c as any).unidadeDest ?? '').trim(),
           emissao: c.emissao,
           prevEnt: c.prevEnt,

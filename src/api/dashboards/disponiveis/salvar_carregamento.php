@@ -102,15 +102,19 @@ function resolverTpCarregamento($conn, $tabela, $tabelaCap, $unidade, $seqCarreg
                 );
                 if ($res2 && pg_num_rows($res2) > 0) {
                     $dest = trim((string)pg_fetch_result($res2, 0, 0));
-                    $tp = ($dest === '') ? 'E' : 'T';
+                    $dest = strtoupper(trim((string)$dest));
+                    $tp = ($dest === '' || ($unidade !== '' && $dest === $unidade)) ? 'E' : 'T';
                 }
             } catch (Exception $e) {}
         }
     }
     if ($tp !== 'T' && $tp !== 'E') {
-        $tp = (trim((string)$destinoFallback) === '') ? 'E' : 'T';
+        $dest = strtoupper(trim((string)$destinoFallback));
+        $tp = ($dest === '' || ($unidade !== '' && $dest === $unidade)) ? 'E' : 'T';
     }
-    return $tp;
+    $dest = strtoupper(trim((string)$destinoFallback));
+    if ($dest === '' || ($unidade !== '' && $dest === $unidade)) return 'E';
+    return 'T';
 }
 
 function parseCsvSiglas($csv) {
@@ -783,7 +787,7 @@ if ($acao === 'criar') {
             PRIMARY KEY (unidade, seq_carregamento)
         )
     ");
-    $tpCarreg = ($destino === '') ? 'E' : 'T';
+    $tpCarreg = ($destino === '' || $destino === $unidade) ? 'E' : 'T';
     @pg_query($conn,
         "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, nro_linha, tp_carregamento)
          VALUES ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', TRUE, NULL, '{$tpCarreg}')
@@ -968,6 +972,8 @@ if ($acao === 'adicionar_ctes') {
         respondJson(['success' => false, 'message' => 'Carregamento ou CT-es inválidos.']);
     }
 
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS ordem INT");
+
     // Busca destino/unidades do carregamento existente (para replicar em cada linha)
     $seqCarreg = 0;
     $placaDb = '';
@@ -1034,6 +1040,19 @@ if ($acao === 'adicionar_ctes') {
     pg_query($conn, 'BEGIN');
     $adicionados = 0;
     $ignorados = 0;
+    $maxOrdem = 0;
+    $resMax = @pg_query($conn,
+        "SELECT COALESCE(MAX(COALESCE(ordem, 0)), 0) AS max_ordem
+         FROM {$tabela}
+         WHERE unidade = '" . pg_escape_string($conn, $unidade) . "'
+           AND seq_carregamento = {$seqCarreg}
+           AND data_finalizacao IS NULL
+           AND nro_cte > 0"
+    );
+    if ($resMax && pg_num_rows($resMax) > 0) {
+        $maxOrdem = (int)(pg_fetch_result($resMax, 0, 0) ?? 0);
+    }
+    $ordSeq = 0;
 
     foreach ($cteList as $cteData) {
         $nroCte = (int)($cteData['nroCte'] ?? 0);
@@ -1135,6 +1154,13 @@ if ($acao === 'adicionar_ctes') {
         $peso     = is_numeric($peso)     ? (float)$peso     : 0;
         $cubagem  = is_numeric($cubagem)  ? (float)$cubagem  : 0;
 
+        $ordInput = (int)($cteData['ordem'] ?? 0);
+        if ($ordInput <= 0) {
+            $ordSeq += 1;
+            $ordInput = $ordSeq;
+        }
+        $ordFinal = $maxOrdem + $ordInput;
+
         $emissaoSql = 'NULL';
         $prevEntSql = 'NULL';
         $nowYear  = (int)date('Y');
@@ -1163,13 +1189,13 @@ if ($acao === 'adicionar_ctes') {
         $res = pg_query($conn,
             "INSERT INTO {$tabela}
              (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
-              ser_cte, nro_cte, destino_cte, setor_cte, data_emissao_cte, data_prev_ent_cte,
+              ser_cte, nro_cte, destino_cte, setor_cte, ordem, data_emissao_cte, data_prev_ent_cte,
               remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
               vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
               destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
              VALUES
              ('" . pg_escape_string($conn, $unidade) . "', {$seqCarreg}, '" . pg_escape_string($conn, $placa) . "', '" . pg_escape_string($conn, $login) . "', CURRENT_DATE, CURRENT_TIME,
-              '{$serCte}', {$nroCte}, '{$destCte}', '{$setorCteEsc}', {$emissaoSql}, {$prevEntSql},
+              '{$serCte}', {$nroCte}, '{$destCte}', '{$setorCteEsc}', {$ordFinal}, {$emissaoSql}, {$prevEntSql},
               '{$remetente}', '{$destinatar}', '{$pagador}', '{$cidade}',
               {$vlrMerc}, {$vlrFrete}, {$peso}, {$cubagem}, {$qtdeVol},
               '{$destEsc}', '{$unidEsc}', '{$setoresEsc}', NULL, '" . pg_escape_string($conn, $origemCriacao) . "', '{$unidCar}')"
@@ -2482,7 +2508,7 @@ if ($acao === 'atualizar_ctes_ssw') {
     }
     if ($dtRef === null) $dtRef = new DateTime();
 
-    $tpCarregamento = (trim((string)$setoresEntregaCarreg) !== '' || trim((string)$destinoCarreg) === '') ? 'E' : 'T';
+    $tpCarregamento = (trim((string)$setoresEntregaCarreg) !== '' || trim((string)$destinoCarreg) === '' || strtoupper(trim((string)$destinoCarreg)) === strtoupper(trim((string)$unidade))) ? 'E' : 'T';
     if ($tpCarregamento !== 'T') {
         respondJson(['success' => false, 'message' => 'Disponível apenas para Transferência.']);
     }
