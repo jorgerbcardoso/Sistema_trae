@@ -311,7 +311,7 @@ try {
         ];
     };
 
-    $refFimDmy = date('dmy');
+    $refFimDmy = date('dmy', strtotime('-1 day'));
     $url = 'https://sistema.ssw.inf.br/bin/ssw0103?act=PES'
         . '&cod_emp_ctb=01'
         . '&t_data_ref_ini=010101'
@@ -321,12 +321,12 @@ try {
         . '&t_tp_cli_fat=T'
         . '&t_situacao_ctrc=I'
         . '&t_periodicidade=T'
-        . '&t_rel_lista=T'
+        . '&t_rel_lista=C'
         . '&t_cons_bloqueados=N'
         . '&t_cons_a_vista=N'
         . '&t_tp_classificacao=F'
         . '&t_excel=S'
-        . '&t_ler_morto=N';
+        . '&t_ler_morto=S';
 
     if ($step === 'START' || $step === 'RUN') {
         $rowsBefore = $get1440Rows();
