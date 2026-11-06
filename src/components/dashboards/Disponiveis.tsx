@@ -13057,18 +13057,11 @@ export function Disponiveis() {
     const temFiltro = sel.length > 0;
     const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
     const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
-    const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
-    const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
       if (ctesEmCarregamentoFinalizado.has(cteId(cte))) return false;
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (filters.unidadeDestino?.length) {
         if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
-      }
-      if (ocultarPadraoBNR) {
-        const anyCte = cte as any;
-        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
-        if (rawCod && ocultarBNR.has(rawCod)) return false;
       }
       if (temFiltro) {
         const anyCte = cte as any;
@@ -13097,7 +13090,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dados, dadosHub, ctesEmCarregamentoFinalizado, filters.unidadeDestino, filters.ultOcorCodigos, ultOcorTouched, isBNR, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
+  }, [dados, dadosHub, ctesEmCarregamentoFinalizado, filters.unidadeDestino, filters.ultOcorCodigos, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
     const totals: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
@@ -13243,16 +13236,9 @@ export function Disponiveis() {
     const temFiltro = sel.length > 0;
     const codigosSet = new Set(sel.filter(v => v !== OCORRENCIA_SEM_CODIGO));
     const permiteSem = sel.includes(OCORRENCIA_SEM_CODIGO);
-    const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
-    const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
       if (ctesEmCarregamentoFinalizado.has(cteId(cte))) return false;
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
-      if (ocultarPadraoBNR) {
-        const anyCte = cte as any;
-        const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
-        if (rawCod && ocultarBNR.has(rawCod)) return false;
-      }
       if (temFiltro) {
         const anyCte = cte as any;
         const rawCod = String(anyCte.codUltOcor ?? anyCte.cod_ultima_ocorrencia ?? '').trim();
@@ -13275,7 +13261,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dadosEntrega, ctesEmCarregamentoFinalizado, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, ultOcorTouched, isBNR, dominioUsuario, unidadeAtual]);
+  }, [dadosEntrega, ctesEmCarregamentoFinalizado, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
     const base = { ...filtrosVazios };
