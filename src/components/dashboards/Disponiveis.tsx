@@ -10228,13 +10228,15 @@ function CarregamentoArea({
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={loadingRota || (((Number((c as any)?.qtde_ctes_presto ?? c.qtde_ctes ?? 0) || 0) + (c2 ? (Number((c2 as any)?.qtde_ctes_presto ?? c2.qtde_ctes ?? 0) || 0) : 0)) <= 0)}
+                              disabled={loadingRota}
+                              className={loadingRota ? 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/40' : 'border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'}
                               onClick={() => {
                                 void onCarregarRota(c);
                                 setCalDetalheOpen(false);
                               }}
-                              title={(((Number((c as any)?.qtde_ctes_presto ?? c.qtde_ctes ?? 0) || 0) + (c2 ? (Number((c2 as any)?.qtde_ctes_presto ?? c2.qtde_ctes ?? 0) || 0) : 0)) <= 0) ? 'Carregamento sem CT-es' : 'Ver rota e reimprimir ordem'}
+                              title="Ver rota e reimprimir ordem"
                             >
+                              {loadingRota ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <MapPin className="w-3.5 h-3.5 mr-1" />}
                               Rota
                             </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => void abrirCtesCarregamento(c)}>
@@ -11557,6 +11559,7 @@ export function Disponiveis() {
   const ctesJaCarregados = React.useMemo<Map<number, string>>(() => {
     const m = new Map<number, string>();
     for (const car of carregamentos) {
+      if (car.data_finalizacao) continue;
       for (const c of car.ctes) {
         // Usa seq_cte como chave primária (é o que o backend salva)
         if (c.seq_cte > 0) m.set(c.seq_cte, car.placa_provisoria);
@@ -11565,6 +11568,18 @@ export function Disponiveis() {
       }
     }
     return m;
+  }, [carregamentos]);
+
+  const ctesEmCarregamentoFinalizado = React.useMemo(() => {
+    const s = new Set<number>();
+    for (const car of carregamentos) {
+      if (!car.data_finalizacao) continue;
+      for (const c of car.ctes) {
+        if (c.seq_cte > 0) s.add(c.seq_cte);
+        if ((c.nroCte ?? 0) > 0) s.add(c.nroCte as number);
+      }
+    }
+    return s;
   }, [carregamentos]);
 
   // IDs dos CT-es marcados para desapontamento (para destaque nas listas)
@@ -13045,6 +13060,7 @@ export function Disponiveis() {
     const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
     const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
+      if (ctesEmCarregamentoFinalizado.has(cteId(cte))) return false;
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (filters.unidadeDestino?.length) {
         if (!filters.unidadeDestino.includes((cte.unidadeDest ?? '').toUpperCase())) return false;
@@ -13081,7 +13097,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dados, dadosHub, filters.unidadeDestino, filters.ultOcorCodigos, ultOcorTouched, isBNR, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
+  }, [dados, dadosHub, ctesEmCarregamentoFinalizado, filters.unidadeDestino, filters.ultOcorCodigos, ultOcorTouched, isBNR, emissaoInicio, emissaoFim, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, dominioUsuario, unidadeAtual]);
 
   const totalsPorUnidadeParaLinhas = React.useMemo(() => {
     const totals: Record<string, { pesoKg: number; cubagem: number; frete: number; prevMinTs?: number }> = {};
@@ -13230,6 +13246,7 @@ export function Disponiveis() {
     const ocultarPadraoBNR = isBNR && !ultOcorTouched && !temFiltro;
     const ocultarBNR = new Set(['52', '25', '34', '11']);
     return list.filter((cte) => {
+      if (ctesEmCarregamentoFinalizado.has(cteId(cte))) return false;
       if (shouldIgnoreDestinoRVE(cte.unidadeDest)) return false;
       if (ocultarPadraoBNR) {
         const anyCte = cte as any;
@@ -13258,7 +13275,7 @@ export function Disponiveis() {
       }
       return true;
     });
-  }, [dadosEntrega, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, ultOcorTouched, isBNR, dominioUsuario, unidadeAtual]);
+  }, [dadosEntrega, ctesEmCarregamentoFinalizado, previsaoInicio, previsaoFim, tempoArmazemDe, tempoArmazemAte, filters.ultOcorCodigos, ultOcorTouched, isBNR, dominioUsuario, unidadeAtual]);
 
   const clearFilters = () => {
     const base = { ...filtrosVazios };

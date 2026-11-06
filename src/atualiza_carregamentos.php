@@ -611,9 +611,13 @@ while ($rowD = pg_fetch_array($resDomains)) {
     }
 
     $conjuntoPorPlaca = [];
+    $conjuntoPorSeq = [];
     try {
         $qConj = "
             SELECT
+                cap.unidade AS unidade,
+                cap.seq_carregamento AS seq1,
+                cap.seq_carregamento_conjunto AS seq2,
                 (SELECT placa_provisoria FROM {$tblCar} c1 WHERE c1.unidade = cap.unidade AND c1.seq_carregamento = cap.seq_carregamento LIMIT 1) AS placa1,
                 (SELECT placa_provisoria FROM {$tblCar} c2 WHERE c2.unidade = cap.unidade AND c2.seq_carregamento = cap.seq_carregamento_conjunto LIMIT 1) AS placa2
             FROM {$tblCap} cap
@@ -621,14 +625,21 @@ while ($rowD = pg_fetch_array($resDomains)) {
         ";
         $resConj = @pg_query($g_sql, $qConj);
         while ($resConj && ($rc = pg_fetch_assoc($resConj))) {
+            $seq1 = (int)($rc['seq1'] ?? 0);
+            $seq2 = (int)($rc['seq2'] ?? 0);
             $p1 = strtoupper(trim((string)($rc['placa1'] ?? '')));
             $p2 = strtoupper(trim((string)($rc['placa2'] ?? '')));
             if ($p1 === '' || $p2 === '' || $p1 === $p2) continue;
             $conjuntoPorPlaca[$p1] = [$p1, $p2];
             $conjuntoPorPlaca[$p2] = [$p1, $p2];
+            if ($seq1 > 0 && $seq2 > 0 && $seq1 !== $seq2) {
+                $conjuntoPorSeq[$seq1] = $seq2;
+                $conjuntoPorSeq[$seq2] = $seq1;
+            }
         }
     } catch (Exception $e) {
         $conjuntoPorPlaca = [];
+        $conjuntoPorSeq = [];
     }
 
     $dtMinGlobal = null;
@@ -728,8 +739,13 @@ while ($rowD = pg_fetch_array($resDomains)) {
             $seq = (int)($it['seq_carregamento'] ?? 0);
             $total = (int)($it['total_ctes'] ?? 0);
             $dataFinal = trim((string)($it['data_finalizacao'] ?? ''));
+            $dtInclRaw = trim((string)($it['dt_inclusao'] ?? ''));
+            $dtIncl = null;
+            try { $dtIncl = $dtInclRaw !== '' ? new DateTime($dtInclRaw) : null; } catch (Exception $e) { $dtIncl = null; }
 
-            if ($dataFinal === '') $abertos[$placa] = true;
+            if ($dataFinal === '' && $seq > 0 && $placa !== '' && $dtIncl instanceof DateTime) {
+                $abertos[] = ['placa' => $placa, 'seq' => $seq, 'dt_inclusao' => $dtIncl];
+            }
             if ($total <= 0) $zerados[] = $it;
         }
 
@@ -740,43 +756,54 @@ while ($rowD = pg_fetch_array($resDomains)) {
         $placaParaInfo = $placaParaInfoGlobal;
 
         $finalizados = 0;
-        foreach ($abertos as $placa => $_) {
+        foreach ($abertos as $ab) {
+            $placa = (string)($ab['placa'] ?? '');
+            $seq = (int)($ab['seq'] ?? 0);
+            $dtIncl = $ab['dt_inclusao'] ?? null;
+            if ($placa === '' || $seq <= 0 || !($dtIncl instanceof DateTime)) continue;
             if (!isset($placaParaInfo[$placa])) continue;
             $info = $placaParaInfo[$placa];
             $dtSaida = $info['saida'] ?? null;
             if (!($dtSaida instanceof DateTime)) continue;
 
-            $placasFinalizar = isset($conjuntoPorPlaca[$placa]) ? $conjuntoPorPlaca[$placa] : [$placa];
-            foreach ($placasFinalizar as $pf) {
-                $pf = strtoupper(trim((string)$pf));
-                if ($pf === '') continue;
-                $data = $dtSaida->format('Y-m-d');
-                $hora = $dtSaida->format('H:i:s');
-                $qUpd = "
-                    UPDATE {$tblCar} t
-                    SET data_finalizacao = '{$data}'::date,
-                        hora_finalizacao = '{$hora}'::time,
-                        login_finalizacao = '" . pg_escape_string($g_sql, $loginScript) . "'
-                    WHERE t.unidade = '" . pg_escape_string($g_sql, $unidade) . "'
-                      AND UPPER(t.placa_provisoria) = '" . pg_escape_string($g_sql, $pf) . "'
-                      AND t.data_finalizacao IS NULL
-                      AND COALESCE(
-                            (SELECT cap.tp_carregamento
-                             FROM {$tblCap} cap
-                             WHERE cap.unidade = t.unidade
-                               AND cap.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
-                             LIMIT 1),
-                            (CASE WHEN EXISTS (
-                                SELECT 1 FROM {$tblCar} x
-                                WHERE x.unidade = t.unidade
-                                  AND x.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
-                                  AND TRIM(COALESCE(x.destino, '')) <> ''
-                            ) THEN 'T' ELSE 'E' END)
-                      ) = 'T'
-                ";
-                $resUpd = @pg_query($g_sql, $qUpd);
-                if ($resUpd) $finalizados += (int)pg_affected_rows($resUpd);
+            $minSaidaTs = $dtSaida->getTimestamp();
+            $minInclTs = $dtIncl->getTimestamp() - (5 * 60);
+            if ($minSaidaTs < $minInclTs) continue;
+
+            $seqsFinalizar = [$seq];
+            if (isset($conjuntoPorSeq[$seq]) && (int)$conjuntoPorSeq[$seq] > 0) {
+                $seqsFinalizar[] = (int)$conjuntoPorSeq[$seq];
             }
+            $seqsFinalizar = array_values(array_unique(array_filter($seqsFinalizar, function($v) { return (int)$v > 0; })));
+            if (count($seqsFinalizar) === 0) continue;
+
+            $data = $dtSaida->format('Y-m-d');
+            $hora = $dtSaida->format('H:i:s');
+            $inSeq = implode(',', array_map(function($v) use ($g_sql) { return (string)((int)$v); }, $seqsFinalizar));
+            $qUpd = "
+                UPDATE {$tblCar} t
+                SET data_finalizacao = '{$data}'::date,
+                    hora_finalizacao = '{$hora}'::time,
+                    login_finalizacao = '" . pg_escape_string($g_sql, $loginScript) . "'
+                WHERE t.unidade = '" . pg_escape_string($g_sql, $unidade) . "'
+                  AND t.seq_carregamento IN ({$inSeq})
+                  AND t.data_finalizacao IS NULL
+                  AND COALESCE(
+                        (SELECT cap.tp_carregamento
+                         FROM {$tblCap} cap
+                         WHERE cap.unidade = t.unidade
+                           AND cap.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
+                         LIMIT 1),
+                        (CASE WHEN EXISTS (
+                            SELECT 1 FROM {$tblCar} x
+                            WHERE x.unidade = t.unidade
+                              AND x.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
+                              AND TRIM(COALESCE(x.destino, '')) <> ''
+                        ) THEN 'T' ELSE 'E' END)
+                  ) = 'T'
+            ";
+            $resUpd = @pg_query($g_sql, $qUpd);
+            if ($resUpd) $finalizados += (int)pg_affected_rows($resUpd);
         }
         echo "   ✅ Finalizados: {$finalizados}\n";
 

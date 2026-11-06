@@ -479,39 +479,6 @@ $unidadeEsc = pg_escape_string($conn, $unidade);
 $finalizadosSumiramSsw = 0;
 
 if (empty($placas_ssw)) {
-    $loginEsc = pg_escape_string($conn, $login);
-    $resFinAll = @pg_query(
-        $conn,
-        "UPDATE {$tabela} externo
-         SET data_finalizacao = CURRENT_DATE,
-             hora_finalizacao = CURRENT_TIME,
-             login_finalizacao = '{$loginEsc}'
-         WHERE UPPER(externo.unidade) = '{$unidadeEsc}'
-           AND externo.data_finalizacao IS NULL
-           AND externo.origem_ssw IS NOT NULL AND externo.origem_ssw <> ''
-           AND NOT EXISTS (
-               SELECT 1 FROM {$tabela} interno
-               WHERE interno.seq_carregamento = externo.seq_carregamento
-                 AND (interno.nro_cte::text ~ '^[0-9]+$' AND (interno.nro_cte::text)::int > 0)
-           )
-           AND externo.seq_carregamento IS NOT NULL"
-    );
-    if (!$resFinAll) {
-        $resFinAllFallback = @pg_query(
-            $conn,
-            "UPDATE {$tabela}
-             SET data_finalizacao = CURRENT_DATE,
-                 hora_finalizacao = CURRENT_TIME,
-                 login_finalizacao = '{$loginEsc}'
-             WHERE UPPER(unidade) = '{$unidadeEsc}'
-               AND data_finalizacao IS NULL
-               AND origem_ssw IS NOT NULL AND origem_ssw <> ''
-               AND COALESCE(nro_cte, 0) = 0"
-        );
-        if ($resFinAllFallback) $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAllFallback);
-    } else {
-        $finalizadosSumiramSsw = (int)pg_affected_rows($resFinAll);
-    }
     respondJson([
         'success' => true,
         'message' => "Nenhum carregamento encontrado no SSW para esta unidade.",
@@ -1804,6 +1771,7 @@ if (count($placasUp) > 0) {
                  WHERE t.unidade = \$1
                    AND t.data_finalizacao IS NULL
                    AND UPPER(t.placa_provisoria) = UPPER(\$2)
+                   AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
                    {$guardaSomenteTransferencia}",
                 [$unidade, $p, $d, $h, $login],
                 $conn
@@ -1824,7 +1792,9 @@ if (count($placasUp) > 0) {
                              login_finalizacao = \$5
                          WHERE t.unidade = \$1
                            AND t.data_finalizacao IS NULL
-                           AND RIGHT(UPPER(t.placa_provisoria), 4) = RIGHT(UPPER(\$2), 4)
+                           AND char_length(BTRIM(COALESCE(t.placa_provisoria, ''))) = 4
+                           AND UPPER(BTRIM(COALESCE(t.placa_provisoria, ''))) = RIGHT(UPPER(\$2), 4)
+                           AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
                            {$guardaSomenteTransferencia}",
                         [$unidade, $p, $d, $h, $login],
                         $conn
