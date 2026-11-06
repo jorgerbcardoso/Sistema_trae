@@ -3512,6 +3512,8 @@ function CardCarregamento(props: CardCarregamentoProps) {
 
   const carregamentoIniciado = !isSimulado && !isEntregaCarreg && (carregamento.origem_criacao === 'AUTO' || carregamento.origem_criacao === 'SSW');
   const dominante = isEntregaCarreg ? 'ENTREGA' : 'TRANSFERENCIA';
+  const temEntrega = isEntregaCarreg;
+  const temTransferencia = !isEntregaCarreg;
 
   const sugestaoVeiculo = useMemo(() => {
     if (!isEntregaCarreg) return null;
