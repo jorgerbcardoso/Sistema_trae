@@ -32,6 +32,7 @@ import { ControleTransbordo } from './relatorios/ControleTransbordo';
 import { TotaisVendedores } from './relatorios/TotaisVendedores';
 import { FretesExpedidosRecebidos } from './relatorios/FretesExpedidosRecebidos';
 import { RelacaoCTes } from './relatorios/RelacaoCTes';
+import { VendedoresCarteiras } from './comercial/VendedoresCarteiras';
 import { GestaoMenu } from './admin/GestaoMenu';
 import { ParametrosEmpresa } from './admin/ParametrosEmpresa';
 
@@ -157,6 +158,11 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'relatorios/TotaisVendedores': TotaisVendedores,
   'relatorios/FretesExpedidosRecebidos': FretesExpedidosRecebidos,
   'relatorios/RelacaoCTes': RelacaoCTes,
+  
+  // ============================================
+  // COMERCIAL
+  // ============================================
+  'comercial/VendedoresCarteiras': VendedoresCarteiras,
   
   // ============================================
   // ADMINISTRAÇÃO
