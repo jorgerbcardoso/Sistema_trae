@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { toast } from 'sonner';
 import { apiFetch } from '../../utils/apiUtils';
@@ -26,9 +27,19 @@ type EmpParam = {
   ocor_chegada_unid_dest: number | null;
   ocor_cte_retido: number | null;
   ocor_estorno_baixa: number | null;
+  com_vend_desc_pis_cofins: boolean;
+  com_vend_dest_icms: boolean;
 };
 
-type FieldKey = keyof EmpParam;
+type FieldKey =
+  | 'ocor_aguardando_agendamento'
+  | 'ocor_agendamento'
+  | 'ocor_saida_transf'
+  | 'ocor_saida_entrega'
+  | 'ocor_chegada_unid'
+  | 'ocor_chegada_unid_dest'
+  | 'ocor_cte_retido'
+  | 'ocor_estorno_baixa';
 
 function formatOcorCodigo(codigo: number) {
   return String(codigo).padStart(2, '0');
@@ -173,6 +184,8 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: null,
     ocor_cte_retido: null,
     ocor_estorno_baixa: null,
+    com_vend_desc_pis_cofins: false,
+    com_vend_dest_icms: false,
   });
 
   const [ocorrenciasOpen, setOcorrenciasOpen] = useState<Record<FieldKey, boolean>>({
@@ -245,7 +258,11 @@ export function ParametrosEmpresa() {
         return;
       }
       const p = response.params as EmpParam;
-      setParams(p);
+      setParams({
+        ...p,
+        com_vend_desc_pis_cofins: !!p?.com_vend_desc_pis_cofins,
+        com_vend_dest_icms: !!p?.com_vend_dest_icms,
+      });
       const fields: FieldKey[] = [
         'ocor_aguardando_agendamento',
         'ocor_agendamento',
@@ -509,25 +526,63 @@ export function ParametrosEmpresa() {
               onSelect={handleSelect}
               onClear={handleClear}
             />
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" disabled={loading || saving} onClick={loadParams}>
-                Recarregar
-              </Button>
-              <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={save}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Salvar
-              </Button>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando parâmetros...
-              </div>
-            ) : null}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Comissão de Vendas</CardTitle>
+            <CardDescription>
+              Defina o que deve ser descontado do frete para formar a base de cálculo da comissão do vendedor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div className="min-w-0">
+                <Label className="text-sm font-medium">Descontar PIS/COFINS</Label>
+                <p className="text-xs text-slate-500">
+                  Desconta o PIS/COFINS do frete na formação da base de cálculo da comissão.
+                </p>
+              </div>
+              <Switch
+                checked={params.com_vend_desc_pis_cofins}
+                onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_desc_pis_cofins: v }))}
+                disabled={loading || saving}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div className="min-w-0">
+                <Label className="text-sm font-medium">Descontar ICMS</Label>
+                <p className="text-xs text-slate-500">
+                  Desconta o ICMS do frete na formação da base de cálculo da comissão.
+                </p>
+              </div>
+              <Switch
+                checked={params.com_vend_dest_icms}
+                onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_dest_icms: v }))}
+                disabled={loading || saving}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" disabled={loading || saving} onClick={loadParams}>
+            Recarregar
+          </Button>
+          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={save}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Salvar
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando parâmetros...
+          </div>
+        ) : null}
       </div>
     </AdminLayout>
   );

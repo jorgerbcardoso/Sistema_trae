@@ -25,7 +25,6 @@ import { CadastroUnidades } from './cadastros/CadastroUnidades';
 import { GruposEventos } from './cadastros/GruposEventos';
 import { CadastroLinhas } from './cadastros/CadastroLinhas';
 import { CadastroClientes } from './cadastros/CadastroClientes';
-import { Vendedores } from './cadastros/Vendedores';
 import { ClientesVendedor } from './cadastros/ClientesVendedor';
 import { ConferenciaSaidas } from './relatorios/ConferenciaSaidas';
 import { ControleTransbordo } from './relatorios/ControleTransbordo';
@@ -144,7 +143,6 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'cadastros/GruposEventos': GruposEventos,
   'cadastros/CadastroClientes': CadastroClientes,
   'cadastros/CadastroLinhas': CadastroLinhas, // ✅ CORRIGIDO: era 'cadastros/linhas'
-  'cadastros/Vendedores': Vendedores,
   'cadastros/ClientesVendedor': ClientesVendedor,
   
   // ============================================

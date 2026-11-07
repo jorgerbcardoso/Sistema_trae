@@ -28,7 +28,6 @@ import { CadastroUnidades } from './components/cadastros/CadastroUnidades';
 import { GruposEventos } from './components/cadastros/GruposEventos';
 import { CadastroLinhas } from './components/cadastros/CadastroLinhas';
 import { CadastroClientes } from './components/cadastros/CadastroClientes';
-import { Vendedores } from './components/cadastros/Vendedores';
 import { ClientesVendedor } from './components/cadastros/ClientesVendedor';
 import { VendedoresCarteiras } from './components/comercial/VendedoresCarteiras';
 
@@ -327,14 +326,6 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CadastroUsuarios />
-          </ProtectedRoute>
-        )
-      },
-      {
-        path: 'cadastros/vendedores',
-        element: (
-          <ProtectedRoute>
-            <Vendedores />
           </ProtectedRoute>
         )
       },

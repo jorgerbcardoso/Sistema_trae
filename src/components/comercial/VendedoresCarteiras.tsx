@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -177,6 +178,7 @@ export function VendedoresCarteiras() {
   const [totais, setTotais] = useState<TotaisVendedores | null>(null);
   const [busca, setBusca] = useState('');
   const [pagina, setPagina] = useState(1);
+  const [salvandoTeleVendas, setSalvandoTeleVendas] = useState<string | null>(null);
 
   // ============ CARTEIRA (DIALOG) ============
   const [carteiraOpen, setCarteiraOpen] = useState(false);
@@ -187,6 +189,7 @@ export function VendedoresCarteiras() {
   const [buscaCliente, setBuscaCliente] = useState('');
   const [paginaCarteira, setPaginaCarteira] = useState(1);
   const [salvandoCnpj, setSalvandoCnpj] = useState<string | null>(null);
+  const [statusCarteiraFiltro, setStatusCarteiraFiltro] = useState<StatusCodigo | null>(null);
 
   // ============ BUSCA DE CLIENTE (DIALOG) ============
   const [buscaGlobal, setBuscaGlobal] = useState('');
@@ -261,17 +264,53 @@ export function VendedoresCarteiras() {
     }
   }, []);
 
-  const abrirCarteira = (vendedor: Vendedor) => {
+  const abrirCarteira = (vendedor: Vendedor, status: StatusCodigo | null = null) => {
     setCarteiraVendedor(vendedor);
     setClientes([]);
     setTotaisCarteira(null);
     setBuscaCliente('');
     setPaginaCarteira(1);
+    setStatusCarteiraFiltro(status);
     setCarteiraOpen(true);
     carregarClientes(vendedor.login);
   };
 
   // ============ AÇÕES ============
+  const alterarTeleVendas = async (vendedor: Vendedor, habilitado: boolean) => {
+    const teleVendaAnterior = vendedor.tele_venda;
+    setSalvandoTeleVendas(vendedor.login);
+    setVendedores((prev) =>
+      prev.map((v) => (v.login === vendedor.login ? { ...v, tele_venda: habilitado } : v))
+    );
+
+    try {
+      const resp = await apiFetch(API, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update_tele_venda',
+          login: vendedor.login,
+          tele_venda: habilitado,
+        }),
+      });
+      if (!resp?.success) {
+        setVendedores((prev) =>
+          prev.map((v) =>
+            v.login === vendedor.login ? { ...v, tele_venda: teleVendaAnterior } : v
+          )
+        );
+      }
+    } catch (e) {
+      console.error('Erro ao atualizar tele-vendas:', e);
+      setVendedores((prev) =>
+        prev.map((v) =>
+          v.login === vendedor.login ? { ...v, tele_venda: teleVendaAnterior } : v
+        )
+      );
+    } finally {
+      setSalvandoTeleVendas(null);
+    }
+  };
+
   const alterarStatus = async (cliente: ClienteCarteira, novoStatus: StatusCodigo) => {
     if (!carteiraVendedor || novoStatus === cliente.status) return;
 
@@ -433,14 +472,15 @@ export function VendedoresCarteiras() {
 
   const clientesFiltrados = useMemo(() => {
     const termo = buscaCliente.trim().toLowerCase();
-    if (!termo) return clientes;
     return clientes.filter(
       (c) =>
-        c.nome.toLowerCase().includes(termo) ||
-        c.cnpj_fmt.toLowerCase().includes(termo) ||
-        c.cidade.toLowerCase().includes(termo)
+        (!termo ||
+          c.nome.toLowerCase().includes(termo) ||
+          c.cnpj_fmt.toLowerCase().includes(termo) ||
+          c.cidade.toLowerCase().includes(termo)) &&
+        (!statusCarteiraFiltro || c.status === statusCarteiraFiltro)
     );
-  }, [clientes, buscaCliente]);
+  }, [clientes, buscaCliente, statusCarteiraFiltro]);
 
   const clientesOrdenados = useMemo(
     () => clienteSort.sortData(clientesFiltrados),
@@ -561,8 +601,8 @@ export function VendedoresCarteiras() {
             </div>
           ) : (
             <>
-              <div className="rounded-md border border-border overflow-hidden">
-                <Table>
+              <div className="rounded-md border border-border overflow-hidden [&>div]:overflow-x-hidden">
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
                       <SortableTableHeader
@@ -571,7 +611,7 @@ export function VendedoresCarteiras() {
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[130px]"
+                        className="w-[8%] !px-2 !py-2 text-[11px] leading-tight"
                       />
                       <SortableTableHeader
                         field="nome"
@@ -579,62 +619,46 @@ export function VendedoresCarteiras() {
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
+                        className="w-[20%] !px-2 !py-2 text-[11px] leading-tight"
                       />
                       <SortableTableHeader
                         field="tele_venda"
-                        label="Tele-venda"
+                        label="Tele-vendas"
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[110px]"
+                        className="w-[10%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
                       />
+                      {([
+                        ['qtd_cadastrado', 'Cadastrados'],
+                        ['qtd_prospeccao', 'Prospecção'],
+                        ['qtd_negociacao', 'Negociação'],
+                        ['qtd_conquista', 'Conquista'],
+                      ] as const).map(([field, label]) => (
+                        <SortableTableHeader
+                          key={field}
+                          field={field}
+                          label={label}
+                          currentSortField={vendedorSort.sortField}
+                          currentSortDirection={vendedorSort.sortDirection}
+                          onSort={vendedorSort.handleSort}
+                          className="w-[12%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
+                        />
+                      ))}
                       <SortableTableHeader
                         field="qtd_clientes"
-                        label="Clientes"
+                        label="Total"
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[100px]"
+                        className="w-[14%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
                       />
-                      <SortableTableHeader
-                        field="qtd_conquista"
-                        label="Conquista"
-                        currentSortField={vendedorSort.sortField}
-                        currentSortDirection={vendedorSort.sortDirection}
-                        onSort={vendedorSort.handleSort}
-                        className="w-[100px]"
-                      />
-                      <SortableTableHeader
-                        field="qtd_negociacao"
-                        label="Negociação"
-                        currentSortField={vendedorSort.sortField}
-                        currentSortDirection={vendedorSort.sortDirection}
-                        onSort={vendedorSort.handleSort}
-                        className="w-[110px]"
-                      />
-                      <SortableTableHeader
-                        field="qtd_prospeccao"
-                        label="Prospecção"
-                        currentSortField={vendedorSort.sortField}
-                        currentSortDirection={vendedorSort.sortDirection}
-                        onSort={vendedorSort.handleSort}
-                        className="w-[110px]"
-                      />
-                      <SortableTableHeader
-                        field="qtd_cadastrado"
-                        label="Cadastrado"
-                        currentSortField={vendedorSort.sortField}
-                        currentSortDirection={vendedorSort.sortDirection}
-                        onSort={vendedorSort.handleSort}
-                        className="w-[110px]"
-                      />
-                      <TableHead className="w-[140px] text-right">Carteira</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {vendedoresPagina.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-slate-500 py-10">
+                        <TableCell colSpan={8} className="text-center text-slate-500 py-10">
                           {busca
                             ? 'Nenhum vendedor encontrado para essa busca.'
                             : 'Nenhum vendedor cadastrado. Clique em "Importar do TMS" para começar.'}
@@ -643,50 +667,53 @@ export function VendedoresCarteiras() {
                     ) : (
                       vendedoresPagina.map((v) => (
                         <TableRow key={v.login}>
-                          <TableCell className="font-mono text-xs">{v.login}</TableCell>
-                          <TableCell className="font-medium">{v.nome}</TableCell>
-                          <TableCell>
-                            {v.tele_venda ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 text-[11px] h-5 px-2">
-                                <Phone className="w-3 h-3 mr-1" />
-                                SIM
-                              </Badge>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
+                          <TableCell className="p-2 font-mono text-xs truncate" title={v.login}>
+                            {v.login}
                           </TableCell>
-                          <TableCell className="font-semibold tabular-nums">{v.qtd_clientes}</TableCell>
-                          <TableCell className="tabular-nums">
-                            <span className={v.qtd_conquista > 0 ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}>
-                              {v.qtd_conquista}
-                            </span>
+                          <TableCell className="p-2 font-medium truncate max-w-0" title={v.nome}>
+                            {v.nome}
                           </TableCell>
-                          <TableCell className="tabular-nums">
-                            <span className={v.qtd_negociacao > 0 ? 'font-semibold text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}>
-                              {v.qtd_negociacao}
-                            </span>
+                          <TableCell className="p-2 text-center">
+                            <Switch
+                              checked={v.tele_venda}
+                              onCheckedChange={(checked) => alterarTeleVendas(v, checked)}
+                              disabled={Boolean(salvandoTeleVendas)}
+                              aria-label={`Tele-vendas para ${v.nome}`}
+                              title={v.tele_venda ? 'Desativar tele-vendas' : 'Ativar tele-vendas'}
+                              className="scale-90"
+                            />
                           </TableCell>
-                          <TableCell className="tabular-nums">
-                            <span className={v.qtd_prospeccao > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-slate-400'}>
-                              {v.qtd_prospeccao}
-                            </span>
-                          </TableCell>
-                          <TableCell className="tabular-nums">
-                            <span className={v.qtd_cadastrado > 0 ? 'font-semibold text-slate-600 dark:text-slate-300' : 'text-slate-400'}>
-                              {v.qtd_cadastrado}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
+                          {([
+                            ['D', 'qtd_cadastrado', 'text-slate-600 dark:text-slate-300'],
+                            ['P', 'qtd_prospeccao', 'text-amber-600 dark:text-amber-400'],
+                            ['N', 'qtd_negociacao', 'text-indigo-600 dark:text-indigo-400'],
+                            ['C', 'qtd_conquista', 'text-emerald-600 dark:text-emerald-400'],
+                          ] as const).map(([status, field, color]) => (
+                            <TableCell key={status} className="p-2 text-center tabular-nums">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className={`h-7 min-w-8 px-1 font-semibold ${v[field] > 0 ? color : 'text-slate-400'}`}
+                                onClick={() => abrirCarteira(v, status)}
+                                disabled={v[field] === 0}
+                                title={`Ver clientes ${STATUS_MAP[status].label.toLowerCase()}`}
+                              >
+                                {v[field]}
+                              </Button>
+                            </TableCell>
+                          ))}
+                          <TableCell className="p-2 text-center tabular-nums">
                             <Button
-                              variant="outline"
+                              type="button"
+                              variant="ghost"
                               size="sm"
-                              className="gap-2 h-8"
+                              className="h-7 min-w-8 px-1 font-semibold"
                               onClick={() => abrirCarteira(v)}
                               disabled={v.qtd_clientes === 0}
-                              title="Ver clientes da carteira"
+                              title="Ver todos os clientes da carteira"
                             >
-                              <Users className="w-3.5 h-3.5" />
-                              Ver carteira
+                              {v.qtd_clientes}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -706,14 +733,14 @@ export function VendedoresCarteiras() {
                   <span>
                     <strong className="text-slate-800 dark:text-slate-100">{totais.clientes}</strong> clientes
                   </span>
-                  <StatusBadge status="C" />
-                  <span className="tabular-nums">{totais.conquista}</span>
-                  <StatusBadge status="N" />
-                  <span className="tabular-nums">{totais.negociacao}</span>
-                  <StatusBadge status="P" />
-                  <span className="tabular-nums">{totais.prospeccao}</span>
                   <StatusBadge status="D" />
                   <span className="tabular-nums">{totais.cadastrado}</span>
+                  <StatusBadge status="P" />
+                  <span className="tabular-nums">{totais.prospeccao}</span>
+                  <StatusBadge status="N" />
+                  <span className="tabular-nums">{totais.negociacao}</span>
+                  <StatusBadge status="C" />
+                  <span className="tabular-nums">{totais.conquista}</span>
                 </div>
               )}
 
@@ -756,7 +783,7 @@ export function VendedoresCarteiras() {
 
       {/* ================= DIALOG: CARTEIRA ================= */}
       <Dialog open={carteiraOpen} onOpenChange={setCarteiraOpen}>
-        <DialogContent className="max-w-5xl h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl h-[90vh] max-h-[90vh] min-h-0 overflow-hidden !flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               Carteira de {carteiraVendedor?.nome ?? '—'}
@@ -773,7 +800,9 @@ export function VendedoresCarteiras() {
               )}
             </DialogTitle>
             <DialogDescription>
-              Defina o status da negociação de cada cliente da carteira
+              {statusCarteiraFiltro
+                ? `Clientes com status ${STATUS_MAP[statusCarteiraFiltro].label}`
+                : 'Defina o status da negociação de cada cliente da carteira'}
             </DialogDescription>
           </DialogHeader>
 
@@ -806,6 +835,19 @@ export function VendedoresCarteiras() {
                   Limpar
                 </Button>
               )}
+              {statusCarteiraFiltro && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => {
+                    setStatusCarteiraFiltro(null);
+                    setPaginaCarteira(1);
+                  }}
+                >
+                  Ver todos os status
+                </Button>
+              )}
               <div className="flex items-center gap-2 ml-auto">
                 <Button
                   variant="outline"
@@ -827,22 +869,28 @@ export function VendedoresCarteiras() {
             {totaisCarteira && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <span className="font-semibold text-slate-700 dark:text-slate-200">
-                  {totaisCarteira.total} cliente(s)
+                  {statusCarteiraFiltro
+                    ? `${totaisCarteira[statusCarteiraFiltro]} cliente(s) neste status`
+                    : `${totaisCarteira.total} cliente(s) na carteira`}
                 </span>
-                <span className="text-slate-300 dark:text-slate-600">|</span>
-                <StatusBadge status="C" />
-                <span className="tabular-nums">{totaisCarteira.C}</span>
-                <StatusBadge status="N" />
-                <span className="tabular-nums">{totaisCarteira.N}</span>
-                <StatusBadge status="P" />
-                <span className="tabular-nums">{totaisCarteira.P}</span>
-                <StatusBadge status="D" />
-                <span className="tabular-nums">{totaisCarteira.D}</span>
+                {!statusCarteiraFiltro && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-600">|</span>
+                    <StatusBadge status="D" />
+                    <span className="tabular-nums">{totaisCarteira.D}</span>
+                    <StatusBadge status="P" />
+                    <span className="tabular-nums">{totaisCarteira.P}</span>
+                    <StatusBadge status="N" />
+                    <span className="tabular-nums">{totaisCarteira.N}</span>
+                    <StatusBadge status="C" />
+                    <span className="tabular-nums">{totaisCarteira.C}</span>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
             {loadingClientes ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -999,7 +1047,7 @@ export function VendedoresCarteiras() {
 
       {/* ================= DIALOG: BUSCA DE CLIENTE ================= */}
       <Dialog open={buscaOpen} onOpenChange={setBuscaOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl h-[90vh] max-h-[90vh] min-h-0 overflow-hidden !flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UserSquare2 className="w-4 h-4" />
@@ -1008,7 +1056,7 @@ export function VendedoresCarteiras() {
             <DialogDescription>Vendedor(es) responsáveis pela carteira deste cliente</DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain pr-1 py-2 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 py-2 space-y-3">
             {buscandoCliente ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-slate-400" />

@@ -138,6 +138,8 @@ try {
 
         if ($postAction === 'update_status') {
             crmAtualizarStatus($tblVendedorCliente, $data, $STATUS);
+        } elseif ($postAction === 'update_tele_venda') {
+            crmAtualizarTeleVenda($tblVendedor, $data);
         } elseif ($postAction === 'importar') {
             crmImportar();
         } else {
@@ -149,7 +151,7 @@ try {
     msg('Método não permitido', 'error', 405);
 
 } catch (Throwable $e) {
-    error_log("❌ ERRO em crm/vendedores_carteiras.php: " . $e->getMessage()
+    error_log("❌ ERRO em comercial/vendedores_carteiras.php: " . $e->getMessage()
         . " | " . $e->getFile() . ":" . $e->getLine());
     msg('Erro interno do servidor', 'error', 500);
 }
@@ -404,6 +406,37 @@ function crmAtualizarStatus(string $tblVendedorCliente, array $data, array $STAT
     }
 
     msg('Status atualizado para ' . $STATUS[$status], 'success');
+}
+
+/**
+ * Atualiza a configuração de tele-vendas do vendedor.
+ */
+function crmAtualizarTeleVenda(string $tblVendedor, array $data): void {
+    $login = trim((string)($data['login'] ?? ''));
+    $teleVenda = filter_var(
+        $data['tele_venda'] ?? null,
+        FILTER_VALIDATE_BOOLEAN,
+        FILTER_NULL_ON_FAILURE
+    );
+
+    if ($login === '' || $teleVenda === null) {
+        msg('Vendedor e configuração de tele-vendas são obrigatórios', 'error', 400);
+    }
+
+    $result = sql(
+        "UPDATE {$tblVendedor} SET tele_vendas = $1 WHERE LOWER(login) = LOWER($2)",
+        [$teleVenda ? 'true' : 'false', $login]
+    );
+
+    if (!$result) {
+        msg('Erro ao atualizar tele-vendas', 'error', 500);
+    }
+
+    if (pg_affected_rows($result) === 0) {
+        msg('Vendedor não encontrado', 'error', 404);
+    }
+
+    msg('Configuração de tele-vendas atualizada', 'success');
 }
 
 /**

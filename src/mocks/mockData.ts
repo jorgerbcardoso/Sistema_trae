@@ -294,6 +294,14 @@ export const MOCK_MENU_SECTIONS = [
     description: 'GESTÃO DE COMPRAS E FORNECEDORES',
     icon: 'ShoppingCart',
     display_order: 7
+  },
+  {
+    id: 9,
+    code: 'comercial',
+    name: 'COMERCIAL',
+    description: 'CARTEIRAS DE CLIENTES E NEGOCIAÇÃO',
+    icon: 'Briefcase',
+    display_order: 9
   }
 ];
 
@@ -402,13 +410,13 @@ export const MOCK_MENU_ITEMS = [
   },
   {
     id: 19,
-    section_id: 2,
-    code: 'vendedores',
-    name: 'CADASTRO DE VENDEDORES',
-    description: 'IMPORTAÇÃO DOS VENDEDORES E DEFINIÇÃO DE SETORES',
-    icon: 'UserCheck',
-    route_path: '/cadastros/vendedores',
-    component_path: 'cadastros/Vendedores',
+    section_id: 9,
+    code: 'comercial_vendedores_carteiras',
+    name: 'VENDEDORES E CARTEIRAS',
+    description: 'CARTEIRAS DE CLIENTES E STATUS DA NEGOCIAÇÃO',
+    icon: 'Users',
+    route_path: '/comercial/vendedores-carteiras',
+    component_path: 'comercial/VendedoresCarteiras',
     is_available: true,
     status: 'active'
   },
@@ -937,16 +945,25 @@ export const MOCK_MENU_VCS = {
             can_export: false
           }
         },
-        // Cadastro de Vendedores
+      ]
+    },
+    {
+      id: 9,
+      code: 'comercial',
+      name: 'COMERCIAL',
+      description: 'CARTEIRAS DE CLIENTES E NEGOCIAÇÃO',
+      icon: 'Briefcase',
+      display_order: 9,
+      items: [
         {
           id: 22,
-          section_id: 2,
-          code: 'vendedores',
-          name: 'CADASTRO DE VENDEDORES',
-          description: 'IMPORTAÇÃO DOS VENDEDORES E DEFINIÇÃO DE SETORES',
-          icon: 'UserCheck',
-          route_path: '/cadastros/vendedores',
-          component_path: 'cadastros/Vendedores',
+          section_id: 9,
+          code: 'comercial_vendedores_carteiras',
+          name: 'VENDEDORES E CARTEIRAS',
+          description: 'CARTEIRAS DE CLIENTES E STATUS DA NEGOCIAÇÃO',
+          icon: 'Users',
+          route_path: '/comercial/vendedores-carteiras',
+          component_path: 'comercial/VendedoresCarteiras',
           is_available: true,
           status: 'active',
           permissions: {
