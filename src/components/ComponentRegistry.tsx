@@ -33,6 +33,7 @@ import { FretesExpedidosRecebidos } from './relatorios/FretesExpedidosRecebidos'
 import { RelacaoCTes } from './relatorios/RelacaoCTes';
 import { VendedoresCarteiras } from './comercial/VendedoresCarteiras';
 import { AcoesVenda } from './comercial/AcoesVenda';
+import { BIComercial } from './comercial/BIComercial';
 import { GestaoMenu } from './admin/GestaoMenu';
 import { ParametrosEmpresa } from './admin/ParametrosEmpresa';
 
@@ -163,6 +164,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   // ============================================
   'comercial/VendedoresCarteiras': VendedoresCarteiras,
   'comercial/AcoesVenda': AcoesVenda,
+  'comercial/BIComercial': BIComercial,
   
   // ============================================
   // ADMINISTRAÇÃO
