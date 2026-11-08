@@ -12,12 +12,14 @@ import {
   Building2,
   UserSquare2,
   Info,
+  Percent,
 } from 'lucide-react';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import {
   Table,
   TableBody,
@@ -119,7 +121,7 @@ interface TotaisVendedores {
   cadastrado: number;
 }
 
-interface ClienteCarteira {
+interface ClienteCarteira extends ComissaoPeriodo {
   cnpj: string;
   cnpj_fmt: string;
   nome: string;
@@ -129,6 +131,59 @@ interface ClienteCarteira {
   status: StatusCodigo;
   status_label: string;
   data_status: string;
+}
+
+interface ComissaoPeriodo {
+  perc_conquista: number | null;
+  data_ini_conquista: string | null;
+  data_fin_conquista: string | null;
+  perc_manutencao: number | null;
+  data_ini_manutencao: string | null;
+  data_fin_manutencao: string | null;
+  perc_manutencao2: number | null;
+  data_ini_manutencao2: string | null;
+  data_fin_manutencao2: string | null;
+}
+
+type ComissaoFormState = Record<keyof ComissaoPeriodo, string>;
+
+interface DefinicaoPeriodo {
+  rotulo: string;
+  perc: keyof ComissaoPeriodo;
+  ini: keyof ComissaoPeriodo;
+  fin: keyof ComissaoPeriodo;
+}
+
+const PERIODOS_COMISSAO: DefinicaoPeriodo[] = [
+  { rotulo: 'Conquista', perc: 'perc_conquista', ini: 'data_ini_conquista', fin: 'data_fin_conquista' },
+  { rotulo: 'Manutenção', perc: 'perc_manutencao', ini: 'data_ini_manutencao', fin: 'data_fin_manutencao' },
+  { rotulo: 'Manutenção 2', perc: 'perc_manutencao2', ini: 'data_ini_manutencao2', fin: 'data_fin_manutencao2' },
+];
+
+function criarComissaoVazia(): ComissaoFormState {
+  return {
+    perc_conquista: '',
+    data_ini_conquista: '',
+    data_fin_conquista: '',
+    perc_manutencao: '',
+    data_ini_manutencao: '',
+    data_fin_manutencao: '',
+    perc_manutencao2: '',
+    data_ini_manutencao2: '',
+    data_fin_manutencao2: '',
+  };
+}
+
+function formatarPercentualBR(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined) return '';
+  return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function resumoComissao(cliente: ClienteCarteira): string {
+  return PERIODOS_COMISSAO.map((p) => cliente[p.perc])
+    .filter((v): v is number => v !== null && v !== undefined)
+    .map((v) => `${formatarPercentualBR(v)}%`)
+    .join(' · ');
 }
 
 interface TotaisCarteira {
@@ -156,6 +211,41 @@ interface ClienteBusca {
   uf: string;
   vendedores: VendedorDoCliente[];
 }
+
+/** Parâmetros de comissão da empresa ([dominio]_emp_param) — exibição informativa. */
+interface ParametrosComissao {
+  com_vend_desc_pis_cofins: boolean;
+  com_vend_desc_icms: boolean;
+  com_vend_apenas_liq: boolean;
+  com_vend_apenas_entr: boolean;
+}
+
+const PARAMS_COMISSAO_DISPLAY: {
+  key: keyof ParametrosComissao;
+  label: string;
+  title: string;
+}[] = [
+  {
+    key: 'com_vend_desc_pis_cofins',
+    label: 'Desconta PIS/COFINS',
+    title: 'A base de cálculo da comissão desconta o PIS/COFINS do frete.',
+  },
+  {
+    key: 'com_vend_desc_icms',
+    label: 'Desconta ICMS',
+    title: 'A base de cálculo da comissão desconta o ICMS do frete.',
+  },
+  {
+    key: 'com_vend_apenas_liq',
+    label: 'Só CT-es liquidados',
+    title: 'A comissão é paga apenas sobre CT-es liquidados.',
+  },
+  {
+    key: 'com_vend_apenas_entr',
+    label: 'Só CT-es entregues',
+    title: 'A comissão é paga apenas sobre CT-es entregues.',
+  },
+];
 
 function hojeBR(): string {
   return new Date().toLocaleDateString('pt-BR');
@@ -190,6 +280,15 @@ export function VendedoresCarteiras() {
   const [paginaCarteira, setPaginaCarteira] = useState(1);
   const [salvandoCnpj, setSalvandoCnpj] = useState<string | null>(null);
   const [statusCarteiraFiltro, setStatusCarteiraFiltro] = useState<StatusCodigo | null>(null);
+
+  // ============ COMISSÃO (DIALOG) ============
+  const [comissaoOpen, setComissaoOpen] = useState(false);
+  const [comissaoCliente, setComissaoCliente] = useState<ClienteCarteira | null>(null);
+  const [comissaoForm, setComissaoForm] = useState<ComissaoFormState>(criarComissaoVazia);
+  const [salvandoComissao, setSalvandoComissao] = useState(false);
+
+  // ============ PARÂMETROS DE COMISSÃO DA EMPRESA (DISPLAY) ============
+  const [paramsComissao, setParamsComissao] = useState<ParametrosComissao | null>(null);
 
   // ============ BUSCA DE CLIENTE (DIALOG) ============
   const [buscaGlobal, setBuscaGlobal] = useState('');
@@ -243,6 +342,33 @@ export function VendedoresCarteiras() {
   useEffect(() => {
     carregarVendedores();
   }, [carregarVendedores, user?.domain]);
+
+  // Carrega os parâmetros de comissão da empresa apenas para exibição no topo.
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        const resp = await apiFetch(
+          `${ENVIRONMENT.apiBaseUrl}/admin/empresa_parametros.php`,
+          { method: 'GET' },
+          true
+        );
+        if (!ativo || !resp?.success) return;
+        const p = resp.params ?? {};
+        setParamsComissao({
+          com_vend_desc_pis_cofins: !!p.com_vend_desc_pis_cofins,
+          com_vend_desc_icms: !!p.com_vend_desc_icms,
+          com_vend_apenas_liq: !!p.com_vend_apenas_liq,
+          com_vend_apenas_entr: !!p.com_vend_apenas_entr,
+        });
+      } catch {
+        // Exibição apenas informativa — falha não bloqueia a tela.
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [user?.domain]);
 
   const carregarClientes = useCallback(async (login: string) => {
     try {
@@ -371,6 +497,112 @@ export function VendedoresCarteiras() {
       );
     } finally {
       setSalvandoCnpj(null);
+    }
+  };
+
+  const abrirComissao = (cliente: ClienteCarteira) => {
+    setComissaoCliente(cliente);
+    setComissaoForm({
+      perc_conquista: formatarPercentualBR(cliente.perc_conquista),
+      data_ini_conquista: cliente.data_ini_conquista ?? '',
+      data_fin_conquista: cliente.data_fin_conquista ?? '',
+      perc_manutencao: formatarPercentualBR(cliente.perc_manutencao),
+      data_ini_manutencao: cliente.data_ini_manutencao ?? '',
+      data_fin_manutencao: cliente.data_fin_manutencao ?? '',
+      perc_manutencao2: formatarPercentualBR(cliente.perc_manutencao2),
+      data_ini_manutencao2: cliente.data_ini_manutencao2 ?? '',
+      data_fin_manutencao2: cliente.data_fin_manutencao2 ?? '',
+    });
+    setComissaoOpen(true);
+  };
+
+  const limparPeriodoComissao = (periodo: DefinicaoPeriodo) => {
+    setComissaoForm((prev) => ({ ...prev, [periodo.perc]: '', [periodo.ini]: '', [periodo.fin]: '' }));
+  };
+
+  const salvarComissao = async () => {
+    if (!comissaoCliente || !carteiraVendedor) return;
+
+    const payload: Record<string, string | number | null> = {
+      action: 'update_comissao',
+      login: carteiraVendedor.login,
+      cnpj: comissaoCliente.cnpj,
+    };
+
+    let periodosPreenchidos = 0;
+
+    for (const periodo of PERIODOS_COMISSAO) {
+      const percRaw = comissaoForm[periodo.perc].trim();
+      const iniRaw = comissaoForm[periodo.ini].trim();
+      const finRaw = comissaoForm[periodo.fin].trim();
+
+      const usado = percRaw !== '' || iniRaw !== '' || finRaw !== '';
+
+      if (!usado) {
+        payload[periodo.perc] = null;
+        payload[periodo.ini] = null;
+        payload[periodo.fin] = null;
+        continue;
+      }
+
+      if (percRaw === '' || iniRaw === '' || finRaw === '') {
+        toast.error(`Preencha o percentual e as datas inicial e final do período ${periodo.rotulo}.`);
+        return;
+      }
+
+      const percNum = Number(percRaw.replace(',', '.'));
+      if (!Number.isFinite(percNum) || percNum < 0 || percNum > 100) {
+        toast.error(`O percentual do período ${periodo.rotulo} deve estar entre 0 e 100.`);
+        return;
+      }
+
+      if (iniRaw > finRaw) {
+        toast.error(`No período ${periodo.rotulo}, a data inicial não pode ser posterior à final.`);
+        return;
+      }
+
+      payload[periodo.perc] = percNum;
+      payload[periodo.ini] = iniRaw;
+      payload[periodo.fin] = finRaw;
+      periodosPreenchidos++;
+    }
+
+    if (periodosPreenchidos === 0) {
+      toast.error('Informe ao menos um período de comissão (Conquista, Manutenção ou Manutenção 2).');
+      return;
+    }
+
+    try {
+      setSalvandoComissao(true);
+      const resp = await apiFetch(API, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (!resp?.success) return;
+
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.cnpj === comissaoCliente.cnpj
+            ? {
+                ...c,
+                perc_conquista: payload.perc_conquista as number | null,
+                data_ini_conquista: payload.data_ini_conquista as string | null,
+                data_fin_conquista: payload.data_fin_conquista as string | null,
+                perc_manutencao: payload.perc_manutencao as number | null,
+                data_ini_manutencao: payload.data_ini_manutencao as string | null,
+                data_fin_manutencao: payload.data_fin_manutencao as string | null,
+                perc_manutencao2: payload.perc_manutencao2 as number | null,
+                data_ini_manutencao2: payload.data_ini_manutencao2 as string | null,
+                data_fin_manutencao2: payload.data_fin_manutencao2 as string | null,
+              }
+            : c
+        )
+      );
+      setComissaoOpen(false);
+    } catch (e) {
+      console.error('Erro ao salvar comissão:', e);
+    } finally {
+      setSalvandoComissao(false);
     }
   };
 
@@ -506,6 +738,36 @@ export function VendedoresCarteiras() {
             <CardDescription>
               Carteiras de clientes e status da negociação
             </CardDescription>
+
+            {paramsComissao && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Regras de comissão:
+                </span>
+                {PARAMS_COMISSAO_DISPLAY.map(({ key, label, title }) => {
+                  const ativo = paramsComissao[key];
+                  return (
+                    <Badge
+                      key={key}
+                      variant="outline"
+                      title={ativo ? title : `Inativo — ${title}`}
+                      className={`gap-1.5 text-[11px] h-5 px-2 whitespace-nowrap font-normal ${
+                        ativo
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-500'
+                      }`}
+                    >
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          ativo ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                        }`}
+                      />
+                      {label}
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -783,7 +1045,7 @@ export function VendedoresCarteiras() {
 
       {/* ================= DIALOG: CARTEIRA ================= */}
       <Dialog open={carteiraOpen} onOpenChange={setCarteiraOpen}>
-        <DialogContent className="max-w-5xl h-[90vh] max-h-[90vh] min-h-0 overflow-hidden !flex flex-col">
+        <DialogContent className="max-w-6xl h-[90vh] max-h-[90vh] min-h-0 overflow-hidden !flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               Carteira de {carteiraVendedor?.nome ?? '—'}
@@ -921,7 +1183,7 @@ export function VendedoresCarteiras() {
                         currentSortField={clienteSort.sortField}
                         currentSortDirection={clienteSort.sortDirection}
                         onSort={clienteSort.handleSort}
-                        className="w-[180px]"
+                        className="w-[150px]"
                       />
                       <SortableTableHeader
                         field="uf"
@@ -929,9 +1191,9 @@ export function VendedoresCarteiras() {
                         currentSortField={clienteSort.sortField}
                         currentSortDirection={clienteSort.sortDirection}
                         onSort={clienteSort.handleSort}
-                        className="w-[70px]"
+                        className="w-[60px]"
                       />
-                      <TableHead className="w-[130px] px-6 py-3 text-xs uppercase tracking-wider">
+                      <TableHead className="w-[110px] px-4 py-3 text-xs uppercase tracking-wider">
                         Últ. Movto
                       </TableHead>
                       <SortableTableHeader
@@ -948,14 +1210,17 @@ export function VendedoresCarteiras() {
                         currentSortField={clienteSort.sortField}
                         currentSortDirection={clienteSort.sortDirection}
                         onSort={clienteSort.handleSort}
-                        className="w-[130px]"
+                        className="w-[110px]"
                       />
+                      <TableHead className="w-[150px] px-4 py-3 text-xs uppercase tracking-wider text-right">
+                        Comissão
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {clientesPagina.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-slate-500 py-10">
+                        <TableCell colSpan={8} className="text-center text-slate-500 py-10">
                           {buscaCliente
                             ? 'Nenhum cliente encontrado nessa carteira.'
                             : 'Este vendedor não possui clientes na carteira.'}
@@ -993,6 +1258,28 @@ export function VendedoresCarteiras() {
                             </div>
                           </TableCell>
                           <TableCell className="text-slate-500 text-xs">{c.data_status || '—'}</TableCell>
+                          <TableCell className="px-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <span
+                                className={`text-xs tabular-nums truncate ${
+                                  resumoComissao(c) ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'
+                                }`}
+                                title={resumoComissao(c) || 'Nenhum período de comissão definido'}
+                              >
+                                {resumoComissao(c) || 'Não definida'}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 shrink-0"
+                                onClick={() => abrirComissao(c)}
+                                title="Definir comissão do vendedor"
+                              >
+                                <Percent className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -1117,6 +1404,113 @@ export function VendedoresCarteiras() {
           <div className="shrink-0 border-t pt-3 flex justify-end">
             <Button variant="outline" size="sm" onClick={() => setBuscaOpen(false)}>
               Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ================= DIALOG: COMISSÃO ================= */}
+      <Dialog open={comissaoOpen} onOpenChange={setComissaoOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] min-h-0 overflow-hidden !flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Percent className="w-4 h-4" />
+              Comissão do vendedor
+            </DialogTitle>
+            <DialogDescription>
+              {comissaoCliente ? (
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                    {comissaoCliente.nome}
+                  </span>
+                  <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-mono text-[11px]">
+                    {comissaoCliente.cnpj_fmt}
+                  </Badge>
+                </span>
+              ) : (
+                'Períodos e percentuais de comissão'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 py-2 space-y-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Informe ao menos um período. Um período é considerado quando o percentual, a data
+              inicial e a data final estiverem preenchidos.
+            </p>
+
+            {PERIODOS_COMISSAO.map((periodo) => (
+              <div key={periodo.perc} className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">{periodo.rotulo}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => limparPeriodoComissao(periodo)}
+                    disabled={salvandoComissao}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Limpar
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Percentual (%)</Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      className="h-9"
+                      value={comissaoForm[periodo.perc]}
+                      onChange={(e) =>
+                        setComissaoForm((prev) => ({ ...prev, [periodo.perc]: e.target.value }))
+                      }
+                      disabled={salvandoComissao}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data inicial</Label>
+                    <Input
+                      type="date"
+                      className="h-9"
+                      value={comissaoForm[periodo.ini]}
+                      onChange={(e) =>
+                        setComissaoForm((prev) => ({ ...prev, [periodo.ini]: e.target.value }))
+                      }
+                      disabled={salvandoComissao}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data final</Label>
+                    <Input
+                      type="date"
+                      className="h-9"
+                      value={comissaoForm[periodo.fin]}
+                      onChange={(e) =>
+                        setComissaoForm((prev) => ({ ...prev, [periodo.fin]: e.target.value }))
+                      }
+                      disabled={salvandoComissao}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="shrink-0 border-t pt-3 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setComissaoOpen(false)}
+              disabled={salvandoComissao}
+            >
+              Cancelar
+            </Button>
+            <Button size="sm" className="gap-2" onClick={salvarComissao} disabled={salvandoComissao}>
+              {salvandoComissao && <Loader2 className="w-4 h-4 animate-spin" />}
+              Salvar
             </Button>
           </div>
         </DialogContent>

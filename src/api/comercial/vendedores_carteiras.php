@@ -5,21 +5,29 @@
  * ============================================
  * Tabelas:
  * - [dominio]_vendedor          (login, nome, tele_vendas)
- * - [dominio]_vendedor_cliente  (login, cnpj, status, data_status)
+ * - [dominio]_vendedor_cliente  (login, cnpj, status, data_status,
+ *                                perc_conquista, data_ini_conquista, data_fin_conquista,
+ *                                perc_manutencao, data_ini_manutencao, data_fin_manutencao,
+ *                                perc_manutencao2, data_ini_manutencao2, data_fin_manutencao2)
  * - [dominio]_cliente           (cnpj, nome, seq_cidade, data_ult_mvto)
  *
  * GET
  * - (padrão)                       → lista vendedores + totais por status
- * - ?action=clientes&login=xxx     → clientes da carteira do vendedor (com status)
+ * - ?action=clientes&login=xxx     → clientes da carteira do vendedor (com status e comissão)
  * - ?action=buscar_cliente&q=xxx   → busca cliente(s) e seus vendedores
- * - ?action=exportar               → CSV (vendedores + clientes + status)
+ * - ?action=exportar               → CSV (vendedores + clientes + status + comissão)
  *
  * POST (JSON)
  * - { action: 'update_status', login, cnpj, status }
+ * - { action: 'update_comissao', login, cnpj, perc_*, data_ini_*, data_fin_* }
+ * - { action: 'update_tele_venda', login, tele_venda }
  * - { action: 'importar' }
  *
  * Status do vínculo vendedor x cliente:
  *   C = CONQUISTA | D = CADASTRADO | P = EM PROSPECÇÃO | N = EM NEGOCIAÇÃO
+ *
+ * Comissão: períodos (Conquista, Manutenção, Manutenção 2), cada um com
+ * percentual + data inicial + data final. Mínimo de 1 período preenchido.
  * ============================================
  */
 
@@ -88,6 +96,65 @@ function crmGarantirColunasStatus(string $tabela): void {
     }
 }
 
+/**
+ * Garante as colunas de comissão (períodos + percentuais) na tabela de vínculo.
+ */
+function crmGarantirColunasComissao(string $tabela): void {
+    $colunas = [
+        'perc_conquista'       => 'NUMERIC',
+        'data_ini_conquista'   => 'DATE',
+        'data_fin_conquista'   => 'DATE',
+        'perc_manutencao'      => 'NUMERIC',
+        'data_ini_manutencao'  => 'DATE',
+        'data_fin_manutencao'  => 'DATE',
+        'perc_manutencao2'     => 'NUMERIC',
+        'data_ini_manutencao2' => 'DATE',
+        'data_fin_manutencao2' => 'DATE',
+    ];
+
+    foreach ($colunas as $coluna => $tipo) {
+        if (!crmColunaExiste($tabela, $coluna)) {
+            sql("ALTER TABLE {$tabela} ADD COLUMN {$coluna} {$tipo}");
+        }
+    }
+}
+
+function crmNormalizarPercentual($valor): ?float {
+    if ($valor === null) {
+        return null;
+    }
+    if (is_string($valor)) {
+        $valor = trim($valor);
+        if ($valor === '') {
+            return null;
+        }
+        $valor = str_replace(',', '.', $valor);
+    }
+    if (!is_numeric($valor)) {
+        msg('Percentual de comissão inválido.', 'error', 400);
+    }
+    $num = (float) $valor;
+    if ($num < 0 || $num > 100) {
+        msg('O percentual de comissão deve estar entre 0 e 100.', 'error', 400);
+    }
+    return round($num, 2);
+}
+
+function crmNormalizarData($valor): ?string {
+    if ($valor === null) {
+        return null;
+    }
+    $valor = trim((string) $valor);
+    if ($valor === '') {
+        return null;
+    }
+    $dt = DateTime::createFromFormat('Y-m-d', $valor);
+    if (!$dt || $dt->format('Y-m-d') !== $valor) {
+        msg('Data inválida: ' . $valor, 'error', 400);
+    }
+    return $valor;
+}
+
 function crmFormatarCnpj(?string $cnpj): string {
     $n = preg_replace('/[^0-9]/', '', (string)$cnpj);
     if (strlen($n) !== 14) return (string)$cnpj;
@@ -99,6 +166,27 @@ function crmFormatarData(?string $data): string {
     if (!$data) return '';
     $ts = strtotime($data);
     return $ts ? date('d/m/Y', $ts) : '';
+}
+
+function crmFormatarPercentual($valor): string {
+    if ($valor === null || $valor === '') {
+        return '';
+    }
+    return number_format((float) $valor, 2, ',', '');
+}
+
+function crmDataIso($valor): ?string {
+    if ($valor === null || $valor === '') {
+        return null;
+    }
+    return (string) $valor;
+}
+
+function crmPercentualNum($valor): ?float {
+    if ($valor === null || $valor === '') {
+        return null;
+    }
+    return (float) $valor;
 }
 
 // ============================================
@@ -113,6 +201,7 @@ try {
         msg('Tabela de vendedores não encontrada para este domínio.', 'error');
     }
     crmGarantirColunasStatus($tblVendedorCliente);
+    crmGarantirColunasComissao($tblVendedorCliente);
 
     if ($method === 'GET') {
         switch ($action) {
@@ -138,6 +227,8 @@ try {
 
         if ($postAction === 'update_status') {
             crmAtualizarStatus($tblVendedorCliente, $data, $STATUS);
+        } elseif ($postAction === 'update_comissao') {
+            crmAtualizarComissao($tblVendedorCliente, $data);
         } elseif ($postAction === 'update_tele_venda') {
             crmAtualizarTeleVenda($tblVendedor, $data);
         } elseif ($postAction === 'importar') {
@@ -246,7 +337,16 @@ function crmListarClientesVendedor(string $tblVendedor, string $tblVendedorClien
             COALESCE(cid.uf, '')   AS uf,
             c.data_ult_mvto,
             {$colStatus}     AS status,
-            {$colDataStatus} AS data_status
+            {$colDataStatus} AS data_status,
+            vc.perc_conquista,
+            vc.data_ini_conquista,
+            vc.data_fin_conquista,
+            vc.perc_manutencao,
+            vc.data_ini_manutencao,
+            vc.data_fin_manutencao,
+            vc.perc_manutencao2,
+            vc.data_ini_manutencao2,
+            vc.data_fin_manutencao2
         FROM {$tblVendedorCliente} vc
         INNER JOIN {$tblCliente} c ON c.cnpj = vc.cnpj
         LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
@@ -278,6 +378,16 @@ function crmListarClientesVendedor(string $tblVendedor, string $tblVendedorClien
             'status'         => $status,
             'status_label'   => $STATUS[$status],
             'data_status'    => crmFormatarData($row['data_status']),
+
+            'perc_conquista'       => crmPercentualNum($row['perc_conquista']),
+            'data_ini_conquista'   => crmDataIso($row['data_ini_conquista']),
+            'data_fin_conquista'   => crmDataIso($row['data_fin_conquista']),
+            'perc_manutencao'      => crmPercentualNum($row['perc_manutencao']),
+            'data_ini_manutencao'  => crmDataIso($row['data_ini_manutencao']),
+            'data_fin_manutencao'  => crmDataIso($row['data_fin_manutencao']),
+            'perc_manutencao2'     => crmPercentualNum($row['perc_manutencao2']),
+            'data_ini_manutencao2' => crmDataIso($row['data_ini_manutencao2']),
+            'data_fin_manutencao2' => crmDataIso($row['data_fin_manutencao2']),
         ];
 
         $totais['total']++;
@@ -409,6 +519,71 @@ function crmAtualizarStatus(string $tblVendedorCliente, array $data, array $STAT
 }
 
 /**
+ * Atualiza os períodos e percentuais de comissão do vínculo vendedor x cliente.
+ * Regras: mínimo de 1 período; um período usado exige percentual + data inicial + data final.
+ */
+function crmAtualizarComissao(string $tblVendedorCliente, array $data): void {
+    $login = trim((string)($data['login'] ?? ''));
+    $cnpj  = trim((string)($data['cnpj'] ?? ''));
+
+    if ($login === '' || $cnpj === '') {
+        msg('Vendedor e cliente são obrigatórios', 'error', 400);
+    }
+
+    $periodos = [
+        ['perc_conquista', 'data_ini_conquista', 'data_fin_conquista', 'Conquista'],
+        ['perc_manutencao', 'data_ini_manutencao', 'data_fin_manutencao', 'Manutenção'],
+        ['perc_manutencao2', 'data_ini_manutencao2', 'data_fin_manutencao2', 'Manutenção 2'],
+    ];
+
+    $valores = [];
+    $preenchidos = 0;
+
+    foreach ($periodos as [$campoPerc, $campoIni, $campoFin, $rotulo]) {
+        $perc = crmNormalizarPercentual($data[$campoPerc] ?? null);
+        $ini  = crmNormalizarData($data[$campoIni] ?? null);
+        $fin  = crmNormalizarData($data[$campoFin] ?? null);
+
+        if ($perc !== null || $ini !== null || $fin !== null) {
+            if ($perc === null || $ini === null || $fin === null) {
+                msg("Preencha o percentual e as datas inicial e final do período {$rotulo}.", 'error', 400);
+            }
+            if ($ini > $fin) {
+                msg("No período {$rotulo}, a data inicial não pode ser posterior à data final.", 'error', 400);
+            }
+            $preenchidos++;
+        }
+
+        $valores[] = $perc;
+        $valores[] = $ini;
+        $valores[] = $fin;
+    }
+
+    if ($preenchidos === 0) {
+        msg('Informe ao menos um período de comissão (Conquista, Manutenção ou Manutenção 2).', 'error', 400);
+    }
+
+    $result = sql(
+        "UPDATE {$tblVendedorCliente}
+            SET perc_conquista = $1, data_ini_conquista = $2, data_fin_conquista = $3,
+                perc_manutencao = $4, data_ini_manutencao = $5, data_fin_manutencao = $6,
+                perc_manutencao2 = $7, data_ini_manutencao2 = $8, data_fin_manutencao2 = $9
+          WHERE LOWER(login) = LOWER($10) AND cnpj = $11",
+        array_merge($valores, [$login, $cnpj])
+    );
+
+    if (!$result) {
+        msg('Erro ao salvar a comissão', 'error', 500);
+    }
+
+    if (pg_affected_rows($result) === 0) {
+        msg('Vínculo entre vendedor e cliente não encontrado', 'error', 404);
+    }
+
+    msg('Comissão atualizada com sucesso', 'success');
+}
+
+/**
  * Atualiza a configuração de tele-vendas do vendedor.
  */
 function crmAtualizarTeleVenda(string $tblVendedor, array $data): void {
@@ -487,7 +662,16 @@ function crmExportarCsv(string $tblVendedor, string $tblVendedorCliente, string 
             COALESCE(cid.nome, '') AS cidade,
             COALESCE(cid.uf, '')   AS uf,
             {$colStatus}     AS status,
-            {$colDataStatus} AS data_status
+            {$colDataStatus} AS data_status,
+            vc.perc_conquista,
+            vc.data_ini_conquista,
+            vc.data_fin_conquista,
+            vc.perc_manutencao,
+            vc.data_ini_manutencao,
+            vc.data_fin_manutencao,
+            vc.perc_manutencao2,
+            vc.data_ini_manutencao2,
+            vc.data_fin_manutencao2
         FROM {$tblVendedorCliente} vc
         INNER JOIN {$tblVendedor} v ON LOWER(v.login) = LOWER(vc.login)
         INNER JOIN {$tblCliente}  c ON c.cnpj = vc.cnpj
@@ -512,6 +696,15 @@ function crmExportarCsv(string $tblVendedor, string $tblVendedorCliente, string 
         'UF',
         'STATUS',
         'DATA DO STATUS',
+        'PERC. CONQUISTA',
+        'INÍCIO CONQUISTA',
+        'FIM CONQUISTA',
+        'PERC. MANUTENÇÃO',
+        'INÍCIO MANUTENÇÃO',
+        'FIM MANUTENÇÃO',
+        'PERC. MANUTENÇÃO 2',
+        'INÍCIO MANUTENÇÃO 2',
+        'FIM MANUTENÇÃO 2',
     ]);
 
     while ($row = pg_fetch_assoc($result)) {
@@ -530,6 +723,15 @@ function crmExportarCsv(string $tblVendedor, string $tblVendedorCliente, string 
             $row['uf'],
             $status . ' - ' . $STATUS[$status],
             crmFormatarData($row['data_status']),
+            crmFormatarPercentual($row['perc_conquista']),
+            crmFormatarData($row['data_ini_conquista']),
+            crmFormatarData($row['data_fin_conquista']),
+            crmFormatarPercentual($row['perc_manutencao']),
+            crmFormatarData($row['data_ini_manutencao']),
+            crmFormatarData($row['data_fin_manutencao']),
+            crmFormatarPercentual($row['perc_manutencao2']),
+            crmFormatarData($row['data_ini_manutencao2']),
+            crmFormatarData($row['data_fin_manutencao2']),
         ]);
     }
 

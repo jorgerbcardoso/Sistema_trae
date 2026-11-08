@@ -28,7 +28,9 @@ type EmpParam = {
   ocor_cte_retido: number | null;
   ocor_estorno_baixa: number | null;
   com_vend_desc_pis_cofins: boolean;
-  com_vend_dest_icms: boolean;
+  com_vend_desc_icms: boolean;
+  com_vend_apenas_liq: boolean;
+  com_vend_apenas_entr: boolean;
 };
 
 type FieldKey =
@@ -185,7 +187,9 @@ export function ParametrosEmpresa() {
     ocor_cte_retido: null,
     ocor_estorno_baixa: null,
     com_vend_desc_pis_cofins: false,
-    com_vend_dest_icms: false,
+    com_vend_desc_icms: false,
+    com_vend_apenas_liq: false,
+    com_vend_apenas_entr: false,
   });
 
   const [ocorrenciasOpen, setOcorrenciasOpen] = useState<Record<FieldKey, boolean>>({
@@ -261,7 +265,9 @@ export function ParametrosEmpresa() {
       setParams({
         ...p,
         com_vend_desc_pis_cofins: !!p?.com_vend_desc_pis_cofins,
-        com_vend_dest_icms: !!p?.com_vend_dest_icms,
+        com_vend_desc_icms: !!p?.com_vend_desc_icms,
+        com_vend_apenas_liq: !!p?.com_vend_apenas_liq,
+        com_vend_apenas_entr: !!p?.com_vend_apenas_entr,
       });
       const fields: FieldKey[] = [
         'ocor_aguardando_agendamento',
@@ -533,36 +539,81 @@ export function ParametrosEmpresa() {
           <CardHeader>
             <CardTitle>Comissão de Vendas</CardTitle>
             <CardDescription>
-              Defina o que deve ser descontado do frete para formar a base de cálculo da comissão do vendedor.
+              Defina a base de cálculo e a elegibilidade dos CT-es para o pagamento da comissão do vendedor.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
-              <div className="min-w-0">
-                <Label className="text-sm font-medium">Descontar PIS/COFINS</Label>
-                <p className="text-xs text-slate-500">
-                  Desconta o PIS/COFINS do frete na formação da base de cálculo da comissão.
-                </p>
+          <CardContent className="space-y-5">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Base de cálculo
+              </p>
+
+              <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Descontar PIS/COFINS</Label>
+                  <p className="text-xs text-slate-500">
+                    Desconta o PIS/COFINS do frete na formação da base de cálculo da comissão.
+                  </p>
+                </div>
+                <Switch
+                  checked={params.com_vend_desc_pis_cofins}
+                  onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_desc_pis_cofins: v }))}
+                  disabled={loading || saving}
+                />
               </div>
-              <Switch
-                checked={params.com_vend_desc_pis_cofins}
-                onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_desc_pis_cofins: v }))}
-                disabled={loading || saving}
-              />
+
+              <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Descontar ICMS</Label>
+                  <p className="text-xs text-slate-500">
+                    Desconta o ICMS do frete na formação da base de cálculo da comissão.
+                  </p>
+                </div>
+                <Switch
+                  checked={params.com_vend_desc_icms}
+                  onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_desc_icms: v }))}
+                  disabled={loading || saving}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
-              <div className="min-w-0">
-                <Label className="text-sm font-medium">Descontar ICMS</Label>
-                <p className="text-xs text-slate-500">
-                  Desconta o ICMS do frete na formação da base de cálculo da comissão.
-                </p>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Elegibilidade
+              </p>
+              <p className="text-xs text-slate-500 -mt-1">
+                Determina sobre quais CT-es a comissão é paga. Ative apenas uma opção para pagar
+                exclusivamente sobre CT-es liquidados ou entregues; ative as duas para exigir as
+                duas condições; deixe as duas desativadas para não aplicar restrição.
+              </p>
+
+              <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Apenas CT-es liquidados</Label>
+                  <p className="text-xs text-slate-500">
+                    Paga a comissão somente sobre CT-es já liquidados.
+                  </p>
+                </div>
+                <Switch
+                  checked={params.com_vend_apenas_liq}
+                  onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_apenas_liq: v }))}
+                  disabled={loading || saving}
+                />
               </div>
-              <Switch
-                checked={params.com_vend_dest_icms}
-                onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_dest_icms: v }))}
-                disabled={loading || saving}
-              />
+
+              <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Apenas CT-es entregues</Label>
+                  <p className="text-xs text-slate-500">
+                    Paga a comissão somente sobre CT-es já entregues.
+                  </p>
+                </div>
+                <Switch
+                  checked={params.com_vend_apenas_entr}
+                  onCheckedChange={(v) => setParams((prev) => ({ ...prev, com_vend_apenas_entr: v }))}
+                  disabled={loading || saving}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

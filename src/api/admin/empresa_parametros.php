@@ -18,7 +18,9 @@ $conn = connect();
 @pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS ocor_saida_entrega INT");
 @pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS ocor_estorno_baixa INT");
 @pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS com_vend_desc_pis_cofins BOOLEAN DEFAULT FALSE");
-@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS com_vend_dest_icms BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS com_vend_desc_icms BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS com_vend_apenas_liq BOOLEAN DEFAULT FALSE");
+@pg_query($conn, "ALTER TABLE {$tableEmpParam} ADD COLUMN IF NOT EXISTS com_vend_apenas_entr BOOLEAN DEFAULT FALSE");
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -89,7 +91,7 @@ if ($method === 'GET') {
         ]);
     }
 
-    $result = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido, ocor_estorno_baixa, COALESCE(com_vend_desc_pis_cofins, FALSE) AS com_vend_desc_pis_cofins, COALESCE(com_vend_dest_icms, FALSE) AS com_vend_dest_icms FROM {$tableEmpParam} LIMIT 1", [], $conn);
+    $result = sql("SELECT ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido, ocor_estorno_baixa, COALESCE(com_vend_desc_pis_cofins, FALSE) AS com_vend_desc_pis_cofins, COALESCE(com_vend_desc_icms, FALSE) AS com_vend_desc_icms, COALESCE(com_vend_apenas_liq, FALSE) AS com_vend_apenas_liq, COALESCE(com_vend_apenas_entr, FALSE) AS com_vend_apenas_entr FROM {$tableEmpParam} LIMIT 1", [], $conn);
     $row = pg_fetch_assoc($result);
 
     if (!$row) {
@@ -104,7 +106,9 @@ if ($method === 'GET') {
             'ocor_cte_retido' => null,
             'ocor_estorno_baixa' => null,
             'com_vend_desc_pis_cofins' => false,
-            'com_vend_dest_icms' => false,
+            'com_vend_desc_icms' => false,
+            'com_vend_apenas_liq' => false,
+            'com_vend_apenas_entr' => false,
         ];
     }
 
@@ -119,7 +123,9 @@ if ($method === 'GET') {
             'ocor_cte_retido' => $row['ocor_cte_retido'] !== null ? (int) $row['ocor_cte_retido'] : null,
             'ocor_estorno_baixa' => $row['ocor_estorno_baixa'] !== null ? (int) $row['ocor_estorno_baixa'] : null,
             'com_vend_desc_pis_cofins' => pgBoolToPHP($row['com_vend_desc_pis_cofins']),
-            'com_vend_dest_icms' => pgBoolToPHP($row['com_vend_dest_icms']),
+            'com_vend_desc_icms' => pgBoolToPHP($row['com_vend_desc_icms']),
+            'com_vend_apenas_liq' => pgBoolToPHP($row['com_vend_apenas_liq']),
+            'com_vend_apenas_entr' => pgBoolToPHP($row['com_vend_apenas_entr']),
         ],
     ]);
 }
@@ -135,21 +141,23 @@ $ocorChegada = isset($input['ocor_chegada_unid_dest']) && $input['ocor_chegada_u
 $ocorCteRetido = isset($input['ocor_cte_retido']) && $input['ocor_cte_retido'] !== '' ? (int) $input['ocor_cte_retido'] : null;
 $ocorEstornoBaixa = isset($input['ocor_estorno_baixa']) && $input['ocor_estorno_baixa'] !== '' ? (int) $input['ocor_estorno_baixa'] : null;
 $comVendDescPisCofins = filter_var($input['com_vend_desc_pis_cofins'] ?? false, FILTER_VALIDATE_BOOLEAN);
-$comVendDestIcms = filter_var($input['com_vend_dest_icms'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$comVendDescIcms = filter_var($input['com_vend_desc_icms'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$comVendApenasLiq = filter_var($input['com_vend_apenas_liq'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$comVendApenasEntr = filter_var($input['com_vend_apenas_entr'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
 $existsResult = sql("SELECT 1 FROM {$tableEmpParam} LIMIT 1", [], $conn);
 $exists = (bool) pg_fetch_assoc($existsResult);
 
 if (!$exists) {
     sql(
-        "INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido, ocor_estorno_baixa, com_vend_desc_pis_cofins, com_vend_dest_icms) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido, $ocorEstornoBaixa, phpBoolToPg($comVendDescPisCofins), phpBoolToPg($comVendDestIcms)],
+        "INSERT INTO {$tableEmpParam} (ocor_aguardando_agendamento, ocor_agendamento, ocor_saida_transf, ocor_saida_entrega, ocor_chegada_unid, ocor_chegada_unid_dest, ocor_cte_retido, ocor_estorno_baixa, com_vend_desc_pis_cofins, com_vend_desc_icms, com_vend_apenas_liq, com_vend_apenas_entr) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido, $ocorEstornoBaixa, phpBoolToPg($comVendDescPisCofins), phpBoolToPg($comVendDescIcms), phpBoolToPg($comVendApenasLiq), phpBoolToPg($comVendApenasEntr)],
         $conn
     );
 } else {
     sql(
-        "UPDATE {$tableEmpParam} SET ocor_aguardando_agendamento = $1, ocor_agendamento = $2, ocor_saida_transf = $3, ocor_saida_entrega = $4, ocor_chegada_unid = $5, ocor_chegada_unid_dest = $6, ocor_cte_retido = $7, ocor_estorno_baixa = $8, com_vend_desc_pis_cofins = $9, com_vend_dest_icms = $10",
-        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido, $ocorEstornoBaixa, phpBoolToPg($comVendDescPisCofins), phpBoolToPg($comVendDestIcms)],
+        "UPDATE {$tableEmpParam} SET ocor_aguardando_agendamento = $1, ocor_agendamento = $2, ocor_saida_transf = $3, ocor_saida_entrega = $4, ocor_chegada_unid = $5, ocor_chegada_unid_dest = $6, ocor_cte_retido = $7, ocor_estorno_baixa = $8, com_vend_desc_pis_cofins = $9, com_vend_desc_icms = $10, com_vend_apenas_liq = $11, com_vend_apenas_entr = $12",
+        [$ocorAguardando, $ocorAgendamento, $ocorSaidaTransf, $ocorSaidaEntrega, $ocorChegadaUnid, $ocorChegada, $ocorCteRetido, $ocorEstornoBaixa, phpBoolToPg($comVendDescPisCofins), phpBoolToPg($comVendDescIcms), phpBoolToPg($comVendApenasLiq), phpBoolToPg($comVendApenasEntr)],
         $conn
     );
 }
