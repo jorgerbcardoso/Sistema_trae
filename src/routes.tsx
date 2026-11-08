@@ -31,6 +31,7 @@ import { CadastroClientes } from './components/cadastros/CadastroClientes';
 import { ClientesVendedor } from './components/cadastros/ClientesVendedor';
 import { VendedoresCarteiras } from './components/comercial/VendedoresCarteiras';
 import { AcoesVenda } from './components/comercial/AcoesVenda';
+import { BIComercial } from './components/comercial/BIComercial';
 
 // Relatórios
 import { ConferenciaSaidas } from './components/relatorios/ConferenciaSaidas';
@@ -355,6 +356,18 @@ export const router = createBrowserRouter([
             <AcoesVenda />
           </ProtectedRoute>
         )
+      },
+      {
+        path: 'comercial/bi-comercial',
+        element: (
+          <ProtectedRoute>
+            <BIComercial />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'comercial/bi_comercial',
+        element: <Navigate to="/comercial/bi-comercial" replace />
       },
       
       // Relatórios (protegidos)
