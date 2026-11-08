@@ -30,6 +30,7 @@ import { CadastroLinhas } from './components/cadastros/CadastroLinhas';
 import { CadastroClientes } from './components/cadastros/CadastroClientes';
 import { ClientesVendedor } from './components/cadastros/ClientesVendedor';
 import { VendedoresCarteiras } from './components/comercial/VendedoresCarteiras';
+import { AcoesVenda } from './components/comercial/AcoesVenda';
 
 // Relatórios
 import { ConferenciaSaidas } from './components/relatorios/ConferenciaSaidas';
@@ -344,6 +345,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <VendedoresCarteiras />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'comercial/acoes-venda',
+        element: (
+          <ProtectedRoute>
+            <AcoesVenda />
           </ProtectedRoute>
         )
       },

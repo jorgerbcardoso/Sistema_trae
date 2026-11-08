@@ -24,7 +24,7 @@
  * - { action: 'importar' }
  *
  * Status do vínculo vendedor x cliente:
- *   C = CONQUISTA | D = CADASTRADO | P = EM PROSPECÇÃO | N = EM NEGOCIAÇÃO
+ *   C = CONQUISTA | D = CADASTRADO | P = EM PROSPECÇÃO | N = EM NEGOCIAÇÃO | R = RECONQUISTA
  *
  * Comissão: períodos (Conquista, Manutenção, Manutenção 2), cada um com
  * percentual + data inicial + data final. Mínimo de 1 período preenchido.
@@ -62,6 +62,7 @@ $STATUS = [
     'D' => 'CADASTRADO',
     'P' => 'EM PROSPECÇÃO',
     'N' => 'EM NEGOCIAÇÃO',
+    'R' => 'RECONQUISTA',
 ];
 
 // ============================================
@@ -266,6 +267,7 @@ function crmListarVendedores(string $tblVendedor, string $tblVendedorCliente, ar
             COUNT(DISTINCT CASE WHEN {$colStatus} = 'C' THEN vc.cnpj END)::int AS qtd_conquista,
             COUNT(DISTINCT CASE WHEN {$colStatus} = 'N' THEN vc.cnpj END)::int AS qtd_negociacao,
             COUNT(DISTINCT CASE WHEN {$colStatus} = 'P' THEN vc.cnpj END)::int AS qtd_prospeccao,
+            COUNT(DISTINCT CASE WHEN {$colStatus} = 'R' THEN vc.cnpj END)::int AS qtd_reconquista,
             COUNT(DISTINCT CASE WHEN {$colStatus} = 'D' OR {$colStatus} IS NULL OR {$colStatus} = '' THEN vc.cnpj END)::int AS qtd_cadastrado
         FROM {$tblVendedor} v
         LEFT JOIN {$tblVendedorCliente} vc ON LOWER(vc.login) = LOWER(v.login)
@@ -285,6 +287,7 @@ function crmListarVendedores(string $tblVendedor, string $tblVendedorCliente, ar
         'conquista'    => 0,
         'negociacao'   => 0,
         'prospeccao'   => 0,
+        'reconquista'  => 0,
         'cadastrado'   => 0,
     ];
 
@@ -297,6 +300,7 @@ function crmListarVendedores(string $tblVendedor, string $tblVendedorCliente, ar
             'qtd_conquista'  => (int)$row['qtd_conquista'],
             'qtd_negociacao' => (int)$row['qtd_negociacao'],
             'qtd_prospeccao' => (int)$row['qtd_prospeccao'],
+            'qtd_reconquista' => (int)$row['qtd_reconquista'],
             'qtd_cadastrado' => (int)$row['qtd_cadastrado'],
         ];
         $vendedores[] = $item;
@@ -306,6 +310,7 @@ function crmListarVendedores(string $tblVendedor, string $tblVendedorCliente, ar
         $totais['conquista']    += $item['qtd_conquista'];
         $totais['negociacao']   += $item['qtd_negociacao'];
         $totais['prospeccao']   += $item['qtd_prospeccao'];
+        $totais['reconquista']  += $item['qtd_reconquista'];
         $totais['cadastrado']   += $item['qtd_cadastrado'];
     }
 
@@ -360,7 +365,7 @@ function crmListarClientesVendedor(string $tblVendedor, string $tblVendedorClien
     }
 
     $clientes = [];
-    $totais = ['total' => 0, 'C' => 0, 'D' => 0, 'P' => 0, 'N' => 0];
+    $totais = ['total' => 0, 'C' => 0, 'D' => 0, 'P' => 0, 'N' => 0, 'R' => 0];
 
     while ($row = pg_fetch_assoc($result)) {
         $status = trim((string)$row['status']);

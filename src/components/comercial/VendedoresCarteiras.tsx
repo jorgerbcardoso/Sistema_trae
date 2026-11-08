@@ -68,7 +68,7 @@ const API = `${ENVIRONMENT.apiBaseUrl}/comercial/vendedores_carteiras.php`;
 const ITEMS_PER_PAGE = 70;
 const ITEMS_PER_PAGE_CARTEIRA = 70;
 
-type StatusCodigo = 'C' | 'D' | 'P' | 'N';
+type StatusCodigo = 'C' | 'D' | 'P' | 'N' | 'R';
 
 const STATUS_LIST: { value: StatusCodigo; label: string; badge: string }[] = [
   {
@@ -91,6 +91,11 @@ const STATUS_LIST: { value: StatusCodigo; label: string; badge: string }[] = [
     label: 'CADASTRADO',
     badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   },
+  {
+    value: 'R',
+    label: 'RECONQUISTA',
+    badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200',
+  },
 ];
 
 const STATUS_MAP: Record<string, { label: string; badge: string }> = STATUS_LIST.reduce(
@@ -109,6 +114,7 @@ interface Vendedor {
   qtd_conquista: number;
   qtd_negociacao: number;
   qtd_prospeccao: number;
+  qtd_reconquista: number;
   qtd_cadastrado: number;
 }
 
@@ -118,6 +124,7 @@ interface TotaisVendedores {
   conquista: number;
   negociacao: number;
   prospeccao: number;
+  reconquista: number;
   cadastrado: number;
 }
 
@@ -192,6 +199,7 @@ interface TotaisCarteira {
   D: number;
   P: number;
   N: number;
+  R: number;
 }
 
 interface VendedorDoCliente {
@@ -768,6 +776,10 @@ export function VendedoresCarteiras() {
                 })}
               </div>
             )}
+
+            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+              Clique sobre os números para ver os clientes.
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -881,7 +893,7 @@ export function VendedoresCarteiras() {
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[20%] !px-2 !py-2 text-[11px] leading-tight"
+                        className="w-[18%] !px-2 !py-2 text-[11px] leading-tight"
                       />
                       <SortableTableHeader
                         field="tele_venda"
@@ -889,13 +901,14 @@ export function VendedoresCarteiras() {
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[10%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
+                        className="w-[8%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
                       />
                       {([
                         ['qtd_cadastrado', 'Cadastrados'],
                         ['qtd_prospeccao', 'Prospecção'],
                         ['qtd_negociacao', 'Negociação'],
                         ['qtd_conquista', 'Conquista'],
+                        ['qtd_reconquista', 'Reconquista'],
                       ] as const).map(([field, label]) => (
                         <SortableTableHeader
                           key={field}
@@ -904,7 +917,7 @@ export function VendedoresCarteiras() {
                           currentSortField={vendedorSort.sortField}
                           currentSortDirection={vendedorSort.sortDirection}
                           onSort={vendedorSort.handleSort}
-                          className="w-[12%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
+                          className="w-[10%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
                         />
                       ))}
                       <SortableTableHeader
@@ -913,14 +926,14 @@ export function VendedoresCarteiras() {
                         currentSortField={vendedorSort.sortField}
                         currentSortDirection={vendedorSort.sortDirection}
                         onSort={vendedorSort.handleSort}
-                        className="w-[14%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
+                        className="w-[16%] !px-2 !py-2 text-[11px] leading-tight text-center [&>button]:mx-auto"
                       />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {vendedoresPagina.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-slate-500 py-10">
+                        <TableCell colSpan={9} className="text-center text-slate-500 py-10">
                           {busca
                             ? 'Nenhum vendedor encontrado para essa busca.'
                             : 'Nenhum vendedor cadastrado. Clique em "Importar do TMS" para começar.'}
@@ -950,6 +963,7 @@ export function VendedoresCarteiras() {
                             ['P', 'qtd_prospeccao', 'text-amber-600 dark:text-amber-400'],
                             ['N', 'qtd_negociacao', 'text-indigo-600 dark:text-indigo-400'],
                             ['C', 'qtd_conquista', 'text-emerald-600 dark:text-emerald-400'],
+                            ['R', 'qtd_reconquista', 'text-rose-600 dark:text-rose-400'],
                           ] as const).map(([status, field, color]) => (
                             <TableCell key={status} className="p-2 text-center tabular-nums">
                               <Button
@@ -1003,6 +1017,8 @@ export function VendedoresCarteiras() {
                   <span className="tabular-nums">{totais.negociacao}</span>
                   <StatusBadge status="C" />
                   <span className="tabular-nums">{totais.conquista}</span>
+                  <StatusBadge status="R" />
+                  <span className="tabular-nums">{totais.reconquista}</span>
                 </div>
               )}
 
@@ -1146,6 +1162,8 @@ export function VendedoresCarteiras() {
                     <span className="tabular-nums">{totaisCarteira.N}</span>
                     <StatusBadge status="C" />
                     <span className="tabular-nums">{totaisCarteira.C}</span>
+                    <StatusBadge status="R" />
+                    <span className="tabular-nums">{totaisCarteira.R}</span>
                   </>
                 )}
               </div>
@@ -1529,6 +1547,8 @@ function campoContador(status: string): keyof Vendedor {
       return 'qtd_negociacao';
     case 'P':
       return 'qtd_prospeccao';
+    case 'R':
+      return 'qtd_reconquista';
     default:
       return 'qtd_cadastrado';
   }

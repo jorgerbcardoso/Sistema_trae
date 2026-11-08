@@ -420,6 +420,18 @@ export const MOCK_MENU_ITEMS = [
     is_available: true,
     status: 'active'
   },
+  {
+    id: 60,
+    section_id: 9,
+    code: 'comercial_acoes_venda',
+    name: 'AÇÕES DE VENDA',
+    description: 'CADASTRO DE AÇÕES DE VENDA E STATUS DO FUNIL',
+    icon: 'Target',
+    route_path: '/comercial/acoes-venda',
+    component_path: 'comercial/AcoesVenda',
+    is_available: true,
+    status: 'active'
+  },
   
   // Operações
   {
@@ -971,6 +983,25 @@ export const MOCK_MENU_VCS = {
             can_create: false,
             can_edit: true,
             can_delete: false,
+            can_export: false
+          }
+        },
+        {
+          id: 61,
+          section_id: 9,
+          code: 'comercial_acoes_venda',
+          name: 'AÇÕES DE VENDA',
+          description: 'CADASTRO DE AÇÕES DE VENDA E STATUS DO FUNIL',
+          icon: 'Target',
+          route_path: '/comercial/acoes-venda',
+          component_path: 'comercial/AcoesVenda',
+          is_available: true,
+          status: 'active',
+          permissions: {
+            can_access: true,
+            can_create: true,
+            can_edit: true,
+            can_delete: true,
             can_export: false
           }
         }
