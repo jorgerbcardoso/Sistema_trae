@@ -27,7 +27,9 @@
  *   C = CONQUISTA | D = CADASTRADO | P = EM PROSPECÇÃO | N = EM NEGOCIAÇÃO | R = RECONQUISTA
  *
  * Comissão: períodos (Conquista, Manutenção, Manutenção 2), cada um com
- * percentual + data inicial + data final. Mínimo de 1 período preenchido.
+ * percentual + data inicial (+ data final). Mínimo de 1 período preenchido.
+ * Os períodos não podem se conflitar; somente o período mais futuro pode
+ * ficar sem data final (vigência indeterminada).
  * ============================================
  */
 
@@ -525,7 +527,9 @@ function crmAtualizarStatus(string $tblVendedorCliente, array $data, array $STAT
 
 /**
  * Atualiza os períodos e percentuais de comissão do vínculo vendedor x cliente.
- * Regras: mínimo de 1 período; um período usado exige percentual + data inicial + data final.
+ * Regras: mínimo de 1 período; um período usado exige percentual + data inicial;
+ * os períodos não podem se conflitar (sobreposição de datas); somente o período
+ * mais futuro (maior data inicial) pode ficar sem data final (vigência indeterminada).
  */
 function crmAtualizarComissao(string $tblVendedorCliente, array $data): void {
     $login = trim((string)($data['login'] ?? ''));
@@ -541,31 +545,85 @@ function crmAtualizarComissao(string $tblVendedorCliente, array $data): void {
         ['perc_manutencao2', 'data_ini_manutencao2', 'data_fin_manutencao2', 'Manutenção 2'],
     ];
 
-    $valores = [];
-    $preenchidos = 0;
+    // Períodos efetivamente preenchidos.
+    $preenchidos = [];
 
     foreach ($periodos as [$campoPerc, $campoIni, $campoFin, $rotulo]) {
         $perc = crmNormalizarPercentual($data[$campoPerc] ?? null);
         $ini  = crmNormalizarData($data[$campoIni] ?? null);
         $fin  = crmNormalizarData($data[$campoFin] ?? null);
 
-        if ($perc !== null || $ini !== null || $fin !== null) {
-            if ($perc === null || $ini === null || $fin === null) {
-                msg("Preencha o percentual e as datas inicial e final do período {$rotulo}.", 'error', 400);
-            }
-            if ($ini > $fin) {
-                msg("No período {$rotulo}, a data inicial não pode ser posterior à data final.", 'error', 400);
-            }
-            $preenchidos++;
+        if ($perc === null && $ini === null && $fin === null) {
+            continue;
         }
 
-        $valores[] = $perc;
-        $valores[] = $ini;
-        $valores[] = $fin;
+        if ($perc === null || $ini === null) {
+            msg("Informe o percentual e a data inicial do período {$rotulo}.", 'error', 400);
+        }
+        if ($fin !== null && $ini > $fin) {
+            msg("No período {$rotulo}, a data inicial não pode ser posterior à data final.", 'error', 400);
+        }
+
+        $preenchidos[] = [
+            'campoPerc' => $campoPerc,
+            'rotulo'    => $rotulo,
+            'perc'      => $perc,
+            'ini'       => $ini,
+            'fin'       => $fin,
+        ];
     }
 
-    if ($preenchidos === 0) {
+    if (empty($preenchidos)) {
         msg('Informe ao menos um período de comissão (Conquista, Manutenção ou Manutenção 2).', 'error', 400);
+    }
+
+    // Somente o período mais futuro (maior data inicial) pode ficar sem data final.
+    $total = count($preenchidos);
+    $idxMaisFuturo = 0;
+    for ($i = 1; $i < $total; $i++) {
+        if ($preenchidos[$i]['ini'] > $preenchidos[$idxMaisFuturo]['ini']) {
+            $idxMaisFuturo = $i;
+        }
+    }
+    foreach ($preenchidos as $i => $p) {
+        if ($p['fin'] === null && $i !== $idxMaisFuturo) {
+            msg(
+                "Somente o período mais futuro ({$preenchidos[$idxMaisFuturo]['rotulo']}) pode ficar sem data final.",
+                'error',
+                400
+            );
+        }
+    }
+
+    // Períodos não podem se conflitar (sobreposição de datas).
+    for ($i = 0; $i < $total; $i++) {
+        for ($j = $i + 1; $j < $total; $j++) {
+            $a = $preenchidos[$i];
+            $b = $preenchidos[$j];
+            $aFim = $a['fin'] ?? '9999-12-31';
+            $bFim = $b['fin'] ?? '9999-12-31';
+            if ($a['ini'] <= $bFim && $b['ini'] <= $aFim) {
+                msg(
+                    "Os períodos {$a['rotulo']} e {$b['rotulo']} se sobrepõem. Ajuste as datas para que não haja conflito.",
+                    'error',
+                    400
+                );
+            }
+        }
+    }
+
+    // Reorganiza os valores na ordem fixa das 3 colunas (período não preenchido = NULL).
+    $porCampo = [];
+    foreach ($preenchidos as $p) {
+        $porCampo[$p['campoPerc']] = $p;
+    }
+
+    $valores = [];
+    foreach ($periodos as [$campoPerc]) {
+        $p = $porCampo[$campoPerc] ?? null;
+        $valores[] = $p ? $p['perc'] : null;
+        $valores[] = $p ? $p['ini'] : null;
+        $valores[] = $p ? $p['fin'] : null;
     }
 
     $result = sql(

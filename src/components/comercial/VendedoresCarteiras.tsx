@@ -186,13 +186,6 @@ function formatarPercentualBR(valor: number | null | undefined): string {
   return valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function resumoComissao(cliente: ClienteCarteira): string {
-  return PERIODOS_COMISSAO.map((p) => cliente[p.perc])
-    .filter((v): v is number => v !== null && v !== undefined)
-    .map((v) => `${formatarPercentualBR(v)}%`)
-    .join(' · ');
-}
-
 interface TotaisCarteira {
   total: number;
   C: number;
@@ -259,9 +252,78 @@ function hojeBR(): string {
   return new Date().toLocaleDateString('pt-BR');
 }
 
+/** Data de hoje no formato ISO (YYYY-MM-DD), no fuso local. */
+function hojeISO(): string {
+  const d = new Date();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
+/** Converte uma data ISO (YYYY-MM-DD) em dd/mm/aaaa. */
+function dataIsoBR(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const [ano, mes, dia] = iso.slice(0, 10).split('-');
+  if (!ano || !mes || !dia) return iso;
+  return `${dia}/${mes}/${ano}`;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const info = STATUS_MAP[status] ?? STATUS_MAP['D'];
   return <Badge className={`${info.badge} text-[11px] h-5 px-2 whitespace-nowrap`}>{info.label}</Badge>;
+}
+
+/**
+ * Exibe (somente leitura) os períodos de comissão do cliente.
+ * Destaca o período que contempla a data de hoje.
+ */
+function PeriodosComissao({ cliente }: { cliente: ClienteCarteira }) {
+  const hoje = hojeISO();
+
+  const periodos = PERIODOS_COMISSAO.map((def) => ({
+    def,
+    perc: cliente[def.perc],
+    ini: cliente[def.ini],
+    fin: cliente[def.fin],
+  })).filter((p) => p.perc !== null && p.perc !== undefined);
+
+  if (periodos.length === 0) {
+    return <span className="text-[11px] text-slate-400 dark:text-slate-500">Não definida</span>;
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5 min-w-[128px]">
+      {periodos.map(({ def, perc, ini, fin }) => {
+        const ativo = ini !== null && ini <= hoje && (fin === null || hoje <= fin);
+        const intervalo = `${dataIsoBR(ini)} – ${fin ? dataIsoBR(fin) : 'vigente'}`;
+        return (
+          <div
+            key={def.perc}
+            title={`${def.rotulo}: ${formatarPercentualBR(perc)}% · ${intervalo}${
+              ativo ? ' · vigente hoje' : ''
+            }`}
+            className={`flex items-center justify-between gap-2 rounded-md border px-1.5 py-px text-[11px] leading-tight ${
+              ativo
+                ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm'
+                : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400'
+            }`}
+          >
+            <span className="flex min-w-0 items-center gap-1">
+              <span
+                className={`size-1.5 shrink-0 rounded-full ${
+                  ativo ? 'bg-white animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
+                }`}
+              />
+              <span className="truncate">{def.rotulo}</span>
+            </span>
+            <span className="tabular-nums font-semibold shrink-0">
+              {formatarPercentualBR(perc)}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export function VendedoresCarteiras() {
@@ -531,30 +593,23 @@ export function VendedoresCarteiras() {
   const salvarComissao = async () => {
     if (!comissaoCliente || !carteiraVendedor) return;
 
-    const payload: Record<string, string | number | null> = {
-      action: 'update_comissao',
-      login: carteiraVendedor.login,
-      cnpj: comissaoCliente.cnpj,
-    };
-
-    let periodosPreenchidos = 0;
+    // Coleta os períodos efetivamente preenchidos.
+    const preenchidos: {
+      periodo: DefinicaoPeriodo;
+      perc: number;
+      ini: string;
+      fin: string | null;
+    }[] = [];
 
     for (const periodo of PERIODOS_COMISSAO) {
       const percRaw = comissaoForm[periodo.perc].trim();
       const iniRaw = comissaoForm[periodo.ini].trim();
       const finRaw = comissaoForm[periodo.fin].trim();
 
-      const usado = percRaw !== '' || iniRaw !== '' || finRaw !== '';
+      if (percRaw === '' && iniRaw === '' && finRaw === '') continue;
 
-      if (!usado) {
-        payload[periodo.perc] = null;
-        payload[periodo.ini] = null;
-        payload[periodo.fin] = null;
-        continue;
-      }
-
-      if (percRaw === '' || iniRaw === '' || finRaw === '') {
-        toast.error(`Preencha o percentual e as datas inicial e final do período ${periodo.rotulo}.`);
+      if (percRaw === '' || iniRaw === '') {
+        toast.error(`Informe o percentual e a data inicial do período ${periodo.rotulo}.`);
         return;
       }
 
@@ -564,20 +619,57 @@ export function VendedoresCarteiras() {
         return;
       }
 
-      if (iniRaw > finRaw) {
+      if (finRaw !== '' && iniRaw > finRaw) {
         toast.error(`No período ${periodo.rotulo}, a data inicial não pode ser posterior à final.`);
         return;
       }
 
-      payload[periodo.perc] = percNum;
-      payload[periodo.ini] = iniRaw;
-      payload[periodo.fin] = finRaw;
-      periodosPreenchidos++;
+      preenchidos.push({ periodo, perc: percNum, ini: iniRaw, fin: finRaw === '' ? null : finRaw });
     }
 
-    if (periodosPreenchidos === 0) {
+    if (preenchidos.length === 0) {
       toast.error('Informe ao menos um período de comissão (Conquista, Manutenção ou Manutenção 2).');
       return;
+    }
+
+    // Somente o período mais futuro (maior data inicial) pode ficar sem data final.
+    const maisFuturo = preenchidos.reduce((a, b) => (b.ini > a.ini ? b : a));
+    for (const p of preenchidos) {
+      if (p.fin === null && p !== maisFuturo) {
+        toast.error(
+          `Somente o período mais futuro (${maisFuturo.periodo.rotulo}) pode ficar sem data final.`
+        );
+        return;
+      }
+    }
+
+    // Períodos não podem se conflitar (sobreposição de datas).
+    for (let i = 0; i < preenchidos.length; i++) {
+      for (let j = i + 1; j < preenchidos.length; j++) {
+        const a = preenchidos[i];
+        const b = preenchidos[j];
+        const aFim = a.fin ?? '9999-12-31';
+        const bFim = b.fin ?? '9999-12-31';
+        if (a.ini <= bFim && b.ini <= aFim) {
+          toast.error(
+            `Os períodos ${a.periodo.rotulo} e ${b.periodo.rotulo} se sobrepõem. Ajuste as datas para que não haja conflito.`
+          );
+          return;
+        }
+      }
+    }
+
+    const payload: Record<string, string | number | null> = {
+      action: 'update_comissao',
+      login: carteiraVendedor.login,
+      cnpj: comissaoCliente.cnpj,
+    };
+
+    for (const periodo of PERIODOS_COMISSAO) {
+      const p = preenchidos.find((x) => x.periodo.perc === periodo.perc);
+      payload[periodo.perc] = p ? p.perc : null;
+      payload[periodo.ini] = p ? p.ini : null;
+      payload[periodo.fin] = p ? p.fin : null;
     }
 
     try {
@@ -1230,7 +1322,7 @@ export function VendedoresCarteiras() {
                         onSort={clienteSort.handleSort}
                         className="w-[110px]"
                       />
-                      <TableHead className="w-[150px] px-4 py-3 text-xs uppercase tracking-wider text-right">
+                      <TableHead className="w-[200px] px-4 py-3 text-xs uppercase tracking-wider text-right">
                         Comissão
                       </TableHead>
                     </TableRow>
@@ -1276,16 +1368,9 @@ export function VendedoresCarteiras() {
                             </div>
                           </TableCell>
                           <TableCell className="text-slate-500 text-xs">{c.data_status || '—'}</TableCell>
-                          <TableCell className="px-4">
+                          <TableCell className="px-4 py-2">
                             <div className="flex items-center justify-end gap-2">
-                              <span
-                                className={`text-xs tabular-nums truncate ${
-                                  resumoComissao(c) ? 'text-slate-600 dark:text-slate-300' : 'text-slate-400'
-                                }`}
-                                title={resumoComissao(c) || 'Nenhum período de comissão definido'}
-                              >
-                                {resumoComissao(c) || 'Não definida'}
-                              </span>
+                              <PeriodosComissao cliente={c} />
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1453,8 +1538,9 @@ export function VendedoresCarteiras() {
 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 py-2 space-y-4">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Informe ao menos um período. Um período é considerado quando o percentual, a data
-              inicial e a data final estiverem preenchidos.
+              Informe ao menos um período (percentual + data inicial). Os períodos não podem se
+              conflitar. Somente o período mais futuro pode ficar sem data final — nesse caso, a
+              comissão fica vigente por prazo indeterminado.
             </p>
 
             {PERIODOS_COMISSAO.map((periodo) => (
