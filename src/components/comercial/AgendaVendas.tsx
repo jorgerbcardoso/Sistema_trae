@@ -86,6 +86,7 @@ interface AcaoVenda {
 interface Vendedor {
   login: string;
   nome: string;
+  qtd_clientes?: number;
 }
 
 interface AgendaItem {
@@ -157,8 +158,12 @@ function fmtCurto(s: string): string {
   return s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : '';
 }
 
-function fmtCompleto(s: string): string {
-  return s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '';
+function vendedorHue(login: string): number {
+  let hash = 0;
+  for (let i = 0; i < login.length; i += 1) {
+    hash = (hash * 31 + login.charCodeAt(i)) | 0;
+  }
+  return (((hash % 360000) + 360000) % 360000) / 1000;
 }
 
 // ============================================================
@@ -274,11 +279,40 @@ export function AgendaVendas() {
     }));
   };
 
-  const voltarHoje = () => {
+  const definirPeriodoPadrao = () => {
     setPeriodo({
       ini: ymd(addDias(new Date(), -DIAS_ATRAS_PADRAO)),
       fim: ymd(addDias(new Date(), DIAS_FRENTE_PADRAO)),
     });
+  };
+
+  const definirPeriodoRapido = (tipo: 'hoje' | 'semana' | 'mes') => {
+    const agora = new Date();
+    if (tipo === 'hoje') {
+      const data = ymd(agora);
+      setPeriodo({ ini: data, fim: data });
+      return;
+    }
+    if (tipo === 'semana') {
+      const inicio = new Date(agora);
+      inicio.setDate(agora.getDate() - agora.getDay());
+      const fim = addDias(inicio, 6);
+      setPeriodo({ ini: ymd(inicio), fim: ymd(fim) });
+      return;
+    }
+    const inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 12);
+    const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 12);
+    setPeriodo({ ini: ymd(inicio), fim: ymd(fim) });
+  };
+
+  const alterarInicioPeriodo = (ini: string) => {
+    if (!ini) return;
+    setPeriodo((p) => ({ ini, fim: p.fim < ini ? ini : p.fim }));
+  };
+
+  const alterarFimPeriodo = (fim: string) => {
+    if (!fim) return;
+    setPeriodo((p) => ({ ini: p.ini > fim ? fim : p.ini, fim }));
   };
 
   const alternarVendedor = (login: string) => {
@@ -422,7 +456,6 @@ export function AgendaVendas() {
     }
   };
 
-  const periodoLabel = `${fmtCompleto(periodo.ini)} – ${fmtCompleto(periodo.fim)}`;
   const nomeClienteSelecionado = clientes.find((c) => c.cnpj === formCnpj);
 
   return (
@@ -446,7 +479,7 @@ export function AgendaVendas() {
               Recarregar
             </Button>
             <Button size="sm" onClick={() => abrirNovo()}>
-              <Plus className="size-4 mr-1.5" />
+              <Plus className="mr-1.5 size-4 text-emerald-300" />
               Nova ação
             </Button>
           </div>
@@ -454,21 +487,43 @@ export function AgendaVendas() {
 
         <CardContent className="pt-0 space-y-3">
           {/* ===== FILTROS ===== */}
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => deslocarPeriodo(-7)}>
-                <ChevronLeft className="size-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={voltarHoje}>
-                Hoje
-              </Button>
-              <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => deslocarPeriodo(7)}>
-                <ChevronRight className="size-3.5" />
-              </Button>
+          <div className="space-y-3 rounded-md border border-border/60 bg-muted/30 p-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex items-center gap-1 pb-0.5">
+                <Button variant="outline" size="sm" className="h-8 w-8 px-0" onClick={() => deslocarPeriodo(-7)} title="Voltar 7 dias">
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={definirPeriodoPadrao}>
+                  Padrão
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 w-8 px-0" onClick={() => deslocarPeriodo(7)} title="Avançar 7 dias">
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">De</Label>
+                <DateInput
+                  value={periodo.ini}
+                  onChange={(e) => alterarInicioPeriodo(e.target.value)}
+                  className="h-8 w-[145px] text-xs"
+                  aria-label="Data inicial do período"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Até</Label>
+                <DateInput
+                  value={periodo.fim}
+                  onChange={(e) => alterarFimPeriodo(e.target.value)}
+                  className="h-8 w-[145px] text-xs"
+                  aria-label="Data final do período"
+                />
+              </div>
+              <div className="flex flex-wrap gap-1 pb-0.5">
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => definirPeriodoRapido('hoje')}>Hoje</Button>
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => definirPeriodoRapido('semana')}>Esta semana</Button>
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => definirPeriodoRapido('mes')}>Este mês</Button>
+              </div>
             </div>
-            <span className="text-xs font-medium text-foreground tabular-nums">{periodoLabel}</span>
-
-            <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
             {ehVendedor ? (
               <Badge
@@ -479,38 +534,45 @@ export function AgendaVendas() {
                 {eu?.nome ? ` · ${eu.nome}` : ''}
               </Badge>
             ) : (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground">Vendedores:</span>
-                <button
-                  type="button"
-                  onClick={() => setLoginsFiltro([])}
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
-                    loginsFiltro.length === 0
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary/50'
-                  )}
-                >
-                  Todos
-                </button>
-                {vendedores.map((v) => {
-                  const ativo = loginsFiltro.includes(v.login);
-                  return (
-                    <button
-                      key={v.login}
-                      type="button"
-                      onClick={() => alternarVendedor(v.login)}
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
-                        ativo
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background text-muted-foreground hover:border-primary/50'
-                      )}
-                    >
-                      {v.nome || v.login}
-                    </button>
-                  );
-                })}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground">Vendedores</span>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                  <button
+                    type="button"
+                    onClick={() => setLoginsFiltro([])}
+                    className={cn(
+                      'flex min-w-0 items-center justify-center rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors',
+                      loginsFiltro.length === 0
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:border-primary/50'
+                    )}
+                  >
+                    Todos
+                  </button>
+                  {vendedores.map((v) => {
+                    const ativo = loginsFiltro.includes(v.login);
+                    const hue = vendedorHue(v.login.toLowerCase());
+                    return (
+                      <button
+                        key={v.login}
+                        type="button"
+                        onClick={() => alternarVendedor(v.login)}
+                        className={cn(
+                          'flex min-w-0 items-center justify-between gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition-colors',
+                          ativo ? 'ring-1 ring-inset' : 'bg-background hover:bg-muted/60'
+                        )}
+                        style={{
+                          borderColor: `hsl(${hue} 65% 55%)`,
+                          color: `hsl(${hue} 65% 32%)`,
+                          ...(ativo ? { backgroundColor: `hsl(${hue} 80% 93%)` } : {}),
+                        }}
+                      >
+                        <span className="truncate">{v.nome || v.login}</span>
+                        <span className="shrink-0 tabular-nums">({v.qtd_clientes ?? 0})</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -591,7 +653,7 @@ export function AgendaVendas() {
                               type="button"
                               onClick={() => abrirNovo(chave)}
                               title="Agendar ação nesta data"
-                              className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-primary/10 hover:text-primary focus:opacity-100 group-hover:opacity-100"
+                              className="rounded p-0.5 text-emerald-600 opacity-0 transition-opacity hover:bg-emerald-500/10 hover:text-emerald-700 focus:opacity-100 group-hover:opacity-100"
                             >
                               <Plus className="size-3.5" />
                             </button>
@@ -603,8 +665,9 @@ export function AgendaVendas() {
                         {itens.map((item) => (
                           <div
                             key={item.seq_agenda}
+                            style={{ borderLeftColor: `hsl(${vendedorHue(item.login.toLowerCase())} 65% 48%)` }}
                             className={cn(
-                              'rounded border px-1.5 py-1 text-left text-[11px] leading-tight',
+                              'rounded border border-l-[3px] px-1.5 py-1 text-left text-[11px] leading-tight',
                               item.cumprida
                                 ? 'border-emerald-300/70 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/40'
                                 : 'border-border bg-card'
@@ -638,17 +701,14 @@ export function AgendaVendas() {
                               {item.acao_descricao || 'Ação não encontrada'}
                             </p>
 
-                            {item.observacao && (
-                              <p
-                                className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground/90"
-                                title={item.observacao}
-                              >
-                                {item.observacao}
-                              </p>
-                            )}
-
                             {!ehVendedor && (
-                              <p className="mt-0.5 truncate text-[10px] text-muted-foreground/80">
+                              <p
+                                className="mt-0.5 w-fit max-w-full truncate rounded px-1 text-[10px] font-medium"
+                                style={{
+                                  color: `hsl(${vendedorHue(item.login.toLowerCase())} 65% 32%)`,
+                                  backgroundColor: `hsl(${vendedorHue(item.login.toLowerCase())} 80% 93%)`,
+                                }}
+                              >
                                 {item.vendedor_nome || item.login}
                               </p>
                             )}
@@ -658,7 +718,7 @@ export function AgendaVendas() {
                                 type="button"
                                 onClick={() => abrirEdicao(item)}
                                 title="Alterar ação e observação"
-                                className="rounded p-0.5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                className="rounded p-0.5 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
                               >
                                 <Pencil className="size-3" />
                               </button>
@@ -668,7 +728,7 @@ export function AgendaVendas() {
                                   onClick={() => cumprir(item)}
                                   disabled={cumprindo === item.seq_agenda}
                                   title="Confirmar cumprimento"
-                                  className="rounded p-0.5 text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-50"
+                                  className="rounded p-0.5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:opacity-50"
                                 >
                                   {cumprindo === item.seq_agenda ? (
                                     <Loader2 className="size-3 animate-spin" />

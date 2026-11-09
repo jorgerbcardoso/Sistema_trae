@@ -295,11 +295,18 @@ function agListar(
     // Vendedores disponíveis para o filtro (apenas para quem não é vendedor).
     $vendedores = [];
     if (!$eu['is_vendedor']) {
-        $rv = sql("SELECT login, nome FROM {$tblVendedor} ORDER BY nome");
+        $rv = sql("
+            SELECT v.login, v.nome, COUNT(DISTINCT vc.cnpj)::int AS qtd_clientes
+              FROM {$tblVendedor} v
+              LEFT JOIN {$tblVendedorCliente} vc ON lower(vc.login) = lower(v.login)
+             GROUP BY v.login, v.nome
+             ORDER BY v.nome
+        ");
         while ($rv && ($row = pg_fetch_assoc($rv))) {
             $vendedores[] = [
-                'login' => (string)$row['login'],
-                'nome'  => (string)($row['nome'] ?? ''),
+                'login'        => (string)$row['login'],
+                'nome'         => (string)($row['nome'] ?? ''),
+                'qtd_clientes' => (int)($row['qtd_clientes'] ?? 0),
             ];
         }
     }
