@@ -44,8 +44,17 @@ export function MainMenu() {
   const [selectedUnidade, setSelectedUnidade] = useState<string>('');
   
   // ✅ NOVO: Controle da Central de Ajuda
-  const [helpModule, setHelpModule] = useState<'estoque' | 'compras' | null>(null);
+  const [helpModule, setHelpModule] = useState<'estoque' | 'compras' | 'comercial' | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  // ✅ Mapeia o código da seção para o módulo da Central de Ajuda
+  const getHelpModule = (code?: string): 'estoque' | 'compras' | 'comercial' | null => {
+    const c = String(code ?? '').trim().toUpperCase();
+    if (c === 'ESTOQUE') return 'estoque';
+    if (c === 'COMPRAS') return 'compras';
+    if (c === 'COMERCIAL' || c === 'CRM') return 'comercial';
+    return null;
+  };
   
   // ✅ NOVO: Controle de seções expandidas com localStorage
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
@@ -590,15 +599,15 @@ export function MainMenu() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Ícone de Ajuda (?) para Estoque e Compras - COM MAIS DESTAQUE (ESTILO ÍCONE DE ITEM) */}
-                    {(section.section.code === 'ESTOQUE' || section.section.code === 'COMPRAS') && (
+                    {/* Ícone de Ajuda (?) para Estoque, Compras e Comercial - COM MAIS DESTAQUE (ESTILO ÍCONE DE ITEM) */}
+                    {getHelpModule(section.section.code) && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-10 w-10 p-0 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 text-blue-600 dark:text-blue-400 transition-all hover:scale-110 hover:shadow-md border border-blue-200/50 dark:border-blue-800/30"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setHelpModule(section.section.code === 'ESTOQUE' ? 'estoque' : 'compras');
+                          setHelpModule(getHelpModule(section.section.code));
                           setShowHelp(true);
                         }}
                       >

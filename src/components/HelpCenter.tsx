@@ -24,7 +24,15 @@ import {
   Calculator,
   Mail,
   PieChart,
-  ClipboardCheck
+  ClipboardCheck,
+  Target,
+  CalendarDays,
+  BarChart3,
+  TrendingUp,
+  Percent,
+  Phone,
+  Upload,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from './ThemeProvider';
@@ -35,7 +43,7 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 
 interface HelpCenterProps {
-  module?: 'estoque' | 'compras' | 'geral';
+  module?: 'estoque' | 'compras' | 'comercial' | 'geral';
   onClose?: () => void;
 }
 
@@ -48,6 +56,7 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
   const moduleColors = {
     estoque: 'blue',
     compras: 'emerald',
+    comercial: 'indigo',
     geral: 'indigo'
   };
 
@@ -110,6 +119,8 @@ export function HelpCenter({ module = 'estoque', onClose }: HelpCenterProps) {
             <EstoqueHelp primaryColor={primaryColor} />
           ) : module === 'compras' ? (
             <ComprasHelp primaryColor={primaryColor} />
+          ) : module === 'comercial' ? (
+            <ComercialHelp primaryColor={primaryColor} />
           ) : (
             <div className="py-20 text-center">
               <BookOpen className="w-16 h-16 mx-auto text-slate-300 mb-4" />
@@ -388,6 +399,138 @@ function ComprasHelp({ primaryColor }: { primaryColor: string }) {
           </CardHeader>
           <CardContent className="text-sm text-slate-600 dark:text-slate-400">
             A integração com o financeiro é automática na entrada. O número do lançamento gerado no SSW ficará eternamente vinculado ao seu pedido de compra.
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function ComercialHelp({ primaryColor }: { primaryColor: string }) {
+  return (
+    <>
+      {/* Fluxograma Visual Simplificado do Comercial */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+          <Workflow className="w-5 h-5" />
+          <h3 className="font-bold text-lg">Fluxo Operacional do Comercial</h3>
+        </div>
+
+        <div className="space-y-6">
+          {/* Linha 1: Itens 1 e 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+            <div className="md:col-span-3">
+              <StepBox icon={<Users />} title="1. Vendedores e Carteiras" desc="Importe vendedores e carteiras do TMS e defina o status de negociação de cada cliente." />
+            </div>
+            <div className="hidden md:flex justify-center md:col-span-1">
+              <ArrowRight className="text-slate-300 w-8 h-8" />
+            </div>
+            <div className="md:col-span-3">
+              <StepBox icon={<Target />} title="2. Ações de Venda" desc="Cadastre as ações que movimentam o funil (ex: Visita, Proposta, Fechamento), cada uma ligada a um status." />
+            </div>
+          </div>
+
+          {/* Linha 2: Itens 3 e 4 */}
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+            <div className="md:col-span-3">
+              <StepBox icon={<CalendarDays />} title="3. Agenda de Vendas" desc="Agende compromissos ligando um cliente da carteira a uma ação de venda e a uma data." />
+            </div>
+            <div className="hidden md:flex justify-center md:col-span-1">
+              <ArrowRight className="text-slate-300 w-8 h-8" />
+            </div>
+            <div className="md:col-span-3">
+              <StepBox icon={<ClipboardCheck />} title="4. Cumprimento" desc="Ao executar a ação, confirme o cumprimento: o status do cliente migra automaticamente no funil." />
+            </div>
+          </div>
+
+          {/* Linha 3: Item 5 (Centralizado) */}
+          <div className="flex justify-center">
+            <div className="w-full md:max-w-[calc(100%/7*3)]">
+              <StepBox icon={<BarChart3 />} title="5. BI Comercial" desc="Acompanhe KPIs, funil, ranking de vendedores e a incidência de frete por UF de entrega." />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Lista de Procedimentos Detalhada do Comercial */}
+      <section className="space-y-8">
+        <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+          <ClipboardList className="w-5 h-5" />
+          <h3 className="font-bold text-lg">Protocolos de Utilização (Módulo Comercial)</h3>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+          <ProtocolItem
+            number="01"
+            title="Vendedores e Carteiras — Importação"
+            content="A tela lista os vendedores da base (tabela de vendedores por domínio) com os totais da carteira. Use a importação para trazer vendedores e carteiras do TMS; o processo reescreve os vínculos existentes, porém PRESERVA os status de negociação já definidos."
+          />
+          <ProtocolItem
+            number="02"
+            title="Status do Funil Comercial"
+            content="Cada cliente do vendedor possui um status no funil: CADASTRADO (D), EM PROSPECÇÃO (P), EM NEGOCIAÇÃO (N), CONQUISTA (C) e RECONQUISTA (R). O status pode ser alterado manualmente na carteira ou automaticamente ao cumprir uma ação na agenda."
+          />
+          <ProtocolItem
+            number="03"
+            title="Cadastro de Ações de Venda"
+            content="A tela de Ações de Venda cadastra as ações disponíveis para a agenda. Cada ação possui descrição e um status do funil. É esse status que será aplicado ao cliente quando a ação for cumprida."
+          />
+          <ProtocolItem
+            number="04"
+            title="Configuração de Comissões"
+            content="Na carteira do vendedor configure até 3 períodos de comissão: Conquista, Manutenção e Manutenção 2, cada um com percentual e vigência (data inicial e final). Regras: no mínimo 1 período; período preenchido exige percentual e data inicial; a data final não pode ser menor que a inicial; períodos não podem se sobrepor; apenas o período mais futuro pode ficar sem data final (vigência indeterminada)."
+          />
+          <ProtocolItem
+            number="05"
+            title="Tele-Vendas"
+            content="Na tela de Vendedores e Carteiras é possível marcar um vendedor como Tele-Vendas. Essa marcação identifica a equipe de atendimento remoto, que também possui carteira e agenda próprias."
+          />
+          <ProtocolItem
+            number="06"
+            title="Agenda de Vendas"
+            content="O calendário mostra os compromissos por dia. Escolha o período desejado (atalhos Hoje, Esta semana, Este mês ou Padrão) e, para administradores, filtre quais vendedores acompanhar. Cada vendedor recebe uma cor própria, repetida nos respectivos compromissos. Vendedores cadastrados veem apenas a própria agenda."
+          />
+          <ProtocolItem
+            number="07"
+            title="Cumprimento de Ações"
+            content="Antes da confirmação, NADA muda no funil. Ao marcar um compromisso como cumprido, o status da ação passa a valer para o vínculo vendedor x cliente e a data do status é atualizada, movendo o cliente no funil."
+          />
+          <ProtocolItem
+            number="08"
+            title="BI Comercial"
+            content="Painel analítico que cruza os CT-es com a carteira (pelo CNPJ pagador). Apresenta KPIs (frete, mercadoria, CT-es, peso, volumes, ticket médio, frete por kg, comissão estimada e clientes ativos/carteira), funil de vendas, evolução (frete x comissão), ranking de vendedores, top clientes e mapa de incidência de frete por UF. Todo indicador abre a lista de CT-es que o compõe."
+          />
+          <ProtocolItem
+            number="09"
+            title="Busca e Exportação"
+            content="Ainda em Vendedores e Carteiras, busque um cliente por nome ou CNPJ para descobrir o(s) vendedor(es) responsável(is) e exporte a carteira completa (vendedores + clientes + status) em CSV para conferência externa."
+          />
+        </div>
+      </section>
+
+      {/* Dicas e Alertas do Comercial */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-indigo-200 bg-indigo-50/30 dark:bg-indigo-900/10">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold">
+              <Percent className="w-5 h-5" />
+              <span>Comissões</span>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-slate-600 dark:text-slate-400">
+            Ao configurar os períodos, deixe apenas o período mais distante sem data final. Períodos sobrepostos são bloqueados para evitar ambiguidade no cálculo da comissão.
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-200 bg-blue-50/30 dark:bg-blue-900/10">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold">
+              <Info className="w-5 h-5" />
+              <span>Drill-down no BI</span>
+            </div>
+          </CardHeader>
+          <CardContent className="text-sm text-slate-600 dark:text-slate-400">
+            No BI Comercial, clique em qualquer card, barra do funil ou linha do gráfico para abrir a lista de CT-es que formam o número e, de lá, os detalhes de cada conhecimento.
           </CardContent>
         </Card>
       </div>
