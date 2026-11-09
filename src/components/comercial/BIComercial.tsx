@@ -343,13 +343,35 @@ const IBGE_UF: Record<string, string> = {
 const GEOJSON_UFS =
   'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF';
 
-// Escala sequencial (azul claro -> índigo) para a incidência de frete.
-const ESCALA_UF = ['#e0e7ff', '#c7d2fe', '#a5b4fc', '#818cf8', '#6366f1', '#4f46e5', '#3730a3'];
+// Escala contínua do azul do sistema, reservando branco para UFs sem frete.
+const ESCALA_UF = ['#eff6ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#1d4ed8'];
 function corUf(ratio: number): string {
   const r = Math.max(0, Math.min(1, Number(ratio) || 0));
-  const idx = Math.min(ESCALA_UF.length - 1, Math.round(r * (ESCALA_UF.length - 1)));
-  return ESCALA_UF[idx];
+  const scaled = r * (ESCALA_UF.length - 1);
+  const index = Math.min(ESCALA_UF.length - 2, Math.floor(scaled));
+  const mix = scaled - index;
+  const parse = (hex: string) => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+  const start = parse(ESCALA_UF[index]);
+  const end = parse(ESCALA_UF[index + 1]);
+  return `#${start.map((value, i) => Math.round(value + (end[i] - value) * mix).toString(16).padStart(2, '0')).join('')}`;
 }
+
+// Posição externa dos rótulos das UFs pequenas. As linhas-guia partem do
+// centro do território e terminam no rótulo deslocado.
+const CHAMADAS_UF: Record<string, [number, number]> = {
+  RN: [-3.7, -34.8],
+  PB: [-5.9, -34.8],
+  PE: [-8.1, -34.8],
+  AL: [-10.3, -34.8],
+  SE: [-12.5, -34.8],
+  DF: [-15.7, -50.3],
+  ES: [-19.5, -38.7],
+  RJ: [-23.5, -39.4],
+};
 
 // ============================================================
 // LEAFLET (choropleth das UFs)
@@ -369,6 +391,7 @@ function useLeafletUfChoropleth(
 ) {
   const mapRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
+  const annotationRef = useRef<any>(null);
   const geoRef = useRef<any>(null);
   const [loaded, setLoaded] = useState(false);
   const [geo, setGeo] = useState<any>(null);
@@ -439,14 +462,19 @@ function useLeafletUfChoropleth(
         preferCanvas: true,
         minZoom: 2,
       });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+      map.getContainer().style.background = isDark ? '#0f172a' : '#f1f5f9';
       mapRef.current = map;
     }
     const map = mapRef.current;
+    map.getContainer().style.background = isDark ? '#0f172a' : '#f1f5f9';
 
     if (layerRef.current) {
       map.removeLayer(layerRef.current);
       layerRef.current = null;
+    }
+    if (annotationRef.current) {
+      map.removeLayer(annotationRef.current);
+      annotationRef.current = null;
     }
 
     const info: Record<string, UfItem> = {};
@@ -455,17 +483,17 @@ function useLeafletUfChoropleth(
       if (k) info[k] = u;
     });
     const maxFrete = Math.max(1, ...porUf.map((u) => Number(u.frete) || 0));
-    const vazio = isDark ? '#1e293b' : '#f1f5f9';
+    const annotationLayer = L.layerGroup();
 
     const geoLayer: any = L.geoJSON(geo, {
       style: (feat: any) => {
         const sigla = IBGE_UF[String(feat?.properties?.codarea ?? '')] ?? '';
         const frete = sigla ? Number(info[sigla]?.frete) || 0 : 0;
         return {
-          color: isDark ? '#0f172a' : '#ffffff',
-          weight: 0.8,
-          fillColor: frete > 0 ? corUf(frete / maxFrete) : vazio,
-          fillOpacity: frete > 0 ? 0.9 : 0.5,
+          color: isDark ? '#64748b' : '#94a3b8',
+          weight: 1,
+          fillColor: frete > 0 ? corUf(Math.log1p(frete) / Math.log1p(maxFrete)) : '#ffffff',
+          fillOpacity: 1,
         };
       },
       onEachFeature: (feat: any, lyr: any) => {
@@ -476,8 +504,10 @@ function useLeafletUfChoropleth(
         const temDados = frete > 0 || ctes > 0;
 
         lyr.bindTooltip(
-          `${escapeHtml(sigla || 'UF')}${temDados ? ' · ' + escapeHtml(fmtBRL(frete)) : ' · sem frete'}`,
-          { sticky: true }
+          `<div style="font-weight:700;margin-bottom:2px">${escapeHtml(sigla || 'UF')}</div>
+           <div>Frete: <b>${escapeHtml(fmtBRL(frete))}</b></div>
+           <div>CT-es: <b>${escapeHtml(fmtNum(ctes))}</b></div>`,
+          { sticky: true, direction: 'top', opacity: 0.98 }
         );
         lyr.bindPopup(
           `<div style="font-family:inherit;min-width:170px">
@@ -487,8 +517,30 @@ function useLeafletUfChoropleth(
              ${temDados ? '<button class="bi-popup-uf" style="width:100%;cursor:pointer;border:0;border-radius:6px;padding:4px 8px;background:#6366f1;color:#fff;font-size:11px;font-weight:600">Ver CT-es</button>' : ''}
            </div>`
         );
-        lyr.on('mouseover', () => lyr.setStyle({ weight: 2, color: '#6366f1' }));
+        lyr.on('mouseover', () => lyr.setStyle({ weight: 2, color: '#2563eb' }));
         lyr.on('mouseout', () => geoLayer.resetStyle(lyr));
+        if (ctes > 0 && sigla) {
+          const centro = lyr.getBounds().getCenter();
+          const chamada = CHAMADAS_UF[sigla];
+          const destino = chamada ? L.latLng(chamada[0], chamada[1]) : centro;
+          if (chamada) {
+            L.polyline([centro, destino], {
+              color: '#2563eb',
+              weight: 1.5,
+              opacity: 0.9,
+              interactive: false,
+            }).addTo(annotationLayer);
+          }
+          L.marker(destino, {
+            interactive: false,
+            icon: L.divIcon({
+              className: 'bi-uf-count-icon',
+              html: `<span style="display:block;min-width:24px;padding:1px 4px;border:1px solid #2563eb;border-radius:4px;background:rgba(255,255,255,.96);color:#0f172a;font:700 10px/14px system-ui,sans-serif;text-align:center;white-space:nowrap;box-shadow:0 1px 3px rgba(15,23,42,.25)">${escapeHtml(fmtNum(ctes))}</span>`,
+              iconSize: [38, 18],
+              iconAnchor: [19, 9],
+            }),
+          }).addTo(annotationLayer);
+        }
         if (onDrill && temDados) {
           lyr.on('popupopen', (e: any) => {
             const el = e?.popup?.getElement?.()?.querySelector?.('.bi-popup-uf');
@@ -497,12 +549,14 @@ function useLeafletUfChoropleth(
         }
       },
     }).addTo(map);
+    annotationLayer.addTo(map);
     layerRef.current = geoLayer;
+    annotationRef.current = annotationLayer;
 
     // Mantém o Brasil inteiro centralizado, independente das UFs com dados.
     const fitBrasil = () => {
       try {
-        map.fitBounds(geoLayer.getBounds(), { padding: [4, 4], animate: false });
+        map.fitBounds(geoLayer.getBounds().pad(0.12), { padding: [2, 2], animate: false });
       } catch {
         /* noop */
       }
@@ -527,6 +581,7 @@ function useLeafletUfChoropleth(
         mapRef.current.remove();
         mapRef.current = null;
         layerRef.current = null;
+        annotationRef.current = null;
       }
     };
   }, []);
@@ -1450,16 +1505,16 @@ export function BIComercial() {
                     <>
                       <div ref={mapaRef} style={{ width: '100%', height: 300, zIndex: 1 }} />
                       <div className="flex items-center justify-center gap-2 px-4 pt-2">
-                        <span className="text-[10px] text-muted-foreground">Menor</span>
-                        <div className="flex overflow-hidden rounded-sm">
-                          {ESCALA_UF.map((c) => (
-                            <span key={c} className="h-2.5 w-5" style={{ backgroundColor: c }} />
-                          ))}
+                        <span className="text-[10px] text-muted-foreground">Sem frete</span>
+                        <div
+                          className="h-2.5 w-32 overflow-hidden rounded-sm"
+                          style={{ background: `linear-gradient(to right, #ffffff, ${ESCALA_UF.join(', ')})` }}
+                        >
                         </div>
                         <span className="text-[10px] text-muted-foreground">Maior frete</span>
                       </div>
                       <p className="px-4 pb-3 pt-1 text-[10px] text-muted-foreground">
-                        Frete entregue por UF · clique em um estado para listar os CT-es.
+                        Cor indica o frete; os números indicam CT-es. Clique em uma UF para abrir a lista.
                       </p>
                     </>
                   )}
