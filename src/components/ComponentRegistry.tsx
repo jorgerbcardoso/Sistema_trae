@@ -34,6 +34,7 @@ import { RelacaoCTes } from './relatorios/RelacaoCTes';
 import { VendedoresCarteiras } from './comercial/VendedoresCarteiras';
 import { AcoesVenda } from './comercial/AcoesVenda';
 import { BIComercial } from './comercial/BIComercial';
+import { AgendaVendas } from './comercial/AgendaVendas';
 import { GestaoMenu } from './admin/GestaoMenu';
 import { ParametrosEmpresa } from './admin/ParametrosEmpresa';
 
@@ -165,6 +166,7 @@ export const COMPONENT_REGISTRY: ComponentMap = {
   'comercial/VendedoresCarteiras': VendedoresCarteiras,
   'comercial/AcoesVenda': AcoesVenda,
   'comercial/BIComercial': BIComercial,
+  'comercial/AgendaVendas': AgendaVendas,
   
   // ============================================
   // ADMINISTRAÇÃO
