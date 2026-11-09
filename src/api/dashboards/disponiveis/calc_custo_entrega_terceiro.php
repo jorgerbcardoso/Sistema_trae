@@ -35,6 +35,35 @@ if ($placaSim === '' || !preg_match('/^[A-Z0-9]{6,10}$/', preg_replace('/[^A-Z0-
 $normPlate = function(string $p): string {
     return preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($p)));
 };
+$placaNorm = $normPlate($placaSim);
+
+try {
+    $conn = connect();
+    $tblVeiculo = "{$domain}_veiculo";
+    $resVeiculo = sql(
+        "SELECT tipo
+           FROM {$tblVeiculo}
+          WHERE regexp_replace(upper(COALESCE(placa, '')), '[^A-Z0-9]', '', 'g') = $1
+          LIMIT 1",
+        [$placaNorm],
+        $conn
+    );
+    if (!$resVeiculo || pg_num_rows($resVeiculo) === 0) {
+        respondJson([
+            'success' => false,
+            'error_code' => 'VEHICLE_NOT_FOUND_PRESTO',
+            'message' => 'Veículo não localizado na base Presto. Clique em Importar Veículos Recentes neste painel.',
+        ]);
+    }
+} catch (Exception $e) {
+    error_log('Erro ao consultar veículo para cálculo de terceiro: ' . $e->getMessage());
+    respondJson([
+        'success' => false,
+        'error_code' => 'VEHICLE_LOOKUP_FAILED',
+        'message' => 'Não foi possível consultar o veículo na base Presto.',
+    ], 500);
+}
+
 $toFloat = function($v): float {
     if ($v === null || $v === '') return 0.0;
     if (is_int($v) || is_float($v)) return (float)$v;
@@ -172,7 +201,6 @@ if (count($rows) <= 1) {
     respondJson(['success' => false, 'message' => 'Arquivo inválido.']);
 }
 
-$placaNorm = $normPlate($placaSim);
 $unidadeN = strtoupper($unidade);
 
 $idxUnid = 0;
@@ -201,7 +229,11 @@ for ($i = 1; $i < count($rows); $i++) {
 }
 
 if (count($tbl) === 0) {
-    respondJson(['success' => false, 'message' => 'Placa não encontrada na tabela.']);
+    respondJson([
+        'success' => false,
+        'error_code' => 'VEHICLE_TABLE_NOT_FOUND_TMS',
+        'message' => 'Tabela do veículo não localizada no TMS.',
+    ]);
 }
 
 $pickRow = function(array $rows) {

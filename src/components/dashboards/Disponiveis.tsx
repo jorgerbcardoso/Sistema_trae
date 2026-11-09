@@ -5276,6 +5276,7 @@ function ModalDadosOrdemCarregamento({
   const [ajudantes, setAjudantes] = useState('');
   const [doca, setDoca] = useState('');
   const [freteDisponivel, setFreteDisponivel] = useState(0);
+  const [freteTotalCarregamento, setFreteTotalCarregamento] = useState(0);
 
   const [motBusca, setMotBusca] = useState('');
   const [motList, setMotList] = useState<{ cpf: string; nome: string; ddd: string; fone: string }[]>([]);
@@ -5290,6 +5291,7 @@ function ModalDadosOrdemCarregamento({
   const [calcParams, setCalcParams] = useState<any>(null);
   const [calcLoading, setCalcLoading] = useState(false);
   const [calcTerceiroInfo, setCalcTerceiroInfo] = useState<{ total: number; parcelaSetores: number; diaria: number } | null>(null);
+  const [calcTerceiroErro, setCalcTerceiroErro] = useState('');
   const [calcTerceiroLoading, setCalcTerceiroLoading] = useState(false);
 
   useEffect(() => {
@@ -5305,6 +5307,7 @@ function ModalDadosOrdemCarregamento({
         if (!alive) return;
         if (resp?.success && resp?.data) {
           setFreteDisponivel(Number(resp.data.frete_disponivel ?? 0) || 0);
+          setFreteTotalCarregamento(Number(resp.data.vlr_frete_total ?? 0) || 0);
           setPlacaDefinitiva(String(resp.data.placa_definitiva ?? '').toUpperCase());
           setPlacaCarreta(String(resp.data.placa_carreta ?? '').toUpperCase());
           setCpfMotorista(String(resp.data.cpf_motorista ?? ''));
@@ -5366,8 +5369,7 @@ function ModalDadosOrdemCarregamento({
       if (!resp?.success || !Array.isArray(resp.data)) return null;
       const list = resp.data;
       const found = list.find((v: any) => String(v?.placa ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === pNorm)
-        ?? list.find((v: any) => String(v?.placa ?? '').trim().toUpperCase() === p)
-        ?? list[0];
+        ?? list.find((v: any) => String(v?.placa ?? '').trim().toUpperCase() === p);
       if (!found) return null;
       return { placa: String(found?.placa ?? p).trim().toUpperCase(), tipo: normTipo(found?.tipo ?? '') };
     } catch {
@@ -5445,6 +5447,7 @@ function ModalDadosOrdemCarregamento({
       if (!p) {
         setCalcTerceiroTipo('');
         setCalcTerceiroInfo(null);
+        setCalcTerceiroErro('');
         return;
       }
       const v = await fetchVeiculo(p);
@@ -5461,13 +5464,16 @@ function ModalDadosOrdemCarregamento({
       const p = calcTerceiroPlaca.trim().toUpperCase();
       if (!p) {
         setCalcTerceiroInfo(null);
+        setCalcTerceiroErro('');
         return;
       }
       if (!Array.isArray(resumoSetoresEntrega) || resumoSetoresEntrega.length === 0) {
         setCalcTerceiroInfo(null);
+        setCalcTerceiroErro('');
         return;
       }
       setCalcTerceiroLoading(true);
+      setCalcTerceiroErro('');
       try {
         const resp = await apiFetch(
           `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/calc_custo_entrega_terceiro.php`,
@@ -5477,8 +5483,17 @@ function ModalDadosOrdemCarregamento({
         if (!alive) return;
         if (!resp?.success) {
           setCalcTerceiroInfo(null);
+          const codigo = String(resp?.error_code ?? '');
+          setCalcTerceiroErro(
+            codigo === 'VEHICLE_NOT_FOUND_PRESTO'
+              ? 'Veículo não localizado na base Presto. Clique em Importar Veículos Recentes neste painel.'
+              : codigo === 'VEHICLE_TABLE_NOT_FOUND_TMS'
+                ? 'Tabela do veículo não localizada no TMS.'
+                : String(resp?.message || 'Não foi possível calcular o custo para esta placa.')
+          );
           return;
         }
+        setCalcTerceiroErro('');
         setCalcTerceiroInfo({
           total: Number(resp.total ?? 0) || 0,
           parcelaSetores: Number(resp.parcela_setores ?? 0) || 0,
@@ -5487,6 +5502,7 @@ function ModalDadosOrdemCarregamento({
       } catch {
         if (!alive) return;
         setCalcTerceiroInfo(null);
+        setCalcTerceiroErro('Não foi possível consultar a tabela do veículo no TMS.');
       } finally {
         if (alive) setCalcTerceiroLoading(false);
       }
@@ -5494,6 +5510,9 @@ function ModalDadosOrdemCarregamento({
     const t = setTimeout(run, 250);
     return () => { alive = false; clearTimeout(t); };
   }, [calcTerceiroPlaca, resumoSetoresEntrega, unidade]);
+
+  // Frete original do carregamento: soma de vlr_frete_cte (mesma base do frete disponível).
+  const freteOriginalCarregamento = freteTotalCarregamento > 0 ? freteTotalCarregamento : (Number(freteOriginal) || 0);
 
   const calc = useMemo(() => {
     const km = Number(rotaKm ?? 0) || 0;
@@ -5717,13 +5736,13 @@ function ModalDadosOrdemCarregamento({
                 <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Calculadora</div>
                 <div className="flex items-center gap-1.5 whitespace-nowrap">
                   <Badge className="bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100 text-[11px] font-mono tabular-nums">
-                    Frete: R$ {fmtMoedaBR(Number(freteOriginal) || 0)}
+                    Frete: R$ {fmtMoedaBR(freteOriginalCarregamento)}
                   </Badge>
                   <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 text-[11px] font-mono tabular-nums">
                     Disp.: R$ {fmtMoedaBR(Number(freteDisponivel) || 0)}
                   </Badge>
                   <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 text-[11px] font-mono tabular-nums">
-                    {freteOriginal > 0 ? `${Math.max(0, Math.min((freteDisponivel / freteOriginal) * 100, 999)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '—'}
+                    {freteOriginalCarregamento > 0 ? `${Math.max(0, Math.min((freteDisponivel / freteOriginalCarregamento) * 100, 999)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '—'}
                   </Badge>
                 </div>
               </div>
@@ -5805,7 +5824,9 @@ function ModalDadosOrdemCarregamento({
                     </div>
                   ) : null}
                   {calcTerceiroPlaca.trim() && !calcTerceiroLoading && !calcTerceiroInfo ? (
-                    <div className="text-red-700 dark:text-red-300">Não foi possível calcular para esta placa.</div>
+                    <div className="text-red-700 dark:text-red-300">
+                      {calcTerceiroErro || 'Não foi possível calcular para esta placa.'}
+                    </div>
                   ) : null}
                   {calcTerceiroInfo ? (
                     <>
@@ -6067,7 +6088,8 @@ function ModalRotaCarregamento({
 
       const ctrc = padCte(ser, nro);
       const peso = c?.peso !== null && c?.peso !== undefined && String(c.peso) !== '' ? parsePeso(String(c.peso)) : 0;
-      const frete = c?.vlr_frete !== null && c?.vlr_frete !== undefined && String(c.vlr_frete) !== '' ? parseMoeda(String(c.vlr_frete)) : 0;
+      const freteRaw = (c as any)?.vlr_frete ?? (c as any)?.vlr_frete_cte ?? (c as any)?.frete;
+      const frete = freteRaw !== null && freteRaw !== undefined && String(freteRaw) !== '' ? parseMoeda(String(freteRaw)) : 0;
       const cubagem = c?.cubagem !== null && c?.cubagem !== undefined && String(c.cubagem) !== '' ? parseCubagem(String(c.cubagem)) : 0;
       const qtdeVol = c?.qtde_vol !== null && c?.qtde_vol !== undefined && String(c.qtde_vol) !== '' ? Number(c.qtde_vol) : 0;
       const nfs = norm(c?.nfs ?? '');

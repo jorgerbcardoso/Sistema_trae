@@ -77,9 +77,11 @@ if ($seqCarResolved <= 0) {
 if ($acao === 'get') {
     try {
         $freteDisponivel = 0.0;
+        $vlrFreteTotal = 0.0;
         try {
             $resFd = sql(
                 "SELECT
+                    COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0)), 0) AS vlr_frete_total,
                     COALESCE(SUM(COALESCE(c.vlr_frete_cte, 0) * (COALESCE(fd.percentual, 100)::numeric / 100.0)), 0) AS frete_disponivel
                  FROM {$tblCar} c
                  LEFT JOIN {$tblFreteDisp} fd
@@ -94,6 +96,7 @@ if ($acao === 'get') {
             if ($resFd && pg_num_rows($resFd) > 0) {
                 $rowFd = pg_fetch_assoc($resFd);
                 $freteDisponivel = (float)($rowFd['frete_disponivel'] ?? 0);
+                $vlrFreteTotal = (float)($rowFd['vlr_frete_total'] ?? 0);
             }
         } catch (Exception $e) {}
         $res = sql(
@@ -130,6 +133,7 @@ if ($acao === 'get') {
             'seq_carregamento' => $seqCarResolved,
             'data' => [
                 'frete_disponivel' => $freteDisponivel,
+                'vlr_frete_total' => $vlrFreteTotal,
                 'placa_definitiva' => strtoupper(trim((string)($row['placa_definitiva'] ?? ''))),
                 'placa_carreta' => strtoupper(trim((string)($row['placa_carreta'] ?? ''))),
                 'cpf_motorista' => $cpf,
