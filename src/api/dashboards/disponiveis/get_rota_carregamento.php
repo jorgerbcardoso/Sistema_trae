@@ -166,7 +166,6 @@ try {
          FROM {$tblCar}
          WHERE unidade = $1
            AND UPPER(placa_provisoria) = UPPER($2)
-           AND data_finalizacao IS NULL
            {$whereSeq}",
         $paramsCar,
         $conn
@@ -256,7 +255,6 @@ try {
         {$joinCidade}
         WHERE car.unidade = $1
           AND UPPER(car.placa_provisoria) = UPPER($2)
-          AND car.data_finalizacao IS NULL
           {$whereSeq}
           AND (car.nro_cte::text ~ '^[0-9]+$' AND (car.nro_cte::text)::int > 0)
         ORDER BY

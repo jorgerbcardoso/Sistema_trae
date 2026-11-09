@@ -78,7 +78,6 @@ $toFloat = function($v): float {
 $setorMap = [];
 
 if ($seqCarreg > 0) {
-    $conn = connect();
     $tblCar = "{$domain}_carregamento";
     try {
         $res = sql(
@@ -89,7 +88,6 @@ if ($seqCarreg > 0) {
              FROM {$tblCar}
              WHERE unidade = \$1
                AND seq_carregamento = \$2
-               AND data_finalizacao IS NULL
                AND COALESCE(nro_cte, 0) <> 0
              GROUP BY 1",
             [$unidade, $seqCarreg],
