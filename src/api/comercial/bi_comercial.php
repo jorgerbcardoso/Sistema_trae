@@ -31,6 +31,17 @@ require_once __DIR__ . '/../config.php';
 handleOptionsRequest();
 validateRequestMethod('GET');
 
+// Falhas de SQL deixam de virar HTTP 500 sem corpo: devolvemos JSON para o
+// frontend exibir uma mensagem tratada em vez de quebrar a tela.
+set_exception_handler(function ($e) {
+    error_log('[bi_comercial] ' . $e->getMessage());
+    respondJson([
+        'success' => false,
+        'message' => 'Não foi possível gerar os indicadores. Ajuste o período e tente novamente.',
+        'detail'  => $e->getMessage(),
+    ], 500);
+});
+
 $auth = authenticateAndGetUser();
 $domain = strtolower(trim((string)($auth['domain'] ?? '')));
 if ($domain === '' || !preg_match('/^[a-z0-9_]+$/', $domain)) {
@@ -108,9 +119,9 @@ if ($resP && ($rp = pg_fetch_assoc($resP))) {
 // ============================================
 // EXPRESSÕES DE APOIO
 // ============================================
-$cnpjVc  = "regexp_replace(COALESCE(vc.cnpj, ''), '\\\\D', '', 'g')";
+$cnpjVc  = "regexp_replace(COALESCE(vc.cnpj::text, ''), '\\\\D', '', 'g')";
 $cnpjPag = "regexp_replace(COALESCE(cte.cnpj_pag::text, ''), '\\\\D', '', 'g')";
-$cnpjCli = "regexp_replace(COALESCE(c.cnpj, ''), '\\\\D', '', 'g')";
+$cnpjCli = "regexp_replace(COALESCE(c.cnpj::text, ''), '\\\\D', '', 'g')";
 
 $percExpr = "
     CASE
@@ -178,9 +189,9 @@ $selLat = $cteHasLat
 $selLng = $cteHasLat
     ? "COALESCE(NULLIF(cte.longitude_entrega, ''), c.longitude_entrega) AS longitude_entrega"
     : "c.longitude_entrega AS longitude_entrega";
-$selCep      = $cteHasEnd ? "COALESCE(cte.cep_entrega, '') AS cep_entrega" : "'' AS cep_entrega";
-$selEndereco = $cteHasEnd ? "COALESCE(cte.endereco_entrega, '') AS endereco_entrega" : "'' AS endereco_entrega";
-$selBairro   = $cteHasEnd ? "COALESCE(cte.bairro_entrega, '') AS bairro_entrega" : "'' AS bairro_entrega";
+$selCep      = $cteHasEnd ? "COALESCE(cte.cep_entrega::text, '') AS cep_entrega" : "'' AS cep_entrega";
+$selEndereco = $cteHasEnd ? "COALESCE(cte.endereco_entrega::text, '') AS endereco_entrega" : "'' AS endereco_entrega";
+$selBairro   = $cteHasEnd ? "COALESCE(cte.bairro_entrega::text, '') AS bairro_entrega" : "'' AS bairro_entrega";
 $joinEntr    = $cteHasCidEnt ? "LEFT JOIN cidade ce ON ce.seq_cidade = cte.seq_cidade_entr" : "";
 $selCidade   = $cteHasCidEnt ? "COALESCE(NULLIF(ce.nome, ''), cid.nome, '')" : "COALESCE(cid.nome, '')";
 $selUf       = $cteHasCidEnt ? "COALESCE(NULLIF(ce.uf, ''), cid.uf, '')" : "COALESCE(cid.uf, '')";
@@ -218,7 +229,7 @@ if ($action === 'ctes') {
     }
     if ($login !== '' && $login !== '__todos__') {
         $wParts[] = "EXISTS (SELECT 1 FROM {$tblVc} vcl
-                            WHERE regexp_replace(COALESCE(vcl.cnpj, ''), '\\\\D', '', 'g') = {$cnpjPag}
+                            WHERE regexp_replace(COALESCE(vcl.cnpj::text, ''), '\\\\D', '', 'g') = {$cnpjPag}
                               AND LOWER(BTRIM(vcl.login)) = LOWER(\${$pp}))";
         $wParams[] = $login; $pp++;
     }
@@ -233,7 +244,7 @@ if ($action === 'ctes') {
         case 'vendedor':
             if ($valor !== '') {
                 $addFiltro("EXISTS (SELECT 1 FROM {$tblVc} vcx
-                                    WHERE regexp_replace(COALESCE(vcx.cnpj, ''), '\\\\D', '', 'g') = {$cnpjPag}
+                                    WHERE regexp_replace(COALESCE(vcx.cnpj::text, ''), '\\\\D', '', 'g') = {$cnpjPag}
                                       AND LOWER(BTRIM(vcx.login)) = LOWER({IDX}))", $valor);
             }
             break;
@@ -245,7 +256,7 @@ if ($action === 'ctes') {
         case 'status':
             if ($valor !== '') {
                 $addFiltro("EXISTS (SELECT 1 FROM {$tblVc} vcs
-                                    WHERE regexp_replace(COALESCE(vcs.cnpj, ''), '\\\\D', '', 'g') = {$cnpjPag}
+                                    WHERE regexp_replace(COALESCE(vcs.cnpj::text, ''), '\\\\D', '', 'g') = {$cnpjPag}
                                       AND COALESCE(NULLIF(UPPER(BTRIM(vcs.status)), ''), 'D') = {IDX})", strtoupper($valor));
             }
             break;
@@ -413,7 +424,7 @@ $baseDoc = "
         SELECT DISTINCT ON (cte.seq_cte)
             cte.seq_cte,
             cte.data_emissao,
-            cte.cnpj_pag,
+            cte.cnpj_pag::text AS cnpj_pag,
             COALESCE(NULLIF(cte.nome_pag, ''), 'SEM NOME') AS nome_pag,
             COALESCE(cte.sigla_emit, '') AS sigla_emit,
             COALESCE(cte.sigla_dest, '') AS sigla_dest,
@@ -501,7 +512,7 @@ if ($login !== '' && $login !== '__todos__') {
     $carteiraWhere = "WHERE LOWER(login) = LOWER($1)";
     $carteiraParams = [$login];
 }
-$q = "SELECT COUNT(DISTINCT regexp_replace(COALESCE(cnpj, ''), '\\\\D', '', 'g'))::int AS total
+$q = "SELECT COUNT(DISTINCT regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g'))::int AS total
       FROM {$tblVc} {$carteiraWhere}";
 $r = sql($q, $carteiraParams);
 $clientesCarteira = $r ? (int)(pg_fetch_assoc($r)['total'] ?? 0) : 0;
@@ -522,10 +533,10 @@ $out['kpis'] = [
 // ---- Funil (contagem de clientes por status + frete por status) ----
 $funilClientes = [];
 $q = "SELECT COALESCE(status, 'D') AS s, COUNT(*)::int AS c FROM (
-        SELECT DISTINCT ON (regexp_replace(COALESCE(cnpj, ''), '\\\\D', '', 'g'))
+        SELECT DISTINCT ON (regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g'))
             COALESCE(status, 'D') AS status
         FROM {$tblVc} {$carteiraWhere}
-        ORDER BY regexp_replace(COALESCE(cnpj, ''), '\\\\D', '', 'g')
+        ORDER BY regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g')
       ) t GROUP BY s";
 $r = sql($q, $carteiraParams);
 if ($r) { while ($row = pg_fetch_assoc($r)) { $funilClientes[trim((string)$row['s'])] = (int)$row['c']; } }

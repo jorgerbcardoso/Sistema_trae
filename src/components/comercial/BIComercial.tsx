@@ -595,7 +595,7 @@ export function BIComercial() {
         tp_frete: f.tpFrete === 'TODOS' ? '' : f.tpFrete,
       });
       const res = await apiFetch(`${API}?${qs.toString()}`);
-      if (!res || res.success === false) {
+      if (!res || res.success === false || !res.periodo) {
         throw new Error(res?.message || 'Falha ao carregar o BI Comercial.');
       }
       setDados(res as BiData);
@@ -656,7 +656,7 @@ export function BIComercial() {
           v: v || '',
         });
         const res = await apiFetch(`${API}?${qs.toString()}`);
-        if (!res || res.success === false) {
+        if (!res || res.success === false || !Array.isArray(res.ctes)) {
           throw new Error(res?.message || 'Falha ao carregar os CT-es.');
         }
         setDrillRows((res.ctes as CteRow[]) || []);
@@ -1072,7 +1072,7 @@ export function BIComercial() {
                     </h3>
                   </div>
                   <Badge variant="outline" className="text-[10px]">
-                    {dados.periodo.granularidade === 'dia' ? 'Diário' : 'Mensal'}
+                    {dados.periodo?.granularidade === 'dia' ? 'Diário' : 'Mensal'}
                   </Badge>
                 </div>
                 <CardContent className="pt-2">
