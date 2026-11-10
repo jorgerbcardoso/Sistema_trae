@@ -114,6 +114,7 @@ function ssw_cte_col_exists($conn, string $tblCte, string $col): bool {
 
 function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, string $login, array $carBase, ?DateTime $dtRef = null): array {
     $placaReq = strtoupper(trim((string)($carBase['placa_provisoria'] ?? $carBase['placa'] ?? '')));
+    $placaReqNorm = preg_replace('/[^A-Z0-9]/', '', $placaReq);
     $seqCarreg = (int)($carBase['seq_carregamento'] ?? 0);
     if ($placaReq === '' || $seqCarreg <= 0) {
         return ['success' => false, 'message' => 'Carregamento inválido.'];
@@ -162,30 +163,62 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
         return ['success' => false, 'message' => 'SSW: XML inválido.'];
     }
 
-    $info = ['saida' => null, 'qtd' => 0, 'manifestos' => []];
+    $viagens = [];
     $rows = $xml->xpath('//r');
     if ($rows && count($rows) > 0) {
         foreach ($rows as $r) {
+            $status = strtoupper(trim(strip_tags((string)($r->f17 ?? ''))));
+            if (strpos($status, 'CANCELADO') !== false) continue;
+
             $f3 = strtoupper(trim((string)($r->f3 ?? '')));
             $f2 = strtoupper(trim((string)($r->f2 ?? '')));
-            $placa = $f3 !== '' ? $f3 : $f2;
-            if ($placa !== $placaReq) continue;
+            $placasNorm = [
+                preg_replace('/[^A-Z0-9]/', '', $f2),
+                preg_replace('/[^A-Z0-9]/', '', $f3),
+            ];
+            if (!in_array($placaReqNorm, $placasNorm, true)) continue;
             $f11 = trim((string)($r->f11 ?? ''));
             $dt = $f11 !== '' ? ssw_parse_dt_br($f11) : null;
-            if ($dt !== null) {
-                if ($info['saida'] === null || $dt->getTimestamp() < $info['saida']->getTimestamp()) $info['saida'] = $dt;
-            }
+            if ($dt === null) continue;
+
             $f8Raw = trim((string)($r->f8 ?? ''));
             $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-            if ($f8Num > 0) $info['qtd'] += $f8Num;
-            $f17 = trim((string)($r->f17 ?? ''));
-            $seqMan = (string)preg_replace('/[^\d]/', '', $f17);
-            if ($seqMan !== '') $info['manifestos'][$seqMan] = true;
+            $seqManRaw = trim((string)($r->f18 ?? ''));
+            $seqMan = preg_match('/^\d+$/', $seqManRaw) ? $seqManRaw : '';
+            $ts = $dt->getTimestamp();
+            if (!isset($viagens[$ts])) {
+                $viagens[$ts] = ['saida' => $dt, 'qtd' => 0, 'manifestos' => []];
+            }
+            if ($f8Num > 0) $viagens[$ts]['qtd'] += $f8Num;
+            if ($seqMan !== '') $viagens[$ts]['manifestos'][$seqMan] = true;
         }
     }
 
-    $qtdSsw = (int)($info['qtd'] ?? 0);
-    $manifestos = isset($info['manifestos']) && is_array($info['manifestos']) ? array_keys($info['manifestos']) : [];
+    $dtInclusao = null;
+    $dtInclusaoRaw = trim(
+        (string)($carBase['data_criacao'] ?? '') . ' ' .
+        (string)($carBase['hora_criacao'] ?? '')
+    );
+    if ($dtInclusaoRaw !== '') {
+        try { $dtInclusao = new DateTime($dtInclusaoRaw); } catch (Exception $e) { $dtInclusao = null; }
+    }
+    if (!($dtInclusao instanceof DateTime)) $dtInclusao = clone $dtBase;
+
+    $candidatas = [];
+    $limiteInferior = $dtInclusao->getTimestamp() - (5 * 60);
+    foreach ($viagens as $viagem) {
+        $saida = $viagem['saida'] ?? null;
+        if (!($saida instanceof DateTime) || $saida->getTimestamp() < $limiteInferior) continue;
+        $candidatas[] = $viagem;
+    }
+    usort($candidatas, function($a, $b) {
+        return $a['saida']->getTimestamp() <=> $b['saida']->getTimestamp();
+    });
+    $viagemSelecionada = $candidatas[0] ?? null;
+    $qtdSsw = (int)($viagemSelecionada['qtd'] ?? 0);
+    $manifestos = isset($viagemSelecionada['manifestos']) && is_array($viagemSelecionada['manifestos'])
+        ? array_keys($viagemSelecionada['manifestos'])
+        : [];
 
     $qtdPresto = 0;
     try {
@@ -364,49 +397,140 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
     $dataFinalStr = trim((string)($carBase['data_finalizacao'] ?? ''));
     if ($dataFinalStr === '') $dataFinalStr = $dtBase->format('Y-m-d');
     $horaFinalStr = trim((string)($carBase['hora_finalizacao'] ?? ''));
-    if ($horaFinalStr === '') $horaFinalStr = ($info['saida'] instanceof DateTime) ? $info['saida']->format('H:i:s') : date('H:i:s');
+    if ($horaFinalStr === '') $horaFinalStr = ($viagemSelecionada['saida'] ?? null) instanceof DateTime
+        ? $viagemSelecionada['saida']->format('H:i:s')
+        : date('H:i:s');
     $loginFinalStr = trim((string)($carBase['login_finalizacao'] ?? ''));
     if ($loginFinalStr === '') $loginFinalStr = $login;
 
+    $dataInclusaoStr = trim((string)($carBase['data_criacao'] ?? ''));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataInclusaoStr)) $dataInclusaoStr = date('Y-m-d');
+    $horaInclusaoStr = trim((string)($carBase['hora_criacao'] ?? ''));
+    if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $horaInclusaoStr)) $horaInclusaoStr = date('H:i:s');
+    if (strlen($horaInclusaoStr) === 5) $horaInclusaoStr .= ':00';
+    $loginInclusao = trim((string)($carBase['login_criacao'] ?? ''));
+    if ($loginInclusao === '') $loginInclusao = $login;
+
+    $added = 0;
     $updated = 0;
     if (count($cteAll) > 0) {
-        @pg_query($conn, 'BEGIN');
+        if (!@pg_query($conn, 'BEGIN')) {
+            return ['success' => false, 'message' => 'Não foi possível iniciar a recuperação dos CT-es.'];
+        }
         try {
-            $unidadeEsc = pg_escape_string($conn, $unidade);
-            $seqCarregEsc = (int)$seqCarreg;
-
             foreach ($cteAll as $rowC) {
                 $ser = strtoupper(trim((string)($rowC['ser_cte'] ?? '')));
                 $nro = (int)($rowC['nro_cte'] ?? 0);
                 if ($ser === '' || $nro <= 0) continue;
 
-                // Apenas marca como LIDO se o CT-e já existir no carregamento do Presto
-                $resUpd = @pg_query($conn,
-                    "UPDATE {$tabela}
-                     SET lido = TRUE
-                     WHERE unidade = '{$unidadeEsc}'
-                       AND seq_carregamento = {$seqCarregEsc}
-                       AND UPPER(BTRIM(ser_cte)) = '" . pg_escape_string($conn, $ser) . "'
-                       AND nro_cte = {$nro}
-                       AND COALESCE(lido, FALSE) = FALSE"
+                $resExiste = @pg_query_params(
+                    $conn,
+                    "SELECT 1
+                     FROM {$tabela}
+                     WHERE unidade = $1
+                       AND seq_carregamento = $2
+                       AND UPPER(BTRIM(ser_cte)) = $3
+                       AND nro_cte = $4
+                     LIMIT 1",
+                    [$unidade, $seqCarreg, $ser, $nro]
                 );
-                
-                if ($resUpd && pg_affected_rows($resUpd) > 0) {
-                    $updated += 1;
+                if (!$resExiste) throw new Exception('Falha ao conferir CT-e existente.');
+                if (pg_num_rows($resExiste) > 0) {
+                    $resUpd = @pg_query_params(
+                        $conn,
+                        "UPDATE {$tabela}
+                         SET lido = TRUE
+                         WHERE unidade = $1
+                           AND seq_carregamento = $2
+                           AND UPPER(BTRIM(ser_cte)) = $3
+                           AND nro_cte = $4
+                           AND COALESCE(lido, FALSE) = FALSE",
+                        [$unidade, $seqCarreg, $ser, $nro]
+                    );
+                    if (!$resUpd) throw new Exception('Falha ao atualizar CT-e existente.');
+                    $updated += (int)pg_affected_rows($resUpd);
+                    continue;
                 }
+
+                $emissao = trim((string)($rowC['data_emissao'] ?? ''));
+                $prevEnt = trim((string)($rowC['data_prev_ent'] ?? ''));
+                $paramsInsert = [
+                    $unidade,
+                    $seqCarreg,
+                    $placaReq,
+                    $loginInclusao,
+                    $dataInclusaoStr,
+                    $horaInclusaoStr,
+                    $ser,
+                    $nro,
+                    strtoupper(trim((string)($rowC['destino_cte'] ?? ''))),
+                    $emissao !== '' ? $emissao : null,
+                    $prevEnt !== '' ? $prevEnt : null,
+                    (string)($rowC['remetente'] ?? ''),
+                    (string)($rowC['destinatario'] ?? ''),
+                    (string)($rowC['pagador'] ?? ''),
+                    (string)($rowC['cidade_destino'] ?? ''),
+                    (float)($rowC['vlr_merc'] ?? 0),
+                    (float)($rowC['vlr_frete'] ?? 0),
+                    (float)($rowC['peso'] ?? 0),
+                    (float)($rowC['cubagem'] ?? 0),
+                    (int)($rowC['qtde_vol'] ?? 0),
+                    $destinoCarreg,
+                    $unidadesCarreg,
+                    $setoresEntregaCarreg,
+                    $origemCriacao === 'SSW' ? $placaReq : null,
+                    $origemCriacao,
+                    $unidade,
+                    $dataFinalStr,
+                    $horaFinalStr,
+                    $loginFinalStr,
+                ];
+                $resInsert = @pg_query_params(
+                    $conn,
+                    "INSERT INTO {$tabela}
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao,
+                      ser_cte, nro_cte, destino_cte, data_emissao_cte, data_prev_ent_cte,
+                      remetente_cte, destinatario_cte, pagador_cte, cidade_destino_cte,
+                      vlr_merc_cte, vlr_frete_cte, peso_cte, cubagem_cte, qtde_vol_cte,
+                      destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento,
+                      data_finalizacao, hora_finalizacao, login_finalizacao)
+                     VALUES
+                     ($1, $2, $3, $4, $5::date, $6::time,
+                      $7, $8, $9, NULLIF($10, '')::date, NULLIF($11, '')::date,
+                      $12, $13, $14, $15,
+                      $16, $17, $18, $19, $20,
+                      $21, $22, $23, $24, $25, $26,
+                      $27::date, $28::time, $29)",
+                    $paramsInsert
+                );
+                if (!$resInsert) throw new Exception('Falha ao inserir CT-e recuperado.');
+                $added += (int)pg_affected_rows($resInsert);
             }
 
-            @pg_query($conn, 'COMMIT');
+            if ($added > 0) {
+                $resDeletePlaceholders = @pg_query_params(
+                    $conn,
+                    "DELETE FROM {$tabela}
+                     WHERE unidade = $1
+                       AND seq_carregamento = $2
+                       AND COALESCE(nro_cte, 0) = 0",
+                    [$unidade, $seqCarreg]
+                );
+                if (!$resDeletePlaceholders) throw new Exception('Falha ao remover linha vazia do carregamento.');
+            }
+
+            if (!@pg_query($conn, 'COMMIT')) throw new Exception('Falha ao confirmar recuperação.');
         } catch (Exception $e) {
             @pg_query($conn, 'ROLLBACK');
+            return ['success' => false, 'added' => 0, 'updated' => 0, 'message' => $e->getMessage()];
         }
     }
 
     return [
         'success' => true,
         'qtd_ssw' => $qtdSsw,
-        'qtd_presto' => $qtdPresto,
-        'added' => 0,
+        'qtd_presto' => $qtdPresto + $added,
+        'added' => $added,
         'updated' => $updated,
         'debug' => [
             'manifestos_count' => $manifestosCount,
@@ -416,4 +540,3 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
         ],
     ];
 }
-

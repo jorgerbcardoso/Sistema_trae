@@ -294,23 +294,16 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                 $dt = $f11 !== '' ? $parseDt($f11) : null;
                 $f8Raw = trim((string)($r->f8 ?? ''));
                 $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-                $f16 = strtoupper(trim((string)($r->f16 ?? '')));
-                $f17 = trim((string)($r->f17 ?? ''));
+                $status = strtoupper(trim(strip_tags((string)($r->f17 ?? ''))));
+                if (strpos($status, 'CANCELADO') !== false) continue;
+                $f18 = trim((string)($r->f18 ?? ''));
                 $mans = [];
-                if ($f17 !== '') {
-                    $mm = null;
-                    if (preg_match_all('/\d+/', $f17, $mm)) {
-                        foreach (($mm[0] ?? []) as $sx) {
-                            $sx = (string)$sx;
-                            if ($sx !== '') $mans[$sx] = true;
-                        }
-                    }
-                }
+                if (preg_match('/^\d+$/', $f18)) $mans[$f18] = true;
 
                 $reg = [
                     'dt' => $dt,
                     'ts' => ($dt instanceof DateTime) ? $dt->getTimestamp() : 0,
-                    'status' => $f16,
+                    'status' => $status,
                     'qtd' => $f8Num,
                     'manifestos' => $mans,
                 ];
@@ -319,7 +312,8 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
                     $cleanF3 = preg_replace('/[^A-Z0-9]/', '', $f3);
                     $keyF3 = ($domainUpper === 'RVE') ? substr($cleanF3, -4) : $cleanF3;
                     if ($keyF3 !== '' && $keyF3 === $keyReq) $regF3[] = $reg;
-                } elseif ($f2 !== '') {
+                }
+                if ($f2 !== '') {
                     $cleanF2 = preg_replace('/[^A-Z0-9]/', '', $f2);
                     $keyF2 = ($domainUpper === 'RVE') ? substr($cleanF2, -4) : $cleanF2;
                     if ($keyF2 !== '' && $keyF2 === $keyReq) $regF2[] = $reg;
@@ -347,12 +341,16 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
 
                 if ($best !== null) {
                     $info['saida'] = $best['dt'] ?? null;
-                    $info['qtd'] = (int)($best['qtd'] ?? 0);
-                    $mans = $best['manifestos'] ?? [];
-                    if (is_array($mans)) {
-                        foreach (array_keys($mans) as $sx) {
-                            $sx = (string)$sx;
-                            if ($sx !== '') $info['manifestos'][$sx] = true;
+                    $bestTs = (int)($best['ts'] ?? 0);
+                    foreach ($cands as $x) {
+                        if ((int)($x['ts'] ?? 0) !== $bestTs) continue;
+                        $info['qtd'] += (int)($x['qtd'] ?? 0);
+                        $mans = $x['manifestos'] ?? [];
+                        if (is_array($mans)) {
+                            foreach (array_keys($mans) as $sx) {
+                                $sx = (string)$sx;
+                                if ($sx !== '') $info['manifestos'][$sx] = true;
+                            }
                         }
                     }
                 }
@@ -1994,8 +1992,8 @@ if ($acao === 'verificar_saidas_ssw') {
 
             $f8Raw = trim((string)($r->f8 ?? ''));
             $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-            $f17 = trim((string)($r->f17 ?? ''));
-            $seqMan = (string)preg_replace('/[^\d]/', '', $f17);
+            $f18 = trim((string)($r->f18 ?? ''));
+            $seqMan = preg_match('/^\d+$/', $f18) ? $f18 : '';
 
             if (!isset($placaParaInfo[$placa])) {
                 $placaParaInfo[$placa] = [
@@ -2622,26 +2620,16 @@ if ($acao === 'atualizar_ctes_ssw') {
             $dt = $f11 !== '' ? $parseDt($f11) : null;
             $f8Raw = trim((string)($r->f8 ?? ''));
             $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-            $f16 = strtoupper(trim((string)($r->f16 ?? '')));
-            $f17 = trim((string)($r->f17 ?? ''));
+            $status = strtoupper(trim(strip_tags((string)($r->f17 ?? ''))));
+            if (strpos($status, 'CANCELADO') !== false) continue;
+            $f18 = trim((string)($r->f18 ?? ''));
             $mans = [];
-            if ($f17 !== '' && stripos($f16, 'CANCELADO') === false && stripos($f17, 'CANCELADO') === false) {
-                $mm = null;
-                if (preg_match_all('/\d+/', $f17, $mm) && count(($mm[0] ?? [])) > 0) {
-                    foreach (($mm[0] ?? []) as $sx) {
-                        $sx = (string)$sx;
-                        if ($sx !== '') $mans[$sx] = true;
-                    }
-                } else {
-                    $sx = trim($f17);
-                    if ($sx !== '') $mans[$sx] = true;
-                }
-            }
+            if (strpos($status, 'CANCELADO') === false && preg_match('/^\d+$/', $f18)) $mans[$f18] = true;
 
             $reg = [
                 'dt' => $dt,
                 'ts' => ($dt instanceof DateTime) ? $dt->getTimestamp() : 0,
-                'status' => $f16,
+                'status' => $status,
                 'qtd' => $f8Num,
                 'manifestos' => $mans,
             ];
@@ -2650,7 +2638,8 @@ if ($acao === 'atualizar_ctes_ssw') {
                 $cleanF3 = preg_replace('/[^A-Z0-9]/', '', $f3);
                 $keyF3 = ($domainUpper === 'RVE') ? substr($cleanF3, -4) : $cleanF3;
                 if ($keyF3 !== '' && $keyF3 === $keyReq) $regF3[] = $reg;
-            } elseif ($f2 !== '') {
+            }
+            if ($f2 !== '') {
                 $cleanF2 = preg_replace('/[^A-Z0-9]/', '', $f2);
                 $keyF2 = ($domainUpper === 'RVE') ? substr($cleanF2, -4) : $cleanF2;
                 if ($keyF2 !== '' && $keyF2 === $keyReq) $regF2[] = $reg;

@@ -399,7 +399,7 @@ export default function AreaClienteDemo() {
                 </div>
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3">
                   <div className="text-xs text-slate-500 dark:text-slate-400">Integrações</div>
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">APIs SSW</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">APIs</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3">
                   <div className="text-xs text-slate-500 dark:text-slate-400">Segurança</div>
@@ -1229,7 +1229,7 @@ export default function AreaClienteDemo() {
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <Label>CTRC</Label>
-                      <Input defaultValue={remessaSel.ctrc} />
+                      <Input defaultValue={remessaSel?.ctrc ?? ''} />
                     </div>
                     <div className="space-y-1.5">
                       <Label>E-mail para envio</Label>

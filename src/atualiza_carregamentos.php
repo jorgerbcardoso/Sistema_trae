@@ -4,28 +4,28 @@
  * SCRIPT: ATUALIZAÇÃO DE CARREGAMENTOS (TRANSFERÊNCIA) - SISTEMA PRESTO
  * ================================================================
  * Objetivo (somente Transferência):
- * - Finalizar automaticamente carregamentos abertos quando o SSW indicar SAÍDA (SSW0125 PER).
- * - Alimentar carregamentos vazios (total_ctes = 0) inserindo os CT-es do SSW (SSW0125 CTRCS_MAN).
+ * - Sincronizar carregamentos recentes, abertos ou finalizados, com saídas do SSW0125.
+ * - Agrupar por placa e data/hora de saída (f11), importar os CT-es dos manifestos do grupo
+ *   e atualizar a finalização do carregamento com o horário da saída.
  *
  * Importante:
- * - Não recebe período: o script sempre busca TUDO que estiver (1) em aberto e (2) zerado.
- * - Em seguida, calcula automaticamente o período do SSW0125 (PER) por UNIDADE:
- *   dt_ini = data de inclusão do carregamento mais antigo do universo (abertos + zerados)
- *   dt_fin = data de inclusão do carregamento mais recente + 2 dias (limitado a hoje)
+ * - Reprocessa todas as cargas abertas e as finalizadas nos últimos 7 dias.
+ * - O período do SSW0125 (PER) é calculado por unidade, usando a inclusão mais antiga e
+ *   a mais recente do universo da unidade (mais 2 dias, limitado a hoje).
  *
  * Regra de escopo:
  * - Vale apenas para carregamentos de Transferência (tp_carregamento = 'T')
  * - Ignora simulações (cap.simulado = true)
  *
- * Regras atuais (mapa):
- * - Universo de trabalho:
- *   1) Abertos: data_finalizacao IS NULL AND cap.simulado = false
- *   2) Zerados: total_ctes = 0 (COUNT linhas onde nro_cte > 0) AND cap.simulado = false
- *   3) Apenas Transferência: tp_carregamento = 'T' (lido de [dominio]_carregamento_capacidade.tp_carregamento, com fallback por destino)
- * - Finalização automática:
- *   - SSW0125(PER) retorna f11 (saída). Se existe saída para a placa e o carregamento está aberto, finaliza no Presto.
- * - Alimentação de "zerados":
- *   - Usa manifestos retornados pelo PER (f17) e consulta SSW0125(CTRCS_MAN) para obter CTRCs do manifesto.
+ * - Regras:
+ *   - Apenas transferências não simuladas.
+ *   - A placa Presto pode corresponder a f2 ou f3 no PER.
+ *   - Registros com a mesma placa e f11 formam um agrupamento de manifestos.
+ *   - O identificador dos manifestos é lido de f18; f17 é o status da linha.
+ *   - A associação dos agrupamentos às cargas respeita a cronologia de saída.
+ *   - No domínio RVE a placa Presto é fictícia e combina apenas os 4 últimos
+ *     caracteres com a placa real do veículo; cargas com o mesmo sufixo são
+ *     combinadas no mesmo cenário de saída.
  *
  * Execução via crontab (exemplo):
  *   0 * * * * php /var/www/html/src/atualiza_carregamentos.php >> /var/www/html/tmp/atualiza_carregamentos.log 2>&1
@@ -44,6 +44,24 @@ function echo_hr() {
 
 function isoDate(?DateTime $dt): string {
     return $dt ? $dt->format('Y-m-d') : '';
+}
+
+function normalizar_placa_sync_carregamento(string $placa): string {
+    return strtoupper((string)preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($placa))));
+}
+
+/**
+ * Chave de casamento entre a placa do carregamento Presto e a placa do ssw0125.
+ * No domínio RVE a placa Presto é fictícia (prefixo = destino) e apenas os 4
+ * últimos caracteres coincidem com a placa real do veículo.
+ */
+function chave_match_sync_carregamento(string $placa, string $dominio): string {
+    $limpa = normalizar_placa_sync_carregamento($placa);
+    if ($limpa === '') return '';
+    if (strtoupper($dominio) === 'RVE' && preg_match('/^[A-Z0-9]{3}[A-Z0-9]{4}$/', $limpa)) {
+        return substr($limpa, 3, 4);
+    }
+    return $limpa;
 }
 
 function dmyDate(?DateTime $dt): string {
@@ -182,14 +200,22 @@ function ssw_per_por_periodo(string $dominio, string $unidade, DateTime $ini, Da
     $xml = @simplexml_load_string($xmlStr);
     if ($xml === false) return ['success' => false, 'message' => 'SSW0125 (PER): XML inválido.'];
 
-    $placaParaInfo = [];
+    $viagensPorPlaca = [];
     $rows = $xml->xpath('//r');
     if ($rows && count($rows) > 0) {
         foreach ($rows as $r) {
+            $status = strtoupper(trim(strip_tags((string)($r->f17 ?? ''))));
+            if (strpos($status, 'CANCELADO') !== false) continue;
+
             $f3 = strtoupper(trim((string)($r->f3 ?? '')));
             $f2 = strtoupper(trim((string)($r->f2 ?? '')));
-            $placa = $f3 !== '' ? $f3 : $f2;
-            if ($placa === '') continue;
+            // No RVE a placa real do ssw0125 casa com a placa fictícia do Presto
+            // apenas pelos 4 últimos caracteres (chave de casamento).
+            $placas = array_values(array_unique(array_filter([
+                chave_match_sync_carregamento($f2, $dominio),
+                chave_match_sync_carregamento($f3, $dominio),
+            ])));
+            if (count($placas) === 0) continue;
 
             $f11 = trim((string)($r->f11 ?? ''));
             if ($f11 === '') continue;
@@ -198,18 +224,49 @@ function ssw_per_por_periodo(string $dominio, string $unidade, DateTime $ini, Da
 
             $f8Raw = trim((string)($r->f8 ?? ''));
             $f8Num = (int)preg_replace('/[^\d]/', '', $f8Raw);
-            $f17 = trim((string)($r->f17 ?? ''));
-            $seqMan = (string)preg_replace('/[^\d]/', '', $f17);
+            $seqManRaw = trim((string)($r->f18 ?? ''));
+            $seqMan = preg_match('/^\d+$/', $seqManRaw) ? $seqManRaw : '';
+            $ts = $dt->getTimestamp();
 
-            if (!isset($placaParaInfo[$placa])) {
-                $placaParaInfo[$placa] = ['saida' => $dt, 'qtd' => 0, 'manifestos' => []];
+            foreach ($placas as $placa) {
+                if (!isset($viagensPorPlaca[$placa][$ts])) {
+                    $viagensPorPlaca[$placa][$ts] = [
+                        'saida' => $dt,
+                        'qtd' => 0,
+                        'manifestos' => [],
+                    ];
+                }
+                if ($f8Num > 0) $viagensPorPlaca[$placa][$ts]['qtd'] += $f8Num;
+                if ($seqMan !== '') $viagensPorPlaca[$placa][$ts]['manifestos'][$seqMan] = true;
             }
-            if ($dt->getTimestamp() < $placaParaInfo[$placa]['saida']->getTimestamp()) $placaParaInfo[$placa]['saida'] = $dt;
-            if ($f8Num > 0) $placaParaInfo[$placa]['qtd'] += $f8Num;
-            if ($seqMan !== '') $placaParaInfo[$placa]['manifestos'][$seqMan] = true;
         }
     }
-    return ['success' => true, 'placas' => $placaParaInfo];
+
+    foreach ($viagensPorPlaca as &$viagens) {
+        ksort($viagens, SORT_NUMERIC);
+    }
+    unset($viagens);
+
+    return ['success' => true, 'placas' => $viagensPorPlaca];
+}
+
+function ssw_viagem_para_carregamento(array $viagens, DateTime $dtInclusao, array $viagensUtilizadas = []): ?array {
+    $candidatas = [];
+    $limiteInferior = $dtInclusao->getTimestamp() - (5 * 60);
+    foreach ($viagens as $ts => $viagem) {
+        if (isset($viagensUtilizadas[(string)$ts])) continue;
+        $saida = $viagem['saida'] ?? null;
+        if (!($saida instanceof DateTime) || $saida->getTimestamp() < $limiteInferior) continue;
+        $candidatas[] = $viagem;
+    }
+    if (count($candidatas) === 0) return null;
+
+    usort($candidatas, function($a, $b) {
+        $aDt = $a['saida'] instanceof DateTime ? $a['saida']->getTimestamp() : PHP_INT_MAX;
+        $bDt = $b['saida'] instanceof DateTime ? $b['saida']->getTimestamp() : PHP_INT_MAX;
+        return $aDt <=> $bDt;
+    });
+    return $candidatas[0];
 }
 
 function ssw_ctr_cs_man(string $seqMan): array {
@@ -587,7 +644,10 @@ while ($rowD = pg_fetch_array($resDomains)) {
                       AND TRIM(COALESCE(x.destino, '')) <> ''
                 ) THEN 'T' ELSE 'E' END)
           ) = 'T'
-          AND (g.data_finalizacao IS NULL OR g.total_ctes = 0)
+          AND (
+                g.data_finalizacao IS NULL
+                OR g.dt_inclusao::date >= CURRENT_DATE - INTERVAL '7 days'
+          )
         ORDER BY g.unidade, g.dt_inclusao
     ";
 
@@ -642,100 +702,14 @@ while ($rowD = pg_fetch_array($resDomains)) {
         $conjuntoPorSeq = [];
     }
 
-    $dtMinGlobal = null;
-    $dtMaxGlobal = null;
-    foreach ($porUnidade as $u => $items) {
-        foreach ($items as $it) {
-            $dtInclRaw = trim((string)($it['dt_inclusao'] ?? ''));
-            if ($dtInclRaw === '') continue;
-            $dtIncl = null;
-            try { $dtIncl = new DateTime($dtInclRaw); } catch (Exception $e) { $dtIncl = null; }
-            if (!$dtIncl) continue;
-            if ($dtMinGlobal === null || $dtIncl->getTimestamp() < $dtMinGlobal->getTimestamp()) $dtMinGlobal = $dtIncl;
-            if ($dtMaxGlobal === null || $dtIncl->getTimestamp() > $dtMaxGlobal->getTimestamp()) $dtMaxGlobal = $dtIncl;
-        }
-    }
-
-    if ($dtMinGlobal === null || $dtMaxGlobal === null) {
-        echo "⚠️  Não foi possível determinar período por data de inclusão.\n\n";
-        continue;
-    }
-
-    $fimGlobal = clone $dtMaxGlobal;
-    $fimGlobal->modify('+2 days');
-    [$dtMinGlobal, $fimGlobal] = clampDmyRange($dtMinGlobal, $fimGlobal);
-
-    $unidadePer = $unidadeFiltro !== '' ? $unidadeFiltro : '';
-    echo "📅 Período SSW0125(PER): " . $dtMinGlobal->format('d/m/Y') . " → " . $fimGlobal->format('d/m/Y') . "\n";
-
-    $placaParaInfoGlobal = [];
-    $erroPer = '';
-    $chunkIni = clone $dtMinGlobal;
-    $chunkIni->setTime(0, 0, 0);
-    $dtFim = clone $fimGlobal;
-    $dtFim->setTime(0, 0, 0);
-    $iPer = 0;
-
-    while ($chunkIni->getTimestamp() <= $dtFim->getTimestamp()) {
-        $chunkFim = clone $chunkIni;
-        $chunkFim->modify('+30 days');
-        if ($chunkFim->getTimestamp() > $dtFim->getTimestamp()) $chunkFim = clone $dtFim;
-
-        $iPer++;
-        echo "   - PER {$iPer}: " . $chunkIni->format('d/m/Y') . " → " . $chunkFim->format('d/m/Y') . "\n";
-
-        $per = ssw_per_por_periodo($domain, $unidadePer, $chunkIni, $chunkFim);
-        if (!$per['success']) {
-            $erroPer = (string)($per['message'] ?? 'Falha ao consultar SSW0125 (PER).');
-            break;
-        }
-
-        $placasChunk = is_array($per['placas'] ?? null) ? $per['placas'] : [];
-        foreach ($placasChunk as $placa => $info) {
-            $placa = strtoupper(trim((string)$placa));
-            if ($placa === '') continue;
-
-            if (!isset($placaParaInfoGlobal[$placa])) {
-                $placaParaInfoGlobal[$placa] = ['saida' => null, 'qtd' => 0, 'manifestos' => []];
-            }
-
-            $dtSaida = $info['saida'] ?? null;
-            if ($dtSaida instanceof DateTime) {
-                $cur = $placaParaInfoGlobal[$placa]['saida'] ?? null;
-                if (!($cur instanceof DateTime) || $dtSaida->getTimestamp() < $cur->getTimestamp()) {
-                    $placaParaInfoGlobal[$placa]['saida'] = $dtSaida;
-                }
-            }
-
-            $placaParaInfoGlobal[$placa]['qtd'] += (int)($info['qtd'] ?? 0);
-            $mans = $info['manifestos'] ?? null;
-            if (is_array($mans)) {
-                foreach ($mans as $seqMan => $_) {
-                    $seqMan = (string)$seqMan;
-                    if ($seqMan === '') continue;
-                    $placaParaInfoGlobal[$placa]['manifestos'][$seqMan] = true;
-                }
-            }
-        }
-
-        $chunkIni = clone $chunkFim;
-        $chunkIni->modify('+1 day');
-        $chunkIni->setTime(0, 0, 0);
-    }
-
-    if ($erroPer !== '') {
-        echo "❌ {$erroPer}\n\n";
-        continue;
-    }
-    echo "\n";
-
     foreach ($porUnidade as $unidade => $items) {
         echo "🔎 Unidade {$unidade}:\n";
-        $abertos = [];
-        $zerados = [];
+        $cargas = [];
+        $cntAbertos = 0;
+        $cntZerados = 0;
 
         foreach ($items as $it) {
-            $placa = strtoupper(trim((string)($it['placa'] ?? '')));
+            $placa = normalizar_placa_sync_carregamento((string)($it['placa'] ?? ''));
             $seq = (int)($it['seq_carregamento'] ?? 0);
             $total = (int)($it['total_ctes'] ?? 0);
             $dataFinal = trim((string)($it['data_finalizacao'] ?? ''));
@@ -743,91 +717,206 @@ while ($rowD = pg_fetch_array($resDomains)) {
             $dtIncl = null;
             try { $dtIncl = $dtInclRaw !== '' ? new DateTime($dtInclRaw) : null; } catch (Exception $e) { $dtIncl = null; }
 
-            if ($dataFinal === '' && $seq > 0 && $placa !== '' && $dtIncl instanceof DateTime) {
-                $abertos[] = ['placa' => $placa, 'seq' => $seq, 'dt_inclusao' => $dtIncl];
-            }
-            if ($total <= 0) $zerados[] = $it;
+            if ($dataFinal === '') $cntAbertos++;
+            if ($total <= 0) $cntZerados++;
+            if ($seq <= 0 || $placa === '' || !($dtIncl instanceof DateTime)) continue;
+
+            $it['_placa_normalizada'] = $placa;
+            $it['_chave_match'] = chave_match_sync_carregamento((string)($it['placa'] ?? ''), $domain);
+            $it['_dt_inclusao'] = $dtIncl;
+            $cargas[] = $it;
         }
 
-        $cntAbertos = count($abertos);
-        $cntZerados = count($zerados);
         echo "   - Abertos: {$cntAbertos}\n";
         echo "   - Zerados: {$cntZerados}\n";
-        $placaParaInfo = $placaParaInfoGlobal;
+        echo "   - Carregamentos para sincronizar: " . count($cargas) . "\n";
+        usort($cargas, function($a, $b) {
+            return $a['_dt_inclusao']->getTimestamp() <=> $b['_dt_inclusao']->getTimestamp();
+        });
 
-        $finalizados = 0;
-        foreach ($abertos as $ab) {
-            $placa = (string)($ab['placa'] ?? '');
-            $seq = (int)($ab['seq'] ?? 0);
-            $dtIncl = $ab['dt_inclusao'] ?? null;
-            if ($placa === '' || $seq <= 0 || !($dtIncl instanceof DateTime)) continue;
-            if (!isset($placaParaInfo[$placa])) continue;
-            $info = $placaParaInfo[$placa];
-            $dtSaida = $info['saida'] ?? null;
-            if (!($dtSaida instanceof DateTime)) continue;
-
-            $minSaidaTs = $dtSaida->getTimestamp();
-            $minInclTs = $dtIncl->getTimestamp() - (5 * 60);
-            if ($minSaidaTs < $minInclTs) continue;
-
-            $seqsFinalizar = [$seq];
-            if (isset($conjuntoPorSeq[$seq]) && (int)$conjuntoPorSeq[$seq] > 0) {
-                $seqsFinalizar[] = (int)$conjuntoPorSeq[$seq];
-            }
-            $seqsFinalizar = array_values(array_unique(array_filter($seqsFinalizar, function($v) { return (int)$v > 0; })));
-            if (count($seqsFinalizar) === 0) continue;
-
-            $data = $dtSaida->format('Y-m-d');
-            $hora = $dtSaida->format('H:i:s');
-            $inSeq = implode(',', array_map(function($v) use ($g_sql) { return (string)((int)$v); }, $seqsFinalizar));
-            $qUpd = "
-                UPDATE {$tblCar} t
-                SET data_finalizacao = '{$data}'::date,
-                    hora_finalizacao = '{$hora}'::time,
-                    login_finalizacao = '" . pg_escape_string($g_sql, $loginScript) . "'
-                WHERE t.unidade = '" . pg_escape_string($g_sql, $unidade) . "'
-                  AND t.seq_carregamento IN ({$inSeq})
-                  AND t.data_finalizacao IS NULL
-                  AND COALESCE(
-                        (SELECT cap.tp_carregamento
-                         FROM {$tblCap} cap
-                         WHERE cap.unidade = t.unidade
-                           AND cap.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
-                         LIMIT 1),
-                        (CASE WHEN EXISTS (
-                            SELECT 1 FROM {$tblCar} x
-                            WHERE x.unidade = t.unidade
-                              AND x.seq_carregamento IS NOT DISTINCT FROM t.seq_carregamento
-                              AND TRIM(COALESCE(x.destino, '')) <> ''
-                        ) THEN 'T' ELSE 'E' END)
-                  ) = 'T'
-            ";
-            $resUpd = @pg_query($g_sql, $qUpd);
-            if ($resUpd) $finalizados += (int)pg_affected_rows($resUpd);
+        $dtMinUnidade = null;
+        $dtMaxUnidade = null;
+        foreach ($items as $it) {
+            $dtInclRaw = trim((string)($it['dt_inclusao'] ?? ''));
+            if ($dtInclRaw === '') continue;
+            try { $dtIncl = new DateTime($dtInclRaw); } catch (Exception $e) { $dtIncl = null; }
+            if (!$dtIncl) continue;
+            if ($dtMinUnidade === null || $dtIncl->getTimestamp() < $dtMinUnidade->getTimestamp()) $dtMinUnidade = $dtIncl;
+            if ($dtMaxUnidade === null || $dtIncl->getTimestamp() > $dtMaxUnidade->getTimestamp()) $dtMaxUnidade = $dtIncl;
         }
-        echo "   ✅ Finalizados: {$finalizados}\n";
+        if ($dtMinUnidade === null || $dtMaxUnidade === null) {
+            echo "   ⚠️  Não foi possível determinar o período de inclusão.\n\n";
+            continue;
+        }
 
+        $fimUnidade = clone $dtMaxUnidade;
+        $fimUnidade->modify('+2 days');
+        [$dtMinUnidade, $fimUnidade] = clampDmyRange($dtMinUnidade, $fimUnidade);
+        echo "   📅 SSW0125(PER) {$unidade}: " . $dtMinUnidade->format('d/m/Y') . " → " . $fimUnidade->format('d/m/Y') . "\n";
+
+        $placaParaInfo = [];
+        $erroPer = '';
+        $chunkIni = clone $dtMinUnidade;
+        $chunkIni->setTime(0, 0, 0);
+        $dtFim = clone $fimUnidade;
+        $dtFim->setTime(0, 0, 0);
+        $iPer = 0;
+        while ($chunkIni->getTimestamp() <= $dtFim->getTimestamp()) {
+            $chunkFim = clone $chunkIni;
+            $chunkFim->modify('+30 days');
+            if ($chunkFim->getTimestamp() > $dtFim->getTimestamp()) $chunkFim = clone $dtFim;
+
+            $iPer++;
+            echo "      - PER {$iPer}: " . $chunkIni->format('d/m/Y') . " → " . $chunkFim->format('d/m/Y') . "\n";
+            $per = ssw_per_por_periodo($domain, $unidade, $chunkIni, $chunkFim);
+            if (!$per['success']) {
+                $erroPer = (string)($per['message'] ?? 'Falha ao consultar SSW0125 (PER).');
+                break;
+            }
+
+            foreach (($per['placas'] ?? []) as $placa => $viagens) {
+                $placa = strtoupper(trim((string)$placa));
+                if ($placa === '' || !is_array($viagens)) continue;
+                if (!isset($placaParaInfo[$placa])) $placaParaInfo[$placa] = [];
+                foreach ($viagens as $ts => $viagem) {
+                    $ts = (int)$ts;
+                    if ($ts <= 0) continue;
+                    if (!isset($placaParaInfo[$placa][$ts])) {
+                        $placaParaInfo[$placa][$ts] = $viagem;
+                        continue;
+                    }
+                    $placaParaInfo[$placa][$ts]['qtd'] += (int)($viagem['qtd'] ?? 0);
+                    foreach (($viagem['manifestos'] ?? []) as $seqMan => $_) {
+                        $placaParaInfo[$placa][$ts]['manifestos'][(string)$seqMan] = true;
+                    }
+                }
+            }
+
+            $chunkIni = clone $chunkFim;
+            $chunkIni->modify('+1 day');
+            $chunkIni->setTime(0, 0, 0);
+        }
+        if ($erroPer !== '') {
+            echo "   ❌ {$erroPer}; nenhuma atualização será feita para esta unidade.\n\n";
+            continue;
+        }
+        echo "   - Placas no PER: " . count($placaParaInfo) . "\n";
+
+        $isRve = strtoupper($domain) === 'RVE';
+        $viagensUtilizadasPorChave = [];
+        $finalizacoesAtualizadas = 0;
         $restoredTotal = 0;
-        foreach ($zerados as $car) {
-            $placa = strtoupper(trim((string)($car['placa'] ?? '')));
-            $seq = (int)($car['seq_carregamento'] ?? 0);
-            if ($placa === '' || $seq <= 0) continue;
-            if (!isset($placaParaInfo[$placa])) continue;
+        $semSaidaCorrespondente = 0;
+        $semManifesto = 0;
 
-            $info = $placaParaInfo[$placa];
-            $dtSaida = $info['saida'] ?? null;
-            if (!($dtSaida instanceof DateTime)) continue;
+        // No RVE, cargas com o mesmo sufixo (4 últimos caracteres) referenciam o
+        // mesmo veículo e são combinadas no mesmo cenário de saída. Nos demais
+        // domínios cada carga é processada individualmente (uma saída por carga).
+        $grupos = [];
+        foreach ($cargas as $idx => $car) {
+            $chave = (string)($car['_chave_match'] ?? '');
+            if ($chave === '') continue;
+            $grupoKey = $isRve ? $chave : ($chave . '#' . $idx);
+            $grupos[$grupoKey][] = $car;
+        }
 
-            $manifestos = isset($info['manifestos']) && is_array($info['manifestos']) ? array_keys($info['manifestos']) : [];
-            if (count($manifestos) === 0) continue;
+        foreach ($grupos as $grupoCargas) {
+            $chave = (string)($grupoCargas[0]['_chave_match'] ?? '');
+            if ($chave === '') continue;
 
-            $res = restore_zerado($g_sql, $domain, $unidade, $loginScript, $car, $manifestos, $dtSaida);
-            if ($res['success'] && (int)($res['added'] ?? 0) > 0) {
-                $restoredTotal += (int)$res['added'];
-                echo "   📦 Restore: {$placa} (seq {$seq}) +{$res['added']} CT-es\n";
+            $viagens = $placaParaInfo[$chave] ?? [];
+            if (count($viagens) === 0) {
+                $semSaidaCorrespondente += count($grupoCargas);
+                $placaLog = (string)($grupoCargas[0]['_placa_normalizada'] ?? $chave);
+                echo "   ⚠️  Sem saída PER para a chave {$chave} ({$placaLog}).\n";
+                continue;
+            }
+
+            $dtIncl = null;
+            foreach ($grupoCargas as $gc) {
+                $dt = $gc['_dt_inclusao'] ?? null;
+                if ($dt instanceof DateTime && ($dtIncl === null || $dt->getTimestamp() < $dtIncl->getTimestamp())) {
+                    $dtIncl = $dt;
+                }
+            }
+            if (!($dtIncl instanceof DateTime)) continue;
+
+            $viagem = ssw_viagem_para_carregamento(
+                $viagens,
+                $dtIncl,
+                $viagensUtilizadasPorChave[$chave] ?? []
+            );
+            $dtSaida = $viagem['saida'] ?? null;
+            if (!($dtSaida instanceof DateTime)) {
+                $semSaidaCorrespondente += count($grupoCargas);
+                echo "   ⚠️  Sem agrupamento cronológico disponível para a chave {$chave}.\n";
+                continue;
+            }
+
+            $tsSaida = $dtSaida->getTimestamp();
+            $viagensUtilizadasPorChave[$chave][(string)$tsSaida] = true;
+            $dataSaida = $dtSaida->format('Y-m-d');
+            $horaSaida = $dtSaida->format('H:i:s');
+            $saidaFmt = $dtSaida->format('d/m/Y H:i:s');
+
+            $manifestos = isset($viagem['manifestos']) && is_array($viagem['manifestos'])
+                ? array_keys($viagem['manifestos'])
+                : [];
+
+            foreach ($grupoCargas as $car) {
+                $placa = (string)($car['_placa_normalizada'] ?? '');
+                $seq = (int)($car['seq_carregamento'] ?? 0);
+                if ($seq <= 0) continue;
+
+                $resUpd = @pg_query_params(
+                    $g_sql,
+                    "UPDATE {$tblCar} t
+                     SET data_finalizacao = $3::date,
+                         hora_finalizacao = $4::time,
+                         login_finalizacao = CASE
+                             WHEN t.data_finalizacao IS NULL THEN $5
+                             ELSE t.login_finalizacao
+                         END
+                     WHERE t.unidade = $1
+                       AND t.seq_carregamento = $2
+                       AND (
+                           t.data_finalizacao IS DISTINCT FROM $3::date
+                           OR t.hora_finalizacao IS DISTINCT FROM $4::time
+                       )",
+                    [$unidade, $seq, $dataSaida, $horaSaida, $loginScript]
+                );
+                if (!$resUpd) {
+                    echo "   ❌ Falha ao atualizar finalização de {$placa} (seq {$seq}).\n";
+                    continue;
+                }
+                $finalizacoesAtualizadas += (int)pg_affected_rows($resUpd);
+
+                if (count($manifestos) === 0) {
+                    $semManifesto++;
+                    echo "   ⚠️  Saída atualizada; nenhum identificador de manifesto em f18 para {$placa} (seq {$seq}).\n";
+                    continue;
+                }
+
+                $car['data_finalizacao'] = $dataSaida;
+                $car['hora_finalizacao'] = $horaSaida;
+                $car['login_finalizacao'] = $loginScript;
+                $res = restore_zerado($g_sql, $domain, $unidade, $loginScript, $car, $manifestos, $dtSaida);
+                if ($res['success'] && (int)($res['added'] ?? 0) > 0) {
+                    $restoredTotal += (int)$res['added'];
+                    echo "   📦 Sincronizado: {$placa} (seq {$seq}) saída {$saidaFmt} "
+                        . count($manifestos) . " manifesto(s), +{$res['added']} CT-es.\n";
+                } elseif ($res['success']) {
+                    echo "   ✅ Sincronizado: {$placa} (seq {$seq}) saída {$saidaFmt}; "
+                        . count($manifestos) . " manifesto(s), nenhum CT-e novo.\n";
+                } else {
+                    echo "   ❌ Falha ao sincronizar {$placa} (seq {$seq}): "
+                        . (string)($res['message'] ?? 'erro não identificado') . "\n";
+                }
             }
         }
-        echo "   ✅ CT-es restaurados (total linhas): {$restoredTotal}\n\n";
+        echo "   ✅ Finalizações atualizadas: {$finalizacoesAtualizadas}\n";
+        echo "   ✅ CT-es acrescentados: {$restoredTotal}\n";
+        echo "   ⚠️  Cargas sem saída correspondente: {$semSaidaCorrespondente}; sem manifesto f18: {$semManifesto}\n\n";
     }
 }
 

@@ -680,7 +680,7 @@ function obterPrimeiraCapturaSsw($placaSsw) {
     ];
 }
 
-function listarSaidasAutorizadasSsw0125(string $siglaOrigem): array {
+function listarSaidasSsw0125(string $siglaOrigem): array {
     $siglaOrigem = strtoupper(trim($siglaOrigem));
     if ($siglaOrigem === '') return [];
 
@@ -706,25 +706,30 @@ function listarSaidasAutorizadasSsw0125(string $siglaOrigem): array {
     foreach ($rows as $r) {
         $f3 = strtoupper(trim((string)($r->f3 ?? '')));
         $f2 = strtoupper(trim((string)($r->f2 ?? '')));
-        $placa = $f3 !== '' ? $f3 : $f2;
         $f11 = trim((string)($r->f11 ?? ''));
-        $f16raw = (string)($r->f16 ?? '');
-        $f16 = strtoupper(trim(html_entity_decode($f16raw)));
+        $status = strtoupper(trim(strip_tags((string)($r->f17 ?? ''))));
 
-        if ($placa === '' || $f11 === '') continue;
-        if (strpos($f16, 'AUTORIZADO') === false) continue;
+        if ($f11 === '' || strpos($status, 'CANCELADO') !== false) continue;
 
         $dt = DateTime::createFromFormat('d/m/y H:i', $f11);
         if (!$dt) continue;
 
-        $out[] = [
-            'placa' => $placa,
-            'data' => $dt->format('Y-m-d'),
-            'hora' => $dt->format('H:i:s'),
-            'raw' => $f11,
-        ];
+        foreach (array_unique(array_filter([$f2, $f3])) as $placa) {
+            $out[$placa . '|' . $dt->getTimestamp()] = [
+                'placa' => $placa,
+                'data' => $dt->format('Y-m-d'),
+                'hora' => $dt->format('H:i:s'),
+                'raw' => $f11,
+            ];
+        }
     }
 
+    $out = array_values($out);
+    usort($out, function($a, $b) {
+        $aTs = strtotime(($a['data'] ?? '') . ' ' . ($a['hora'] ?? '')) ?: 0;
+        $bTs = strtotime(($b['data'] ?? '') . ' ' . ($b['hora'] ?? '')) ?: 0;
+        return $aTs <=> $bTs;
+    });
     return $out;
 }
 
@@ -1745,7 +1750,7 @@ $placasUp = array_values(array_unique(array_filter(array_map(function($p) {
 if (count($placasUp) > 0) {
     $saidas = [];
     try {
-        $saidas = listarSaidasAutorizadasSsw0125($unidade);
+        $saidas = listarSaidasSsw0125($unidade);
     } catch (Exception $e) {
         $saidas = [];
     }
@@ -1764,15 +1769,25 @@ if (count($placasUp) > 0) {
         $affected = 0;
         try {
             $resUp = sql(
-                "UPDATE {$tabela} t
+                "WITH candidata AS (
+                    SELECT t.seq_carregamento
+                    FROM {$tabela} t
+                    WHERE t.unidade = \$1
+                      AND t.data_finalizacao IS NULL
+                      AND UPPER(t.placa_provisoria) = UPPER(\$2)
+                      AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
+                      {$guardaSomenteTransferencia}
+                    ORDER BY t.data_inclusao, t.hora_inclusao, t.seq_carregamento
+                    LIMIT 1
+                 )
+                 UPDATE {$tabela} t
                  SET data_finalizacao = \$3,
                      hora_finalizacao = \$4,
                      login_finalizacao = \$5
+                 FROM candidata c
                  WHERE t.unidade = \$1
-                   AND t.data_finalizacao IS NULL
-                   AND UPPER(t.placa_provisoria) = UPPER(\$2)
-                   AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
-                   {$guardaSomenteTransferencia}",
+                   AND t.seq_carregamento = c.seq_carregamento
+                   AND t.data_finalizacao IS NULL",
                 [$unidade, $p, $d, $h, $login],
                 $conn
             );
@@ -1786,16 +1801,26 @@ if (count($placasUp) > 0) {
             if ($suf !== '') {
                 try {
                     $resUp = sql(
-                        "UPDATE {$tabela} t
+                        "WITH candidata AS (
+                            SELECT t.seq_carregamento
+                            FROM {$tabela} t
+                            WHERE t.unidade = \$1
+                              AND t.data_finalizacao IS NULL
+                              AND char_length(BTRIM(COALESCE(t.placa_provisoria, ''))) = 4
+                              AND UPPER(BTRIM(COALESCE(t.placa_provisoria, ''))) = RIGHT(UPPER(\$2), 4)
+                              AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
+                              {$guardaSomenteTransferencia}
+                            ORDER BY t.data_inclusao, t.hora_inclusao, t.seq_carregamento
+                            LIMIT 1
+                         )
+                         UPDATE {$tabela} t
                          SET data_finalizacao = \$3,
                              hora_finalizacao = \$4,
                              login_finalizacao = \$5
+                         FROM candidata c
                          WHERE t.unidade = \$1
-                           AND t.data_finalizacao IS NULL
-                           AND char_length(BTRIM(COALESCE(t.placa_provisoria, ''))) = 4
-                           AND UPPER(BTRIM(COALESCE(t.placa_provisoria, ''))) = RIGHT(UPPER(\$2), 4)
-                           AND (\$3::date + \$4::time) >= ((t.data_inclusao::timestamp + t.hora_inclusao::time) - interval '5 minutes')
-                           {$guardaSomenteTransferencia}",
+                           AND t.seq_carregamento = c.seq_carregamento
+                           AND t.data_finalizacao IS NULL",
                         [$unidade, $p, $d, $h, $login],
                         $conn
                     );
