@@ -1112,37 +1112,6 @@ foreach ($placas_ssw as $placa) {
 
     $placaProvEsc = pg_escape_string($conn, $placaProvisoriaSalvar);
 
-    $captura = null;
-    try {
-        $captura = obterPrimeiraCapturaSsw($placa);
-    } catch (Exception $e) {
-        $captura = null;
-    }
-
-    $res_check = sql(
-        "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS inicio_ts, MAX(data_finalizacao) AS data_finalizacao
-         FROM {$tabela}
-         WHERE unidade = \$1 AND origem_ssw = \$2",
-        [$unidade, $placa],
-        $conn
-    );
-    $row_check = ($res_check && pg_num_rows($res_check) > 0) ? pg_fetch_assoc($res_check) : null;
-    $inicioTs = $row_check ? (string)($row_check['inicio_ts'] ?? '') : '';
-    $ja_existe = $inicioTs !== '';
-    $dataInc = $inicioTs !== '' ? substr($inicioTs, 0, 10) : '';
-    $horaInc = $inicioTs !== '' ? substr($inicioTs, 11, 8) : '';
-
-    if (is_array($captura) && ($captura['data'] ?? '') !== '' && ($captura['hora'] ?? '') !== '') {
-        $dataIncSql = "DATE '" . pg_escape_string($conn, (string)$captura['data']) . "'";
-        $horaIncSql = "TIME '" . pg_escape_string($conn, (string)$captura['hora']) . "'";
-    } else if ($dataInc !== '' && $horaInc !== '') {
-        $dataIncSql = "DATE '" . pg_escape_string($conn, $dataInc) . "'";
-        $horaIncSql = "TIME '" . pg_escape_string($conn, $horaInc) . "'";
-    } else {
-        $dataIncSql = 'CURRENT_DATE';
-        $horaIncSql = 'CURRENT_TIME';
-    }
-
     $seqCarreg = 0;
     $preservarCabecalhoRve = false;
     $reaproveitandoPorPlaca = false;
@@ -1204,6 +1173,65 @@ foreach ($placas_ssw as $placa) {
         if ($seqCarreg <= 0) {
             $logs[] = ['placa' => $placa, 'status' => 'erro', 'msg' => 'Erro ao gerar seq_carregamento.'];
             continue;
+        }
+    }
+
+    // $ja_existe mantém a semântica original (existe linha real com origem_ssw = placa).
+    $inicioTs = '';
+    try {
+        $res_check = sql(
+            "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS inicio_ts
+             FROM {$tabela}
+             WHERE unidade = \$1 AND origem_ssw = \$2",
+            [$unidade, $placa],
+            $conn
+        );
+        if ($res_check && pg_num_rows($res_check) > 0) {
+            $inicioTs = trim((string)pg_fetch_result($res_check, 0, 0));
+        }
+    } catch (Exception $e) {
+        $inicioTs = '';
+    }
+    $ja_existe = $inicioTs !== '';
+
+    // Regra crítica: a data de inclusão do carregamento é a primeira bipagem
+    // registrada no ssw0194 (f12 mais antigo) e NUNCA pode ser alterada depois
+    // de criada. Lemos o MIN((data_inclusao::timestamp + hora_inclusao::time))
+    // de TODAS as linhas do seq — o que inclui a linha-âncora nro_cte = 0 mesmo
+    // quando origem_ssw é NULL — e o preservamos. A captura do SSW só define a
+    // data quando o carregamento é novo (nenhuma linha gravada).
+    $inicioTsCar = '';
+    try {
+        $res_check_car = sql(
+            "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS inicio_ts
+             FROM {$tabela}
+             WHERE unidade = \$1 AND seq_carregamento = \$2",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        if ($res_check_car && pg_num_rows($res_check_car) > 0) {
+            $inicioTsCar = trim((string)pg_fetch_result($res_check_car, 0, 0));
+        }
+    } catch (Exception $e) {
+        $inicioTsCar = '';
+    }
+
+    if ($inicioTsCar !== '') {
+        $dataIncSql = "DATE '" . pg_escape_string($conn, substr($inicioTsCar, 0, 10)) . "'";
+        $horaIncSql = "TIME '" . pg_escape_string($conn, substr($inicioTsCar, 11, 8)) . "'";
+    } else {
+        $captura = null;
+        try {
+            $captura = obterPrimeiraCapturaSsw($placa);
+        } catch (Exception $e) {
+            $captura = null;
+        }
+        if (is_array($captura) && ($captura['data'] ?? '') !== '' && ($captura['hora'] ?? '') !== '') {
+            $dataIncSql = "DATE '" . pg_escape_string($conn, (string)$captura['data']) . "'";
+            $horaIncSql = "TIME '" . pg_escape_string($conn, (string)$captura['hora']) . "'";
+        } else {
+            $dataIncSql = 'CURRENT_DATE';
+            $horaIncSql = 'CURRENT_TIME';
         }
     }
 

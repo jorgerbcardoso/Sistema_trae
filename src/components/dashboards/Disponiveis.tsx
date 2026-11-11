@@ -2451,7 +2451,7 @@ function CardCarregamento(props: CardCarregamentoProps) {
   const [cteDetalheLista, setCteDetalheLista] = useState<any[]>([]);
   const [cteDetalheTotais, setCteDetalheTotais] = useState<any>(null);
   const [loadingCteDetalhe, setLoadingCteDetalhe] = useState(false);
-  const [separandoCteDetalheSetores, setSeparandoCteDetalheSetores] = useState(false);
+  const [desconectandoCarregamento, setDesconectandoCarregamento] = useState(false);
   const [cteDetalheSelecionados, setCteDetalheSelecionados] = useState<Set<number>>(new Set());
   const cteDetalheListaRef = useRef<any[]>([]);
   const cteDetalheTituloRef = useRef<string>('');
@@ -2466,12 +2466,6 @@ function CardCarregamento(props: CardCarregamentoProps) {
   const placa1 = String(carregamento.placa_provisoria ?? '').trim().toUpperCase();
   const placa2 = carregamentoConjunto ? String(carregamentoConjunto.placa_provisoria ?? '').trim().toUpperCase() : '';
   const isConjunto = !!placa2;
-  const podeSepararPorSetores = React.useMemo(() => {
-    if (isConjunto) return false;
-    if (!isEntregaCteDetalhe) return false;
-    const parts = String(setoresEntregaCteDetalhe ?? '').split(',').map(s => s.trim()).filter(Boolean);
-    return parts.length > 1;
-  }, [isConjunto, isEntregaCteDetalhe, setoresEntregaCteDetalhe]);
 
   const cteDetalheListaOrdenada = React.useMemo(() => {
     const parseBrDate = (v: any): number => {
@@ -2867,36 +2861,55 @@ function CardCarregamento(props: CardCarregamentoProps) {
     URL.revokeObjectURL(url);
   };
 
-  const separarCarregamentoPorSetores = async () => {
-    if (!podeSepararPorSetores) return;
+  const desconectarCarregamento = async () => {
     if (!placa1) return;
     const ok = await confirmar({
-      title: 'Separar por setores?',
-      description: 'O carregamento será dividido em um card por setor, mantendo a mesma placa. Os CT-es serão redistribuídos pelo setor e os parâmetros do veículo serão copiados. Esta ação não altera o carregamento no TMS.',
-      confirmText: 'Separar',
+      title: 'Desconectar carregamento?',
+      description: isConjunto
+        ? 'O conjunto será desfeito e os carregamentos voltarão a ficar separados.'
+        : (isEntregaCteDetalhe
+            ? 'O carregamento será dividido em um card por setor, mantendo a mesma placa. Esta ação não altera o carregamento no TMS.'
+            : 'O carregamento será dividido em um card por destino, mantendo a mesma placa. Esta ação não altera o carregamento no TMS.'),
+      confirmText: 'Desconectar',
       cancelText: 'Cancelar',
       variant: 'destructive',
     });
     if (!ok) return;
-    setSeparandoCteDetalheSetores(true);
+    setDesconectandoCarregamento(true);
     try {
+      const seq = Number((carregamento as any).seq_carregamento ?? 0) || 0;
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
-        { method: 'POST', body: JSON.stringify({ acao: 'separar_entrega_setores', placa: placa1 }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            acao: 'desconectar_carregamento',
+            placa: placa1,
+            seq_carregamento: seq > 0 ? seq : undefined,
+          }),
+        },
         true
       );
       if (res?.success) {
-        const created = Number(res?.created ?? 0) || 0;
-        toast.success(created > 0 ? `Separado em ${created + 1} carregamentos (por setor).` : 'Carregamento separado.');
+        const disconnected = Number(res?.disconnected ?? 0) || 0;
+        if (disconnected <= 0) {
+          toast.info('Não há o que desconectar neste carregamento.');
+          return;
+        }
+        if (String(res?.tipo ?? '') === 'conjunto') {
+          toast.success('Conjunto desfeito. Os carregamentos voltaram a ficar separados.');
+        } else {
+          toast.success(`Desconectado em ${disconnected + 1} carregamentos (mesma placa).`);
+        }
         setCteDetalheDialogOpen(false);
         await onRecarregarCarregamentos();
       } else {
-        toast.error(res?.message || 'Falha ao separar carregamento por setores.');
+        toast.error(res?.message || 'Falha ao desconectar carregamento.');
       }
     } catch (e: any) {
-      toast.error(e?.message || 'Falha ao separar carregamento por setores.');
+      toast.error(e?.message || 'Falha ao desconectar carregamento.');
     } finally {
-      setSeparandoCteDetalheSetores(false);
+      setDesconectandoCarregamento(false);
     }
   };
   const ativo = modoApontamento === placa1;
@@ -4026,30 +4039,28 @@ function CardCarregamento(props: CardCarregamentoProps) {
                 size="sm"
                 onClick={exportarCteDetalheCSV}
                 className="gap-1.5"
-                disabled={loadingCteDetalhe || separandoCteDetalheSetores}
+                disabled={loadingCteDetalhe || desconectandoCarregamento}
               >
                 <FileDown className="w-4 h-4" />
                 Exportar CSV
               </Button>
             )}
-            {podeSepararPorSetores && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={separarCarregamentoPorSetores}
-                className="gap-1.5"
-                disabled={loadingCteDetalhe || separandoCteDetalheSetores}
-              >
-                <Split className="w-4 h-4" />
-                Separar por Setores
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={desconectarCarregamento}
+              className="gap-1.5"
+              disabled={loadingCteDetalhe || desconectandoCarregamento}
+            >
+              <Split className="w-4 h-4" />
+              Desconectar
+            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={removerCtesSelecionados}
               className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-              disabled={loadingCteDetalhe || separandoCteDetalheSetores || cteDetalheSelecionados.size === 0}
+              disabled={loadingCteDetalhe || desconectandoCarregamento || cteDetalheSelecionados.size === 0}
             >
               <Trash2 className="w-4 h-4" />
               Excluir selecionados

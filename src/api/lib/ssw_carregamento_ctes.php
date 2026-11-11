@@ -403,9 +403,39 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
     $loginFinalStr = trim((string)($carBase['login_finalizacao'] ?? ''));
     if ($loginFinalStr === '') $loginFinalStr = $login;
 
-    $dataInclusaoStr = trim((string)($carBase['data_criacao'] ?? ''));
+    // Regra crítica: a data de inclusão do carregamento representa a primeira
+    // bipagem (ssw0194) e NUNCA pode ser alterada. Lemos o MIN(data_inclusao)
+    // já gravado (inclui a linha-âncora nro_cte = 0, mesmo com origem_ssw NULL)
+    // antes de inserir os CT-es e de remover a âncora, garantindo que a data
+    // original seja sempre preservada.
+    $dataInclusaoStr = '';
+    $horaInclusaoStr = '';
+    try {
+        $resIncMin = sql(
+            "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS inicio_ts
+             FROM {$tabela}
+             WHERE unidade = \$1 AND seq_carregamento = \$2",
+            [$unidade, $seqCarreg],
+            $conn
+        );
+        if ($resIncMin && pg_num_rows($resIncMin) > 0) {
+            $incTs = trim((string)pg_fetch_result($resIncMin, 0, 0));
+            if ($incTs !== '') {
+                $dataInclusaoStr = substr($incTs, 0, 10);
+                $horaInclusaoStr = substr($incTs, 11, 8);
+            }
+        }
+    } catch (Exception $e) {
+        $dataInclusaoStr = '';
+        $horaInclusaoStr = '';
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataInclusaoStr)) {
+        $dataInclusaoStr = trim((string)($carBase['data_criacao'] ?? ''));
+    }
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataInclusaoStr)) $dataInclusaoStr = date('Y-m-d');
-    $horaInclusaoStr = trim((string)($carBase['hora_criacao'] ?? ''));
+    if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $horaInclusaoStr)) {
+        $horaInclusaoStr = trim((string)($carBase['hora_criacao'] ?? ''));
+    }
     if (!preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $horaInclusaoStr)) $horaInclusaoStr = date('H:i:s');
     if (strlen($horaInclusaoStr) === 5) $horaInclusaoStr .= ':00';
     $loginInclusao = trim((string)($carBase['login_criacao'] ?? ''));

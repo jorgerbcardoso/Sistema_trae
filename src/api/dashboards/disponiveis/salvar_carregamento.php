@@ -3844,4 +3844,348 @@ if ($acao === 'separar_entrega_setores') {
     }
 }
 
+// ─── Ação: desconectar carregamento ───
+// Desfaz um conjunto de transferência (2 placas) ou separa o carregamento em
+// vários (mesma placa) por setor (entrega) ou por destino (transferência).
+if ($acao === 'desconectar_carregamento') {
+    $placaIn = strtoupper(trim((string)($input['placa'] ?? '')));
+    $seqIn   = (int)($input['seq_carregamento'] ?? 0);
+    if ($placaIn === '' && $seqIn <= 0) {
+        respondJson(['success' => false, 'message' => 'Placa ou seq_carregamento não informado.']);
+    }
+
+    $camposBase = "
+            seq_carregamento,
+            COALESCE(placa_provisoria, '') AS placa_provisoria,
+            COALESCE(destino, '') AS destino,
+            COALESCE(unidades, '') AS unidades,
+            COALESCE(setores_entrega, '') AS setores_entrega,
+            COALESCE(origem_ssw, '') AS origem_ssw,
+            COALESCE(origem_criacao, '') AS origem_criacao,
+            COALESCE(unidade_carregamento, '') AS unidade_carregamento,
+            COALESCE(login_inclusao, '') AS login_inclusao,
+            data_inclusao,
+            hora_inclusao";
+
+    if ($seqIn > 0) {
+        $resBase = sql(
+            "SELECT {$camposBase}
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+             ORDER BY data_inclusao ASC, hora_inclusao ASC
+             LIMIT 1",
+            [$unidade, $seqIn],
+            $conn
+        );
+    } else {
+        $resBase = sql(
+            "SELECT {$camposBase}
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND UPPER(placa_provisoria) = UPPER(\$2)
+               AND data_finalizacao IS NULL
+             ORDER BY data_inclusao ASC, hora_inclusao ASC
+             LIMIT 1",
+            [$unidade, $placaIn],
+            $conn
+        );
+    }
+    if (!$resBase || pg_num_rows($resBase) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento não encontrado (ou finalizado).']);
+    }
+    $rowBase = pg_fetch_assoc($resBase);
+    $seqBase = (int)($rowBase['seq_carregamento'] ?? 0);
+    $placaBase = strtoupper(trim((string)($rowBase['placa_provisoria'] ?? $placaIn)));
+    if ($seqBase <= 0) {
+        respondJson(['success' => false, 'message' => 'seq_carregamento inválido.']);
+    }
+
+    // 1) Desfazer conjunto de transferência (2 placas em um único card).
+    $resConj = sql(
+        "SELECT
+            (SELECT COALESCE(seq_carregamento_conjunto, 0) FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento = \$2 LIMIT 1) AS prim_conj,
+            (SELECT 1 FROM {$tabelaCap} WHERE unidade = \$1 AND seq_carregamento_conjunto = \$2 LIMIT 1) AS eh_sec",
+        [$unidade, $seqBase],
+        $conn
+    );
+    $temConjunto = false;
+    if ($resConj && pg_num_rows($resConj) > 0) {
+        $rc = pg_fetch_assoc($resConj);
+        $temConjunto = ((int)($rc['prim_conj'] ?? 0) > 0) || (($rc['eh_sec'] ?? null) !== null);
+    }
+    if ($temConjunto) {
+        pg_query($conn, 'BEGIN');
+        try {
+            $upd = sql(
+                "UPDATE {$tabelaCap}
+                 SET seq_carregamento_conjunto = NULL
+                 WHERE unidade = \$1
+                   AND (seq_carregamento = \$2 OR seq_carregamento_conjunto = \$2)",
+                [$unidade, $seqBase],
+                $conn
+            );
+            if (!$upd) throw new Exception('Erro ao desconectar conjunto.');
+            pg_query($conn, 'COMMIT');
+            respondJson(['success' => true, 'disconnected' => 1, 'created' => 0, 'moved' => 0, 'tipo' => 'conjunto']);
+        } catch (Exception $e) {
+            pg_query($conn, 'ROLLBACK');
+            respondJson(['success' => false, 'message' => 'Erro ao desconectar conjunto.']);
+        }
+    }
+
+    // 2) Separar em vários carregamentos (mesma placa): entrega por setor, transferência por destino.
+    $destinoBase = strtoupper(trim((string)($rowBase['destino'] ?? '')));
+    $isEntregaSplit = ($destinoBase === '' || $destinoBase === $unidade);
+
+    if ($isEntregaSplit) {
+        $resChaves = sql(
+            "SELECT DISTINCT
+                COALESCE(NULLIF(UPPER(BTRIM(setor_cte)), ''), UPPER(BTRIM(destino_cte)), '') AS chave
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+               AND nro_cte <> 0",
+            [$unidade, $seqBase],
+            $conn
+        );
+        $tpNovo = 'E';
+    } else {
+        $resChaves = sql(
+            "SELECT DISTINCT UPPER(BTRIM(destino_cte)) AS chave
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+               AND nro_cte <> 0
+               AND COALESCE(BTRIM(destino_cte), '') <> ''",
+            [$unidade, $seqBase],
+            $conn
+        );
+        $tpNovo = 'T';
+    }
+
+    $chaves = [];
+    while ($resChaves && ($r = pg_fetch_assoc($resChaves))) {
+        $k = strtoupper(trim((string)($r['chave'] ?? '')));
+        $k = preg_replace('/[^A-Z0-9]/', '', $k);
+        if ($k === '') continue;
+        if (!in_array($k, $chaves, true)) $chaves[] = $k;
+    }
+    if (count($chaves) <= 1) {
+        respondJson(['success' => true, 'disconnected' => 0, 'created' => 0, 'moved' => 0, 'chaves' => $chaves]);
+    }
+    sort($chaves);
+
+    $capCols = [];
+    try {
+        $resCols = sql(
+            "SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = lower(\$1)",
+            [$tabelaCap],
+            $conn
+        );
+        while ($resCols && ($rc = pg_fetch_assoc($resCols))) {
+            $c = strtolower(trim((string)($rc['column_name'] ?? '')));
+            if ($c !== '') $capCols[$c] = true;
+        }
+    } catch (Exception $e) {
+        $capCols = [];
+    }
+    $wantCols = [
+        'unidade','seq_carregamento','placa_provisoria','cap_ton','cap_m3','vlr_min_frete','vlr_frete_carreteiro','custo_entrega',
+        'simulado','nro_linha','placa_definitiva','placa_carreta','cpf_motorista','ddd_motorista','fone_motorista',
+        'qtde_pallets','conferente','ajudantes','doca','tp_carregamento'
+    ];
+    $useCols = [];
+    foreach ($wantCols as $c) {
+        if (isset($capCols[$c])) $useCols[] = $c;
+    }
+
+    $created = 0;
+    $movedTotal = 0;
+
+    pg_query($conn, 'BEGIN');
+    try {
+        $chaveBase = (string)$chaves[0];
+
+        if ($isEntregaSplit) {
+            $updHeader = sql(
+                "UPDATE {$tabela}
+                 SET setores_entrega = \$1, destino = '', unidades = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte = 0",
+                [$chaveBase, $unidade, $seqBase],
+                $conn
+            );
+            sql(
+                "UPDATE {$tabela}
+                 SET setores_entrega = \$1, destino = '', unidades = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte <> 0
+                   AND COALESCE(NULLIF(UPPER(BTRIM(setor_cte)), ''), UPPER(BTRIM(destino_cte)), '') = \$4",
+                [$chaveBase, $unidade, $seqBase, $chaveBase],
+                $conn
+            );
+        } else {
+            $updHeader = sql(
+                "UPDATE {$tabela}
+                 SET destino = \$1, unidades = \$1, setores_entrega = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte = 0",
+                [$chaveBase, $unidade, $seqBase],
+                $conn
+            );
+            sql(
+                "UPDATE {$tabela}
+                 SET destino = \$1, unidades = \$1, setores_entrega = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte <> 0
+                   AND UPPER(BTRIM(destino_cte)) = \$4",
+                [$chaveBase, $unidade, $seqBase, $chaveBase],
+                $conn
+            );
+        }
+
+        for ($i = 1; $i < count($chaves); $i += 1) {
+            $chave = (string)$chaves[$i];
+            $seqNew = nextSeqCarregamento($conn, $seqName);
+            if ($seqNew <= 0) throw new Exception('Erro ao gerar seq_carregamento.');
+
+            if ($isEntregaSplit) {
+                $insHeader = sql(
+                    "INSERT INTO {$tabela}
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte,
+                      destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
+                     VALUES (\$1, \$2, \$3, \$4, \$5::date, \$6::time, 0, '', '', \$7, \$8, \$9, \$10)",
+                    [
+                        $unidade,
+                        $seqNew,
+                        $placaBase,
+                        (string)($rowBase['login_inclusao'] ?? $login),
+                        (string)($rowBase['data_inclusao'] ?? date('Y-m-d')),
+                        (string)($rowBase['hora_inclusao'] ?? date('H:i:s')),
+                        $chave,
+                        (string)($rowBase['origem_ssw'] ?? ''),
+                        (string)($rowBase['origem_criacao'] ?? ''),
+                        (string)($rowBase['unidade_carregamento'] ?? $unidade),
+                    ],
+                    $conn
+                );
+            } else {
+                $insHeader = sql(
+                    "INSERT INTO {$tabela}
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte,
+                      destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
+                     VALUES (\$1, \$2, \$3, \$4, \$5::date, \$6::time, 0, \$7, \$7, '', \$8, \$9, \$10)",
+                    [
+                        $unidade,
+                        $seqNew,
+                        $placaBase,
+                        (string)($rowBase['login_inclusao'] ?? $login),
+                        (string)($rowBase['data_inclusao'] ?? date('Y-m-d')),
+                        (string)($rowBase['hora_inclusao'] ?? date('H:i:s')),
+                        $chave,
+                        (string)($rowBase['origem_ssw'] ?? ''),
+                        (string)($rowBase['origem_criacao'] ?? ''),
+                        (string)($rowBase['unidade_carregamento'] ?? $unidade),
+                    ],
+                    $conn
+                );
+            }
+
+            if (count($useCols) > 0) {
+                $colsInsert = implode(',', $useCols);
+                $colsSelect = [];
+                foreach ($useCols as $c) {
+                    if ($c === 'seq_carregamento') $colsSelect[] = ((int)$seqNew) . " AS seq_carregamento";
+                    elseif ($c === 'tp_carregamento') $colsSelect[] = "'" . $tpNovo . "' AS tp_carregamento";
+                    else $colsSelect[] = "cap.{$c}";
+                }
+                $colsSelectSql = implode(',', $colsSelect);
+                $insCap = sql(
+                    "INSERT INTO {$tabelaCap} ({$colsInsert})
+                     SELECT {$colsSelectSql}
+                     FROM {$tabelaCap} cap
+                     WHERE cap.unidade = \$1
+                       AND cap.seq_carregamento = \$2
+                     LIMIT 1",
+                    [$unidade, $seqBase],
+                    $conn
+                );
+                $aff = $insCap ? (int)pg_affected_rows($insCap) : 0;
+                if ($aff <= 0) {
+                    @pg_query_params(
+                        $conn,
+                        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, tp_carregamento)
+                         VALUES (\$1, \$2, \$3, FALSE, \$4)
+                         ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria",
+                        [$unidade, $seqNew, $placaBase, $tpNovo]
+                    );
+                }
+            } else {
+                @pg_query_params(
+                    $conn,
+                    "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, tp_carregamento)
+                     VALUES (\$1, \$2, \$3, FALSE, \$4)
+                     ON CONFLICT (unidade, seq_carregamento) DO UPDATE SET placa_provisoria = EXCLUDED.placa_provisoria",
+                    [$unidade, $seqNew, $placaBase, $tpNovo]
+                );
+            }
+
+            if ($isEntregaSplit) {
+                $up = sql(
+                    "UPDATE {$tabela}
+                     SET seq_carregamento = \$1,
+                         setores_entrega = \$2,
+                         destino = '',
+                         unidades = ''
+                     WHERE unidade = \$3
+                       AND seq_carregamento = \$4
+                       AND data_finalizacao IS NULL
+                       AND nro_cte <> 0
+                       AND COALESCE(NULLIF(UPPER(BTRIM(setor_cte)), ''), UPPER(BTRIM(destino_cte)), '') = \$5",
+                    [$seqNew, $chave, $unidade, $seqBase, $chave],
+                    $conn
+                );
+            } else {
+                $up = sql(
+                    "UPDATE {$tabela}
+                     SET seq_carregamento = \$1,
+                         destino = \$2,
+                         unidades = \$2,
+                         setores_entrega = ''
+                     WHERE unidade = \$3
+                       AND seq_carregamento = \$4
+                       AND data_finalizacao IS NULL
+                       AND nro_cte <> 0
+                       AND UPPER(BTRIM(destino_cte)) = \$5",
+                    [$seqNew, $chave, $unidade, $seqBase, $chave],
+                    $conn
+                );
+            }
+            if ($up) $movedTotal += (int)pg_affected_rows($up);
+            $created += 1;
+        }
+
+        pg_query($conn, 'COMMIT');
+        respondJson(['success' => true, 'disconnected' => $created, 'created' => $created, 'moved' => $movedTotal, 'chaves' => $chaves, 'tipo' => ($isEntregaSplit ? 'entrega' : 'transferencia')]);
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        respondJson(['success' => false, 'message' => 'Erro ao desconectar carregamento.']);
+    }
+}
+
 respondJson(['success' => false, 'message' => 'Ação inválida.']);
