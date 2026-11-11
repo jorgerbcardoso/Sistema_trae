@@ -42,7 +42,7 @@ import { useTheme } from '../ThemeProvider';
 import { ENVIRONMENT } from '../../config/environment';
 import { apiFetch } from '../../utils/apiUtils';
 import { formatCteComDv } from '../../utils/cteUtils';
-import { CteDetalhesDialog } from './CteDetalhesDialog';
+import { CteDetalhesDialog, type CteDetalhesData } from './CteDetalhesDialog';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -258,6 +258,8 @@ export function FaturamentoClientes() {
   const [cteDialogLista, setCteDialogLista] = useState<any[]>([]);
   const [cteDialogTotais, setCteDialogTotais] = useState<any>(null);
   const [loadingCtes, setLoadingCtes] = useState(false);
+  const [cteDetalhe, setCteDetalhe] = useState<CteDetalhesData | null>(null);
+  const [cteDetalheOpen, setCteDetalheOpen] = useState(false);
   const [cteDialogPage, setCteDialogPage] = useState(1);
   const [cteDialogSort, setCteDialogSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'data_emissao', dir: 'desc' });
 
@@ -821,6 +823,66 @@ export function FaturamentoClientes() {
       setLoadingCtes(false);
     }
   }, [filters]);
+
+  const abrirDetalhesCte = useCallback((cte: any) => {
+    const nfs = String(cte?.nfs ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+    const cidadeEntrega = [String(cte?.cidade_entrega ?? '').trim(), String(cte?.uf_entrega ?? '').trim()]
+      .filter(Boolean)
+      .join('/');
+    const cidadeEmitente = [String(cte?.cidade_emit ?? '').trim(), String(cte?.uf_emit ?? '').trim()]
+      .filter(Boolean)
+      .join('/');
+    const serCte = String(cte?.ser_cte ?? '').trim();
+    const nroCte = String(cte?.nro_cte ?? '').trim();
+
+    setCteDetalhe({
+      serCte,
+      nroCte,
+      ctrc: `${serCte}${nroCte.padStart(6, '0')}`,
+      seqCte: Number(cte?.seq_cte ?? 0) || undefined,
+      tpDocumento: cte?.tp_documento,
+      emissao: cte?.data_emissao,
+      chegadaUnid: cte?.data_chegada_unid,
+      prevEnt: cte?.data_prev_ent,
+      dataEnt: cte?.data_entrega,
+      unidadeOrigem: cte?.sigla_emit,
+      unidadeDest: cte?.sigla_dest,
+      unidadeEntrega: cte?.sigla_dest,
+      unidAtual: cte?.unid_atual,
+      remetente: cte?.nome_emit,
+      pagador: cte?.nome_pag,
+      destinatario: cte?.nome_dest,
+      cnpjEmit: cte?.cnpj_emit,
+      cnpjPag: cte?.cnpj_pag,
+      cnpjDest: cte?.cnpj_dest,
+      cidadeEmitente,
+      nfiscal: nfs[0] ?? '',
+      placaColeta: cte?.placa_coleta,
+      frete: cte?.vlr_frete,
+      vlrMerc: cte?.vlr_merc,
+      peso: cte?.peso_real,
+      pesoReal: cte?.peso_real,
+      pesoCalc: cte?.peso_calc,
+      cubagem: cte?.cubagem,
+      qtdeVol: cte?.qtde_vol,
+      cidadeEntrega,
+      cepEntrega: cte?.cep_entrega,
+      enderecoEntrega: cte?.endereco_entrega,
+      bairroEntrega: cte?.bairro_entrega,
+      custoSeguro: cte?.custo_seguro,
+      custoIcms: cte?.custo_icms,
+      custoPisCofins: cte?.custo_pis_cofins,
+      custoGris: cte?.custo_gris,
+      custoPedagio: cte?.custo_pedagio,
+      custoExpedicao: cte?.custo_expedicao,
+      custoTransbordo: cte?.custo_transbordo,
+      custoVendedor: cte?.custo_vendedor,
+      custoRecepcao: cte?.custo_recepcao,
+      custoDespDiv: cte?.custo_desp_div,
+      custoTransferenciaReal: cte?.custo_transferencia_real,
+    });
+    setCteDetalheOpen(true);
+  }, []);
 
   const buscarClientesOpcoes = useCallback(async (search: string, f: Filters) => {
     setLoadingClientes(true);
@@ -2354,16 +2416,14 @@ export function FaturamentoClientes() {
                           <span className="font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
                             <span className="inline-flex items-center gap-1.5">
                               {cte.ser_cte}{String(cte.nro_cte).padStart(6, '0')}
-                              <CteDetalhesDialog cte={{ serCte: cte.ser_cte, nroCte: cte.nro_cte, ctrc: `${cte.ser_cte}${String(cte.nro_cte).padStart(6, '0')}`, remetente: cte.nome_emit, destinatario: cte.nome_dest, pagador: cte.nome_pag, nfs: cte.nfs, emissao: cte.data_emissao, prevEnt: cte.data_prev_ent, dataEnt: cte.data_entrega, cidadeEntrega: cte.cidade_uf_entrega }}>
-                                <button
-                                  type="button"
-                                  className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
-                                  onClick={(e) => { e.stopPropagation(); }}
-                                  title="Detalhes do CT-e"
-                                >
-                                  <Info className="w-3.5 h-3.5" />
-                                </button>
-                              </CteDetalhesDialog>
+                              <button
+                                type="button"
+                                className="p-0.5 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors shrink-0"
+                                onClick={(e) => { e.stopPropagation(); abrirDetalhesCte(cte); }}
+                                title="Detalhes do CT-e"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
                             </span>
                           </span>
                           <span className="text-slate-500 dark:text-slate-400 whitespace-nowrap">{cte.data_emissao}</span>
@@ -2426,6 +2486,17 @@ export function FaturamentoClientes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CteDetalhesDialog
+        cte={cteDetalhe}
+        open={cteDetalheOpen && !!cteDetalhe}
+        onOpenChange={(open) => {
+          setCteDetalheOpen(open);
+          if (!open) setCteDetalhe(null);
+        }}
+      >
+        <span />
+      </CteDetalhesDialog>
 
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
         <DialogContent className="sm:max-w-[680px] bg-white dark:bg-slate-900 max-h-[90vh] overflow-y-auto overscroll-contain">

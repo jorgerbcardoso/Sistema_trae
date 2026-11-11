@@ -2863,51 +2863,62 @@ function CardCarregamento(props: CardCarregamentoProps) {
 
   const desconectarCarregamento = async () => {
     if (!placa1) return;
+    const isTransferencia = !isEntregaCteDetalhe;
     const ok = await confirmar({
-      title: 'Desconectar carregamento?',
-      description: isConjunto
-        ? 'O conjunto será desfeito e os carregamentos voltarão a ficar separados.'
-        : (isEntregaCteDetalhe
-            ? 'O carregamento será dividido em um card por setor, mantendo a mesma placa. Esta ação não altera o carregamento no TMS.'
-            : 'O carregamento será dividido em um card por destino, mantendo a mesma placa. Esta ação não altera o carregamento no TMS.'),
-      confirmText: 'Desconectar',
+      title: isTransferencia ? 'Dividir por destino?' : 'Dividir por setor?',
+      description: isTransferencia
+        ? 'Os CT-es serão redistribuídos em carregamentos separados por destino, mantendo as placas. Se houver um conjunto, o vínculo entre as placas também será desfeito.'
+        : 'O carregamento será dividido em um card por setor, mantendo a mesma placa. Esta ação não altera o carregamento no TMS.',
+      confirmText: 'Dividir',
       cancelText: 'Cancelar',
       variant: 'destructive',
     });
     if (!ok) return;
     setDesconectandoCarregamento(true);
     try {
-      const seq = Number((carregamento as any).seq_carregamento ?? 0) || 0;
+      const seqs = [
+        Number((carregamento as any).seq_carregamento ?? 0) || 0,
+        ...(isConjunto ? [Number((carregamentoConjunto as any)?.seq_carregamento ?? 0) || 0] : []),
+      ].filter((seq, index, values) => seq > 0 && values.indexOf(seq) === index);
+      const acao = isTransferencia ? 'separar_transferencia_destinos' : 'desconectar_carregamento';
       const res = await apiFetch(
         `${ENVIRONMENT.apiBaseUrl}/dashboards/disponiveis/salvar_carregamento.php`,
         {
           method: 'POST',
           body: JSON.stringify({
-            acao: 'desconectar_carregamento',
+            acao,
             placa: placa1,
-            seq_carregamento: seq > 0 ? seq : undefined,
+            seq_carregamento: seqs[0] ?? undefined,
+            seq_carregamentos: isTransferencia ? seqs : undefined,
           }),
         },
         true
       );
       if (res?.success) {
-        const disconnected = Number(res?.disconnected ?? 0) || 0;
-        if (disconnected <= 0) {
-          toast.info('Não há o que desconectar neste carregamento.');
+        const changed = Boolean(res?.detached)
+          || (Number(res?.created ?? 0) || 0) > 0
+          || (Number(res?.moved ?? 0) || 0) > 0
+          || (Number(res?.disconnected ?? 0) || 0) > 0;
+        if (!changed) {
+          toast.info(isTransferencia
+            ? 'Não há destinos diferentes para dividir neste carregamento.'
+            : 'Não há o que desconectar neste carregamento.');
           return;
         }
-        if (String(res?.tipo ?? '') === 'conjunto') {
-          toast.success('Conjunto desfeito. Os carregamentos voltaram a ficar separados.');
+        if (isTransferencia) {
+          const total = Number(res?.total_carregamentos ?? 0) || (seqs.length + (Number(res?.created ?? 0) || 0));
+          toast.success(`Carregamento dividido por destino em ${total} carregamento(s).`);
         } else {
-          toast.success(`Desconectado em ${disconnected + 1} carregamentos (mesma placa).`);
+          const created = Number(res?.created ?? 0) || 0;
+          toast.success(created > 0 ? `Dividido em ${created + 1} carregamentos por setor.` : 'Carregamento separado.');
         }
         setCteDetalheDialogOpen(false);
         await onRecarregarCarregamentos();
       } else {
-        toast.error(res?.message || 'Falha ao desconectar carregamento.');
+        toast.error(res?.message || 'Falha ao dividir carregamento.');
       }
     } catch (e: any) {
-      toast.error(e?.message || 'Falha ao desconectar carregamento.');
+      toast.error(e?.message || 'Falha ao dividir carregamento.');
     } finally {
       setDesconectandoCarregamento(false);
     }
@@ -4049,11 +4060,11 @@ function CardCarregamento(props: CardCarregamentoProps) {
               variant="outline"
               size="sm"
               onClick={desconectarCarregamento}
-              className="gap-1.5"
+              className="gap-1.5 border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
               disabled={loadingCteDetalhe || desconectandoCarregamento}
             >
-              <Split className="w-4 h-4" />
-              Desconectar
+              {desconectandoCarregamento ? <Loader2 className="w-4 h-4 animate-spin" /> : <Split className="w-4 h-4" />}
+              {isEntregaCteDetalhe ? 'Dividir por Setor' : 'Dividir por Destino'}
             </Button>
             <Button
               variant="outline"

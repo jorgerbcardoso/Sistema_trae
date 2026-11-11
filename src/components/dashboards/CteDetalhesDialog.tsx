@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Package, Truck, Building2, MapPin, Weight, Box, CalendarDays, DollarSign, FileText, Car, AlertCircle } from 'lucide-react';
+import { Package, Truck, Building2, MapPin, Weight, Box, CalendarDays, DollarSign, FileText, Car, AlertCircle, Loader2 } from 'lucide-react';
 import { useTooltipStyle } from './CustomTooltip';
 import { formatCteComDvFromAny } from '../../utils/cteUtils';
+import { ENVIRONMENT } from '../../config/environment';
+import { apiFetch } from '../../utils/apiUtils';
 
 export interface CteCustoParcela {
   key: string;
@@ -236,7 +238,7 @@ export function CteDetalhesDialog({ cte, children, open: openProp, onOpenChange 
 }
 
 function CteDetalhesDialogInner({
-  cte,
+  cte: initialCte,
   children,
   open: openProp,
   onOpenChange,
@@ -246,6 +248,96 @@ function CteDetalhesDialogInner({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const [cte, setCte] = useState(initialCte);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
+  const dialogOpen = openProp === undefined ? internalOpen : openProp;
+  const fetchedKeyRef = useRef('');
+  const initialCteKey = JSON.stringify(initialCte);
+  const initialCteKeyRef = useRef(initialCteKey);
+
+  useEffect(() => {
+    if (initialCteKeyRef.current === initialCteKey) return;
+    initialCteKeyRef.current = initialCteKey;
+    fetchedKeyRef.current = '';
+    setCte(initialCte);
+  }, [initialCte, initialCteKey]);
+
+  const hasValue = (value: any) => value !== undefined && value !== null && String(value).trim() !== '';
+  const precisaCompletarDetalhes = [
+    initialCte.seqCte,
+    initialCte.tpDocumento,
+    initialCte.emissao,
+    initialCte.remetente,
+    initialCte.destinatario,
+    initialCte.pagador,
+    initialCte.frete,
+    initialCte.vlrMerc ?? initialCte.vlrNf,
+    initialCte.pesoReal ?? initialCte.peso,
+    initialCte.pesoCalc,
+    initialCte.cubagem,
+    initialCte.qtdeVol,
+    initialCte.custoSeguro,
+    initialCte.custoIcms,
+    initialCte.custoPisCofins,
+    initialCte.custoGris,
+    initialCte.custoPedagio,
+    initialCte.custoExpedicao,
+    initialCte.custoTransbordo,
+    initialCte.custoVendedor,
+    initialCte.custoRecepcao,
+    initialCte.custoDespDiv,
+    initialCte.custoTransferenciaReal,
+  ].some((value) => !hasValue(value));
+
+  useEffect(() => {
+    if (!dialogOpen || !precisaCompletarDetalhes) return;
+    const serie = String(initialCte.serCte ?? '').trim();
+    const numero = String(initialCte.nroCte ?? '').trim();
+    const seq = Number(initialCte.seqCte ?? 0) || 0;
+    if (seq <= 0 && (!serie || !numero)) return;
+
+    const requestKey = seq > 0 ? `seq:${seq}` : `${serie}|${numero}`;
+    if (fetchedKeyRef.current === requestKey) return;
+    fetchedKeyRef.current = requestKey;
+    setLoadingDetalhes(true);
+
+    void apiFetch(
+      `${ENVIRONMENT.apiBaseUrl}/dashboards/get_cte_detalhes.php`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ seq_cte: seq > 0 ? seq : undefined, ser_cte: serie, nro_cte: numero }),
+      },
+      true
+    ).then((response) => {
+      if (fetchedKeyRef.current !== requestKey || !response?.success || !response?.cte) return;
+      setCte((current) => {
+        const merged: CteDetalhesData = { ...current };
+        Object.entries(response.cte as Record<string, any>).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && !(typeof value === 'string' && value.trim() === '')) {
+            merged[key] = value;
+          }
+        });
+        return merged;
+      });
+    }).catch(() => {
+      // Keep the details already provided by the screen when enrichment is unavailable.
+    }).finally(() => {
+      if (fetchedKeyRef.current === requestKey) setLoadingDetalhes(false);
+    });
+  }, [
+    dialogOpen,
+    initialCte.seqCte,
+    initialCte.serCte,
+    initialCte.nroCte,
+    precisaCompletarDetalhes,
+  ]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (openProp === undefined) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
+
   const tooltipStyle = useTooltipStyle();
   const tpDoc = String((cte as any)?.tpDocumento ?? (cte as any)?.tp_documento ?? '').trim();
 
@@ -253,8 +345,8 @@ function CteDetalhesDialogInner({
   const custoTotal = useMemo(() => (cte ? calcularCustoTotal(cte) : 0), [cte]);
   const freteNum = parseNum(cte?.frete);
   const vlrMercNum = parseNum(cte?.vlrMerc ?? cte?.vlrNf);
-  const pesoNum = parseNum(cte?.peso);
-  const pesoCalcNum = parseNum(cte?.pesoCalc ?? cte?.pesoReal);
+  const pesoNum = parseNum(cte?.peso ?? cte?.pesoReal);
+  const pesoCalcNum = parseNum(cte?.pesoCalc ?? cte?.peso);
   const cubagemNum = parseNum(cte?.cubagem);
   const volNum = parseNum(cte?.qtdeVol);
 
@@ -294,7 +386,7 @@ function CteDetalhesDialogInner({
   }, [ctrcDisplay, temCusto, temEntrega]);
 
   return (
-    <Dialog open={openProp} onOpenChange={onOpenChange}>
+    <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="!w-[92vw] !max-w-[650px] !max-h-[80vh] h-[80vh] overflow-hidden flex flex-col !p-0 gap-0">
         <DialogHeader className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 shrink-0">
@@ -306,6 +398,7 @@ function CteDetalhesDialogInner({
               <div className="flex flex-col">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wide truncate">{ctrcDisplay || 'CT-e'}</span>
+                  {loadingDetalhes && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" aria-label="Carregando detalhes" />}
                   {tpDoc ? (
                     <Badge className="bg-slate-100 dark:bg-slate-900/35 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-[10px] h-5 px-1.5 font-medium">
                       {tpDoc}
@@ -339,6 +432,8 @@ function CteDetalhesDialogInner({
             >
               <Campo label="Chegada Unid." valor={cte.chegadaUnid} mono />
               {cte.prevChegada && <Campo label="Prev. Chegada" valor={cte.prevChegada} mono />}
+              {cte.dataEnt && <Campo label="Data Entrega" valor={cte.dataEnt} mono />}
+              {cte.unidAtual && <Campo label="Unidade Atual" valor={cte.unidAtual} />}
               {cte.agendamento && (
                 <Campo
                   label="Agendamento"

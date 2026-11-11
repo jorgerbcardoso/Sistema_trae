@@ -3844,6 +3844,264 @@ if ($acao === 'separar_entrega_setores') {
     }
 }
 
+// ─── Ação: separar transferência por destino ───
+if ($acao === 'separar_transferencia_destinos') {
+    $seqsInput = $input['seq_carregamentos'] ?? [];
+    if (!is_array($seqsInput)) $seqsInput = [];
+    if (count($seqsInput) === 0 && (int)($input['seq_carregamento'] ?? 0) > 0) {
+        $seqsInput[] = (int)$input['seq_carregamento'];
+    }
+    $seqs = [];
+    foreach ($seqsInput as $seqValue) {
+        $seqValue = (int)$seqValue;
+        if ($seqValue > 0 && !in_array($seqValue, $seqs, true)) $seqs[] = $seqValue;
+    }
+    if (count($seqs) === 0) {
+        respondJson(['success' => false, 'message' => 'Carregamento não informado.']);
+    }
+    if (count($seqs) > 2) {
+        respondJson(['success' => false, 'message' => 'Só é possível dividir um carregamento conjunto por vez.']);
+    }
+    if (count($seqs) === 2) {
+        $resRelacao = sql(
+            "SELECT 1
+             FROM {$tabelaCap}
+             WHERE unidade = \$1
+               AND (
+                    (seq_carregamento = \$2 AND seq_carregamento_conjunto = \$3)
+                    OR (seq_carregamento = \$3 AND seq_carregamento_conjunto = \$2)
+               )
+             LIMIT 1",
+            [$unidade, $seqs[0], $seqs[1]],
+            $conn
+        );
+        if (!$resRelacao || pg_num_rows($resRelacao) === 0) {
+            respondJson(['success' => false, 'message' => 'Os carregamentos não pertencem ao mesmo conjunto. Atualize a lista e tente novamente.']);
+        }
+    }
+
+    $bases = [];
+    $destinosPorSeq = [];
+    foreach ($seqs as $seq) {
+        $resBase = sql(
+            "SELECT
+                seq_carregamento,
+                COALESCE(placa_provisoria, '') AS placa_provisoria,
+                COALESCE(destino, '') AS destino,
+                COALESCE(origem_ssw, '') AS origem_ssw,
+                COALESCE(origem_criacao, '') AS origem_criacao,
+                COALESCE(unidade_carregamento, '') AS unidade_carregamento,
+                COALESCE(login_inclusao, '') AS login_inclusao,
+                data_inclusao,
+                hora_inclusao
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+             ORDER BY data_inclusao ASC, hora_inclusao ASC
+             LIMIT 1",
+            [$unidade, $seq],
+            $conn
+        );
+        if (!$resBase || pg_num_rows($resBase) === 0) {
+            respondJson(['success' => false, 'message' => 'Um dos carregamentos não foi encontrado ou já foi finalizado.']);
+        }
+        $base = pg_fetch_assoc($resBase);
+        $destinoBase = strtoupper(trim((string)($base['destino'] ?? '')));
+        if ($destinoBase === '' || $destinoBase === $unidade) {
+            respondJson(['success' => false, 'message' => 'A divisão por destino está disponível somente para carregamentos de transferência.']);
+        }
+        $bases[$seq] = $base;
+
+        $resDestinos = sql(
+            "SELECT DISTINCT UPPER(BTRIM(destino_cte)) AS destino
+             FROM {$tabela}
+             WHERE unidade = \$1
+               AND seq_carregamento = \$2
+               AND data_finalizacao IS NULL
+               AND nro_cte <> 0
+               AND COALESCE(BTRIM(destino_cte), '') <> ''
+             ORDER BY 1",
+            [$unidade, $seq],
+            $conn
+        );
+        $destinos = [];
+        while ($resDestinos && ($rowDestino = pg_fetch_assoc($resDestinos))) {
+            $destino = strtoupper(trim((string)($rowDestino['destino'] ?? '')));
+            if ($destino !== '' && !in_array($destino, $destinos, true)) $destinos[] = $destino;
+        }
+        $destinosPorSeq[$seq] = $destinos;
+    }
+
+    $capCols = [];
+    $resCols = sql(
+        "SELECT lower(column_name) AS column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower(\$1)",
+        [$tabelaCap],
+        $conn
+    );
+    while ($resCols && ($rowCol = pg_fetch_assoc($resCols))) {
+        $col = strtolower(trim((string)($rowCol['column_name'] ?? '')));
+        if ($col !== '') $capCols[$col] = true;
+    }
+    $capWantCols = [
+        'unidade','seq_carregamento','placa_provisoria','cap_ton','cap_m3','vlr_min_frete','vlr_frete_carreteiro','custo_entrega',
+        'simulado','nro_linha','placa_definitiva','placa_carreta','cpf_motorista','ddd_motorista','fone_motorista',
+        'qtde_pallets','conferente','ajudantes','doca','tp_carregamento'
+    ];
+    $capUseCols = [];
+    foreach ($capWantCols as $col) {
+        if (isset($capCols[$col])) $capUseCols[] = $col;
+    }
+
+    $created = 0;
+    $movedTotal = 0;
+    $detached = false;
+    if (!pg_query($conn, 'BEGIN')) {
+        respondJson(['success' => false, 'message' => 'Não foi possível iniciar a divisão do carregamento.']);
+    }
+    try {
+        foreach ($seqs as $seq) {
+            $updConjunto = sql(
+                "UPDATE {$tabelaCap}
+                 SET seq_carregamento_conjunto = NULL
+                 WHERE unidade = \$1
+                   AND seq_carregamento_conjunto IS NOT NULL
+                   AND (seq_carregamento = \$2 OR seq_carregamento_conjunto = \$2)",
+                [$unidade, $seq],
+                $conn
+            );
+            if ($updConjunto === false) throw new Exception('Erro ao desfazer vínculo do conjunto.');
+            if ($updConjunto && pg_affected_rows($updConjunto) > 0) $detached = true;
+        }
+
+        foreach ($seqs as $seqBase) {
+            $base = $bases[$seqBase];
+            $destinos = $destinosPorSeq[$seqBase] ?? [];
+            if (count($destinos) === 0) continue;
+
+            $destinoBase = $destinos[0];
+            $updHeader = sql(
+                "UPDATE {$tabela}
+                 SET destino = \$1, unidades = \$1, setores_entrega = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte = 0",
+                [$destinoBase, $unidade, $seqBase],
+                $conn
+            );
+            if ($updHeader === false) throw new Exception('Erro ao atualizar cabeçalho do carregamento.');
+
+            $updBaseCtes = sql(
+                "UPDATE {$tabela}
+                 SET destino = \$1, unidades = \$1, setores_entrega = ''
+                 WHERE unidade = \$2
+                   AND seq_carregamento = \$3
+                   AND data_finalizacao IS NULL
+                   AND nro_cte <> 0
+                   AND UPPER(BTRIM(destino_cte)) = \$4",
+                [$destinoBase, $unidade, $seqBase, $destinoBase],
+                $conn
+            );
+            if ($updBaseCtes === false) throw new Exception('Erro ao atualizar CT-es do carregamento.');
+
+            for ($i = 1; $i < count($destinos); $i++) {
+                $destino = $destinos[$i];
+                $seqNew = nextSeqCarregamento($conn, $seqName);
+                if ($seqNew <= 0) throw new Exception('Erro ao gerar seq_carregamento.');
+
+                $insHeader = sql(
+                    "INSERT INTO {$tabela}
+                     (unidade, seq_carregamento, placa_provisoria, login_inclusao, data_inclusao, hora_inclusao, nro_cte,
+                      destino, unidades, setores_entrega, origem_ssw, origem_criacao, unidade_carregamento)
+                     VALUES (\$1, \$2, \$3, \$4, \$5::date, \$6::time, 0, \$7, \$7, '', \$8, \$9, \$10)",
+                    [
+                        $unidade,
+                        $seqNew,
+                        strtoupper(trim((string)($base['placa_provisoria'] ?? ''))),
+                        (string)($base['login_inclusao'] ?? $login),
+                        (string)($base['data_inclusao'] ?? date('Y-m-d')),
+                        (string)($base['hora_inclusao'] ?? date('H:i:s')),
+                        $destino,
+                        (string)($base['origem_ssw'] ?? ''),
+                        (string)($base['origem_criacao'] ?? ''),
+                        (string)($base['unidade_carregamento'] ?? $unidade),
+                    ],
+                    $conn
+                );
+                if ($insHeader === false) throw new Exception('Erro ao criar carregamento por destino.');
+
+                if (count($capUseCols) > 0) {
+                    $colsSelect = [];
+                    foreach ($capUseCols as $col) {
+                        if ($col === 'seq_carregamento') $colsSelect[] = ((int)$seqNew) . ' AS seq_carregamento';
+                        elseif ($col === 'tp_carregamento') $colsSelect[] = "'T' AS tp_carregamento";
+                        else $colsSelect[] = "cap.{$col}";
+                    }
+                    $insCap = sql(
+                        "INSERT INTO {$tabelaCap} (" . implode(',', $capUseCols) . ")
+                         SELECT " . implode(',', $colsSelect) . "
+                         FROM {$tabelaCap} cap
+                         WHERE cap.unidade = \$1
+                           AND cap.seq_carregamento = \$2
+                         LIMIT 1",
+                        [$unidade, $seqBase],
+                        $conn
+                    );
+                    if ($insCap === false) throw new Exception('Erro ao copiar dados do veículo.');
+                    if (pg_affected_rows($insCap) === 0) {
+                        throw new Exception('Dados do veículo não encontrados para copiar.');
+                    }
+                } else {
+                    $insCap = sql(
+                        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, tp_carregamento)
+                         VALUES (\$1, \$2, \$3, FALSE, 'T')",
+                        [$unidade, $seqNew, strtoupper(trim((string)($base['placa_provisoria'] ?? '')))],
+                        $conn
+                    );
+                    if ($insCap === false) throw new Exception('Erro ao criar dados do veículo.');
+                }
+
+                $updCtes = sql(
+                    "UPDATE {$tabela}
+                     SET seq_carregamento = \$1,
+                         destino = \$2,
+                         unidades = \$2,
+                         setores_entrega = ''
+                     WHERE unidade = \$3
+                       AND seq_carregamento = \$4
+                       AND data_finalizacao IS NULL
+                       AND nro_cte <> 0
+                       AND UPPER(BTRIM(destino_cte)) = \$5",
+                    [$seqNew, $destino, $unidade, $seqBase, $destino],
+                    $conn
+                );
+                if ($updCtes === false) throw new Exception('Erro ao redistribuir CT-es por destino.');
+                $movedTotal += (int)pg_affected_rows($updCtes);
+                $created++;
+            }
+        }
+
+        pg_query($conn, 'COMMIT');
+        $changed = $detached || $created > 0 || $movedTotal > 0;
+        respondJson([
+            'success' => true,
+            'changed' => $changed,
+            'detached' => $detached,
+            'created' => $created,
+            'moved' => $movedTotal,
+            'total_carregamentos' => count($seqs) + $created,
+        ]);
+    } catch (Exception $e) {
+        pg_query($conn, 'ROLLBACK');
+        error_log('[separar_transferencia_destinos] ' . $e->getMessage());
+        respondJson(['success' => false, 'message' => 'Não foi possível dividir o carregamento por destino.']);
+    }
+}
+
 // ─── Ação: desconectar carregamento ───
 // Desfaz um conjunto de transferência (2 placas) ou separa o carregamento em
 // vários (mesma placa) por setor (entrega) ou por destino (transferência).

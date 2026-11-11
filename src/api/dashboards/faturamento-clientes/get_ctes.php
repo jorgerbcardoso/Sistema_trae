@@ -25,6 +25,64 @@ $excluirGrupos = (isset($input['excluir_grupos']) && is_array($input['excluir_gr
 $excluirSiglas = (isset($input['excluir_siglas']) && is_array($input['excluir_siglas'])) ? $input['excluir_siglas'] : [];
 
 $conn = connect();
+$tblCte = "{$domain}_cte";
+$tblCliente = "{$domain}_cliente";
+
+$listarColunas = function (string $tabela) use ($conn): array {
+    $cols = [];
+    $res = sql(
+        "SELECT lower(column_name) AS column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND lower(table_name) = lower($1)",
+        [$tabela],
+        $conn
+    );
+    while ($res && ($row = pg_fetch_assoc($res))) {
+        $nome = strtolower(trim((string)($row['column_name'] ?? '')));
+        if ($nome !== '') $cols[$nome] = true;
+    }
+    return $cols;
+};
+
+$cteCols = $listarColunas($tblCte);
+$clienteCols = $listarColunas($tblCliente);
+$hasEntregaEndereco = isset($cteCols['cep_entrega'], $cteCols['endereco_entrega'], $cteCols['bairro_entrega']);
+$hasCidadeEntrega = isset($cteCols['seq_cidade_entr']);
+$hasCidadeEmitente = isset($clienteCols['seq_cidade']);
+$selEnderecoEntrega = $hasEntregaEndereco
+    ? "COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
+       COALESCE(cte.endereco_entrega::text, '') AS endereco_entrega,
+       COALESCE(cte.bairro_entrega::text, '') AS bairro_entrega"
+    : "'' AS cep_entrega, '' AS endereco_entrega, '' AS bairro_entrega";
+$selCidadeEntrega = $hasCidadeEntrega
+    ? "COALESCE(ce.nome, '') AS cidade_entrega, COALESCE(ce.uf, '') AS uf_entrega"
+    : "'' AS cidade_entrega, '' AS uf_entrega";
+$selCidadeEmitente = $hasCidadeEmitente
+    ? "COALESCE(ce_emit.nome, '') AS cidade_emit, COALESCE(ce_emit.uf, '') AS uf_emit"
+    : "'' AS cidade_emit, '' AS uf_emit";
+$joinCidadeEntrega = $hasCidadeEntrega ? "LEFT JOIN cidade ce ON ce.seq_cidade = cte.seq_cidade_entr" : '';
+$joinCidadeEmitente = $hasCidadeEmitente
+    ? "LEFT JOIN {$tblCliente} cli_emit
+           ON regexp_replace(COALESCE(cli_emit.cnpj::text, ''), '\\\\D', '', 'g') =
+              regexp_replace(COALESCE(cte.cnpj_emit::text, ''), '\\\\D', '', 'g')
+       LEFT JOIN cidade ce_emit ON ce_emit.seq_cidade = cli_emit.seq_cidade"
+    : '';
+$selOptionalText = function (string $coluna, string $alias) use ($cteCols): string {
+    return isset($cteCols[$coluna])
+        ? "COALESCE(cte.{$coluna}::text, '') AS {$alias}"
+        : "'' AS {$alias}";
+};
+$selOptionalDate = function (string $coluna, string $alias) use ($cteCols): string {
+    return isset($cteCols[$coluna])
+        ? "TO_CHAR(cte.{$coluna}, 'DD/MM/YYYY') AS {$alias}"
+        : "'' AS {$alias}";
+};
+$selOptionalNumber = function (string $coluna, string $alias) use ($cteCols): string {
+    return isset($cteCols[$coluna])
+        ? "COALESCE(cte.{$coluna}, 0) AS {$alias}"
+        : "0 AS {$alias}";
+};
 
 $costFields = [
     'custo_seguro',
@@ -159,11 +217,20 @@ $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
 
 $query = "
     SELECT
+        " . (isset($cteCols['seq_cte']) ? "cte.seq_cte" : "NULL::integer") . " AS seq_cte,
         cte.ser_cte,
         cte.nro_cte,
+        " . $selOptionalText('tp_documento', 'tp_documento') . ",
         TO_CHAR(cte.data_emissao, 'DD/MM/YYYY') AS data_emissao,
+        " . $selOptionalDate('data_chegada_unid', 'data_chegada_unid') . ",
+        " . $selOptionalDate('data_prev_ent', 'data_prev_ent') . ",
+        " . $selOptionalDate('data_entrega', 'data_entrega') . ",
+        " . $selOptionalText('sigla_dest', 'sigla_dest') . ",
+        " . $selOptionalText('unid_atual', 'unid_atual') . ",
         COALESCE(cte.vlr_merc, 0)               AS vlr_merc,
         COALESCE(cte.peso_real, 0)              AS peso_real,
+        " . $selOptionalNumber('peso_calc', 'peso_calc') . ",
+        " . $selOptionalNumber('cubagem', 'cubagem') . ",
         COALESCE(cte.qtde_vol, 0)               AS qtde_vol,
         COALESCE(cte.vlr_frete, 0)              AS vlr_frete,
         COALESCE(cte.custo_seguro, 0)           AS custo_seguro,
@@ -181,9 +248,20 @@ $query = "
         {$costExpr}                             AS total_custos,
         (COALESCE(cte.vlr_frete, 0) - {$costExpr}) AS resultado,
         cte.nome_pag,
+        " . $selOptionalText('nome_emit', 'nome_emit') . ",
         cte.nome_dest,
+        " . $selOptionalText('cnpj_emit', 'cnpj_emit') . ",
+        " . $selOptionalText('cnpj_pag', 'cnpj_pag') . ",
+        " . $selOptionalText('cnpj_dest', 'cnpj_dest') . ",
         cte.sigla_emit
+        , " . $selOptionalText('placa_coleta', 'placa_coleta') . "
+        , " . $selOptionalText('nfs', 'nfs') . "
+        , {$selEnderecoEntrega}
+        , {$selCidadeEntrega}
+        , {$selCidadeEmitente}
     FROM {$domain}_cte cte
+    {$joinCidadeEntrega}
+    {$joinCidadeEmitente}
     {$whereClause}
     ORDER BY cte.data_emissao DESC, cte.nro_cte DESC
 ";
@@ -205,11 +283,21 @@ foreach ($costFields as $cf) { $totCostBreak[$cf] = 0.0; }
 
 while ($row = pg_fetch_assoc($result)) {
     $ctes[] = [
+        'seq_cte'      => (int)($row['seq_cte'] ?? 0),
         'ser_cte'      => $row['ser_cte'],
         'nro_cte'      => $row['nro_cte'],
+        'tp_documento' => (string)($row['tp_documento'] ?? ''),
         'data_emissao' => $row['data_emissao'],
+        'data_chegada_unid' => (string)($row['data_chegada_unid'] ?? ''),
+        'data_prev_ent' => (string)($row['data_prev_ent'] ?? ''),
+        'data_entrega' => (string)($row['data_entrega'] ?? ''),
+        'sigla_emit'   => (string)($row['sigla_emit'] ?? ''),
+        'sigla_dest'   => (string)($row['sigla_dest'] ?? ''),
+        'unid_atual'   => (string)($row['unid_atual'] ?? ''),
         'vlr_merc'     => (float)$row['vlr_merc'],
         'peso_real'    => (float)$row['peso_real'],
+        'peso_calc'    => (float)($row['peso_calc'] ?? 0),
+        'cubagem'      => (float)($row['cubagem'] ?? 0),
         'qtde_vol'     => (int)$row['qtde_vol'],
         'vlr_frete'    => (float)$row['vlr_frete'],
         'total_custos' => (float)($row['total_custos'] ?? 0),
@@ -226,9 +314,21 @@ while ($row = pg_fetch_assoc($result)) {
         'custo_recepcao' => (float)($row['custo_recepcao'] ?? 0),
         'custo_desp_div' => (float)($row['custo_desp_div'] ?? 0),
         'custo_transferencia_real' => (float)($row['custo_transferencia_real'] ?? 0),
+        'nome_emit'    => (string)($row['nome_emit'] ?? ''),
         'nome_pag'     => $row['nome_pag'],
         'nome_dest'    => $row['nome_dest'],
-        'sigla_emit'   => $row['sigla_emit'],
+        'cnpj_emit'    => (string)($row['cnpj_emit'] ?? ''),
+        'cnpj_pag'     => (string)($row['cnpj_pag'] ?? ''),
+        'cnpj_dest'    => (string)($row['cnpj_dest'] ?? ''),
+        'placa_coleta' => (string)($row['placa_coleta'] ?? ''),
+        'nfs'          => (string)($row['nfs'] ?? ''),
+        'cep_entrega'  => (string)($row['cep_entrega'] ?? ''),
+        'endereco_entrega' => (string)($row['endereco_entrega'] ?? ''),
+        'bairro_entrega' => (string)($row['bairro_entrega'] ?? ''),
+        'cidade_entrega' => (string)($row['cidade_entrega'] ?? ''),
+        'uf_entrega' => (string)($row['uf_entrega'] ?? ''),
+        'cidade_emit' => (string)($row['cidade_emit'] ?? ''),
+        'uf_emit' => (string)($row['uf_emit'] ?? ''),
     ];
     $totVlrMerc += (float)$row['vlr_merc'];
     $totPeso    += (float)$row['peso_real'];
