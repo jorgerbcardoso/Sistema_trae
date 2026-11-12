@@ -14,7 +14,7 @@
     ssw_login ($dominio);
 
     // Agora vamos buscar a planilha da 930 na 156
-    $str = ssw_go ('https://sistema.ssw.inf.br/bin/ssw1440'); // Comanda a 156
+    $str = ssw_go ('https://tms.ssw.inf.br/bin/ssw1440'); // Comanda a 156
 
     $str = substr ($str, strpos($str,'<xml'), strlen($str));
     $str = substr ($str, 0, strpos($str,'</xml>')) . '</xml>';
@@ -35,7 +35,7 @@
 
         $arq = "$dominio" . fmtnum ((int) $seq, 9) . '.csv';
 
-        $pla = ssw_go ("https://sistema.ssw.inf.br/bin/ssw0424?act=$arq&filename=$arq&path=/usr/aws/jobs/$dominio/&down=1&nw=1");
+        $pla = ssw_go ("https://tms.ssw.inf.br/bin/ssw0424?act=$arq&filename=$arq&path=/usr/aws/jobs/$dominio/&down=1&nw=1");
 
         $pla = str_replace (chr(0xa0), '', $pla);
         $fil_arr = explode ("\r", $pla);

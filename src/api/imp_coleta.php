@@ -68,7 +68,7 @@ while ($row_domains = pg_fetch_array($result_domains))
   $g_sql = connect();
 
   // Troca a unidade para matriz no SSW
-  $str = ssw_go ('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
+  $str = ssw_go ('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
 
   // ================================================================
   // BUSCAR COLETAS DO SSW0166
@@ -93,7 +93,7 @@ while ($row_domains = pg_fetch_array($result_domains))
                "&f19=";                         // Unidade vazia = TODAS
 
       // Chamar SSW0166
-      $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param);
+      $str = ssw_go('https://tms.ssw.inf.br/bin/ssw0166?' . $param);
 
       // Verificar se não há movimento
       if (strpos($str, 'Sem movimento de coletas para') !== false) {
@@ -114,7 +114,7 @@ while ($row_domains = pg_fetch_array($result_domains))
 
       // Baixar arquivo do relatório
       echo "📄 Baixando relatório do SSW...\n";
-      $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+      $file = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
       $fil_arr = explode("\r", $file);
       $count = count($fil_arr);
 

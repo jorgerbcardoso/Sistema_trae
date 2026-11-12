@@ -63,7 +63,7 @@ try {
 
     // Dispara requisição para 56, filtrando APENAS relatório 073
     // Usa act=FILCOD&f1=73 para filtrar pelo código do relatório
-    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0082?act=FILCOD&f1=73");
+    $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0082?act=FILCOD&f1=73");
 
     $str = substr($str, strpos($str,'<xml'), strlen($str));
     $str = substr($str, 0, strpos($str,'</xml>')) . '</xml>';
@@ -115,14 +115,14 @@ try {
         }
 
         if (($rel == '073') && (substr($pro, 0, 2) == '01')) {
-            $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0082?act=$act");
+            $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0082?act=$act");
 
             $str = urldecode($str);
             $act = ssw_get_act($str);
             $arq = ssw_get_arq($str);
 
             // Abre o arquivo do relatório
-            $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+            $file = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
 
             $fil_arr = explode("\r", $file);
             $count = count($fil_arr);

@@ -67,7 +67,7 @@ try {
     };
 
     $get1440Rows = static function() use ($sswFetch, $extractXml): array {
-        $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 6);
+        $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 6);
         if ($raw === '' || stripos($raw, '504 Gateway Time-out') !== false) return [];
         $xmlStr = $extractXml($raw);
         if ($xmlStr === '') return [];
@@ -119,7 +119,7 @@ try {
 
     $downloadFromAct = static function(string $act) use ($sswFetch): ?array {
         $dummy = (string)((int)(microtime(true) * 1000));
-        $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
+        $url = 'https://tms.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
         $t0 = microtime(true);
         $html = (string)$sswFetch($url, 6);
         $t1 = microtime(true);
@@ -140,7 +140,7 @@ try {
         if ($filename === '' || $path === '') return null;
 
         $t2 = microtime(true);
-        $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 6);
+        $file = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 6);
         $t3 = microtime(true);
         if ($file === '' || strlen($file) < 50) return null;
 
@@ -354,7 +354,7 @@ try {
     };
 
     $refFimDmy = date('dmy', strtotime('-1 day'));
-    $url = 'https://sistema.ssw.inf.br/bin/ssw0103?act=PES'
+    $url = 'https://tms.ssw.inf.br/bin/ssw0103?act=PES'
         . '&cod_emp_ctb=01'
         . '&t_data_ref_ini=010101'
         . '&t_data_ref_fim=' . urlencode($refFimDmy)
@@ -382,7 +382,7 @@ try {
         [$act, $arq] = $getActArq($html);
         if ($act !== '' && $arq !== '') {
             $t0 = microtime(true);
-            $csvRaw = (string)$sswFetch("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0", 6);
+            $csvRaw = (string)$sswFetch("https://tms.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0", 6);
             $t1 = microtime(true);
             if ($csvRaw === '' || strlen((string)$csvRaw) < 20) {
                 $respondJson(['success' => false, 'message' => 'Arquivo CSV do SSW0103 vazio ou inválido.'], 500);

@@ -1075,7 +1075,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
 
     ssw_login($domain);
 
-    $str = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
+    $str = ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
 
     $f19 = !empty($unidade) ? strtoupper(substr(trim($unidade), 0, 3)) : '';
 
@@ -1086,7 +1086,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
              "&f17=E" .
              "&f19=$f19";
 
-    $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param);
+    $str = ssw_go('https://tms.ssw.inf.br/bin/ssw0166?' . $param);
 
     if (strpos($str, 'Sem movimento de coletas para') !== false) {
         pg_query($g_sql, "DROP TABLE IF EXISTS tmp_coleta_rt");
@@ -1110,7 +1110,7 @@ function fetchColetasSSW($g_sql, $domain, $data_ini, $data_fin, $tp_periodo = 'I
     $act = ssw_get_act($str);
     $arq = ssw_get_arq($str);
 
-    $file    = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    $file    = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
     $fil_arr = explode("\r", $file);
     $count   = count($fil_arr);
 

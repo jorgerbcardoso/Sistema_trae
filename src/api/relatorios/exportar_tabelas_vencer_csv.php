@@ -64,7 +64,7 @@ try {
     $paramUnidade = $unidadeParam ? "&f6=" . urlencode(strtoupper($unidadeParam)) : "";
     
     $param = "?act=PER&t_tp_geracao=S{$paramUnidade}&f7={$dataInicio}&f8={$dataFim}";
-    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
+    $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0169$param");
 
     $strDec = urldecode((string)$str);
 
@@ -91,7 +91,7 @@ try {
         };
 
         if (preg_match("/ssw0432\\?([^'\\\"]+)/i", $strDec, $m)) {
-            $url0432 = "https://sistema.ssw.inf.br/bin/ssw0432?" . $m[1];
+            $url0432 = "https://tms.ssw.inf.br/bin/ssw0432?" . $m[1];
             for ($i = 0; $i < 30; $i++) {
                 $html0432 = ssw_go($url0432);
                 $html0432 = urldecode((string)$html0432);
@@ -122,7 +122,7 @@ try {
     }
 
     if (!$csvFrom0432 && !empty($act) && !empty($arq)) {
-        $csvFile = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
+        $csvFile = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
     } elseif (!$csvFrom0432) {
         $csvFile = $strDec;
     }

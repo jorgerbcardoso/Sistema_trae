@@ -63,7 +63,7 @@ PADRÕES DE CÓDIGO CRÍTICOS:
         - `ssw_get_act($html)` e `ssw_get_arq($html)` (padrão já usado em várias telas)
         - fallback: ler o `web_body` e extrair o `abrir('ARQ.sswweb', ...)`
      c) Baixe o arquivo via `ssw0424` mantendo o padrão de parâmetros:
-        - `https://sistema.ssw.inf.br/bin/ssw0424?act=<ACT>&filename=<ARQ>&path=&down=1&nw=1`
+        - `https://tms.ssw.inf.br/bin/ssw0424?act=<ACT>&filename=<ARQ>&path=&down=1&nw=1`
         - (ou `nw=0` quando o padrão daquela tela exigir)
      d) Só depois de baixar é que o backend deve processar o conteúdo (CSV/TXT).
      e) Se o SSW retornar uma mensagem/erro (ou se o HTML não contiver act/arq), o backend deve devolver essa mensagem ao frontend para exibição no Presto.

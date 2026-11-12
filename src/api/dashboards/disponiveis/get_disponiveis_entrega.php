@@ -46,13 +46,13 @@ register_shutdown_function(function() {
 });
 
 // Navega para a unidade correta antes de gerar o relatório
-ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
+ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
 
 $agora12h    = time() + (12 * 3600);
 $dataPrevMan = date('dmy', $agora12h);
 $horaPrevMan = date('Hi', $agora12h);
 
-$url0052 = 'https://sistema.ssw.inf.br/bin/ssw0052?act=ENV'
+$url0052 = 'https://tms.ssw.inf.br/bin/ssw0052?act=ENV'
     . '&data_prev_man='      . $dataPrevMan
     . '&hora_prev_man='      . $horaPrevMan
     . '&tp_cliente_pag=T'
@@ -86,11 +86,11 @@ $actImediato = ssw_get_act($str0052dec);
 $arqImediato = ssw_get_arq($str0052dec);
 
 if (!$queued081 && !empty($actImediato) && !empty($arqImediato)) {
-    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$actImediato}&filename={$arqImediato}&path=&down=1&nw=1");
+    $file = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$actImediato}&filename={$arqImediato}&path=&down=1&nw=1");
 }
 
 if (empty($file) || strlen($file) < 100) {
-    $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+    $str1440 = ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
     $str1440 = substr($str1440, strpos($str1440, '<xml'), strlen($str1440));
     $str1440 = substr($str1440, 0, strpos($str1440, '</xml>')) . '</xml>';
     $xml1440 = simplexml_load_string($str1440);
@@ -122,7 +122,7 @@ if (empty($file) || strlen($file) < 100) {
                 $f8dec = html_entity_decode((string)$f8);
 
                 if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    $htmlDow = ssw_go("https://tms.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
                     if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
                         $decoded = urldecode($mVal[1]);
                         if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
@@ -140,7 +140,7 @@ if (empty($file) || strlen($file) < 100) {
         respondJson(['success' => false, 'message' => 'Relatório 081 não encontrado (nem gerado imediatamente nem na fila do ssw1440).']);
     }
 
-    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq081}&filename={$nomeArq081}&path={$pathArq081}&down=1&nw=1");
+    $file = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$nomeArq081}&filename={$nomeArq081}&path={$pathArq081}&down=1&nw=1");
 }
 
 if (empty($file) || strlen($file) < 100) {

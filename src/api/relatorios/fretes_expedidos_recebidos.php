@@ -252,7 +252,7 @@ $sswFetch = static function(string $url, int $tries = 3): string {
 };
 
 $lerXml1440 = static function() use ($extractXml, $sswFetch): ?SimpleXMLElement {
-    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
+    $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
     if ($raw === '') return null;
     if (stripos($raw, '504 Gateway Time-out') !== false) return null;
     $xmlStr = $extractXml($raw);
@@ -261,13 +261,13 @@ $lerXml1440 = static function() use ($extractXml, $sswFetch): ?SimpleXMLElement 
 };
 
 $get1440Rows = static function() use ($parse1440RowsFromRaw, $sswFetch): array {
-    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
+    $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
     return $parse1440RowsFromRaw($raw);
 };
 
 $downloadFromAct = static function(string $act) use ($sswFetch): ?array {
     $dummy = (string)((int)(microtime(true) * 1000));
-    $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
+    $url = 'https://tms.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
     $t0 = microtime(true);
     $html = (string)$sswFetch($url, 3);
     $t1 = microtime(true);
@@ -288,7 +288,7 @@ $downloadFromAct = static function(string $act) use ($sswFetch): ?array {
     if ($filename === '' || $path === '') return null;
 
     $t2 = microtime(true);
-    $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
+    $file = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
     $t3 = microtime(true);
     if ($file === '' || strlen($file) < 50) return null;
 
@@ -747,7 +747,7 @@ if ($step === 'START') {
     $q = http_build_query($params);
     $requestStartTs = time();
 
-    $sswFetch("https://sistema.ssw.inf.br/bin/ssw0057?$q", 2);
+    $sswFetch("https://tms.ssw.inf.br/bin/ssw0057?$q", 2);
 
     respondJson([
         'success' => true,
@@ -784,7 +784,7 @@ $baselineSeq = 0;
 foreach ($rowsBefore as $r) {
     $baselineSeq = max($baselineSeq, (int)$r['seq']);
 }
-$sswFetch("https://sistema.ssw.inf.br/bin/ssw0057?$q", 2);
+$sswFetch("https://tms.ssw.inf.br/bin/ssw0057?$q", 2);
 
 $jobRow = null;
 $deadline = time() + 45;

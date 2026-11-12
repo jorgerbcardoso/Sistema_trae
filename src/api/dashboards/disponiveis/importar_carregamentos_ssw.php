@@ -328,9 +328,9 @@ function guardTpTransferenciaSsw($tabela, $tabelaCap, $alias) {
     ) = 'T'";
 }
 
-ssw_go("https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
+ssw_go("https://tms.ssw.inf.br/bin/menu01?act=TRO&f2={$unidade}&f3=101");
 $__dbg('E', 'ssw TRO unidade', ['unidade' => $unidade]);
-$html_placas = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act=PREP_IMP&prioritario=N&restrito=");
+$html_placas = ssw_go("https://tms.ssw.inf.br/bin/ssw0194?act=PREP_IMP&prioritario=N&restrito=");
 $__dbg('A', 'ssw0194 PREP_IMP raw', ['len' => is_string($html_placas) ? strlen($html_placas) : null, 'head' => substr((string)$html_placas, 0, 120)]);
 
 $inicio_xml = strpos($html_placas, '<?xml');
@@ -651,7 +651,7 @@ function obterPrimeiraCapturaSsw($placaSsw) {
     $placaSsw = strtoupper(trim((string)$placaSsw));
     if ($placaSsw === '') return null;
 
-    $url = "https://sistema.ssw.inf.br/bin/ssw0194?act=VER_BAR2&placa=" . rawurlencode($placaSsw);
+    $url = "https://tms.ssw.inf.br/bin/ssw0194?act=VER_BAR2&placa=" . rawurlencode($placaSsw);
     $html = ssw_go($url);
     $xmlStr = extrairXmlDoRetornoSsw($html);
     if ($xmlStr === null) return null;
@@ -687,7 +687,7 @@ function listarSaidasSsw0125(string $siglaOrigem): array {
     $ini = date('dmy', strtotime('-1 day'));
     $fim = date('dmy');
 
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER"
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER"
         . "&t_sigla_origem=" . rawurlencode($siglaOrigem)
         . "&t_data_saida_ini=" . rawurlencode($ini)
         . "&t_data_saida_fin=" . rawurlencode($fim);
@@ -894,7 +894,7 @@ for ($i = 0; $i < count($loteIds); $i += $tamanhoLote) {
 
     $act = 'SR_IMP|' . implode('|', array_map('rawurlencode', $chunk));
     $__dbg('B', 'ssw0194 SR_IMP request', ['modo' => 'placa', 'chunk' => count($chunk), 'act_head' => substr($act, 0, 80)]);
-    $str_retorno = ssw_go("https://sistema.ssw.inf.br/bin/ssw0194?act={$act}");
+    $str_retorno = ssw_go("https://tms.ssw.inf.br/bin/ssw0194?act={$act}");
     $str_decodificada = urldecode($str_retorno);
     $act_download = ssw_get_act($str_decodificada);
     $arq_download = ssw_get_arq($str_decodificada);
@@ -921,7 +921,7 @@ $__dbg('B', 'ssw0194 SR_IMP response', ['len' => is_string($str_retorno) ? strle
         continue;
     }
 
-    $relatorio = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0");
+    $relatorio = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$act_download}&filename={$arq_download}&path=&down=1&nw=0");
     $__dbg('B', 'ssw0424 download', ['len' => is_string($relatorio) ? strlen($relatorio) : null, 'head' => substr((string)$relatorio, 0, 160)]);
     if (empty($relatorio) || strlen($relatorio) < 50) {
         foreach ($chunk as $p) {

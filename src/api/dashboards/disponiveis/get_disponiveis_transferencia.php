@@ -151,7 +151,7 @@ function downloadRelatorio019($sigla, $agora) {
     $sigla = strtoupper(trim((string)$sigla));
     if ($sigla === '') return null;
 
-    ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
+    ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($sigla) . '&f3=101');
 
     $agora12h = $agora + (12 * 3600);
     $dataPrevMan = date('dmy', $agora12h);
@@ -159,7 +159,7 @@ function downloadRelatorio019($sigla, $agora) {
     $dataEmitCte = date('dmy', $agora);
     $horaEmitCte = date('Hi', $agora);
 
-    $url0036 = 'https://sistema.ssw.inf.br/bin/ssw0036?act=ENV'
+    $url0036 = 'https://tms.ssw.inf.br/bin/ssw0036?act=ENV'
         . '&l_siglas_familia=' . urlencode($sigla)
         . '&data_prev_man='    . $dataPrevMan
         . '&hora_prev_man='    . $horaPrevMan
@@ -180,12 +180,12 @@ function downloadRelatorio019($sigla, $agora) {
     $arq = $queued ? '' : ssw_get_arq($strDec);
 
     if ($act !== '' && $arq !== '') {
-        $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
+        $file = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=0");
         if (!empty($file) && strlen($file) >= 100) return $file;
     }
 
     for ($try = 0; $try < 25; $try++) {
-        $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+        $str1440 = ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
         $posXml = strpos($str1440, '<xml');
         if ($posXml !== false) {
             $str1440 = substr($str1440, $posXml);
@@ -216,7 +216,7 @@ function downloadRelatorio019($sigla, $agora) {
 
                 $f8dec = html_entity_decode((string)$f8);
                 if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                    $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                    $htmlDow = ssw_go("https://tms.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
                     if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
                         $decoded = urldecode($mVal[1]);
                         if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
@@ -230,7 +230,7 @@ function downloadRelatorio019($sigla, $agora) {
         }
 
         if ($nomeArq019 && $pathArq019) {
-            $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
+            $file = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
             if (!empty($file) && strlen($file) >= 100) return $file;
         }
 
@@ -809,7 +809,7 @@ $param0166 = 'act=FIL_COL'
     . '&f17=E'
     . '&f19=' . urlencode($sigla);
 
-$str166 = ssw_go('https://sistema.ssw.inf.br/bin/ssw0166?' . $param0166);
+$str166 = ssw_go('https://tms.ssw.inf.br/bin/ssw0166?' . $param0166);
 
 if (
     strpos($str166, 'Sem movimento de coletas') !== false
@@ -829,7 +829,7 @@ if (
         respondJson(['success' => false, 'message' => 'Erro SSW (0166): parâmetros de download não encontrados.']);
     }
 
-    $file166 = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=0");
+    $file166 = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$act166}&filename={$arq166}&path=&down=1&nw=0");
 
     if (empty($file166) || strlen($file166) < 100) {
         respondJson(['success' => false, 'message' => 'Arquivo do relatório 0166 vazio ou inválido.']);

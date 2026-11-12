@@ -262,7 +262,7 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
         try { require_ssw(); } catch (Exception $e) {}
         try { ssw_login($domain); } catch (Exception $e) { return false; }
 
-        $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+        $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
                "&t_data_saida_ini=" . rawurlencode($ddIni) .
                "&t_data_saida_fin=" . rawurlencode($ddFin);
 
@@ -424,7 +424,7 @@ function _atualizarCtesAntesFinalizar($conn, $domain, $tabela, $tabelaCap, $seqN
         foreach ($manifestos as $seqMan) {
             $seqMan = trim((string)$seqMan);
             if ($seqMan === '') continue;
-            $urlMan = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+            $urlMan = "https://tms.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
             $htmlMan = '';
             try { $htmlMan = ssw_go($urlMan); } catch (Exception $e) { continue; }
             $xmlManStr = $extractXml($htmlMan);
@@ -1901,7 +1901,7 @@ if ($acao === 'verificar_saidas_ssw') {
     $ddmmaaHoje = date('dmy');
     $ddmmaaOntem = date('dmy', strtotime('-1 day'));
 
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
         "&t_data_saida_ini=" . rawurlencode($ddmmaaOntem) .
         "&t_data_saida_fin=" . rawurlencode($ddmmaaHoje);
 
@@ -2145,7 +2145,7 @@ if ($acao === 'verificar_saidas_ssw') {
             foreach ($manifestos as $seqMan) {
                 $seqMan = trim((string)$seqMan);
                 if ($seqMan === '') continue;
-                $urlMan = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+                $urlMan = "https://tms.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
                 $htmlMan = '';
                 try {
                     $htmlMan = ssw_go($urlMan);
@@ -2581,7 +2581,7 @@ if ($acao === 'atualizar_ctes_ssw') {
         return null;
     };
 
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
         "&t_data_saida_ini=" . rawurlencode($ddIni) .
         "&t_data_saida_fin=" . rawurlencode($ddFin);
 
@@ -2814,7 +2814,7 @@ if ($acao === 'atualizar_ctes_ssw') {
         foreach ($manifestos as $seqMan) {
             $seqMan = trim((string)$seqMan);
             if ($seqMan === '') continue;
-            $urlMan = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+            $urlMan = "https://tms.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
             $htmlMan = '';
             try { $htmlMan = ssw_go($urlMan); } catch (Exception $e) { $htmlMan = ''; }
             $xmlManStr = $extractXml($htmlMan);
@@ -3147,7 +3147,7 @@ if ($acao === 'atualizar_bipagens_entrega') {
 
     $strTroca = '';
     try {
-        $strTroca = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
+        $strTroca = ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
     } catch (Exception $e) {
         $strTroca = '';
     }
@@ -3157,7 +3157,7 @@ if ($acao === 'atualizar_bipagens_entrega') {
 
     $xmlRaw = '';
     try {
-        $xmlRaw = ssw_go('https://sistema.ssw.inf.br/bin/ssw0197?act=PREP_IMP&entrega_dificil=N&prioritario=N&tp_carregamento=&qtde=2');
+        $xmlRaw = ssw_go('https://tms.ssw.inf.br/bin/ssw0197?act=PREP_IMP&entrega_dificil=N&prioritario=N&tp_carregamento=&qtde=2');
     } catch (Exception $e) {
         $xmlRaw = '';
     }
@@ -3289,7 +3289,7 @@ if ($acao === 'atualizar_bipagens_entrega') {
     $act = 'SR_IMP|' . implode('|', $placasConsulta);
     $txt = '';
     try {
-        $txt = ssw_go('https://sistema.ssw.inf.br/bin/ssw0197?act=' . $act);
+        $txt = ssw_go('https://tms.ssw.inf.br/bin/ssw0197?act=' . $act);
     } catch (Exception $e) {
         $txt = '';
     }

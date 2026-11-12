@@ -150,7 +150,7 @@ foreach ($params as $k => $v) {
 // Garantir parâmetro fixo exigido pelo SSW (mesmo que o chamador tente omitir/alterar)
 $params['f6'] = 'E';
 
-$url = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($params);
+$url = 'https://tms.ssw.inf.br/bin/ssw1601?' . http_build_query($params);
 $extractPlainMessage = static function(string $raw): string {
     $s = (string)$raw;
     $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -190,7 +190,7 @@ $extractXml = static function(string $html): string {
 };
 
 $get1440Rows = static function() use ($sswFetch, $extractXml): array {
-    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
+    $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
     if ($raw === '' || stripos($raw, '504 Gateway Time-out') !== false) return [];
     $xmlStr = $extractXml($raw);
     if ($xmlStr === '') return [];
@@ -288,7 +288,7 @@ $normalizeRequestStartTs = static function(int $v): int {
 
 $downloadFrom1440Act = static function(string $act) use ($sswFetch): ?array {
     $dummy = (string)((int)(microtime(true) * 1000));
-    $url1440 = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
+    $url1440 = 'https://tms.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
     $t0 = microtime(true);
     $html = (string)$sswFetch($url1440, 3);
     $t1 = microtime(true);
@@ -310,7 +310,7 @@ $downloadFrom1440Act = static function(string $act) use ($sswFetch): ?array {
 
     $t2 = microtime(true);
     $file = (string)$sswFetch(
-        'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1',
+        'https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1',
         3
     );
     $t3 = microtime(true);
@@ -398,7 +398,7 @@ $tryImmediate = static function(string $u) use ($sswFetch, $extractPlainMessage)
     }
 
     if ($act !== '' && $arq !== '') {
-        $dlUrl = 'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($act) . '&filename=' . urlencode($arq) . '&path=&down=1&nw=1';
+        $dlUrl = 'https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($act) . '&filename=' . urlencode($arq) . '&path=&down=1&nw=1';
         $t2 = microtime(true);
         $raw2 = (string)$sswFetch($dlUrl, 3);
         $t3 = microtime(true);
@@ -467,7 +467,7 @@ $fetchCsvOrMessage = static function(string $u) use ($extractPlainMessage): arra
     }
 
     if ($act !== '' && $arq !== '') {
-        $dlUrl = 'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($act) . '&filename=' . urlencode($arq) . '&path=&down=1&nw=1';
+        $dlUrl = 'https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($act) . '&filename=' . urlencode($arq) . '&path=&down=1&nw=1';
         $raw2 = (string)ssw_go($dlUrl);
         $t2 = trim((string)$raw2);
         if ($t2 !== '') {
@@ -884,7 +884,7 @@ $computeComparisons = static function() use ($includeComparisons, $periodoFimIso
     };
 
     $fetch = static function(array $p) use ($fetchCsvOrMessage): array {
-        $u = 'https://sistema.ssw.inf.br/bin/ssw1601?' . http_build_query($p);
+        $u = 'https://tms.ssw.inf.br/bin/ssw1601?' . http_build_query($p);
         return [$u, $fetchCsvOrMessage($u)];
     };
 

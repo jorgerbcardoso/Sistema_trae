@@ -131,14 +131,14 @@ $getCsv = function(string $domain, string $unidade): array {
     }
 
     try {
-        ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
+        ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
     } catch (Exception $e) {
         return ['ok' => false, 'message' => 'Falha ao trocar unidade.'];
     }
 
     $html = '';
     try {
-        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw0012?act=GERA_TABS&f5=R&t_para_raiz=N');
+        $html = ssw_go('https://tms.ssw.inf.br/bin/ssw0012?act=GERA_TABS&f5=R&t_para_raiz=N');
     } catch (Exception $e) {
         return ['ok' => false, 'message' => 'Falha ao gerar tabela.'];
     }
@@ -168,7 +168,7 @@ $getCsv = function(string $domain, string $unidade): array {
     $csv = '';
 
     try {
-        $csv = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($chosen) . '&filename=' . urlencode($chosen) . '&path=xml&down=1&nw=1');
+        $csv = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($chosen) . '&filename=' . urlencode($chosen) . '&path=xml&down=1&nw=1');
     } catch (Exception $e) {
         $csv = '';
     }

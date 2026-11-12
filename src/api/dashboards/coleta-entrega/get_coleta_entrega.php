@@ -96,7 +96,7 @@ function downloadFrom1440Act($act) {
     $act = trim((string)$act);
     if ($act === '') return null;
     $dummy = (string)((int)(microtime(true) * 1000));
-    $html = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy);
+    $html = (string)ssw_go('https://tms.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy);
     if ($html === '') return null;
     if (substr($html, 0, 5) === '<foc ') return null;
 
@@ -121,7 +121,7 @@ function downloadFrom1440Act($act) {
     }
 
     if ($filename === '' || $path === '') return null;
-    $file = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1');
+    $file = (string)ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1');
     if ($file === '' || strlen($file) < 100) return null;
 
     return [
@@ -152,7 +152,7 @@ if ($step !== 'RUN') {
 
         $login = strtolower(trim((string)($currentUser['username'] ?? '')));
         $baselineSeq = 0;
-        $xmlBaseline = parseXmlFromResponse((string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440'));
+        $xmlBaseline = parseXmlFromResponse((string)ssw_go('https://tms.ssw.inf.br/bin/ssw1440'));
         if ($xmlBaseline) {
             $rows = $xmlBaseline->xpath('rs/r') ?: [];
             foreach ($rows as $row) {
@@ -165,7 +165,7 @@ if ($step !== 'RUN') {
             }
         }
 
-        $url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
+        $url0216 = 'https://tms.ssw.inf.br/bin/ssw0216?act=ENV'
             . '&f2=' . urlencode($unidade)
             . '&f3=' . urlencode($dataIniSsw)
             . '&f4=' . urlencode($dataFinSsw)
@@ -192,7 +192,7 @@ if ($step !== 'RUN') {
         $login = strtolower(trim((string)($currentUser['username'] ?? '')));
 
         $t0 = microtime(true);
-        $raw1440 = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+        $raw1440 = (string)ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
         $t1 = microtime(true);
         $ms1440 = (int)round(($t1 - $t0) * 1000);
         $xml = parseXmlFromResponse($raw1440);
@@ -488,12 +488,12 @@ function dbg_ce504($runId, $event, $data = []) {
 }
 
 if ($view !== '076') {
-    $strTroca = ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
+    $strTroca = ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($unidade) . '&f3=101');
     if (substr((string)$strTroca, 0, 5) === '<foc ') {
         respondJson(['success' => false, 'message' => 'Erro SSW (troca unidade): ' . (string)$strTroca]);
     }
 
-    $romXmlRaw = ssw_go('https://sistema.ssw.inf.br/bin/ssw0198?act=ROM');
+    $romXmlRaw = ssw_go('https://tms.ssw.inf.br/bin/ssw0198?act=ROM');
     if (substr((string)$romXmlRaw, 0, 5) === '<foc ') {
         respondJson(['success' => false, 'message' => 'Erro SSW (0198): ' . (string)$romXmlRaw]);
     }
@@ -611,7 +611,7 @@ dbg_ce504($runId, 'request_start', [
 ]);
 $baselineSeq = 0;
 $t0 = microtime(true);
-$baselineRaw = (string)ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+$baselineRaw = (string)ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
 $t1 = microtime(true);
 $xmlBaseline = parseXmlFromResponse($baselineRaw);
 dbg_ce504($runId, 'ssw1440_baseline_done', [
@@ -627,7 +627,7 @@ if ($xmlBaseline) {
 }
 dbg_ce504($runId, 'baseline_seq', ['baselineSeq' => $baselineSeq]);
 
-$url0216 = 'https://sistema.ssw.inf.br/bin/ssw0216?act=ENV'
+$url0216 = 'https://tms.ssw.inf.br/bin/ssw0216?act=ENV'
     . '&f2=' . urlencode($unidade)
     . '&f3=' . urlencode($dataIniSsw)
     . '&f4=' . urlencode($dataFinSsw)
@@ -657,7 +657,7 @@ $maxTentativas = 80;
 $intervalo     = 3;
 
 function lerXml1440() {
-    $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+    $str = ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
     $pos = strpos($str, '<xml');
     if ($pos === false) return null;
     $str = substr($str, $pos);
@@ -768,7 +768,7 @@ if (empty($file) || strlen($file) < 100) {
         'CSV' . $dominioUpper . $suffix,
     ];
     foreach ($candidates as $cand) {
-        $try = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$cand}&filename={$cand}&path={$pathJobs}&down=1&nw=1");
+        $try = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$cand}&filename={$cand}&path={$pathJobs}&down=1&nw=1");
         if (!empty($try) && strlen($try) >= 100) {
             $file = $try;
             break;

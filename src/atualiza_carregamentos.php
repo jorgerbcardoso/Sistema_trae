@@ -187,7 +187,7 @@ function pg_cte_col_exists($conn, string $tblCte, string $col): bool {
 function ssw_per_por_periodo(string $dominio, string $unidade, DateTime $ini, DateTime $fim): array {
     $ddIni = dmyDate($ini);
     $ddFim = dmyDate($fim);
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
         "&t_data_saida_ini=" . rawurlencode($ddIni) .
         "&t_data_saida_fin=" . rawurlencode($ddFim);
 
@@ -284,7 +284,7 @@ function ssw_viagem_para_carregamento(array $viagens, DateTime $dtInclusao, arra
 function ssw_ctr_cs_man(string $seqMan): array {
     $seqMan = trim((string)$seqMan);
     if ($seqMan === '') return ['success' => false, 'pairs' => [], 'cteXml' => []];
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
     $html = '';
     try {
         $html = ssw_go($url);

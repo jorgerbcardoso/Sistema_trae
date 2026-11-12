@@ -125,14 +125,14 @@ foreach ($unidadesCompart as $siglaHub) {
     if (!preg_match('/^[A-Z0-9]{2,5}$/', $siglaHub)) continue;
 
     try {
-        ssw_go('https://sistema.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($siglaHub) . '&f3=101');
+        ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=' . urlencode($siglaHub) . '&f3=101');
 
         $dataPrevMan = date('dmy', $agora12h);
         $horaPrevMan = date('Hi', $agora12h);
         $dataEmitCte = date('dmy', $agora);
         $horaEmitCte = date('Hi', $agora);
 
-        $url0036 = 'https://sistema.ssw.inf.br/bin/ssw0036?act=ENV'
+        $url0036 = 'https://tms.ssw.inf.br/bin/ssw0036?act=ENV'
             . '&l_siglas_familia=' . urlencode($siglaHub)
             . '&data_prev_man='    . $dataPrevMan
             . '&hora_prev_man='    . $horaPrevMan
@@ -157,12 +157,12 @@ foreach ($unidadesCompart as $siglaHub) {
 
         $file = '';
         if ($act !== '' && $arq !== '') {
-            $file = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+            $file = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
         }
 
         if (empty($file) || strlen($file) < 100) {
             for ($try = 0; $try < 10; $try++) {
-                $str1440 = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+                $str1440 = ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
                 $posXml = strpos($str1440, '<xml');
                 if ($posXml !== false) {
                     $str1440 = substr($str1440, $posXml);
@@ -189,7 +189,7 @@ foreach ($unidadesCompart as $siglaHub) {
                         if (substr((string)$opc, 0, 3) !== '019') continue;
                         $f8dec = html_entity_decode((string)$f8);
                         if (preg_match("/ajaxEnvia\s*\(\s*'DOW(\d+)'\s*\)/", $f8dec, $mDow)) {
-                            $htmlDow = ssw_go("https://sistema.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
+                            $htmlDow = ssw_go("https://tms.ssw.inf.br/bin/ssw1440?act=DOW{$mDow[1]}");
                             if (preg_match('/value="([^"]+)"/', $htmlDow, $mVal)) {
                                 $decoded = urldecode($mVal[1]);
                                 if (preg_match("/abrir\s*\(\s*'([^']+)'\s*,\s*'[^']*'\s*,\s*\d+\s*,\s*\d+\s*,\s*'([^']+)'/", $decoded, $mArq)) {
@@ -202,7 +202,7 @@ foreach ($unidadesCompart as $siglaHub) {
                     }
                 }
                 if ($nomeArq019 && $pathArq019) {
-                    $file = ssw_go("https://sistema.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
+                    $file = ssw_go("https://tms.ssw.inf.br/bin/ssw0424?act={$nomeArq019}&filename={$nomeArq019}&path={$pathArq019}&down=1&nw=1");
                     if (!empty($file) && strlen($file) >= 100) break;
                 }
                 usleep(400000);

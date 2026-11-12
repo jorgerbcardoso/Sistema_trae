@@ -24,7 +24,7 @@ foreach ($dominios as $dominio) {
 
     ssw_login($dominio);
 
-    $url0052 = 'https://sistema.ssw.inf.br/bin/ssw0052?act=ENV'
+    $url0052 = 'https://tms.ssw.inf.br/bin/ssw0052?act=ENV'
         . '&data_prev_man='      . $dataPrevMan
         . '&hora_prev_man='      . $horaPrevMan
         . '&tp_cliente_pag=T'

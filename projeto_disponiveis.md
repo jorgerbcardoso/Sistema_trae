@@ -29,7 +29,7 @@ COMO MONTAR A TELA "DISPONÍVEIS PARA TRANSFERÊNCIA"
 1. Vamos utilizar um relatório do SSW chamado "DISPONÍVEIS PARA TRANSFERÊNCIA". Nele também já vamos capturar o que está em Trânsito de Transferência para a unidade em questão.
 2. Você vai fazer o login no ssw, como outros programas já fazem (ver CONFERÊNCIA DE SAÍDAS)
 3. Você fará a seguinte requisição ao SSW, usando a function "ssw_go" que está em /var/www/html/lib/ssw.php onde $sigla é a sigla da unidade em questão: 
-https://sistema.ssw.inf.br/bin/ssw0036?act=ENV&l_siglas_familia=$sigla&data_prev_man=260426&hora_prev_man=1928&data_emit_ctrc=260426&hora_emit_ctrc=0728&status_ctrc=C&ctrc_pendente=T&lista_pendencias=N&apenas_descarregados=T&lista_reversa=T&apenas_prioritarios=T&id_tp_produto=T&fg_enderecados=T&relacionar_produtos=N&relatorio_excel=N&button_env_enable=ENV&button_env_disable=btn_envia
+https://tms.ssw.inf.br/bin/ssw0036?act=ENV&l_siglas_familia=$sigla&data_prev_man=260426&hora_prev_man=1928&data_emit_ctrc=260426&hora_emit_ctrc=0728&status_ctrc=C&ctrc_pendente=T&lista_pendencias=N&apenas_descarregados=T&lista_reversa=T&apenas_prioritarios=T&id_tp_produto=T&fg_enderecados=T&relacionar_produtos=N&relatorio_excel=N&button_env_enable=ENV&button_env_disable=btn_envia
 detalhes:
 data_prev_man e hora_prev_man são sempre a data e hora de AGORA somada com 12h, e no formato ddmmaa para data e hhmm
 data_emit_cte e hora_emit_cte são sempre a data e hora correntes
@@ -38,7 +38,7 @@ data_emit_cte e hora_emit_cte são sempre a data e hora correntes
     ssw_login ($dominio_ssw);
 
     // Faz a requisicao
-    $str = ssw_go ('https://sistema.ssw.inf.br/bin/ssw0241?act=IMP');
+    $str = ssw_go ('https://tms.ssw.inf.br/bin/ssw0241?act=IMP');
 
     if (substr ($str, 0, 5) == '<foc ')
       msg ('Mensagem do SSW (403): ' . $str);
@@ -48,7 +48,7 @@ data_emit_cte e hora_emit_cte são sempre a data e hora correntes
     $arq = ssw_get_arq ($str);
 
     // Abre o arquivo do relatorio
-    $file    = ssw_go ('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    $file    = ssw_go ('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
     $fil_arr = explode ("\r", $file);
 
 5. repare que, após a extração do arquivo, o arquivo é quebrado em "\r". isso porque é um arquivo de relatório texto, em modo caracter, ou seja, teremos que ler posição a posição de cada linha
@@ -81,7 +81,7 @@ Com isso montamos toda nossa base de dados do que está em PISO e do que está e
 Para isso, usaremos outro relatório do SSW, o RELATÓRIO DE COLETAS.
 
 você logará no SSW (se já o tiver feito, não precisa) e fará a seguinte requisição:
-https://sistema.ssw.inf.br/bin/ssw0157?act=ENV&f2=$sigla&f3=A&f6=230426&f7=240426&f16=0&f17=1&f18=2
+https://tms.ssw.inf.br/bin/ssw0157?act=ENV&f2=$sigla&f3=A&f6=230426&f7=240426&f16=0&f17=1&f18=2
 IMPORTANTE: os campos f6 e f7 são as datas de coleta, formatadas como "date ('dmy')" no PHP. usaremos sempre "ontem" para f6 e "hoje" para f7.
 
 um exemplo deste arquivo está em 

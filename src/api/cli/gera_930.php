@@ -29,7 +29,7 @@
              "&f8=" . $cnpj .
              "&f9=" . "C";
 
-    $str = ssw_go ("https://sistema.ssw.inf.br/bin/ssw0846?$param");
+    $str = ssw_go ("https://tms.ssw.inf.br/bin/ssw0846?$param");
     echo $str . "\n";
     echo "930 comandada ($data_ini a $data_fin). Aguarde alguns minutos para consumir a planilha.\n\n";
   }

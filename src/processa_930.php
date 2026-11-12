@@ -183,7 +183,7 @@ if ((!$apenas_organizar) && (!$relatorio_pronto))
                  "&f3=T" .
                  "&f9=C";
 
-        $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0846?$param");
+        $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0846?$param");
 
         if (strpos($str, 'Erro') !== false)
             echo "ERRO ao comandar 930\n";
@@ -284,7 +284,7 @@ foreach ($dominios as $dominio)
                 continue;
         }
 
-        $str = ssw_go('https://sistema.ssw.inf.br/bin/ssw1440');
+        $str = ssw_go('https://tms.ssw.inf.br/bin/ssw1440');
 
         $pos_ini = strpos($str, '<xml');
         $pos_fim = strpos($str, '</xml>');
@@ -339,7 +339,7 @@ foreach ($dominios as $dominio)
                 $arq = $dominio . fmtnum((int)$seq, 9) . '.csv';
 
                 $pla = ssw_go(
-                    "https://sistema.ssw.inf.br/bin/ssw0424" .
+                    "https://tms.ssw.inf.br/bin/ssw0424" .
                     "?act=$arq" .
                     "&filename=$arq" .
                     "&path=/usr/aws/jobs/$dominio/" .

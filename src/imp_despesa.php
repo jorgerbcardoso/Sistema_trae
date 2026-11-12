@@ -69,7 +69,7 @@
     if ($v == 2) $param = "?act=PES&cod_emp_ctb=00&data_ini_pagamento_parcela=$data_ini_pgto&data_fin_pagamento_parcela=$data_fin_pgto&sit_desp=T&sit_arq=T&sequencia=477";
     if ($v == 3) $param = "?act=PES&cod_emp_ctb=00&data_ini_pagamento_parcela=$data_ini_canc&data_fin_pagamento_parcela=$data_fin_canc&sit_desp=C&sit_arq=T&sequencia=477";
 
-    $str = ssw_go ("https://sistema.ssw.inf.br/bin/ssw0099$param");
+    $str = ssw_go ("https://tms.ssw.inf.br/bin/ssw0099$param");
 
 //echo chr(10) . $str . chr (10);
     if (strpos ($str, 'N&atilde;o h&aacute; lan&ccedil;amento') !== false)
@@ -171,7 +171,7 @@
 
   $param = "?act=PES&cod_emp_ctb=00&data_ini_caixa=$data_ini&data_fin_caixa=$data_fin&sit_desp=L&sit_arq=T&sequencia=477";
 
-  $str = ssw_go ("https://sistema.ssw.inf.br/bin/ssw0099$param");
+  $str = ssw_go ("https://tms.ssw.inf.br/bin/ssw0099$param");
 
   if (strpos ($str, 'N&atilde;o h&aacute; lan&ccedil;amento') !== false)
     exit;

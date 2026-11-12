@@ -132,7 +132,7 @@ function listarDespesas($userData, $g_sql) {
         $_SESSION['ssw_last_pes_params'] = $params;
         
         // Chamar SSW1196
-        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        $html = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params);
         
         // ✅ SALVAR HTML PARA USO NA APROVAÇÃO (EXTRAIR NRO_LANCTO)
         $_SESSION['ssw_last_listar_html'] = $html;
@@ -210,7 +210,7 @@ function toggleIndividual($userData, $g_sql) {
         $params = "act=" . $act_ssw . "&seq_desp_parcela=" . urlencode($seq);
         
         // ✅ ENVIO REAL AO SSW
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params);
+        $result = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params);
         
         // Verificar se houve erro no retorno
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
@@ -257,7 +257,7 @@ function aprovarDespesas($userData, $g_sql) {
         $params_final = "act=" . $act_ssw; // Manter pipes literais conforme exemplo do usuário
         
         // Chamar SSW1196 para efetivar a aprovação em massa
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
+        $result = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_final);
         
         // Verificar se houve erro no retorno final
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
@@ -339,11 +339,11 @@ function lerObservacao($userData, $g_sql) {
         // 1. Reconsulta as despesas com base nos filtros informados na tela
         if (session_status() === PHP_SESSION_NONE) session_start();
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
         // 2. Efetua a busca da observação cadastrada (act=COM)
         $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq);
-        $html = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
+        $html = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_com);
         
         // ✅ PARSEAR HTML: Procurar input com id="-3" e extrair seu value
         preg_match('/id=[\"|\']?-3[\"|\']?[^>]*value=[\"|\']?([^\"|\'>]*)[\"|\']?/i', $html, $matches);
@@ -387,21 +387,21 @@ function salvarObservacao($userData, $g_sql) {
         
         // 1. Reconsulta as despesas com base nos filtros informados na tela
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
         // 2. Efetua a busca da observação cadastrada (se houve)
         $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq);
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_com);
         
         // 3. Grava a nova observação
         $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq) . "&comentario1=" . urlencode($obs) . "&comentario2=";
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_inc);
         
         // 4. Salva todas as alterações (SRENV|id1|id2...)
         // O disparo deve ser RIGOROSAMENTE igual ao de aprovação em massa
         $act_ssw = "SRENV|" . implode('|', $seq_parcelas);
         $params_final = "act=" . $act_ssw; // Manter pipes literais conforme exemplo
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
+        $result = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_final);
         
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {
             http_response_code(500);
@@ -447,19 +447,19 @@ function removerAprovacao($userData, $g_sql) {
         
         // 1. Reconsulta as despesas com base nos filtros informados na tela
         $last_pes_params = $_SESSION['ssw_last_pes_params'] ?? "act=PES";
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $last_pes_params);
         
         // 2. Efetua a busca da observação cadastrada (act=COM)
         $params_com = "act=COM&seq_desp_parcela=" . urlencode($seq_parcela);
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_com);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_com);
         
         // 3. Chamada act=EXC para desmarcar o registro específico
         $params_exc = "act=EXC&seq_desp_parcela=" . urlencode($seq_parcela);
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_exc);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_exc);
         
         // 4. Grava a nova observação (motivo do estorno)
         $params_inc = "act=INC&seq_desp_parcela=" . urlencode($seq_parcela) . "&comentario1=" . urlencode($observacao) . "&comentario2=";
-        ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_inc);
+        ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_inc);
         
         // 5. Chamada act=SRENV para efetivar o estorno
         // Deve conter a lista de despesas que permaneceram marcadas
@@ -468,7 +468,7 @@ function removerAprovacao($userData, $g_sql) {
             $act_ssw .= "|" . implode('|', $seq_parcelas);
         }
         $params_final = "act=" . $act_ssw; // Manter pipes literais
-        $result = ssw_go('https://sistema.ssw.inf.br/bin/ssw1196?' . $params_final);
+        $result = ssw_go('https://tms.ssw.inf.br/bin/ssw1196?' . $params_final);
         
         // Verificar se houve erro no retorno final
         if (strpos($result, 'erro') !== false || strpos($result, 'ERRO') !== false) {

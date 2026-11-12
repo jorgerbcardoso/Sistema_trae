@@ -51,7 +51,7 @@ try {
     $dataFim = date('dmy', strtotime('last day of this month'));
     
     $param = "?act=PER&t_tp_geracao=N&f7={$dataInicio}&f8={$dataFim}";
-    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0169$param");
+    $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0169$param");
     
     // ============================================
     // 5. Extrair XML da resposta

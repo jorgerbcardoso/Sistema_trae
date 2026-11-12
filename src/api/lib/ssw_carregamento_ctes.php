@@ -142,7 +142,7 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
         return ['success' => false, 'message' => 'Falha ao autenticar no SSW.'];
     }
 
-    $url = "https://sistema.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
+    $url = "https://tms.ssw.inf.br/bin/ssw0125?act=PER&t_sigla_origem=" . rawurlencode($unidade) .
         "&t_data_saida_ini=" . rawurlencode($ddmmaa) .
         "&t_data_saida_fin=" . rawurlencode($ddmmaa);
 
@@ -259,7 +259,7 @@ function ssw_restore_ctes_carregamento($conn, string $domain, string $unidade, s
     foreach ($manifestos as $seqMan) {
         $seqMan = trim((string)$seqMan);
         if ($seqMan === '') continue;
-        $urlMan = "https://sistema.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
+        $urlMan = "https://tms.ssw.inf.br/bin/ssw0125?act=CTRCS_MAN&seq_manifesto=" . rawurlencode($seqMan);
         $htmlMan = '';
         try {
             $htmlMan = ssw_go($urlMan);

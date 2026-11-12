@@ -94,14 +94,14 @@ try {
              "&f11=" . "E";
 
     // ✅ Chamar ssw_go com tratamento de erro
-    $str = ssw_go("https://sistema.ssw.inf.br/bin/ssw0644$param");
+    $str = ssw_go("https://tms.ssw.inf.br/bin/ssw0644$param");
 
     $str = urldecode($str);
     $act = ssw_get_act($str);
     $arq = ssw_get_arq($str);
 
     // Abre o arquivo do relatorio
-    $file    = ssw_go('https://sistema.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
+    $file    = ssw_go('https://tms.ssw.inf.br/bin/ssw0424?act=' . $act . '&filename=' . $arq . '&path=&down=1&nw=0');
     $fil_arr = explode("\r", $file);
     $count   = count($fil_arr);
 

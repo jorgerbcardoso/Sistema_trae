@@ -72,7 +72,7 @@ $extractXml = static function(string $html): string {
 };
 
 $get1440Rows = static function() use ($sswFetch, $extractXml): array {
-    $raw = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw1440', 3);
+    $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
     if ($raw === '' || stripos($raw, '504 Gateway Time-out') !== false) return [];
     $xmlStr = $extractXml($raw);
     if ($xmlStr === '') return [];
@@ -124,7 +124,7 @@ $extractActsFromF8 = static function(string $f8raw): array {
 
 $downloadFromAct = static function(string $act) use ($sswFetch): ?array {
     $dummy = (string)((int)(microtime(true) * 1000));
-    $url = 'https://sistema.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
+    $url = 'https://tms.ssw.inf.br/bin/ssw1440?act=' . urlencode($act) . '&web_body=&dummy=' . $dummy;
     $t0 = microtime(true);
     $html = (string)$sswFetch($url, 3);
     $t1 = microtime(true);
@@ -145,7 +145,7 @@ $downloadFromAct = static function(string $act) use ($sswFetch): ?array {
     if ($filename === '' || $path === '') return null;
 
     $t2 = microtime(true);
-    $file = (string)$sswFetch('https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
+    $file = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1', 3);
     $t3 = microtime(true);
     if ($file === '' || strlen($file) < 50) return null;
 
@@ -542,7 +542,7 @@ try {
     if ($cnpjGrupo !== '') $params['rel_ana_cgc_grupo'] = $cnpjGrupo;
 
     $buildUrl = static function(array $params): string {
-        return 'https://sistema.ssw.inf.br/bin/ssw0049?' . http_build_query($params);
+        return 'https://tms.ssw.inf.br/bin/ssw0049?' . http_build_query($params);
     };
 
     $getActArq = static function(string $html): array {
@@ -602,7 +602,7 @@ try {
         [$act, $arq] = $getActArq($html);
         if ($act !== '' && $arq !== '') {
             $t2 = microtime(true);
-            $csvRaw = (string)$sswFetch("https://sistema.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1", 3);
+            $csvRaw = (string)$sswFetch("https://tms.ssw.inf.br/bin/ssw0424?act={$act}&filename={$arq}&path=&down=1&nw=1", 3);
             $t3 = microtime(true);
             if ($csvRaw === '' || strlen($csvRaw) < 50) {
                 return [
@@ -646,7 +646,7 @@ try {
 
             $t2 = microtime(true);
             $csvRaw = (string)$sswFetch(
-                'https://sistema.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1',
+                'https://tms.ssw.inf.br/bin/ssw0424?act=' . urlencode($filename) . '&filename=' . urlencode($filename) . '&path=' . urlencode($path) . '&down=1&nw=1',
                 3
             );
             $t3 = microtime(true);
