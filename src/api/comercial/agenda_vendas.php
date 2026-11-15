@@ -352,6 +352,15 @@ function agListarClientes(string $tblVendedorCliente, string $tblCliente, array 
         msg('Origem dos clientes inválida', 'error', 400);
     }
     $foraCarteira = $origem === 'fora';
+    $termo = trim((string)($_GET['q'] ?? ''));
+    if ($foraCarteira) {
+        preg_match_all('/./u', $termo, $caracteres);
+        if (count($caracteres[0] ?? []) < 3) {
+            echo json_encode(['success' => true, 'clientes' => []], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+    }
+
     $colStatus = agColunaExiste($tblVendedorCliente, 'status') ? 'vc.status' : "''::varchar";
     $joinVinculo = $foraCarteira
         ? ''
@@ -366,6 +375,23 @@ function agListarClientes(string $tblVendedorCliente, string $tblCliente, array 
            )"
         : '';
     $selStatus = $foraCarteira ? "''::varchar" : $colStatus;
+    $params = [$login];
+    $whereBusca = '';
+    if ($foraCarteira) {
+        $params[] = '%' . $termo . '%';
+        $idxNome = count($params);
+        $whereBusca = " AND (COALESCE(c.nome, '') ILIKE $" . $idxNome .
+            " OR COALESCE(cid.nome, '') ILIKE $" . $idxNome .
+            " OR COALESCE(cid.uf, '') ILIKE $" . $idxNome;
+        $digitosBusca = agDigitos($termo);
+        if ($digitosBusca !== '') {
+            $params[] = '%' . $digitosBusca . '%';
+            $idxCnpj = count($params);
+            $whereBusca .= " OR " . agCnpjDigitosSql('c.cnpj') . " LIKE $" . $idxCnpj;
+        }
+        $whereBusca .= ')';
+    }
+    $limite = $foraCarteira ? 'LIMIT 100' : '';
 
     $query = "
         SELECT
@@ -378,12 +404,14 @@ function agListarClientes(string $tblVendedorCliente, string $tblCliente, array 
         {$joinVinculo}
         LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
         {$whereOrigem}
+        {$whereBusca}
         ORDER BY c.nome
+        {$limite}
     ";
 
-    $result = sql($query, [$login]);
+    $result = sql($query, $params);
     if (!$result) {
-        msg('Erro ao buscar os clientes da carteira', 'error', 500);
+        msg('Erro ao buscar os clientes', 'error', 500);
     }
 
     $clientes = [];

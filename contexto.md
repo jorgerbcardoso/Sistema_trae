@@ -249,3 +249,10 @@ Objetivo: Exibir um dialog com todas as informações relevantes de um CT-e, inc
    - `paddingAngle={2}`, `innerRadius={48}`, `outerRadius={78}` — valores padrão para visual equilibrado.
    - Lista lateral com cores + pct + valor substitui a Legend padrão do Recharts (evita quebras de layout).
 
+PADRÃO PARA CAMPOS DE DATA E ÍCONE DO CALENDÁRIO:
+- Preferir o componente compartilhado `src/components/ui/date-input.tsx` para campos nativos de data/hora.
+- O `DateInput` deve aplicar `color-scheme` diretamente no elemento conforme o tema (`dark` ou `light`). Isso mantém o ícone nativo do calendário legível e também aplica o tema correto ao seletor de datas do navegador.
+- Não depender apenas de `filter: invert(...)` em `::-webkit-calendar-picker-indicator`: o resultado varia entre navegadores e pode deixar o ícone escuro no tema escuro.
+- Se for inevitável usar `<input type="date">` diretamente, declarar explicitamente `color-scheme: dark` no tema escuro e `color-scheme: light` no tema claro.
+- Em formulários, alinhar a altura do campo `DateInput` à dos demais controles da mesma linha.
+

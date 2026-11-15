@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   CheckCircle2,
@@ -204,6 +204,7 @@ export function AgendaVendas() {
   const [carregandoClientes, setCarregandoClientes] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState('');
   const [origemCliente, setOrigemCliente] = useState<OrigemCliente>('carteira');
+  const requisicaoClientesRef = useRef(0);
 
   // ============ TRANSFERÊNCIA DE AGENDA ============
   const [loginOrigemTransferencia, setLoginOrigemTransferencia] = useState('');
@@ -271,7 +272,7 @@ export function AgendaVendas() {
 
   const clientesFiltrados = useMemo(() => {
     const termo = buscaCliente.trim().toLowerCase();
-    if (!termo) return clientes;
+    if (!termo || origemCliente === 'fora') return clientes;
     return clientes.filter(
       (c) =>
         c.nome.toLowerCase().includes(termo) ||
@@ -279,7 +280,7 @@ export function AgendaVendas() {
         c.cnpj.includes(termo) ||
         `${c.cidade}/${c.uf}`.toLowerCase().includes(termo)
     );
-  }, [clientes, buscaCliente]);
+  }, [clientes, buscaCliente, origemCliente]);
 
   // ============ PERÍODO ============
   const deslocarPeriodo = (dias: number) => {
@@ -332,28 +333,45 @@ export function AgendaVendas() {
   };
 
   // ============ CARTEIRA ============
-  const carregarClientes = useCallback(async (login: string, origem: OrigemCliente): Promise<ClienteCarteira[]> => {
-    if (!login) {
+  const carregarClientes = useCallback(async (
+    login: string,
+    origem: OrigemCliente,
+    termo = ''
+  ): Promise<ClienteCarteira[]> => {
+    const requestId = ++requisicaoClientesRef.current;
+    if (!login || (origem === 'fora' && termo.trim().length < 3)) {
       setClientes([]);
+      setCarregandoClientes(false);
       return [];
     }
     try {
       setCarregandoClientes(true);
       const qs = new URLSearchParams({ action: 'clientes', login, origem });
+      if (origem === 'fora') qs.set('q', termo.trim());
       const resp = await apiFetch(`${API}?${qs.toString()}`);
       const lista = resp?.success && Array.isArray(resp.clientes)
         ? (resp.clientes as ClienteCarteira[])
         : [];
-      setClientes(lista);
+      if (requestId === requisicaoClientesRef.current) setClientes(lista);
       return lista;
     } catch (e) {
       console.error('Erro ao carregar os clientes:', e);
-      setClientes([]);
+      if (requestId === requisicaoClientesRef.current) setClientes([]);
       return [];
     } finally {
-      setCarregandoClientes(false);
+      if (requestId === requisicaoClientesRef.current) setCarregandoClientes(false);
     }
   }, []);
+
+  useEffect(() => {
+    const termo = buscaCliente.trim();
+    if (!dialogOpen || origemCliente !== 'fora' || termo.length < 3 || !formLogin) return;
+
+    const timer = window.setTimeout(() => {
+      void carregarClientes(formLogin, 'fora', termo);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [dialogOpen, origemCliente, buscaCliente, formLogin, carregarClientes]);
 
   // ============ DIALOG ============
   const abrirNovo = (data?: string) => {
@@ -936,7 +954,7 @@ export function AgendaVendas() {
 
       {/* ===== DIALOG: COMPROMISSO ===== */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] min-w-0 max-w-lg overflow-x-hidden overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editando ? 'Alterar compromisso' : 'Nova ação na agenda'}</DialogTitle>
             <DialogDescription>
@@ -948,28 +966,28 @@ export function AgendaVendas() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+          <div className="min-w-0 space-y-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div className="min-w-0 space-y-1.5">
                 <Label className="text-xs">Data</Label>
                 <DateInput
                   value={formData}
                   onChange={(e) => setFormData(e.target.value)}
-                  className="h-8 text-xs"
+                  className="h-9 text-xs"
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5">
                 <Label className="text-xs">Vendedor</Label>
                 {ehVendedor || compromissoCumprido ? (
-                  <div className="flex h-8 items-center rounded-md border border-input bg-muted/40 px-2 text-xs text-muted-foreground">
+                  <div className="flex h-9 min-w-0 items-center truncate rounded-md border border-input bg-muted/40 px-2 text-xs text-muted-foreground">
                     {editando
                       ? `${editando.vendedor_nome || editando.login}`
                       : `${eu?.nome || eu?.login || ''}`}
                   </div>
                 ) : (
                   <Select value={formLogin} onValueChange={trocarVendedorForm}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-9 min-w-0 text-xs">
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
@@ -984,30 +1002,57 @@ export function AgendaVendas() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label className="text-xs">Cliente</Label>
               {!formLogin ? (
                 <p className="text-xs text-muted-foreground">Selecione o vendedor para carregar os clientes.</p>
               ) : (
                 <>
-                  <Select
-                    value={origemCliente}
-                    onValueChange={(value) => trocarOrigemCliente(value as OrigemCliente)}
-                    disabled={compromissoCumprido}
+                  <div
+                    role="tablist"
+                    aria-label="Origem do cliente"
+                    className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/40 p-1"
                   >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="carteira" className="text-xs">Clientes da carteira do vendedor</SelectItem>
-                      <SelectItem value="fora" className="text-xs">Clientes fora da carteira</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={origemCliente === 'carteira'}
+                      disabled={compromissoCumprido}
+                      onClick={() => trocarOrigemCliente('carteira')}
+                      className={cn(
+                        'min-w-0 rounded-md px-2 py-2 text-center text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                        origemCliente === 'carteira'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      Carteira do vendedor
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={origemCliente === 'fora'}
+                      disabled={compromissoCumprido}
+                      onClick={() => trocarOrigemCliente('fora')}
+                      className={cn(
+                        'min-w-0 rounded-md px-2 py-2 text-center text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                        origemCliente === 'fora'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      Fora da carteira
+                    </button>
+                  </div>
 
                   {formCnpj && (
-                    <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs">
-                      <span className="truncate font-medium text-foreground">
-                        {nomeClienteSelecionado?.nome || formCnpj}
+                    <div className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs">
+                      <span className="min-w-0 truncate font-medium text-foreground">
+                        {nomeClienteSelecionado?.nome ||
+                          (editando?.cnpj.replace(/\D/g, '') === formCnpj.replace(/\D/g, '')
+                            ? editando.cliente_nome
+                            : '') ||
+                          formCnpj}
                         {nomeClienteSelecionado?.cnpj_fmt ? ` · ${nomeClienteSelecionado.cnpj_fmt}` : ''}
                       </span>
                       <button
@@ -1026,17 +1071,29 @@ export function AgendaVendas() {
                     <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={buscaCliente}
-                      onChange={(e) => setBuscaCliente(e.target.value)}
+                      onChange={(e) => {
+                        const termo = e.target.value;
+                        setBuscaCliente(termo);
+                        if (origemCliente === 'fora') {
+                          requisicaoClientesRef.current += 1;
+                          setClientes([]);
+                          setCarregandoClientes(false);
+                        }
+                      }}
                       placeholder={origemCliente === 'carteira'
                         ? 'Buscar na carteira por nome, CNPJ ou cidade...'
                         : 'Buscar fora da carteira por nome, CNPJ ou cidade...'}
-                      className="h-8 pl-7 text-xs"
+                      className="h-9 min-w-0 pl-7 text-xs"
                       disabled={compromissoCumprido}
                     />
                   </div>
 
-                  <div className="max-h-44 overflow-y-auto rounded-md border border-border">
-                    {carregandoClientes ? (
+                  <div className="min-w-0 max-w-full overflow-x-hidden rounded-md border border-border">
+                    {origemCliente === 'fora' && buscaCliente.trim().length < 3 ? (
+                      <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        Digite pelo menos 3 caracteres para buscar clientes.
+                      </p>
+                    ) : carregandoClientes ? (
                       <div className="flex items-center justify-center py-6">
                         <Loader2 className="size-4 animate-spin text-primary" />
                       </div>
@@ -1044,28 +1101,30 @@ export function AgendaVendas() {
                       <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                         {origemCliente === 'carteira'
                           ? 'Nenhum cliente encontrado na carteira.'
-                          : 'Nenhum cliente fora da carteira encontrado.'}
+                          : 'Nenhum cliente encontrado. Refine ou altere a busca.'}
                       </p>
                     ) : (
-                      clientesFiltrados.map((c) => (
+                      <div className="max-h-44 overflow-y-auto">
+                        {clientesFiltrados.map((c) => (
                         <button
                           key={c.cnpj}
                           type="button"
                           onClick={() => setFormCnpj(c.cnpj)}
                           disabled={compromissoCumprido}
                           className={cn(
-                            'flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
+                            'flex w-full min-w-0 items-center justify-between gap-2 overflow-hidden px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
                             formCnpj.replace(/\D/g, '') === c.cnpj.replace(/\D/g, '') && 'bg-primary/10',
                             compromissoCumprido && 'cursor-not-allowed opacity-60'
                           )}
                         >
-                          <span className="truncate font-medium text-foreground">{c.nome}</span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{c.nome}</span>
+                          <span className="min-w-0 max-w-[48%] truncate text-right text-[10px] text-muted-foreground">
                             {c.cnpj_fmt}
                             {c.uf ? ` · ${[c.cidade, c.uf].filter(Boolean).join('/')}` : ''}
                           </span>
                         </button>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
                 </>
