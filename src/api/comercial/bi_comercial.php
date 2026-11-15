@@ -183,12 +183,10 @@ $cteHasLat    = biColunaExiste($tblCte, 'latitude_entrega') && biColunaExiste($t
 $cteHasEnd    = biColunaExiste($tblCte, 'cep_entrega') && biColunaExiste($tblCte, 'endereco_entrega') && biColunaExiste($tblCte, 'bairro_entrega');
 $cteHasCidEnt = biColunaExiste($tblCte, 'seq_cidade_entr');
 
-$selLat = $cteHasLat
-    ? "COALESCE(NULLIF(cte.latitude_entrega, ''), c.latitude_entrega) AS latitude_entrega"
-    : "c.latitude_entrega AS latitude_entrega";
-$selLng = $cteHasLat
-    ? "COALESCE(NULLIF(cte.longitude_entrega, ''), c.longitude_entrega) AS longitude_entrega"
-    : "c.longitude_entrega AS longitude_entrega";
+// A geolocalização usada neste painel vem exclusivamente do CT-e; o cadastro
+// do cliente não é consultado (as colunas de geo podem nem existir no domínio).
+$selLat = $cteHasLat ? "cte.latitude_entrega AS latitude_entrega" : "NULL AS latitude_entrega";
+$selLng = $cteHasLat ? "cte.longitude_entrega AS longitude_entrega" : "NULL AS longitude_entrega";
 $selCep      = $cteHasEnd ? "COALESCE(cte.cep_entrega::text, '') AS cep_entrega" : "'' AS cep_entrega";
 $selEndereco = $cteHasEnd ? "COALESCE(cte.endereco_entrega::text, '') AS endereco_entrega" : "'' AS endereco_entrega";
 $selBairro   = $cteHasEnd ? "COALESCE(cte.bairro_entrega::text, '') AS bairro_entrega" : "'' AS bairro_entrega";

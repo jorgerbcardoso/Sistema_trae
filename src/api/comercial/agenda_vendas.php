@@ -205,6 +205,7 @@ function agLoginsDoParametro(string $valor): array {
 function agListar(
     string $tblAgenda,
     string $tblVendedor,
+    string $tblVendedorCliente,
     string $tblCliente,
     string $tblAcaoVenda,
     array $STATUS,
@@ -619,7 +620,7 @@ try {
         if ($action === 'clientes') {
             agListarClientes($tblVendedorCliente, $tblCliente, $STATUS);
         } else {
-            agListar($tblAgenda, $tblVendedor, $tblCliente, $tblAcaoVenda, $STATUS, $eu);
+            agListar($tblAgenda, $tblVendedor, $tblVendedorCliente, $tblCliente, $tblAcaoVenda, $STATUS, $eu);
         }
         exit;
     }
